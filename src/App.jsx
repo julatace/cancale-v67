@@ -253,8 +253,8 @@ import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExempl
 // (6 nov., v36) Les temps réels chez les vendeurs, anonymes et agrégés (src/mesuresCollecte.js).
 import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
-import { GuideDemarrage, BandeauExemple } from "./GuideDemarrage.jsx";
-import { etatGuide, preuveExtension, preuveListe, preuveNombre, compterNumeros } from "./guideDemarrage.js";
+import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
+import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
 import { PHRASES_ECRAN } from "./phrasesEcran.js";
 // ⟦→ ecrans/Reglages.jsx #12⟧
 import { noterPlantage, viderPlantages, ecouterViolationsCspDans, derniersPlantages } from "./plantages.js";
@@ -2323,6 +2323,8 @@ const SYNC_KEYS = [
   'vrm_visite_vue',
   // (6 nov.) « Masquer le guide » de démarrage (src/guideDemarrage.js) : le même choix sur tous ses appareils.
   'vrm_guide_masque',
+  // (8 nov.) « Plus tard » sur une étape du parcours ou la question de la numérotation : { [cle]: iso }, 7 jours.
+  'vrm_parcours_plus_tard',
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
   'vrm_brouillons_ecartes',
   // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
@@ -17713,10 +17715,14 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
 //   · Vinted : `comptes` (la liste lue par la coque ; `undefined` en cours, `null` pas su) ;
 //   · boîte e-mail : une ligne `email_reception_*` chez lui (une seule, `select=id`,
 //     jamais `select=data`) ; échec ⇒ `null`, jamais « aucun » ;
-//   · numéros : ses tables synchronisées, lues après l'arrivée du nuage.
-// `plein` (aucun compte relié) : la carte d'accueil, avec « Découvrir avec des
+//   · numéros : ses tables synchronisées, lues après l'arrivée du nuage (elles décident
+//     seulement si la question de la numérotation se pose : un vendeur qui a déjà des N°
+//     n'est jamais interrogé) ;
+//   · (8 nov.) compte : la session ; première vente : `useVentesGuide` (compteurs scalaires).
+// `plein` (aucun compte relié) : la carte d'accueil, avec « Voir VRM avec des
 // exemples ». Sinon : seulement s'il reste une étape à faire, et « Masquer le guide ».
-// En mode exemple : rien (le bandeau dit déjà « Brancher mes comptes »).
+// « Plus tard » met une étape de côté 7 jours. En mode exemple : rien (le bandeau
+// dit déjà « Passer à mes vraies données »).
 const CLE_GUIDE_MASQUE = 'vrm_guide_masque';
 function useReceptionEmails(actif, version = 0) {
   // (6 nov.) La dernière réponse LUE (src/memoireEcrans.js) : revenir sur Ma journée ne fait plus
@@ -17759,27 +17765,138 @@ function GuideDemarrageApp(props) {
   if (exempleActif()) return null;
   return props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>;
 }
+// (8 nov.) La première vente : le compteur `nItems` des listes de ventes Vinted
+// (un scalaire par compte, jamais `select=data`) ; échec ⇒ `null`, jamais « aucune ».
+function useVentesGuide(actif, version = 0) {
+  const [n, setN] = React.useState(() => souvenir('guide:ventes', AUTH.user?.id));
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    const proprietaire = AUTH.user?.id;
+    if (!proprietaire) return undefined;
+    let stop = false;
+    if (version > 0) setN(undefined);
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,n:data->>nItems`, { headers: sbAuth(), cache: 'no-store' });
+        const j = r.ok ? await r.json() : null;
+        if (stop || AUTH.user?.id !== proprietaire) return;
+        const v = Array.isArray(j) ? compterVentes(j.filter((x) => ligneDeSaSession(x && x.id))) : null;
+        if (typeof v === 'number') retenir('guide:ventes', proprietaire, v);
+        setN(v);
+      } catch (_) { if (!stop && AUTH.user?.id === proprietaire) setN(null); }
+    })();
+    return () => { stop = true; };
+  }, [actif, version]);
+  return n;
+}
+// « Plus tard » : { [cle]: iso }, synchronisé (le même choix sur tous ses appareils).
+function usePlusTardParcours() {
+  const [m, setM] = React.useState(() => load(CLE_PLUS_TARD, {}) || {});
+  React.useEffect(() => onCloudReady(() => setM(load(CLE_PLUS_TARD, {}) || {})), []);
+  const reporter = React.useCallback((cle) => {
+    setM((avant) => { const n = { ...(avant || {}), [cle]: new Date().toISOString() }; save(CLE_PLUS_TARD, n); return n; });
+  }, []);
+  return [m, reporter];
+}
+// Le lien du geste d'installation pour CE navigateur (le même choix que `PremiersPas`) :
+// Orion sur iPhone, la boutique publiée de ce navigateur, sinon le zip pour un
+// navigateur de la famille de Chrome sur ordinateur. '' ⇒ pas de geste d'ici.
+function lienInstallerIci(sansSouris) {
+  const b = boutiqueIci();
+  if (mobileIci() === 'ios-orion') return `${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`;
+  if (b.lien && (!sansSouris || (b.nav === 'firefox' && estAndroid()))) return b.lien;
+  if (sansSouris || ['firefox', 'safari', 'samsung', 'duckduckgo', 'orion'].includes(b.nav)) return '';
+  return '/VRM-extension.zip';
+}
 function GuideDemarrageCarte({ onNav, comptes, plein = false, etape }) {
   const sansSouris = useSansSouris();
   const [masque, setMasque] = React.useState(() => !!load(CLE_GUIDE_MASQUE, null));
   React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
   const [verification,setVerification]=React.useState(0);
+  const [verifOuverte, setVerifOuverte] = React.useState(false);
   const emails = useReceptionEmails(plein || !masque, verification);
+  const ventes = useVentesGuide(!plein && !masque, verification);
   const nNum = useNumerosGuide();
-  const guide = etatGuide({ extension: preuveExtension(etape, comptes), vinted: preuveListe(comptes), emails: preuveListe(emails), numeros: preuveNombre(nNum) });
+  const [plusTard, reporter] = usePlusTardParcours();
+  // La numérotation : demandée au départ seulement (jamais choisie ET aucune paire lue avec un N°).
+  const [numEcrit, setNumEcrit] = React.useState(() => (isCloudReady() ? load(CLE_NUMERO_ECRIT, null) : undefined));
+  React.useEffect(() => onCloudReady(() => setNumEcrit(load(CLE_NUMERO_ECRIT, null))), []);
+  const guide = etatGuide({ compte: preuveCompte(AUTH.user?.id || ''), extension: preuveExtension(etape, comptes), vinted: preuveListe(comptes), emails: preuveListe(emails),
+    // Sans compte relié, aucune vente ne peut être lue : l'étape reste « à faire », sans lecture.
+    vente: plein ? 'afaire' : preuveNombre(ventes) }, { plusTard });
   if (!plein && (guide.fini || masque || !guide.courante)) return null;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;
+  const demanderNum = numEcrit !== undefined && numerotationAChoisir(numEcrit, nNum) && !reporteeActive(plusTard, 'numerotation');
+  const choisirNum = (cle) => {
+    const r = reglageDuChoix(cle);
+    save(CLE_NUMERO_ECRIT, r); setNumEcrit(r);
+    try { window.dispatchEvent(new Event('vrm-numero-ecrit')); } catch (_) {}
+    toast(cle === 'moi' ? 'C’est noté : VRM lira le N° écrit à la fin de tes descriptions.' : 'C’est noté : VRM donnera un numéro à chaque nouvelle annonce.');
+  };
   return (
     // Où s'installe l'extension : dans CE navigateur, ou — appareil sans extension
     // (téléphone, sauf Orion et Firefox Android avec sa fiche) — sur l'ordinateur.
     <GuideDemarrage guide={guide} nav={(sansSouris && !(mobileIci() === 'ios-orion' || (boutiqueIci().nav === 'firefox' && estAndroid() && boutiqueIci().lien))) ? 'sur ton ordinateur' : NAV.dansNu}
       onVerifier={()=>{setVerification(n=>n+1);sonderPonts();}}
       detail={<PremiersPas onNav={onNav} dansGuide/>}
-      gestes={{ emails: { libelle: 'Relier ma boîte', onClick: () => ouvrirEmailsRelier() }, numeros: { libelle: 'Voir mes annonces', onClick: () => onNav && onNav('annonces') } }}
+      gestes={{ emails: { libelle: 'Relier ma boîte', onClick: () => ouvrirEmailsRelier() } }}
+      onPlusTard={reporter}
+      numerotation={demanderNum ? <ChoixNumerotation choix={CHOIX_NUMEROTATION} onChoisir={choisirNum} onPlusTard={() => reporter('numerotation')}/> : null}
+      verification={verifOuverte ? <VerifierInstallationApp comptes={comptes} onNav={onNav} onFermer={() => setVerifOuverte(false)}/> : null}
+      onOuvrirVerification={verifOuverte ? null : () => setVerifOuverte(true)}
       onExemple={sansCompte ? () => entrerModeExemple() : null}
       onMasquer={!plein ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
   );
 }
+
+// ── « VÉRIFIER MON INSTALLATION » (8 nov.) ───────────────────────────────────
+// Un bouton, des sondes qui EXISTENT déjà (aucune nouvelle lecture lourde) :
+//   · l'extension ici : le pont (`useEtapePont`), sa version (`vmrExtVersion`,
+//     `extEnRetard`), le compte VRM sous lequel elle écrit (CE compte ?) ;
+//   · les comptes Vinted : la liste de la coque, sinon `fetchVintedAccounts` ;
+//   · la boîte e-mail : la même lecture que le guide (`email_reception_*`, `select=id`) ;
+//   · la dernière relecture : `lireCapturesDetail` (scalaires projetés, par compte).
+// La règle et les mots : `verifierInstallation` (src/guideDemarrage.js). Chaque ligne
+// lue a son état ; « pas su » n'est jamais « OK ». Dans le guide ET dans Paramètres → Aide.
+// (Quand la page « Tout va bien ? » de la branche garde-fous arrivera, elle détaille
+// chaque appareil ; ceci reste le contrôle en un geste des premières minutes.)
+function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null, seule = false }) {
+  const { pont, etape, relire } = useEtapePont();
+  const sansSouris = useSansSouris();
+  const [tour, setTour] = React.useState(0);
+  const emails = useReceptionEmails(true, tour);
+  const [comptesLus, setComptesLus] = React.useState(undefined);
+  const [relu, setRelu] = React.useState(undefined);
+  const aLaCoque = Array.isArray(comptesCoque) && tour === 0;
+  React.useEffect(() => {
+    let stop = false;
+    setRelu(undefined);
+    if (!aLaCoque) setComptesLus(undefined);
+    (async () => {
+      const [c, caps] = await Promise.all([aLaCoque ? Promise.resolve(comptesCoque) : fetchVintedAccounts(), lireCapturesDetail()]);
+      if (stop) return;
+      setComptesLus(Array.isArray(c) ? c : null);
+      setRelu(caps && caps.by ? caps.by : null);
+    })();
+    return () => { stop = true; };
+  }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
+  const comptes = aLaCoque ? comptesCoque : comptesLus;
+  const v = pont.v || vmrExtVersion();
+  const verif = verifierInstallation({ pont: { etape: pont.on ? etape : 'absente', version: v, enRetard: !!v && extEnRetard(v), telephone: sansSouris }, comptes, emails, relu });
+  const lienGeste = (cle) => cle === 'installer' ? lienInstallerIci(sansSouris) : cle === 'maj' ? (lienInstallerIci(sansSouris) || '/VRM-extension.zip') : (cle === 'vinted' || cle === 'relire') ? 'https://www.vinted.fr' : '';
+  const onGeste = (cle) => {
+    if (cle === 'emails') { ouvrirEmailsRelier(); return; }
+    if (cle === 'installer') { onNav && onNav('journee'); return; }
+    if (cle === 'reessayer') { setTour((t) => t + 1); relire(); sonderPonts(); }
+  };
+  return (
+    <div className={seule ? 'vrm-verif-cadre' : undefined}>
+      <VerificationInstallation verif={verif} lienGeste={lienGeste} onGeste={onGeste} onFermer={onFermer}/>
+      {seule ? <button type="button" className="vrm-b vrm-b-secondaire" data-verif-relancer="" onClick={() => onGeste('reessayer')}>Vérifier à nouveau</button> : null}
+    </div>
+  );
+}
+export { VerifierInstallationApp };
 
 function Onboarding({ setTab }) {
   // ⚠️ LES ÉTAPES NE VIVENT PLUS ICI (§11). Cet écran ouvre la conversation

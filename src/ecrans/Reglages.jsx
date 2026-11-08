@@ -24,6 +24,8 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, Avancement, BUILD_ID, BlocCompt
 
 // ⟦← App.jsx #1⟧
 import SuiviComptes from '../SuiviComptes.jsx';
+// (8 nov.) « Vérifier mon installation » : le même contrôle que le guide de démarrage (src/guideDemarrage.js).
+import { VerifierInstallationApp } from '../App.jsx';
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
@@ -1729,6 +1731,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       </span>
     )},
     {id:'aide',titre:'Aide',items:[
+      // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
+      { id:'verifier', type:'panneau', nu:true, ic:'pulse', lib:'Vérifier mon installation', desc:'Extension, comptes, boîte e-mail : ce qui manque, et le geste.', data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM présentés un par un.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
