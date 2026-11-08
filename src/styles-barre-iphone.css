@@ -60,6 +60,11 @@
   html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label[data-lib-long] { font-size: 11px; letter-spacing: -.01em; }
   /* « Communauté » sur un iPhone SE : la 5ᵉ place s'élargit un peu plutôt que de couper. */
   html .vrm-app-shell .vrm-tabbar > .vrm-nav-more:has(.vrm-nav-label[data-lib-long]) { flex-grow: 1.3; }
+  /* (8 nov., clarté) La 5ᵉ place dit le NOM de l'écran (« Statistiques », « Paramètres ») :
+     sur un iPhone SE (320 px), toute la barre passe à 11 px pour que « Annonces » ne se coupe pas. */
+  @media (max-width: 360px) {
+    html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 11px; letter-spacing: -.01em; }
+  }
   /* La barre s'arrête au-dessus de l'indicateur d'accueil (zone sûre) et des
      bords arrondis en paysage. */
   html .vrm-app-shell .vrm-tabbar {
