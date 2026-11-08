@@ -19,7 +19,6 @@
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const RACINE = path.join(__dirname, '..');
-const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 
 // Une copie de api/_lib et de src/retraitSuivi.js, une mutation éventuelle appliquée.
 function copie(mutation) {
@@ -27,18 +26,15 @@ function copie(mutation) {
   fs.mkdirSync(path.join(dir, 'api', '_lib'), { recursive: true }); fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   for (const f of fs.readdirSync(path.join(RACINE, 'api', '_lib'))) if (f.endsWith('.js')) fs.copyFileSync(path.join(RACINE, 'api', '_lib', f), path.join(dir, 'api', '_lib', f));
   fs.copyFileSync(path.join(RACINE, 'src', 'retraitSuivi.js'), path.join(dir, 'src', 'retraitSuivi.js'));
-  const textes = { widget: fs.readFileSync(path.join(RACINE, 'api', 'widget.js'), 'utf8'), app: fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8') };
   if (mutation) {
     const f = path.join(dir, mutation.fichier);
-    if (mutation.fichier === 'widget') textes.widget = remplace(textes.widget, mutation);
-    else if (mutation.fichier === 'app') textes.app = remplace(textes.app, mutation);
-    else fs.writeFileSync(f, remplace(fs.readFileSync(f, 'utf8'), mutation));
+    fs.writeFileSync(f, remplace(fs.readFileSync(f, 'utf8'), mutation));
   }
-  return { dir, textes };
+  return { dir };
 }
 function remplace(s, m) { if (!s.includes(m.de)) throw new Error(`mutation « ${m.nom} » : motif absent`); return s.split(m.de).join(m.vers); }
 
-async function controles({ dir, textes }, dit) {
+async function controles({ dir }, dit) {
   const imp = (r) => import(pathToFileURL(path.join(dir, r)).href + '?v=' + Math.random());
   let T, S, R;
   try { T = await imp('api/_lib/transporteurs.js'); S = await imp('api/_lib/suivi-colis.js'); R = await imp('src/retraitSuivi.js'); }
