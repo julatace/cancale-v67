@@ -19,14 +19,8 @@
   :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { margin: 0 !important; }
   :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section { margin-top: 0 !important; }
 }
-/* Une transition de contenu, sans déplacer toute la zone de travail. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  .vrm-app-shell .vrm-main.vrm-ecran-anime { animation: vrm-bureau-entree .18s ease; }
-}
-@keyframes vrm-bureau-entree { from { opacity: .9; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .vrm-app-shell .vrm-main.vrm-ecran-anime { animation: none !important; }
-}
+/* Une transition de contenu, sans déplacer toute la zone de travail : (8 nov.)
+   jouée par src/passageOnglet.js (Web Animations, 0,9 → 1 en 180 ms), plus par une classe. */
 
 /* Lecture de bureau : une ligne de vente, des zones stables et un fil assez large. */
 @media (min-width: 1024px) {

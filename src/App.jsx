@@ -472,6 +472,8 @@ import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAb
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
+import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
+import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
@@ -14549,6 +14551,9 @@ function EspacePlateforme({ nom, children }) {
 const BarreHautSlot = React.createContext(null);
 function DansBarreHaut({ children }) {
   const el = React.useContext(BarreHautSlot);
+  // (8 nov.) Un écran gardé caché (src/ecransGardes.jsx) ne laisse rien dans la barre de la coque.
+  const montre = useEcranGardeMontre();
+  if (!montre) return null;
   return el ? createPortal(children, el) : children;
 }
 // (31 oct., Julien : « quand on appuie sur la barre de recherche, ça fait un
@@ -14921,6 +14926,9 @@ function ouvrirEntree(t, setTab) {
     demanderVue(t.cle || t.vue);
     try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: t.cle || t.vue })); } catch (_) {}
   }
+  // (8 nov.) Une entrée SANS demande est un simple changement d'écran : un écran gardé
+  // revient tel quel (src/ecransGardes.jsx). Avec une demande, il est remonté (il la lit au montage).
+  if (!t.vue && typeof t.avant !== 'function') noterNavigationSimple(t.id);
   setTab(t.id);
 }
 // L'entrée est-elle « l'écran où l'on est » ? Une entrée qui ouvre une VUE d'un
@@ -15232,11 +15240,41 @@ function BottomBar({tab,setTab,sites,badges}) {
   const [vise,setVise]=React.useState(null);
   const [enCours,demarrer]=React.useTransition();
   React.useEffect(()=>{ if(!enCours) setVise(null); },[enCours,tab]);
-  const allerA=(id)=>{ setVise(id); demarrer(()=>setTab(id)); };
+  // (8 nov.) Un toucher de la barre est un simple changement d'écran : un écran GARDÉ
+  // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
+  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
   const tabMontre=vise||tab;
   const navRef=React.useRef(null);
+  // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
+  // fluide, pas robotique »). Les places des onglets sont relevées quand la barre change de
+  // taille (jamais au toucher : aucune lecture de mise en page pendant le changement d'écran) ;
+  // le toucher ne fait que poser un `transform` (styles-ecrans-gardes.css). Mouvement réduit :
+  // elle saute, sans glisser.
+  const pastilleRef=React.useRef(null);
+  const placesRef=React.useRef(new Map());
+  const poserPastille=React.useCallback((id)=>{
+    const p=pastilleRef.current; if(!p) return;
+    const pl=placesRef.current.get(id);
+    if(!pl){ p.style.opacity='0'; return; }
+    // Une capsule DANS l'onglet (6 px de chaque côté, 4 px en haut et en bas).
+    p.style.width=Math.max(0,pl.w-12)+'px'; p.style.top=(pl.y+4)+'px'; p.style.height=Math.max(0,pl.h-8)+'px';
+    p.style.transform=`translateX(${pl.x+6}px)`; p.style.opacity='';
+    if(!p.hasAttribute('data-prete')) requestAnimationFrame(()=>{ try{ p.setAttribute('data-prete',''); }catch(_){} });
+  },[]);
+  const ouPastille=React.useRef(null);
   // La hauteur de la barre (zone sûre comprise), pour poser le panneau « Plus »
   // juste au-dessus d'elle : `--vrm-barre-bas` sur la racine.
+  // L'onglet qui porte la pastille : celui de la barre, ou « Plus » pour un écran rangé dedans.
+  ouPastille.current=BOTTOM_TABS.some(t=>t.id===(BAR_GROUPE[tabMontre]||tabMontre))?(BAR_GROUPE[tabMontre]||tabMontre):'__plus';
+  React.useLayoutEffect(()=>{ poserPastille(ouPastille.current); },[tabMontre,poserPastille]);
+  React.useEffect(()=>{
+    const el=navRef.current; if(!el||typeof ResizeObserver==='undefined') return undefined;
+    // Les places sont relevées par rapport à l'ANCRE de la pastille (premier enfant de la barre) :
+    // elles restent justes quand la barre se déplace sans changer de taille.
+    const relever=()=>{ const m=new Map(); try{ const a=pastilleRef.current&&pastilleRef.current.parentNode; if(!a) return; for(const b of el.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')){ const id=b.classList.contains('vrm-nav-more')?'__plus':b.getAttribute('data-nav-entree'); if(id&&b.offsetWidth>0) m.set(id,{x:b.offsetLeft-a.offsetLeft,w:b.offsetWidth,y:b.offsetTop-a.offsetTop,h:b.offsetHeight}); } }catch(_){} placesRef.current=m; poserPastille(ouPastille.current); };
+    const ro=new ResizeObserver(relever); ro.observe(el);
+    return ()=>ro.disconnect();
+  },[poserPastille]);
   React.useLayoutEffect(()=>{
     const el=navRef.current; if(!el) return undefined;
     const poser=()=>{ try{ const h=Math.round(el.getBoundingClientRect().height); if(h>0) document.documentElement.style.setProperty('--vrm-barre-bas', h+'px'); }catch(_){} };
@@ -15279,6 +15317,7 @@ function BottomBar({tab,setTab,sites,badges}) {
     <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-en-cours={enCours?'1':undefined} data-plus-ouvert={plusOuvert?'1':'0'} aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
+      <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
       {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tabMontre]||tabMontre)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
         <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-label={lib+(n?` · ${n} à faire`:'')} aria-current={on?'page':undefined}>
           <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
@@ -21023,14 +21062,15 @@ function useVentesVestiaire() { return ventesVcDeMemo(useVentesVestiaireBrut());
 function ventesVcDeMemo(d) { const loc = useVcLocal(); const k = JSON.stringify(loc.auto); return React.useMemo(() => ventesVcDe(avecNumerosVc(d)), [d, k]); }
 function useVentesVestiaireBrut() {
   const [d, setD] = React.useState(_vcVentesLecture.d);
+  const ecranGarde = useVivant();   // (8 nov.) caché dans un écran gardé : il ne relit pas (src/ecransGardes.jsx)
   React.useEffect(() => {
     let vivant = true;
     const lire = (force) => lireVentesVestiaire(force).then((r) => { if (vivant) setD((v) => (v !== undefined && JSON.stringify(v) === JSON.stringify(r)) ? v : r); });
     lire(false);
-    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(true); };
+    const f = (e) => { if (estCache(ecranGarde)) return; const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(true); };
     window.addEventListener('vrm:ext', f);
     return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
-  }, []);
+  }, [ecranGarde]);
   return d;
 }
 // La phrase des ventes FAITES dont l'argent n'est compté nulle part (prix pas
@@ -27094,6 +27134,11 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+  // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
+  // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
+  // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
+  const vivant = useVivant();
+  const cache = () => estCache(vivant);
   // (7 nov., vitesse) COLIS EN DEUX TEMPS : dessiner 70 cartes d'un coup gelait l'écran
   // 1 à 2 s au toucher (revue du 7 nov., 4 400 éléments). Les 24 plus pressées sont
   // dessinées tout de suite ; toutes les autres arrivent juste après, en tâche
@@ -27335,7 +27380,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
     relireVersements.current = lire;
     lire();
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
+    const f = (e) => { if (cache()) return; const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
     window.addEventListener('vrm:ext', f);
     return () => { mort = true; window.removeEventListener('vrm:ext', f); };
   }, []);
@@ -27554,7 +27599,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [accounts]);
   // L'extension prévient : un bordereau vient d'être rangé → on relit CE compte.
   useEffect(() => {
-    const ecoute = (e) => { const ev = e && e.detail; if (ev && ev.type === 'maj' && ev.quoi === 'label' && ev.uid) rechargerLabels(ev.uid); };
+    const ecoute = (e) => { if (cache()) return; const ev = e && e.detail; if (ev && ev.type === 'maj' && ev.quoi === 'label' && ev.uid) rechargerLabels(ev.uid); };
     window.addEventListener('vrm:ext', ecoute);
     return () => window.removeEventListener('vrm:ext', ecoute);
   }, [rechargerLabels]);
@@ -28738,9 +28783,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // liste les relit aussitôt (même lecture, rien de neuf).
   // « Réessayer » (e-mails de suivi) touché sous Colis → « À retirer » (les outils) : la
   // liste par point relit aussi (sinon elle garderait « pas lu »).
-  useEffect(() => { const f = () => { if (curSub === 'bordereaux') lireSuivis({ force: true }); }; window.addEventListener('vrm:suivis-relire', f); return () => window.removeEventListener('vrm:suivis-relire', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const f = () => { if (cache()) return; if (curSub === 'bordereaux') lireSuivis({ force: true }); }; window.addEventListener('vrm:suivis-relire', f); return () => window.removeEventListener('vrm:suivis-relire', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const relireSuivisManuelsPartout = async () => { await relireSuivisManuels(); try { window.dispatchEvent(new Event('vrm:suivis-manuels')); } catch (_) {} };
-  useEffect(() => { const f = () => { if (curSub === 'bordereaux' || curSub === 'achats') relireSuivisManuels(); }; window.addEventListener('vrm:suivis-manuels', f); return () => window.removeEventListener('vrm:suivis-manuels', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const f = () => { if (cache()) return; if (curSub === 'bordereaux' || curSub === 'achats') relireSuivisManuels(); }; window.addEventListener('vrm:suivis-manuels', f); return () => window.removeEventListener('vrm:suivis-manuels', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -33412,6 +33457,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let hiddenAt = 0;
     const onVis = () => {
       if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (cache()) { hiddenAt = 0; return; }   // écran gardé caché : il sera remonté à son retour (src/ecransGardes.jsx)
       if (!hiddenAt || Date.now() - hiddenAt < 20000 || !accounts.length) { hiddenAt = 0; return; }
       hiddenAt = 0;
       viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
@@ -33452,6 +33498,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       loadOrders('sold', setSales, false, { silencieux: true });
     };
     const ecoute = (e) => {
+      if (cache()) return;
       const ev = e && e.detail; if (!ev || ev.type !== 'maj') return;
       if (ev.quoi === 'ventes') relire(ev.uid);
       // Achats rangés par l'extension (5.155) : on relit les achats s'ils sont
@@ -33484,12 +33531,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     window.addEventListener('vrm:ext', ecoute);
     // (24 oct.) La relecture chez les transporteurs (`useRelectureTransporteurs`)
     // a changé un état : on relit les lignes `transp_*`.
-    const transpMaj = () => lireTransp();
+    const transpMaj = () => { if (!cache()) lireTransp(); };
     window.addEventListener('vrm:transp-maj', transpMaj);
     if (ecrans.includes(curSub) && ventesPerimees.current) relire();
     const vus = vusSonde.current;
     const sonde = async () => {
-      if (document.hidden || !ecrans.includes(curSub)) return;
+      if (document.hidden || !ecrans.includes(curSub) || cache()) return;
       try {
         // (31 oct.) Même orthographe (`*`) que l'âge des ventes lu par la coque :
         // une adresse, donc une lecture partagée (`lecturesPartagees`).
@@ -33507,16 +33554,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     // Et on demande à l'extension (si elle tourne ici) de relire les ventes du
     // compte connecté : à l'ouverture de l'écran et au retour sur l'onglet.
-    const demander = () => { if (curSub!=='messages' && vmrExtPresent() && ecrans.includes(curSub)) vmrCmd({ cmd: 'ventes' }, 3000); };
+    const demander = () => { if (curSub!=='messages' && vmrExtPresent() && ecrans.includes(curSub) && !cache()) vmrCmd({ cmd: 'ventes' }, 3000); };
     const onVis = () => { if (!document.hidden) demander(); };
     document.addEventListener('visibilitychange', onVis);
     demander();
     sonde();
+    // Un écran gardé qui revient tel quel (src/ecransGardes.jsx) fait ce qu'il faisait en
+    // s'ouvrant : demander les ventes à l'extension, sonder l'âge des ventes captées.
+    const offRetour = vivant ? vivant.surRetour(() => { demander(); sonde(); }) : null;
     // (6 nov., charge) Au rythme commun : plus lentement quand personne ne
     // touche l'écran, tout de suite quand la main revient.
     const t = setInterval(() => { if (rythme().doitLire('sonde-ventes', 60000)) sonde(); }, 60000);
     const reveil = rythme().surReveil(() => { rythme().noter('sonde-ventes'); sonde(); });
-    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); reveil(); signalAnnonces.arreter(); };
+    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); reveil(); signalAnnonces.arreter(); if (offRetour) offRetour(); };
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
@@ -33961,6 +34011,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let arrete = false, timer;
     const captures = new Map();
     const ecoute = e => {
+      if (cache()) return;
       const d = e?.detail;
       if (d?.type !== 'maj' || d.quoi !== 'messages' || !accounts.some(a=>String(a.vinted_user_id)===String(d.uid))) return;
       const uid=String(d.uid);
@@ -36787,7 +36838,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   useEffect(() => {
     if (curSub !== 'bordereaux') return undefined;
-    const f = () => { DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
+    const f = () => { if (cache()) return; DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
     window.addEventListener('vrm:emballer', f);
     return () => window.removeEventListener('vrm:emballer', f);
   }, [curSub]);
@@ -37242,7 +37293,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
-    const f=()=>setTimeout(appliquer,0);
+    // (8 nov.) Caché (écran gardé), il ne PREND pas la demande : elle est pour l'écran qui s'ouvre.
+    const f=()=>{ if(cache()) return; setTimeout(appliquer,0); };
     window.addEventListener('vrm:vue',f);
     return ()=>window.removeEventListener('vrm:vue',f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48690,16 +48742,15 @@ function AppCoeur() {
   mesuresEcran(tab);
   useEffect(() => { if (!exempleActif()) demarrerMesures({ jeton: () => (exempleActif() ? '' : String((readSession() || {}).access_token || '')), ouverture: SESSION_AU_CHARGEMENT }); }, []);
   // (27 oct., « des effets entre les pages ») Changer d'écran se VOIT : le
-  // contenu arrive en fondu, d'un léger glissé (styles-mouvement.css). Rien
-  // n'est remonté — on rejoue une classe sur `<main>` — et rien ne bouge si
-  // la personne a demandé de réduire les animations.
-  useEffect(() => {
+  // contenu arrive en fondu. Rien ne bouge si la personne a demandé de réduire
+  // les animations. (8 nov.) Par Web Animations, opacité seule (src/passageOnglet.js) :
+  // la classe rejouée sur `<main>` (et sa lecture forcée `offsetWidth`) faisait
+  // recalculer le style de TOUT l'écran à chaque onglet (0,8 s mesuré au téléphone) ;
+  // posé avant l'affichage (plus d'image pleine puis vide).
+  React.useLayoutEffect(() => {
     const m = document.querySelector('.vrm-main');
-    if (!m) return;
-    m.classList.remove('vrm-ecran-anime'); void m.offsetWidth; m.classList.add('vrm-ecran-anime');
-    const fin = (e) => { if (e.target === m) m.classList.remove('vrm-ecran-anime'); };
-    m.addEventListener('animationend', fin);
-    return () => m.removeEventListener('animationend', fin);
+    const a = fonduEntree(m);
+    return () => { try { if (a) a.cancel(); } catch (_) {} };
   }, [tab]);
   // (17 oct., Julien) TROIS ÉCRANS QUITTENT LE MENU, SANS DISPARAÎTRE : « Prix
   // qui marche » devient une rubrique de Statistiques, « Factures » une rubrique
@@ -48761,9 +48812,13 @@ function AppCoeur() {
   const subVoulue=React.useRef(null);
   const sectionsPlateformes=React.useRef({});
   const dernierePlateforme=React.useRef(tab);
+  // (8 nov., écrans gardés) La section de l'écran visé est posée : il peut revenir.
+  // Un écran gardé (src/ecransGardes.jsx) n'est jamais rendu avec la section de l'écran d'AVANT.
+  const [subPose,setSubPose]=useState(tab);
   React.useLayoutEffect(()=>{
     const precedent=dernierePlateforme.current;
     if(precedent!==tab){
+      setSubPose(tab);
       sectionsPlateformes.current[precedent]=platSub;
       // Une tâche (Ventes, Annonces, Messages) rouvre sur le dernier filtre de
       // site choisi (mémorisé sur l'appareil), sinon son défaut.
@@ -51872,6 +51927,9 @@ function AppCoeur() {
         <BlocNumerosPerimes/>
         {/* (6 nov.) L'ÉCRAN ATTEND SES DONNÉES ESSENTIELLES (src/AttenteEcran.jsx) : monté mais
             invisible, son squelette à sa place, puis il arrive d'un bloc — au plus ~2,5 s. */}
+        {/* (8 nov.) Ma journée, Colis, Ventes, Annonces déjà vues restent montées, gelées et hors de
+            la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
+        <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque}>
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
@@ -52146,6 +52204,7 @@ function AppCoeur() {
         )}
         {tab==='vintedaccounts'&&<GardeEcran nom="vintedaccounts"><VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/></GardeEcran>}
         </AttenteEcran>
+        </EcransGardes>
         </>)}
         </GardeEcran>
         </BarreHautSlot.Provider>

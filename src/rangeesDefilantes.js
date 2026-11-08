@@ -24,7 +24,9 @@ function toutJuger() {
   prevu = true;
   setTimeout(() => requestAnimationFrame(() => {
     prevu = false;
-    try { document.querySelectorAll(SEL).forEach(juger); } catch (_) {}
+    // (8 nov.) Jamais dans un écran gardé caché (src/ecransGardes.jsx) : le mesurer
+    // forcerait toute sa mise en page, que `content-visibility: hidden` saute.
+    try { document.querySelectorAll(SEL).forEach((el) => { if (!el.closest('[data-ecran-cache]')) juger(el); }); } catch (_) {}
   }), 300);
 }
 
