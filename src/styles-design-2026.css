@@ -651,3 +651,22 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-app-shell .vrm-main .vrm-ios-groupe-titre { font-size: var(--d-t-13) !important; font-weight: 600 !important; color: var(--d-gris) !important; text-transform: none !important; letter-spacing: 0 !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-ios-detail { color: var(--d-gris) !important; font-weight: 400 !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-ios-icone { border-radius: 8px !important; background: var(--d-remplir-fort) !important; color: var(--d-encre) !important; }
+
+/* ══ 14. STOCK (8 nov., passage 2) ═════════════════════════════════════════
+   Le résumé (« au moins 84 annonces actuelles ») collait au bord de sa carte :
+   il prend la marge d'une carte, son grand chiffre l'échelle (34/800). La
+   recherche du Stock : le champ d'iOS, comme partout (elle portait un cadre
+   à l'encre). Le compteur « À ranger » : neutre (le bleu reste l'action). */
+:root:root body .vrm-app-shell .vrm-main .vrm-surface:has(> .vrm-s2d-resume) {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; background: var(--d-carte) !important; padding: var(--d-e-4) var(--d-e-5) !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-s2d-resume { padding: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-s2d-resume-n { font-size: var(--d-t-34) !important; font-weight: 800 !important; letter-spacing: var(--d-ap-34) !important; font-variant-numeric: tabular-nums; line-height: 1.1 !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-s2d-resume-n > :is(span, small) { font-size: var(--d-t-15) !important; font-weight: 500 !important; color: var(--d-gris) !important; letter-spacing: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-s2d-resume-l { font-size: var(--d-t-13) !important; color: var(--d-gris) !important; margin-top: var(--d-e-1); }
+:root:root body .vrm-app-shell .vrm-main .vrm-s2d-filtres select { background-color: var(--d-remplir) !important; border: 0 !important; border-radius: var(--d-r-ctrl) !important; font-size: var(--d-t-15) !important; }
+:root:root body .vrm-app-shell .vrm-main [data-stock-recherche] > div { background: var(--d-remplir) !important; border: 0 !important; box-shadow: none !important; border-radius: var(--d-r-ctrl) !important; }
+:root:root body .vrm-app-shell .vrm-main [data-stock-recherche] input { background: transparent !important; border: 0 !important; box-shadow: none !important; outline: 0; }
+:root:root body .vrm-app-shell .vrm-main [data-stock-recherche] > div:focus-within { box-shadow: 0 0 0 2px var(--d-accent) !important; }
+:root:root body .vrm-app-shell .vrm-main section.vrm-sx { border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; background: var(--d-carte) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sx-titre { font-size: var(--d-t-17) !important; font-weight: 600 !important; }
