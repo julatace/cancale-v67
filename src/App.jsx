@@ -308,7 +308,7 @@ const EbayEvaluations = _ecranEbay("EbayEvaluations"), EbayRetours = _ecranEbay(
 import {repereAdmis} from "./repereEbay.js";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
-import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur, motsNavigateur } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, installerExtensionIci, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur, motsNavigateur } from "./navigateurExtension.js";
 // (5 nov., Julien sur Orion : « elle affiche Chrome alors que je suis sur Orion »)
 // Les mots du navigateur D'ICI, une fois : « ce Chrome », « Orion », « ce
 // navigateur »… — jamais « Chrome » en dur dans une phrase qui parle de lui.
@@ -12140,6 +12140,22 @@ function ExtEnRetard({ onNav }) {
   // était précisément la seule à ne rien déclencher.
   const muette = ext.on && !ext.v;
   if (!extEstEnRetard(ext)) return null;
+  // (8 nov.) La fiche de la boutique de CE navigateur, si elle est publiée
+  // (`installerExtensionIci`, LIENS_BOUTIQUES) : installée de là, l'extension
+  // se met ensuite à jour TOUTE SEULE. Sinon, le zip et ses gestes, comme avant.
+  const inst = installerExtensionIci();
+  if (inst.boutique) return (
+    <Notice tone="warn" icon="alert"
+      title="Ton extension VRM est en retard"
+      value={muette ? `? → ${EXT_ATTENDUE}` : `${ext.v} → ${EXT_ATTENDUE}`}
+      desc={`Installe-la depuis ${inst.nomBoutique} : ensuite, elle se met à jour toute seule.`}
+      detail={`1. Ouvre la fiche ${inst.nomBoutique} ci-contre et ajoute VRM à ton navigateur. Si elle vient déjà de la boutique, la nouvelle version arrive toute seule dès que la boutique l'a validée. 2. Sur la page des extensions (${pageExtensionsIci()}), retire l'ancienne copie installée à la main : deux extensions VRM dans un même navigateur, l'app coupe les commandes. 3. Recharge une page Vinted.`}
+      action={<a href={inst.lien} target="_blank" rel="noreferrer" data-ext-boutique={inst.nav}
+        style={{display:'inline-block',border:'none',background:C.warn,color:C.onWarn||'#fff',borderRadius:12,padding:'9px 15px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',textDecoration:'none'}}>
+        Ouvrir la boutique
+      </a>}
+      style={{marginBottom:14}}/>
+  );
   return (
     <Notice tone="warn" icon="alert"
       title="Ton extension VRM est en retard"
@@ -17644,7 +17660,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
     ? <a href="/VRM-extension.zip" download className="vrm-b vrm-b-primaire">Télécharger l’extension</a>
     : majLiaison
       ? <>
-          <a href="/VRM-extension.zip" download data-premiers-geste="maj" className="vrm-b vrm-b-primaire">Télécharger la mise à jour ({EXT_ATTENDUE})</a>
+          {installerExtensionIci().boutique
+            ? <a href={installerExtensionIci().lien} target="_blank" rel="noreferrer" data-premiers-geste="maj-boutique" className="vrm-b vrm-b-primaire">Mettre à jour depuis la boutique</a>
+            : <a href="/VRM-extension.zip" download data-premiers-geste="maj" className="vrm-b vrm-b-primaire">Télécharger la mise à jour ({EXT_ATTENDUE})</a>}
           {etape === 'autrecompte' && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-court" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : `Déconnecter l’extension ${NAV.de}`}</button>}
         </>
     : etape === 'connectee'
