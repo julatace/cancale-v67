@@ -378,11 +378,11 @@ export default function Accueil({ onEntrer }) {
             {/* Ce qui est VRAI (1er et 5 nov.) : VRM lit Vinted par l'extension, dans le
                 navigateur de l'ordinateur ; le téléphone consulte et commande. Pas
                 « Chrome obligatoire » : la liste des navigateurs SERVIS. */}
-            <p className="av-prereq" data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
+            <div className="av-prereq" data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
               {sansSouris
                 ? `Crée ton compte ici, puis installe l’extension une fois sur ton ordinateur : ${NAVS_ORDI}.`
                 : `L’extension s’installe une fois sur ton ordinateur, dans ${NAVS_ORDI} — il reste nécessaire pour lire Vinted. Ton téléphone suit tout.`}
-            </p>
+            </div>
           </div>
           <figure className="av-scene" data-scene-haut="">
             <span className="av-ecran-bureau"><Capture nom="bureau" taille={BUREAU} alt="Ma journée de VRM sur ordinateur : le menu à gauche, le montant vendu aujourd’hui au centre, et à droite « À faire » — 1 colis à envoyer, 2 colis à retirer, 2 messages, 6 prix à baisser. Données d’exemple." /></span>
