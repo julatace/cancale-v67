@@ -82,12 +82,17 @@ dans l'e-mail (`numeroLu`), jamais celui retrouvé par titre.
 - `scripts/bancs/bordereau-des-email.cjs` — 390 tactile et 1512 : Colis carte « prête », sans N° (le
   30 deviné ne sort pas), `vrm_colis_prets` 2/2 ; Ventes « Imprimer » sur la ligne e-mail + mention ;
   Ma journée 2 ; N° écrit « n12 » ⇒ 12 ; liste relue annulée ⇒ aucune carte, 1 à imprimer.
-  **24 verts** ; sur le dist de départ : **14 rouges**. Captures regardées (Colis 390, Ventes 390).
+  imprimé sans N° puis N° 44 posé sur la transaction ⇒ la carte dit « Imprimé sans N° — écris N° 44 ».
+  **26 verts** ; sur le dist de départ : **16 rouges**. Captures regardées (Colis 390/1512, Ventes
+  390/1512). (Défaut trouvé à 1512 : le registre « imprimé sans N° » arrivait avec le nuage après le
+  montage — branché sur `onCloudReady` comme `vinted_bords_printed`.)
 - Audit retouché (la décision a changé, pas affaiblie) : `audit-vente-email-fraiche` F8 (« à
   expédier » seulement avec SON bordereau, jamais « Déposé » ni « en transit »).
 - Verts : `npm run build`, `audit-identite`, `audit-statuts`, `audit-a-envoyer-preuves`,
   `audit-coherence`, `audit-variables`, `audit-tdz`, `audit-vente-email-fraiche`,
-  `audit-fonctions-api`, et les audits qui parlent de tampon/bordereau (voir le rapport de session).
+  `audit-fonctions-api`, et les **96** audits qui parlent de tampon/bordereau (tous verts).
+- Bancs verts : `bordereau-des-email`, `vente-email-fraiche` (390/1512 clair, 32 verts),
+  `a-envoyer-preuves` (34 verts).
 
 ## Geste de Julien
 Aucun.
