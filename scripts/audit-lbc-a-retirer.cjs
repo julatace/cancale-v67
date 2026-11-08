@@ -61,7 +61,7 @@ function extraire(src, nom) {
   let R = null;
   await essaie('la règle se charge', async () => {
     const noms = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'numeroLbcIdentite', 'LBC_PAUSE_INDEX_MS', 'lbcSortieDe', 'LBC_ANNONCE_MORTE', 'annonceLbcEnVente', 'numDeTitreLbc', 'clesAnnonceLbc', 'aRetirerDeLbcVinted'];
-    const code = 'const load = (k, d) => d;\n' + noms.map((n) => extraire(APP, n)).join('\n') + '\n;this.R = { aRetirerDeLbcVinted };';
+    const code = 'const load = (k, d) => d;\n' + '/* (7 nov.) « Je numérote moi-même » ÉTEINT : src/numeroEcrit.js, jugé par audit-numero-ecrit */ const numeroEcritLbc = () => ""; const numeroEcritActif = () => false;\n' + noms.map((n) => extraire(APP, n)).join('\n') + '\n;this.R = { aRetirerDeLbcVinted };';
     const ctx = {}; vm.createContext(ctx); vm.runInContext(code, ctx); R = ctx.R;
   });
   const f = R ? R.aRetirerDeLbcVinted : () => { throw new Error('règle absente'); };

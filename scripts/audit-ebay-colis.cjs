@@ -22,6 +22,7 @@
 // Mutations éprouvées le 19 octobre (copie mutée, audit lancé depuis elle) :
 // la règle qui compte une annulation demandée (7 rouges) ; le widget qui
 // ignore eBay (1) ; eBay illisible lu « 0 » (1). Sur 65eec06 : 9 rouges.
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path'), fs = require('fs'), os = require('os');
 const RACINE = process.env.RACINE || path.join(__dirname, '..');
 let ko = 0;

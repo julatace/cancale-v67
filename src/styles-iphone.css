@@ -229,3 +229,26 @@
  .vrm-main .vrm-ca-table th{white-space:normal!important;}
  .vrm-main .vrm-ca-table{font-size:12px!important;}
 }
+
+/* (7 nov., revue UX) Le titre replié de l'en-tête passait SOUS les icônes de droite
+   (« Annonce● ») : la colonne des actions (4 × 44 px) était plus large que sa part
+   (1fr). Au téléphone : les deux côtés prennent leur largeur, le titre la place qui
+   RESTE, coupé proprement s'il le faut. */
+@media(max-width:767px){
+ .vrm-app-shell .vrm-app-header{grid-template-columns:auto minmax(0,1fr) auto;}
+ .vrm-app-shell .vrm-app-header .vrm-hdr-titre{max-width:100%;justify-self:center;min-width:0;}
+}
+/* (7 nov., revue UX) « Autre N° » : coupé en « Autre N » au téléphone, étiré sur ~900 px à
+   l'ordinateur. Une largeur fixe, lisible partout. */
+html body .vrm-main input.vrm-autre-num{width:118px!important;flex:0 0 118px!important;min-width:0!important;max-width:118px!important;}
+/* (7 nov., revue UX) Messages : « Non lues 21 » passait seul sur une 2e ligne. Une rangée
+   défilante, comme les autres rangées de filtres. */
+@media(max-width:767px){
+ html body .vrm-main .vrm-msg-bar .vrm-inbox-filters{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;min-width:0;}
+ html body .vrm-main .vrm-msg-bar .vrm-inbox-filters::-webkit-scrollbar{display:none;}
+ html body .vrm-main .vrm-msg-bar .vrm-inbox-filters>button{flex:0 0 auto;white-space:nowrap;}
+}
+/* (7 nov., demande de Julien) Le logo du transporteur sur la ligne de vente : petit, aligné sur le texte. */
+.vrm-fu-vente-l2 .vrm-fu-vente-transp{display:inline-flex;align-items:center;margin:0 2px 0 6px;vertical-align:middle;}
+.vrm-toutes-transp{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;}
+.vrm-toutes-bureau-site .vrm-toutes-transp{margin-left:6px;}

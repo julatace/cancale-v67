@@ -165,7 +165,7 @@ const remplacer = (src, a, b) => { if (!src.includes(a)) { console.error('ancre 
       dit(G.prochainGesteAnnonces({}) === null && G.prochainGesteAnnonces({ aVerifier: null, sansNum: undefined, prixConnus: null, prixTotal: null, dorment: NaN }) === null, 'D2 · des compteurs pas sus ne déclenchent AUCUN geste (jamais inventé)');
       dit(g1 && !/\d/.test(g1.texte) && g2 && !/\d/.test(g2.texte) && g4 && !/\d/.test(g4.texte), 'D3 · le geste ne redit pas un compteur déjà affiché (§7)');
     }
-    dit(/prochainGesteAnnonces\(\{ aVerifier: aVerifierCarton\.length, sansNum: annStats\.sansNum, prixConnus: n, prixTotal: m, dorment: annStats\.sleeping \}\)/.test(app), 'D4 · Annonces passe SES compteurs (aucun recalcul)');
+    dit(/prochainGesteAnnonces\(\{ aVerifier: aVerifierCarton\.length, sansNum: annStats\.sansNum, prixConnus: n, prixTotal: m, dorment: annStats\.sleeping(?:, ecrit: numeroEcritActif\(\))? \}\)/.test(app), 'D4 · Annonces passe SES compteurs (aucun recalcul)');
     dit(/&& !\(geste && geste\.cle === 'prix'\)/.test(app), 'D4 · « Prix d’achat N/M » ne s’écrit qu’une fois sur l’écran');
 
     // ── E. STATISTIQUES ──────────────────────────────────────────────────────

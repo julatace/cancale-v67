@@ -16,6 +16,7 @@
 //   • sans résumé de l'extension, le repli lit la vente entière et reconnaît
 //     « Bordereau d'envoi commandé » (le champ machine `needs_action`).
 // §4.10 — la VRAIE route est exécutée (import du module, faux fetch).
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-banc';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
 let ko = 0;

@@ -214,7 +214,10 @@ function base({ lectureKO = false, devancer = 0 } = {}) {
     const id = (/id=eq\.([^&]+)/.exec(u) || [])[1];
     if (m === 'GET') {
       if (lectureKO) return rep(500, { message: 'panne' });
-      if (/id=like\.mesures_jour_/.test(u)) return rep(200, [...lignes.values()].map((l) => ({ id: l.id, data: l.data })));
+      // (7 nov.) La vraie forme : `select=id` (identifiants seuls, ordre décroissant), puis `id=in.(…)`.
+      if (/id=like\.mesures_jour_/.test(u)) return rep(200, [...lignes.values()].map((l) => l.id).sort().reverse().map((x) => (/select=id(&|$)/.test(u) ? { id: x } : { id: x, data: lignes.get(x).data })));
+      const ins = /id=in\.\(([^)]*)\)/.exec(u);
+      if (ins) return rep(200, ins[1].split(',').filter((x) => lignes.has(x)).map((x) => ({ id: x, data: lignes.get(x).data })));
       const l = lignes.get(id); return rep(200, l ? [{ data: l.data }] : []);
     }
     const corps = JSON.parse(o.body || 'null'); ecrites.push({ m, u, corps });
@@ -258,8 +261,13 @@ async function serveur(Srv, T, dit) {
     const b = await Srv.recevoirMesures({ corps: { ...lot('journee|telephone|peu', 800, 2), jeton: J }, verifierJeton: verif(UID), env, fetcher: B.fetcher, maintenant: t0 + 10000 });
     const c = await Srv.recevoirMesures({ corps: { ...lot('cat_bord|telephone|peu', 1200, 4), jeton: J }, verifierJeton: verif(UID2), env, fetcher: B.fetcher, maintenant: t0 + 12000 });
     const d = await Srv.recevoirMesures({ corps: { ...lot('cat_bord|telephone|peu', 450, 5), jeton: J }, verifierJeton: verif(UID), env, fetcher: B.fetcher, maintenant: t0 + 61000 });
-    const l = B.lignes.get('mesures_jour_2026-11-06');
-    const txt = JSON.stringify(l || {});
+    // (7 nov.) Le jour est ÉCLATÉ : l'agrégat du jour = la somme de ses éclats.
+    const eclats = [...B.lignes.values()].filter((x) => x.id.startsWith('mesures_jour_2026-11-06'));
+    const l = eclats.length ? { id: 'mesures_jour_2026-11-06', owner: eclats.every((x) => x.owner === PROPRIO) ? PROPRIO : 'mélangé',
+      data: { lots: eclats.reduce((t, x) => t + x.data.lots, 0), mesures: eclats.reduce((t, x) => t + x.data.mesures, 0), h: Srv.agregerJours(eclats)['2026-11-06'].h, contrib: Object.assign({}, ...eclats.map((x) => x.data.contrib)) } } : null;
+    const txt = JSON.stringify(eclats);
+    dit(eclats.length >= 1 && eclats.every((x) => /^mesures_jour_2026-11-06_[0-9a-f]$/.test(x.id)) && !B.lignes.has('mesures_jour_2026-11-06'), 'S13 rangé dans un ÉCLAT du jour (`mesures_jour_{jour}_{éclat}`), jamais dans la ligne unique', eclats.map((x) => x.id).join(' '));
+    dit(Object.keys((l && l.data.contrib) || {}).every((k) => eclats.filter((x) => x.data.contrib && x.data.contrib[k]).length === 1), 'S14 un appareil retombe toujours dans le même éclat ce jour-là (anti-abus juste)', eclats.map((x) => x.id + ':' + Object.keys(x.data.contrib).length).join(' '));
     dit(a.code === 200 && !!l && l.owner === PROPRIO, 'S3 le lot est rangé dans l\'agrégat du JOUR, chez le propriétaire de l\'installation', `${a.code} · ${l ? l.id + ' ' + l.owner : 'aucune ligne'}`);
     dit(!!l && ![UID, UID2, J, 'jean.dupont@gmail.com', UID.replace(/-/g, '').slice(0, 12)].some((p) => txt.includes(p)), 'S4 ni identifiant de vendeur, ni jeton, ni e-mail rangés', txt.slice(0, 160));
     dit(!!l && Object.keys(l.data.contrib || {}).length === 2 && Object.keys(l.data.contrib).every((k) => /^[0-9a-f]{12}$/.test(k)), 'S5 seuls deux EMPREINTES du jour (12 hex) tiennent l\'anti-abus', JSON.stringify(Object.keys((l && l.data.contrib) || {})));
@@ -275,6 +283,21 @@ async function serveur(Srv, T, dit) {
     dit(Object.keys(l.data.contrib).every((k) => !j2.includes(k)) && !/"contrib"|"h":/.test(j2), 'S10 il ne reçoit ni empreinte ni histogramme brut, seulement des agrégats', j2.slice(0, 160));
     const ligneP = (L2.corps.jours[0].lignes || []).find((x) => x.ecran === 'cat_bord' && x.metrique === 'peu');
     dit(!!ligneP && ligneP.n === 12 && ligneP.p50 > 250 && ligneP.p50 <= 500 && ligneP.p95 > 1000 && ligneP.p95 <= 1250, 'S11 p50/p95 lus sur l\'agrégat (300×3, 1200×4, 450×5)', JSON.stringify(ligneP));
+  }
+  // Éclats : 16 vendeurs la même minute se répartissent ; l'ancienne ligne d'un jour reste lue.
+  {
+    const B = base();
+    for (let i = 0; i < 16; i++) await Srv.recevoirMesures({ corps: { ...lot('cat_bord|telephone|peu', 300), jeton: J }, verifierJeton: verif(`7a7a7a7a-0000-4000-8000-${String(i).padStart(12, '0')}`), env, fetcher: B.fetcher, maintenant: t0 });
+    const ids = [...B.lignes.keys()];
+    dit(ids.length >= 6 && ids.length <= Srv.ECLATS, 'S15 seize vendeurs la même minute se répartissent sur plusieurs éclats (moins de devancements)', `${ids.length} éclat(s)`);
+    B.lignes.set('mesures_jour_2026-11-05', { id: 'mesures_jour_2026-11-05', owner: PROPRIO, data: { v: 1, rev: 3, lots: 2, mesures: 7, h: lot('journee|telephone|peu', 800, 7).h, contrib: { aaaaaaaaaaaa: { n: 2, m: 1 } } } });
+    B.lignes.set('mesures_jour_2026-11-06', { id: 'mesures_jour_2026-11-06', owner: PROPRIO, data: { v: 1, rev: 1, lots: 1, mesures: 4, h: lot('cat_bord|telephone|peu', 300, 4).h, contrib: { bbbbbbbbbbbb: { n: 1, m: 1 } } } });
+    const L = await Srv.listerMesures({ utilisateur: { id: PROPRIO }, env, fetcher: B.fetcher });
+    const j6 = L.corps && L.corps.jours.find((x) => x.jour === '2026-11-06'), j5 = L.corps && L.corps.jours.find((x) => x.jour === '2026-11-05');
+    dit(L.code === 200 && L.corps.jours.length === 2 && !!j5 && j5.mesures === 7 && j5.lots === 2 && !!j6 && j6.mesures === 16 + 4 && j6.lots === 17 && j6.appareils === 17, 'S16 le panneau additionne les éclats d\'un jour ET l\'ancienne ligne (celles d\'avant restent lisibles)', JSON.stringify((L.corps.jours || []).map((x) => [x.jour, x.lots, x.mesures, x.appareils])));
+    const hs = await Srv.histosDesJours({ lire: async (p) => { const r = await B.fetcher('https://banc.supabase.co/rest/v1/' + p); return r.json(); }, proprio: PROPRIO, jours: ['2026-11-05', '2026-11-06', '2026-11-04'] });
+    const somme = (h) => Object.values(h || {}).reduce((t, l) => t + l.reduce((a, b) => a + b, 0), 0);
+    dit(!!hs && somme(hs['2026-11-06']) === 20 && somme(hs['2026-11-05']) === 7 && hs['2026-11-04'] === null, 'S17 la veille des lenteurs lit le jour entier (éclats + ancienne ligne) ; un jour sans mesure ⇒ null', JSON.stringify(hs && Object.fromEntries(Object.entries(hs).map(([k, v]) => [k, somme(v)]))));
   }
   // Plafond du jour.
   {
@@ -323,6 +346,10 @@ const MUTATIONS = {
   'lecture-ratee-ecrit': ['api/_lib/mesures-terrain.js', "    if (!r.ok) return undefined;\n    const j = await r.json().catch(() => null);\n    if (!Array.isArray(j)) return undefined;", "    if (!r.ok) return null;\n    const j = await r.json().catch(() => null);\n    if (!Array.isArray(j)) return undefined;"],
   'veille-seuil-zero': ['src/mesuresTerrain.js', 'if (hausse > seuil) out.push', 'if (hausse > 0) out.push'],
   'zero-invente': ['src/mesuresCollecte.js', 'if (E.saitInp && v.inp > 0) noter', 'if (v.inp >= 0) noter'],
+  'une-seule-ligne-par-jour': ['api/_lib/mesures-terrain.js', 'const id = idEclat(jour, eclatDe(emp));', 'const id = idJour(jour);'],
+  'eclat-au-hasard': ['api/_lib/mesures-terrain.js', 'const id = idEclat(jour, eclatDe(emp));', 'const id = idEclat(jour, Math.floor(Math.random() * ECLATS));'],
+  'panneau-sans-anciennes': ['api/_lib/mesures-terrain.js', 'const RE_ID_MESURES = /^mesures_jour_(\\d{4}-\\d{2}-\\d{2})(?:_([0-9a-f]))?$/;', 'const RE_ID_MESURES = /^mesures_jour_(\\d{4}-\\d{2}-\\d{2})_([0-9a-f])$/;'],
+  'veille-un-seul-eclat': ['api/_lib/mesures-terrain.js', '&id=in.(${jours.flatMap(idsDuJour).join(\',\')})', '&id=in.(${jours.map(idJour).join(\',\')})'],
   'jeton-pas-verifie': ['api/_lib/mesures-terrain.js', "if (!u || !u.id) return { code: 401, corps: { ok: false, raison: 'session' } };", "if (!u || !u.id) return recevoirMesures({ corps, jetonEntete, verifierJeton: async () => ({ id: 'x' }), env, fetcher, maintenant });"],
 };
 
