@@ -236,7 +236,7 @@ async function scenario(b, vp, sombre) {
     await pg.click('[data-colis-barre-btn="outils"]').catch(() => {});
     // ── T : la tournée de dépôt.
     const ouvrirT = await pg.$('[data-tournee-ouvrir]');
-    dit(!!ouvrirT, `${nom} : T « Tournée de dépôt » est dans « À envoyer »`);
+    dit(!!ouvrirT, `${nom} : T « Préparer la tournée de dépôt » est dans « À envoyer »`);
     if (ouvrirT) {
       const hb = await ouvrirT.boundingBox();
       if (tel) dit(hb && hb.height >= 44, `${nom} : T le bouton fait 44 px au doigt`, hb ? String(Math.round(hb.height)) : '');
