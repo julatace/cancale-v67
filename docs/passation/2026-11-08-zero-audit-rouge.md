@@ -76,5 +76,9 @@ pas vérifié — « pas su » ≠ « oui »). Dans ce conteneur, pdfjs-dist a �
 (hors dépôt) pour le lancer.
 Preuve : vert (64/64) avec pdfjs-dist ; sans lui, rouge avec la phrase ci-dessus.
 
-## Tous les audits
-Voir la section « Relance complète » ci-dessous.
+## Relance complète
+Les 363 `scripts/audit-*.cjs`, un par un (`timeout 300`), sur la branche : **0 rouge**
+(avec `pdfjs-dist` installé ; sans lui, `audit-registres` seul reste rouge et dit pourquoi).
+Les 7 audits qui lisent CLAUDE.md ou `BoiteEmails` relancés après le dernier commit : verts.
+Aucun banc de rendu lancé (la photo des e-mails n'est couverte par aucun banc) : à regarder
+à l'occasion sur l'écran E-mails (vignette d'un e-mail de bordereau).
