@@ -61,8 +61,12 @@ const texteDe = (mail) => {
 
 // Lit { source, code } — ou `null` dès que le message ne dit pas UNE adresse
 // et UN code, d'accord entre sujet et corps, vers la boîte collective.
-export function lireConfirmationTransfert(mail) {
+// (8 nov.) `destination` : l'ADRESSE DE RÉCEPTION UNIQUE d'un vendeur
+// (api/_lib/adresse-reception.js). Sans elle, la destination attendue reste la
+// boîte collective — la règle d'avant, inchangée.
+export function lireConfirmationTransfert(mail, { destination } = {}) {
   if (!estConfirmationTransfert(mail)) return null;
+  const versIci = destination ? ((a) => normAdresse(a) === normAdresse(destination)) : estAdresseCollectrice;
   const sujet = String((mail && mail.subject) || '');
   const corps = texteDe(mail);
   // Le code : « (#123456789) » en tête du sujet ; « Code de confirmation : 123456789 »
@@ -75,12 +79,12 @@ export function lireConfirmationTransfert(mail) {
   // qui, dans le corps, « a demandé à transférer » / « has requested to … forward ».
   const sujetAdresses = uniques((sujet.match(RE_ADRESSE) || []).map(normAdresse));
   const corpsSources = uniques([...corps.matchAll(/([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\s+(?:a\s+demand[ée]\s+(?:à|a)\s+transf[ée]rer|has\s+requested\s+to\s+(?:automatically\s+)?forward)/gi)].map((m) => normAdresse(m[1])));
-  const sources = uniques([...sujetAdresses, ...corpsSources]).filter((a) => !estAdresseCollectrice(a));
+  const sources = uniques([...sujetAdresses, ...corpsSources]).filter((a) => !estAdresseCollectrice(a) && !versIci(a));
   if (sources.length !== 1 || !corpsSources.length || !sujetAdresses.length) return null;
   // La destination nommée (« vers votre adresse X » / « to your email address X »),
   // si le texte la donne, doit être la boîte collective.
   const dest = uniques([...corps.matchAll(/(?:vers\s+votre\s+adresse|to\s+your\s+(?:email\s+)?address)\s+([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/gi)].map((m) => normAdresse(m[1])));
-  if (dest.some((d) => !estAdresseCollectrice(d))) return null;
+  if (dest.some((d) => !versIci(d))) return null;
   return { source: sources[0], code: codes[0] };
 }
 

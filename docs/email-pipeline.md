@@ -9,6 +9,47 @@ l'ancien Apps Script). Il ne reste qu'à brancher la plomberie ci-dessous.
 
 ---
 
+## ⭐ L'adresse de réception UNIQUE de chaque vendeur (8 nov. 2026)
+
+Chaque vendeur a SA propre adresse VRM, aléatoire (24 caractères, ex.
+`k7p2m9…@recu-vrm.fr`), affichée dans **Réglages → E-mails → Adresses → Ton adresse
+VRM** et dans **E-mails → Relier ma boîte**. Il y fait suivre ses e-mails
+(transfert automatique Gmail / iCloud / Outlook / Yahoo) ou la donne directement
+comme e-mail d'un compte Vinted. **Tout e-mail livré à cette adresse est rangé chez
+lui, sans autre preuve** : c'est VRM qui l'a fabriquée pour lui
+(`api/_lib/adresse-reception.js`). Elle passe AVANT toutes les autres règles ;
+inconnue, remplacée ou désactivée ⇒ quarantaine neutre (jamais chez un autre,
+jamais jetée). Les adresses déclarées/prouvées et le script Gmail continuent de
+marcher à côté.
+
+### Les gestes de Julien (une fois)
+
+1. Acheter un **domaine court dédié** à la réception (≈ 10 €/an, ex. `recu-vrm.fr`) —
+   jamais `vrm.center` (ses e-mails à lui y vivent).
+2. L'ajouter à **Cloudflare** (gratuit) : Cloudflare donne deux *nameservers*, les
+   poser chez le registrar.
+3. Cloudflare → le domaine → **Email → Email Routing** → activer (Cloudflare pose
+   les MX) → **Routing rules → Catch-all address** → *Action* : **Send to a
+   Worker** → le Worker ci-dessous (avec la variable `EMAIL_INBOUND_SECRET`).
+4. Vercel → projet → Settings → Environment Variables : **`DOMAINE_RECEPTION`** =
+   le domaine (ex. `recu-vrm.fr`, sans `@`), puis redéployer.
+5. Vérifier que **`EMAIL_INBOUND_SECRET`** est la même sur Vercel et dans le Worker.
+6. Dans VRM : Réglages → E-mails → Adresses → **Ton adresse VRM** → « Envoyer un
+   e-mail d'essai » : « Dernier e-mail reçu : il y a 1 min » doit apparaître.
+
+Tant que `DOMAINE_RECEPTION` est vide, la feuille le dit et aucune adresse n'est
+fabriquée.
+
+### Le code de confirmation Gmail
+
+Quand le vendeur ajoute son adresse VRM comme adresse de transfert, Gmail y envoie
+« (#123456789) Confirmation de transfert Gmail ». VRM le lit (la règle stricte de
+`api/_lib/transfert-gmail.js`, destination = SON adresse) et l'AFFICHE dans sa
+feuille avec « Copier » et le lien de confirmation de Google (hôtes Google
+seulement). Même chose pour le lien de vérification de Yahoo.
+
+---
+
 ## Vue d'ensemble
 
 ```
@@ -53,6 +94,11 @@ Vercel → projet → **Settings → Environment Variables** :
 ### Code de l'Email Worker (Cloudflare)
 
 Nécessite le paquet `postal-mime` (parse le MIME → texte + pièces jointes).
+Le même Worker sert la boîte collective et le **catch-all** du domaine de réception :
+il transmet le destinataire RÉEL de l'enveloppe (`message.to`) dans `envelopeTo` —
+c'est lui qui désigne le vendeur (les en-têtes To/Cc d'un e-mail transféré disent
+encore la boîte d'origine) — et l'en-tête `Authentication-Results` (la signature
+de Google sur un code de transfert).
 
 ```js
 import PostalMime from 'postal-mime';
@@ -78,7 +124,11 @@ export default {
         // ont souvent le même corps — sans elle, le second ne sonnait pas.
         messageId: message.headers.get('Message-ID') || email.messageId || '',
         from: (message.from) || '',
+        // L'ENVELOPPE : l'adresse à laquelle CET exemplaire a été livré (une par
+        // destinataire, même en catch-all). C'est elle qui désigne le vendeur.
+        envelopeTo: (message.to) || '',
         to: (message.to) || '',
+        authentification: message.headers.get('Authentication-Results') || message.headers.get('ARC-Authentication-Results') || '',
         subject: email.subject || '',
         text: email.text || '',
         html: email.html || '',
