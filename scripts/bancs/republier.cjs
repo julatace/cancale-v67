@@ -179,7 +179,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-selection-annonce="9102"] input').uncheck();
         await pg.locator('.vrm-ann-toolbar').first().screenshot({ path: path.join(require('os').tmpdir(), `republier-barre-${vp.width}.png`) }).catch(() => {});
         dit(await pg.locator('[data-atelier-ouvrir]').count() === 0, 'plus de « ✨ Préparer » sur les cartes (un seul parcours)');
-        const outils = pg.locator('[aria-label="Outils"]').first();
+        const outils = pg.locator('[aria-label^="Outils"]').first();
         if (await outils.count()) { await outils.click(); await pg.waitForTimeout(200); }
         const menu = await pg.evaluate(() => document.body.innerText);
         dit(!/Lots — titres|File de publication/.test(menu), 'le menu Outils ne propose plus « Lots » ni « File de publication »');

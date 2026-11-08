@@ -149,7 +149,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
   const prog = objectifSurPage(objectif, page) ? progressionObjectif(objectif, valeurObjectif(objectif, sources, regles)) : null;
   const courbe = g.place.id === 'vendu' && !g.hors ? courbeVendu(sources, sel, g.p, regles) : null;
   const modifier = (
-    <button type="button" className="vrm-fu-modifier" data-carte-modifier={page} aria-label="Choisir les chiffres de la carte" onClick={() => setOuvert(true)}>Modifier</button>
+    <button type="button" className="vrm-fu-modifier" data-carte-modifier={page} aria-label="Modifier les chiffres de la carte" title="Choisir les chiffres que montre cette carte" onClick={() => setOuvert(true)}>Modifier</button>
   );
   return (
     <>

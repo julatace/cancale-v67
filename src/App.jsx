@@ -40869,10 +40869,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 on coche, puis UNE feuille « Actions » (Republier · Modifier prix ou titre ·
                 Mettre en brouillon · Mettre en ligne). L'ancienne feuille « Republier et
                 brouillons » (un second chemin, d'autres mots) est retirée. */}
-            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='selection'} title="Republier : coche les annonces, puis Actions"
+            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='selection'} aria-label="Republier des annonces" title="Republier : coche les annonces, puis Actions"
               onClick={()=>setAnnSort('selection')}><Icon name="sync" size={17}/><span className="vrm-annbar-mot">Republier…</span></button>
             <div className="vrm-ann-outils">
-              <button type="button" className="vrm-annbar-bouton" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : offres automatiques, répartir un lot, studio photo, inventaire, audit du stock">
+              <button type="button" className="vrm-annbar-bouton" aria-label="Outils des annonces" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : offres automatiques, répartir un lot, studio photo, inventaire, audit du stock">
                 <Icon name="more" size={17}/><span className="vrm-annbar-mot vrm-ann-outils-mot">Outils</span></button>
               {annToolsOpen && (<>
                 <div className="vrm-menu-voile" onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
