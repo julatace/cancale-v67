@@ -117,5 +117,5 @@
 .vrm-vue-vide { padding: 20px 16px; text-align: center; border: 1px dashed var(--vrm-line); border-radius: 12px; margin: 12px 0; font-size: 13px; line-height: 1.5; color: var(--vrm-muted); }
 .vrm-vue-vide b { color: var(--vrm-ink); font-weight: 600; }
 @media (min-width: 1024px) and (pointer: coarse) {
-  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 44px; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 44px !important; }
 }

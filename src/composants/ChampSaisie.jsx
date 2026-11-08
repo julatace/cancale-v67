@@ -18,7 +18,7 @@ export default function ChampSaisie({ value, onCommit, apresEntree, style, ...p 
     enCours.current = true; setOccupe(true); setErreur('');
     try {
       const r = await onCommit(v, avant.current);
-      if (r === false) throw new Error('refus');
+      if (r === false || r?.etat === 'illisible') throw new Error('refus');
       refuse.current = false; avant.current = String(v);
     } catch (_) {
       refuse.current = true;
