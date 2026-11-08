@@ -218,7 +218,10 @@ const ouvrir = async (b, vp, sombre) => {
           const trou = await pg.evaluate(() => { const d = document.querySelector('[data-rp-section="route"]'); const r = document.querySelector('[data-rp-section="argent"]'); return d && r ? Math.round(r.getBoundingClientRect().top - d.getBoundingClientRect().bottom) : null; });
           dit(trou != null && trou <= 60, 'pas de grand vide entre « En route » replié et « Argent à vérifier »', String(trou));
           dit(by('90000003').ech === 'dernier', 'locker au dernier jour ⇒ puce ambre « dernier jour »', JSON.stringify(by('90000003')));
-          dit(by('90000007').ech === null, 'échéance inconnue ⇒ aucune puce', JSON.stringify(by('90000007')));
+          // (8 nov., barre du délai) LA RÈGLE A CHANGÉ : sans date limite lue mais avec l'arrivée lue, la barre dit la garde
+          // de SON transporteur, « estimée » (src/delaiRetrait.js) — jamais une date présentée comme lue.
+          const est7 = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte="r:e:90000007"]'); const d = l && l.querySelector('[data-rp-delai]'); return d ? { est: d.getAttribute('data-rp-delai-estimee'), txt: d.innerText } : null; });
+          dit(!!est7 && est7.est === '1' && /estimée/.test(est7.txt), 'échéance pas lue ⇒ barre « estimée » (garde du transporteur), jamais une date lue', JSON.stringify(est7));
           dit(by('90000006').ech === 'date', 'échéance connue ⇒ « jusqu’au jj/mm »', JSON.stringify(by('90000006')));
           const pp = m.points.filter((p) => /POINT PRESSE/i.test(p.nom || ''));
           dit(pp.length === 2, 'même nom de relais dans deux villes : deux cartes', JSON.stringify(pp));
