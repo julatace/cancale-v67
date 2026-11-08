@@ -125,9 +125,10 @@ const vgJson = (evs) => JSON.stringify({ tracking_events: evs.map((e, i) => ({ i
   const lit = (f) => { try { return fs.readFileSync(path.join(RACINE, f), 'utf8'); } catch (_) { return ''; } };
   const app = lit('src/App.jsx'), widget = lit('api/widget.js'), rappels = lit('api/ship-reminders.js'), lecture = lit('api/_lib/transporteurs-lecture.js');
   dit(/avecNumerosVc = \(d\)[^\n]*departs: departsCarte\(\)/.test(app), 'app : chaque lecture Vestiaire porte les départs (`avecNumerosVc`) — Colis, Ma journée, la cloche, Ventes');
-  dit(/partisTransp\.has\(String\(b\.transaction\)\)/.test(app) && /txVintedParties\(/.test(app), 'app : Vinted, `bordShipped` lit la même règle (`txVintedParties`)');
-  dit(/txVintedParties\(/.test(widget) && /departs \}/.test(widget) && /like\.depart_\*/.test(widget), 'widget : Vinted et Vestiaire lisent les départs');
-  dit(/txVintedParties\(/.test(rappels) && (rappels.match(/like\.depart_\*/g) || []).length >= 2, 'rappels (matin, soir, bilan) : Vinted et Vestiaire lisent les départs');
+  // (8 nov., « à envoyer » prouvé) La règle Vinted vit dans api/_lib/depart-vente.js (`ventesPartiesParPreuve`, qui appelle `departProuve`).
+  dit(/partisVinted\.get\(String\(b\.transaction\)\)/.test(app) && /ventesPartiesParPreuve\(\{[\s\S]{0,400}departs: vcLoc0\.departs/.test(app), 'app : Vinted, `bordShipped` lit la même règle (`ventesPartiesParPreuve` → `departProuve`)');
+  dit(/ventesPartiesParPreuve\([^)]*departs,/.test(widget) && /departs \}/.test(widget) && /like\.depart_\*/.test(widget), 'widget : Vinted et Vestiaire lisent les départs');
+  dit(/ventesPartiesParPreuve\([\s\S]{0,300}departs: d\.departs/.test(rappels) && (rappels.match(/like\.depart_\*/g) || []).length >= 2, 'rappels (matin, soir, bilan) : Vinted et Vestiaire lisent les départs');
   dit(/passageDeparts\(/.test(lecture) && /MAX_DEPARTS_CRON/.test(rappels), 'le serveur lit les départs au passage de l’app ET au cron');
   // Aucun lecteur de « à retirer » ne lit une ligne de départ.
   const retrait = ['api/_lib/retrait-colis.js', 'api/_lib/suivi-colis.js', 'api/_lib/etat-colis.js', 'api/_lib/transporteurs-notif.js', 'src/retraitPreuves.js'].map((f) => [f, lit(f)]);

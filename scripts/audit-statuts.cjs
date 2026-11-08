@@ -100,6 +100,8 @@ const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat',
   shippedSuivis: new Set(), soldByTxn: {},
   // (8 nov.) les transactions parties d'après le transporteur (api/_lib/depart-colis.js) : aucune ici.
   partisTransp: new Map(),
+  // (8 nov., « à envoyer » prouvé) la règle unique (api/_lib/depart-vente.js) : aucune preuve ici.
+  partisVinted: new Map(), raisonDepartPubliee: () => null,
   // (5 nov.) `achatStage` lit les fins prouvées par `pickupUnion` (aucune ici).
   pickupUnion: { txFinis: new Set() },
 }));
