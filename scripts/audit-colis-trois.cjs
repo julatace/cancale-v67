@@ -11,6 +11,7 @@
 //     App.jsx : rien sans tap (un seul appelant, un clic), la vente retournée sort des
 //     totaux par la règle existante (`PAS_UNE_VENTE`), la remise n'écrit que ses deux clés.
 //   node scripts/audit-colis-trois.cjs [--mutation=NOM | --prouve]
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');

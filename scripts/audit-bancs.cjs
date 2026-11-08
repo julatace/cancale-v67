@@ -11,6 +11,7 @@
 // fait mesurer des fictions restent câblées dans les bancs.
 //
 // Lecture seule.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 const DIR = path.join(RACINE, 'scripts/bancs');

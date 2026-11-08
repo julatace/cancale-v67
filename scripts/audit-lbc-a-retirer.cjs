@@ -11,6 +11,7 @@
 // pas toujours une annonce vendue). La VRAIE règle de l'app est exécutée (vm),
 // sur des identifiants INVENTÉS ; et le VRAI background.js (le logo VRM sur
 // leboncoin.fr lit le résumé publié par l'app).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const racine = path.join(__dirname, '..');

@@ -18,6 +18,7 @@
 //     incluses, jours entiers).
 // `--prouve` rejoue l'audit sur des règles RÉAFFAIBLIES : chacune doit le faire
 // passer au rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
 const SRC_CAL = path.join(RACINE, 'src', 'periodeCalendrier.js');

@@ -12,6 +12,7 @@
 //    node scripts/recopie-enligne-serveur.cjs            → refabrique la copie
 //    node scripts/recopie-enligne-serveur.cjs --verifier → rouge si elle diffère
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const racine = path.resolve(__dirname, '..');

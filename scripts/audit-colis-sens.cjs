@@ -12,6 +12,7 @@
 //   • dans l'app, parce que les 128 lignes déjà en base ne seront JAMAIS
 //     réécrites — un correctif serveur seul ne changerait rien à son écran.
 // ────────────────────────────────────────────────────────────────────────────
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const R = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 const app = R('src/App.jsx'), srv = R('api/email-inbound.js');

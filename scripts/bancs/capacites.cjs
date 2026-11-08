@@ -26,6 +26,7 @@
 // pont absent · pont ancien · pont à jour. L'état « muet » (présent, sans
 // version) est le plus en retard de tous, et c'était le seul à ne rien
 // déclencher — il est testé ici aussi.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)

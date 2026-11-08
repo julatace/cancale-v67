@@ -26,6 +26,7 @@
 //    · les recherches enregistrées (metier.js) : pointure / achat immédiat /
 //      livraison par défaut sur une recherche d'avant, 10 actives au plus.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');

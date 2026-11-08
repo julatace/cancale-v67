@@ -27,6 +27,7 @@
 //  le banc `scripts/bancs/file-envoi.cjs` — rouge sur le build d'avant.
 //  `--prouve` : chaque mutation de la règle doit rendre au moins un rouge.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const racine = path.join(__dirname, '..');

@@ -17,6 +17,7 @@
 //  5. L'app monte l'écran (`tab==='emails'`), l'annonce dans la navigation et
 //     l'accepte dans `?tab=`.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const fs = require('fs');

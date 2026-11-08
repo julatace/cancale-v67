@@ -16,6 +16,7 @@
 //   · la barre : « Plus » se ferme au retour (FermeAuRetour), un balayage parti
 //     du bord est laissé au système, Ventes ne répète pas le nombre de Colis.
 //   node scripts/audit-reprise-ecran.cjs [--mutation=NOM | --prouve]
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');

@@ -25,6 +25,7 @@
 //    revendeur n'a, et ne doit avoir, aucun accès.
 //
 // Usage : node scripts/audit-entetes.cjs           (sort en 1 si un contrôle échoue)
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 

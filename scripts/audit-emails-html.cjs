@@ -38,6 +38,7 @@
 //  Lancer : node scripts/audit-emails-html.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path'), fs = require('fs');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');

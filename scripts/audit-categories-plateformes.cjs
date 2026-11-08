@@ -12,6 +12,7 @@
 //   · eBay : la même famille alimente « Département » (genre Vinted seulement).
 // `--src chemin` lance l'audit sur une copie de background.js (mutations).
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'); const path = require('path'); const vm = require('vm');
 const arg = process.argv.indexOf('--src');
 const SRC = arg > 0 ? process.argv[arg + 1] : path.join(__dirname, '..', 'vinted-sync-extension', 'background.js');

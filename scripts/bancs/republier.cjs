@@ -14,6 +14,7 @@
 //     paire choisie, avec SON prix, `confirme: true` ; une paire refusée par
 //     l'extension dit « pas faite » avec SA raison, jamais « republiée ».
 // §6.1 : sur un build d'origin/main, `[data-republier-ouvrir]` n'existe pas ⇒ rouge.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

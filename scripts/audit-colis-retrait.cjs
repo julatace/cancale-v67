@@ -14,6 +14,7 @@
 //   · Mondial Relay : lieu « ® juste ici ! » (le texte d'un bouton).
 // Il EXÉCUTE la vraie `parseCarrierEmail` (api/email-inbound.js) et la vraie
 // `cleanLieu` (src/App.jsx, extraite par Babel).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const R = path.join(__dirname, '..');
 let ko = 0;

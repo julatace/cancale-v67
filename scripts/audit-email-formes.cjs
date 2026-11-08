@@ -5,6 +5,7 @@
 // Julien attendait ses codes de retrait Chronopost.
 // Aucun rapprochement métier ici : on vérifie seulement qu'on sait ouvrir le
 // contenant. Lecture seule, aucun réseau.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 let ko = 0;
 const ok = (t) => console.log('✅ ' + t);

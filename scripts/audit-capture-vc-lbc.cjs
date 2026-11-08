@@ -31,6 +31,7 @@
 //  d'avant, §6.1). `--prouve` : chaque règle réaffaiblie doit faire rougir.
 //  Données INVENTÉES uniquement (le dépôt est public).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { faireFond } = require('./_fond-vm.cjs');

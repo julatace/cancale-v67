@@ -27,6 +27,7 @@
 //   node scripts/audit-lbc-en-ligne.cjs --prouve        toutes les mutations : chacune doit rougir
 //   RACINE=<arbre> node …                               juger un autre arbre (l'arbre d'avant)
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');

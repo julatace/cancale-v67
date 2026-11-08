@@ -17,6 +17,7 @@
 //   · des étiquettes qui ne contredisent pas cette réponse ;
 //   · le résumé que l'extension pose pour le widget = la même règle.
 // Aucune donnée réelle : seuls des LIBELLÉS de statut Vinted, aucun acheteur.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const R = path.join(__dirname, '..');
 let ko = 0;

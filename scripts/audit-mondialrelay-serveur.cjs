@@ -32,6 +32,7 @@
 // `--prouve` : réaffaiblit la règle, chaque mutation doit rendre ROUGE.
 // §6.1 : lancé depuis un arbre d'avant (AUDIT_RACINE, ou copié dedans), il est rouge.
 // ─────────────────────────────────────────────────────────────────────────────
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');

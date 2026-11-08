@@ -1,3 +1,4 @@
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 require('./_porte-banc.cjs');
 const {build}=require('esbuild'),{chromium}=require('playwright'),fs=require('fs'),path=require('path'),assert=require('node:assert/strict'),PL=require('pdf-lib');
 const root=path.resolve(__dirname,'../..'),s=fs.readFileSync(path.join(root,'src/App.jsx'),'utf8');

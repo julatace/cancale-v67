@@ -27,6 +27,7 @@
 // `_meta.cjs` pose la porte des bancs (`_porte-banc.cjs`) sur `require('playwright')` :
 // le MÊME module doit être pris ici (un chemin absolu en donnerait un autre, sans
 // la porte — l'app resterait sur l'écran de connexion).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { metaVersData } = require('./_meta.cjs');
 const { chromium } = require('playwright');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

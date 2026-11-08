@@ -1,5 +1,6 @@
 // Vrais PDF synthétiques : lit le QR AVANT/APRÈS le tampon réel de VRM.
 // Cela ne remplace pas une impression et un scan avec le transporteur.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert/strict');
 const PL=require('pdf-lib'),qrcode=require('qrcode-generator'),{chromium}=require('playwright');
 const lecteur=process.env.VRM_JSQR_PATH||require.resolve('jsqr');

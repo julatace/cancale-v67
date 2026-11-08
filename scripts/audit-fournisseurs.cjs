@@ -24,6 +24,7 @@
 //      JAMAIS « au moins » sur un bénéfice (src/beneficeNoms.js), « au plus »
 //      gardé quand des frais ne sont pas confirmés.
 // --prouve : chaque mutation DOIT rougir.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');

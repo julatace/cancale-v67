@@ -32,6 +32,7 @@
 // `--prouve` : réaffaiblit le code, une mutation à la fois ⇒ ROUGE exigé.
 // Données inventées (le dépôt est public).
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');

@@ -20,6 +20,7 @@
 //  peut pas tourner n'est jamais vert par défaut.
 //  ⚠️ Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie`.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { spawnSync, execFileSync } = require('child_process');
 const RACINE = path.join(__dirname, '..');

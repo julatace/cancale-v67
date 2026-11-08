@@ -8,6 +8,7 @@
 // donc on vérifie qu'elles ne divergent pas).
 //
 // À relancer après toute modification d'`URL_QR_CERTAIN` / `URL_PAS_UN_QR`.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const R = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');

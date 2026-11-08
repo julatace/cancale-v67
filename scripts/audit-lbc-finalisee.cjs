@@ -3,6 +3,7 @@
 // le CA du mois (ventes FINALISÉES uniquement, jamais les ventes en cours : risque
 // de litige, « c'est très important » — Julien) et la disparition d'un colis vendu.
 // Exécute le VRAI code extrait d'App.jsx dans un vm (§4.10 : on EXÉCUTE la règle).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
 

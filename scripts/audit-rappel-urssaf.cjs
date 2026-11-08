@@ -27,6 +27,7 @@
 // sur le serveur, Paris dans l'app : la notification disait « au moins » quand
 // Ma journée ne le disait pas. La section 4 exécute la règle sous TZ=UTC et
 // TZ=Europe/Paris, dans deux processus.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const R = path.join(__dirname, '..');

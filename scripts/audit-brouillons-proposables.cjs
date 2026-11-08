@@ -18,6 +18,7 @@
 // du blocage des lignes de l'atelier « Brouillons → en ligne ».
 //   node scripts/audit-brouillons-proposables.cjs              la règle du dépôt
 //   node scripts/audit-brouillons-proposables.cjs --prouve     chaque mutation doit rougir
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');

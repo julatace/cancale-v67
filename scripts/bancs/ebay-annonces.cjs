@@ -52,6 +52,7 @@
 //     aucune » dans le même paragraphe), ni code périmé, ni sa 5.164 d'aujourd'hui
 //     (périmée ou muette), ni pas connectée / autre compte VRM, ni absente — et
 //     l'autre sens : une 5.170 connectée (commande possible) les garde.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

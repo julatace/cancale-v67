@@ -26,6 +26,7 @@
 //   node scripts/audit-inventaire.cjs                 la règle du dépôt
 //   node scripts/audit-inventaire.cjs --mutation=NOM  une règle réaffaiblie
 //   node scripts/audit-inventaire.cjs --prouve        toutes les mutations : chacune doit rougir
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');

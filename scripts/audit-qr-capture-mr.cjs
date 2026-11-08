@@ -14,6 +14,7 @@
 //  E. l'app : « QR dans l'app Mondial Relay », « Ajouter le QR », « Retirer ce QR »,
 //     le QR posé nourrit les lignes de suivi, synchronisé, lu localement.
 // `--prouve` : chaque mutation doit rendre l'audit ROUGE.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
 const F = {

@@ -14,6 +14,7 @@
 //   X6 l'app : lectures PAGINÉES (`lireTout`), PROJETÉES (jamais `select=data`),
 //      aucune écriture ni envoi (rien ne part ailleurs), « Exporter mes données »
 //      dans Paramètres, sans texte explicatif.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');
 const MUTS = {

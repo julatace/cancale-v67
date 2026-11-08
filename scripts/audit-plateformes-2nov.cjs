@@ -48,7 +48,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   finally { global.fetch = vrai; }
 
   console.log('\nP1, P6, P7 — l\'app');
-  const app = sansCommentaires(fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8'));
+  const app = sansCommentaires(require("./_source-app.cjs").sourceAppDe(path.join(R, 'src', 'App.jsx')));
   const nPartiel = (app.match(/=== 'PARTIALLY_REFUNDED'/g) || []).length;
   dit(nPartiel >= 2, 'CA déclaré ET vendu traitent `PARTIALLY_REFUNDED`', nPartiel);
   dit(/ecartees\.push\(\{ id: idp, plateforme: 'eBay', raison: 'remboursement partiel/.test(app), 'CA déclaré : remboursée en partie ⇒ mise à part et nommée (« au moins »)');

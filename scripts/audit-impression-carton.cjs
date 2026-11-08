@@ -5,6 +5,7 @@
 // tamponné sur un bordereau c'est la mauvaise chaussure dans le colis.
 // On EXÉCUTE la vraie fonction (`confirmerNumerosAVerifier`, extraite d'App.jsx)
 // dans un `vm`, et on vérifie que les trois chemins d'impression l'appellent.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 // (1er nov., audit X5) Une paire REPUBLIÉE (fiche de l'annonce supprimée + fiche
 // de la nouvelle qui la reprend par `recreeDe`) est UNE paire : pas de question

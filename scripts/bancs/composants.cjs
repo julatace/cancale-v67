@@ -34,6 +34,7 @@
 //  BANC_PORT (8750–8799, défaut 8750). SHOTS : le dossier des captures.
 //  `node scripts/bancs/composants.cjs` (esbuild, pas Vite).
 // ════════════════════════════════════════════════════════════════════════════
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
 const RACINE = process.env.RACINE || path.join(__dirname, '..', '..');
 const NM = [path.join(RACINE, 'node_modules'), path.join(__dirname, '..', '..', 'node_modules')].find((p) => fs.existsSync(path.join(p, 'esbuild')));
@@ -63,7 +64,8 @@ const MUTATIONS = {
 
 async function construire(theme) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-composants-'));
-  const main = fs.readFileSync(path.join(RACINE, 'src', 'main.jsx'), 'utf8');
+  // (8 nov., démarrage léger) les feuilles de l'app ont quitté main.jsx pour src/stylesApp.js (même ordre)
+  const main = fs.readFileSync(path.join(RACINE, 'src', 'main.jsx'), 'utf8') + '\n' + (fs.existsSync(path.join(RACINE, 'src', 'stylesApp.js')) ? fs.readFileSync(path.join(RACINE, 'src', 'stylesApp.js'), 'utf8') : '');
   const css = [...main.matchAll(/^import\s+'\.\/([^']+\.css)';/gm)].map((m) => path.join(RACINE, 'src', m[1]));
   const src = (f) => JSON.stringify(path.join(RACINE, 'src', f));
   const sombre = theme === 'sombre';

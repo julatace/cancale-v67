@@ -13,6 +13,7 @@
 // Lit le code, n'écrit rien. Un chemin en argument : juger un autre App.jsx
 // (l'arbre d'avant : il doit être ROUGE).
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const R = path.join(__dirname, '..');
 const fichier = process.argv[2] || path.join(R, 'src', 'App.jsx');

@@ -1,4 +1,5 @@
 // Rejoue les régressions dans des copies locales ; zéro appel marketplace réel.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
 const mutations=[
