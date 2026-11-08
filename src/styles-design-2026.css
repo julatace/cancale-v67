@@ -290,3 +290,102 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 @media (min-width: 1280px) {
   :root:root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee > :is(.vrm-guide, :has(> .vrm-guide)) { grid-column: 1; grid-row: 3; margin: 0 !important; }
 }
+
+/* ══ 6. VENTES (8 nov., passage 2) ═════════════════════════════════════════
+   Une liste de ventes est UN objet (Wallet, Mail) : un groupe à rangées, le filet
+   après la vignette ; l'état est une ligne de texte (plus de pastille grise
+   répétée sur chaque vente) ; le geste à faire est un POINT ambre, le mot reste à
+   l'encre. Le tiroir devient une feuille groupée comme Réglages : des blocs
+   blancs sur le fond gris, des lignes séparées par un filet. */
+
+/* 6.1 « À venir » : une carte posée (ombre), plus de cadre gris. */
+:root:root body .vrm-app-shell .vrm-main section.vrm-a-venir {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important;
+}
+:root:root body .vrm-app-shell .vrm-main section.vrm-a-venir [data-a-venir-total] { font-weight: 700 !important; letter-spacing: var(--d-ap-22); font-variant-numeric: tabular-nums; }
+
+/* 6.2 « Tous » : le repli « Vestiaire : pas encore lu » est une note, pas un titre. */
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-repli-tete { min-height: 44px; font-size: var(--d-t-13) !important; color: var(--d-gris) !important; }
+
+/* 6.3 La liste « Tous » : un groupe à rangées, au téléphone ET à l'ordinateur. */
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-liste {
+  background: var(--d-carte) !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; overflow: hidden; padding: 0 !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-liste > .vrm-toutes-ligne {
+  position: relative; border: 0 !important; border-radius: 0 !important; background: transparent; align-items: center !important;
+  min-height: 76px !important; padding: var(--d-e-3) var(--d-e-4) !important; gap: var(--d-e-3) !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-liste > .vrm-toutes-ligne + .vrm-toutes-ligne::before {
+  content: ''; position: absolute; top: 0; left: 84px; right: 0; height: .5px; background: var(--d-filet); pointer-events: none;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-liste > .vrm-toutes-ligne:active { background: var(--d-case) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-photo { width: 56px !important; height: 56px !important; border-radius: var(--d-r-case) !important; background: var(--d-case) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-titre > span:first-child { letter-spacing: var(--d-ap-15); display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-meta { color: var(--d-gris) !important; }
+/* L'état : une ligne de texte gris, sans pastille. Un geste à faire (« À envoyer ») :
+   le mot à l'encre et un point ambre devant — jamais toute la phrase en ambre. */
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-etat {
+  display: block !important; width: auto !important; margin-top: 2px !important; padding: 0 !important; border-radius: 0 !important; background: none !important;
+  font-size: var(--d-t-13) !important; font-weight: 500 !important; line-height: var(--d-il-ligne) !important; color: var(--d-gris) !important;
+}
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-toutes-etat, .vrm-toutes-bureau > span)[data-ton="action"] { color: var(--d-encre) !important; font-weight: 600 !important; }
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-toutes-etat, .vrm-toutes-bureau > span)[data-ton="action"]::before {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin: 0 6px 1px 0; border-radius: 50%; background: var(--d-point-ambre); vertical-align: middle;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-montant { align-self: flex-start; padding-top: 2px; }
+:root:root body .vrm-app-shell .vrm-main .vrm-toutes-montant [data-toutes-prix] { font-size: var(--d-t-15) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-15); }
+@media (min-width: 1024px) {
+  /* L'ordinateur : la même rangée en colonnes, posée DANS le groupe (elle flottait sur le gris). */
+  :root:root body .vrm-app-shell .vrm-main .vrm-toutes-liste > .vrm-toutes-ligne { min-height: 68px !important; padding: var(--d-e-2) var(--d-e-5) var(--d-e-2) var(--d-e-4) !important; gap: var(--d-e-4) !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-toutes-liste > .vrm-toutes-ligne + .vrm-toutes-ligne::before { left: 80px; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-toutes-photo { width: 48px !important; height: 48px !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-toutes-montant { align-self: center; padding-top: 0; }
+  /* L'état a sa colonne : sous le titre, il ne se répète pas. */
+  :root:root body .vrm-app-shell .vrm-main .vrm-toutes-titre > .vrm-toutes-etat { display: none !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-toutes-bureau > span { font-size: var(--d-t-13) !important; color: var(--d-gris) !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-toutes-bureau b { font-weight: 500 !important; color: var(--d-encre) !important; }
+  @media (hover: hover) and (pointer: fine) {
+    :root:root body .vrm-app-shell .vrm-main .vrm-toutes-liste > .vrm-toutes-ligne:hover { background: color-mix(in srgb, var(--d-case) 60%, transparent) !important; }
+  }
+}
+
+/* 6.4 La liste d'un site (Vinted…) : les ventes dans UNE carte, une rangée par vente. Une vente
+   qui porte une frise ou un geste les garde dans sa rangée (rien n'est retiré). */
+:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste[data-fu-liste] {
+  gap: 0 !important; background: var(--d-carte) !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; overflow: hidden !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste[data-fu-liste] .vrm-sale-row[data-fu-ligne] {
+  position: relative; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; padding: var(--d-e-3) var(--d-e-4) !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste[data-fu-liste] .vrm-sale-row[data-fu-ligne] ~ .vrm-sale-row[data-fu-ligne]::before {
+  content: ''; position: absolute; top: 0; left: 84px; right: 0; height: .5px; background: var(--d-filet); pointer-events: none; z-index: 1;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { width: 56px !important; height: 56px !important; background: var(--d-case) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-vente-nom { letter-spacing: var(--d-ap-15); }
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-vente-prix { font-weight: 600; }
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-fu-vente-l2 .vrm-fu-site, .vrm-fu-vente-l2 .vrm-fu-vente-compte, .vrm-fu-vente-taille) { font-size: var(--d-t-13); color: var(--d-gris); }
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-vente-l3 { font-size: var(--d-t-13); font-weight: 500; color: var(--d-gris); }
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-vente-l3[data-ton="action"] { color: var(--d-encre); font-weight: 600; }
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-vente-l3[data-ton="action"]::before {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin: 0 6px 1px 0; border-radius: 50%; background: var(--d-point-ambre); vertical-align: middle;
+}
+
+/* 6.5 Le tiroir d'une vente : une feuille GROUPÉE (Réglages, Wallet). Le fond gris, chaque bloc
+   (état, argent, détails) une carte blanche ; plus de traits pleine largeur ni de trait noir épais. */
+:root:root body .vrm-ledger-drawer.vrm-recap, :root:root body .vrm-ledger-drawer.vrm-recap .vrm-main.vrm-recap-corps { background: var(--d-fond) !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-corps > header { border-bottom: 0 !important; padding-bottom: var(--d-e-3) !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-corps > :is(.vrm-recap-etat, .vrm-recap-argent, .vrm-recap-details) {
+  margin: 0 var(--d-e-4) var(--d-e-3); padding: var(--d-e-3) var(--d-e-4) !important; border: 0 !important;
+  background: var(--d-carte); border-radius: var(--d-r-carte); box-shadow: var(--d-ombre-carte);
+}
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-corps > .vrm-recap-gestes { border: 0 !important; padding-top: var(--d-e-1) !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-ligne { min-height: 44px !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-ligne + .vrm-recap-ligne { border-top: .5px solid var(--d-filet); }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-ligne > dt { color: var(--d-gris); }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-argent .vrm-recap-benef { border-top: .5px solid var(--d-filet) !important; margin-top: 0 !important; padding-top: 0 !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-argent .vrm-recap-benef > dt { font-size: var(--d-t-17) !important; font-weight: 600 !important; color: var(--d-encre) !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-argent .vrm-recap-ligne > dd { font-family: inherit !important; word-spacing: normal !important; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-titre { font-size: var(--d-t-13) !important; font-weight: 600 !important; color: var(--d-gris) !important; letter-spacing: 0 !important; text-transform: none !important; margin: var(--d-e-1) 0 !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap h2.vrm-recap-nom { font-size: var(--d-t-20) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-17) !important; line-height: 1.2 !important; }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-gestes .vrm-b-secondaire { background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte); }
+:root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-modifier > summary { background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte); border-radius: var(--d-r-carte) !important; }
