@@ -1082,3 +1082,7 @@ export default async function handler(req, res) {
     res.status(500).json({ ok: false, erreur: 'panne', message: String(e) });
   }
 }
+
+// (8 nov., « à envoyer » prouvé) Pour le banc seulement (scripts/audit-a-envoyer-preuves.cjs) : la
+// composition « à expédier » du soir, du bilan et du matin, exécutée sur une fausse base.
+export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan };
