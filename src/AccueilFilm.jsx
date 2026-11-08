@@ -19,6 +19,10 @@
 // ⚠️ Ce morceau n'est chargé qu'avec `?film` (main.jsx) : un visiteur de la page
 //    ne le télécharge jamais.
 import React from 'react';
+// (8 nov.) Les couches de style de l'ANCIENNE page d'accueil, dont la carte du film
+// garde l'apparence : la nouvelle page (src/Accueil.jsx) ne les importe plus.
+import './styles-accueil-studio.css';
+import './styles-accueil-vitrine.css';
 import { K } from './accueil-jetons.js';
 
 // La couleur du fond du film, avec une opacité (pour les voiles en dégradé).

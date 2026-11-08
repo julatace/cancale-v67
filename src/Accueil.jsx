@@ -1,466 +1,279 @@
 // ══════════════════════════════════════════════════════════════════════════
 // LA PAGE D'ACCUEIL PUBLIQUE — ce que voit quelqu'un qui ne connaît pas VRM
 // ══════════════════════════════════════════════════════════════════════════
-// Julien, 11 octobre : « c'est vraiment pas intuitif, on ne comprend pas trop
-// ce que c'est ; il faut vraiment qu'il soit super celui-là ».
+// (8 nov., refaite pour VENDRE — calme, premium, style Apple de VRM.)
+// La promesse en une phrase : « Tes ventes, tes colis et ta compta, au même
+// endroit. » Puis la journée d'un revendeur, en quatre moments, montrée par de
+// VRAIES captures de l'app (mode exemple, scripts/accueil-captures.cjs) : le
+// prochain geste chaque matin · les colis à envoyer et à retirer, avec leurs
+// codes · les numéros de rangement · la compta et l'URSSAF. Sur ordinateur, un
+// téléphone reste fixe à gauche et change d'écran au fil des chapitres ; sur
+// téléphone, chaque chapitre porte sa capture.
 //
-// LA PAGE RACONTE LA JOURNÉE D'UN REVENDEUR. Une pastille dit ce qu'est VRM, le
-// titre promet (« Tu ouvres VRM. Tu sais quoi faire. »), et à côté la carte
-// « Aujourd'hui » montre — sans qu'on lise — ses comptes qui se replient en un,
-// puis une vente qui crée toute seule ce qu'il y a à faire. Trois sections
-// répondent ensuite aux trois questions de sa journée : 8 h 02 quels colis je
-// poste · 8 h 03 vendu ici, encore en ligne ailleurs ? · fin du mois, combien
-// je déclare. Un seul article inventé, la N°128, traverse toute la page.
-//
-// Grammaire du mouvement : ce que VRM fait arrive SANS curseur ; ce que TU fais
-// passe par un curseur dessiné. Rien ne boucle : chaque écran joue une fois,
-// quand on le voit, en moins de 5 s. « Réduire les animations » : état final.
-//
-// ⚠️ AUCUNE DONNÉE INVENTÉE PRÉSENTÉE COMME VRAIE (§2.3) : ni nombre de
-//    vendeurs, ni étoile, ni avis. La démo dit « exemple ». Le prix vient des
-//    CGV (src/accueil-reglages.js, comparé par le banc), et chaque phrase
-//    correspond à une fonction qui existe (registre : spec du 11 octobre).
-// ⚠️ LÉGÈRE : cette page se charge AVANT l'app. Les écrans du bas
-//    (src/accueil-scenes.jsx) arrivent à part, pendant un temps mort ; le film
-//    (src/AccueilFilm.jsx) seulement avec `?film`.
+// ⚠️ AUCUNE PREUVE INVENTÉE (§2.3, PRODUCT.md « Evidence on Hand ») : ni
+//    témoignage, ni nombre de vendeurs, ni note, ni logo de client. Chaque image
+//    est l'app réelle sur des données INVENTÉES et le dit (« Données d'exemple »).
+// ⚠️ Le prix et l'essai viennent de src/accueil-reglages.js, comparés par le banc
+//    aux CGV et au serveur (scripts/bancs/accueil.cjs) : la page ne peut pas dire
+//    un autre prix ni une autre durée d'essai.
+// ⚠️ LÉGÈRE : cette page se charge AVANT l'app ; elle ne télécharge ni l'app ni
+//    le film (`?film`, src/AccueilFilm.jsx — gardé tel quel). Les captures sont
+//    en WebP (~40 Ko), au double de leur taille affichée, chargées paresseusement
+//    sauf la première.
+// ⚠️ Les contrats `data-*` (prérequis, navigateurs, ordinateur nécessaire, accès
+//    offert, contact) sont lus par scripts/audit-accueil-navigateurs.cjs et
+//    scripts/audit-lancement.cjs : ne pas les retirer.
 import React from 'react';
-import './styles-accueil-studio.css';
-// (31 oct.) Vitrine, chargée APRÈS la couche « studio » : elle a le dernier mot.
-import './styles-accueil-vitrine.css';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
-import { K, COURBE_SORTIE, OMBRE_CARTE, REFLET, HAUTEURS_SCENES, LARGEUR_COMPACTE } from './accueil-jetons.js';
-import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, DETOURAGE_POUR_TOUS, VESTIAIRE_BRANCHE, PRIX_MOIS } from './accueil-reglages.js';
-import { useMoinsDeMouvement, useSansSouris, useTaille } from './accueil-mouvement.js';
-import CarteJour from './accueil-carte.jsx';
+import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, ESSAI_JOURS } from './accueil-reglages.js';
+import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
 // (5 nov.) Les navigateurs où l'extension SERVIE s'installe : une source, la même
-// que l'app (src/navigateursServis.js, ré-exporté par navigateurExtension.js) —
-// jamais « Chrome obligatoire ». Module léger : la page se charge avant l'app.
+// que l'app — jamais « Chrome obligatoire ». Module léger.
 import { navigateursServis, NAVS_ORDINATEUR_TEXTE as NAVS_ORDI } from './navigateursServis.js';
 const SERVIS = navigateursServis();
 
-// ── Les écrans dessinés du bas : un morceau à part ──────────────────────────
-let promesseScenes = null;
-const chargerScenes = () => (promesseScenes || (promesseScenes = import('./accueil-scenes.jsx')));
-const paresseux = (nom) => React.lazy(() => chargerScenes().then((m) => ({ default: m[nom] })));
-const SCENES = {
-  colis: paresseux('SceneColis'),
-  ailleurs: paresseux('SceneAilleurs'),
-  urssaf: paresseux('SceneMois'),
-  premier: paresseux('ScenePremier'),
-};
-const LIBELLES = {
-  colis: 'Exemple d’écran Colis : trois colis à poster, deux bordereaux prêts ; le bordereau de la N°128 sort avec son numéro imprimé, et le carton 128 est mis en avant.',
-  ailleurs: 'Exemple : la N°128 est vendue sur Vinted ; VRM la relie par son numéro à ses annonces Leboncoin et eBay, les signale à retirer, et l’annonce eBay est retirée après confirmation.',
-  urssaf: 'Exemple : la vente de la N°128, versée en fin de mois, porte le chiffre à déclarer de 1 159,50\u00a0€ à 1 244,50\u00a0€, toutes plateformes ; le mois est ensuite noté comme déclaré.',
-  premier: 'Un bordereau dessiné, tamponné du numéro 1.',
-};
-
-// L'emplacement d'un écran : sa boîte est réservée à sa hauteur finale tant que
-// le morceau n'est pas arrivé, et porte déjà `data-scene` et `data-etat`.
-function Emplacement({ nom, pret }) {
-  const boite = React.useRef(null);
-  const { w } = useTaille(boite);
-  // La feuille de la fin vit dans une boîte de 220 px : elle est compacte sur
-  // TÉLÉPHONE (< 760 px), pas parce que sa boîte est étroite.
-  const compact = w > 0 && (nom === 'premier' ? window.innerWidth < 760 : w < LARGEUR_COMPACTE);
-  const h = HAUTEURS_SCENES[nom][compact ? 1 : 0];
-  const Scene = SCENES[nom];
-  const reserve = <div className="acc-ecran" data-scene={nom} data-etat="debut" role="img" aria-label={LIBELLES[nom]} style={{ height: h }} />;
+// ── Les captures (public/accueil/, scripts/accueil-captures.cjs) ────────────
+// Taille réelle des fichiers : téléphone 780 × 1688 (390 px affichés, ×2),
+// ordinateur 1600 × 1000 (1440 × 900 réduits).
+const TEL = { w: 780, h: 1688 }, BUREAU = { w: 1600, h: 1000 };
+function Capture({ nom, alt, taille = TEL, paresseuse = true, prioritaire = false, actif }) {
   return (
-    <div ref={boite} className="acc-emplacement" style={{ minHeight: h }}>
-      {pret && w > 0 ? <React.Suspense fallback={reserve}><Scene compact={compact} libelle={LIBELLES[nom]} /></React.Suspense> : reserve}
-    </div>
+    <picture data-capture={nom} {...(actif ? { 'data-actif': '' } : {})}>
+      <source srcSet={`/accueil/${nom}-sombre.webp`} media="(prefers-color-scheme: dark)" type="image/webp" />
+      <img src={`/accueil/${nom}-clair.webp`} alt={alt} width={taille.w} height={taille.h}
+        loading={paresseuse ? 'lazy' : 'eager'} decoding="async" {...(prioritaire ? { fetchpriority: 'high' } : {})} />
+    </picture>
   );
 }
 
-// ── Les petites pièces ──────────────────────────────────────────────────────
-const Chevron = () => <span className="acc-chev" aria-hidden="true">›</span>;
-const ICONES = {
-  colis: <path d="M3 6.5 9 3.5l6 3v5L9 14.5 3 11.5zM3 6.5l6 3 6-3M9 9.5v5" />,
-  bulle: <path d="M3.5 4.5h11v7h-6l-3.5 3v-3H3.5z" />,
-  euro: <><path d="M13 5.2A4.5 4.5 0 1 0 13 12.8" /><path d="M3.5 8h6M3.5 10.2h6" /></>,
-  envoi: <path d="M3 9h10M10 5.5 13.5 9 10 12.5M15 4v10" />,
-  tel: <><rect x="5" y="2.5" width="8" height="13" rx="2" /><path d="M8 13h2" /></>,
-  pile: <path d="M9 3 15 6 9 9 3 6zM3 9l6 3 6-3M3 12l6 3 6-3" />,
-  photo: <><rect x="3" y="4.5" width="12" height="9" rx="1.5" /><circle cx="9" cy="9" r="2.3" /></>,
-};
-const Icone = ({ nom }) => (
-  <svg className="acc-icone" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-    <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">{ICONES[nom]}</g>
-  </svg>
-);
-
-// `r` : la réponse sur ordinateur, deux lignes (≤ 96 caractères).
-// `c` : la même, courte, sur téléphone (coupe n° 2 du §9 du cahier : une ligne
-//       et demie) — elle ne dit rien que `r` ne dise.
-// `horsTel` : la question qui n'est PAS rendue sur un téléphone (coupe n° 3) —
-//       son contenu passe dans la ligne 2 du haut de page.
-const QUESTIONS = [
-  { i: 'colis', q: 'Mon colis est au relais : c’est quoi le code ?', r: 'Le code de retrait et le point relais de tes achats, avec le compte qui a acheté.', c: 'Le code de retrait et le point relais, avec le compte qui a acheté.' },
-  { i: 'bulle', q: 'Ce message, il est sur quel compte ?', r: 'Tes conversations Vinted, chacune avec son compte ; tu réponds depuis VRM, sur ordinateur.', c: 'Tes conversations Vinted, chacune avec le compte qui l’a reçue.' },
-  { i: 'euro', q: 'J’ai combien chez Vinted ?', r: 'L’argent en attente et l’argent disponible, compte par compte — jamais mélangés.', c: 'En attente et disponible, compte par compte — jamais mélangés.' },
-  { i: 'envoi', q: 'Je la mets aussi sur Leboncoin et eBay ?', r: 'Sans tout retaper : l’extension remplit l’annonce Leboncoin, l’annonce eBay se crée dans VRM.', c: 'L’extension remplit l’annonce Leboncoin ; eBay se crée dans VRM.' },
-  { i: 'tel', q: 'Et sur mon téléphone ?', r: 'Sur ton écran d’accueil : une notification à chaque vente si tu l’actives, un widget sur iPhone.', horsTel: true },
-  { i: 'pile', q: 'J’ai plusieurs comptes Vinted.', r: 'C’est fait pour — et un seul marche aussi : chacun se met à jour quand tu l’ouvres sur ton ordinateur.', c: 'Chacun se met à jour quand tu l’ouvres sur ton ordinateur.' },
-  // N'apparaît que le jour où le détourage est ouvert à tous (src/accueil-reglages.js).
-  ...(DETOURAGE_POUR_TOUS ? [{ i: 'photo', q: 'Mes photos sur fond blanc ?', r: 'Tes photos sont détourées avant d’être attachées à ton annonce Leboncoin.' }] : []),
+// ── Les quatre moments de la journée ────────────────────────────────────────
+const MOMENTS = [
+  {
+    id: 'matin', capture: 'journee',
+    alt: 'L’écran Ma journée de VRM : le montant vendu aujourd’hui, la semaine, et la liste « À faire » — 1 colis à envoyer, 2 colis à retirer, 2 messages. Données d’exemple.',
+    titre: 'Chaque matin, le prochain geste.',
+    texte: 'Ma journée met en haut ce qui presse : le colis à envoyer avant sa date limite, les achats arrivés au relais, les messages qui attendent. Un bouton par geste.',
+    points: ['Tous tes comptes Vinted, Leboncoin et eBay dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
+  },
+  {
+    id: 'colis', capture: 'retirer',
+    alt: 'L’écran Colis de VRM, onglet « À retirer » : le point relais Le Fournil à Rennes, deux colis, et le code de retrait 582913 prêt à copier. Données d’exemple.',
+    titre: 'Tes colis, à envoyer comme à retirer.',
+    texte: 'Les bordereaux s’impriment d’un geste, tamponnés du titre et du numéro de la paire. Au relais, tes codes de retrait t’attendent, rangés par point, même sans réseau.',
+    points: ['Le code, le QR et le point relais de chaque achat.', '« J’ai retiré » le sort de la liste ; un colis douteux reste visible, jamais caché.'],
+  },
+  {
+    id: 'numeros', capture: 'numeros',
+    alt: 'L’écran Annonces de VRM : chaque paire en ligne porte son numéro de rangement en pastille noire, N°14, N°15, N°16, N°9. Données d’exemple.',
+    titre: 'Un numéro par paire. Jamais deux fois.',
+    texte: 'Chaque annonce reçoit un numéro de rangement, celui que tu écris sur le carton. Une vente est reliée à sa paire par une identité — l’annonce, la photo, la transaction —, jamais par un titre qui se ressemble.',
+    points: ['Un numéro n’est jamais redonné à une autre paire.', 'Deux paires sous un même numéro : VRM te le dit, en rouge, tout de suite.'],
+  },
+  {
+    id: 'compta', capture: 'compta',
+    alt: 'L’écran Compta de VRM : « Déclarer octobre 2026, avant le 30 novembre », le chiffre d’affaires et les cotisations estimées à 12,4 %, puis « J’ai déclaré ». Données d’exemple.',
+    titre: 'Ta compta et l’URSSAF, sans tableur.',
+    texte: 'Le chiffre d’affaires mois par mois, daté au jour du versement, et ce qu’il faut recopier sur le site de l’URSSAF. Quand un prix d’achat manque, VRM écrit « au moins » plutôt qu’un faux total.',
+    points: ['Vendu et reçu, séparés : une vente compte quand l’argent arrive.', '« J’ai déclaré » : une vente notée ne se recompte jamais ailleurs.'],
+  },
 ];
 
 const LEGAL = [
-  ['Mentions légales', '/legal/mentions-legales.html'], ['CGU', '/legal/cgu.html'], ['CGV', '/legal/cgv.html'],
-  ['Confidentialité', '/legal/confidentialite.html'], ['Cookies', '/legal/cookies.html'],
+  ['CGV', '/legal/cgv.html'], ['CGU', '/legal/cgu.html'], ['Confidentialité', '/legal/confidentialite.html'],
+  ['Mentions légales', '/legal/mentions-legales.html'], ['Cookies', '/legal/cookies.html'],
 ];
-const ANCRES = [['colis', 'Colis'], ['ailleurs', 'Vendu ailleurs'], ['urssaf', 'URSSAF'], ['prix', 'Prix'], ['faq', 'Questions']];
 
 const CSS = `
-.acc{position:relative;background:${K.bg};color:${K.text};min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;font-variant-numeric:normal;font-feature-settings:normal}
-@supports not (overflow-x:clip){.acc{overflow-x:hidden}}
-.acc *{box-sizing:border-box}
-.acc a{color:inherit}
-.acc :focus-visible{outline:2px solid ${K.accent};outline-offset:2px;border-radius:12px}
-.acc button,.acc a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-:where(.acc) h1,:where(.acc) h2,:where(.acc) h3{font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;margin:0;color:${K.text}}
-:where(.acc) p{margin:0}
-.acc-in{max-width:1180px;margin:0 auto;padding:0 20px}
-.acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
+.av{--fond:#FFFFFF;--fond2:#F5F5F7;--encre:#1D1D1F;--gris:#6E6E73;--accent:#0071E3;--accent-texte:#0066CC;--nuit:#1D1D1F;--nuit-encre:#F5F5F7;--nuit-gris:#A1A1A6;--cadre:#1D1D1F;--ombre:0 1px 2px rgba(0,0,0,.06),0 24px 48px -12px rgba(0,0,0,.18);
+  position:relative;background:var(--fond);color:var(--encre);min-height:100vh;overflow-x:clip;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Inter','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-size:17px;line-height:1.5;letter-spacing:-.01em}
+@media (prefers-color-scheme:dark){.av{--fond:#000000;--fond2:#161617;--encre:#F5F5F7;--gris:#A1A1A6;--accent-texte:#2997FF;--nuit:#1C1C1E;--cadre:#2C2C2E;--ombre:0 0 0 .5px rgba(255,255,255,.12),0 24px 48px -12px rgba(0,0,0,.6)}}
+@supports not (overflow-x:clip){.av{overflow-x:hidden}}
+.av *{box-sizing:border-box}
+.av ::selection{background:rgba(0,113,227,.24)}
+:where(.av) a{color:inherit}
+.av :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px}
+.av a,.av button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+:where(.av) :where(h1,h2,h3,p,ol,ul,figure){margin:0}
+.av-in{max-width:1180px;margin:0 auto;padding:0 24px}
+.av-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
 
-/* La barre : transparente en haut, matière dès qu'on défile. */
-.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(255,255,255,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
-.acc-nav.defile{background:${K.bg};border-bottom-color:${K.line}}
-@media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
-.acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
-.acc img.vrm-brand-asset{background:${K.ink};padding:2px;object-fit:contain;box-sizing:border-box}
-.acc .cj-lib img.vrm-brand-asset{padding:0;border-radius:3px}
-.acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
-.acc-marque img{width:36px;height:36px;border-radius:12px;display:block;object-fit:contain;background:${K.ink};padding:2px;box-sizing:border-box}
-.acc-marque b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:20px;font-weight:700;letter-spacing:.04em}
-.acc-ancres{display:flex;gap:2px;margin-left:22px}
-.acc-ancres a{color:${K.muted};font-size:15px;font-weight:500;padding:8px 10px;border-radius:12px;text-decoration:none;transition:color 160ms ease}
-@media (hover:hover) and (pointer:fine){.acc-ancres a:hover{color:${K.text}}}
-.acc-nav-droite{margin-left:auto;display:flex;align-items:center;gap:6px}
+/* La barre : le fond de la page dès qu'on défile, rien de plus. */
+.av-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:transparent;transition:background-color 200ms ease}
+.av-nav.defile{background:var(--fond)}
+.av-nav .av-in{display:flex;align-items:center;gap:8px;height:56px}
+.av-marque{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;min-height:44px}
+.av-marque img{width:28px;height:28px;border-radius:8px;display:block;background:#1D1D1F;padding:2px;object-fit:contain}
+.av-marque b{font-size:19px;font-weight:700;letter-spacing:.02em}
+.av-liens{display:flex;gap:4px;margin-left:24px}
+.av-liens a{font-size:14px;color:var(--gris);text-decoration:none;padding:12px 10px;border-radius:8px;transition:color 150ms ease}
+@media (hover:hover) and (pointer:fine){.av-liens a:hover{color:var(--encre)}}
+.av-droite{margin-left:auto;display:flex;align-items:center;gap:4px}
 
-/* Les boutons : une forme, trois poids. */
-.acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:12px;border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
-.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:none}
-.acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
-.acc .acc-btn:hover{filter:none}
-.acc-chev{display:inline-block;font-size:20px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
-@media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:none;background:#0071E3}
-  .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
-}
-.acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
-.acc .acc-lien b{font-weight:600;color:${K.text};margin-left:4px}
-@media (hover:hover) and (pointer:fine){.acc .acc-lien:hover b,.acc .acc-lien:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}}
-.acc .acc-lien:active:not(:disabled){transform:none}
-.acc-nav .acc-btn{height:38px;padding:0 14px;font-size:15px;gap:8px}
-.acc-nav .acc-btn .acc-chev{font-size:17px}
-.acc-nav .acc-cta-nav{opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity 150ms ${COURBE_SORTIE},transform 150ms ${COURBE_SORTIE}}
-.acc-nav .acc-cta-nav.la{opacity:1;transform:none;pointer-events:auto;transition-duration:180ms}
+/* Les boutons : une forme (pilule), deux poids. */
+.av .av-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 24px;border-radius:999px;border:none;cursor:pointer;font:inherit;font-size:17px;font-weight:600;letter-spacing:-.01em;text-decoration:none;white-space:nowrap;background:var(--accent);color:#FFFFFF;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease}
+.av .av-btn:active{transform:scale(.97)}
+@media (hover:hover) and (pointer:fine){.av .av-btn:hover{background:#0077ED}}
+.av .av-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:17px;color:var(--accent-texte);text-decoration:none;font-weight:500}
+.av .av-lien span{transition:transform 150ms cubic-bezier(.23,1,.32,1);display:inline-block;margin-left:3px}
+@media (hover:hover) and (pointer:fine){.av .av-lien:hover{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}.av .av-lien:hover span{transform:translateX(2px)}}
+.av-nav .av-btn{min-height:36px;padding:0 16px;font-size:14px;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity 160ms ease,transform 160ms ease}
+.av-nav .av-btn.la{opacity:1;pointer-events:auto;transform:none}
+.av-nav .av-lien{font-size:14px}
 
-/* Le haut de page. */
-.acc-hero{position:relative;padding:56px 0 64px}
-.acc-hero:before{content:none}
-.acc-hero .acc-in{position:relative;display:grid;grid-template-columns:minmax(0,580px) minmax(0,500px);gap:60px;align-items:start}
-.acc-def{display:inline-flex;align-items:center;font-size:15px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:12px;padding:6px 12px;line-height:1.3;text-wrap:balance}
-.acc-h1{font-size:56px;line-height:1.04;letter-spacing:-.03em;font-weight:700;margin:22px 0 0}
-.acc-h1 span{display:block}
-.acc-h1 .attenue{color:${K.muted}}
-.acc-sous{font-size:20px;line-height:1.5;color:${K.text};margin-top:16px;max-width:560px}
-.acc-sous em{font-style:normal;color:${K.muted}}
-.acc-actions{display:flex;align-items:center;gap:20px;margin-top:28px;flex-wrap:wrap}
-.acc-hero .acc-actions .acc-btn{font-size:17px}
-.acc-lignes{margin-top:22px;display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.5;color:${K.faint}}
-.acc-lignes b{color:${K.text};font-weight:600}
-.acc-lignes .sep{padding-left:6px;color:${K.faint}}
-.acc-lignes .nw{white-space:nowrap}
-.acc-carte-jour{position:relative}
-.acc-carte-jour:before{content:none}
-.acc-carte-jour > *{position:relative;z-index:1}
-/* PROFONDEUR 3D DE LA CARTE DÉMO (vitrine marketing — JAMAIS sur les écrans de
-   données de l'app). Trois couches, transform/opacity seuls :
-   • .acc-flotte  : flotte doucement (translateY) — marche SANS souris, donc sur
-     téléphone aussi ; porte la matière (ombre portée + halo bleu) qui la fait
-     décoller du fond. perspective ici pour que la rotation de l'enfant ait du
-     relief.
-   • .acc-tilt    : inclinaison 3D. Au REPOS une pose légère (rotateY/rotateX) —
-     visible tout de suite, sans bouger la souris ; à la souris fine elle suit le
-     pointeur (JS, retargeté par la transition, interruptible). Mono-colonne
-     (≤1099 px) : pas de rotation (évite tout débord), le flottement suffit.
-   Le film ne rend que CarteJourEcran : ces wrappers ne le touchent pas.
-   Mouvement réduit : tout est coupé, carte à plat et immobile. */
-.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08),0 26px 60px rgba(0,0,0,.16),0 20px 60px rgba(0,0,0,.16)}
-/* La carte se POSE en 3D au chargement (un rotateX qui s'aplatit) : le relief
-   se voit sur téléphone comme sur ordinateur, UNE fois, puis la carte se fige
-   À PLAT — texte net, chaque ligne cliquable (une démo qu'on lit et qu'on clique
-   ne doit ni bouger sans fin ni déformer son contenu). À la souris fine, elle
-   suit ensuite le pointeur (JS). Au repos, la profondeur vient de la matière
-   au-dessus (ombre portée + halo), pas d'une rotation figée. */
-.acc-tilt{transform-style:preserve-3d;transition:transform 320ms ${COURBE_SORTIE};will-change:transform}
-@media (prefers-reduced-motion:no-preference){.acc-tilt{animation:accCarte3D 780ms ${COURBE_SORTIE} 240ms both}}
-@keyframes accCarte3D{from{transform:rotateX(14deg) translateY(10px)}to{transform:rotateX(0) translateY(0)}}
-@media (prefers-reduced-motion:reduce){.acc-tilt{animation:none!important;transition:none!important;transform:none!important}}
-.acc-carte-jour > .acc-revoir-l{position:absolute;left:0;right:0;top:100%;height:34px;display:flex;justify-content:flex-end;align-items:center;max-width:500px}
-.acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
-@media (hover:hover) and (pointer:fine){.acc .acc-revoir:hover{color:${K.text}}}
-@keyframes accApparait{from{opacity:0}to{opacity:1}}
+/* Le haut de page : la promesse, centrée — le seul moment centré de la page. */
+.av-hero{padding:72px 0 0;text-align:center}
+.av-h1{font-size:clamp(36px,5.2vw,76px);line-height:1.04;letter-spacing:-.035em;font-weight:700;max-width:16em;margin:0 auto;text-wrap:balance}
+.av-sous{font-size:clamp(19px,1.7vw,24px);line-height:1.4;color:var(--gris);max-width:34em;margin:24px auto 0;text-wrap:balance;letter-spacing:-.015em}
+.av-actions{display:flex;align-items:center;justify-content:center;gap:12px 20px;margin-top:32px;flex-wrap:wrap}
+.av-prix-ligne{margin-top:20px;font-size:15px;color:var(--gris);line-height:1.5}
+.av-prix-ligne b{color:var(--encre);font-weight:600}
+.av-prix-ligne .nw{white-space:nowrap}
+.av-prereq{margin:6px auto 0;font-size:15px;color:var(--gris);max-width:40em;line-height:1.5}
 
-/* APPARITION DU HÉROS AU CHARGEMENT (14 oct.) — première impression. Une
-   cascade douce : chaque élément monte de 14 px en fondu, décalé, ease-out
-   court, et se fige à l'état final (fill both) — aucun décalage de mise en
-   page après. La carte démo arrive un cheveu plus tard. Grammaire du mouvement
-   de la page : ca joue UNE fois, au premier regard. Reduire les animations
-   coupe tout (etat final direct). */
-@keyframes accMonte{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-.acc-def,.acc-h1,.acc-sous,.acc-actions,.acc-lignes,.acc-carte-jour{animation:accMonte 560ms ${COURBE_SORTIE} both}
-.acc-def{animation-delay:40ms}
-.acc-h1{animation-delay:110ms}
-.acc-sous{animation-delay:190ms}
-.acc-actions{animation-delay:270ms}
-.acc-lignes{animation-delay:350ms}
-.acc-carte-jour{animation-duration:680ms;animation-delay:180ms}
-.acc-hero:before{animation:accApparait 1000ms ${COURBE_SORTIE} both}
-@media (prefers-reduced-motion:reduce){
-  .acc-def,.acc-h1,.acc-sous,.acc-actions,.acc-lignes,.acc-carte-jour,.acc-hero:before{animation:none!important}
-}
-/* Un reflet balaie le bouton principal du héros UNE fois, juste après qu'il
-   apparaît : l'œil va à l'action. Invisible avant et après (hors écran), coupé
-   en mouvement réduit (le pseudo reste hors champ, aucune animation posée). */
-.acc-actions .acc-p{overflow:hidden}
-.acc-actions .acc-p:after{content:none}
-@keyframes accLustre{from{transform:translateX(-185%) skewX(-12deg)}to{transform:translateX(230%) skewX(-12deg)}}
+/* La scène du haut : l'ordinateur et le téléphone, de vraies captures. */
+.av-scene{position:relative;margin:56px auto 0;max-width:1100px;padding:0 24px}
+.av-ecran-bureau{display:block;border-radius:14px;overflow:hidden;background:var(--fond2);box-shadow:var(--ombre)}
+.av-ecran-bureau img,.av-tel img{display:block;width:100%;height:auto}
+.av-tel{display:block;background:var(--cadre);padding:7px;border-radius:44px;box-shadow:var(--ombre)}
+.av-tel img{border-radius:37px;overflow:hidden}
+.av-scene .av-tel{position:absolute;right:-8px;bottom:-56px;width:230px}
+.av-legende{font-size:13px;color:var(--gris);margin-top:16px;text-align:left}
+.av-scene .av-legende{margin-top:72px;text-align:center}
+
+/* La journée : sur ordinateur, le téléphone reste fixe et change d'écran. */
+.av-journee{padding:160px 0 40px}
+.av-journee-tete{max-width:780px}
+.av-h2{font-size:clamp(30px,3.6vw,48px);line-height:1.08;letter-spacing:-.03em;font-weight:700;text-wrap:balance}
+.av-chapo{font-size:clamp(18px,1.5vw,21px);color:var(--gris);margin-top:16px;max-width:36em;line-height:1.45}
+.av-split{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:96px;margin-top:72px;align-items:start}
+.av-plateau{position:sticky;top:max(80px,calc(50vh - 330px));height:640px;display:flex;justify-content:center}
+.av-plateau .av-tel{position:relative;width:300px;height:fit-content}
+.av-pile{display:block;position:relative;border-radius:37px;overflow:hidden;aspect-ratio:780/1688}
+.av-pile picture{display:block;position:absolute;inset:0;opacity:0;transition:opacity 260ms ease}
+.av-pile picture[data-actif]{opacity:1}
+.av-pile img{width:100%;height:100%;object-fit:cover;border-radius:0}
+.av-moment{min-height:72vh;display:flex;flex-direction:column;justify-content:center;padding:40px 0}
+.av-moment h3{font-size:clamp(26px,2.6vw,36px);line-height:1.12;letter-spacing:-.028em;font-weight:700;text-wrap:balance;max-width:16em}
+.av-moment p{margin-top:16px;max-width:34em;font-size:19px;line-height:1.5;color:var(--encre)}
+.av-moment ul{list-style:none;padding:0;margin-top:24px;display:flex;flex-direction:column;gap:12px;max-width:34em}
+.av-moment li{position:relative;padding-left:20px;font-size:16px;color:var(--gris);line-height:1.45}
+.av-moment li:before{content:"";position:absolute;left:2px;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--gris)}
+.av-moment .av-tel-seul{display:none}
+.av-moment[data-actif] h3{color:var(--encre)}
+
+/* Les comptes et l'installation : une bande grise, deux colonnes de texte. */
+.av-bande{background:var(--fond2);padding:128px 0;margin-top:120px}
+.av-deux{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:96px;align-items:start}
+.av-bande p{font-size:17px;line-height:1.55;margin-top:16px;max-width:34em}
+.av-bande .av-h2{font-size:clamp(28px,3vw,40px)}
+.av-etapes{list-style:none;padding:0;margin-top:32px;display:flex;flex-direction:column;gap:28px;counter-reset:e}
+.av-etapes li{display:grid;grid-template-columns:36px 1fr;gap:16px;align-items:start}
+.av-etapes .n{width:32px;height:32px;border-radius:50%;background:var(--encre);color:var(--fond);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+.av-etapes h3{font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3}
+.av-etapes p{margin-top:4px;font-size:16px;color:var(--gris)}
+.av-note{font-size:15px!important;color:var(--gris)}
+
+/* Le prix : la carte sombre, signature de VRM. */
+.av-prix{padding:160px 0 0}
+.av-carte-prix{background:var(--nuit);color:var(--nuit-encre);border-radius:28px;padding:64px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:end}
+.av-carte-prix .av-h2{color:var(--nuit-encre)}
+.av-montant{display:flex;align-items:baseline;gap:12px;margin-top:28px;font-variant-numeric:tabular-nums}
+.av-montant b{font-size:clamp(64px,8vw,112px);font-weight:700;letter-spacing:-.045em;line-height:.95}
+.av-montant span{white-space:nowrap;font-size:21px;color:var(--nuit-gris)}
+.av-carte-prix p{font-size:17px;line-height:1.55;color:var(--nuit-encre);max-width:30em}
+.av-carte-prix p + p{margin-top:14px}
+.av-carte-prix .petit{font-size:15px;color:var(--nuit-gris)}
+.av-carte-prix .petit a{color:var(--nuit-encre);text-underline-offset:3px}
+.av-carte-prix .av-btn{margin-top:28px}
+.av-offert{display:inline-block;margin-top:20px;font-size:15px;font-weight:600;color:var(--nuit-encre)}
+
+/* Les questions : du texte qu'on lit, sans accordéon. */
+.av-faq{padding:160px 0 0}
+.av-faq-grille{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,8fr);gap:64px;align-items:start}
+.av-faq-texte{columns:2;column-gap:56px}
+.av-faq-texte p{break-inside:avoid;margin:0 0 24px;font-size:16px;line-height:1.55;color:var(--gris)}
+.av-faq-texte p b{color:var(--encre);font-weight:600}
+.av-faq-texte a{color:var(--accent-texte);text-underline-offset:3px}
+
+/* La fin : une phrase, un geste. */
+.av-fin{padding:200px 0 160px;text-align:left}
+.av-fin p{font-size:clamp(24px,2.4vw,32px);line-height:1.25;letter-spacing:-.022em;font-weight:600;max-width:24em;text-wrap:balance}
+.av-fin .av-actions{justify-content:flex-start;margin-top:28px}
+
+/* Le pied : la marque revient, puis les liens utiles. */
+.av-pied{background:var(--fond2);padding:56px 0 calc(40px + env(safe-area-inset-bottom));font-size:13px;color:var(--gris)}
+.av-pied .av-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:start}
+.av-pied nav{display:flex;flex-wrap:wrap;gap:0 4px;justify-content:flex-end}
+.av-pied nav a,.av-pied nav span{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;text-decoration:none;color:var(--gris)}
+@media (hover:hover) and (pointer:fine){.av-pied nav a:hover{color:var(--encre);text-decoration:underline;text-underline-offset:3px}}
+.av-pied .marque{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--encre);display:block;margin-bottom:8px}
+
+/* Apparition au défilement : une fois, en montée courte ; jamais caché sans observateur. */
 @media (prefers-reduced-motion:no-preference){
-  .acc-actions .acc-p:after{animation:accLustre 1050ms ${COURBE_SORTIE} 820ms 1 both}
+  .av-hero > .av-in > *{animation:avMonte 520ms cubic-bezier(.23,1,.32,1) both}
+  .av-hero .av-sous{animation-delay:70ms}.av-hero .av-actions{animation-delay:140ms}.av-hero .av-prix-ligne,.av-hero .av-prereq{animation-delay:200ms}
+  .av-scene{animation:avMonte 700ms cubic-bezier(.23,1,.32,1) 160ms both}
+  .av-reveil > *{opacity:0;transform:translateY(20px);transition:opacity 500ms cubic-bezier(.23,1,.32,1),transform 500ms cubic-bezier(.23,1,.32,1)}
+  .av-reveil.vu > *{opacity:1;transform:none}
+  .av-reveil.vu > *:nth-child(2){transition-delay:70ms}.av-reveil.vu > *:nth-child(3){transition-delay:140ms}
 }
-/* Apparition au defilement des sections du corps. La classe .acc-reveil n'est
-   posee QUE par le script (jamais au rendu) : sans JS, ou si l'observateur ne
-   se declenche pas, la section reste visible (un filet la revele apres 1,6 s).
-   Reduire les animations : jamais posee. */
-.acc-reveil{opacity:0;transform:translateY(22px);transition:opacity 640ms ${COURBE_SORTIE},transform 640ms ${COURBE_SORTIE}}
-.acc-reveil.vu{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.acc-reveil{opacity:1!important;transform:none!important;transition:none!important}}
+@keyframes avMonte{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.av *{animation:none!important;transition:none!important}}
 
-/* Les sections. */
-.acc-sec{position:relative;padding:64px 0;scroll-margin-top:80px}
-.acc-quand{font-size:13px;font-weight:500;color:${K.muted};margin-bottom:12px}
-.acc-quand b{color:${K.text};font-weight:600}
-.acc-h2{font-size:38px;line-height:1.1;letter-spacing:-.02em;font-weight:700}
-.acc-rep{font-size:20px;line-height:1.5;color:${K.text};margin-top:14px}
-.acc-roles{margin-top:18px;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.5;color:${K.muted}}
-.acc-roles b{font-weight:600;margin-right:8px}
-.acc-roles .vrm{color:${K.text}}
-.acc-roles .toi{color:${K.muted}}
-.acc-prec{margin:16px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.5;color:${K.muted}}
-.acc-prec li{position:relative;padding-left:14px}
-.acc-prec li:before{content:"";position:absolute;left:0;top:.62em;width:4px;height:4px;border-radius:2px;background:${K.faint}}
-.acc-emplacement{position:relative;width:100%}
-.acc-ecran{position:relative;width:100%}
-.acc-g1{display:grid;grid-template-columns:minmax(0,460px) minmax(0,600px);gap:80px;align-items:center;justify-content:space-between}
-.acc-g2-texte{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:60px;align-items:end;margin-bottom:32px}
-.acc-g2-texte .acc-roles{margin-top:0}
-.acc-g3{display:grid;grid-template-columns:minmax(0,560px) minmax(0,480px);gap:80px;align-items:center;justify-content:space-between}
-
-/* Le fil de la journée (ordinateur large seulement, CSS seul). ⚠️ Pas sous
-   1 440 px : vu au rendu à 1 366 px, son repère « 8 h 02 » sortait par la
-   gauche de l'écran (coupé net, sans débordement mesurable : overflow clip). */
-.acc-fil{display:none}
-@media (min-width:1440px){
-  .acc-fil{display:block;position:absolute;left:calc(50% - 620px);top:0;bottom:0;width:1px;background:${K.line2};pointer-events:none}
-  .acc-fil i{position:absolute;inset:0;background:rgba(255,255,255,.4);transform-origin:top}
-  .acc-fil span{position:absolute;right:12px;top:64px;white-space:nowrap;font-size:13px;font-weight:600;color:${K.text};line-height:18px}
-  .acc-fil span:after{content:"";position:absolute;right:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:${K.bg};border:1px solid rgba(255,255,255,.5)}
+/* Tablette et petit ordinateur. */
+@media (max-width:1023px){
+  .av-split{grid-template-columns:1fr;gap:0;margin-top:32px}
+  .av-plateau{display:none}
+  .av-moment{min-height:0;padding:56px 0 0}
+  .av-moment .av-tel-seul{display:block;width:min(300px,78vw);margin:32px auto 0}
+  .av-deux,.av-carte-prix,.av-faq-grille{grid-template-columns:1fr;gap:40px}
+  .av-carte-prix{padding:48px 32px}
+  .av-liens{display:none}
 }
-@supports (animation-timeline:view()){
-  .acc-fil i{animation:accRemplit linear both;animation-timeline:view();animation-range:entry 20% cover 55%}
-}
-@keyframes accRemplit{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-@media (prefers-reduced-motion:reduce){.acc-fil i{animation:none!important;transform:none!important}}
-
-/* Les petites questions. */
-.acc-qs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
-.acc-q{background:${K.card};border:1px solid ${K.line};border-radius:12px;padding:18px;box-shadow:${REFLET}}
-.acc-q .acc-icone{color:${K.muted};flex-shrink:0;margin-top:1px}
-.acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
-.acc-q p{font-size:15px;line-height:1.45;color:${K.muted};margin-top:6px}
-/* Les cartes répondent sous le curseur (sur SOURIS seulement — sur mobile un
-   survol reste collé après un tap, et la carte-question y est de toute façon
-   sans cadre). §7 : on réutilise les ombres existantes, aucune couleur neuve. */
-@media (hover:hover) and (pointer:fine){
-  .acc-q{transition:transform 180ms ${COURBE_SORTIE},box-shadow 180ms ${COURBE_SORTIE}}
-  .acc-q:hover{transform:translateY(-2px);box-shadow:${REFLET},${OMBRE_CARTE}}
-  .acc-prix{transition:transform 200ms ${COURBE_SORTIE}}
-  .acc-prix:hover{transform:translateY(-2px)}
-  .acc-marque img{transition:transform 220ms ${COURBE_SORTIE}}
-  .acc-marque:hover img{transform:scale(1.05)}
-}
-@media (prefers-reduced-motion:reduce){.acc-q:hover,.acc-prix:hover,.acc-marque:hover img{transform:none!important}}
-
-/* L'installation, puis la confiance. */
-.acc-bande{background:${K.surface};border-top:1px solid ${K.line};border-bottom:1px solid ${K.line}}
-.acc-deux{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;align-items:start}
-.acc-h2b{font-size:28px;line-height:1.15;letter-spacing:-.02em;font-weight:700}
-.acc-note{margin:18px 0 0;font-size:13px;line-height:1.55;color:${K.muted}}
-.acc-etapes{list-style:none;margin:24px 0 0;padding:0;display:flex;flex-direction:column;gap:18px}
-.acc-etapes li{display:flex;gap:14px;align-items:flex-start}
-.acc-etapes .n{width:28px;height:28px;border-radius:12px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${K.text};flex-shrink:0}
-.acc-etapes h3{font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:17px;font-weight:600;line-height:1.35;letter-spacing:0;margin-top:3px}
-.acc-etapes p{font-size:15px;line-height:1.55;color:${K.muted};margin-top:3px}
-.acc-conf p{font-size:15px;line-height:1.6;color:${K.muted};margin-top:14px}
-.acc-conf p:first-of-type{margin-top:24px;color:${K.text}}
-.acc-conf p b{color:${K.text};font-weight:600}
-
-/* Le prix et les questions. */
-.acc-g-prix{display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);gap:64px;align-items:start}
-.acc-prix{background:${K.card};border:1px solid ${K.line2};border-radius:12px;padding:28px;box-shadow:${REFLET},${OMBRE_CARTE}}
-.acc-offert{display:inline-flex;font-size:13px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:12px;padding:4px 10px;margin-top:16px}
-.acc-gros{display:flex;align-items:baseline;gap:10px;margin-top:12px}
-.acc-gros b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:52px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
-.acc-gros span{font-size:17px;color:${K.muted}}
-.acc-prix ul{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5;color:${K.text}}
-.acc-prix .petit{font-size:15px;line-height:1.5;color:${K.muted};margin-top:14px}
-.acc-prix .petit a{color:${K.text};text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
-.acc-prix .acc-btn{width:100%;margin-top:20px}
-.acc-faq h2{font-size:28px;line-height:1.15;letter-spacing:-.02em;font-weight:700;margin-bottom:8px}
-.acc-faq details{border-bottom:1px solid ${K.line}}
-.acc-faq summary{list-style:none;cursor:pointer;min-height:52px;padding:14px 0;font-size:17px;font-weight:600;line-height:1.4;display:flex;justify-content:space-between;gap:16px;align-items:center}
-.acc-faq summary::-webkit-details-marker{display:none}
-.acc-faq summary:after{content:"+";font-size:22px;line-height:1;color:${K.muted};font-weight:400;flex-shrink:0;transition:transform 200ms ${COURBE_SORTIE}}
-.acc-faq details[open] summary:after{transform:rotate(45deg)}
-.acc-faq details p{margin:0 0 16px;font-size:15px;line-height:1.6;color:${K.muted};max-width:640px}
-.acc-faq details[open] p{animation:accApparait 150ms ease both}
-.acc-faq details p a{color:${K.text};text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
-
-/* La fin. */
-.acc-fin{position:relative;text-align:center;padding:64px 0}
-.acc-fin:before{content:none}
-.acc-fin .acc-in{position:relative;display:flex;flex-direction:column;align-items:center}
-.acc-fin-feuille{display:flex;flex-direction:column;align-items:center}
-.acc-fin-texte{display:flex;flex-direction:column;align-items:center}
-.acc-fin .acc-emplacement{width:220px}
-.acc-fin .note{font-size:15px;color:${K.muted};margin-top:12px}
-.acc-fin .acc-h2{margin-top:22px}
-.acc-fin .texte{font-size:17px;line-height:1.55;color:${K.muted};margin-top:12px;max-width:520px}
-.acc-fin .acc-actions{justify-content:center}
-@media (min-width:1100px){
-  .acc-fin .acc-in{flex-direction:row;justify-content:center;align-items:center;gap:64px}
-  .acc-fin-texte{align-items:flex-start;text-align:left}
-  .acc-fin .acc-h2{margin-top:0}
-  .acc-fin .texte{max-width:720px}
-  .acc-fin .acc-actions{justify-content:flex-start;margin-top:24px}
-}
-
-/* Le pied de page. */
-.acc-pied{border-top:1px solid ${K.line};padding:28px 0 36px;font-size:13px;color:${K.faint}}
-.acc-pied .acc-in{display:flex;gap:14px 28px;flex-wrap:wrap;align-items:center;justify-content:space-between}
-.acc-pied nav{display:flex;gap:4px 16px;flex-wrap:wrap}
-.acc-pied a{text-decoration:none;color:${K.muted}}
-@media (hover:hover) and (pointer:fine){.acc-pied a:hover{color:${K.text}}}
-
-/* Tablette. */
-@media (max-width:1099px){
-  .acc-hero .acc-in{grid-template-columns:minmax(0,640px);gap:40px}
-  .acc-carte-jour{max-width:500px}
-  .acc-g1,.acc-g3{grid-template-columns:minmax(0,1fr);gap:32px}
-  .acc-g3 .acc-g3-ecran{order:2}
-  .acc-g2-texte{grid-template-columns:minmax(0,1fr);gap:0}
-  .acc-g2-texte .acc-roles{margin-top:18px}
-  .acc-qs{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .acc-deux,.acc-g-prix{grid-template-columns:minmax(0,1fr);gap:40px}
-  .acc-prix{max-width:520px}
-}
-@media (max-width:899px){.acc-ancres{display:none}}
-@media (min-width:760px){.acc-tel-seul,.acc-court{display:none}}
-
 /* Téléphone. */
 @media (max-width:759px){
-  .acc-nav .acc-in{height:56px;gap:8px}
-  .acc-marque img{width:32px;height:32px}
-  .acc-marque b{font-size:17px}
-  .acc-nav .acc-btn{height:38px;padding:0 12px;font-size:13px}
-  .acc-nav .acc-lien{font-size:15px;padding:0 4px}
-  .acc-hero{padding:16px 0 0}
-  .acc-def{font-size:13px;padding:5px 10px}
-  .acc-h1{font-size:34px;margin-top:10px}
-  .acc-sous{font-size:17px;line-height:1.45;margin-top:12px}
-  .acc-actions{flex-direction:column;align-items:stretch;gap:2px;margin-top:16px}
-  .acc-hero .acc-actions .acc-btn{height:52px;width:100%}
-  .acc-actions .acc-lien{justify-content:center}
-  .acc-lignes{margin-top:6px;font-size:13px;gap:4px;line-height:1.45}
-  .acc-hero .acc-in{gap:16px}
-  .acc-sec{padding:32px 0}
-  .acc-h2{font-size:28px}
-  .acc-rep{font-size:17px;line-height:1.45;margin-top:10px}
-  .acc-roles{margin-top:14px;gap:6px;line-height:1.45}
-  .acc-quand{margin-bottom:8px}
-  .acc-prec{display:none}
-  .acc-g1,.acc-g3{gap:20px}
-  .acc-g2-texte{gap:0;margin-bottom:20px}
-  .acc-g2-texte .acc-roles{margin-top:14px}
-  .acc-qs{grid-template-columns:minmax(0,1fr);gap:0;margin-top:16px}
-  .acc-q{background:none;border:none;border-radius:0;border-bottom:1px solid ${K.line};padding:12px 0;box-shadow:none}
-  .acc-q h3{gap:12px}
-  .acc-q p{line-height:1.45;margin-top:2px;padding-left:30px}
-  .acc-q:last-child{border-bottom:none}
-  .acc-hors-tel,.acc-q .acc-long:not(:only-child){display:none}
-  .acc-h2b{font-size:22px}
-  .acc-etapes{margin-top:16px;gap:12px}
-  .acc-etapes h3{font-size:15px}
-  .acc-etapes p{font-size:15px;line-height:1.5;margin-top:2px}
-  .acc-conf p{font-size:15px;line-height:1.5;margin-top:10px}
-  .acc-conf p:first-of-type{margin-top:16px}
-  .acc-deux,.acc-g-prix{gap:32px}
-  .acc-prix{padding:22px 20px}
-  .acc-gros b{font-size:44px}
-  .acc-prix .acc-btn{height:52px}
-  .acc-faq h2{font-size:22px}
-  .acc-faq summary{font-size:15px}
-  .acc-fin{padding:36px 0 40px}
-  .acc-fin .acc-emplacement{width:180px}
-  .acc-fin .acc-h2{margin-top:16px}
-  .acc-fin .texte{display:none}
-  .acc-fin-texte{align-self:stretch}
-  .acc-fin .acc-actions{align-self:stretch}
-  .acc-pied{padding:22px 0 28px}
+  .av-in{padding:0 20px}
+  .av-hero{padding-top:40px}
+  .av-sous{margin-top:16px}
+  .av-actions{margin-top:24px;flex-direction:column;gap:4px}
+  .av-actions .av-btn{width:100%;max-width:360px}
+  .av-scene{margin-top:40px;padding:0 20px}
+  .av-scene .av-ecran-bureau{display:none}
+  .av-scene .av-tel{position:relative;right:auto;bottom:auto;width:min(280px,74vw);margin:0 auto}
+  .av-scene .av-legende{margin-top:16px}
+  .av-journee{padding-top:104px}
+  .av-moment p{font-size:17px}
+  .av-bande{padding:88px 0;margin-top:96px}
+  .av-prix,.av-faq{padding-top:104px}
+  .av-carte-prix{padding:40px 24px;border-radius:24px}
+  .av-faq-texte{columns:1}
+  .av-fin{padding:120px 0 104px}
+  .av-fin .av-actions{align-items:flex-start}
+  .av-pied .av-in{grid-template-columns:1fr}
+  .av-pied nav{justify-content:flex-start;margin-left:-8px}
+  .av-nav .av-btn{display:none}
 }
-@media (max-width:379px){.acc-marque b{display:none}}
-/* Sous 340 px, le premier morceau (« Gratuit pour l'instant, puis … par mois · »)
-   ne tient plus sur une ligne : on le laisse se couper plutôt que déborder. */
-@media (max-width:339px){.acc-lignes .nw{white-space:normal}}
+@media (max-width:359px){.av-marque b{display:none}}
 `;
 
-// ── Les gabarits ────────────────────────────────────────────────────────────
-function Quand({ heure, contexte }) {
-  return <div className="acc-quand">{heure ? <><b>{heure}</b> · {contexte}</> : <b>{contexte}</b>}</div>;
-}
-function Roles({ vrm, toi }) {
-  return (
-    <div className="acc-roles">
-      <div><b className="vrm">VRM</b><span>{vrm}</span></div>
-      <div><b className="toi">Toi</b><span>{toi}</span></div>
-    </div>
-  );
-}
-function Precisions({ items }) {
-  return <ul className="acc-prec">{items.map((x) => <li key={x}>{x}</li>)}</ul>;
-}
-const Fil = ({ libelle }) => <div className="acc-fil" aria-hidden="true"><i /><span>{libelle}</span></div>;
-
 export default function Accueil({ onEntrer }) {
-  // La page impose son fond sombre au DOCUMENT (sinon iOS peint le fond clair
-  // du body au rebond du défilement), et le rend en partant.
-  React.useEffect(() => {
-    const avant = document.body.style.background;
-    document.body.style.background = K.bg;
-    const titre = document.title;
-    document.title = 'VRM — l’outil de gestion des revendeurs Vinted, Leboncoin et eBay';
-    return () => { document.body.style.background = avant; document.title = titre; };
-  }, []);
   const moins = useMoinsDeMouvement();
   const sansSouris = useSansSouris();
+  // Le fond du DOCUMENT suit la page (sinon iOS peint un autre fond au rebond).
+  React.useEffect(() => {
+    const avant = document.body.style.background, titre = document.title;
+    let mq = null;
+    const poser = () => { document.body.style.background = mq && mq.matches ? '#000000' : '#FFFFFF'; };
+    try { mq = window.matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener && mq.addEventListener('change', poser); } catch (_) {}
+    poser();
+    document.title = 'VRM — tes ventes, tes colis et ta compta, au même endroit';
+    return () => { try { mq && mq.removeEventListener && mq.removeEventListener('change', poser); } catch (_) {} document.body.style.background = avant; document.title = titre; };
+  }, []);
 
-  // La barre : matière dès 8 px de défilement ; « Créer mon compte » n'y
-  // apparaît que si le bouton du haut de page est sorti de l'écran (un seul
-  // bouton principal visible à la fois).
+  // La barre : le fond dès 8 px ; « Créer mon compte » n'y paraît que quand le
+  // bouton du haut est sorti de l'écran (un seul bouton principal à la fois).
   const sentinelle = React.useRef(null), ctaHaut = React.useRef(null);
   const [defile, setDefile] = React.useState(false);
   const [ctaNav, setCtaNav] = React.useState(false);
@@ -469,303 +282,220 @@ export default function Accueil({ onEntrer }) {
     try {
       const a = new IntersectionObserver((es) => setDefile(!es[es.length - 1].isIntersecting));
       if (sentinelle.current) { a.observe(sentinelle.current); obs.push(a); }
-      const b = new IntersectionObserver((es) => setCtaNav(!es[es.length - 1].isIntersecting), { rootMargin: '-64px 0px 0px 0px' });
+      const b = new IntersectionObserver((es) => setCtaNav(!es[es.length - 1].isIntersecting), { rootMargin: '-56px 0px 0px 0px' });
       if (ctaHaut.current) { b.observe(ctaHaut.current); obs.push(b); }
     } catch (_) {}
     return () => obs.forEach((o) => { try { o.disconnect(); } catch (_) {} });
   }, []);
 
-  // Le morceau des scènes : demandé pendant un temps mort, ou dès qu'une
-  // section à scène approche.
-  const [scenesPretes, setScenesPretes] = React.useState(false);
-  const zoneScenes = React.useRef(null);
+  // Le moment de la journée au milieu de l'écran : le téléphone fixe le montre.
+  const [actif, setActif] = React.useState(MOMENTS[0].id);
   React.useEffect(() => {
-    let fini = false, id = 0, io = null;
-    const go = () => { if (fini) return; chargerScenes().then(() => { if (!fini) setScenesPretes(true); }, () => {}); };
-    try {
-      if (typeof window.requestIdleCallback === 'function') id = window.requestIdleCallback(go, { timeout: 2000 });
-      else id = setTimeout(go, 1200);
-    } catch (_) { id = setTimeout(go, 1200); }
-    try {
-      io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) go(); }, { rootMargin: '800px 0px' });
-      if (zoneScenes.current) io.observe(zoneScenes.current);
-    } catch (_) {}
-    return () => { fini = true; try { window.cancelIdleCallback && window.cancelIdleCallback(id); } catch (_) {} clearTimeout(id); try { io && io.disconnect(); } catch (_) {} };
-  }, []);
-
-  // Apparition au défilement des sections du corps (le héros a sa propre
-  // cascade au chargement). On ne cache une section QUE si le mouvement est
-  // permis ET qu'un observateur existe. L'observateur livre toujours une
-  // notification initiale : les sections déjà à l'écran se révèlent tout de
-  // suite, celles plus bas attendent le défilement. S'il ne se construit pas,
-  // tout est révélé. « Réduire les animations » : on ne touche à rien.
-  React.useEffect(() => {
-    if (moins || typeof IntersectionObserver !== 'function') return;
-    const secs = Array.from(document.querySelectorAll('.acc-sec, .acc-fin'));
-    if (!secs.length) return;
-    const reveler = (s) => { try { s.classList.add('vu'); } catch (_) {} };
     let io = null;
     try {
       io = new IntersectionObserver((es) => {
-        es.forEach((e) => { if (e.isIntersecting) { reveler(e.target); io.unobserve(e.target); } });
-      }, { rootMargin: '0px 0px -12% 0px' });
-      secs.forEach((s) => { s.classList.add('acc-reveil'); io.observe(s); });
-    } catch (_) { secs.forEach((s) => s.classList.remove('acc-reveil')); }
+        const vus = es.filter((e) => e.isIntersecting);
+        if (vus.length) setActif(vus[vus.length - 1].target.getAttribute('data-moment'));
+      }, { rootMargin: '-45% 0px -45% 0px' });
+      document.querySelectorAll('[data-moment]').forEach((m) => io.observe(m));
+    } catch (_) {}
+    return () => { try { io && io.disconnect(); } catch (_) {} };
+  }, []);
+
+  // Apparition au défilement — seulement si le mouvement est permis ET qu'un
+  // observateur existe ; sinon tout reste visible.
+  React.useEffect(() => {
+    if (moins || typeof IntersectionObserver !== 'function') return;
+    const blocs = Array.from(document.querySelectorAll('[data-reveil]'));
+    let io = null;
+    try {
+      io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('vu'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -10% 0px' });
+      blocs.forEach((b) => { b.classList.add('av-reveil'); io.observe(b); });
+    } catch (_) { blocs.forEach((b) => b.classList.remove('av-reveil')); }
     return () => { try { io && io.disconnect(); } catch (_) {} };
   }, [moins]);
 
-  const vers = (id) => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: moins ? 'auto' : 'smooth', block: 'start' }); };
-  const ancre = (id) => (e) => { e.preventDefault(); vers(id); };
+  const vers = (id) => (e) => { const el = document.getElementById(id); if (!el) return; e.preventDefault(); el.scrollIntoView({ behavior: moins ? 'auto' : 'smooth', block: 'start' }); };
   // L'app ne se télécharge que quand on montre l'intention d'entrer.
   const prepare = () => { try { import('./App.jsx'); } catch (_) {} };
-  const entrer = (mode) => () => onEntrer && onEntrer(mode);
-  // ⚠️ Des fonctions qui RENDENT un bouton, pas des composants déclarés ici :
-  //    un composant redéfini à chaque rendu serait démonté et remonté à chaque
-  //    défilement (la barre change d'état), et le focus clavier se perdrait.
+  // De vrais liens (`/?inscription`, `/?connexion`) : ils marchent sans script ;
+  // avec, l'app s'ouvre sans recharger la page.
+  const entrer = (mode) => (e) => { if (!onEntrer || e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); onEntrer(mode); };
+  // ⚠️ Des fonctions qui RENDENT un bouton, pas des composants déclarés ici
+  //    (un composant redéfini à chaque rendu perdrait le focus clavier).
   const creer = (extra) => (
-    <button type="button" className="acc-btn acc-p" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>
-      Créer mon compte<Chevron />
-    </button>
+    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>Créer mon compte</a>
   );
   const connexion = (extra) => (
-    <button type="button" className="acc-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>
-      Déjà un compte ?<b>Se connecter</b>
-    </button>
+    <a href="/?connexion" className="av-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>Se connecter<span aria-hidden="true">›</span></a>
   );
+  const ligneEssai = `${ESSAI_JOURS} jours d’essai gratuit`;
 
   return (
-    <div className="acc" data-accueil="">
+    <div className="av" data-accueil="">
       <style>{CSS}</style>
-      <div className="acc-sentinelle" ref={sentinelle} />
-      <header className={`acc-nav${defile ? ' defile' : ''}`}>
-        <div className="acc-in">
-          <a className="acc-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label="VRM — haut de la page">
-            <img className="vrm-brand-asset" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="32px" alt="" width="32" height="32" />
+      <div className="av-sentinelle" ref={sentinelle} />
+      <header className={`av-nav${defile ? ' defile' : ''}`}>
+        <div className="av-in">
+          <a className="av-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label="VRM — haut de la page">
+            <img src="/vrm-logo-v4-96.png" srcSet="/vrm-logo-v4-96.png 1x, /vrm-logo-v4-192.png 2x" alt="" width="28" height="28" />
             <b>VRM</b>
           </a>
-          <nav className="acc-ancres" aria-label="Sections">
-            {ANCRES.map(([id, l]) => <a key={id} href={`#${id}`} onClick={ancre(id)}>{l}</a>)}
+          <nav className="av-liens" aria-label="Sections">
+            <a href="#journee" onClick={vers('journee')}>Fonctions</a>
+            <a href="#prix" onClick={vers('prix')}>Prix</a>
+            <a href="#faq" onClick={vers('faq')}>Questions</a>
+            <a href="/aide">Aide</a>
           </nav>
-          <div className="acc-nav-droite">
-            {/* « Se connecter » reste au bord droit, toujours ; « Créer mon compte »
-                apparaît à sa gauche une fois le bouton du haut de page sorti. */}
-            <button type="button" className={`acc-btn acc-p acc-cta-nav${ctaNav ? ' la' : ''}`} data-cta-nav="inscription"
-              tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>
-              Créer mon compte<Chevron />
-            </button>
-            <button type="button" className="acc-lien" data-cta-nav="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}><b style={{ margin: 0 }}>Se connecter</b></button>
+          <div className="av-droite">
+            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte</a>
+            <a href="/?connexion" className="av-lien" data-cta-nav="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>Se connecter</a>
           </div>
         </div>
       </header>
 
       <main>
-        <section className="acc-hero" data-section="hero">
-          <div className="acc-in">
-            <div>
-              <div className="acc-def" data-definition=""><span className="acc-def-dot" aria-hidden="true"/>L’espace de travail des revendeurs</div>
-              <div className="acc-plateformes" aria-label="Plateformes prises en charge"><span>Vinted</span><span>Leboncoin</span><span>eBay</span></div>
-              <h1 className="acc-h1"><span>Moins de gestion.</span><span className="attenue acc-h1-long">Plus de temps pour vendre.</span><span className="attenue acc-h1-court">Place à la vente.</span></h1>
-              <p className="acc-sous">Tes ventes, tes colis et tes chiffres, réunis. <em>Une vue claire pour passer à l’action.</em></p>
-              <div className="acc-actions">
-                {creer({ ref: ctaHaut })}
-                {connexion({ 'data-cta': 'connexion' })}
-              </div>
-              <div className="acc-lignes">
-                {/* Trois morceaux insécables : la ligne ne se coupe qu'APRÈS un
-                    « · » (vu au rendu à 390 px : « · Sans / engagement »). */}
-                <div>
-                  <span className="nw">{ACCES_OFFERT && <><span data-acces-offert="">Gratuit pour l’instant</span>, puis </>}<b>{PRIX_MOIS}&nbsp;€</b> par mois<span className="sep">·</span></span>{' '}
-                  <span className="nw">Sans engagement<span className="sep">·</span></span>{' '}
-                  <span className="nw">Aucun mot de passe Vinted demandé</span>
-                </div>
-                {/* (5 nov.) Pas « Chrome obligatoire » : la liste des navigateurs SERVIS
-                    (src/navigateurExtension.js). L'ordinateur reste nécessaire tant
-                    qu'aucun chemin sur téléphone n'est prouvé (`lectureTelephone`). */}
-                <div data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
-                  {sansSouris
-                    ? `Crée ton compte ici, puis installe l’extension une fois sur ton ordinateur : ${NAVS_ORDI}.`
-                    : `S’installe une fois sur ton ordinateur, dans ${NAVS_ORDI} — il reste nécessaire pour lire Vinted. Ton téléphone suit tout.`}
-                </div>
-              </div>
+        <section className="av-hero" data-section="hero">
+          <div className="av-in">
+            <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
+            <p className="av-sous">VRM, l’outil des revendeurs Vinted, Leboncoin et eBay, te dit chaque matin quoi faire — sans jamais te tromper de paire.</p>
+            <div className="av-actions">
+              {creer({ ref: ctaHaut })}
+              {connexion({ 'data-cta': 'connexion' })}
             </div>
-            <div className="acc-preview"><div className="acc-preview-head"><span>UNE JOURNÉE PLUS CLAIRE</span><span className="acc-preview-example">Démonstration</span></div><CarteJour onVers={vers} /><p className="acc-preview-note">Ce qui compte aujourd’hui, visible au même endroit. Données d’exemple.</p></div>
+            <p className="av-prix-ligne" data-prix-ligne="">
+              {ACCES_OFFERT && <><span className="nw" data-acces-offert="">Gratuit pour l’instant</span>, puis </>}
+              <span className="nw"><b>{PRIX_MOIS}&nbsp;€</b> par mois</span> après <span className="nw" data-essai={ESSAI_JOURS}>{ligneEssai}</span> · <span className="nw">sans engagement</span>
+            </p>
+            {/* Ce qui est VRAI (1er et 5 nov.) : VRM lit Vinted par l'extension, dans le
+                navigateur de l'ordinateur ; le téléphone consulte et commande. Pas
+                « Chrome obligatoire » : la liste des navigateurs SERVIS. */}
+            <p className="av-prereq" data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
+              {sansSouris
+                ? `Crée ton compte ici, puis installe l’extension une fois sur ton ordinateur : ${NAVS_ORDI}.`
+                : `L’extension s’installe une fois sur ton ordinateur, dans ${NAVS_ORDI} — il reste nécessaire pour lire Vinted. Ton téléphone suit tout.`}
+            </p>
           </div>
+          <figure className="av-scene" data-scene-haut="">
+            <span className="av-ecran-bureau"><Capture nom="bureau" taille={BUREAU} alt="Ma journée de VRM sur ordinateur : le menu à gauche, le montant vendu aujourd’hui au centre, et à droite « À faire » — 1 colis à envoyer, 2 colis à retirer, 2 messages, 6 prix à baisser. Données d’exemple." /></span>
+            <span className="av-tel"><Capture nom="journee" paresseuse={false} prioritaire alt="Ma journée de VRM sur iPhone : le montant vendu aujourd’hui, la semaine, puis « À faire ». Données d’exemple." /></span>
+            <figcaption className="av-legende">L’app VRM telle qu’elle est. Données d’exemple.</figcaption>
+          </figure>
         </section>
 
-        <nav className="acc-benefices acc-in" aria-label="Découvrir les fonctions de VRM">
-          {[
-            ['colis','colis','Savoir quoi expédier','Tes bordereaux et les colis à déposer.'],
-            ['ailleurs','pile','Repérer les annonces à retirer','Un article vendu, les autres annonces à vérifier.'],
-            ['urssaf','euro','Voir où tu en es','Tes ventes finalisées et les rapports du mois.'],
-          ].map(([id,icone,titre,texte])=><a key={id} href={'#'+id} onClick={ancre(id)}><span className="acc-benefice-icon"><Icone nom={icone}/></span><span><b>{titre}</b><small>{texte}</small></span><Chevron/></a>)}
-        </nav>
-
-        <div ref={zoneScenes}>
-          <section className="acc-sec" id="colis" data-section="colis">
-            <Fil libelle="01" />
-            <div className="acc-in acc-g1">
+        <section className="av-journee" id="journee" data-section="journee">
+          <div className="av-in">
+            <div className="av-journee-tete" data-reveil="">
+              <h2 className="av-h2">Ta journée de revendeur, en quatre moments.</h2>
+              <p className="av-chapo">Le matin, au point relais, devant tes cartons, à la fin du mois : VRM te montre ce qu’il y a à faire, et rien que ça.</p>
+            </div>
+            <div className="av-split">
+              <div className="av-plateau" aria-hidden="true">
+                <span className="av-tel">
+                  <span className="av-pile" data-pile="">
+                    {MOMENTS.map((m) => <Capture key={m.id} nom={m.capture} alt="" actif={actif === m.id} paresseuse={m.id !== MOMENTS[0].id} />)}
+                  </span>
+                </span>
+              </div>
               <div>
-                <Quand contexte="01 · Préparer les envois" />
-                <h2 className="acc-h2">Les bons colis. Dans le bon ordre.</h2>
-                <p className="acc-rep">Retrouve les colis à envoyer et leurs bordereaux. Le numéro de rangement t’aide à retrouver le bon article.</p>
-                <Roles vrm="prépare le bordereau de chaque vente et y imprime le titre et le numéro." toi="tu imprimes, tu retrouves ton article et tu déposes le colis." />
-                <Precisions items={['Un bordereau par feuille, en A4 ou sur imprimante thermique.', 'Ton numéro de rangement, en chiffres ou en série (B125…), n’est jamais redonné à un autre article.']} />
+                {MOMENTS.map((m) => (
+                  <article key={m.id} className="av-moment" data-moment={m.id} {...(actif === m.id ? { 'data-actif': '' } : {})}>
+                    <h3>{m.titre}</h3>
+                    <p>{m.texte}</p>
+                    <ul>{m.points.map((x) => <li key={x}>{x}</li>)}</ul>
+                    {/* Le premier moment est déjà la capture du haut de page : pas deux fois. */}
+                    {m.id !== MOMENTS[0].id && <span className="av-tel av-tel-seul"><Capture nom={m.capture} alt={m.alt} /></span>}
+                  </article>
+                ))}
               </div>
-              <Emplacement nom="colis" pret={scenesPretes} />
-            </div>
-          </section>
-
-          <section className="acc-sec" id="ailleurs" data-section="ailleurs">
-            <Fil libelle="02" />
-            <div className="acc-in">
-              <div className="acc-g2-texte">
-                <div>
-                  <Quand contexte="02 · Suivre les annonces" />
-                  <h2 className="acc-h2">Vendu ici. À retirer ailleurs.</h2>
-                  <p className="acc-rep">Un article vendu peut encore être en ligne ailleurs. VRM rassemble les annonces liées à la vente pour que tu saches lesquelles vérifier.</p>
-                </div>
-                <div>
-                  <Roles vrm="relie tes annonces par leur numéro et te signale celles à retirer." toi="tu la retires d’eBay d’un clic ; sur Vinted et Leboncoin, c’est toi qui la retires — VRM te dit laquelle." />
-                  <Precisions items={['Publiée depuis VRM, l’annonce porte déjà son numéro ; sinon, tu la relies d’un clic.', 'Ça marche aussi pour une veste, un sac ou un livre : le lien, c’est le numéro.']} />
-                </div>
-              </div>
-              <Emplacement nom="ailleurs" pret={scenesPretes} />
-            </div>
-          </section>
-
-          <section className="acc-sec" id="urssaf" data-section="urssaf">
-            <Fil libelle="03" />
-            <div className="acc-in acc-g3">
-              <div className="acc-g3-ecran"><Emplacement nom="urssaf" pret={scenesPretes} /></div>
-              <div>
-                <Quand contexte="03 · Retrouver ses chiffres" />
-                <h2 className="acc-h2">Tes ventes, prêtes pour la comptabilité.</h2>
-                <p className="acc-rep">Le chiffre d’affaires finalisé, mois par mois. Sur Vinted, la date est celle du versement ; sur Leboncoin et eBay, celle de la vente.</p>
-                <Roles vrm="compte, date chaque vente et prépare le rapport du mois." toi="tu reportes le montant sur ton espace URSSAF, puis tu le notes comme déclaré." />
-                <Precisions items={['« J’ai déclaré ce mois » : une vente notée ne se recompte jamais dans un autre mois.', 'Le rapport du mois en PDF et en tableur, pour toi ou ton comptable.']} />
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <section className="acc-sec" id="questions" data-section="questions">
-          <div className="acc-in">
-            <Quand contexte="Le reste de la journée" />
-            <h2 className="acc-h2">Le quotidien, dans le détail.</h2>
-            <div className="acc-qs">
-              {QUESTIONS.map((x) => (
-                <div key={x.q} className={`acc-q${x.horsTel ? ' acc-hors-tel' : ''}`}>
-                  <h3><Icone nom={x.i} />{x.q}</h3>
-                  <p><span className="acc-long">{x.r}</span>{x.c && <span className="acc-court">{x.c}</span>}</p>
-                </div>
-              ))}
             </div>
           </div>
         </section>
 
-        <section className="acc-sec acc-bande" id="comment" data-section="comment">
-          <div className="acc-in acc-deux">
-            <div>
-              <h2 className="acc-h2b" data-prerequis-ordinateur="">Une installation, sur ton ordinateur. Ensuite, tu suis tout depuis ton téléphone.</h2>
-              <ol className="acc-etapes">
+        <section className="av-bande" id="comment" data-section="comment">
+          <div className="av-in av-deux">
+            <div className="av-conf" data-confiance="" data-reveil="">
+              <h2 className="av-h2">Tes comptes restent les tiens.</h2>
+              <p>VRM agit sur le compte ouvert dans ton navigateur, une action à la fois, jamais plus de 50 par heure. Aucun mot de passe Vinted ne t’est demandé.</p>
+              <p>Rien ne part sans toi. Les automatismes — <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span>, <span data-automatisme="">accepter une offre Vinted au-dessus de ton prix mini</span> — restent éteints tant que tu ne les allumes pas, et aucune annonce n’est supprimée sans ta confirmation.</p>
+              <p>Tes données ne servent qu’à faire marcher ta boutique : VRM ne vend rien et ne fait pas de publicité.</p>
+            </div>
+            <div data-reveil="">
+              <h2 className="av-h2" data-prerequis-ordinateur="">Prêt en trois étapes.</h2>
+              <ol className="av-etapes">
                 <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un e-mail et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
-                <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p>{`Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}${EXTENSION_SUR_LE_STORE ? ', depuis le Chrome Web Store. Puis connecte-la' : '. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes'} avec le même email.`}</p></div></li>
-                <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes. Ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
+                <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p>{`Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}${EXTENSION_SUR_LE_STORE ? ', depuis le Chrome Web Store. Puis connecte-la' : '. VRM te guide pas à pas, puis tu la connectes'} avec le même e-mail.`}</p></div></li>
+                <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes : ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
               </ol>
-              {/* (1er nov., vendeur neuf) CE QUI EST VRAI : VRM lit Vinted par l'extension,
-                  dans le navigateur de l'ordinateur. Le téléphone consulte et commande, mais
-                  une action (bordereau, réponse, republication) passe par l'ordinateur
-                  allumé, navigateur ouvert — « ton téléphone suffit » promettait l'inverse.
-                  (5 nov.) Orion a un paquet servi, en essai : dit tel quel, jamais promis. */}
-              <p className="acc-note" data-ordinateur-necessaire="">Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, navigateur ouvert.</p>
-              {SERVIS.essai.length > 0 && <p className="acc-note" data-navigateurs-essai={SERVIS.essai.join(',')}>{SERVIS.essai.join(', ')} (Mac, iPhone) : en essai, lecture de Vinted pas encore confirmée. {SERVIS.pasEncore.join(', ')} : pas encore.</p>}
-            </div>
-            <div className="acc-conf" data-confiance="">
-              <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
-              <p>VRM agit sur le compte ouvert dans ton navigateur : une action à la fois, jamais plus de 50 par heure.</p>
-              <p>Tu gardes la main sur tes ventes et tes messages. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
-              <p>Rien ne part sans toi : les messages aux favoris, la republication et l’acceptation automatique des offres Vinted (éteinte par défaut) ne démarrent que si tu les lances, et aucune annonce n’est supprimée sans ta confirmation.</p>
+              <p className="av-note" data-ordinateur-necessaire="">Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, navigateur ouvert.</p>
+              {SERVIS.essai.length > 0 && <p className="av-note" data-navigateurs-essai={SERVIS.essai.join(',')}>{SERVIS.essai.join(', ')} (Mac, iPhone) : en essai, lecture de Vinted pas encore confirmée. {SERVIS.pasEncore.join(', ')} : pas encore.</p>}
             </div>
           </div>
         </section>
 
-        <section className="acc-sec" id="prix" data-section="prix">
-          <div className="acc-in acc-g-prix">
-            <div className="acc-prix">
-              <h2 className="acc-h2b">Tous tes comptes. Un seul espace.</h2>
-              {ACCES_OFFERT && <div className="acc-offert" data-acces-offert="">Gratuit pour l’instant</div>}
-              <div className="acc-gros"><b>{PRIX_MOIS}&nbsp;€</b><span>par mois</span></div>
-              <ul>
-                <li>Sans engagement · résiliable en ligne, depuis l’app</li>
-                <li>Tous tes comptes, toutes les fonctions.</li>
-                <li className="acc-tel-seul">« Fermer mon compte » efface tes données.</li>
-              </ul>
-              <p className="petit">
-                {ACCES_OFFERT && 'Tant que l’abonnement n’est pas exigé, VRM reste gratuit. '}
-                Aucun paiement ne te sera demandé sans que tu aies vu le prix et accepté les conditions générales de vente. <a href="/legal/cgv.html">Lire les CGV</a>
-              </p>
-              {creer()}
-            </div>
-            <div className="acc-faq" id="faq" data-faq="">
-              <h2>Questions</h2>
-              <details>
-                <summary>Vinted peut-il bloquer mon compte à cause de VRM ?</summary>
-                <p>Personne ne peut garantir une décision de Vinted. VRM est conçu pour travailler comme toi, sans les automatismes qui font repérer un robot (voir « Tes comptes restent les tiens »).</p>
-              </details>
-              <details>
-                <summary>C’est seulement pour les baskets ?</summary>
-                <p>Non. Vêtements, sacs, livres… Le numéro de rangement, le bordereau, les ventes en double et la compta marchent pour n’importe quel article.</p>
-              </details>
-              {!VESTIAIRE_BRANCHE && (
-                <details>
-                  <summary>Et Vestiaire Collective ?</summary>
-                  <p>Pas encore : VRM apprend à lire Vestiaire, mais ne compte rien de ce site aujourd’hui.</p>
-                </details>
-              )}
-              <details className="acc-hors-tel">
-                <summary>Comment j’arrête ?</summary>
-                <p>Tu résilies en ligne, depuis l’app : l’abonnement s’arrête à la fin de la période payée. « Fermer mon compte » efface ensuite tes données, comme l’explique la <a href="/legal/confidentialite.html">politique de confidentialité</a>.</p>
-              </details>
-              <details>
-                <summary>Que deviennent mes données ?</summary>
-                <p>Elles servent à faire marcher ta boutique, rien d’autre : VRM ne vend aucune donnée et ne fait pas de publicité. <a href="/legal/confidentialite.html">Lire la politique de confidentialité</a>.</p>
-              </details>
-            </div>
-          </div>
-        </section>
-
-        <section className="acc-fin" data-section="fin">
-          <div className="acc-in">
-            <div className="acc-fin-feuille">
-              <Emplacement nom="premier" pret={scenesPretes} />
-              <p className="note">Ton premier article aura le N° 1.</p>
-            </div>
-            <div className="acc-fin-texte">
-              <h2 className="acc-h2">Place à ta prochaine vente.</h2>
-              <p className="texte">Crée ton espace, installe l’extension et retrouve tes prochaines actions au même endroit.</p>
-              <div className="acc-actions">
-                {creer()}
-                {connexion()}
+        <section className="av-prix" id="prix" data-section="prix">
+          <div className="av-in">
+            <div className="av-carte-prix" data-reveil="">
+              <div>
+                <h2 className="av-h2">Un prix. Tout VRM.</h2>
+                {ACCES_OFFERT && <span className="av-offert" data-acces-offert="">Gratuit pour l’instant</span>}
+                <div className="av-montant" data-prix=""><b>{PRIX_MOIS}&nbsp;€</b><span>par mois</span></div>
               </div>
+              <div>
+                <p>Tous tes comptes Vinted, Leboncoin et eBay, toutes les fonctions, l’extension et l’app sur ton iPhone.</p>
+                <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>, une fois par adresse e-mail et par compte Vinted. Sans engagement : tu résilies en ligne, depuis l’app.</p>
+                <p className="petit">
+                  {ACCES_OFFERT && 'Tant que l’abonnement n’est pas exigé, VRM reste gratuit. '}
+                  Aucun paiement sans que tu aies vu le prix et accepté les <a href="/legal/cgv.html">conditions générales de vente</a>.
+                </p>
+                {creer()}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="av-faq" id="faq" data-section="faq" data-faq="">
+          <div className="av-in av-faq-grille">
+            <h2 className="av-h2">Questions fréquentes</h2>
+            <div className="av-faq-texte">
+              <p><b>Pourquoi une extension ?</b> VRM lit Vinted là où tu es déjà connecté : dans ton navigateur, sur ton ordinateur. Personne ne te demande ton mot de passe Vinted, et l’extension n’agit qu’au nom du compte ouvert dans l’onglet. <a href="/aide/extension">L’installer</a>.</p>
+              <p><b>Vinted peut-il bloquer mon compte à cause de VRM ?</b> Personne ne peut garantir une décision de Vinted. VRM travaille comme toi : une requête à la fois, au plus 50 actions par heure et par compte, et il s’arrête de lui-même si Vinted demande de ralentir.</p>
+              <p><b>Mes données sont-elles en sécurité ?</b> Ta boutique est cloisonnée : aucun autre vendeur ne la voit. Tu peux ajouter une double vérification par application d’authentification. <a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p>
+              <p><b>Comment j’arrête ?</b> Tu résilies en ligne, depuis l’app : l’abonnement s’arrête à la fin de la période payée, et résilier pendant l’essai ne coûte rien. « Fermer mon compte » efface ensuite tes données.</p>
+              <p><b>Et sur mon téléphone ?</b> Tu consultes tout, tu retrouves tes codes de retrait au relais, même sans réseau, et tu reçois une notification à chaque vente si tu l’actives. Les actions sur Vinted passent par ton ordinateur allumé.</p>
+              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, et un seul marche aussi : chacun se met à jour quand tu l’ouvres sur ton ordinateur, et ses chiffres restent séparés.</p>
+              <p><b>C’est seulement pour les baskets ?</b> Non. Vêtements, sacs, livres : le numéro de rangement, le bordereau et la compta marchent pour n’importe quel article.</p>
+              {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> Pas encore compté : VRM apprend à lire Vestiaire, mais ses ventes n’entrent dans aucun total aujourd’hui.</p>}
+              <p><b>Une question qui n’est pas ici ?</b> <a href="/aide">L’aide</a> répond pas à pas ; <a href="/etat">l’état du service</a> dit si tout fonctionne en ce moment.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="av-fin" data-section="fin">
+          <div className="av-in" data-reveil="">
+            <p>Demain matin, tu sauras quoi poster, quoi retirer et quoi déclarer.</p>
+            <div className="av-actions">
+              {creer()}
+              {connexion()}
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="acc-pied">
-        <div className="acc-in">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img className="vrm-brand-asset" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="32px" alt="" width="22" height="22" style={{ borderRadius: 6 }} />
+      <footer className="av-pied">
+        <div className="av-in">
+          <div>
+            <span className="marque">VRM</span>
             <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
           </div>
-          <nav aria-label="Informations légales">
+          <nav aria-label="Informations">
+            <a href="/aide">Aide</a>
+            <a href="/etat" data-statut="">État du service</a>
             {LEGAL.map(([l, h]) => <a key={h} href={h}>{l}</a>)}
-            {/* CONTACT — une seule source (src/contact.js). Tant qu'elle est
-                vide, on le DIT au lieu d'inventer une adresse qui ne recevrait
-                rien (§2.3). */}
+            {/* CONTACT — une seule source (src/contact.js) ; vide ⇒ on le DIT (§2.3). */}
             {contactEmail()
               ? <a data-contact="" href={`mailto:${contactEmail()}`}>Contact</a>
-              : <span data-contact="" data-contact-absent="">Contact : {CONTACT_A_VENIR}</span>}
+              : <span data-contact="" data-contact-absent="">Contact : {CONTACT_A_VENIR}</span>}
           </nav>
         </div>
       </footer>
