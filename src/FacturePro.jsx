@@ -518,9 +518,57 @@ async function lireContenu(deps, id) {
 const heureParis = (t) => { try { return (globalThis.__vrmFmtHeureFP || (globalThis.__vrmFmtHeureFP = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }))).format(new Date(t)); } catch (_) { return ''; } };
 const motEnvoi = (e, av) => (av && av.emiseLe ? `annulée par l'avoir ${av.numero}` : !e ? 'émise, pas encore envoyée' : e.etat === 'envoyee' ? `envoyée le ${jourParis(e.at)}` : e.etat === 'en-cours' ? 'envoi en cours…' : e.etat === 'incertaine' ? 'envoi incertain — à vérifier' : 'pas envoyée — touche pour voir pourquoi');
 
+// (8 nov., « restes ventes ») UNE PHRASE PAR GROUPE (CLAUDE.md §7) : le refus d'une ligne
+// (« Facture : acheteur pas prouvé : … ») identique sur DEUX lignes affichées ou plus se dit
+// UNE fois, en tête de la liste (`FactureRaisonsTete`) ; ces lignes ne la répètent plus. Un
+// refus qui parle du COMPTE (« ouvre Vinted sur ce compte ») se groupe par compte. Un refus
+// propre à la ligne (l'écart d'heure, les deux prix) reste sur elle. Même calcul que la ligne
+// (`preuveAcheteur`), rien de deviné : une vente qui n'est pas Pro, ou déjà facturée, n'a pas
+// de refus. `groupe` : les ventes AFFICHÉES (forme de `vente`). `d` : `useFactures`.
+const CODES_PAR_COMPTE = new Set(['vinted', 'compte']);
+function refusDeLigne(vente, d) {
+  if (!vente || !vente.tx || !d) return null;
+  const tx = String(vente.tx);
+  const mails = d.ventesPro.get(tx) || [];
+  const f = d.factures.get(tx) || null;
+  const proCompte = vente.uid != null ? d.comptesPro.get(String(vente.uid)) : undefined;
+  if (f && f.emiseLe) return null;
+  if (!(mails.length > 0 || proCompte === true)) return null;
+  const preuve = preuveAcheteur({ tx, mails, commandes: vente.commandes || [], brouillon: f, adresseLisible: adresseVintedLisible });
+  if (preuve.prouve) return null;
+  const phrase = phraseRefus(preuve);
+  const parCompte = CODES_PAR_COMPTE.has(preuve.code);
+  return { code: preuve.code, phrase, cle: (parCompte ? String(vente.uid || '') + '|' : '|') + phrase, uid: parCompte ? String(vente.uid || '') : '', compte: parCompte ? String(vente.compte || '') : '' };
+}
+const _communes = new WeakMap();
+export function refusCommuns(groupe, d) {
+  if (!Array.isArray(groupe) || !d) return new Map();
+  const c = _communes.get(groupe);
+  if (c && c.d === d) return c.m;
+  const m = new Map();
+  for (const v of groupe) { const r = refusDeLigne(v, d); if (!r) continue; const g = m.get(r.cle) || { ...r, txs: [] }; g.txs.push(String(v.tx)); m.set(r.cle, g); }
+  for (const [k, g] of [...m]) if (g.txs.length < 2) m.delete(k);
+  _communes.set(groupe, { d, m });
+  return m;
+}
+// L'en-tête : chaque refus commun, une fois, avec le nombre de ventes (et le compte s'il en dépend).
+export function FactureRaisonsTete({ ventes, deps }) {
+  const d = useFactures(deps);
+  const m = refusCommuns(ventes, d);
+  if (!m.size) return null;
+  return <div className="vrm-fp-tete" data-fp-tete="" style={{ margin: '0 2px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+    {[...m.values()].map((g) => (
+      <p key={g.cle} className="vrm-fp-muet vrm-fp-raison" style={{ margin: 0, fontSize: 13, lineHeight: 1.45, overflowWrap: 'anywhere' }} data-fp-tete-code={g.code} data-fp-tete-n={g.txs.length} data-fp-tete-txs={g.txs.join(',')}>
+        Facture · {g.txs.length} ventes{g.compte ? <> de <span className="vrm-sensible" data-stream-type="compte">{g.compte}</span></> : null} : {g.phrase}.
+      </p>
+    ))}
+  </div>;
+}
+
 // `vente` = { tx, uid, compte, titre, centimes, venteLe, commandes:[ventes Vinted portant ce n°] }.
 // `ligne` : la forme courte, sur la ligne de la liste (à côté de la vente).
-export function FactureVente({ vente, deps, ligne = false }) {
+// `groupe` (ligne seulement) : les ventes affichées — un refus commun est dit en tête, pas ici.
+export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
   const d = useFactures(deps);
   const [ouverte, setOuverte] = React.useState(false);
   if (!vente || !vente.tx || !d) return d === null && !ligne && vente && vente.tx ? <p className="vrm-fp-muet">Les factures n'ont pas pu être lues — réessaie dans un instant.</p> : null;
@@ -546,6 +594,8 @@ export function FactureVente({ vente, deps, ligne = false }) {
     );
   } else {
     preuve = preuveAcheteur({ tx, mails, commandes: vente.commandes || [], brouillon: f, adresseLisible: adresseVintedLisible });
+    // Le même refus sur d'autres lignes affichées : dit une fois en tête (`FactureRaisonsTete`).
+    if (ligne && groupe && !preuve.prouve) { const r = refusDeLigne(vente, d); if (r && refusCommuns(groupe, d).has(r.cle)) return null; }
     corps = preuve.prouve
       ? <button type="button" className={`vrm-b vrm-b-secondaire${ligne ? ' vrm-fp-ligne-bouton' : ' vrm-b-plein'}`} data-fp-vente="a-faire" data-fp-preuve="ok" data-sans-glisse="" onClick={() => setOuverte(true)}>Envoyer la facture</button>
       : <p className={ligne ? 'vrm-fp-ligne-raison' : 'vrm-fp-muet vrm-fp-raison'} data-fp-vente="pas-prouve" data-fp-preuve={preuve.code}>Facture : {phraseRefus(preuve)}.</p>;
