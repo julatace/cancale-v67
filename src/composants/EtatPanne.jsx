@@ -22,14 +22,16 @@ import { PAS_SU, VERBES } from '../libelles.js';
 export function EtatPanne({ quoi, raison, onReessayer, compact = false, className = '', ...rest }) {
   const [occupe, setOccupe] = React.useState(false);
   const vivant = React.useRef(true);
-  React.useEffect(() => () => { vivant.current = false; }, []);
+  const enVol = React.useRef(false);
+  React.useEffect(() => { vivant.current = true; return () => { vivant.current = false; }; }, []);
   const relire = () => {
-    if (!onReessayer || occupe) return;
+    if (!onReessayer || enVol.current) return;
+    enVol.current = true;
     let r; try { r = onReessayer(); } catch (_) { r = null; }
     if (r && typeof r.then === 'function') {
       setOccupe(true);
-      r.then(() => {}, () => {}).then(() => { if (vivant.current) setOccupe(false); });
-    }
+      Promise.resolve(r).then(() => {}, () => {}).then(() => { enVol.current = false; if (vivant.current) setOccupe(false); });
+    } else enVol.current = false;
   };
   return (
     <div role="status" className={`vrm-etat-panne${compact ? ' vrm-etat-panne-compact' : ''}${className ? ' ' + className : ''}`} data-etat-panne="" {...rest}>

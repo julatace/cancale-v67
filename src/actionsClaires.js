@@ -10,3 +10,12 @@ export function prixAnnoncePourOffre(annonces,item,uid) {
   const prix=Number(String(brut).replace(',','.'));
   return Number.isFinite(prix)&&prix>0?prix:null;
 }
+
+// Comparaison au centime, uniquement sur les deux montants renseignés.
+export function comparaisonMinimum(offre,mini) {
+  const centimes=v=>typeof v==='number'&&Number.isFinite(v)&&v>0&&Math.round(v*100)>0&&Number.isSafeInteger(Math.round(v*100))?Math.round(v*100):null;
+  const o=centimes(offre),m=centimes(mini);
+  if(o==null)return {etat:'offre-inconnue'};
+  if(m==null)return {etat:'minimum-inconnu'};
+  return {etat:o<m?'sous-minimum':'minimum-atteint',ecart:Math.abs(o-m)/100};
+}

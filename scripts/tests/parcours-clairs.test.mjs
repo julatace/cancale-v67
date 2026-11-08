@@ -18,3 +18,12 @@ test('Le guide ne saute pas une lecture en cours ou en échec',()=>{
  }
  assert.equal(etatGuide({extension:'fait',vinted:'fait',emails:'fait',numeros:'fait'}).courante,null);
 });
+
+test('Repère de négociation : centimes exacts, minimum jamais inventé',async()=>{
+ const {comparaisonMinimum}=await import('../../src/actionsClaires.js');
+ assert.deepEqual(comparaisonMinimum(19.99,20.01),{etat:'sous-minimum',ecart:.02});
+ assert.deepEqual(comparaisonMinimum(45,40),{etat:'minimum-atteint',ecart:5});
+ assert.deepEqual(comparaisonMinimum(40,40),{etat:'minimum-atteint',ecart:0});
+ for(const v of [null,undefined,'40',0,.001,-1,NaN,Infinity])assert.equal(comparaisonMinimum(45,v).etat,'minimum-inconnu');
+ assert.equal(comparaisonMinimum(null,40).etat,'offre-inconnue');
+});
