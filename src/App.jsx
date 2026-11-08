@@ -274,6 +274,7 @@ import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exc
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL } from './venteEmailFraiche.js';
+import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
 import './comptes-lies.css';
 import './centre-notifs.css';
@@ -2304,6 +2305,8 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
   // (3 nov.) La place du tampon choisie à la main, par FORME de bordereau (« Toujours ici »).
   'vrm_tampon_positions','vinted_bords_printed',
+  // (8 nov.) Les bordereaux imprimés SANS N° (src/bordereauVenteEmail.js) : la carte le redit.
+  'vrm_bords_sans_num',
   // (5 nov.) Le PROGRAMME du mode stream (ce qu'il cache quand il filme) : le même sur
   // tous ses appareils. L'interrupteur, lui (`vrm_stream`), reste propre à l'appareil.
   'vrm_stream_regles','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
@@ -26721,7 +26724,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
   // (7 nov., vitesse) COLIS EN DEUX TEMPS : dessiner 70 cartes d'un coup gelait l'écran
   // 1 à 2 s au toucher (revue du 7 nov., 4 400 éléments). Les 24 plus pressées sont
   // dessinées tout de suite ; toutes les autres arrivent juste après, en tâche
@@ -27200,6 +27203,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useStateCle('vinted_bords_printed', () => load('vinted_bords_printed', {}));
+  // (8 nov.) Les bordereaux Vinted imprimés SANS N° (clé = n° de transaction, synchronisé) :
+  // la carte le redit (« Imprimé sans N° »), avec le N° sûr apparu depuis (src/bordereauVenteEmail.js).
+  const [bordsSansNum, setBordsSansNum] = useStateCle(CLE_IMPRIMES_SANS_NUM, () => load(CLE_IMPRIMES_SANS_NUM, {}));
+  const noterImprimeSansNum = (txs) => { const l = (txs || []).map((t) => String(t || '')).filter(Boolean); if (!l.length) return; setBordsSansNum((prev) => { const u = { ...(prev || {}) }; const at = new Date().toISOString(); l.forEach((k) => { u[k] = at; }); save(CLE_IMPRIMES_SANS_NUM, u); return u; }); };
   const bordKey = (b) => String((b && (b.transaction || b.suivi || b.numero)) || '');
   // Liens MANUELS bordereau → paire numérotée (quand l'app ne retrouve pas seule
   // la paire : titre en double même taille, ou paire jamais numérotée). Clé = clé
@@ -28209,6 +28216,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted seule — une ligne e-mail n'y numérote ni n'y expédie rien.
   const ventesEmail = useVentesEmailFraiches(sales.items, sales.failedUids, accounts, acctOff, [...hiddenAccts].sort().join(',') + '|' + JSON.stringify(panelAcctOff || {}));
   const ventesListe = useMemo(() => avecVentesEmail(sales.items, ventesEmail), [sales.items, ventesEmail]);
+  // (8 nov.) Les ventes vues par e-mail, par n° de transaction (src/bordereauVenteEmail.js).
+  const ventesEmailParTx = useMemo(() => new Map((ventesEmail || []).filter((o) => o && o.transaction_id != null).map((o) => [String(o.transaction_id), o])), [ventesEmail]);
   // (6 nov.) LA FACTURE PRO : les ventes VINTED lues, par n° de transaction (tous
   // comptes), pour la preuve de l'acheteur (src/facturePro/rattachement.js : une
   // seule vente Vinted à ce n°, heure et montant de l'e-mail de vente). Seule la
@@ -29392,6 +29401,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // L'impression reste affichée (pastille « ✓ Imprimé »), mais elle ne retire
   // plus rien. Rien n'est jamais supprimé : « Voir » réaffiche les terminés.
   const isBordDone = (b) => isBordShippedManual(b) || bordShipped(b) || !!panelBordsDone[bordKey(b)];
+  // (8 nov.) Une vente vue par e-mail est-elle un colis « à envoyer » (son bordereau là, pas partie,
+  // pas cochée) ? La règle de Colis (`colisVentesEmail`), pour le filtre de Ventes.
+  const estColisEmail = (o) => !!(o && o._venteEmail) && !isShipDone(o) && colisVentesEmail({ ventesEmail: [o], bordsParTx: bordsParTransaction(emailBords, isBordHidden), connues: (tx) => !!soldByTxn[tx], cachee: (tx) => hiddenSales.has(tx), partie: (_o, b) => isBordDone(b) }).length > 0;
 
   // ── LES COLIS À ENVOYER VIENNENT DE LA MOISSON, PAS DES EMAILS ───────────
   // Avant, l'écran Bordereaux était construit sur les lignes `email_bord_*`.
@@ -29451,6 +29463,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
       })
       .filter(e => !(e.b && isBordDone(e.b)));            // colis déjà parti : il sort tout seul
+    // (8 nov.) LA VENTE VUE PAR E-MAIL ET SON BORDEREAU (src/bordereauVenteEmail.js) : le même n°
+    //    de transaction (l'identité) ⇒ un colis à envoyer, prêt à imprimer, sans attendre que
+    //    l'extension relise Vinted. La liste Vinted, dès qu'elle porte le n°, la remplace.
+    for (const x of colisVentesEmail({ ventesEmail, bordsParTx: parTxn, connues: (tx) => !!soldByTxn[tx], cachee: (tx) => hiddenSales.has(tx), partie: (o, b) => isBordDone(b) }))
+      items.push({ key: 'v' + x.txn, o: x.o, b: x.b, txn: x.txn, venteEmail: true });
     // 2) ⚠️ IL NE PEUT PAS Y AVOIR DE BORDEREAU SANS VENTE (règle posée par
     //    Julien, vérifiée sur les données : 72 des 73 bordereaux retrouvent leur
     //    vente, le 73ᵉ était une ligne de test). Donc un bordereau qu'on ne
@@ -30164,7 +30181,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
   // `buyFromId`/`buyFrom` — la fusion les fait ressortir (même propriétaire que
   // `choosePick`, §11).
-  const effEntry = memoRendu((o) => fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum));
+  // (8 nov.) LE N° D'UNE VENTE VUE PAR E-MAIL (src/bordereauVenteEmail.js) : seulement une
+  // identité sûre — posé à la main sur la transaction, « Relier », l'annonce de la transaction
+  // (identité Vinted captée, photo exacte), le N° qu'IL a écrit dans le titre (lu dans l'e-mail du
+  // bordereau, ou réglage « je numérote moi-même »). Jamais le `numero` qu'un serveur a retrouvé par
+  // ressemblance de titre ; deux sources qui se contredisent ⇒ aucun N°.
+  const bordsVenteEmailParTx = useMemo(() => bordsParTransaction(emailBords, isBordHidden),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [emailBords, bordsHidden]);
+  const numeroVenteEmail = (o, b0) => {
+    const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+    if (!tx) return decisionNumeroVenteEmail([]);
+    const b = b0 || bordsVenteEmailParTx[tx] || null;
+    const src = [];
+    const ov = saleOv[tx]; if (ov && ov.numero != null) src.push({ source: 'transaction', numero: ov.numero });
+    const lk = b ? bordLinks[bordKey(b)] : null; if (lk && lk.numero) src.push({ source: 'lien', numero: lk.numero });
+    const cap = labelsCaptes[tx]; const fi = cap && cap.item ? numeros[String(cap.item)] : null; if (fi && fi.numero != null) src.push({ source: 'annonce', numero: fi.numero });
+    const re = resolvedEntry(o); if (re && re.numero != null) src.push({ source: 'annonce', numero: re.numero });
+    const ec = b ? numeroEcritDansArticle(b) : ''; if (ec && numeroEmailAdmis(b, numeros)) src.push({ source: 'ecrit', numero: ec });
+    if (numeroEcritActif()) { const lec = lireNumeroEcrit({ titre: o.title || '' }); if (lec.etat === 'lu' && numeroReprenable(lec.cle) && (coupureNumerotation() == null || venteApresCoupure(o))) src.push({ source: 'ecrit', numero: lec.cle }); }
+    return decisionNumeroVenteEmail(src);
+  };
+  const effEntry = memoRendu((o) => {
+    const r = fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum);
+    if (!(o && o._venteEmail)) return r;
+    // Une vente vue par e-mail : le N° est la DÉCISION ci-dessus (contredit ⇒ aucun).
+    const d = numeroVenteEmail(o);
+    if (!d.numero) { if (!r || r.numero == null) return r; const { numero: _n, ...reste } = r; return reste; }
+    return { ...(r || {}), numero: d.numero };
+  });
 
   // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
   // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à
@@ -30537,7 +30582,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // qui est en route ? »). Deux filtres, la même règle que Colis (§11).
       // (6 nov.) Une vente vue par e-mail n'est ni « à expédier » ni « en transit » : son
       // état n'est pas encore lu chez Vinted (Colis ne la compte pas non plus).
-      if (o._venteEmail && (vFilter === 'aexpedier' || vFilter === 'transit')) return false;
+      // (8 nov.) Sauf quand son bordereau est là (même n° de transaction) : c'est alors un colis à
+      // envoyer, compté par Colis (src/bordereauVenteEmail.js) — le filtre montre le même colis.
+      if (o._venteEmail && vFilter === 'aexpedier') return estColisEmail(o);
+      if (o._venteEmail && vFilter === 'transit') return false;
       if (vFilter === 'aexpedier') return aExpedier(o) && !estParti(o);
       if (vFilter === 'transit') return (st === 'pending' || revient) && !(aExpedier(o) && !estParti(o));
       if (vFilter === 'encours') return st === 'pending';
@@ -30563,7 +30611,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ventesListe, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff]);
+    }, [ventesListe, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff, emailBords, bordsHidden, partisVinted]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
   const [ventesMax, setVentesMax] = useVueSession('ventes-limite',60);
@@ -32959,6 +33007,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // le chargement. Ce sont des corrections de compta (sale_overrides), notes,
     // états de bordereau/retour, achats hors-Vinted : les plus coûteux à perdre.
     setBordsPrinted(n => vide(n) ? load('vinted_bords_printed', {}) : n);
+    setBordsSansNum(n => vide(n) ? load(CLE_IMPRIMES_SANS_NUM, {}) : n);
     setBordLinks(n => vide(n) ? load('vinted_bord_links', {}) : n);
     setBordsHidden(n => vide(n) ? load('vinted_bords_hidden', {}) : n);
     setBordsShipped(n => vide(n) ? load('vinted_bords_shipped', {}) : n);
@@ -34346,10 +34395,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (b && isBordDone(b)) continue;
       out.push({ o, ...limiteExpedition(o, b) });
     }
+    // (8 nov.) La vente vue par e-mail dont le bordereau est là : la MÊME règle que Colis
+    // (`colisVentesEmail`, src/bordereauVenteEmail.js) — Ma journée, la cloche et Colis disent un nombre.
+    for (const x of colisVentesEmail({ ventesEmail, bordsParTx: bordParTxn, connues: (tx) => !!soldByTxn[tx], cachee: (tx) => hiddenSales.has(tx), partie: (o, b) => isBordDone(b) })) {
+      if (isShipDone(x.o)) continue;
+      out.push({ o: x.o, ...limiteExpedition(x.o, x.b) });
+    }
     out.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, shipDone, bordsParTxn, tracking, bordsShipped, panelBordsDone, partisTransp, partisVinted]);
+  }, [sales.items, hiddenSales, hiddenAccts, shipDone, bordsParTxn, tracking, bordsShipped, panelBordsDone, partisTransp, partisVinted, ventesEmail]);
+  // (8 nov.) Les ventes vues par e-mail qui sont dans « à envoyer » (bordereau là, pas parties) :
+  // leur ligne de Ventes porte « Imprimer » (le même colis que Colis, src/bordereauVenteEmail.js).
+  const toShipEmailTx = useMemo(() => new Set(toShip.filter((t) => t.o && t.o._venteEmail).map((t) => String(t.o.transaction_id))), [toShip]);
   // ── « COCHÉ POSTÉ » MAIS JAMAIS VU PARTIR — UN PROPRIÉTAIRE (§11) ─────────
   // La règle vit dans `posteSansDepart` ; la liste se calcule ICI, une fois, et
   // Colis comme Ma journée la LISENT. La capture qui a lu le statut de la vente
@@ -34421,7 +34479,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const envoyer = toShip.map((t) => {
         const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
-        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee', tx: tid };
+        return { titre: o.title, numero: (o && o._venteEmail) ? ((effEntry(o) || {}).numero || '') : (((saleOv[tid] || {}).numero) || (b && b.numero) || ''), compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee', tx: tid };
       }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
       // ⚠️ (revue du 23 oct.) « À RETIRER » = EXACTEMENT ce que la tuile compte
       // en ligne (`pickupUnion.emailList` + `extra`, §11). Les colis « à
@@ -35798,7 +35856,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const pos = posForFormat(width, height);
       const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
-    } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Impossible de lire ce PDF : '+String(err)); }
+      return true;
+    } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Impossible de lire ce PDF : '+String(err)); return false; }
   };
   // ── FACTURE liée à un bordereau (comptes PRO uniquement) ────────────────────
   // La facture vient des emails que l'app reçoit (pipeline Gmail/Apps Script §3) :
@@ -35847,7 +35906,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (b && b.hasPdf && invForBord(b)) { await printBordAndInvoice(b); return; }
     const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
     if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
-    processBordereau(num, titre, lu.octets);
+    if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim()) noterImprimeSansNum([tx]);
   };
   // ── UNE LIGNE DE VENTE NE SE REDESSINE QUE SI CE QU'ELLE MONTRE A CHANGÉ ──
   // (16 oct., « app plus rapide »). `LigneVenteVinted` compare `pre.deps` : la
@@ -35955,7 +36014,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (3 nov.) le prix d'achat proposé par identité (src/prixAchatPropose.js)
       (propositionVente(tx) || {}).centimes ?? null, (propositionVente(tx) || {}).detail || '',
       // (6 nov., vague 2) la remise en vente d'une vente annulée avant l'envoi (src/annuleesChezToi.js)
-      (() => { const r = annulChezParTx.get(tx); return r ? [r.etat, r.num, r.item].join('|') : ''; })()];
+      (() => { const r = annulChezParTx.get(tx); return r ? [r.etat, r.num, r.item].join('|') : ''; })(),
+      // (8 nov.) la vente vue par e-mail dont le bordereau est là (« Imprimer »), et « imprimé sans N° »
+      toShipEmailTx.has(tx), bordsSansNum[tx] || ''];
     // L'état de l'article (« Très bon état ») : celui de SON annonce, trouvée par
     // identité (`txnItem`, la transaction), jamais par titre — sinon rien.
     const annonce = txnItem[tx] != null ? lst.find((it) => it && String(it.id) === String(txnItem[tx])) : null;
@@ -36064,6 +36125,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return e && String(e.numero || '').trim() ? String(e.numero).trim() : '';
   };
   const numForBord = (b) => {
+    // (8 nov.) Le bordereau d'une vente vue par e-mail (absente de la liste Vinted) : la décision
+    // par identité seule (`numeroVenteEmail`) — jamais le `numero` retrouvé par titre.
+    const txB = b && b.transaction != null ? String(b.transaction) : '';
+    const ve = txB && !soldByTxn[txB] ? ventesEmailParTx.get(txB) : null;
+    if (ve) return numeroVenteEmail(ve, b).numero;
     const man = manualEntry(b); if (man && man.numero) return String(man.numero);
     const parItem = numFromLabelItem(b); if (parItem) return parItem;   // identité Vinted, zéro déduction
     const parTxn = numFromTxn(b); if (parTxn) return parTxn;
@@ -36471,6 +36537,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       if (reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+      noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
       (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
       if (choisis && (AUTH.user?.id||null)===proprietaire) setLot(x => (AUTH.user?.id||null)!==proprietaire?x:x?(echecs.length ? { ...x, coches: new Set(echecs), echecs } : null):x);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?texteSansBordereau(sansLignes):'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
@@ -39135,7 +39202,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
-                bas={o._venteEmail ? <NoteVenteEmail o={o}/> : peutDeposer ? <>
+                bas={o._venteEmail ? <>
+                  <NoteVenteEmail o={o}/>
+                  {/* (8 nov.) Le bordereau reçu par e-mail porte le MÊME n° de transaction : il s'imprime
+                      tout de suite, avec le N° seulement s'il est sûr (src/bordereauVenteEmail.js). */}
+                  {toShipEmailTx.has(txL) ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="" data-vente-email-bord={txL}>
+                    <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
+                    <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
+                  </div> : null}
+                  {toShipEmailTx.has(txL) && (!num || bordsSansNum[txL]) ? <div data-vente-sans-num={num ? 'avec' : 'sans'} data-sans-glisse="" style={{fontSize:12,fontWeight:600,color:C.warn,overflowWrap:'anywhere'}}>{phraseImprimeSansNumero(bordsSansNum, txL, num) || MENTION_SANS_NUM}</div> : null}
+                </> : peutDeposer ? <>
                   {/* (2 nov., 22 h 30) Une vente à expédier porte TOUJOURS la rangée de la maquette : la puce du
                       transporteur et le bouton bordereau (« Imprimer le bordereau » si le PDF est là, sinon
                       « Générer le bordereau », l'extension) ; « Déposé » vient après. */}
@@ -42234,7 +42310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
       {/* (30 oct.) Les vérifications passent SOUS la liste, comme sur Ventes : avant, on ne voyait
           aucune annonce au premier écran. Rien n'est retiré, tout reste replié. */}
-      {curSub==='messages' && <section data-verifications-messages="" style={{marginTop:16}}><SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} onFavoris={uid=>{setCompteSel(String(uid));setZoneMessages('favoris');}} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
+      {curSub==='messages' && <section data-verifications-messages="" style={{marginTop:16}}><SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} onFavoris={uid=>{if(typeof setCompteSel==='function')setCompteSel(String(uid));setZoneMessages('favoris');}} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
@@ -43297,6 +43373,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // L'étape en cours est ambre seulement si la limite d'envoi est aujourd'hui/demain.
                 const pvC = o ? preuvesFriseDe(o) : null;
                 const imprimeC = !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b)));
+                // (8 nov.) Imprimé SANS N° (src/bordereauVenteEmail.js) : la carte le redit, avec le N° sûr connu depuis.
+                const sansNumC = phraseImprimeSansNumero(bordsSansNum, e.txn, num);
                 const fuColis = friseColisFusion({ imprime: imprimeC, depose: posted || !!(pvC && pvC.bougeLu), enroute: !!(pvC && pvC.bougeLu), livre: !!(pvC && pvC.livreeLue) }, { geste: dl != null && dl <= 1 && !posted && (imprimeC || pdf) });  // (5 nov.) ambre seulement si l'étape en cours est FAISABLE (sans bordereau, rien à imprimer)
                 const acc = o ? o._acc : null;
                 const att = attenteColis(e);
@@ -43318,7 +43396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span>{nParT[trNomDe(e)]} colis</span>
                     </div>
                   )}
-                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -43381,7 +43459,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             </div>
                           );
                         })()}
-                        {b && (()=>{ const lit=numLitige(b); return lit ? (
+                        {/* (8 nov.) Vue par e-mail, sans N° sûr : le tampon part avec le titre seul (src/bordereauVenteEmail.js) ;
+                            imprimé sans N° : la carte le redit, avec le N° sûr apparu depuis. */}
+                        {sansNumC ? <div data-imprime-sans-num={num?'avec':'sans'} style={{fontSize:12,fontWeight:600,marginTop:5,color:C.warn,overflowWrap:'anywhere'}}>{sansNumC}</div>
+                          : (e.venteEmail && !num) ? <div data-colis-sans-num="1" style={{fontSize:12,fontWeight:600,marginTop:5,color:C.warn,overflowWrap:'anywhere'}}>{MENTION_SANS_NUM}</div> : null}
+                        {b && !e.venteEmail && (()=>{ const lit=numLitige(b); return lit ? (
                           <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <span className="vrm-aide" style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
                             <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>choisir</button>
@@ -43421,7 +43503,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           // pas la source.
                           const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
                           if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
-                          processBordereau(num, titre, lu.octets);
+                          if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim() && e.txn) noterImprimeSansNum([e.txn]);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
                         className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/><span className="vrm-lib-long">{inv ? 'Imprimer + facture' : 'Imprimer le bordereau'}</span><span className="vrm-lib-court">Imprimer</span></button>
                       ) : (<>
@@ -50725,7 +50807,7 @@ function AppCoeur() {
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {/* (5 nov., chantier E2) « Retirer mon argent » et « À venir » passent SOUS la carte du mois,
               dans l'écran Ventes (Comptabilite) : le même ordre que « Tous » (la carte, puis l'argent). */}
-          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
+          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} setCompteSel={setCompteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
         </section>); };
   const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a

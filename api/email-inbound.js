@@ -2443,7 +2443,10 @@ export async function traiterEmail(req, res) {
       };
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
-      try { await pushOnce({ ...texteBordereau({ modele: data.modele, numero: data.numero, tamponne: !!pdfTamponneB64, dateLimite: data.dateLimite }), tag: `bord-${data.transaction}`, url: DESTINATIONS.colis({ tx: data.transaction }) }, 'expedier'); } catch (_) {}
+      // (8 nov.) La notification ne nomme que le N° LU dans l'e-mail (écrit par lui dans le titre) —
+      // jamais celui retrouvé par ressemblance de titre (`parTitre`) : 50 paires au même titre, un
+      // seul N° serait le bon (src/bordereauVenteEmail.js). L'app tamponne par identité.
+      try { await pushOnce({ ...texteBordereau({ modele: data.modele, numero: numeroLu, tamponne: !!pdfTamponneB64, dateLimite: data.dateLimite }), tag: `bord-${data.transaction}`, url: DESTINATIONS.colis({ tx: data.transaction }) }, 'expedier'); } catch (_) {}
       await notifierDoubleVente(numeroLu, data.modele || data.article);
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { parTitre: !!(data.numero && !numeroLu), article: data.modele || data.article }; }
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
