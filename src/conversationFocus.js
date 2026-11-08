@@ -15,7 +15,10 @@ export function useConversationFocus(selectedId,onClose){
   const controls=()=>[...node.querySelectorAll('button,input,select,textarea,a[href],[tabindex]')].filter(el=>!el.disabled && el.tabIndex>=0 && el.getClientRects().length>0);
   const initial=node.querySelector('[aria-label="Fermer la conversation eBay"]');
   initial?.focus({preventScroll:true});
+  let composition=false;
+  const debutComposition=()=>{composition=true;},finComposition=()=>{composition=false;};
   const keyboard=event=>{
+   if(composition||event.defaultPrevented||event.isComposing||event.keyCode===229)return;
    // Une confirmation d’envoi ouverte au-dessus conserve ses propres touches.
    if(!node.contains(event.target))return;
    if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close.current();return;}
@@ -26,8 +29,10 @@ export function useConversationFocus(selectedId,onClose){
    else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
   };
   node.addEventListener('keydown',keyboard);
+  node.addEventListener('compositionstart',debutComposition);node.addEventListener('compositionend',finComposition);
   return()=>{
    node.removeEventListener('keydown',keyboard);
+   node.removeEventListener('compositionstart',debutComposition);node.removeEventListener('compositionend',finComposition);
    locks.forEach(({el,value,priority})=>{if(value)el.style.setProperty('overflow',value,priority);else el.style.removeProperty('overflow');});
    if(opener?.isConnected && opener!==document.body)opener.focus({preventScroll:true});
    else document.querySelector('[aria-label="Rechercher un message eBay"]')?.focus({preventScroll:true});
