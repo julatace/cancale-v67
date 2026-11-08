@@ -450,7 +450,7 @@ const numsDeLaPhoto = (pub) => {
   }
   return { nums: s, incomplet };
 };
-async function colisEmailDepuis(pub, retires, today, lu) {
+async function colisEmailDepuis(pub, retires, today, lu, envoyes = null) {
   const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
   if (pubAt == null) return 0;
   const vus = new Set(Array.isArray(pub.vus) ? pub.vus.map(String) : []);
@@ -491,12 +491,16 @@ async function colisEmailDepuis(pub, retires, today, lu) {
     const k = normSuivi(t.suivi); const at = Date.parse(t.etatAt || '');
     if (!k || !Number.isFinite(at) || at <= pubAt) continue;          // déjà vu par l'app à la photo
     if (photo.nums.has(k) || vusN.has(k) || retiresN.has(k) || comptes.has(k)) continue;
+    // (8 nov., retraits) JAMAIS UN COLIS QU'IL ENVOIE : le n° d'un de ses bordereaux que le
+    // transporteur dit « disponible » (au point relais de SON acheteur) n'est pas à retirer.
+    // Ses bordereaux pas lus ⇒ pas su (« au moins »), jamais compté.
+    if (envoyes instanceof Set && envoyes.has(k)) continue;
     if (sortiParSuivis([k], fins, at)) continue;
     const luMs = Date.parse(t.lu || '');
     const e = leverGarde(etatRetrait({ limite: (t.limiteSure && t.limite) || null, limiteAt: (t.limiteSure && t.limiteAt) || null, arriveeMs: at, transporteur: t.carrier || '' }, Date.now(), today),
       { transpDispoLu: Number.isFinite(luMs) ? luMs : null, limiteVers: (!t.limiteSure && t.limite) || null }, Date.now());
     if (e.etat !== 'a_retirer') continue;
-    if (photo.incomplet) { inconnus++; continue; }
+    if (photo.incomplet || !(envoyes instanceof Set)) { inconnus++; continue; }
     n++; comptes.add(k);
   }
   return inconnus ? null : n;
@@ -758,7 +762,7 @@ export default async function handler(req, res) {
     const pubBrute = m.vrm_colis_retirer;
     const suivisLus = (pubBrute && Array.isArray(pubBrute.colis)) ? await lireSuivisEmail() : null;
     const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(pubBrute, retiresMain, pickupDone, txBuy, suivisLus), leveDepuisTransp(suivisLus));
-    const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus) : 0;
+    const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus, Array.isArray(bords) ? new Set(bords.map((b) => normSuivi(b && b.suivi)).filter(Boolean)) : null) : 0;
     const masques = new Set(Array.isArray(m.vinted_accounts_hidden) ? m.vinted_accounts_hidden.map(String) : []);
     const nouveauxVinted = pubRetirer ? colisVintedDepuis(m.vrm_colis_retirer, txBuy, pickupDone, masques, today) : 0;
     const pickup = pubRetirer ? pubRetirer.n + (nouveauxEmail || 0) + (nouveauxVinted || 0) : pickupVinted;

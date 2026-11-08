@@ -61,6 +61,7 @@ const MUTATIONS = {
   'c3-cp-page-ignore': ['api/_lib/transporteurs.js', "      const cp = it.cp || (seul && normaliserSuivi(seul) === it.suivi && /^\\d{5}$/.test(String(cpSeul || '')) ? String(cpSeul) : '');", '      const cp = it.cp;'],
   // ── Le widget suit la règle de l'app (§11, trouvé au banc `transporteurs.cjs`) ──
   'widget-transp-dispo-ignore': ['api/widget.js', '      return (dispoSuivi.has(k) || tDispo.has(k)) ? false : true;', '      return dispoSuivi.has(k) ? false : true;'],
+  'widget-bordereau-compte': ['api/widget.js', '    if (envoyes instanceof Set && envoyes.has(k)) continue;\n', ''],
   'widget-garde-non-levee': ['api/widget.js', ', leveDepuisTransp(suivisLus));', ');'],
   // ── (29 oct.) Tour 1 du chantier « règles, états, écran » (section 9) ──
   'vg-retour-annule': ['api/_lib/transporteurs.js', "const estRetourVg = (e) => VG_RETOUR_GROUPES.has(e.group) || (e.state === 'return' && VG_GROUPES_DE_ROUTE.has(e.group));", "const estRetourVg = (e) => e.state === 'return' || /^return/.test(e.group) || e.group === 'returned';"],
@@ -680,6 +681,22 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(leve.pickup === 1, 'arrivé il y a 6,5 j (garde Mondial Relay : 5 j), lu « disponible » il y a 1 h : le widget le compte « à retirer », comme l\'app', `pickup=${leve.pickup} aVérifier=${leve.pickupAVerifier}`);
     const perime = await compte({ email: vieux, arriveeMs: NOW - 156 * H, luMs: NOW - 8 * H });
     dit(perime.pickup === 0 && perime.pickupAVerifier === 1, 'l\'autre sens : lu il y a 8 h ⇒ la garde n\'est PAS levée (« à vérifier »)', `pickup=${perime.pickup} aVérifier=${perime.pickupAVerifier}`);
+  });
+  // (8 nov., retraits) JAMAIS UN COLIS QU'IL ENVOIE : le n° d'un de ses bordereaux, lu « disponible »
+  // chez le transporteur après la photo de l'app (au point relais de SON acheteur), n'est pas compté.
+  await essaie('route api/widget : un n° de ses bordereaux « disponible » ⇒ jamais « à retirer »', async () => {
+    const w = (await importer('api/widget.js')).default;
+    const compte = async (avecBord) => {
+      resetBase(); await oublis();
+      base.set(`${A}|main`, { vrm_widget_token: '', vinted_pickup_done: {}, vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_sales_hidden: [], vinted_bords_hidden: {}, vrm_colis_collected: [],
+        vrm_colis_retirer: { total: 0, aVerifier: 0, urgents: 0, at: NOW - 3 * H, colis: [], vus: [], vusTx: [] } });
+      if (avecBord) base.set(`${A}|email_bord_9300004`, { type: 'bordereau', suivi: '87654321', transaction: '9300004', filename: 'Bordereau-Vinted-9300004.pdf', receivedAt: iso(NOW - 50 * H), dateLimite: '31/12/2099' });
+      base.set(`${A}|transp_mondialrelay_87654321`, { v: 1, rev: 1, carrier: 'mondialrelay', suivi: '87654321', etat: 'disponible', etatAt: iso(NOW - H), libelle: '5 jours restants pour retirer le colis en Point Relais', lu: iso(NOW - 0.5 * H), essai: iso(NOW - 0.5 * H), essaiRes: 'ok', voie: 'mr-fr-mvc', fini: false });
+      const res = faireRes(); await w({ method: 'GET', headers: {}, query: {} }, res);
+      return res.corps || {};
+    };
+    const achat = await compte(false), envoi = await compte(true);
+    dit(achat.pickup === 1 && envoi.pickup === 0, 'le widget ne compte jamais « à retirer » un n° de ses bordereaux (1 sans le bordereau : un achat)', `achat=${achat.pickup} envoi=${envoi.pickup}`);
   });
   await essaie('route api/ship-reminders : le cron lit les transporteurs (Mondial Relay par le serveur)', async () => {
     const cron = (await importer('api/ship-reminders.js')).default;

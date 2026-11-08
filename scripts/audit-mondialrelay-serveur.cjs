@@ -395,7 +395,7 @@ const ligneDe = (n) => base.get(`${A}|transp_mondialrelay_${n}`) || null;
     // un agent Chrome, pour que la phrase reste celle d'un ordinateur sous Chrome.
     const { motsNavigateur } = await importer('src/navigateurExtension.js');
     const ctx = { NAV: motsNavigateur('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36'), React, C: { muted: '#777', warn: '#a60', text: '#111', border: '#ccc', card: '#fff' }, extSait: () => etat.ext, useSansSouris: () => etat.tel, vmrExtPresent: () => !etat.tel,
-      normaliserSuivi, carrierLisible: T.carrierLisible, carrierNonLu: T.carrierNonLu, ligneTransporteur: T.ligneTransporteur, nomTransporteur: T.nomTransporteur, LECTURE_SERVEUR_TRANSP: T.LECTURE_SERVEUR_TRANSP, EXT_CAPACITES: { transp: vTransp }, __vmrEtat: null, texteCodePostalMr: T.texteCodePostalMr, Map, Set, Array, String, Number, Math, Object };
+      normaliserSuivi, carrierLisible: T.carrierLisible, carrierLuDeLigne: T.carrierLuDeLigne, carrierNonLu: T.carrierNonLu, ligneTransporteur: T.ligneTransporteur, nomTransporteur: T.nomTransporteur, LECTURE_SERVEUR_TRANSP: T.LECTURE_SERVEUR_TRANSP, EXT_CAPACITES: { transp: vTransp }, __vmrEtat: null, texteCodePostalMr: T.texteCodePostalMr, Map, Set, Array, String, Number, Math, Object };
     vm.createContext(ctx); vm.runInContext(js, ctx);
     const rend = (el) => RDS.renderToStaticMarkup(el);
     const colis = [{ carrier: 'Mondial Relay', suivi: N1 }];

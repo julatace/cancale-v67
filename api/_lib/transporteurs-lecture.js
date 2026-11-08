@@ -177,7 +177,8 @@ export async function lireBaseTransp({ avecRelais = true } = {}) {
   if (![lignes, transp, manuels, vinted, bords, pause, mainRow, relaisRow].every(Array.isArray)) return null;
   const tMap = new Map();
   const attente = [];
-  for (const x of transp) { const t = T.ligneTranspDeMeta(x); if (t) { tMap.set(t.suivi, t); if (x.notifEnAttente) attente.push(t.id); } }
+  // (8 nov., retraits) Deux lignes pour un n° : la préférée (`ligneTranspPreferee`), jamais la dernière renvoyée.
+  for (const x of transp) { const t = T.ligneTranspDeMeta(x); if (t) { tMap.set(t.suivi, T.ligneTranspPreferee(tMap.get(t.suivi), t)); if (x.notifEnAttente) attente.push(t.id); } }
   const relais = objet(relaisRow[0] && relaisRow[0].data);
   const liens = liensDesLignes(vinted, manuels) || [];
   // Les codes postaux PROUVÉS chez ce vendeur : ceux de ses lectures Mondial
