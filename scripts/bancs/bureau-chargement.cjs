@@ -59,7 +59,7 @@ const TB = require('./tous-boutons.cjs');
       await pg.goto(`http://localhost:${TB.PORT}/?tab=journee`,{waitUntil:'domcontentloaded'});
       try {
         await pg.locator('[data-demarrage-vrm]').waitFor({state:'visible'});
-        assert.match(await pg.locator('[role=status]').innerText(),/Ouverture de ton espace/);
+        assert.match(await pg.locator('[data-demarrage-vrm] [role=status]').innerText(),/Ouverture de ton espace/);
         const animation=await pg.locator('.vrm-demarrage-rail > span').evaluate(e=>getComputedStyle(e).animationName);
         assert.equal(animation==='none',reducedMotion==='reduce','respect de la réduction des animations');
         assert.ok(await pg.locator('[data-demarrage-vrm] img').evaluate(e=>e.complete&&e.naturalWidth>0),'logo chargé');
