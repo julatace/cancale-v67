@@ -111,7 +111,28 @@ function sourceApp(racine) {
   const restes = [];
   for (const rel of Object.keys(morceaux)) for (const k of Object.keys(morceaux[rel])) restes.push(cheminsVusDeSrc(morceaux[rel][k]));
   for (const t of sansBalises) restes.push(recoller(t, deja));
-  return restes.length ? out + '\n' + restes.join('\n') : out;
+  const tout = restes.length ? out + '\n' + restes.join('\n') : out;
+  return sansDoublonsImport(tout);
+}
+// (8 nov.) Un morceau recollé porte parfois ses propres lignes d'import (elles étaient à
+// cette place dans App.jsx). Si App.jsx importe aussi ce nom, le texte recollé le
+// déclarerait DEUX fois (Babel : « already been declared »). Dernière passe : chaque nom
+// importé n'est gardé qu'à sa PREMIÈRE ligne d'import ; rien d'autre ne change (chemins
+// et ordre intacts ; une ligne vidée disparaît).
+function sansDoublonsImport(texte) {
+  const vus = new Set();
+  return texte.replace(/^import\s+([^'";]*?)\s+from\s+(["'])([^"'\n]+)\2;[ \t]*$/gm, (ligne, specs, q, chemin) => {
+    // Un import d'App.jsx par un morceau recollé DANS App.jsx : ses noms y sont déclarés.
+    if (/(^|\/)App\.jsx$/.test(chemin)) return '';
+    const acc = specs.match(/\{([^}]*)\}/);
+    const nommes = acc ? acc[1].split(',').map((x) => x.trim()).filter(Boolean) : [];
+    const autres = specs.replace(/\{[^}]*\}/, '').split(',').map((x) => x.trim()).filter(Boolean);
+    const garderA = autres.filter((r) => { const loc = r.replace(/^\*\s+as\s+/, ''); if (vus.has(loc)) return false; vus.add(loc); return true; });
+    const garderN = nommes.filter((n) => { const loc = n.split(/\s+as\s+/).pop(); if (vus.has(loc)) return false; vus.add(loc); return true; });
+    if (garderA.length === autres.length && garderN.length === nommes.length) return ligne;
+    const parts = [...garderA]; if (garderN.length) parts.push(`{ ${garderN.join(', ')} }`);
+    return parts.length ? `import ${parts.join(', ')} from ${q}${chemin}${q};` : '';
+  });
 }
 
 // La même chose à partir du chemin d'App.jsx (ce que les audits lisaient avant) :

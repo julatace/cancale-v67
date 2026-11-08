@@ -1666,7 +1666,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
     { id:'comptes', titre:'Mes comptes', items:[
       // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
-      { id:'toutvabien', type:'panneau', ic:'pulse', lib:'Tout va bien ?', desc:'Chaque compte, sa dernière relecture et l’extension de chaque appareil.', data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
+      { id:'toutvabien', type:'panneau', ic:'heart', lib:'Tout va bien ?', desc:'Chaque compte, sa dernière relecture et l’extension de chaque appareil.', data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
@@ -1746,7 +1746,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     )},
     {id:'aide',titre:'Aide',items:[
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
-      { id:'verifier', type:'panneau', nu:true, ic:'pulse', lib:'Vérifier mon installation', desc:'Extension, comptes, boîte e-mail : ce qui manque, et le geste.', data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
+      { id:'verifier', type:'panneau', nu:true, ic:'check', lib:'Vérifier mon installation', desc:'Extension, comptes, boîte e-mail : ce qui manque, et le geste.', data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM présentés un par un.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
@@ -1758,7 +1758,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
       // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
-      { id:'centre-aide', type:'action', ic:'info', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
+      { id:'centre-aide', type:'action', ic:'search', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
