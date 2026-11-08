@@ -217,12 +217,23 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(cN.n === nov.n && cN.somme === somme(nov) && cN.total === somme(nov) && cN.vides === nov.sansMontant, 'R6 · tableur : une ligne par recette, total = somme, cases vides = sans montant', JSON.stringify({ n: cN.n, total: cN.total, vides: cN.vides }));
   dit(/Dans aucune période/.test(cN.texte) && /9003/.test(cN.texte), 'R2 · le tableur liste « à dater » à part');
   dit(!/encaiss/i.test(cN.texte), 'jamais « encaissé »');
-  let pdfTexte = '';
+  // (8 nov.) pdf.js relit le PDF. C'est une VRAIE dépendance du dépôt (`pdfjs-dist`, déclarée dans
+// package.json, devDependencies : les audits relisent les PDF avec) : absente de node_modules, l'audit le dit en clair
+// et reste ROUGE — un PDF qu'on n'a pas relu n'est pas vérifié (« pas su » ≠ « oui »).
+const importerPdfjs = async (NM) => {
+  const f = path.join(NM, 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs');
+  if (!fs.existsSync(f)) {
+    let declare = false; try { const P = JSON.parse(fs.readFileSync(path.join(R0, 'package.json'), 'utf8')); declare = !!({ ...(P.dependencies || {}), ...(P.devDependencies || {}) })['pdfjs-dist']; } catch (_) {}
+    throw new Error(`pdfjs-dist n’est pas installé dans ${NM}${declare ? ' (il est déclaré dans package.json : lance « npm install »)' : ' ET n’est pas déclaré dans package.json'} — le PDF n’a pas pu être relu`);
+  }
+  return import('file://' + f);
+};
+let pdfTexte = '';
   try {
     const NM = fs.realpathSync(path.join(R0, 'node_modules'));
     const PDFLib = require(path.join(NM, 'pdf-lib'));
     const oct8 = await M.pdfRegistre(nov, { PDFLib, maintenant: T(10, 20) });
-    const pdfjs = await import('file://' + path.join(NM, 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs'));
+    const pdfjs = await importerPdfjs(NM);
     const doc = await pdfjs.getDocument({ data: new Uint8Array(oct8), isEvalSupported: false, useSystemFonts: false, standardFontDataUrl: path.join(NM, 'pdfjs-dist', 'standard_fonts') + '/' }).promise;
     for (let i = 1; i <= doc.numPages; i++) { const p = await doc.getPage(i); const tc = await p.getTextContent(); pdfTexte += tc.items.map((x) => x.str).join(' ') + '\n'; }
   } catch (e) { pdfTexte = ''; dit(false, 'le PDF se crée et se relit', e.message); }
@@ -350,7 +361,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
       const NM = fs.realpathSync(path.join(R0, 'node_modules'));
       const PDFLib = require(path.join(NM, 'pdf-lib'));
       const octG = await M.pdfRegistre(AG, { PDFLib, maintenant: T(10, 20) });
-      const pdfjs = await import('file://' + path.join(NM, 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs'));
+      const pdfjs = await importerPdfjs(NM);
       const doc = await pdfjs.getDocument({ data: new Uint8Array(octG), isEvalSupported: false, useSystemFonts: false, standardFontDataUrl: path.join(NM, 'pdfjs-dist', 'standard_fonts') + '/' }).promise;
       for (let i = 1; i <= doc.numPages; i++) { const p = await doc.getPage(i); const tc = await p.getTextContent(); pdfG += tc.items.map((x) => x.str).join(' ') + '\n'; }
     } catch (e) { pdfG = ''; dit(false, 'G5 · le PDF des achats se crée et se relit', e.message); }
