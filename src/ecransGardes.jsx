@@ -67,12 +67,8 @@ const NAV = { id: null, at: 0 };
 export function noterNavigationSimple(id) { NAV.id = id; NAV.at = Date.now(); }
 const navigationSimple = (id) => NAV.id === id && Date.now() - NAV.at < 3000;
 
-// Les écrans prêts à revenir tels quels (pour la barre : fondu enchaîné court).
+// Les écrans prêts à revenir tels quels (relevé pour le banc et le diagnostic).
 const PRETS = new Map();   // tab → { gen, quitte }
-export function retourInstantane(id) {
-  const p = PRETS.get(id);
-  return !!(p && p.gen === generation && Date.now() - p.quitte < AGE_MAX_CACHE_MS);
-}
 
 // ── Ce que voit un composant d'un écran gardé ─────────────────────────────
 //  `useVivant()` : null hors d'un écran gardé ; sinon un objet STABLE (aucun

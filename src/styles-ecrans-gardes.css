@@ -1,6 +1,6 @@
 /* ════════════════════════════════════════════════════════════════════════════
-   LES ÉCRANS GARDÉS ET LE PASSAGE D'UN ONGLET À L'AUTRE (8 nov.) —
-   src/ecransGardes.jsx, la barre du bas (BottomBar, App.jsx).
+   LES ÉCRANS GARDÉS ET LA PASTILLE DE LA BARRE DU BAS (8 nov.) —
+   src/ecransGardes.jsx, src/passageOnglet.js (le fondu), BottomBar (App.jsx).
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* La place des écrans gardés : aucune boîte en plus pour la mise en page de la
@@ -8,19 +8,6 @@
 .vrm-ecrans-gardes, .vrm-ecran-vivant { display: contents; }
 /* La règle de styles-bureau.css (`.vrm-main > :not(.vrm-barre-haut)`) pour l'écran gardé montré. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { .vrm-app-shell .vrm-main .vrm-ecran-vivant > .vrm-attente { min-width: 0; } }
-
-/* ── Le fondu enchaîné d'un onglet à l'autre (src/passageOnglet.js) ──────────
-   Le retour sur un écran gardé : l'ancien s'efface pendant que le nouveau
-   arrive, 200 ms, courbe douce (sortie rapide, arrivée posée). La barre du bas
-   n'est pas fondue : elle reste vivante, sa pastille glisse. Le reste de la page
-   reste touchable pendant le fondu. */
-html .vrm-app-shell .vrm-tabbar { view-transition-name: vrm-barre-bas; }
-html[data-passage-onglet]::view-transition { pointer-events: none; }
-html[data-passage-onglet]::view-transition-old(root),
-html[data-passage-onglet]::view-transition-new(root) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.22, 1, .36, 1); }
-html[data-passage-onglet]::view-transition-group(vrm-barre-bas) { animation: none; }
-html[data-passage-onglet]::view-transition-old(vrm-barre-bas) { display: none; }
-html[data-passage-onglet]::view-transition-new(vrm-barre-bas) { animation: none; }
 
 /* ── La pastille de l'onglet choisi (BottomBar) ──────────────────────────────
    Une capsule neutre (l'encre à 7 % : l'accent reste à l'icône, §7) qui GLISSE
@@ -36,5 +23,4 @@ html[data-passage-onglet]::view-transition-new(vrm-barre-bas) { animation: none;
 html .vrm-app-shell .vrm-tabbar > .vrm-tab { position: relative; }
 @media (prefers-reduced-motion: reduce) {
   .vrm-tab-pastille[data-prete] { transition: none; }
-  html .vrm-app-shell .vrm-tabbar { view-transition-name: none; }
 }

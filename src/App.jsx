@@ -452,8 +452,8 @@ import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAb
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
-import { EcransGardes, noterNavigationSimple, retourInstantane, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
-import { changerEnFonduEnchaine, fonduEntree } from "./passageOnglet.js";
+import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
+import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
@@ -15099,11 +15099,9 @@ function BottomBar({tab,setTab,sites,badges}) {
   const [vise,setVise]=React.useState(null);
   const [enCours,demarrer]=React.useTransition();
   React.useEffect(()=>{ if(!enCours) setVise(null); },[enCours,tab]);
-  // (8 nov.) Un écran GARDÉ (déjà vu, src/ecransGardes.jsx) revient sans calcul : en
-  // fondu enchaîné court (src/passageOnglet.js). Les autres, comme avant (tâche interruptible).
-  const allerA=(id)=>{ noterNavigationSimple(id);
-    if(retourInstantane(id) && changerEnFonduEnchaine(()=>{ setVise(null); setTab(id); })) return;
-    setVise(id); demarrer(()=>setTab(id)); };
+  // (8 nov.) Un toucher de la barre est un simple changement d'écran : un écran GARDÉ
+  // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
+  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
   const tabMontre=vise||tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
@@ -48290,8 +48288,7 @@ function AppCoeur() {
   // les animations. (8 nov.) Par Web Animations, opacité seule (src/passageOnglet.js) :
   // la classe rejouée sur `<main>` (et sa lecture forcée `offsetWidth`) faisait
   // recalculer le style de TOUT l'écran à chaque onglet (0,8 s mesuré au téléphone) ;
-  // posé avant l'affichage (plus d'image pleine puis vide) ; un retour en fondu
-  // enchaîné (barre du bas) ne refond pas par-dessus.
+  // posé avant l'affichage (plus d'image pleine puis vide).
   React.useLayoutEffect(() => {
     const m = document.querySelector('.vrm-main');
     const a = fonduEntree(m);

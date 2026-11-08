@@ -15,8 +15,8 @@
 //   3. Après ces signaux, l'écran gardé est REMONTÉ à son retour (jamais périmé).
 //   4. Un lien (pas la barre) remonte l'écran (il lit sa demande au montage).
 //   5. Un seul écran dans la page : jamais deux `[data-attente-ecran]`.
-//   6. Le passage : fondu enchaîné au retour (View Transitions) ; mouvement
-//      réduit ⇒ ni fondu, ni glissé de la pastille, aucune animation sur `<main>`.
+//   6. Le passage : le nouvel écran arrive en fondu (Web Animations sur `<main>`) ;
+//      mouvement réduit ⇒ ni fondu, ni glissé de la pastille, aucune animation sur `<main>`.
 //  Les rendus de React sont relevés par un crochet d'outils de développement
 //  posé avant l'app (`__REACT_DEVTOOLS_GLOBAL_HOOK__`) : chaque fibre au
 //  `Comptabilite` (props `only` + `accounts` + `garageGrid`) RENDUE dans un rendu
@@ -83,10 +83,11 @@ async function page(b, { reduit = false } = {}) {
   const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: reduit ? 'reduce' : 'no-preference' });
   await ctx.addInitScript(() => {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1');
-    window.__sq = 0; window.__saves = []; window.__passages = 0; window.__vrmGardeDebug = true;
+    window.__sq = 0; window.__saves = []; window.__vrmGardeDebug = true; window.__fondus = 0;
+    try { const a = Element.prototype.animate; Element.prototype.animate = function (...x) { if (this.classList && this.classList.contains('vrm-main')) window.__fondus++; return a.apply(this, x); }; } catch (_) {}
     window.addEventListener('vrm:save', (e) => { const d = e && e.detail; if (d && d.k) window.__saves.push(d.k); });
-    new MutationObserver((ms) => { for (const m of ms) { if (m.type === 'attributes' && m.target === document.documentElement && m.attributeName === 'data-passage-onglet' && document.documentElement.hasAttribute('data-passage-onglet')) window.__passages++; for (const n of m.addedNodes || []) if (n instanceof Element && (n.matches('[data-demarrage-attente]') || n.querySelector('[data-demarrage-attente]'))) window.__sq++; } })
-      .observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-passage-onglet'] });
+    new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes || []) if (n instanceof Element && (n.matches('[data-demarrage-attente]') || n.querySelector('[data-demarrage-attente]'))) window.__sq++; })
+      .observe(document, { childList: true, subtree: true });
   });
   await ctx.addInitScript(crochet);
   const pg = await ctx.newPage();
@@ -169,7 +170,7 @@ async function signaux(pg) {
       dit(montages === 0, `1. ${t} : le moteur Comptabilite n'est pas remonté (calculs gardés)`, `${montages} montage(s), ${rendus} rendu(s)` + (ecarts ? ' — écarts de la coque : ' + ecarts : ''));
     }
     dit(await pg.evaluate(() => document.querySelectorAll('[data-attente-ecran]').length) === 1, '5. un seul écran dans la page (les écrans gardés sont hors de la page)');
-    dit(await pg.evaluate(() => window.__passages) > 0, '6. le retour sur un écran gardé passe en fondu enchaîné', await pg.evaluate(() => window.__passages));
+    dit(await pg.evaluate(() => window.__fondus) > 0, '6. changer d’onglet arrive en fondu (Web Animations sur <main>, aucune classe)', await pg.evaluate(() => window.__fondus));
     // Les lectures que fait un écran MONTRÉ sur ces signaux (Ma journée), hors celles de la coque
     // (vues sur Réglages) : ce que ferait en double un écran caché qui n'aurait pas tu ses écoutes.
     await signaux(pg); await calme(lectures, 2500);
@@ -212,7 +213,7 @@ async function signaux(pg) {
       await toucher(p2, 'cat_bord'); await calme(l2, 1200); await toucher(p2, 'journee');
       const anim = await p2.evaluate(() => (document.querySelector('.vrm-main').getAnimations ? document.querySelector('.vrm-main').getAnimations().length : 0));
       const trans = await p2.evaluate(() => { const p = document.querySelector('.vrm-tab-pastille'); return p ? getComputedStyle(p).transitionDuration : 'absente'; });
-      dit(await p2.evaluate(() => window.__passages) === 0, '6. mouvement réduit : aucun fondu enchaîné');
+      dit(await p2.evaluate(() => window.__fondus) === 0, '6. mouvement réduit : aucun fondu');
       dit(anim === 0, '6. mouvement réduit : aucune animation sur <main>', anim);
       dit(trans !== 'absente' && String(trans).split(',').every((x) => parseFloat(x) < 0.01), '6. mouvement réduit : la pastille ne glisse pas', trans);
       await c2.close();
