@@ -97,7 +97,7 @@ const srv = http.createServer((q, r) => {
   }
   if (p === '/VRM-Orion.xpi' && PANNE.orionVersion) return envoyer(200, 'application/x-xpinstall', zip([['manifest.json', JSON.stringify({ manifest_version: 2, version: '5.1.0' })]]));
   if (p === '/manifest.webmanifest' && PANNE.manifeste) return page();
-  if (p === '/vrm-icon-v4-512.png' && PANNE.icone) { r.writeHead(404); return r.end(); }
+  if (p === '/vrm-icon-v5-512.png' && PANNE.icone) { r.writeHead(404); return r.end(); }
   if (p === '/sw.js' && PANNE.sw) return page();
   const f = path.join(R, 'public', decodeURIComponent(p));
   if (f.startsWith(path.join(R, 'public')) && fs.existsSync(f) && fs.statSync(f).isFile()) {
@@ -138,7 +138,7 @@ const lancer = (origine, env = {}) => new Promise((ok2) => {
     ['sante500', /\/api\/sante.*HTTP 500/, '/api/sante en panne (500)'],
     ['titre', /page d’accueil.*titre/, 'la page d’accueil sans son titre'],
     ['manifeste', /manifeste.*pas du JSON/, 'le manifeste remplacé par la page de l’app'],
-    ['icone', /manifeste.*vrm-icon-v4-512\.png/, 'une icône du manifeste absente'],
+    ['icone', /manifeste.*vrm-icon-v5-512\.png/, 'une icône du manifeste absente'],
     ['sw', /service worker.*pas du JavaScript/, 'le service worker remplacé par la page de l’app'],
     ['confOuverte', /confidentialité.*HTTP 200 au lieu de 401/, 'une route privée qui répond sans session'],
   ];

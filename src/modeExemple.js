@@ -35,7 +35,7 @@ export { UID_EXEMPLE };
 const HOTE_BASE = 'lgonxzrzjcqthjtbdpzo.supabase.co';
 // Les réglages d'AFFICHAGE de l'appareil que l'exemple reprend (thème, zoom) :
 // ce ne sont pas des données, et l'exemple doit ressembler à SON écran.
-const AFFICHAGE = ['vinted_dark', 'vrm_zoom', 'vrm_densite'];
+const AFFICHAGE = ['vinted_dark', 'vrm_apparence', 'vrm_zoom', 'vrm_densite'];
 
 let ETAT = null;
 

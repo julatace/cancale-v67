@@ -346,7 +346,7 @@ export default function Accueil({ onEntrer }) {
       <header className={`av-nav${defile ? ' defile' : ''}`}>
         <div className="av-in">
           <a className="av-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label="VRM — haut de la page">
-            <img src="/vrm-logo-v4-96.png" srcSet="/vrm-logo-v4-96.png 1x, /vrm-logo-v4-192.png 2x" alt="" width="28" height="28" />
+            <img className="vrm-brand-asset" src="/vrm-logo-v5-96.png" srcSet="/vrm-logo-v5-96.png 1x, /vrm-logo-v5-192.png 2x" alt="" width="28" height="28" />
             <b>VRM</b>
           </a>
           <nav className="av-liens" aria-label="Sections">

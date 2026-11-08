@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
 import { annulationsParCompte } from '../annulationsCompte.js';
 import { modeleSur } from '../ceQuiRapporte.js';
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from '../statsVentes.js';
@@ -616,6 +617,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="chart" title="Statistiques" phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
+      {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
+          (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
+      <VenduParSemaineSante liveStats={liveStats}/>
       <ComparerMoisCarte liveStats={liveStats}/>
       <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
@@ -1766,6 +1770,21 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
 }
 // ⟦← App.jsx #18⟧
 
+// (8 nov., « beauté ») « Vendu par semaine » façon Santé, en tête de l'écran. Les semaines de
+// `rythmeVendu` sur `liveStats.venduLignes` (la règle de « Vendu », §5) ; pas lu ⇒ rien de dessiné,
+// la raison dite ; une plateforme pas lue ⇒ « au moins ».
+function VenduParSemaineSante({ liveStats }) {
+  const vendu = liveStats ? liveStats.venduLignes : undefined;
+  const R = React.useMemo(() => (Array.isArray(vendu) ? rythmeVendu(vendu) : null), [vendu]);
+  const manque = (liveStats && liveStats.venduManque) || [];
+  if (!R) return (
+    <section className="vrm-sante vrm-sante-vide" data-stats-carte="semaines-sante" data-sante-etat={vendu === null || (liveStats && liveStats.venduPasSu) ? 'passu' : 'encours'}>
+      <div className="vrm-sante-haut"><h2 className="vrm-sante-titre">Vendu par semaine</h2></div>
+      <p className="vrm-sante-note">{vendu === null || (liveStats && liveStats.venduPasSu) ? 'Tes ventes n’ont pas pu être lues : rien n’est dessiné.' : 'Je lis tes ventes…'}</p>
+    </section>
+  );
+  return <GraphiqueSemaines semaines={R.semaines} partiel={manque.length > 0} manque={manque} fmt={fmt}/>;
+}
 function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
@@ -1844,12 +1863,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
           {fig('Panier moyen', eurStat(R.panier30.moyen), R.panier30.n ? `sur ${pl(R.panier30.n, 'vente')} en 30 jours` : 'aucune vente en 30 jours', { 'data-stat-panier': R.panier30.moyen == null ? '' : Math.round(R.panier30.moyen * 100) })}
           {fig('Ventes par jour', R.panier30.n ? String(Math.round(R.panier30.n / 30 * 10) / 10).replace('.', ',') : '—', 'moyenne des 30 derniers jours')}
         </div>
-        <div style={{ ...sLib, marginTop: 18 }}>12 dernières semaines</div>
-        <div style={{ marginTop: 8 }}>
-          <BarresStats valeurs={R.semaines.map((s) => s.eur)} attenue={[11]} data={{ 'data-stats-semaines': R.semaines.map((s) => Math.round(s.eur)).join(','), 'aria-label': 'Vendu par semaine, 12 semaines' }}
-            titres={R.semaines.map((s) => `Semaine du ${new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} : ${fmt(s.eur)} · ${pl(s.n, 'vente')}${s.enCours ? ' (en cours)' : ''}`)}/>
-          <LegendeBarres libelles={R.semaines.map((s, i) => i % 3 === 2 ? new Date(s.debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' }) : '')}/>
-        </div>
+        {/* (8 nov., « beauté ») Les 12 semaines sont en tête de l'écran (« Vendu par semaine », façon Santé). */}
         <div style={{ ...sNote, marginTop: 10 }}>{manque.length ? `Sans ${manque.join(', ')} : au moins` : ''}{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune semaine.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? ` Pas comptées (l'argent ne se lit pas) : ${phraseNonComptees(liveStats.venduNonComptees)}.` : ''}</div>
       </>)}
     </section>
