@@ -17644,7 +17644,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
   // débloque est de la METTRE À JOUR (le zip), et — si elle range chez un autre —
   // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
-  const bouton = (!fait.ext && mobile==='ios-orion')
+  // (8 nov.) Le fichier Orion ne se met jamais à jour seul : dès que la fiche
+  // Firefox est publiée (`orion`), c'est elle qu'on propose (branche plus bas).
+  const bouton = (!fait.ext && mobile==='ios-orion' && !orion)
     ? <a href={`${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`} download data-premiers-geste="orion-fichier" className="vrm-b vrm-b-primaire">Télécharger pour Orion</a>
     : (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
     ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" className="vrm-b vrm-b-primaire">Installer depuis la boutique</a>
