@@ -19,12 +19,13 @@ rouges (ou sautés) des deux côtés, donc (c).
 
 ## Avancement
 
-91 bancs lancés sur 221 (de `fiche-paire` à `widget-multi`, ordre `LC_ALL=C`).
+128 bancs lancés sur 221 (de `fiche-paire` à `widget-multi`, ordre `LC_ALL=C`).
 
-- **verts** (58) : `filtre-compte`, `finition`, `finition-premium`, `fluidite`, `fournisseurs`, `garde-ecrans`, `gestes-annuler`, `glisser-onglet`, `gros-volumes`, `hors-ligne`, `hors-reseau`, `ia`, `imprimante`, `inscription-fiable`, `inventaire`, `iphone-reprise`, `journal-emails`, `journee-chiffres`, `journee-premium`, `journee-widgets`, `lbc-bordereau`, `lbc-comme-vinted`, `lbc-demarrage`, `lbc-identite-privee`, `lbc-rappel-mise-a-jour`, `lbc-repondre`, `lbc-revue-complete`, `leboncoin`, `litiges-recherche`, `lot-bordereaux`, `messages-emails-communaute`, `messages-lisibles`, `messages-priorite`, `messages-sites`, `mesures-terrain`, `mode-exemple`, `morceau-perime`, `navigation-tache`, `notif-messages`, `nouveau-vendeur`, `nuage`, `numero-vinted`, `numeros-doublons`, `numeros-lettres`, `numeros-panne`, `numeros-reconnexion`, `numeros-remise-a-zero`, `offres-mini-push`, `onglets-a`, `onglets-c`, `panne`, `parametres-guides`, `parcours-quotidien`, `pave-plateformes`, `petits-plus`, `photo-vente`, `photoroom-carte`, `photos`
-- **(c) rouges identiques sur main** (23) : `fiche-paire`, `file-envoi`, `formes-communes`, `garage3d`, `indicateur-pro`, `jetons-coherence`, `journee-coherence`, `journee-mieux`, `journee-photos`, `lbc-messages`, `lbc-pause`, `lbc-publier-app`, `lbc-relier`, `lbc-supprimer`, `lbcprep`, `messages-volets`, `mobile`, `offres-objectif`, `onglets-d`, `oublies`, `outils-stats`, `parametres-sauvegarde`, `perfv`
+- **verts** (80) : `filtre-compte`, `finition`, `finition-premium`, `fluidite`, `fournisseurs`, `garde-ecrans`, `gestes-annuler`, `glisser-onglet`, `gros-volumes`, `hors-ligne`, `hors-reseau`, `ia`, `imprimante`, `inscription-fiable`, `inventaire`, `iphone-reprise`, `journal-emails`, `journee-chiffres`, `journee-premium`, `journee-widgets`, `lbc-bordereau`, `lbc-comme-vinted`, `lbc-demarrage`, `lbc-identite-privee`, `lbc-rappel-mise-a-jour`, `lbc-repondre`, `lbc-revue-complete`, `leboncoin`, `litiges-recherche`, `lot-bordereaux`, `messages-emails-communaute`, `messages-lisibles`, `messages-priorite`, `messages-sites`, `mesures-terrain`, `mode-exemple`, `morceau-perime`, `navigation-tache`, `notif-messages`, `nouveau-vendeur`, `nuage`, `numero-vinted`, `numeros-doublons`, `numeros-lettres`, `numeros-panne`, `numeros-reconnexion`, `numeros-remise-a-zero`, `offres-mini-push`, `onglets-a`, `onglets-c`, `panne`, `parametres-guides`, `parcours-quotidien`, `pave-plateformes`, `petits-plus`, `photo-vente`, `photoroom-carte`, `photos`, `plantages`, `plateformes-logo`, `pont`, `popup`, `poste-sans-depart`, `postes`, `prix-numerotage`, `prixmarche`, `profil-avatar`, `proxy`, `rappel-soir`, `rappel-urssaf`, `recap-vente`, `reception-emails`, `recherche-numero`, `recherche-photo`, `recherche-universelle`, `recuperation-auth`, `recuperation-retour`, `recus`, `relier-achat-filtres`, `relier-achat-suggestions`
+- **(c) rouges identiques sur main** (36) : `fiche-paire`, `file-envoi`, `formes-communes`, `garage3d`, `indicateur-pro`, `jetons-coherence`, `journee-coherence`, `journee-mieux`, `journee-photos`, `lbc-messages`, `lbc-pause`, `lbc-publier-app`, `lbc-relier`, `lbc-supprimer`, `lbcprep`, `messages-volets`, `mobile`, `offres-objectif`, `onglets-d`, `oublies`, `outils-stats`, `parametres-sauvegarde`, `perfv`, `photos-vinted`, `plateformes-premium`, `premierjour`, `prixachat`, `publier`, `rangement`, `recap-mois`, `recherche-en-place`, `recu-achat`, `registres`, `reglages`, `reglages-premium`, `relais-telephone`
 - **DIFF — à trancher / relancer seuls** : `fusion-app`, `lbc-flou-compte`, `lbc-preuve`, `menu-range`, `messagerie`, `notifs-destination`
-- **NEUF — à trancher / relancer seuls** : `lien-vc-frise`, `mode-stream`, `numero-etiquette`, `pave-vinted`
+- **NEUF — à trancher / relancer seuls** : `lien-vc-frise`, `mode-stream`, `numero-etiquette`, `pave-vinted`, `rapport`
+- **? — à trancher / relancer seuls** : `republier`
 
 ### Classement à la main
 
@@ -47,6 +48,8 @@ rouges (ou sautés) des deux côtés, donc (c).
   redevient capable d'échouer (il passait à vide sur un texte à l'insécable).
 - **(c) `notifs-destination`** — 12 rouges des deux côtés (« ni écran blanc ni
   garde-fou »), pas tout à fait les mêmes lignes : écran pas monté à temps, même défaut.
+- **(a) `rapport`** — 15 expressions `\b75(?:,00)? ?€` (espace ordinaire facultative) :
+  `\s?€` (l'insécable compte).
 - **à relancer seuls** (rouge de transition sous charge, opacité/fond pris en plein
   mouvement) : `fusion-app` (fond rgba(…, 0,353) d'un bouton secondaire en sombre),
   `lbc-flou-compte` (opacité 0,31 sur « rien n'est flouté »).
