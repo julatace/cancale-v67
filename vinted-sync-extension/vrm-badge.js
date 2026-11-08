@@ -94,7 +94,8 @@
   .q { font-size: 14px; font-weight: 600; margin: 2px 0 4px; }
   .q b { font-weight: 700; }
   .err { margin-top: 8px; font-size: 12px; color: var(--ambre); }
-  .connexion { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); height: min(400px, calc(100vh - 90px)); border: 1px solid var(--bord); border-radius: 12px;
+  /* 5.325 : 460 (était 400) — « Continuer avec Google / Discord » y tiennent sans défiler. */
+  .connexion { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); height: min(460px, calc(100vh - 90px)); border: 1px solid var(--bord); border-radius: 12px;
     overflow: hidden; background: var(--fond); box-shadow: var(--ombre); display: none; }
   @media (prefers-color-scheme: light) { .connexion { background: #F4F6FA; } }
   .connexion.on { display: block; }
