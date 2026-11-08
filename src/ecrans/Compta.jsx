@@ -1877,8 +1877,8 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
         </span>
       </span>
       <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
-        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
-        <Bouton variante="secondaire" icone="save" data-registre-csv={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'csv')}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
+        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} aria-label={`Télécharger « ${nom} » en PDF`} title={`Télécharger « ${nom} » en PDF`} disabled={!R || !!enCours} onClick={() => exporter(R, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
+        <Bouton variante="secondaire" icone="save" data-registre-csv={type} aria-label={`Télécharger « ${nom} » en tableur`} title={`Télécharger « ${nom} » en tableur (Excel, Numbers)`} disabled={!R || !!enCours} onClick={() => exporter(R, 'csv')}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
       </span>
     </div>
   );
@@ -2196,8 +2196,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             </div>}
             <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>VRM ne sait pas si un acheteur est une entreprise : toutes tes ventes du mois y figurent. Retire celles faites à une entreprise (elles demandent une facture).</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)}><Icon name="save" size={14} />Récap CSV</button>
-              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)}><Icon name="save" size={14} />Récap JSON</button>
+              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récap en tableur</button>
+              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, au format JSON (pour un logiciel de compta)"><Icon name="save" size={14} />Récap JSON</button>
             </div>
             {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas encore tout seul vers Super PDP : la forme de son envoi par l'API n'a pas pu être vérifiée dans leur documentation officielle. Dépose ces fichiers toi-même d'ici là.</div>}
           </div>)}
@@ -3004,7 +3004,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0'}}>Comment c'est calculé</summary>
           <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
             {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
-            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
+            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, là où elle est installée, qui va chercher ces dates</>}.</div>}
             {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
             {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
             {/* (2 nov., audit P7) eBay ne transmet pas la date de son versement : le dire. */}
@@ -3089,8 +3089,8 @@ function RecapComptableMensuel() {
           </select>
         </div>
         <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-          <Bouton variante="primaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':'PDF'}</Bouton>
-          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}}>{recapEnCours==='csv'?'…':'Tableur'}</Bouton>
+          <Bouton variante="primaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':'Télécharger en PDF'}</Bouton>
+          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title="Un fichier pour Excel ou Numbers">{recapEnCours==='csv'?'…':'Télécharger en tableur'}</Bouton>
         </div>
       </div></Card>
       {/* Récap comptable mensuel */}
@@ -3874,7 +3874,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   return (
     <div className="vrm-finance-page vrm-fu-ecran" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* (5 nov., chantier F, revue 2.27) Plus de surtitre « Novembre 2026 » au-dessus du titre : la carte sombre dit déjà sa période. */}
-      <ScreenHead icon="euro" title={L.compta} desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
+      <ScreenHead icon="euro" title={L.compta} phrase="compta" desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —

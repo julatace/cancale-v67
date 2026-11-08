@@ -19,11 +19,21 @@ import { noterTicketDiscord } from '../communaute/discordAttente.js';
 import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit, apercuNumeroEcrit } from '../numeroEcrit.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
-import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette } from '../App.jsx';
+import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
+
+// (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
+// dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
+import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
+
+// (8 nov.) « Vérifier mon installation » : le même contrôle que le guide de démarrage (src/guideDemarrage.js).
+import { VerifierInstallationApp } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import SuiviComptes from '../SuiviComptes.jsx';
+// (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
+import { ToutVaBien } from '../ToutVaBien.jsx';
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
@@ -51,10 +61,14 @@ import EspaceEmails from '../EspaceEmails.jsx';
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportDonnees.js";
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
+import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
+import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
+import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 // ⟦← App.jsx #13⟧
+import TesDonnees from '../composants/TesDonnees.jsx';
 import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
 // ⟦← App.jsx #14⟧
 import { DISCORD_ERREURS } from "../communaute/discordErreurs.js";
@@ -69,6 +83,8 @@ import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
 const JournalEmails = aLaDemande(() => import('../JournalEmails.jsx'));
+// (8 nov.) « Ton adresse VRM » : l'adresse de réception unique (src/AdresseReception.jsx), à la demande.
+const CarteAdresseReception = aLaDemande(() => import('../AdresseReception.jsx'));
 // ⟦← App.jsx #17⟧
 // Un nom déjà pris (GoTrue refuse deux facteurs au même nom pour un compte) :
 // comparé sans casse ni espaces de bord, pour ne pas laisser « iPhone » et
@@ -107,7 +123,7 @@ const authSetEmail = async (email) => {
 };
 // ⟦← App.jsx #20⟧
 function SignalerProblemeFeuille({ ecran, ...props }) {
-  return <SignalerProblemeFeuilleBase Feuille={SheetShell} Bouton={Bouton} entetes={enTeteSession} contexte={() => contexteSignalement(ecran)} {...props}/>;
+  return <SignalerProblemeFeuilleBase Feuille={SheetShell} Bouton={Bouton} entetes={enTeteSession} masque={masquerPourEnvoi} contexte={() => contexteSignalement(ecran)} {...props}/>;
 }
 // ⟦← App.jsx #21⟧
 function ModelesSetting() {
@@ -1141,6 +1157,7 @@ async function sourcesExportDonnees() {
   };
 }
 async function exporterMesDonnees() {
+  if (lectureSeuleActive()) { toast(EXPORT_FERME); return; }
   try {
     const src = await sourcesExportDonnees();
     const zip = zipStocke(fichiersExport(feuillesExport(src)));
@@ -1194,6 +1211,50 @@ function RelancesEssaiSetting() {
             : <Interrupteur on={!!r.abonne} onClick={basculer} disabled={busy} label={`Conseils par e-mail : ${r.abonne ? 'activés' : 'désactivés'}`}/>}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ── LE BILAN DU MOIS PAR E-MAIL (8 nov., api/_lib/bilan-mois.js) ─────────────
+// Un résumé (ventes, vendu, reçu, bénéfice brut, sa plus belle vente) le 1er du
+// mois, à l'adresse de son compte. ÉTEINT par défaut : le choix est écrit par le
+// serveur (`?mode=bilan-mois`), jamais deviné. Trois états : allumé · éteint ·
+// « — » (pas su : aucun interrupteur qui mentirait).
+function BilanMoisSetting() {
+  const [r, setR] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { let mort = false;
+    (async () => {
+      try {
+        const x = await fetch('/api/compte?mode=bilan-mois', { headers: enTeteSession(), cache: 'no-store' });
+        const j = x.ok ? await x.json() : null;
+        if (!mort) setR(j && j.ok ? j : null);
+      } catch (_) { if (!mort) setR(null); }
+    })();
+    return () => { mort = true; };
+  }, []);
+  if (r === undefined) return null;
+  const basculer = async () => {
+    if (busy || !r || r.actif === null) return; setBusy(true);
+    try {
+      const x = await fetch('/api/compte?mode=bilan-mois', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ actif: !r.actif }) });
+      const j = x.ok ? await x.json() : null;
+      if (j && j.ok) setR({ ...r, actif: j.actif }); else toast('Choix non enregistré — réessaie dans un instant.');
+    } catch (_) { toast('Choix non enregistré — réessaie quand tu as du réseau.'); }
+    setBusy(false);
+  };
+  const etat = !r || r.actif === null ? 'passu' : r.actif ? 'on' : 'off';
+  const dernier = r && r.envois ? Object.entries(r.envois).filter(([, e]) => e && e.issue === 'envoye').map(([k]) => k).sort().pop() : null;
+  return (
+    <div data-bilan-mois={etat} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-ligne">
+        <span className="vrm-np-lib">Bilan du mois par e-mail<small>{!r ? 'Pas su pour l’instant — réessaie plus tard.'
+          : !r.configure ? 'L’envoi d’e-mails n’est pas encore configuré : aucun ne part.'
+          : dernier ? `Le 1er du mois : ventes, vendu, reçu, bénéfice. Dernier envoyé : ${dernier}.`
+          : 'Le 1er du mois, à l’adresse de ton compte : ventes, vendu, reçu, bénéfice et ta plus belle vente.'}</small></span>
+        {etat === 'passu' ? <span className="vrm-np-relance">—</span>
+          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={`Bilan du mois par e-mail : ${r.actif ? 'activé' : 'désactivé'}`}/>}
+      </div>
     </div>
   );
 }
@@ -1394,6 +1455,9 @@ function StatutSauvegardeReglages() {
   const stockage=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
   const echec=stockage||(attente&&['error','refus'].includes(_syncInfo.etat));
   if(!attente&&!stockage) return null;
+  // (8 nov.) Abonnement terminé (aperçu) : la base refuse d'écrire, et
+  // « Réessayer » n'y changerait rien — on dit pourquoi, sans geste trompeur.
+  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Abonnement terminé : rien n'est enregistré tant que tu ne l'as pas repris</span></div>;
   return <div className="vrm-settings-status" role="status" data-statut-reglages={echec?'echec':'encours'} style={{color:echec?C.warn:C.muted}}>
     {!echec&&<span className="vrm-settings-status-pt" aria-hidden="true"/>}
     <span>{stockage?'Refusée par cet appareil':echec?'Pas encore synchronisé':'Enregistrement…'}</span>
@@ -1541,6 +1605,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
   const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
   const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
+  // (8 nov.) La ligne de l'abonnement de la coque (J-3, J-1) ouvre cet onglet.
+  React.useEffect(() => { const f = () => { setVueBrute('abonnement'); setSous(null); }; window.addEventListener('vrm:voir-abonnement', f); return () => window.removeEventListener('vrm:voir-abonnement', f); }, []);
 
 
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
@@ -1640,6 +1706,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
   // ── LES GROUPES ────────────────────────────────────────────────────────────
   // Réglages de l'APP.
+  const profilV = useProfilVendeur();
   const GROUPES_REGLAGES = [
     // (1er nov.) Le groupe portait « Comptes Vinted » mais rangeait aussi eBay, les
     // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
@@ -1651,8 +1718,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // dit en UNE phrase ce que fait le réglage. Les `id` et les attributs `data-*` ne bougent
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
     { id:'comptes', titre:'Mes comptes', items:[
+      // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
+      { id:'toutvabien', type:'panneau', ic:'heart', lib:'Tout va bien ?', desc:'Chaque compte, sa dernière relecture et l’extension de chaque appareil.', data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est relu, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
+      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:'Comptes eBay', desc:'Connecter eBay à VRM et choisir les comptes reliés.', el:ebayCompte },
     ]},
@@ -1665,7 +1734,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
-        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
@@ -1678,7 +1747,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'abonnement-ouvrir', type:'nav', ic:'wallet', lib:'Mon abonnement', desc:'Ton offre, ta carte, tes factures, et l’arrêt si tu veux.', onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Comment s’écrivent les numéros de tes prochaines paires.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:`Comment s’écrivent les numéros de tes prochain${profilV.vend === 'sneakers' ? 'es paires' : 's articles'}.`, val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
@@ -1708,6 +1777,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
+      // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
+      { id:'affichage-mode', type:'panneau', nu:true, ic:'grid', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
+      { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:'Je vends', desc:'Sneakers, ou autre chose : les mots et les vérifications suivent.', val: profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre', data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc:'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
@@ -1729,6 +1801,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       </span>
     )},
     {id:'aide',titre:'Aide',items:[
+      // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
+      { id:'verifier', type:'panneau', nu:true, ic:'check', lib:'Vérifier mon installation', desc:'Extension, comptes, boîte e-mail : ce qui manque, et le geste.', data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM présentés un par un.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
@@ -1739,11 +1813,16 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'conseils-revoir', type:'action', ic:'sync', lib:'Revoir les conseils', desc:'Ceux que tu as passés ou masqués pourront revenir.', onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? 'Les conseils pourront revenir.' : 'Pas pu enregistrer — réessaie.')); }, data:{ 'data-reglage-conseils-revoir':'' } },
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
+      // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
+      { id:'centre-aide', type:'action', ic:'search', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
+      // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
+      { id:'statut', type:'nav', ic:'cloud', lib:'État de VRM', desc:'La base, les e-mails et les notifications fonctionnent-ils ?', onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
+      <details data-aide-statut=""><summary>VRM semble en panne</summary><p>La page d’état dit, minute par minute, si la base, la réception des e-mails et les notifications fonctionnent, et les incidents connus. Si tout y fonctionne, le souci vient sans doute de cet appareil : recharge la page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
       <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un e-mail absent d’un e-mail à vérifier.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
       <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
@@ -1790,17 +1869,22 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
     ], pied:'Vide ce navigateur ; tes données restent dans ton compte.' },
     { id:'donnees', titre:'Tes données', items:[
+      // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
+      { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
+        el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
       AUTH.user && { id:'fermer', type:'panneau', ic:'trash', lib:'Fermer mon compte', el:<FermerCompte/> },
     ]},
   ] : [
     { id:'donnees', titre:'Tes données', items:[
+      { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
+        el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees}/> },
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
     ]},
   ];
   // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
   // carte, factures, résilier) — le MÊME composant qu'avant (§11).
-  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/></div> }] }];
+  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/><Parrainage/></div> }] }];
   const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
@@ -1859,7 +1943,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             ligne du titre, à droite : il ne prend plus la place d'un surtitre (le
             titre ne saute plus de 26 px à chaque réglage touché). */}
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2><StatutSauvegardeReglages/></div>
-        {PHRASES_ECRAN.settings ? <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}</p> : null}
+        {PHRASES_ECRAN.settings ? <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}<AideEcran cle="settings"/></p> : null}
         <ReglagesPasLus/>
         {ongletsCompte && (
           // (5 nov., chantier H) Les trois onglets ont LA forme du contrôle segmenté de
@@ -1881,7 +1965,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={`Rechercher dans ${titreRetour}`} label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder="Rechercher un réglage" label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
           return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>Aucun réglage pour « {rechercheReglage.trim()} ». Essaie « e-mail », « numéro » ou « impression ».</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>Effacer la recherche</Bouton></div>;
@@ -1930,10 +2014,11 @@ const ZOOMS = [['0.65', 'Minus'], ['0.75', 'Petit'], ['0.85', 'Compact'], ['1', 
 // une table que le vendeur ne peut pas écrire. L'app ne fait que l'afficher.
 // Le retour de Stripe (`?abonnement=merci|annule`) est capté AU CHARGEMENT :
 // la navigation par `?tab=` efface ensuite l'adresse.
-const RETOUR_ABONNEMENT = (() => { try { return new URLSearchParams(window.location.search).get('abonnement') || ''; } catch (_) { return ''; } })();
+// (8 nov.) Lus dans l'adresse D'OUVERTURE (App.jsx) : cet écran est chargé à la demande, après que `goto` a nettoyé l'adresse.
+const RETOUR_ABONNEMENT = (() => { try { return new URLSearchParams(RECHERCHE_OUVERTURE).get('abonnement') || ''; } catch (_) { return ''; } })();
 // `?vue=compte` : ouvrir les Paramètres sur l'onglet « Mon compte » (retour de
 // la page de gestion Stripe, lien direct). Capté au chargement pour la même raison.
-const RETOUR_VUE = (() => { try { return new URLSearchParams(window.location.search).get('vue') || ''; } catch (_) { return ''; } })();
+const RETOUR_VUE = (() => { try { return new URLSearchParams(RECHERCHE_OUVERTURE).get('vue') || ''; } catch (_) { return ''; } })();
 // ⟦← App.jsx #39⟧
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
@@ -2341,7 +2426,9 @@ function JournalVrm() {
               <div key={i} className="vrm-sec-ligne" data-journal-ligne={e.type} data-journal-resultat={e.resultat}>
                 <div className="vrm-sec-corps">
                   <span className="vrm-sec-titre">{L.titre}{L.article ? <> · {L.article}</> : null}</span>
-                  <span className="vrm-sec-sous">{e.at ? new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}{L.compte ? ` · ${L.compte}` : ''}</span>
+                  <span className="vrm-sec-sous">{e.at ? new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}{L.compte ? ` · ${L.compte}` : ''}{e.via === 'telephone' ? ' · depuis ton téléphone' : ''}</span>
+                  {/* (8 nov., confiance) La PREUVE de la ligne : ce qui, dans sa base, note ce geste. */}
+                  <span className="vrm-sec-sous vrm-sec-preuve" data-journal-preuve={L.preuve ? 'oui' : 'pas-su'}>{L.preuve || 'D’où vient cette ligne : pas su'}</span>
                 </div>
                 <span className={'vrm-sec-etat' + (L.aVerifier ? ' is-verifier' : '')}>{L.resultat}</span>
               </div>
@@ -2351,7 +2438,7 @@ function JournalVrm() {
       ))}
       {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
       <div className="vrm-sec-trous" data-journal-trous="">
-        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone' }[x] || x)).join(', ')}.</p> : null}
         {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
       </div>
     </div>
@@ -2451,6 +2538,29 @@ function LigneContact() {
   );
 }
 // ⟦← App.jsx #40⟧
+// ── LA PAGE ABONNEMENT (8 nov., « abonnement propre ») ──────────────────────
+// En tête, UNE carte : l'état (essai · abonné · résilié · paiement en échec ·
+// abonnement terminé · pas d'abonnement), la phrase de ce qui se passe ensuite, et
+// les gestes. Puis des rangées iOS : la carte bancaire et la page de gestion de
+// Stripe (factures, carte, adresse — le PORTAIL CLIENT, `mode=portail`, ouvert
+// sur SON client seul, côté serveur), et « Résilier » : deux clics (la rangée,
+// puis la confirmation), comme l'exige la résiliation en ligne (art. L215-1-1).
+// L'état vient de `etatAbonnement` (src/abonnement/etatAbonnement.js) — la même
+// règle que la ligne de la coque. Les `data-abonnement` d'avant sont gardés
+// (actif · sans · impaye · proprietaire · non-branche · pas-su · chargement),
+// `data-abonnement-etat` dit l'état fin. Le parrainage vit À CÔTÉ (son groupe).
+// L'en-tête de la page : l'état, le titre, la phrase de ce qui suit, les gestes.
+function Tete({ etat, titre, phrase, children, jauge }) {
+  return (
+    <div className="vrm-abo-tete">
+      <div className="vrm-abo-etat">{etat}</div>
+      {titre ? <div className="vrm-abo-titre">{titre}</div> : null}
+      {phrase ? <div className="vrm-abo-phrase">{phrase}</div> : null}
+      {jauge != null ? <div className="vrm-abo-jauge" role="progressbar" aria-label="Jours d'essai écoulés" aria-valuemin={0} aria-valuemax={7} aria-valuenow={7 - jauge}><span style={{ width: `${Math.round(Math.min(7, Math.max(0, 7 - jauge)) / 7 * 100)}%` }}/></div> : null}
+      {children}
+    </div>
+  );
+}
 function MonAbonnement() {
   const [cases, setCases] = React.useState({ cgv: false, acces: false });
   const cgv = casesCgvCochees(cases);
@@ -2480,11 +2590,14 @@ function MonAbonnement() {
     const m = await ouvrirStripe(mode, mode === 'checkout' ? { cgv: true, accesImmediat: true } : null);
     if (m) { setMsg(m); setOccupe(''); }
   };
+  const enEssai = !!(e && e.statut === 'trialing');
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
       const fin = e && e.finPeriode ? dateLisible(e.finPeriode) : 'la fin du mois payé';
-      const oui = await askConfirm({ title: 'Résilier ton abonnement ?',
-        desc: `Tu gardes VRM jusqu'au ${fin}, et aucun autre prélèvement ne partira. Tes données restent intactes. Tu peux changer d'avis jusqu'à cette date.`,
+      const oui = await askConfirm({ title: enEssai ? 'Résilier ton essai ?' : 'Résilier ton abonnement ?',
+        desc: enEssai
+          ? `Tu gardes VRM jusqu'au ${fin}, et rien ne sera prélevé : aucun autre prélèvement ne partira. Tes données restent intactes. Tu peux changer d'avis jusqu'à cette date.`
+          : `Tu gardes VRM jusqu'au ${fin}, et aucun autre prélèvement ne partira. Tes données restent intactes. Tu peux changer d'avis jusqu'à cette date.`,
         ok: 'Résilier', cancel: 'Garder mon abonnement', danger: true });
       if (!oui) return;
     }
@@ -2495,163 +2608,232 @@ function MonAbonnement() {
     setE((x) => (x ? { ...x, annuleFinPeriode: r.annuleFinPeriode, finPeriode: r.finPeriode || x.finPeriode } : x));
     toast(r.annuleFinPeriode ? `✓ Abonnement résilié — VRM reste ouvert jusqu'au ${dateLisible(r.finPeriode || e.finPeriode)}` : '✓ Abonnement repris — rien ne change pour toi');
   };
-  const carte = { padding: '15px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
-  const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton abonnement</div>;
-  if (e === undefined) return <div style={carte} data-abonnement="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
-  if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé.</div></div>;
-  // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre : 12,99 €, et le prix
-  //    rangé chez Stripe sous `vrm_mensuel` est un réglage de SON tableau de
-  //    bord). Le serveur refuse alors d'ouvrir le paiement ; c'est au
-  //    propriétaire — le seul qui peut le corriger — qu'on le dit, avec le geste.
-  //    « Pas su » (Stripe muet : `prixConforme` null) ne dit rien.
-  //    ⚠️ Le prix de Stripe s'écrit avec le TEXTE DU SERVEUR (`prixStripe.texte`,
-  //    montant + devise + rythme), jamais reformaté ici : `prixLisible` ignore la
-  //    devise et le rythme, et faisait dire « 12,99 € / mois n'est pas
-  //    12,99 € / mois » pour un prix en dollars ou tous les 3 mois — ou
-  //    « 0,00 € » pour un prix sans montant fixe — juste quand il doit voir son
-  //    erreur dans Stripe (revue du 11 octobre).
+  const et = etatAbonnement(e);
+  const pied = <div className="vrm-ios-groupe-pied" style={{ margin: '12px 16px 0' }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>;
+  if (e === undefined) return <div data-abonnement="chargement" data-abonnement-etat="chargement"><Tete etat="Ton abonnement" phrase="Je regarde…"/></div>;
+  if (e === null) return <div data-abonnement="pas-su" data-abonnement-etat="pas-su"><Tete etat="Ton abonnement" phrase="Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé."/></div>;
+  // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre) : dit au SEUL
+  //    propriétaire, avec le texte du SERVEUR (`prixStripe.texte` : montant,
+  //    devise, rythme), jamais reformaté ici.
   const prixAcorriger = e.proprietaire && e.prixConforme === false && e.prixStripe;
-  // 22 oct. — les mentions de l'éditeur vides ferment le paiement (api/compte.js,
-  // 503 `mentions-legales`) : la liste de ce qui manque n'arrive qu'au
-  // propriétaire, avec le geste. Pas su (`null`) : dit tel quel, jamais « ok ».
   const mentionsAremplir = e.proprietaire && e.mentionsCompletes === false && Array.isArray(e.mentionsManquantes) && e.mentionsManquantes.length ? e.mentionsManquantes : null;
   const texteStripe = prixAcorriger && typeof e.prixStripe.texte === 'string' && e.prixStripe.texte.trim() ? e.prixStripe.texte : 'un prix différent';
+  const note = { fontSize: 13, color: C.text, marginTop: 10, lineHeight: 1.5 };
   if (e.proprietaire) return (
-    <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div>
-      {mentionsAremplir && (
-        <div data-mentions-manquantes={mentionsAremplir.length} style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
-          Le paiement reste <b>fermé</b> tant que les mentions légales sont incomplètes ({mentionsAremplir.join(', ')}). Elles se remplissent dans <b>public/legal/editeur.js</b>, et l'adresse de contact aussi dans src/contact.js.
-        </div>
-      )}
-      {/* 23 oct. (revue) : « pas pu relire » dit le fichier, l'erreur que le
-          serveur a LUE (`mentionsErreur`, au propriétaire seul) et la cause la
-          plus courante — un geste, pas un constat muet. */}
-      {e.proprietaire && e.mentionsCompletes === null && (
-        <div data-mentions-manquantes="pas-su" style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-          Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Marie d'Exemple' ») — écris-le entre guillemets droits (« "Marie d'Exemple" »).
-        </div>
-      )}
-      {prixAcorriger && (
-        <div data-prix-stripe="different" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
-          Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
-        </div>
-      )}
-    </div>
-  );
-  if (!e.configure) return <div style={carte} data-abonnement="non-branche">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
-  const test = e.modeTest ? <div data-mode-test="" style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
-  const cb = fx && fx.carte;
-  const ligneCarte = cb ? (
-    <div data-carte="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
-      Carte {cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : ''} •••• {cb.fin}{cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}
-    </div>
-  ) : null;
-  const listeFactures = e.peutGerer ? <FacturesAbonnement fx={fx}/> : null;
-  const actifs = ['active', 'trialing'];
-  if (actifs.includes(e.statut)) {
-    const annule = !!e.annuleFinPeriode;
-    return (<>
-      <div style={carte} data-abonnement="actif" data-resilie={annule ? '' : undefined}>
-        {titre}
-        {/* ⚠️ Le prix de SON abonnement (`prixAbonnement`, lu sur l'article de
-            l'abonnement chez Stripe), jamais celui de l'offre (`prix`) ni celui
-            des CGV : un abonnement garde le prix auquel il a été souscrit
-            (9,99 € avant le 11 octobre). Pas su ⇒ « Abonné » sans montant. */}
-        <div data-prix-abonnement={e.prixAbonnement && e.prixAbonnement.texte ? '' : undefined} style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Abonné{e.prixAbonnement && typeof e.prixAbonnement.texte === 'string' && e.prixAbonnement.texte.trim() ? ` · ${e.prixAbonnement.texte}` : ''}</div>
-        {e.finPeriode && (
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
-            {annule ? `Résilié : VRM reste ouvert jusqu'au ${dateLisible(e.finPeriode)}, aucun autre prélèvement.` : `Prochain prélèvement le ${dateLisible(e.finPeriode)}.`}
+    <div data-abonnement="proprietaire" data-abonnement-etat="proprietaire">
+      <Tete etat="Ton abonnement" titre="Compte propriétaire" phrase="Compte propriétaire de VRM : gratuit, aucun abonnement.">
+        {mentionsAremplir && (
+          <div data-mentions-manquantes={mentionsAremplir.length} style={note}>
+            Le paiement reste <b>fermé</b> tant que les mentions légales sont incomplètes ({mentionsAremplir.join(', ')}). Elles se remplissent dans <b>public/legal/editeur.js</b>, et l'adresse de contact aussi dans src/contact.js.
           </div>
         )}
-        {ligneCarte}
-        {test}
-        <div className="vrm-b-rangee" style={{ marginTop: 12 }}>
-          {annule
-            ? <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire">{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
-            : <>
-                <button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-secondaire">{occupe === 'portail' ? 'Ouverture…' : 'Changer de carte'}</button>
-                <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(false)} className="vrm-b vrm-b-discret">{occupe === 'resilier' ? 'Un instant…' : 'Résilier'}</button>
-              </>}
-        </div>
-        {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
-      </div>
-      {listeFactures}
-    </>);
-  }
-  if (e.statut === 'past_due' || e.statut === 'unpaid') {
+        {e.mentionsCompletes === null && (
+          <div data-mentions-manquantes="pas-su" style={{ ...note, color: C.muted }}>
+            Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Marie d'Exemple' ») — écris-le entre guillemets droits (« "Marie d'Exemple" »).
+          </div>
+        )}
+        {prixAcorriger && (
+          <div data-prix-stripe="different" style={note}>
+            Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
+          </div>
+        )}
+      </Tete>
+    </div>
+  );
+  // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
+  if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/></div>;
+  const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
+  const cb = fx && fx.carte;
+  const texteCarte = cb ? `${cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : 'Carte'} •••• ${cb.fin}${cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}` : (fx === undefined && e.peutGerer ? 'Je regarde…' : null);
+  const listeFactures = e.peutGerer ? <FacturesAbonnement fx={fx}/> : null;
+  const erreur = msg ? <div role="alert" style={{ fontSize: 13, color: C.warn, margin: '8px 16px 0' }}>{msg}</div> : null;
+  // Julien, 8 nov. : sans abonnement, un extrait net, le reste flouté — rien supprimé.
+  const apresFin = e.lecture === true ? 'Ensuite, sans abonnement : un aperçu de tes données, le reste masqué ; rien n’est supprimé.' : 'Tes données restent intactes : rien n’est supprimé.';
+  // Les rangées « paiement » : la carte (portail) et la page de gestion Stripe.
+  const groupePaiement = (
+    <GroupeIos titre="Paiement">
+      <RangeeIos titre="Changer de carte" detail={texteCarte ? <span data-carte="">{texteCarte}</span> : undefined} onClick={occupe ? undefined : () => agir('portail')} data-rangee-carte=""/>
+      <RangeeIos titre={occupe === 'portail' ? 'Ouverture…' : 'Gérer chez Stripe'} detail="Factures, moyen de paiement, adresse de facturation" onClick={occupe ? undefined : () => agir('portail')} data-rangee-portail=""/>
+    </GroupeIos>
+  );
+  if (et.etat === 'essai' || et.etat === 'essai-resilie' || et.etat === 'actif' || et.etat === 'resilie') {
+    const annule = !!e.annuleFinPeriode;
+    const fin = e.finPeriode ? dateLisible(e.finPeriode) : '';
+    const prix = et.prixAbonnement;
+    let tete;
+    if (et.etat === 'essai') {
+      const j = et.jours;
+      tete = <Tete etat="Essai gratuit" jauge={Number.isInteger(j) ? j : null}
+        titre={j == null ? 'Essai en cours' : j === 0 ? "Dernier jour d'essai" : j === 1 ? "Encore 1 jour d'essai" : `Encore ${j} jours d'essai`}
+        phrase={<span data-essai-phrase="">{fin ? `Le ${fin}, ` : 'À la fin de l’essai, '}ton abonnement démarre{prix ? ` : ${prix} prélevés sur ta carte` : ' et ta carte est débitée'}, sauf si tu résilies avant. Rien n'est prélevé pendant l'essai.</span>}/>;
+    } else if (et.etat === 'essai-resilie') {
+      tete = <Tete etat="Essai gratuit · résilié" titre={fin ? `Fin le ${fin}` : 'Essai résilié'} phrase={`Résilié : VRM reste ouvert jusqu'au ${fin || 'la fin de l’essai'}, et rien ne sera prélevé. ${apresFin}`}/>;
+    } else if (annule) {
+      tete = <Tete etat="Abonnement résilié" titre={fin ? `Fin le ${fin}` : 'Résilié'} phrase={`Résilié : VRM reste ouvert jusqu'au ${fin || 'la fin du mois payé'}, aucun autre prélèvement. ${apresFin}`}/>;
+    } else {
+      tete = <Tete etat="Ton abonnement" titre={<span data-prix-abonnement={prix ? '' : undefined}>Abonné{prix ? ` · ${prix}` : ''}</span>}
+        phrase={fin ? `Prochain prélèvement le ${fin}.` : 'Sans engagement, résiliable à tout moment.'}/>;
+    }
     return (<>
-      <div style={{ ...carte, border: `1px solid ${C.warn}55` }} data-abonnement="impaye">
-        {titre}
-        <div style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Le dernier prélèvement n'est pas passé. Mets à jour ta carte : au bout de 14 jours, l'app se met en pause (tes données restent intactes).</div>
-        {ligneCarte}
+      <div data-abonnement="actif" data-abonnement-etat={et.etat} data-resilie={annule ? '' : undefined} data-essai-jours={enEssai && Number.isInteger(et.jours) ? et.jours : undefined}>
+        {tete}
+        {annule && (
+          <div className="vrm-abo-actions" style={{ padding: '0 0' }}>
+            <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
+          </div>
+        )}
+        {groupePaiement}
+        {!annule && (
+          <GroupeIos titre="Résiliation" pied={enEssai
+            ? `Pendant l'essai : rien n'est prélevé, VRM reste ouvert jusqu'au ${fin || 'dernier jour'}. ${apresFin}`
+            : `Effet à la fin de la période payée${fin ? `, le ${fin}` : ''} : aucun autre prélèvement. Tu peux changer d'avis jusque-là.`}>
+            <RangeeIos titre={occupe === 'resilier' ? 'Un instant…' : 'Résilier'} onClick={occupe ? undefined : () => resilierOuReprendre(false)} data-rangee-resilier=""/>
+          </GroupeIos>
+        )}
+        {erreur}
         {test}
-        <button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire" style={{ marginTop: 12 }}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button>
-        {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+        {pied}
       </div>
       {listeFactures}
     </>);
   }
-  // Le prix de Stripe n'est pas celui des CGV : le serveur n'ouvrira pas le
-  // paiement (api/compte.js) — aucun bouton qui mènerait à un refus.
-  // ⚠️ Un ANCIEN abonné garde ses factures (sa compta) : cette branche les rend
-  //    comme celle du dessous — elle les perdait (revue du 11 octobre).
-  // 23 oct. (revue) : mentions ILLISIBLES (`null`) = fermé, comme le serveur.
+  const portePaiementFerme = e.prixConforme === false || e.mentionsCompletes !== true || e.configure === false;
+  if (et.etat === 'impaye') {
+    return (<>
+      <div data-abonnement="impaye" data-abonnement-etat="impaye">
+        <Tete etat="Paiement en échec" titre="Le dernier prélèvement n'est pas passé"
+          phrase="Le dernier prélèvement n'est pas passé. Mets à jour ta carte : Stripe réessaie pendant 14 jours, puis l'app passe en lecture seule (tes données restent intactes).">
+          <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+        </Tete>
+        {texteCarte && <GroupeIos titre="Paiement"><RangeeIos titre="Carte enregistrée" detail={<span data-carte="">{texteCarte}</span>}/></GroupeIos>}
+        {erreur}
+        {test}
+      </div>
+      {listeFactures}
+    </>);
+  }
+  if (et.etat === 'expire') {
+    // SANS ABONNEMENT (Julien, 8 nov.) : ailleurs, un aperçu net et le reste
+    // flouté ; ici, de quoi reprendre. Paiement fermé ⇒ aucune case ni bouton.
+    return (<>
+      <div data-abonnement="expire" data-abonnement-etat="expire" data-lecture-seule={et.lectureSeule ? '' : undefined}>
+        <Tete etat="Abonnement terminé" titre={et.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}
+          phrase={`Tes données sont là, rien n’est supprimé : ${e.lecture === true ? 'un aperçu reste visible, le reste est masqué' : 'elles reviennent telles quelles'}. Pour tout retrouver et agir à nouveau, ${et.impaye ? 'mets ta carte à jour' : `reprends l’abonnement${portePaiementFerme ? '' : ` : ${prixLisible(e.prix)}, sans engagement`}`}.`}>
+          {et.impaye
+            ? <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+            : portePaiementFerme
+              ? <div className="vrm-abo-phrase" data-paiement-ferme="">Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie un peu plus tard.</div>
+              : <>
+                  <CaseCgv cases={cases} onChange={setCases}/>
+                  <div className="vrm-abo-actions"><button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : (et.ancien ? "Reprendre l'abonnement" : "S'abonner")}</button></div>
+                </>}
+        </Tete>
+        {erreur}
+        {test}
+        {pied}
+      </div>
+      {listeFactures}
+    </>);
+  }
+  // Le prix de Stripe n'est pas celui des CGV, ou les mentions manquent : le
+  // serveur n'ouvrira pas le paiement — aucun bouton qui mènerait à un refus.
+  // Un ANCIEN abonné garde ses factures (sa compta).
   if (e.prixConforme === false || e.mentionsCompletes !== true) return (<>
-    <div style={carte} data-abonnement="non-branche" data-raison={e.prixConforme === false ? 'prix' : 'mentions'}>{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>
+    <div data-abonnement="non-branche" data-abonnement-etat="non-branche" data-raison={e.prixConforme === false ? 'prix' : 'mentions'}><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant."/></div>
     {listeFactures}
   </>);
   return (<>
-    <div style={carte} data-abonnement="sans">
-      {titre}
-      <div style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.5 }} data-essai-dispo={e.essaiDispo ? '' : undefined}>
-        {e.essaiDispo
-          ? <><b>{e.essaiJours || 7} jours gratuits</b>, puis {prixLisible(e.prix)}, sans engagement : aucun prélèvement pendant l'essai, résiliable à tout moment.</>
-          : <>{prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.</>}
-        {!e.obligatoire && <span style={{ color: C.muted }}> Pour l'instant VRM reste gratuit pour toi.</span>}
-      </div>
-      {RETOUR_ABONNEMENT === 'merci' && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+    <div data-abonnement="sans" data-abonnement-etat="sans">
+      <Tete etat="Pas encore d'abonnement" titre={e.essaiDispo ? `${e.essaiJours || 7} jours gratuits` : prixLisible(e.prix)}
+        phrase={<span data-essai-dispo={e.essaiDispo ? '' : undefined}>
+          {e.essaiDispo
+            ? <>Puis {prixLisible(e.prix)}, sans engagement : aucun prélèvement pendant l'essai, résiliable à tout moment. À la fin de l'essai, sans abonnement, tes données restent là.</>
+            : <>{prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.</>}
+          {!e.obligatoire && <> Pour l'instant VRM reste gratuit pour toi.</>}
+        </span>}>
+        {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+        <CaseCgv cases={cases} onChange={setCases}/>
+        <div className="vrm-abo-actions">
+          <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
+        </div>
+        {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
+      </Tete>
+      {erreur}
       {test}
-      <CaseCgv cases={cases} onChange={setCases}/>
-      <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire" style={{ marginTop: 10 }} title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
-      {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
-      <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>
-      {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+      {pied}
     </div>
-    {/* Un ancien abonné garde l'accès à ses factures passées (sa compta). */}
     {listeFactures}
   </>);
 }
 
-// La liste des factures, sous la carte d'abonnement. Une ligne par facture :
-// date · montant · statut · le PDF. Rien d'autre (§7).
+// La liste des factures, en rangées iOS. Une rangée par facture : date ·
+// statut · montant · le PDF. « Pas su » n'est JAMAIS « aucune facture ».
 function FacturesAbonnement({ fx }) {
-  const carte = { padding: '13px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
-  const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Tes factures</div>;
-  if (fx === undefined) return <div style={carte} data-factures="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
-  if (fx === null) return <div style={carte} data-factures="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Factures pas lues chez Stripe. Rouvre cet écran dans un instant — elles sont gardées.</div></div>;
-  if (!fx.factures.length) return <div style={carte} data-factures="vide">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Aucune facture pour l'instant : la première arrive avec ton premier prélèvement.</div></div>;
+  const vide = (etat, texte) => <GroupeIos titre="Tes factures" data-factures={etat}><RangeeIos titre={texte}/></GroupeIos>;
+  if (fx === undefined) return vide('chargement', 'Je regarde…');
+  if (fx === null) return vide('pas-su', 'Factures pas lues chez Stripe. Rouvre cet écran dans un instant — elles sont gardées.');
+  if (!fx.factures.length) return vide('vide', "Aucune facture pour l'instant : la première arrive avec ton premier prélèvement.");
   return (
-    <div style={carte} data-factures={String(fx.factures.length)}>
-      {titre}
-      <div style={{ marginTop: 6 }}>
-        {fx.factures.map((f, i) => {
-          const lien = lienFacture(f.pdf) || lienFacture(f.page);
-          const st = STATUT_FACTURE[f.statut] || f.statut;
-          return (
-            <div key={f.id || i} data-facture="" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, color: C.text, fontWeight: 500 }}>{f.date ? dateLisible(f.date) : '—'}</span>
-                <span style={{ display: 'block', fontSize: 11, color: f.statut === 'open' || f.statut === 'uncollectible' ? C.warn : C.muted, marginTop: 1 }}>{st}{f.numero ? ` · n° ${f.numero}` : ''}</span>
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{montantLisible(f.montant, f.devise)}</span>
-              {lien
-                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accentTexte, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
-                : <span style={{ minWidth: 34 }}/>}
-            </div>
-          );
-        })}
+    <GroupeIos titre="Tes factures" data-factures={String(fx.factures.length)}>
+      {fx.factures.map((f, i) => {
+        const lien = lienFacture(f.pdf) || lienFacture(f.page);
+        const st = STATUT_FACTURE[f.statut] || f.statut;
+        return (
+          <RangeeIos key={f.id || i} data-facture="" titre={f.date ? dateLisible(f.date) : '—'}
+            detail={<span style={{ color: f.statut === 'open' || f.statut === 'uncollectible' ? C.warn : undefined }}>{st}{f.numero ? ` · n° ${f.numero}` : ''}</span>}
+            valeur={<span style={{ fontVariantNumeric: 'tabular-nums', color: C.text, fontWeight: 600 }}>{montantLisible(f.montant, f.devise)}</span>}
+            apres={lien
+              ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 15, fontWeight: 600, color: C.accentTexte, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', paddingRight: 12 }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
+              : <span style={{ minWidth: 44 }}/>}/>
+        );
+      })}
+    </GroupeIos>
+  );
+}
+
+// ── PARRAINAGE (8 nov.) ──────────────────────────────────────────────────────
+// Un lien personnel ; un mois offert à chacun quand l'ami paie son premier
+// mois (règle et anti-abus : api/_lib/parrainage.js, CGV article 2 bis). Le
+// serveur rend des NOMBRES (« 2 amis inscrits, 1 a payé »), jamais qui.
+// Trois états : `undefined` en cours · `null` pas su · l'objet lu. Pas installé
+// (027 pas passée) ou parrainage fermé : on le dit, sans lien à partager.
+async function lireParrainage() {
+  try {
+    const r = await fetch('/api/compte?mode=parrainage', { headers: enTeteSession(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok ? j : null;
+  } catch (_) { return null; }
+}
+function Parrainage() {
+  const [p, setP] = React.useState(undefined);
+  const proprio = useEstProprietaire();
+  React.useEffect(() => { let mort = false; lireParrainage().then((x) => { if (!mort) setP(x); }); return () => { mort = true; }; }, []);
+  if (p === undefined) return null;
+  if (p === null) return <GroupeIos titre="Parrainage" data-parrainage="pas-su"><RangeeIos titre="Parrainage pas lu" detail="Rouvre cet écran dans un instant."/></GroupeIos>;
+  if (!p.installe || !p.ouvert) {
+    // Fermé : rien n'est promis au vendeur ; le propriétaire lit le geste.
+    if (!proprio) return null;
+    return <GroupeIos titre="Parrainage" data-parrainage="ferme" pied={!p.installe ? 'À activer : passer la migration 027, puis vrm_reglages.parrainage = 1.' : 'Éteint : vrm_reglages.parrainage = 1 l’ouvre (un mois offert au parrain et au filleul).'}><RangeeIos titre="Parrainage pas encore ouvert"/></GroupeIos>;
+  }
+  const lien = lienParrainage(p.code);
+  const s = p.suivi || { inscrits: 0, payes: 0, moisOfferts: 0, enAttente: 0 };
+  const amis = (n) => `${n} ami${n > 1 ? 's' : ''}`;
+  const copier = async () => {
+    try { if (navigator.share && window.matchMedia('(pointer: coarse)').matches) { await navigator.share({ title: 'VRM', text: 'Essaie VRM : un mois offert à ton premier paiement.', url: lien }); return; } } catch (_) { return; }
+    try { await navigator.clipboard.writeText(lien); toast('✓ Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
+  };
+  return (
+    <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes}
+      pied={`Un mois offert à ton ami et à toi quand il paie son premier mois : un crédit d'un mois déduit de la prochaine facture. Une fois par ami, pas pour toi-même ; au plus 12 mois offerts par an.${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
+      <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }}>
+        <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
+        <div className="vrm-abo-actions" style={{ marginTop: 10 }}><button type="button" className="vrm-b vrm-b-secondaire" onClick={copier} data-copier-parrainage="">Partager mon lien</button></div>
       </div>
-    </div>
+      <RangeeIos titre="Amis inscrits" valeur={<span data-chiffre-inscrits="">{s.inscrits}</span>}/>
+      <RangeeIos titre="Ont payé leur premier mois" valeur={<span data-chiffre-payes="">{s.payes}</span>}/>
+      <RangeeIos titre="Mois offerts pour toi" detail={s.enAttente ? `${amis(s.enAttente)} : en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{s.moisOfferts}</span>}/>
+    </GroupeIos>
   );
 }
 // ⟦← App.jsx #41⟧
@@ -2741,6 +2923,7 @@ function DiscordCompte() {
 
 function EquipeSetting() {
   const uid = (AUTH.user && AUTH.user.id) || '';
+  const proprio = useEstProprietaire();
   const [lu, setLu] = React.useState(undefined);
   const [email, setEmail] = React.useState('');
   const [occupe, setOccupe] = React.useState('');
@@ -2763,7 +2946,20 @@ function EquipeSetting() {
       Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <button type="button" onClick={relire} className="vrm-b vrm-b-secondaire" style={{ marginLeft: 6 }}>Réessayer</button>
     </div>
   );
-  if (lu.nonInstalle) return <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
+  // (8 nov.) Tant que la 016 n'est pas appliquée : la phrase (la même que l'écran de
+  // l'équipe), CE QUE l'aide verra une fois le mode activé, et qui fait le geste —
+  // jamais un bouton « Inviter » qui ne mènerait nulle part (CLAUDE.md §5, 016).
+  if (lu.nonInstalle) return (
+    <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+      <div>{EQUIPE_NON_INSTALLE_TXT}</div>
+      <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
+        {proprio
+          ? <>Il s’active quand la mise à jour <b style={{ color: C.text }}>016</b> de la base est appliquée (Supabase) : rien d’autre à préparer, l’invitation marchera aussitôt.</>
+          : <>Rien à faire de ton côté : dès qu’il est activé, tu inviteras ici la personne qui t’aide, par son e-mail.</>}
+      </div>
+      <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
+    </div>
+  );
   const vivants = lu.equipe.filter((x) => x.statut !== 'revoquee');
   const inviter = async () => {
     const e = email.trim();
@@ -2841,6 +3037,59 @@ function resumeApercu(a) {
   const c = a.comptes || {};
   return { lus: (c['a-poser'] || 0) + (c.accord || 0), rien: (c.rien || 0) + (c['sans-ecrit'] || 0), ambigus: c.ambigu || 0, contredits: c.contredit || 0, autres: (c.archive || 0) + (c.avant || 0), garde: c.garde || 0, total: a.total || 0 };
 }
+// (8 nov.) AFFICHAGE SIMPLE / COMPLET et « JE VENDS » (src/profilVendeur.js) : deux
+// réglages synchronisés. « Automatique » est un choix à part entière : il suit la
+// règle (Simple pour un seul compte Vinted et moins de 30 ventes sur 30 jours,
+// jamais pour le propriétaire de l'installation) et le dit en une phrase.
+function phraseAffichageAuto(p) {
+  const c = (p && p.contexte) || {};
+  if (c.proprietaire === true) return 'Automatique : Complet (ta boutique).';
+  if (p.mode === 'simple') return `Automatique : Simple — un compte Vinted, ${c.nVentes30j} vente${c.nVentes30j > 1 ? 's' : ''} sur ${JOURS_VENTES_SIMPLE} jours.`;
+  if (c.nComptesVinted == null || c.nVentes30j == null || c.proprietaire == null) return 'Automatique : Complet tant que VRM n’a pas tout lu.';
+  return c.nComptesVinted > 1 ? `Automatique : Complet — ${c.nComptesVinted} comptes Vinted.` : `Automatique : Complet — ${SEUIL_VENTES_SIMPLE} ventes ou plus sur ${JOURS_VENTES_SIMPLE} jours.`;
+}
+function AffichageSetting() {
+  const p = useProfilVendeur();
+  const [r, setR] = React.useState(() => lireReglageAffichage(load(CLE_AFFICHAGE, null)));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lireReglageAffichage(load(CLE_AFFICHAGE, null))); }), []);
+  const choisir = (choix) => {
+    touche.current = true;
+    const n = { choix, at: new Date().toISOString() };
+    setR(n); save(CLE_AFFICHAGE, n);
+    toast(choix === 'simple' ? 'Affichage simple : ce qui ne sert pas encore se range. Rien n’est supprimé.' : choix === 'complet' ? 'Affichage complet : tous les écrans sont là.' : 'Affichage automatique.');
+  };
+  return (
+    <div data-reglage-affichage-mode={p.mode} data-reglage-affichage-choix={r.choix}>
+      <Segmente label="Affichage" plein value={r.choix} onChange={choisir}
+        options={[['auto', 'Automatique'], ['simple', 'Simple'], ['complet', 'Complet']].map(([v, l]) => ({ v, l, data: { 'data-affichage-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{r.choix === 'auto' ? phraseAffichageAuto(p) : r.choix === 'simple' ? 'Simple, choisi par toi.' : 'Complet, choisi par toi.'}</div>
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
+        En simple, le menu ne montre pas ce qui ne sert pas encore : Stock (sans meuble), Republier (jamais lancé), les sites jamais reliés. Ma journée garde tous les gestes dus. <Pourquoi label="Rien n’est perdu ?">Aucun écran n’est supprimé et aucun chiffre ne change : chaque total compte toujours tout. Dès que tu ranges un meuble, relies Leboncoin ou republies, l’entrée revient d’elle-même. « Complet » remet tout, tout de suite.</Pourquoi>
+      </div>
+    </div>
+  );
+}
+function JeVendsSetting() {
+  const p = useProfilVendeur();
+  const [r, setR] = React.useState(() => lireReglageJeVends(load(CLE_JE_VENDS, null)));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lireReglageJeVends(load(CLE_JE_VENDS, null))); }), []);
+  const choisir = (choix) => {
+    touche.current = true;
+    const n = { choix, at: new Date().toISOString() };
+    setR(n); save(CLE_JE_VENDS, n);
+  };
+  const vend = p.vend || 'autre';
+  return (
+    <div data-reglage-je-vends={vend} data-reglage-je-vends-choix={r.choix}>
+      <Segmente label="Je vends" plein value={r.choix} onChange={choisir}
+        options={[['auto', 'Automatique'], ['sneakers', 'Sneakers'], ['autre', 'Autre']].map(([v, l]) => ({ v, l, data: { 'data-je-vends-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{vend === 'sneakers' ? 'Sneakers : VRM parle de « paires » et vérifie taille et marque avant de publier.' : 'Autre : VRM parle d’« articles » ; taille et marque sont facultatives.'}</div>
+    </div>
+  );
+}
+
 function NumeroEcritSetting({ onAnnonces }) {
   const lire = () => lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null));
   const [r, setR] = React.useState(lire);
@@ -3848,6 +4097,8 @@ function SecuriteSetting() {
       {/* (6 nov., v36) Les temps réels des vendeurs, anonymes et agrégés (src/composants/MesuresTerrain.jsx) :
           au propriétaire de l'installation seulement (la route refuse les autres). */}
       {proprio ? <MesuresTerrain entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne} nomEcran={nomEcranVeille}/> : null}
+      {/* (8 nov.) Les alertes de plantage groupées (src/composants/PlantagesTerrain.jsx) : propriétaire seul. */}
+      {proprio ? <PlantagesTerrain entetes={enTeteSession} PanneEl={EtatPanne}/> : null}
     </div>
   );
 }
@@ -3949,6 +4200,7 @@ function EmailsSetting({onComptes}) {
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
+  const proprioEmails = useEstProprietaire();
   const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
   const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
   // (2 nov.) L'Aperçu ouvre le journal sur un état OU un type (« 2 bordereaux ajoutés à Colis » → les bordereaux).
@@ -4172,6 +4424,8 @@ function EmailsSetting({onComptes}) {
     <div ref={racine}>
     <EspaceEmails onglet={rubriqueEmail} onOnglet={(o)=>{if(o==='journal'){setJournalFiltre('');setJournalType('');}setRubriqueEmail(o);}} idBase={espaceId} theme={C}>
     <div id={espaceId+'-adresses'} data-email-panneau="adresses" hidden={rubriqueEmail!=='adresses'}>
+    {/* (8 nov.) L'adresse de réception UNIQUE, en tête : la plus simple (rien à prouver). */}
+    {rubriqueEmail==='adresses'&&<CarteAdresseReception headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioEmails===true} onBoite={()=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:'emails'}));}catch(_){}}}/>}
     <div data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       <p className="vrm-email-intro-adresses">Ajoute les adresses où Vinted t’écrit, puis configure leur transfert vers VRM.</p>
@@ -4461,7 +4715,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
       <h3>Extension · ce navigateur</h3><strong style={{color:extension.etat==='action'?C.warn:C.text}}>{extension.titre}</strong><p style={{color:C.muted}}>{extension.detail}</p>
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
       <details><summary>Installer ou mettre à jour l’extension</summary>
-        <div className="vrm-connexions-actions"><a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a><a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a><a href={`/VRM-Orion-dossier.zip?v=${EXT_ATTENDUE}`} download data-orion-dossier="">Orion · en dossier</a></div>
+        <div className="vrm-connexions-actions">{(()=>{const b=installerExtensionIci();return b.boutique?<a href={b.lien} target="_blank" rel="noreferrer" data-ext-boutique={b.nav}>{b.nomBoutique} · mises à jour automatiques</a>:null;})()}<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a>{boutiqueOrion()&&<a href={boutiqueOrion()} target="_blank" rel="noreferrer" data-orion-boutique="">Orion · depuis la boutique (mises à jour automatiques)</a>}<a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a><a href={`/VRM-Orion-dossier.zip?v=${EXT_ATTENDUE}`} download data-orion-dossier="">Orion · en dossier</a></div>
         <p>Le zip se dézippe en un seul dossier « VRM-extension » : mets-le à la place de l'ancien, au même endroit, PUIS dans chaque navigateur où elle est installée, ouvre <code>chrome://extensions</code> et clique ⟳ sur VRM (sans ⟳, le navigateur garde l'ancien code). Sur Edge, utilise <code>edge://extensions</code>.</p>
         <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
         <p>Si Orion refuse le fichier : télécharge « Orion · en dossier », ouvre-le dans l'app Fichiers (le toucher donne un dossier « VRM-Orion »), puis dans Orion, Extensions → + → depuis un fichier, et choisis ce dossier (ou le fichier manifest.json qui est dedans).</p>

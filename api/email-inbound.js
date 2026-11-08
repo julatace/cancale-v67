@@ -55,6 +55,7 @@ import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from '
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
+import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -1578,6 +1579,36 @@ async function rendreCodeTransfert(req, res, corpsBrut, mail, registre, conflits
   if (!ok) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger le code de validation : renvoie-le." }); return; }
   await repondre(res, 200, { ok: true, type: 'connu-sans-action', transfert: { rendu: true } });
 }
+// (8 nov.) L'adresse de réception unique de cet e-mail, s'il en a une.
+//   null                     aucune adresse du domaine de réception (ou domaine non réglé)
+//   { owner, adresse }       livré à l'adresse d'UN vendeur, active
+//   { repondu, code, corps } déjà décidé : quarantaine neutre (200) ou pas su (503)
+async function adresseUniqueDe(corpsBrut, mail) {
+  const domaine = domaineReception();
+  if (!domaine) return null;
+  const enveloppe = enveloppeDe(corpsBrut);
+  const { jetons, surDomaine } = jetonsDesAdresses(enveloppe.length ? enveloppe : adressesDeLivraison(corpsBrut, mail), domaine);
+  if (!surDomaine.length) return null;
+  const isoler = async (cle) => {
+    await mettreEnQuarantaine(mail, [], RAISON_QUARANTAINE[cle] || RAISON_QUARANTAINE.absent);
+    return { repondu: true, code: 200, corps: { ok: true, quarantaine: true, raison: cle, adresseVrm: cle } };
+  };
+  if (jetons.length > 1) return isoler('plusieurs');
+  if (jetons.length === 0) return isoler('illisible');
+  const v = await vendeurDeJeton({ url: SUPABASE_URL, headers: { ...sbCle(SUPABASE_KEY) }, jeton: jetons[0] });
+  if (v === undefined) return { repondu: true, code: 503, corps: { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu savoir à qui est cette adresse VRM : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." } };
+  if (v.etat !== 'trouve') return isoler(v.etat);
+  return { owner: v.owner, adresse: adresseDeJeton(jetons[0], domaine) };
+}
+async function noterVuAdresse(owner, mail) {
+  try {
+    const at = new Date().toISOString();
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner, id: ID_VU, data: { at, sujet: String((mail && mail.subject) || '').slice(0, 200), de: String((mail && mail.from) || '').slice(0, 200) }, updated_at: at }]),
+    });
+  } catch (_) {}
+}
 async function mettreEnQuarantaine(mail, adresses, raison) {
   try {
     const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -2088,7 +2119,16 @@ export async function traiterEmail(req, res) {
     return;
   }
   if(corpsBrut?.source==='gmail-shared' && cloisonnee!==true){res.status(503).json({ok:false,error:'cloisonnement-requis',message:'La réception collective exige des données séparées par utilisateur.'});return;}
-  const lu = req.__ownerForce ? { registre: {}, conflits: [] } : await lireRegistreEmails(cloisonnee);
+  // (8 nov.) L'ADRESSE DE RÉCEPTION UNIQUE — AVANT TOUTES LES AUTRES RÈGLES.
+  // `jeton@DOMAINE_RECEPTION` a été fabriquée par VRM pour UN vendeur : livré là,
+  // l'e-mail est à lui (api/_lib/adresse-reception.js). L'enveloppe réelle
+  // (`envelopeTo`, le `message.to` du Worker) fait foi quand elle est donnée.
+  // Jeton inconnu, remplacé, désactivé, illisible, ou deux adresses VRM ⇒
+  // quarantaine NEUTRE sans adresse réclamable (jamais chez un autre, jamais jeté) ;
+  // lecture ratée ⇒ 503 (rejeu).
+  const unique = req.__ownerForce ? null : await adresseUniqueDe(corpsBrut, mail);
+  if (unique && unique.repondu) { await repondre(res, unique.code, unique.corps); return; }
+  const lu = (unique || req.__ownerForce) ? { registre: {}, conflits: [] } : await lireRegistreEmails(cloisonnee);
   if (lu === null && cloisonnee) {
     console.log('[email-inbound] registre des adresses illisible — email à renvoyer');
     await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu lire à qui appartient cette adresse de réception : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
@@ -2099,9 +2139,9 @@ export async function traiterEmail(req, res) {
   // collective (son adresse de réception ne désigne personne) : il est rendu au
   // vendeur qui a PROUVÉ l'adresse source que Gmail nomme — jamais à un autre
   // (api/_lib/transfert-gmail.js). Traité avant la résolution ordinaire.
-  if (estConfirmationTransfert(mail)) { await rendreCodeTransfert(req, res, corpsBrut, mail, registre, (lu && lu.conflits) || []); return; }
-  const adresses = adressesDeLivraison(corpsBrut, mail);
-  const proprio = req.__ownerForce
+  if (!unique && estConfirmationTransfert(mail)) { await rendreCodeTransfert(req, res, corpsBrut, mail, registre, (lu && lu.conflits) || []); return; }
+  const adresses = unique ? [unique.adresse] : adressesDeLivraison(corpsBrut, mail);
+  const proprio = unique ? { owner: unique.owner, via: 'adresse-unique' } : req.__ownerForce
     ? { owner: String(req.__ownerForce), via: 'rattachement' }
     : resoudreProprietaire(adresses, registre, process.env.VRM_OWNER_UID || '', (lu && lu.conflits) || []);
   { const st = contexteVendeur.getStore(); if (st) st.owner = proprio.owner || ''; }
@@ -2109,10 +2149,25 @@ export async function traiterEmail(req, res) {
   // Aucune écriture métier ni notification avant résolution de son vendeur.
   if (proprio.owner && mail.messageId) {
     const suivi = contexteVendeur.getStore();
-    suivi.reception = { adresses:adresses.filter(a=>resoudreProprietaire([a],registre,'',(lu&&lu.conflits)||[]).owner===proprio.owner).slice(0,20), messageId:mail.messageId, subject:String(mail.subject || '').slice(0,300), from:String(mail.from || '').slice(0,200), receivedAt: new Date().toISOString(), sourceDate: /^\d{4}-/.test(String(corpsBrut?.sourceDate||'')) && Number.isFinite(Date.parse(corpsBrut.sourceDate)) ? new Date(corpsBrut.sourceDate).toISOString() : null,
+    suivi.reception = { adresses:unique?[unique.adresse]:adresses.filter(a=>resoudreProprietaire([a],registre,'',(lu&&lu.conflits)||[]).owner===proprio.owner).slice(0,20), messageId:mail.messageId, subject:String(mail.subject || '').slice(0,300), from:String(mail.from || '').slice(0,200), receivedAt: new Date().toISOString(), sourceDate: /^\d{4}-/.test(String(corpsBrut?.sourceDate||'')) && Number.isFinite(Date.parse(corpsBrut.sourceDate)) ? new Date(corpsBrut.sourceDate).toISOString() : null,
       // (5 nov., boîte de réception) La LISTE des pièces jointes (nom, type, poids),
       // jamais leur contenu : api/_lib/boite-email.js.
       pieces: listePieces(mail.attachments) };
+  }
+  if (unique) {
+    // Le code de confirmation d'un transfert (Gmail, Yahoo…) arrivé à SON adresse :
+    // rendu à LUI, avec le lien du fournisseur (api/_lib/adresse-reception.js).
+    // Le ranger est le but de ce message : une écriture ratée ⇒ 503 (rejeu).
+    const authBrute = corpsBrut && (corpsBrut.authentification || (corpsBrut.headers && (corpsBrut.headers['authentication-results'] || corpsBrut.headers['Authentication-Results'])));
+    const codeLu = lireCodeTransfert(mail, unique.adresse, { signeGoogle: authentifieGoogle(authBrute) });
+    if (codeLu) {
+      const okCode = await supabaseUpsert([{ id: ID_CODE, data: { ...codeLu, adresse: unique.adresse, recuLe: new Date().toISOString(), messageId: String(mail.messageId || '').slice(0, 300) } }]);
+      if (!okCode) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger le code de confirmation : renvoie-le." }); return; }
+    }
+    // La preuve que le transfert marche : le dernier e-mail reçu à l'adresse
+    // (date, sujet, expéditeur — rien d'autre). Un confort : une écriture ratée
+    // ici ne fait pas rejouer l'e-mail.
+    await noterVuAdresse(unique.owner, mail);
   }
   if (!proprio.owner && await baseCloisonnee()) {
     // ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec sa

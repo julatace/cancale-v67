@@ -181,7 +181,7 @@ async function auditer(sources) {
   dit(/repriseNumerosRecreation\(\{[\s\S]{0,600}?recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
   dit(/depart=\{repubDepart\?'modif':null\}/.test(app) && /depart=\{repubDepart\?'envoi':null\}/.test(app), 'F3 Republier ouvert depuis la sélection commence après « Choisir »');
   dit(/'vrm_repub_main',/.test(app.slice(app.indexOf('const SYNC_KEYS'), app.indexOf('const SYNC_KEYS') + 30000)), 'F4 `vrm_repub_main` est synchronisé');
-  dit(/problemesAnnonce\(a\.verif \|\| \{\}, 'vinted'\)/.test(app) && /champsNonJuges\(a\.verif/.test(app), 'F5 le carré dit, paire par paire, ce qui manque (la règle de « vérifier avant »)');
+  dit((/problemesAnnonce\(a\.verif \|\| \{\}, 'vinted'\)/.test(app) || (/const verifV = \{ \.\.\.\(a\.verif \|\| \{\}\), facultatifs: /.test(app) && /problemesAnnonce\(verifV, 'vinted'\)/.test(app))) && /champsNonJuges\((a\.verif|verifV)/.test(app), 'F5 le carré dit, paire par paire, ce qui manque (la règle de « vérifier avant »)');
   dit(!/titre[^;\n]{0,40}===[^;\n]{0,40}titre/.test(app.slice(app.indexOf('function RepublierALaMain'), app.indexOf('function RepublierVinted('))), 'F6 « à la main » ne relie jamais par le titre');
   // ── G ── revue adverse du 5 nov. : ce qui affichait faux ou cassait une règle
   dit(V.problemesLot([{ numero: '12', titre: 'Nike', prix: null }], 'vinted').every((x) => x.code !== 'prixVide'), 'G1 un prix illisible (`null`, Republier existant) n’est jamais « Sans prix »');

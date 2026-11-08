@@ -1245,8 +1245,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."
-        right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Bouton variante="secondaire" icone="camera" data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} style={{ minHeight: 44 }}>Par photo</Bouton><button type="button" className="vrm-b vrm-b-secondaire" data-stock-inventaire-ouvrir="" onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}>Inventaire</button></div>}/>
+      <ScreenHead icon="home" title="Stock" phrase="garage" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."
+        right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Bouton variante="secondaire" icone="camera" data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} style={{ minHeight: 44 }} title="Photographie la paire : VRM montre les annonces qui lui ressemblent">Trouver par photo</Bouton><button type="button" className="vrm-b vrm-b-secondaire" data-stock-inventaire-ouvrir="" title="Compter les paires présentes, case par case" onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}>Faire l’inventaire</button></div>}/>
 
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 

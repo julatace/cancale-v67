@@ -90,13 +90,46 @@ export function empreinte(s) {
 const lire = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (_) { return d; } };
 const ecrire = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
 
+// ── LES 50 DERNIÈRES ERREURS DE CET APPAREIL (8 nov., « Signaler un problème ») ──
+// Le journal ci-dessus ne garde une erreur qu'une fois par heure, et écarte le
+// bruit (réseau, morceaux périmés) : pour comprendre un signalement, il faut
+// AUSSI ce qui s'est répété et ce que le réseau a refusé. Ici, chaque erreur vue
+// (déjà nettoyée : ni e-mail, ni prix, ni suite de chiffres), sur l'appareil
+// seulement — elle ne part que dans un signalement, qu'il voit avant d'envoyer.
+const ERREURS = 'vrm_erreurs_recentes';
+export const ERREURS_MAX = 50;
+function noterErreurRecente(message, contexte, bruit) {
+  try {
+    const l = lire(ERREURS, []);
+    const liste = Array.isArray(l) ? l : [];
+    liste.push({ message: String(message).slice(0, 300), ecran: String((contexte && contexte.ecran) || '').slice(0, 40), origine: String((contexte && contexte.origine) || 'page').slice(0, 20), version: String((contexte && contexte.version) || '').slice(0, 40), at: new Date().toISOString(), ...(bruit ? { bruit: true } : {}) });
+    ecrire(ERREURS, liste.slice(-ERREURS_MAX));
+  } catch (_) {}
+}
+export function erreursRecentes() {
+  const r = lire(ERREURS, []);
+  return Array.isArray(r) ? r.filter((x) => x && typeof x === 'object' && x.message).slice(-ERREURS_MAX) : [];
+}
+
+// ── L'ALERTE DE PLANTAGE POUR LE PROPRIÉTAIRE (8 nov., src/alertesPlantages.js) ──
+// Un écran tombé sur son garde-fou, ou une erreur qui se RÉPÈTE, est compté ici
+// (par type, sur l'appareil) ; la collecte des temps réels l'envoie, anonyme, avec
+// son lot (src/mesuresCollecte.js). Le compte se fait AVANT le « une fois par
+// heure » du journal : une erreur qui revient dix fois dit dix.
+let compterAlerte = null;
+export function brancherAlertes(f) { compterAlerte = typeof f === 'function' ? f : null; }
+
 // Rend l'entrée notée, ou null si elle est écartée (bruit, déjà notée, plafond).
 export function noterPlantage(err, contexte = {}) {
   try {
     const message = nettoyer((err && (err.message || err.reason)) || err).slice(0, 300);
+    const pileBrute = String((err && err.stack) || '');
+    const premiereExt = pileBrute.split('\n').find((l) => /(https?|chrome-extension|moz-extension|safari-web-extension|safari-extension):\/\//.test(l)) || '';
+    const dExtension = /chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\//.test(premiereExt);
+    if (message && !dExtension) noterErreurRecente(message, contexte, estMorceauPerime(message) || BRUIT.test(message));
     if (message && estMorceauPerime(message)) { compterMorceauPerime(err); return null; }
     if (!message || BRUIT.test(message)) return null;
-    const pileBrute = String((err && err.stack) || '');
+    if (!dExtension && compterAlerte) { try { compterAlerte({ message, ecran: contexte.ecran, origine: contexte.origine, version: contexte.version }); } catch (_) {} }
     // Le bruit se juge sur la frame qui a LEVÉ, pas sur toute la pile : une
     // extension tierce qui enveloppe setTimeout apparaît PLUS BAS dans la pile
     // d'une vraie erreur de l'app, et l'écartait.

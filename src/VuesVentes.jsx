@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { lireVues, ecrireVues, nettoyerVue, restaurerVue } from './vuesVentes.js';
 import './vues-ventes.css';
 const periodeLisible = p => p ? [p.from,p.to].map(d=>d?new Date(d).toLocaleDateString('fr-FR'):'…').join(' → ') : '';
-const libelles = { all:'Toutes', pending:'À expédier', done:'Terminées', cancelled:'Annulées', aexpedier:'À expédier', transit:'En transit', finalisees:'Finalisées', annulees:'Annulées' };
+const libelles = { all:'Toutes', pending:'À envoyer', done:'Terminées', cancelled:'Annulées', aexpedier:'À envoyer', transit:'En route', finalisees:'Finalisées', annulees:'Annulées' };
 export default function VuesVentes({ owner, plateforme, valeur, onAppliquer }) {
   const contexte = JSON.stringify([owner, plateforme]);
   const [etat, setEtat] = useState(() => ({ contexte, vues:lireVues(owner, plateforme) }));

@@ -19,6 +19,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+// (8 nov., vendeurs hors sneakers) Les cartes suivent « Je vends » (src/profilVendeur.js) :
+// « paire » pour Julien, « article » pour un vendeur de vêtements, sacs ou livres.
+export function demoBienvenue(vend = 'sneakers') {
+  const sn = vend === 'sneakers';
+  return DEMO_BIENVENUE.map((c) => c.cle === 'plateformes' && !sn
+    ? { ...c, texte: "Vinted, Leboncoin, eBay et Vestiaire Collective au même endroit : ventes, annonces, messages. Un article vendu d'un côté est signalé ailleurs, pour ne jamais le vendre deux fois.", lignes: [['Vinted', 'vendu'], ['Leboncoin', 'à retirer'], ['eBay', 'à retirer']] }
+    : c.cle === 'numeros' && !sn
+      ? { ...c, titre: 'Un numéro par article', texte: "Chaque article reçoit un numéro à écrire sur sa boîte ou son étiquette. Il est tamponné sur le bordereau et te montre où il est rangé. Deux articles n'ont jamais le même." }
+      : c);
+}
 export const DEMO_BIENVENUE = [
   { cle: 'journee', titre: 'Ma journée', texte: "Chaque matin, l'essentiel : les colis à poster avant leur heure limite, ceux à retirer avec leur code, tes messages et l'argent reçu.",
     lignes: [['Colis à poster', 'avant 10 h'], ['À retirer', 'code 482 913'], ['Messages', '3 non lus']] },
@@ -54,7 +64,8 @@ const voixFr = () => {
   } catch (_) { return null; }
 };
 
-export default function Bienvenue({ prenom = '', dark = false, onTheme, onTerminer }) {
+export default function Bienvenue({ prenom = '', dark = false, onTheme, onTerminer, vend = 'sneakers', ouInstaller = 'sur ton ordinateur' }) {
+  const cartes = useMemo(() => demoBienvenue(vend), [vend]);
   const [etape, setEtape] = useState(0); // 0 univers · 1..5 démonstration · 6 première étape
   const [voix, setVoix] = useState(false);
   // Les voix arrivent après le chargement (Chrome) : on attend `voiceschanged`.
@@ -68,8 +79,8 @@ export default function Bienvenue({ prenom = '', dark = false, onTheme, onTermin
   }, []);
   const peutParler = !!bonneVoix;
   const dialogue = useRef(null);
-  const n = DEMO_BIENVENUE.length;
-  const slide = etape >= 1 && etape <= n ? DEMO_BIENVENUE[etape - 1] : null;
+  const n = cartes.length;
+  const slide = etape >= 1 && etape <= n ? cartes[etape - 1] : null;
 
   const taire = () => { try { window.speechSynthesis.cancel(); } catch (_) {} };
   const fermer = () => { taire(); onTerminer && onTerminer(); };
@@ -155,7 +166,7 @@ export default function Bienvenue({ prenom = '', dark = false, onTheme, onTermin
           <div className="vrm-bienvenue-corps" key="fin">
             <p className="vrm-bienvenue-sur">Prêt</p>
             <h2 id="vrm-bienvenue-titre">Une seule chose à faire</h2>
-            <p className="vrm-bienvenue-texte">Installer l'extension sur ton ordinateur et ouvrir Vinted une fois. Ma journée te montre chaque geste, et avance toute seule quand c'est fait.</p>
+            <p className="vrm-bienvenue-texte">Installer l'extension {ouInstaller} et ouvrir Vinted une fois. Ma journée te montre chaque geste, et avance toute seule quand c'est fait.</p>
             <div className="vrm-bienvenue-gestes">
               <button type="button" className="vrm-bienvenue-second" onClick={precedent}>Retour</button>
               <button type="button" className="vrm-bienvenue-principal" data-bienvenue-commencer onClick={fermer}>Commencer</button>

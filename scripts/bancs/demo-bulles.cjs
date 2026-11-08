@@ -24,8 +24,9 @@ require('./_porte-banc.cjs');
 //   V9  ONGLETS NUS : aucun texte permanent à côté des onglets (colonne, barre du
 //       bas, « Plus ») — chaque entrée ne dit que son nom (et une pastille-nombre) ;
 //   V10 UNE PHRASE PAR ÉCRAN : Journée, Annonces, Ventes, Colis, Messages,
-//       Paramètres disent sous leur titre une phrase courte (src/phrasesEcran.js),
-//       sans jargon, et au plus UN bouton principal visible.
+//       Paramètres, Compta, Statistiques, Stock, E-mails disent sous leur titre
+//       UNE phrase courte (src/phrasesEcran.js, 8 nov.), sans jargon, et au plus
+//       UN bouton principal visible.
 // Le contrôle du code d'avant (§6.1) : lancé sur un `dist/` du commit d'avant,
 // V1 (pas de visite), V9 (« Ventes · eBay : commandes… » sous eBay) et V10
 // (pas de phrase) sont rouges.
@@ -203,30 +204,27 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; fs.mkdirSync(CAPTURE
         await avec.ctx.close();
       }
       // ── V10 : une phrase par écran (le compte neuf, visite déjà vue).
-      // (Ma journée, Ventes et Colis : plus de phrase sous le titre — retiré à la demande de Julien, 2 nov. 22 h ;
-      // le banc vérifie à la place qu'aucune phrase n'y est rendue.)
-      // (Annonces, Messages, Paramètres : plus de phrase non plus — retiré à la demande de Julien, 3 nov. ;
-      // reste vérifié : au plus un bouton principal visible.)
-      const ECRANS = [['annonces', 'annonces'], ['messages', 'messages'], ['settings', 'settings']];
-
+      // (2 nov. 22 h puis 3 nov. : phrases retirées à la demande de Julien.) (8 nov., clarté —
+      // Julien : « on doit mieux comprendre chaque onglet ») UNE phrase revient sur chaque écran :
+      // celle de src/phrasesEcran.js, visible, une seule, ≤ MOTS_MAX_PHRASE mots, sans jargon ;
+      // et toujours au plus un bouton principal visible.
+      const ECRANS = [['journee', 'journee'], ['annonces', 'annonces'], ['ventes', 'ventes'], ['cat_bord', 'colis'], ['messages', 'messages'], ['settings', 'settings'], ['compta', 'compta'], ['dashboard', 'dashboard'], ['garage', 'garage'], ['emails', 'emails']];
       const p10 = await page(nav, { telephone, base: { data: { vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' } }, ecritures: 0 }, comptes: [{ vinted_user_id: '777', login: 'vendeuse', owner: SESSION.user.id }] });
       for (const [tab, cle] of ECRANS) {
         await p10.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
-        await p10.pg.waitForTimeout(2600);
+        // L'écran attend ses données derrière son squelette (plafond 2,5 s) : on attend la phrase, pas un délai.
+        await p10.pg.waitForSelector(`[data-phrase-ecran="${cle}"]`, { state: 'visible', timeout: 12000 }).catch(() => {});
+        await p10.pg.waitForTimeout(600);
         const e = await p10.pg.evaluate((c) => {
-          const ph = [...document.querySelectorAll(`[data-phrase-ecran="${c}"]`)].find((x) => { const r = x.getBoundingClientRect(); return x.getClientRects().length && r.width > 0 && getComputedStyle(x).visibility !== 'hidden'; });
+          const vis = [...document.querySelectorAll(`[data-phrase-ecran="${c}"]`)].filter((x) => { const r = x.getBoundingClientRect(); return x.getClientRects().length && r.width > 0 && getComputedStyle(x).visibility !== 'hidden'; });
           const prim = [...document.querySelectorAll('.vrm-main .vrm-b-primaire')].filter((b) => { const r = b.getBoundingClientRect(); return b.getClientRects().length && r.width > 0 && r.top < innerHeight && r.bottom > 0 && !b.closest('[hidden], details:not([open]) > :not(summary)'); }).map((b) => b.innerText.trim().slice(0, 30));
-          return { phrase: ph ? ph.innerText.trim() : null, prim };
+          return { n: vis.length, phrase: vis[0] ? vis[0].innerText.trim() : null, prim };
         }, cle);
-        dit(!e.phrase, `${T} V10 ${cle} : aucune phrase sous le titre (retiré à la demande de Julien, 3 nov.)`, String(e.phrase));
+        const attendue = (new RegExp(`\\b${cle}: '([^']*)'`).exec(SRC_PHRASES) || [])[1] || '';
+        const ok = e.n === 1 && !!e.phrase && e.phrase === attendue.replace(/\\u2019/g, '’') && mots(e.phrase) <= MOTS_MAX_PHRASE && !JARGON.test(e.phrase);
+        dit(ok, `${T} V10 ${cle} : une phrase sous le titre, ≤ ${MOTS_MAX_PHRASE} mots, sans jargon`, `${e.n} · ${e.phrase}`);
         dit(e.prim.length <= 1, `${T} V10 ${cle} : au plus un bouton principal visible`, JSON.stringify(e.prim));
         if (CAPTURES && (cle === 'colis' || cle === 'annonces' || cle === 'settings')) await capture(p10.pg, `demo-bulles-${W}-ecran-${cle}`);
-      }
-      for (const [tab, cle] of [['journee', 'journee'], ['ventes', 'ventes'], ['cat_bord', 'colis']]) {
-        await p10.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
-        await p10.pg.waitForTimeout(2600);
-        const n = await p10.pg.evaluate((c) => [...document.querySelectorAll(`[data-phrase-ecran="${c}"]`)].filter((x) => x.getClientRects().length).length, cle);
-        dit(n === 0, `${T} V10 ${cle} : aucune phrase sous le titre (maquette Fusion, retiré à la demande de Julien, 2 nov. 22 h)`, String(n));
       }
       await p10.ctx.close();
       // ── Échap ferme (et note vu).

@@ -41,6 +41,7 @@
 //    pas demandé en mode stream (« Masqué en mode stream » : noms et adresses).
 // ⚠️ §5 : un geste (« Voir le colis… ») ne part QUE d'une identité lue.
 // ⚠️ Au téléphone, la feuille de lecture est OPAQUE dès sa première image.
+import CarteAdresseReception from './AdresseReception.jsx';
 import React, { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RUBRIQUES_BOITE, rubriqueEmail } from '../api/_lib/boite-email.js';
@@ -753,6 +754,8 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
       {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')} ecrireLus={ecrireLus} photoDe={photoDe}
         tete={<ARelier comptes={bandeau} onRelier={relierCompte}/>}/>}
       {vue === 'relier' && <div className="vrm-boite-relier" data-boite-relier="">
+        {/* (8 nov.) La voie la plus simple d'abord : SON adresse VRM (src/AdresseReception.jsx). */}
+        {!compteOuvert && <CarteAdresseReception headers={headers} FermeAuRetour={FermeAuRetour} onBoite={() => setVue('boite')} detail="La plus simple : fais-y suivre tes e-mails, rien d’autre à confirmer"/>}
         <div ref={guide}>
           {compteOuvert
             ? <RelierCompte comptes={aRelierListe} uid={compteOuvert} onChoisir={setCompte} boites={boites} lireDernier={lireDernier} onRelie={noterRelie} onAdresses={onAdresses ? versAdresses : undefined}/>

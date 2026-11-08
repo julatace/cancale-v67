@@ -1,0 +1,74 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE CENTRE D'AIDE VRM (8 nov.) — le même calme que l'app : blanc, encre,
+   le bleu d'Apple RARE (liens), police système, clair et sombre.
+   `data-theme` est posé par aide.js (le choix fait dans l'app, sinon le système).
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{--fond:#F2F2F7;--carte:#FFFFFF;--encre:#1D1D1F;--gris:#6E6E73;--filet:rgba(60,60,67,.18);--remplir:rgba(118,118,128,.12);--lien:#0066CC;--bleu:#0071E3;--ambre:#B25000;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fond:#000;--carte:#1C1C1E;--encre:#F5F5F7;--gris:#98989D;--filet:rgba(84,84,88,.65);--remplir:rgba(118,118,128,.24);--lien:#409CFF;--bleu:#0A84FF;--ambre:#FFB340;color-scheme:dark}}
+:root[data-theme="dark"]{--fond:#000;--carte:#1C1C1E;--encre:#F5F5F7;--gris:#98989D;--filet:rgba(84,84,88,.65);--remplir:rgba(118,118,128,.24);--lien:#409CFF;--bleu:#0A84FF;--ambre:#FFB340;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--fond);color:var(--encre);font:17px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+main{max-width:680px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(48px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+a{color:var(--lien);text-decoration:none}
+a:hover{text-decoration:underline}
+a:focus-visible,input:focus-visible{outline:2px solid var(--bleu);outline-offset:2px;border-radius:6px}
+code{font:15px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--remplir);padding:1px 6px;border-radius:6px;overflow-wrap:anywhere}
+.cache{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* En-tête : la marque à gauche, « Ouvrir VRM » à droite */
+.tete{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 28px;min-height:44px}
+.marque{display:flex;align-items:center;gap:10px;color:var(--encre);min-height:44px}
+.marque:hover{text-decoration:none}
+.marque img{width:32px;height:32px;border-radius:8px}
+.marque span{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.marque em{font-style:normal;font-weight:400;color:var(--gris)}
+.ouvrir{font-size:15px;min-height:44px;display:flex;align-items:center}
+
+/* Titres : serrés quand ils grandissent */
+h1{font-size:34px;line-height:1.1;font-weight:700;letter-spacing:-.025em;margin:0 0 10px;text-wrap:balance}
+.titre-index{font-size:40px;margin:8px 0 20px}
+h2{font-size:22px;line-height:1.2;font-weight:600;letter-spacing:-.015em;margin:36px 0 10px;scroll-margin-top:16px}
+.chapo{font-size:19px;line-height:1.45;color:var(--gris);margin:0 0 24px;text-wrap:pretty}
+article p{margin:0 0 14px;text-wrap:pretty}
+.fil{font-size:15px;margin:-12px 0 14px}
+
+/* Étapes numérotées : le chiffre dans une pastille neutre */
+.etapes{list-style:none;counter-reset:e;margin:0 0 18px;padding:0;background:var(--carte);border-radius:14px;overflow:hidden}
+.etapes li{counter-increment:e;position:relative;padding:14px 16px 14px 58px;line-height:1.45;border-top:.5px solid var(--filet)}
+.etapes li:first-child{border-top:0}
+.etapes li::before{content:counter(e);position:absolute;left:16px;top:13px;width:28px;height:28px;border-radius:14px;background:var(--remplir);color:var(--encre);font-size:15px;font-weight:600;line-height:28px;text-align:center;font-variant-numeric:tabular-nums}
+.puces{margin:0 0 18px;padding:0 0 0 22px}
+.puces li{margin:0 0 8px;line-height:1.5}
+.note{background:var(--carte);border-radius:14px;padding:14px 16px;font-size:15px;line-height:1.5}
+.note b:first-child{display:block;margin-bottom:2px}
+
+/* Captures (mode exemple seulement) : le cadre d'un téléphone, sans fioriture */
+.capture{margin:8px 0 22px;text-align:center}
+.capture img{display:block;width:100%;max-width:300px;height:auto;margin:0 auto;border-radius:22px;box-shadow:0 0 0 .5px var(--filet),0 10px 30px rgba(0,0,0,.08);background:var(--carte)}
+.capture figcaption{font-size:13px;color:var(--gris);margin-top:10px;line-height:1.4}
+.capture .exemple{white-space:nowrap}
+
+/* La recherche et la liste des articles : un groupe iOS */
+.recherche input{width:100%;min-height:48px;padding:12px 16px 12px 44px;font:17px/1.3 inherit;font-family:inherit;color:var(--encre);background:var(--remplir) no-repeat 14px 50%/18px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%238E8E93' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='8.5' cy='8.5' r='6'/%3E%3Cpath d='M13 13l5 5'/%3E%3C/svg%3E");border:0;border-radius:12px;-webkit-appearance:none;appearance:none}
+.recherche input::placeholder{color:var(--gris)}
+.resultat{font-size:13px;color:var(--gris);margin:8px 4px 10px;min-height:18px}
+.groupe{list-style:none;margin:0;padding:0;background:var(--carte);border-radius:14px;overflow:hidden}
+.groupe li{border-top:.5px solid var(--filet)}
+.groupe li:first-child{border-top:0}
+.groupe li[hidden]{display:none}
+.groupe a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding:12px 16px;color:var(--encre)}
+.groupe a:hover{text-decoration:none;background:var(--remplir)}
+.groupe a::after{content:"";flex:0 0 8px;width:8px;height:8px;border-right:2px solid var(--gris);border-top:2px solid var(--gris);transform:rotate(45deg);opacity:.55;margin-right:4px}
+.groupe b{display:block;font-weight:500;font-size:17px;line-height:1.3;letter-spacing:-.01em}
+.groupe small{display:block;font-size:15px;line-height:1.35;color:var(--gris);margin-top:2px}
+.rien{color:var(--gris);font-size:15px;margin:14px 4px}
+.voir h2{font-size:13px;font-weight:400;text-transform:uppercase;letter-spacing:.02em;color:var(--gris);margin:40px 16px 8px}
+
+/* Pied */
+.pied{margin:44px 4px 0;color:var(--gris);font-size:15px;line-height:1.5}
+.pied b{color:var(--encre);font-weight:600}
+.liens{margin-top:14px;display:flex;flex-wrap:wrap;gap:0 20px;font-size:15px}
+.liens a{min-height:44px;display:flex;align-items:center}
+@media (max-width:420px){h1{font-size:30px}.titre-index{font-size:32px}.chapo{font-size:17px}}
+@media print{.tete .ouvrir,.recherche,.pied .liens{display:none}body{background:#fff}}

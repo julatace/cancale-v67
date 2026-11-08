@@ -126,6 +126,11 @@ toutes les deux.
 
 ## 3. Le kit de publication addons.mozilla.org (Firefox ordinateur, Android, Orion)
 
+> ⚠️ **8 nov. 2026 : la fiche à coller est désormais `docs/boutiques/firefox.md`** (Chrome :
+> `docs/boutiques/chrome-web-store.md`, Edge : `docs/boutiques/edge.md`). Le texte ci-dessous est
+> l'historique : sa description (« elle ne publie rien et n'accepte aucune offre toute seule ») ne
+> correspond plus au code.
+
 Compte gratuit : https://addons.mozilla.org/developers/ → **Soumettre un
 nouveau module** → envoyer `VRM-firefox.zip`.
 
@@ -133,7 +138,7 @@ nouveau module** → envoyer `VRM-firefox.zip`.
   la trouve et que l'app propose le bouton) ; « Moi-même » sinon (non listée).
 - **Plateformes** : cocher **Firefox** ET **Firefox pour Android**.
 - **Nom** : VRM — outil du revendeur
-- **Résumé (≤ 250 car.)** : « Relie tes comptes Vinted, Leboncoin et eBay à VRM :
+- **Résumé (≤ 250 car.)** : « Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire Collective à VRM :
   tes annonces, ventes, colis et bordereaux arrivent dans ton tableau de bord,
   depuis ton navigateur. Il faut un compte VRM (vrm.center). »
 - **Description** : « VRM est l'outil de gestion des revendeurs. Cette extension

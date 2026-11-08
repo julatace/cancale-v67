@@ -119,6 +119,41 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
       dit(ok === false && h.length === 1 && h[0].statut === 'reseau' && h[0].famille === 'harvest_listings', 'R1 · un envoi coupé par le navigateur est noté « reseau » (et pas « la base n’a pas répondu »)', JSON.stringify(h));
     }
 
+    // ── O1–O6 : 5.328, l'OAuth DANS l'extension (sans VRM) ─────────────────
+    {
+      const BON = { status: 200, body: { external: { google: true, discord: false } } };
+      const avecToken = (f, rep) => { const f1 = f.ctx.fetch; f.tokens = []; f.ctx.fetch = async (u, o) => { if (/\/auth\/v1\/token\?grant_type=pkce/.test(String(u))) { f.tokens.push(JSON.parse(o.body)); return { ok: rep.status === 200, status: rep.status, json: async () => rep.body }; } return f1(u, o); }; };
+      const f = fond(BON, { store: { __sansSession: true } });
+      if (typeof f.ctx.oauthDepart !== 'function') { dit(false, 'O0 · `oauthDepart` existe dans le fond'); throw new Error('absent'); }
+      const r = await f.envoyer({ from: 'cancale-popup', action: 'oauthDepart', fournisseur: 'google' }, { tab: { id: 7, url: 'https://www.vinted.fr/' } });
+      const u = f.ouverts[0] ? new URL(f.ouverts[0]) : null;
+      const d = f.store.vrmOAuthDepart || {};
+      dit(!!(r && r.ok) && !!u && u.origin === 'https://lgonxzrzjcqthjtbdpzo.supabase.co' && u.pathname === '/auth/v1/authorize' && u.searchParams.get('provider') === 'google' && u.searchParams.get('redirect_to') === 'https://vrm.center/extension-retour.html' && u.searchParams.get('code_challenge_method') === 's256' && (u.searchParams.get('code_challenge') || '').length >= 43, 'O1 · « Continuer avec Google » : un onglet Supabase en PKCE s256, retour sur la page de l’extension — jamais l’app', String(f.ouverts[0]));
+      dit(typeof d.v === 'string' && d.v.length >= 43 && !String(f.ouverts[0]).includes(d.v), 'O1 · le vérificateur reste dans l’extension (jamais dans l’adresse)', '');
+      const ferme = await f.envoyer({ from: 'cancale-popup', action: 'oauthDepart', fournisseur: 'discord' }, {});
+      dit(ferme && ferme.ok === false && /pas ouverte sur VRM/.test(ferme.message || '') && f.ouverts.length === 1, 'O2 · Discord pas activé : rien ne s’ouvre, la raison est DITE', JSON.stringify(ferme));
+      const inc = await f.envoyer({ from: 'cancale-popup', action: 'oauthDepart', fournisseur: 'facebook' }, {});
+      dit(inc && inc.ok === false && f.ouverts.length === 1, 'O2 · un autre nom : rien', JSON.stringify(inc));
+      avecToken(f, { status: 200, body: { access_token: 'a.oauth', refresh_token: 'r.oauth', expires_in: 3600, user: { id: 'u-1', email: 'vendeuse@exemple.test', created_at: '2020-01-01T00:00:00Z', identities: [{ provider: 'google' }, { provider: 'email' }] } } });
+      const faux = await f.envoyer({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe: true, code: 'abcdefgh123' }, { tab: { id: 9, url: 'https://evil.example/extension-retour.html' } });
+      dit(faux && faux.ok === false && faux.code === 'origine' && f.tokens.length === 0, 'O3 · un code venu d’ailleurs que vrm.center : refusé, aucun échange', JSON.stringify(faux));
+      const bon = await f.envoyer({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe: true, code: 'abcdefgh123' }, { tab: { id: 9, url: 'https://vrm.center/extension-retour.html?code=abcdefgh123' } });
+      dit(bon && bon.ok === true && f.tokens.length === 1 && f.tokens[0].code_verifier === d.v && f.tokens[0].auth_code === 'abcdefgh123', 'O4 · le code est échangé avec NOTRE vérificateur (grant_type=pkce)', JSON.stringify({ bon, t: f.tokens }));
+      const s = f.store.vrmSession || {};
+      dit(s.access_token === 'a.oauth' && s.user_id === 'u-1' && Number(s.depuis) > 0 && (f.store.vrmOAuthEtat || {}).etat === 'ok', 'O4 · la session est rangée DANS l’extension, datée (`depuis`)', JSON.stringify({ u: s.user_id, e: f.store.vrmOAuthEtat }));
+      const deux = await f.envoyer({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe: true, code: 'abcdefgh123' }, { tab: { id: 9, url: 'https://vrm.center/extension-retour.html' } });
+      dit(deux && deux.ok === false && f.tokens.length === 1, 'O5 · une seule fois : le même retour rejoué n’échange rien', JSON.stringify(deux));
+      // Plus de 10 minutes : refusé.
+      const g = fond(BON, { store: { __sansSession: true, vrmOAuthDepart: { f: 'google', v: 'x'.repeat(64), at: Date.now() - 11 * 60000 } } });
+      avecToken(g, { status: 200, body: {} });
+      const vieux = await g.envoyer({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe: true, code: 'abcdefgh123' }, { tab: { id: 9, url: 'https://vrm.center/extension-retour.html' } });
+      dit(vieux && vieux.ok === false && g.tokens.length === 0 && /plus de 10 minutes/.test(vieux.message || ''), 'O5 · un départ de plus de 10 min : refusé, et dit', JSON.stringify(vieux));
+      // Refus du fournisseur : dit, jamais muet.
+      const h = fond(BON, { store: { __sansSession: true, vrmOAuthDepart: { f: 'google', v: 'x'.repeat(64), at: Date.now() } } });
+      const ann = await h.envoyer({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe: true, error: 'access_denied' }, { tab: { id: 9, url: 'https://vrm.center/extension-retour.html' } });
+      dit(ann && ann.ok === false && /annulée/.test(ann.message || '') && (h.store.vrmOAuthEtat || {}).etat === 'erreur', 'O6 · annulé chez Google : « annulée », noté pour la fenêtre', JSON.stringify(ann));
+    }
+
     // ── C1 : l'app ────────────────────────────────────────────────────────
     const caps = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
     const man = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'manifest.json'), 'utf8'));

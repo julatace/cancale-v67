@@ -45,3 +45,8 @@ html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton { flex: none; min-height
 html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton:disabled { opacity: .5; cursor: default; }
 
 /* (5 nov.) L'œil « cacher les montants » est remplacé par le bouton « Stream » (src/design/mode-stream.css). */
+
+/* (8 nov., confiance) La preuve d'une ligne du journal : plus petite, sur sa ligne,
+   peut aller à la ligne (jamais coupée : c'est elle qui fait la confiance). */
+.vrm-sec-sous.vrm-sec-preuve { font-size: 12px; white-space: normal; color: var(--fu-gris, #6e6e73); }
+.vrm-sec-preuve[data-journal-preuve="pas-su"] { color: var(--fu-ambre-txt, #8a5a00); }

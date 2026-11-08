@@ -41,7 +41,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   // ouvre cette fenêtre dans un onglet entier ; Orion, dans une feuille.
   const ctx = await nav.newContext(mobile
     ? Object.assign({ colorScheme: scheme, viewport: { width: mobile.largeur || 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, mobile.ua ? { userAgent: mobile.ua } : {})
-    : { colorScheme: scheme, viewport: carte ? { width: 300, height: 460 } : { width: 360, height: 900 } });
+    : { colorScheme: scheme, viewport: carte ? { width: 320, height: 720 } : { width: 360, height: 900 } });
   const pg = await ctx.newPage();
   const html = fs.readFileSync(path.join(EXT, 'popup.html'), 'utf8')
     .replace('<script src="popup.js"></script>', '')
@@ -82,6 +82,10 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
             // 5.290 : le fond dit si la lecture des transporteurs est permise ICI.
             : msg.action === 'transpPermis' ? (faux.permis === undefined ? { ok: true } : { ok: true, permis: faux.permis, origines: ['https://www.mondialrelay.be/*', 'https://www.mondialrelay.fr/*', 'https://ws.chronopost.fr/*', 'https://carrier.vintedgo.com/*'] })
             : { ok: true };
+          if (msg.action === 'oauthDepart') {
+            if (faux.oauthFerme) { setTimeout(() => { window.chrome.runtime.lastError = { message: 'The message port closed before a response was received.' }; try { cb && cb(undefined); } finally { window.chrome.runtime.lastError = null; } }, 5); return; }
+            setTimeout(() => cb && cb(faux.oauthRep || { ok: true }), 0); return;
+          }
           if (faux.codeMuet && msg.action === 'codeVersion') return;   // ne répond jamais
           if (faux.permisMuet && msg.action === 'transpPermis') return; // ne répond jamais
           // 5.325 : les fournisseurs activés chez Supabase (lus par le fond).
@@ -100,7 +104,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
       storage: { local: {
         get: (k, cb) => { if (faux.stockKO) return Promise.reject(new Error('stockage illisible')); const out = {}; for (const c of [].concat(k)) if (mem[c] !== undefined) out[c] = mem[c]; if (cb) { setTimeout(() => cb(out), 0); return; } return Promise.resolve(out); },
         set: (o, cb) => { Object.assign(mem, o); if (cb) { setTimeout(cb, 0); return; } return Promise.resolve(); },
-      } },
+      }, onChanged: { addListener: (fn) => { window.__surStock = fn; } } },
       // 30 sept. : connecté, l'icône OUVRE VRM (onglet réutilisé ou créé).
       tabs: {
         query: (q, cb) => setTimeout(() => cb(q && q.active ? [{ id: 1, url: e.__url || 'https://www.vinted.fr/items/1' }] : []), 0),
@@ -146,7 +150,8 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   const look = await pg.evaluate(() => {
     const vis = (el) => !!(el && el.offsetParent);
     const h = (el) => Math.round(el.getBoundingClientRect().height);
-    const b = document.getElementById('lierBtn') || document.getElementById('vrmBtn');
+    // 5.328 : le geste principal est « Me connecter » (email + mot de passe VRM).
+    const b = (document.getElementById('inBtn') && document.getElementById('inBtn').offsetParent ? document.getElementById('inBtn') : null) || document.getElementById('vrmBtn') || document.getElementById('lierBtn');
     return {
       fond: getComputedStyle(document.body).backgroundColor,
       accent: b ? getComputedStyle(b).backgroundColor : '',
@@ -181,9 +186,11 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   await essaie('pas connecté', async () => {
     const neuf = await rendre(nav, { ok: true, connecte: false, cloisonne: false });
     dit(!neuf.erreurs.length, 'la popup s’exécute sans erreur', neuf.erreurs[0]);
-    // 11 octobre : le geste principal OUVRE VRM — aucun mot de passe à taper.
-    dit(neuf.boutons.includes('lierBtn') && /Se connecter avec VRM/.test(neuf.txt), 'le bouton principal est « Se connecter avec VRM »', JSON.stringify(neuf.boutons));
-    dit(!neuf.champs.some((c) => c.visible), 'aucun champ à remplir au premier regard (VRM s’ouvre et connecte l’extension)', JSON.stringify(neuf.champs.filter((c) => c.visible)));
+    // 5.328 (Julien : « je ne veux pas avoir besoin d'aller sur le site pour
+    // connecter l'extension ») : le geste principal est le mot de passe VRM ICI.
+    dit(neuf.boutons[0] === 'inBtn' && neuf.champs.filter((c) => c.visible).map((c) => c.id).join() === 'mail,pw', 'le geste principal : email + mot de passe VRM, « Me connecter » en premier', JSON.stringify({ b: neuf.boutons, c: neuf.champs.filter((c) => c.visible).map((c) => c.id) }));
+    dit(neuf.boutons[neuf.boutons.length - 1] === 'lierBtn', '« Se connecter en passant par le site VRM » : en tout dernier recours', JSON.stringify(neuf.boutons));
+    dit(neuf.liens.some((h) => /mot-de-passe-oublie/.test(h)), '« Mot de passe oublié ? » mène à la récupération de VRM', JSON.stringify(neuf.liens));
     dit(neuf.liens.some((h) => /vrm\.center/.test(h)), 'et on peut aller créer son compte depuis ici');
     dit(!neuf.ouvert, 'pas connecté : rien ne s’ouvre tout seul', neuf.ouvert);
     dit(!neuf.envoyes.includes('freshness') && !neuf.envoyes.includes('syncNow'), 'la fenêtre ne lit plus de données (tout est dans l’app)', JSON.stringify(neuf.envoyes));
@@ -273,8 +280,8 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
       dit(!r.erreurs.length, `${scheme} : sans erreur`, r.erreurs[0]);
       dit(b.length === 2 && b[0].id === 'google' && b[1].id === 'discord' && b[0].txt === 'Continuer avec Google' && b[1].txt === 'Continuer avec Discord', `${scheme} : « Continuer avec Google » puis « Continuer avec Discord »`, JSON.stringify(b));
       dit(b.every((x) => x.svg && x.h >= 44), `${scheme} : chacun avec son logo, au moins 44 px`, JSON.stringify(b));
-      dit(r.fourn.lierY != null && b.every((x) => x.y > r.fourn.lierY), `${scheme} : SOUS « Se connecter avec VRM » (qui reste le geste principal)`, JSON.stringify({ lier: r.fourn.lierY, b: b.map((x) => x.y) }));
-      dit(r.look.accent === (scheme === 'dark' ? 'rgb(61, 123, 255)' : 'rgb(36, 88, 230)'), `${scheme} : le bouton principal garde le bleu`, r.look.accent);
+      dit(r.fourn.formY != null && r.fourn.lierY != null && b.every((x) => x.y > r.fourn.formY && x.y < r.fourn.lierY), `${scheme} : SOUS le mot de passe, AU-DESSUS du dernier recours par le site`, JSON.stringify({ form: r.fourn.formY, lier: r.fourn.lierY, b: b.map((x) => x.y) }));
+      dit(r.look.accent === (scheme === 'dark' ? 'rgb(10, 132, 255)' : 'rgb(0, 113, 227)'), `${scheme} : « Me connecter » porte le bleu de l’app (un seul accent)`, r.look.accent);
     }
   });
   for (const [nom, rep, attendu] of [['Google seul', { ok: true, google: true, discord: false }, ['google']], ['Discord seul', { ok: true, google: false, discord: true }, ['discord']], ['aucun activé', { ok: true, google: false, discord: false }, []], ['pas su (ok:false)', { ok: false }, []], ['pas su (fond muet)', 'muet', []], ['pas su (code périmé)', 'ferme', []]]) {
@@ -288,11 +295,13 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   for (const fourn of ['google', 'discord']) {
     await essaie('clic ' + fourn, async () => {
       const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX }, geste: (pg) => pg.click('#oauth-' + fourn) });
-      const m = r.messages.find((x) => x.action === 'lierAvecVRM');
-      dit(!!m && m.connexion === fourn && /vinted\.fr/.test(m.urlActive || ''), `clic « Continuer avec ${fourn} » : le fond ouvre VRM avec connexion=${fourn}`, JSON.stringify(m));
+      const m = r.messages.find((x) => x.action === 'oauthDepart');
+      dit(!!m && m.fournisseur === fourn && !r.envoyes.includes('lierAvecVRM'), `clic « Continuer avec ${fourn} » : l’OAuth part DANS l’extension (oauthDepart), pas par VRM`, JSON.stringify(r.messages.map((x) => x.action)));
       dit(r.ferme && !r.envoyes.includes('authLogin'), 'la fenêtre se referme, aucun mot de passe envoyé', JSON.stringify(r.envoyes));
-      const p = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX, lierFerme: true, codeFerme: true, manifeste: '5.325.0' }, geste: async (pg) => { await pg.click('#oauth-' + fourn); await pg.waitForTimeout(400); } });
-      dit(p.ouvert === `https://vrm.center/?tab=plat_vinted&lier-extension=abcdefghijklmnopabcdefghijklmnop&connexion=${fourn}`, `fond sans réponse : la fenêtre ouvre VRM elle-même, avec connexion=${fourn}`, String(p.ouvert));
+      const k = await rendre(nav, { ok: true, connecte: false }, { carte: true, faux: { fournisseurs: LES_DEUX, oauthRep: { ok: false, code: 'ferme', message: 'La connexion avec Discord n’est pas ouverte sur VRM. Connecte-toi avec ton email et ton mot de passe VRM.' } }, geste: (pg) => pg.click('#oauth-' + fourn) });
+      dit(/n’est pas ouverte sur VRM/.test(k.txt) && !k.ferme, 'un départ refusé : la raison est DITE, jamais un échec muet', k.txt.replace(/\n/g, ' · ').slice(0, 200));
+      const p = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX, oauthFerme: true, lierFerme: true, codeFerme: true, manifeste: '5.325.0' }, geste: async (pg) => { await pg.click('#oauth-' + fourn); await pg.waitForTimeout(400); } });
+      dit(p.ouvert === `https://vrm.center/?tab=plat_vinted&lier-extension=abcdefghijklmnopabcdefghijklmnop&connexion=${fourn}`, `fond d’avant (sans oauthDepart) : la fenêtre ouvre VRM elle-même, avec connexion=${fourn}`, String(p.ouvert));
     });
   }
   await essaie('« Se connecter avec VRM » ne porte pas de fournisseur', async () => {
@@ -302,7 +311,7 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   });
   await essaie('le mot de passe le dit', async () => {
     const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX }, geste: ouvrirMdp });
-    dit(r.fourn.mot === 'Compte créé avec Google ou Discord ? Utilise les boutons au-dessus.', 'formulaire : « Compte créé avec Google ou Discord ? Utilise les boutons au-dessus. »', r.fourn.mot);
+    dit(r.fourn.mot === 'Compte créé avec Google ou Discord ? Utilise les boutons au-dessus.', 'sous les boutons : « Compte créé avec Google ou Discord ? Utilise les boutons au-dessus. »', r.fourn.mot);
     const g = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: { ok: true, google: true, discord: false } }, geste: ouvrirMdp });
     dit(g.fourn.mot === 'Compte créé avec Google ? Utilise le bouton au-dessus.', 'un seul activé : la phrase ne nomme que lui', g.fourn.mot);
     const n = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: { ok: false } }, geste: ouvrirMdp });
@@ -310,13 +319,13 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   });
   await essaie('Orion', async () => {
     const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX, orion: true } });
-    dit(r.fourn.boutons.length === 2 && r.fourn.formY != null && r.fourn.boutons.every((x) => x.y < r.fourn.formY), 'Orion : les deux boutons apparaissent AU-DESSUS du formulaire', JSON.stringify(r.fourn));
+    dit(r.fourn.boutons.length === 2 && r.fourn.formY != null && r.fourn.boutons.every((x) => x.y > r.fourn.formY), 'Orion : le même ordre que partout (mot de passe, puis Google / Discord)', JSON.stringify(r.fourn));
     dit(r.fourn.mot === 'Compte créé avec Google ou Discord ? Utilise les boutons au-dessus.', 'Orion : et la phrase est vraie (« au-dessus »)', r.fourn.mot);
   });
   await essaie('carte', async () => {
     const r = await rendre(nav, { ok: true, connecte: false }, { carte: true, faux: { fournisseurs: LES_DEUX, capture: 'popup-oauth-carte.png' } });
     dit(r.fourn.boutons.length === 2, 'dans la petite carte aussi', JSON.stringify(r.fourn.boutons));
-    dit(!r.deborde, 'et tout y tient (300 × 460, la hauteur de la carte du logo), sans défilement');
+    dit(!r.deborde, 'et tout y tient (320 × 720, la plus grande hauteur que la carte donne au cadre), sans défilement');
   });
 
   // ── 2. CONNECTÉ — on ne redemande rien ───────────────────────────────────
@@ -388,8 +397,8 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   await essaie('carte', async () => {
     const cd = await rendre(nav, { ok: true, connecte: false, cloisonne: true }, { carte: true });
     dit(!cd.erreurs.length, 'elle s’exécute sans erreur', cd.erreurs[0]);
-    dit(cd.boutons.includes('lierBtn') && !cd.champs.some((c) => c.visible), 'pas connecté : « Se connecter avec VRM », sans champ visible', JSON.stringify(cd.boutons));
-    dit(!cd.deborde, 'tout tient dans la carte (300 × 460), sans défilement');
+    dit(cd.boutons[0] === 'inBtn' && cd.champs.filter((c) => c.visible).length === 2, 'pas connecté : le mot de passe VRM tout de suite dans la carte (5.328)', JSON.stringify(cd.boutons));
+    dit(!cd.deborde, 'tout tient dans la carte (320 × 720), sans défilement');
     const cl = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: (pg) => pg.click('#lierBtn') });
     dit(cl.envoyes.includes('lierAvecVRM') && !cl.ferme, 'dans la carte : le clic demande au service worker d’ouvrir VRM (la carte, elle, reste dans le site)', JSON.stringify(cl.envoyes));
     const cm = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: async (pg) => { await ouvrirMdp(pg); await pg.fill('#mail', 'a@b.fr'); await pg.fill('#pw', 'x'); await pg.click('#inBtn'); } });
@@ -427,13 +436,17 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   // mot de passe).
   console.log('\n── Le graphisme : VRM Noir, clair et sombre, cibles ≥ 44 px');
   await essaie('graphisme', async () => {
-    for (const [scheme, fond, accent] of [['dark', 'rgb(7, 9, 13)', 'rgb(61, 123, 255)'], ['light', 'rgb(244, 246, 250)', 'rgb(36, 88, 230)']]) {
+    // 5.328 : les jetons de l'app (--d-*) — fond iOS #F2F2F7 / #000, bleu Apple
+    // #0071E3 / #0A84FF, rayon 12 ; dans la carte, le cadre est transparent (le
+    // verre de la carte est derrière).
+    for (const [scheme, fond, accent] of [['dark', 'rgb(0, 0, 0)', 'rgb(10, 132, 255)'], ['light', 'rgb(242, 242, 247)', 'rgb(0, 113, 227)']]) {
       for (const carte of [false, true]) {
         const r = await rendre(nav, { ok: true, connecte: false }, { carte, scheme, geste: ouvrirMdp });
         const ou = `${scheme}${carte ? ' · carte' : ''}`;
-        dit(r.look.fond === fond, `${ou} : le fond suit le système (${fond})`, r.look.fond);
-        dit(r.look.accent === accent, `${ou} : le bouton principal porte LE bleu de la marque (${accent})`, r.look.accent);
-        dit(r.look.rayon === '8px', `${ou} : bouton au rayon 8 (5 / 8 / 10 / 12)`, r.look.rayon);
+        const fondAttendu = carte ? 'rgba(0, 0, 0, 0)' : fond;
+        dit(r.look.fond === fondAttendu, `${ou} : le fond suit le système (${fondAttendu})`, r.look.fond);
+        dit(r.look.accent === accent, `${ou} : le bouton principal porte LE bleu de l’app (${accent})`, r.look.accent);
+        dit(r.look.rayon === '12px', `${ou} : bouton au rayon 12 (contrôles de l’app)`, r.look.rayon);
         const petits = r.look.cibles.filter((c) => c.h < 44);
         dit(r.look.cibles.length >= 4 && !petits.length, `${ou} : chaque cible (boutons, champs, lien) fait au moins 44 px`, JSON.stringify(petits.length ? petits : r.look.cibles));
       }

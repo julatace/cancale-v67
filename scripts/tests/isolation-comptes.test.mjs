@@ -9,7 +9,7 @@ const auth=()=>({user:{id:A},session:{access_token:'token-a'}});
 test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étranger et réponse périmée',async()=>{
  const code=extraire(app,'const fetchVintedAccounts =','// Retire un compte de');
  for(const mode of ['bon','etranger','sans-owner','bascule']){
-  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),fetch:async(url)=>{
+  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),memoriserComptesLies:()=>{},CLE_SUPPRIMES:'k',localStorage:{setItem(){},getItem(){return null;}},fetch:async(url)=>{
    assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);
    if(url.includes('/vinted_accounts')){if(mode==='bascule')c.AUTH=authB();return Response.json([{owner:mode==='etranger'?B:mode==='sans-owner'?undefined:A,vinted_user_id:'42'}]);}return Response.json([]);
   }});vm.runInContext(code+';globalThis.lire=fetchVintedAccounts;',c);
@@ -18,7 +18,7 @@ test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étrang
  function authB(){return {user:{id:B},session:{access_token:'token-b'}};}
 });
 test('les sauvegardes différées du vendeur A ne sont pas écrites après une bascule vers B dans un autre onglet',()=>{
- const code=extraire(app,'let _saveTimers = {}','// localStorage est partagé entre les onglets');let travail,ecrit=0;
+ const code=extraire(app,'let _saveTimers = {}','// ── « ANNULER » PARTOUT');let travail,ecrit=0;
  const c=vm.createContext({AUTH:auth(),readSession:()=>({user:{id:B}}),setTimeout:fn=>(travail=fn,1),clearTimeout(){},localStorage:{setItem(){ecrit++;}},SYNC_KEYS:[],window:{dispatchEvent(){}},CustomEvent:class{},cloudPush(){throw Error('Interdit');}});
  vm.runInContext(code+';globalThis.sauver=save;',c);c.sauver('vinted_sales',[{id:'vente-a'}]);travail();assert.equal(ecrit,0);
 });
@@ -58,7 +58,7 @@ test('proxy et renouvellement refusent une ligne étrangère même si la base ne
 });
 test('extension : l’upsert exige une session même si le schéma manque ; le corps ne peut pas imposer un autre propriétaire',async()=>{
  const source=fs.readFileSync('vinted-sync-extension/background.js','utf8');
- const code=extraire(source,'async function supabaseUpsert(','// --- Capture des comptes');
+ const code=extraire(source,source.includes('function sessionAbsente()')?'function sessionAbsente()':'async function supabaseUpsert(','// --- Capture des comptes'); // (8 nov., 5.328) « pas connecté » n'est pas un refus : sessionAbsente précède l'envoi
  for(const session of [null,{user_id:A,access_token:'token-a'}]){
   let appels=0;
   const c=vm.createContext({authToken:async()=>session,isCloisonne:async()=>false,SUPABASE_URL:'https://base.test',SUPABASE_KEY:'anon',RE_LIGNE_CAPTURE:/^harvest_/,noterDiag(){},familleEcriture:()=>'',fetch:async(url,opts)=>{appels++;assert.equal(new URL(url).searchParams.get('on_conflict'),'owner,vinted_user_id');assert.equal(opts.headers.Authorization,'Bearer token-a');assert.equal(JSON.parse(opts.body)[0].owner,A);return {ok:true};}});

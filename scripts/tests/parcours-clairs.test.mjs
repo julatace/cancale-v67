@@ -13,10 +13,10 @@ test('Prix inconnu, incohérent ou autre devise : aucun montant inventé',()=>{
 });
 test('Le guide ne saute pas une lecture en cours ou en échec',()=>{
  for(const etat of ['encours','passu','afaire']){
-  const g=etatGuide({extension:'fait',vinted:etat,emails:'afaire',numeros:'afaire'});
-  assert.equal(g.courante,'vinted');assert.equal(g.faites,1);assert.equal(g.fini,false);
+  const g=etatGuide({compte:'fait',extension:'fait',vinted:etat,emails:'afaire',vente:'afaire'});
+  assert.equal(g.courante,'vinted');assert.equal(g.faites,2);assert.equal(g.fini,false);
  }
- assert.equal(etatGuide({extension:'fait',vinted:'fait',emails:'fait',numeros:'fait'}).courante,null);
+ assert.equal(etatGuide({compte:'fait',extension:'fait',vinted:'fait',emails:'fait',vente:'fait'}).courante,null);
 });
 
 test('Repère de négociation : centimes exacts, minimum jamais inventé',async()=>{

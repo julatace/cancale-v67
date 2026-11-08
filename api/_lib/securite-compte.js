@@ -13,7 +13,12 @@
 // 2. `mode=journal` — ce que VRM a envoyé en son nom, agrégé de ce qui est DÉJÀ
 //    noté en base (aucune source inventée, rien n'est écrit) : file des messages
 //    aux favoris (sa part seulement), journal de l'agent eBay, retraits eBay
-//    automatiques, brouillons de Republier, bordereaux récupérés.
+//    automatiques, brouillons de Republier, bordereaux récupérés, et (8 nov.,
+//    « confiance ») les commandes du téléphone exécutées par l'extension
+//    (`cmd_relais_*` : bordereau, Leboncoin, réponse, offre) — projetées SANS
+//    leur corps : jamais le texte d'un message, seulement le geste, le compte,
+//    l'article et l'heure. Chaque événement porte sa PREUVE (`preuve`) : la
+//    ligne de la base qui le note. Une ligne sans preuve ne sort pas d'ici.
 
 import { createHash } from 'node:crypto';
 
@@ -125,12 +130,29 @@ export const TYPES_JOURNAL = {
   ebay_retrait: 'Retrait eBay automatique',
   ebay_action: 'Action eBay',
   bordereau: 'Bordereau récupéré',
+  bordereau_demande: 'Bordereau demandé',
+  lbc_publication: 'Annonce Leboncoin publiée',
+  offre_acceptee: 'Offre acceptée',
+  offre_refusee: 'Offre refusée',
+  offre_faite: 'Offre envoyée',
+  message_envoye: 'Message envoyé',
+};
+// (8 nov.) LA PREUVE de chaque ligne : la ligne de SA base qui la note. Une
+// source absente d'ici ⇒ l'événement n'est pas rendu (audit-confiance).
+export const PREUVES_JOURNAL = {
+  favoris: 'Noté dans la file des messages aux favoris',
+  brouillons: 'Noté dans la fiche de republication',
+  ebay_retraits_auto: 'Noté dans le registre des retraits eBay',
+  ebay_agent_journal: 'Noté dans le journal des actions eBay',
+  bordereaux: 'Le bordereau est rangé dans ta base',
+  relais: 'Résultat écrit par l’extension dans la commande',
 };
 // Ce qu'aucune ligne de la base ne note — dit tel quel à l'écran.
 export const NON_JOURNALISE = [
-  ['offres', 'Offres acceptées, refusées ou contre-offres sur Vinted : pas notées en base.'],
+  ['offres', 'Offres Vinted acceptées ou refusées depuis l’ordinateur, ou par le réglage automatique : notées seulement dans la fenêtre de l’extension, pas en base. Depuis le téléphone, elles sont ci-dessus.'],
+  ['messages', 'Réponses aux acheteurs Vinted envoyées depuis l’ordinateur : pas notées en base. Depuis le téléphone, elles sont ci-dessus.'],
   ['lbc', 'Suppressions et réponses Leboncoin : pas notées en base.'],
-  ['vestiaire', 'Réponses Vestiaire : pas notées en base.'],
+  ['vestiaire', 'Réponses et offres Vestiaire : pas notées en base.'],
   ['relance', 'Remises en vente eBay : pas notées en base.'],
   ['republications', 'Republications : notées depuis le 28 oct. seulement.'],
 ];
@@ -183,7 +205,40 @@ export function evenementsJournal(sources) {
     const at = ms(l && l.capturedAt); if (!at) continue;
     out.push({ at, type: 'bordereau', site: 'vinted', compte: l.uid ? String(l.uid) : null, cle: { item: l.item && /^\d+$/.test(String(l.item)) ? String(l.item) : null, tx: l.tx ? String(l.tx) : null }, resultat: 'ok', source: 'bordereaux' });
   }
-  return out.sort((a, b) => (b.at || Infinity) - (a.at || Infinity));
+  for (const c of s.relais || []) {
+    const ev = evenementRelais(c);
+    if (ev) out.push(ev);
+  }
+  // La preuve, posée ici pour TOUS : une source sans preuve connue ne sort pas.
+  return out.filter((e) => PREUVES_JOURNAL[e.source]).map((e) => ({ ...e, preuve: PREUVES_JOURNAL[e.source] }))
+    .sort((a, b) => (b.at || Infinity) - (a.at || Infinity));
+}
+
+// Une commande du téléphone (`cmd_relais_*`), projetée sans corps. Seuls les
+// gestes PARTIS comptent : en attente, annulée ou expirée ⇒ rien n'est parti.
+const ETAT_RELAIS = { fait: 'ok', refuse: 'refuse', echec: 'refuse', 'en-cours': 'en_cours', pris: 'verifier' };
+export function evenementRelais(c) {
+  if (!c) return null;
+  const resultat = ETAT_RELAIS[String(c.etat || '')];
+  if (!resultat) return null;
+  const at = ms(c.finiLe) || ms(c.prisLe) || ms(c.demandeLe);
+  if (!at) return null;
+  const uid = /^\d{1,20}$/.test(String(c.uid || '')) ? String(c.uid) : null;
+  if (c.cmd === 'bordereau') return { at, type: 'bordereau_demande', site: 'vinted', compte: uid, cle: { tx: /^\d{1,20}$/.test(String(c.tx || '')) ? String(c.tx) : null }, resultat, source: 'relais', via: 'telephone' };
+  if (c.cmd === 'lbcPublier') return { at, type: 'lbc_publication', site: 'leboncoin', compte: null, cle: { lbc: /^\d{1,20}$/.test(String(c.lbc || '')) ? String(c.lbc) : null }, resultat, source: 'relais', via: 'telephone' };
+  if (c.cmd === 'exec') {
+    const e = String(c.endpoint || ''), m = String(c.methode || '').toUpperCase();
+    const tx = (/^\/api\/v2\/transactions\/(\d+)\//.exec(e) || [])[1] || null;
+    const type = m === 'PUT' && /\/offer_requests\/\d+\/accept$/.test(e) ? 'offre_acceptee'
+      : m === 'PUT' && /\/offer_requests\/\d+\/reject$/.test(e) ? 'offre_refusee'
+      : m === 'POST' && /^\/api\/v2\/transactions\/\d+\/offers$/.test(e) ? 'offre_faite'
+      : m === 'POST' && /^\/api\/v2\/conversations\/\d+\/replies$/.test(e) ? 'message_envoye'
+      : m === 'POST' && e === '/vrm/favoris' ? 'favori'
+      : null;
+    if (!type) return null;
+    return { at, type, site: 'vinted', compte: uid, cle: { tx }, resultat, source: 'relais', via: 'telephone' };
+  }
+  return null;
 }
 
 // ── La lecture (côté serveur) ───────────────────────────────────────────────
@@ -216,5 +271,8 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   // ⚠️ Jamais `select=data` : la ligne d'un bordereau porte son PDF (§4.4).
   await lignes('bordereaux', 'app_data?id=like.harvest_*_label_*&select=id,uid:data->>uid,tx:data->>tx,item:data->>item,capturedAt:data->>capturedAt&limit=500', (r) => (/_label_\d+$/.test(String(r && r.id || '')) ? r : null));
   if (Array.isArray(sources.bordereaux)) sources.bordereaux = sources.bordereaux.filter(Boolean);
+  // (8 nov.) Les commandes du téléphone : le geste, jamais son corps (`args.body`
+  // porte le texte d'un message) — projeté champ par champ.
+  await lignes('relais', 'app_data?id=like.cmd_relais_*&select=cmd:data->>cmd,etat:data->>etat,demandeLe:data->>demandeLe,prisLe:data->>prisLe,finiLe:data->>finiLe,uid:data->args->>uid,tx:data->args->>tx,lbc:data->args->>id,methode:data->args->>method,endpoint:data->args->>endpoint&order=id.desc&limit=300', (r) => r);
   return { evenements: evenementsJournal(sources), pasLu, nonJournalise: NON_JOURNALISE.map(([id, texte]) => ({ id, texte })) };
 }

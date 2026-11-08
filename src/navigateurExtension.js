@@ -77,6 +77,27 @@ export function boutiqueOrion() {
   return LIENS_BOUTIQUES.firefox || LIENS_BOUTIQUES.chrome || '';
 }
 
+// ══ INSTALLER OU METTRE À JOUR : LA BOUTIQUE D'ABORD (8 nov.) ════════════════
+// Julien, 8 nov. : son iPhone tournait encore en 5.322 — le zip ne se met
+// JAMAIS à jour tout seul ; une extension installée depuis une boutique, si.
+// UNE règle pour tous les boutons « installer / mettre à jour » de l'app :
+//   · la fiche du navigateur d'ICI est publiée (`LIENS_BOUTIQUES`, jamais un
+//     lien deviné) ⇒ `{ boutique: true, lien: <la fiche>, nomBoutique }` ;
+//   · sinon ⇒ `{ boutique: false, lien: '/VRM-extension.zip' }` (le paquet
+//     Chromium servi, comme avant). Vide par défaut : rien ne change tant
+//     qu'aucune fiche n'est validée.
+// Orion n'est pas traité ici (son paquet et sa boutique ont leurs boutons).
+// `liens` : pour l'audit (scripts/audit-paquets-boutiques.cjs).
+const BOUTIQUE_DU_NAV = { chrome: 'chrome', brave: 'chrome', vivaldi: 'chrome', yandex: 'chrome', edge: 'edge', opera: 'opera', firefox: 'firefox' };
+const NOM_BOUTIQUE = { chrome: 'Chrome Web Store', edge: 'Microsoft Edge Add-ons', opera: 'Opera Add-ons', firefox: 'Firefox Add-ons' };
+export function installerExtensionIci(ua, liens = LIENS_BOUTIQUES) {
+  const nav = navigateurIci(ua);
+  const cle = BOUTIQUE_DU_NAV[nav];
+  const lien = (cle && liens && liens[cle]) || '';
+  if (lien) return { boutique: true, nav, lien, nomBoutique: NOM_BOUTIQUE[cle] };
+  return { boutique: false, nav, lien: '/VRM-extension.zip', nomBoutique: '' };
+}
+
 // La page des extensions de CE navigateur — celle qu'on nomme dans une consigne.
 export function pageExtensionsIci(ua) {
   const nav = navigateurIci(ua);
@@ -190,3 +211,26 @@ export function phraseNavigateur(nav, ua) {
 // proposée seulement quand l'extension Firefox est PUBLIÉE — sinon installer
 // Firefox ne servirait à rien.
 export const LIEN_FIREFOX_ANDROID = 'https://play.google.com/store/apps/details?id=org.mozilla.firefox';
+
+// ══ OÙ VIT L'EXTENSION, EN MOTS (8 nov., « iPhone seul ») ══════════════════════
+// « sur ton ordinateur » n'est vrai que là où l'extension ne peut PAS vivre ici.
+// Dans Orion sur iPhone ou Firefox sur Android, l'extension s'installe sur CE
+// téléphone : lui dire « ordinateur » enverrait un vendeur sans ordinateur
+// chercher un appareil qu'il n'a pas. Rend la fin de phrase après « installe
+// l'extension » / « l'extension vit ». Règle pure (le code de `mobileIci` et
+// ce qui est publié) : exécutée par scripts/audit-vendeurs-differents.cjs.
+//   'ios-orion'       ⇒ « dans Orion, sur cet iPhone »
+//   'firefox-android' ⇒ « dans Firefox, sur ce téléphone »
+//   'ios' (Safari…)   ⇒ « sur ton ordinateur ou dans Orion sur iPhone » (si une fiche est publiée)
+//   'android'…        ⇒ « sur ton ordinateur ou dans Firefox pour Android » (si publiée)
+//   'autre' (ordinateur) ⇒ « dans ce navigateur »
+export function phraseOuExtension(mobile, { orionPublie = false, firefoxPublie = false } = {}) {
+  if (mobile === 'ios-orion') return 'dans Orion, sur cet iPhone';
+  if (mobile === 'firefox-android') return 'dans Firefox, sur ce téléphone';
+  if (mobile === 'ios') return orionPublie ? 'sur ton ordinateur ou dans Orion sur iPhone' : 'sur ton ordinateur';
+  if (mobile === 'android' || mobile === 'samsung' || mobile === 'duckduckgo') return firefoxPublie ? 'sur ton ordinateur ou dans Firefox pour Android' : 'sur ton ordinateur';
+  return 'dans ce navigateur';
+}
+export function ouExtensionIci(ua) {
+  return phraseOuExtension(mobileIci(ua), { orionPublie: !!boutiqueOrion(), firefoxPublie: !!LIENS_BOUTIQUES.firefox });
+}

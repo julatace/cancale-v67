@@ -9,6 +9,7 @@ import { resumeColisSites } from './_lib/colis-sites.js';
 import { numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
 import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
+import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
 // La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
@@ -270,9 +271,12 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
     const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`));
     if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
-    const ligneDe = {}, capDe = {}, capParUid = {};
+    const ligneDe = {}, capDe = {}, capParUid = {}, lueParUid = {};
     for (const row of rows) {
       if (ligneDunCompteRetire(vivants, row.id)) continue;
+      // (8 nov.) La dernière lecture de la liste de CHAQUE compte (`capturedAt`, la date de
+      // l'app — jamais `updated_at`) : une vente vue par e-mail APRÈS elle compte (src/venteEmailFraiche.js).
+      { const u = uidDeLigne(row.id); const c = Date.parse(row.cap || ''); if (u && Number.isFinite(c)) lueParUid[u] = Math.max(lueParUid[u] || 0, c); }
       if (!Array.isArray(row.txns)) continue;
       resumeTrouve = true;
       const cap = Date.parse(row.ra || '') || Date.parse(row.cap || '') || null;
@@ -288,22 +292,57 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
     // `ligneDe` : la ligne (le compte) de chaque transaction — pour aller
     // chercher la DATE d'une vente sans bordereau email, et seulement elle.
     if (!resumeTrouve) return null;
-    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); Object.defineProperty(out, 'capDe', { value: capDe }); Object.defineProperty(out, 'capParUid', { value: capParUid }); return out;
+    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); Object.defineProperty(out, 'capDe', { value: capDe }); Object.defineProperty(out, 'capParUid', { value: capParUid }); Object.defineProperty(out, 'lueParUid', { value: lueParUid }); return out;
   } catch (_) { return null; }
 }
 async function harvestOrders(kind, vivants) {
   try {
-    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,my_orders:data->payload->my_orders`));
+    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,my_orders:data->payload->my_orders,cap:data->>capturedAt`));
     if (!j) return null;
-    const out = {};
+    const out = {}, lueParUid = {};
     for (const row of j) {
       if (ligneDunCompteRetire(vivants, row.id)) continue;
+      { const u = uidDeLigne(row.id); const c = Date.parse(row.cap || ''); if (u && Number.isFinite(c)) lueParUid[u] = Math.max(lueParUid[u] || 0, c); }
       // Projeté (§4.4) : seule la liste des commandes voyage, jamais la ligne entière.
       const items = Array.isArray(row.my_orders) ? row.my_orders : [];
       for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
     }
-    return Object.values(out);
+    const liste = Object.values(out); Object.defineProperty(liste, 'lueParUid', { value: lueParUid }); return liste;
   } catch (_) { return null; }
+}
+// (8 nov.) LES VENTES VUES PAR E-MAIL DONT LE BORDEREAU EST LÀ — la règle de Ma journée et de
+// Colis (api/_lib/colis-ventes-email.js, qui importe celles de l'app telles quelles). Lectures
+// projetées seulement (scalaires `meta->>` des e-mails de vente, §4.4). Le résumé de l'extension
+// ne porte que les ventes « à expédier » : pour juger « n° absent de la liste », la liste ENTIÈRE
+// des seuls comptes concernés est relue (rare : une vente arrivée depuis la dernière lecture).
+// Une lecture ratée ⇒ aucun colis e-mail (pas su), jamais un colis inventé.
+async function lignePanneauComptes() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped('app_data?id=eq.panel_accounts_off&select=data')}`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    return Array.isArray(j) ? ((j[0] && j[0].data) || {}) : undefined;
+  } catch (_) { return undefined; }
+}
+async function colisVentesEmailDuWidget({ txSold, sold, vivants, masques, bordsParTx, preuves, departs, shipDone, bordsShipped }) {
+  const vide = { txs: [], ventes: {} };
+  try {
+    if (!vivants) return vide;                                  // comptes liés pas sus : (b) pas jugeable
+    const [mails, panneau] = await Promise.all([fetchPaginated(scoped(reqVentesEmail(Date.now()))), lignePanneauComptes()]);
+    if (!Array.isArray(mails) || panneau === undefined) return vide;
+    const lectures = (txSold ? txSold.lueParUid : sold && sold.lueParUid) || {};
+    let connues = txSold ? [...txSold].map(String) : txsDeCommandes(sold);
+    const base = { mails, comptes: [...vivants], masques, panneau, lectures, bordsParTx, shipDone, bordsShipped,
+      panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants };
+    const r = colisVentesEmailServeur({ ...base, connues });
+    if (!txSold || !r.txs.length) return r;
+    const uids = [...new Set(r.txs.map((t) => String((r.ventes[t] && r.ventes[t]._acc && r.ventes[t]._acc.vinted_user_id) || '')).filter(Boolean))];
+    const j = await fetchPaginated(scoped(`app_data?id=in.(${uids.map((u) => encodeURIComponent(`harvest_${u}_orders_sold`)).join(',')})&select=id,my_orders:data->payload->my_orders`));
+    if (!j) return colisVentesEmailServeur({ ...base, connues, ko: uids });
+    const lus = new Set();
+    for (const row of j) { lus.add(uidDeLigne(row.id)); connues = connues.concat(txsDeCommandes(row.my_orders)); }
+    return colisVentesEmailServeur({ ...base, connues, ko: uids.filter((u) => !lus.has(u)) });
+  } catch (_) { return vide; }
 }
 // À expédier : la vente attend que TU postes le colis. MÊME RÈGLE que l'app
 // (`aExpedier`) et l'extension (`A_EXPEDIER`) : le champ machine de Vinted
@@ -755,6 +794,9 @@ export default async function handler(req, res) {
     const preuves = await lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x)));
     const partisVinted = ventesPartiesParPreuve({ txs: txsVinted, bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants });
     const shipTxns = new Set(txsVinted.filter((t) => !partisVinted.has(t)));
+    // (8 nov.) + les ventes vues par e-mail dont le bordereau est là (le nombre de Ma journée).
+    const venteEmail = await colisVentesEmailDuWidget({ txSold, sold, vivants, masques: m.vinted_accounts_hidden, bordsParTx: bordsTx0, preuves, departs, shipDone, bordsShipped });
+    for (const t of venteEmail.txs) shipTxns.add(String(t));
     const shipTotal = shipTxns.size;
     const pickupVinted = txBuy
       ? txBuy.filter(t => !pickupDone[String(t)]).length
@@ -789,6 +831,7 @@ export default async function handler(req, res) {
     // (`sansLimite`), jamais avec une date inventée.
     const ventesTx = {};
     for (const o of sold) if (o && o.transaction_id != null) ventesTx[String(o.transaction_id)] = o;
+    for (const [t, o] of Object.entries(venteEmail.ventes)) if (!ventesTx[t]) ventesTx[t] = o;
     let datesPasSu = false;
     if (txSold) {
       const manque = [...shipTxns].filter((t) => !(bordsTx[t] && lireDateLimite(bordsTx[t].dateLimite)));

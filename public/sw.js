@@ -214,6 +214,9 @@ self.addEventListener('fetch', event => {
   // l'app (comme les pages légales). Elle va au réseau, sans cache : un état
   // gardé en cache dirait « Tout fonctionne » d'hier.
   if (url.pathname === '/etat' || url.pathname.startsWith('/etat.') || url.pathname === '/etat-version.json') return;
+  // (8 nov.) Le centre d'aide (/aide, public/aide/) : des pages statiques, au réseau —
+  // sinon la navigation les rangerait sous « / » et ouvrirait l'app à leur place.
+  if (url.pathname === '/aide' || url.pathname.startsWith('/aide/')) return;
 
   // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;

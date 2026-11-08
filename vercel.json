@@ -40,6 +40,18 @@
       "destination": "/etat.html"
     },
     {
+      "source": "/aide",
+      "destination": "/aide/index.html"
+    },
+    {
+      "source": "/aide/([a-z-]+)",
+      "destination": "/aide/$1.html"
+    },
+    {
+      "source": "/statut",
+      "destination": "/statut.html"
+    },
+    {
       "source": "/api/stripe-webhook",
       "destination": "/api/compte?mode=webhook"
     },

@@ -14,7 +14,8 @@ import { friseVente } from '../recapVente.js';
 import Frise from '../design/Frise.jsx';
 import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
-import { AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner } from '../App.jsx';
+import { champsFacultatifs } from '../profilVendeur.js';
+import { AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner, vendActuel } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { PHOTOS_AJOUT_MAX, PHOTOS_EBAY_MAX, estPhotoAjoutee, placesPhotos, deplacerPhoto, avecPhotosAjoutees, photoEnJpegBase64 } from '../photosEbayAjout.js';
@@ -1040,7 +1041,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     let achat = null;
     try { if (pairSel) achat = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[pairSel.id], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
     const nPh = String(photos || '').split(/\s+/).filter((u) => /^https?:\/\//.test(u.trim())).length;
-    return problemesAnnonce({ titre, taille: String(taille || ''), famille: familleArticle({ titre, taille: String(taille || ''), marque: String(marque || '') }).famille, marque: String(marque || ''), categorie: (cat && cat.categoryId) || '', nPhotos: nPh, prix: item ? item.price : prix, achat }, 'ebay');
+    return problemesAnnonce({ titre, taille: String(taille || ''), famille: familleArticle({ titre, taille: String(taille || ''), marque: String(marque || '') }).famille, marque: String(marque || ''), categorie: (cat && cat.categoryId) || '', nPhotos: nPh, prix: item ? item.price : prix, achat, facultatifs: champsFacultatifs(vendActuel()) }, 'ebay');
   };
   const [autoPub, setAutoPub] = React.useState(null);   // null · { id, etape: 'analyse' | 'verif' }
   const publierEnUnClic = (p) => { setRes(null); setCheck(null); setAutoPub({ id: p.id, etape: 'analyse' }); choisirPaire(p); };
@@ -1258,7 +1259,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               paires.length === 0 ? (
                 <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté n'est encore chargé sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes articles — avec leurs photos — apparaîtront ici.</div>
               ) : (<>
-                <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder="Chercher : n°, marque, pointure…" style={{ ...inp, marginBottom: 10 }} />
+                <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder={vendActuel() === 'sneakers' ? 'Chercher : n°, marque, pointure…' : 'Chercher : n°, titre, marque, taille…'} style={{ ...inp, marginBottom: 10 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
                   {listePaires.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px' }}>Aucun article ne correspond.</div>}
                   {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 12, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Un article porte deux N° (même photo sur deux fiches) : il n\'est proposé qu\'une fois.' : `${nJumellesMasquees} articles portent deux N° (même photo sur deux fiches) : chacun n'est proposé qu'une fois.`}</div>}
@@ -1269,7 +1270,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.accentTexte }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
-                        <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
+                        <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `${vendActuel() === 'sneakers' ? 'Pointure' : 'Taille'} ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
                           const jm = jumelles.get(String(p.id));
                           return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même article que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>
@@ -1796,7 +1797,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                     {bloc(eur(total), 'total des ventes')}
                     {bloc(eur(payees), 'payées')}
                     {enAttente > 0 && bloc(eur(enAttente), 'en attente de paiement', C.warn)}
-                    {aExpedier > 0 && bloc(String(aExpedier), 'à expédier', C.accent)}
+                    {aExpedier > 0 && bloc(String(aExpedier), 'à envoyer', C.accent)}
                   </div>
                   {/* Liste des ventes : acheteur, montant, état de paiement/expédition. */}
                   <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1804,7 +1805,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                       const li = (o.lineItems && o.lineItems[0]) || {};
                       const titre = li.title || 'Vente eBay';
                       const acheteur = (o.buyer && o.buyer.username) || '';
-                      const etat = !paye(o) ? { t: 'en attente de paiement', c: C.warn } : !livre(o) ? { t: 'à expédier', c: C.accent } : { t: 'expédiée', c: C.muted };
+                      const etat = !paye(o) ? { t: 'en attente de paiement', c: C.warn } : !livre(o) ? { t: 'à envoyer', c: C.accent } : { t: 'envoyée', c: C.muted };
                       return (
                         <div key={(o._compte || '') + (o.orderId || i)} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
                           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -4655,7 +4656,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
             UNE ligne (le compte · le geste en trois mots), la liste. La phrase
             entière du geste et le pourquoi s'ouvrent en feuille (textContent les porte). */}
         <div className="vrm-alerte-ligne-titre">{nSansPreuve} vente{un ? '' : 's'} Vinted pas encore reliée{un ? '' : 's'}{' '}<Pourquoi label="Que faire" titre={`Vente${un ? '' : 's'} pas encore reliée${un ? '' : 's'} à ${un ? 'son' : 'leur'} annonce`}>{geste} Tant que ce n'est pas fait, VRM ne peut pas te dire de retirer {un ? 'sa' : 'leur'} paire d'eBay quand elle se vend sur Vinted.</Pourquoi></div>
-        <div className="vrm-alerte-ligne-sous" data-ebay-sans-preuve-court="">{noms.join(', ')} · {promet ? `se relie toute seule ${quand}` : ailleurs ? 'à relier depuis ton ordinateur' : cap === 'retard' ? `mets l'extension à jour (${EXT_ATTENDUE})` : blocage ? 'l\'extension ne peut pas la lire' : 'je vérifie l\'extension…'}</div>
+        <div className="vrm-alerte-ligne-sous" data-ebay-sans-preuve-court="">{noms.join(', ')} · {promet ? `se relie toute seule ${quand}` : ailleurs ? 'à relier : ouvre Vinted là où est l’extension' : cap === 'retard' ? `mets l'extension à jour (${EXT_ATTENDUE})` : blocage ? 'l\'extension ne peut pas la lire' : 'je vérifie l\'extension…'}</div>
         <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {sansPreuve.map((v) => (
             <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} className="vrm-eb-sanspreuve-vente">

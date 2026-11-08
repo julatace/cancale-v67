@@ -12,7 +12,7 @@ export default function SynchronisationVinted({comptes,owner,ownerActuel,lire,co
  const aVerifier=vue.items?.filter(c=>['messages','favoris'].some(type=>!!c[type].action)).length||0;
  if(!owner||!comptes.length)return null;
  return <details className="vrm-sync-comptes vrm-sync-claire" data-sync-total={vue.items?.length} data-sync-verifier={vue.items?aVerifier:undefined} onToggle={e=>{ouvert.current=e.currentTarget.open;if(ouvert.current)recharger.current?.();}}><summary>Comptes Vinted{vue.charge?' · vérification…':vue.items?` · ${vue.items.length} compte${vue.items.length>1?'s':''}${aVerifier?` · ${aVerifier} à vérifier`:''}`:vue.erreur?' · lecture indisponible':''}</summary>
-  <div className="vrm-sync-commandes">{verifier&&<button type="button" onClick={()=>{verifier();maj();}}>Vérifier l’extension</button>}{relire&&<button type="button" onClick={relire}>Relire les données</button>}<button type="button" disabled={vue.charge} onClick={charger}>Actualiser l’état</button></div>
+  <div className="vrm-sync-commandes">{verifier&&<button type="button" onClick={()=>{verifier();maj();}}>Vérifier la connexion de l’extension</button>}{relire&&<button type="button" onClick={relire}>Mettre à jour les données des comptes</button>}<button type="button" disabled={vue.charge} onClick={charger}>Actualiser l’état</button></div>
   {vue.erreur&&<p role="alert">{vue.erreur}</p>}
   <div className="vrm-sync-lignes">{vue.items?.map(c=>{
     const etat=connexion?.(c.uid);const probleme=['messages','favoris'].some(type=>!!c[type].action);

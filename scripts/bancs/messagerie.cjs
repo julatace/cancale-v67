@@ -250,7 +250,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath:process.env.VRM_CHROMIUM_PATH||process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     if(process.env.VRM_MESSAGES_SEARCH_ONLY==='1'){
       for(const tel of [false,true]){
         const r=await rendre(b,{version:'5.135.0',tel});
@@ -262,7 +262,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
           dit((await r.pg.locator('[data-conv="402"]').innerText()).includes('compte_b'),'le compte du résultat est nommé même quand il est seul');
           await champ.fill('N°7');await r.pg.locator('[data-conv="301"]').waitFor();
           dit(await r.pg.locator('[data-conv]').count()===1,'N°7 retrouve uniquement la conversation reliée à cet article');
-          await champ.fill('N°70');await r.pg.getByText(/Aucun résultat parmi les conversations reçues/).waitFor();
+          await champ.fill('N°70');await r.pg.locator('[data-msg-sans-resultat]').waitFor();   // (8 nov.) l'état « aucun résultat » jugé par son attribut, plus par sa phrase (réécrite le 5 nov., chantier G)
           dit(await r.pg.locator('[data-conv]').count()===0,'N°70 ne retrouve pas N°7');
           await champ.fill('gazelle');await r.pg.locator('[data-conv="303"]').waitFor();
           dit(await r.pg.locator('[data-conv]').count()===1,'le titre natif de l’article est recherché même s’il manque dans la boîte');

@@ -142,6 +142,11 @@ function preparerArchive(dossier) {
   }
 }
 
+// (8 nov.) Les fonctions de manifeste servent aussi `paquets-boutiques.cjs`
+// (paquets des boutiques, sans toucher public/) : on les exporte, et le zip
+// ne se fabrique que lorsque CE script est lancé.
+module.exports = { manifesteFirefox, manifesteSafari, compatDansPopup, preparerArchive, COMPAT, ID_FIREFOX };
+if (require.main === module) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-zip-'));
 try {
   const dossier = path.join(tmp, 'VRM-extension');
@@ -211,3 +216,4 @@ try {
   }
 
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}

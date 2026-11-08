@@ -66,7 +66,7 @@ test("connexion : confirmation attendue et identifiants refusés restent distinc
   assert.equal((await b.connecter()).needsConfirm, true);
   assert.equal(b.session, null);
   const c = banc({ ok: false, error: "Invalid login credentials" });
-  assert.equal((await c.connecter()).error, "Email ou mot de passe incorrect.");
+  assert.equal((await c.connecter()).error, "E-mail ou mot de passe incorrect.");
   assert.equal(c.session, null);
 });
 

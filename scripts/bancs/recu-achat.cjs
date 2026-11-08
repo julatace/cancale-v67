@@ -426,7 +426,7 @@ async function fermerParEchap(pg) {
         const libelleMenu = async (tx) => {
           const carte = pg.locator(`[data-achat-tx="${tx}"]`);
           await carte.waitFor({ timeout: 8000 });
-          await carte.locator('button[title="Actions rapides"]').first().click();
+          await carte.locator('button.vrm-buy-more').first().click();
           await pg.waitForTimeout(250);
           const items = await carte.locator('[role="menuitem"]').allInnerTexts();
           return items;

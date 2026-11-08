@@ -179,7 +179,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-selection-annonce="9102"] input').uncheck();
         await pg.locator('.vrm-ann-toolbar').first().screenshot({ path: path.join(require('os').tmpdir(), `republier-barre-${vp.width}.png`) }).catch(() => {});
         dit(await pg.locator('[data-atelier-ouvrir]').count() === 0, 'plus de « ✨ Préparer » sur les cartes (un seul parcours)');
-        const outils = pg.locator('[aria-label="Outils"]').first();
+        const outils = pg.locator('[aria-label^="Outils"]').first();
         if (await outils.count()) { await outils.click(); await pg.waitForTimeout(200); }
         const menu = await pg.evaluate(() => document.body.innerText);
         dit(!/Lots — titres|File de publication/.test(menu), 'le menu Outils ne propose plus « Lots » ni « File de publication »');
@@ -234,7 +234,7 @@ const projette = (row, sel) => {
         dit(paires.join(',') === '9103,9102,9106,9107', 'la liste = ses 4 paires en ligne, les plus anciennes d’abord', paires.join(','));
         dit(!paires.includes('9301'), 'seules les paires du compte ouvert dans Chrome (111) : celle de l’autre compte n’est pas proposée', paires.join(','));
         const ligneCompte = await pg.locator('[data-republier-compte]').first().innerText().catch(() => '');
-        dit(/compte_test/.test(ligneCompte) && /1 paire sur tes autres comptes/.test(ligneCompte), 'la fenêtre nomme le compte ouvert et dit combien de paires sont sur les autres', ligneCompte);
+        dit(/compte_test/.test(ligneCompte) && /(?:^|\s)1 \S+ sur tes autres comptes/.test(ligneCompte)   /* (8 nov.) le NOMBRE est jugé, plus le mot (« paire » devenu « article », passage clarté) */, 'la fenêtre nomme le compte ouvert et dit combien de paires sont sur les autres', ligneCompte);
         const info = await pg.locator('[data-republier-paire="9102"]').innerText();
         dit(/en ligne depuis 30 j/.test(info) && /6 favoris/.test(info) && /10 vues/.test(info), 'chaque paire dit son ancienneté, ses vues et ses favoris', info.replace(/\n/g, ' · '));
         dit(await pg.locator('[data-republier-recente="9106"]').count() === 1 && await pg.locator('[data-republier-recente="9102"]').count() === 0, 'une paire recréée il y a moins de 2 jours le dit (et seulement elle)');
