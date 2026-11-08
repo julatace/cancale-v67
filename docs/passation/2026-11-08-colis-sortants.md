@@ -97,3 +97,17 @@ le serveur) : l'extension n'est pas touchée (pas de nouvelle version).
   en charge), Envoyés (raison), À retirer (aucun), Ma journée (2), pas su (4). 30 verts ; sur
   `origin/main` : 8 rouges. Captures regardées (Envoyés 390 et 1512).
 - `scripts/audit-statuts.cjs` : le bac à sable de `bordShipped` reçoit `partisTransp` (Map vide).
+
+## Ce qui a tourné, et les rouges
+- Audits verts : `audit-identite`, `audit-statuts`, `audit-coherence`, `audit-fonctions-api` (12
+  fonctions, aucune ajoutée), `audit-statut-transporteurs`, `audit-transp-ext`,
+  `audit-transporteur-lu`, `audit-vestiaire-partout`, `audit-bilan-semaine`, `audit-colis-*`
+  (envoi, sens, trois, retrait, prochain, heure), `audit-mondialrelay-serveur` et 30 autres audits
+  qui lisent widget / rappels / relais. Rouge PRÉEXISTANT (identique sur `origin/main`) :
+  `audit-politique-hotes` (`src/enLigneLbc.js` → www.leboncoin.fr hors liste).
+- Bancs verts : `colis-sortants` (nouveau), `vestiaire-colis`, `colis-envoi`, `widget-colis`,
+  `statut-colis`, `postes`, `poste-sans-depart`. Rouges IDENTIQUES sur `origin/main` (git archive,
+  même banc, autre port) : `chiffres-coherents` (widget en 503 au banc, E et R), `colis-tous-sites`
+  (widget 503), `statuts-colis` (groupe « prêt à imprimer », filtres), `journee-coherence` (E9
+  « Voir » vers le Stock). `vestiaire-parite` : 2 rouges d'environnement (`pdfjs-dist` absent du
+  `node_modules` de ce conteneur), sans rapport.
