@@ -547,7 +547,10 @@ async function adresseUnique(req, res) {
     ligne = await lireLigneVendeur(u.id, ID_ADRESSE);   // relue : un autre appareil a pu créer la sienne au même instant
     if (!ligne || !jetonValide(ligne.jeton) || await indexDe(ligne.jeton) === 'autre') { indispo(res); return; }
   }
-  if (!await ecrireIndexReception({ url: SUPABASE_URL, headers: HEADERS, jeton: ligne.jeton, owner: u.id, maintenant })) { indispo(res); return; }
+  // L'index n'est écrit que s'il manque (la feuille relit toutes les 30 s : une lecture, pas une écriture).
+  const ixLigne = await indexDe(ligne.jeton);
+  if (ixLigne === undefined) { indispo(res); return; }
+  if (ixLigne === 'libre' && !await ecrireIndexReception({ url: SUPABASE_URL, headers: HEADERS, jeton: ligne.jeton, owner: u.id, maintenant })) { indispo(res); return; }
   if (req.method === 'POST' && corps.geste === 'remplacer') {
     const ancien = ligne.jeton;
     const neuf = { jeton: nouveauJeton(), actif: true, creeLe: iso, remplaceLe: iso };
