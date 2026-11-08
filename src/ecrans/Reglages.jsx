@@ -1,3 +1,4 @@
+import { PlateformesSetting } from '../App.jsx';
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { HistoriqueModifications } from '../OutilsParcours.jsx';
@@ -1778,6 +1779,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
+      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
       { id:'affichage-mode', type:'panneau', nu:true, ic:'grid', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
       { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:'Je vends', desc:'Sneakers, ou autre chose : les mots et les vérifications suivent.', val: profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre', data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
@@ -3069,7 +3071,7 @@ function AffichageSetting() {
         options={[['auto', 'Automatique'], ['simple', 'Simple'], ['complet', 'Complet']].map(([v, l]) => ({ v, l, data: { 'data-affichage-choix': v } }))}/>
       <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{r.choix === 'auto' ? phraseAffichageAuto(p) : r.choix === 'simple' ? 'Simple, choisi par toi.' : 'Complet, choisi par toi.'}</div>
       <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
-        En simple, le menu ne montre pas ce qui ne sert pas encore : Stock (sans meuble), Republier (jamais lancé), les sites jamais reliés. Ma journée garde tous les gestes dus. <Pourquoi label="Rien n’est perdu ?">Aucun écran n’est supprimé et aucun chiffre ne change : chaque total compte toujours tout. Dès que tu ranges un meuble, relies Leboncoin ou republies, l’entrée revient d’elle-même. « Complet » remet tout, tout de suite.</Pourquoi>
+        En simple, le menu ne montre pas ce qui ne sert pas encore : Stock (sans meuble), Republier (jamais lancé), les fonctions jamais utilisées. Ma journée garde tous les gestes dus. <Pourquoi label="Rien n’est perdu ?">Aucun écran n’est supprimé et aucun chiffre ne change : chaque total compte toujours tout. Dès que tu ranges un meuble, relies Leboncoin ou republies, l’entrée revient d’elle-même. « Complet » remet les fonctions ; les plateformes se choisissent dans « Mes plateformes ».</Pourquoi>
       </div>
     </div>
   );

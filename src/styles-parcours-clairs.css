@@ -96,3 +96,23 @@
 :root:root body .vrm-b:not(.vrm-b-icone) { white-space:normal !important; overflow-wrap:anywhere; height:auto; padding-block:8px; }
 .vrm-boite-aide-recherche { margin:0; color:var(--d-gris,#6e6e73); font-size:12px; line-height:1.4; }
 :root:root body .vrm-b-rangee:not(:has(>:not(.vrm-b))) { align-items:stretch; }
+
+/* 8 novembre : colonne par tâches, hiérarchie calme, sans doublons de site. */
+@media (min-width: 1024px) {
+  html .vrm-app-shell .vrm-atelier-rail { padding: 24px 14px 14px; background: var(--vrm-bg) !important; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand { padding: 0 12px 22px; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 40px; border-radius: 10px; padding: 7px 12px; font-size: 14px; line-height: 1.35; gap: 12px; color: var(--vrm-muted); transition: background-color .15s,color .15s; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button[aria-current=page] { color: var(--vrm-accent); background: color-mix(in srgb,var(--vrm-accent) 9%,var(--vrm-bg)); box-shadow: inset 0 0 0 1px color-mix(in srgb,var(--vrm-accent) 12%,transparent); }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-management-group { margin-top: 20px; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-section-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; padding: 0 12px 7px; opacity: .8; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-pied { border-top: 1px solid var(--vrm-line); padding-top: 10px; margin-top: 12px; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-pied .vrm-rail-management-group { margin-top: 0; }
+  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-pied .vrm-rail-section-label { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { transition: none; } }
+.vrm-saisie-erreur { display: block; flex-basis: 100%; font-size: 12px; color: var(--vrm-ink); line-height: 1.5; margin-top: 5px; max-width: 32rem; }
+.vrm-parcours-recap details { font-size: 13px; line-height: 1.5; }
+.vrm-parcours-recap summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; text-decoration: underline; text-underline-offset: 3px; }
+.vrm-parcours-recap ul { margin: 0; padding-left: 20px; }
+.vrm-vue-vide { padding: 20px 16px; text-align: center; border: 1px dashed var(--vrm-line); border-radius: 12px; margin: 12px 0; font-size: 13px; line-height: 1.5; color: var(--vrm-muted); }
+.vrm-vue-vide b { color: var(--vrm-ink); font-weight: 600; }

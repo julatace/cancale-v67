@@ -223,11 +223,11 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="cat_bord"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
           dit(col.taches.join('|') === 'journee|annonces|ventes|messages|cat_bord', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Colis', col.taches.join('|'));
-          dit(col.groupes.join('|') === 'Vendre|Gérer|Argent|Plateformes|Moi', 'A/J. puis les groupes par tâche — « Plateformes » gardé dans la colonne (sa maquette)', col.groupes.join('|'));
+          dit(col.groupes.join('|') === 'Vendre|Gérer|Argent|Moi', 'A/J. groupes par tâche — aucun doublon par plateforme (décision du 8 novembre)', col.groupes.join('|'));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(exp.join('|') === 'garage|achats|emails' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : Stock, Achats, E-mails ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(plat.join('|') === 'plat_ebay|plat_leboncoin|plat_vestiaire', 'J. colonne, « Plateformes » : eBay · Leboncoin · Vestiaire', plat.join('|'));
+          dit(plat.length === 0, 'J. colonne sans section « Plateformes », sites dans les tâches', plat.join('|'));
           // (6 nov.) La cloche se calcule après ses lectures (passage asynchrone) : sur une
           // machine chargée, 2,8 s ne suffisaient pas toujours (rouge intermittent, mesuré
           // sur 505fe3e6 avec quatre bancs en parallèle, vert seul). On attend SON résultat

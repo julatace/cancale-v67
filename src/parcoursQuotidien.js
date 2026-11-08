@@ -13,7 +13,8 @@ export function garderParcours(storage,owner,nom,valeur,now=Date.now()){
 export function resumeSelection(lignes,coches){
  const vus=new Set(),selection=(lignes||[]).filter(l=>l&&l.cochable!==false&&coches?.has(l.cle)&&!vus.has(l.cle)&&vus.add(l.cle));
  const comptes=new Set(selection.map(l=>l.compte||l.e?.o?._acc?.vinted_user_id||l.lo?.account||l.v?.compte).filter(v=>typeof v==='string'||typeof v==='number').filter(Boolean).map(String));
- return {total:selection.length,prets:selection.filter(l=>l.pdf!==false).length,sansPdf:selection.filter(l=>l.pdf===false).length,dejaImprimes:selection.filter(l=>!!l.imprime).length,comptes:comptes.size,sites:[...new Set(selection.map(l=>l.site).filter(Boolean))],lignes:selection};
+ const demandes = coches instanceof Set ? coches.size : 0;
+ return {exclus:Math.max(0,demandes-selection.length),total:selection.length,prets:selection.filter(l=>l.pdf!==false).length,sansPdf:selection.filter(l=>l.pdf===false).length,dejaImprimes:selection.filter(l=>!!l.imprime).length,comptes:comptes.size,sites:[...new Set(selection.map(l=>l.site).filter(Boolean))],lignes:selection};
 }
 const CHAMPS={vinted_annonce_numeros:{numero:'Numéro de rangement',buyPrice:'Prix d’achat',buyFromId:'Achat relié'},vinted_sale_overrides:{numero:'Numéro de rangement',buyPrice:'Prix d’achat',buyFromId:'Achat relié'},vinted_buyprice_by_num:{$:'Prix d’achat'},vrm_lbc_liens:{$:'Association Leboncoin'}};
 export function changementsImportants(cle,avant,apres,at=new Date().toISOString()){
