@@ -106,7 +106,7 @@ const NICHE = {
     // Le câblage de l'app : `fetchVersementsVinted` passe par CE module.
     const app = require('fs').readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
     const i = app.indexOf('const fetchVersementsVinted = async'), corps = app.slice(i, app.indexOf('\n};', i));
-    dit(i > 0 && /completerVersementsParReleve\(map, releve\)/.test(corps) && /versementsDuReleve\(await lireTout\('id=like\.harvest_%25_releve_%25&select=id,l:data->lignes'\)\)/.test(corps), 'l’app (`fetchVersementsVinted`) complète les dates 450 par CE module, lecture projetée des seules lignes', corps.slice(-400));
+    dit(i > 0 && /completerVersementsParReleve\(map, releve\)/.test(corps) && /versementsDuReleve\(await lireTout\('id=like\.harvest_%25_releve_%25&select=id,l:data->lignes'(?:, \{ memo: true \})?\)\)/.test(corps), 'l’app (`fetchVersementsVinted`) complète les dates 450 par CE module, lecture projetée des seules lignes', corps.slice(-400));
   });
 
   console.log(`\n${ko ? `❌ ${ko} échec(s)` : '✅ tout est vert'} · ${ok} ✅`);
