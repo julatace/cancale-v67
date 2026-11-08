@@ -241,6 +241,17 @@
     return `<details class="refus" data-refus-historique="${h.length}"><summary>${h.length > 1 ? `Les ${h.length} derniers refus` : 'Le dernier refus'}</summary><ul>${lignes}</ul></details>`;
   }
 
+  // 5.327 (8 nov.) : vrm.center n'a pas répondu plusieurs fois de suite ⇒ les
+  // ventes sont parties par la voie DIRECTE, bornée (jamais plus de 256 Ko d'un
+  // coup) — ou rien n'est parti parce que la liste était trop lourde pour elle.
+  // Dit tel quel : jamais « tout va bien » sur un envoi de secours.
+  function ligneSecours(f) {
+    const s = f && f.secours;
+    if (!s || !s.at) return '';
+    if (s.etat === 'trop_lourd') return `<div class="val alerte" data-secours="trop_lourd">vrm.center ne répond pas, et la liste (≈ ${esc(tailleLisible(s.octets))}) est trop lourde pour la voie directe : rien n’est parti ${esc(depuis(s.at))}. Rien n’est perdu, ça repart par vrm.center à la prochaine visite.</div>`;
+    return `<div class="val" data-secours="envoi">vrm.center ne répond pas : envoyé par la voie directe ${esc(depuis(s.at))} (${esc(tailleLisible(s.octets))}).</div>`;
+  }
+
   function rendre() {
     rendreCarte();
     rendreQuestion();
@@ -297,6 +308,7 @@
         flux = `<div class="val alerte" data-refus-cause="${esc(String(f.koStatut == null ? 'inconnu' : f.koStatut))}">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>${historiqueRefus(f)}`;
       } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val">Envoyées à VRM ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
+      flux += ligneSecours(f);
     }
 
     // 5.243 : sur Vestiaire, ce qui est capté, famille par famille.

@@ -1,0 +1,61 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   « TOUT VA BIEN ? » ET LA LIGNE AMBRE (8 nov.) — src/ToutVaBien.jsx
+   La forme des Réglages d'iOS (GroupeIos), jetons --d-* seulement. Une pastille
+   par rangée : encre pleine (rien à faire), point ambre (un geste), cercle creux
+   (pas su). Pas de vert, pas de rouge (§7) ; l'ambre est rare.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-tvb { display: flex; flex-direction: column; gap: var(--d-e-6); color: var(--d-encre); }
+.vrm-tvb .vrm-ios-groupe { margin: 0; }
+
+/* ── L'en-tête : une phrase, calme ── */
+.vrm-tvb-tete {
+  display: flex; align-items: center; gap: var(--d-e-3);
+  padding: var(--d-e-4); background: var(--d-carte); border-radius: var(--d-r-case);
+  box-shadow: var(--d-ombre-carte);
+}
+.vrm-tvb-tete .vrm-tvb-pastille { width: 12px; height: 12px; flex: 0 0 12px; }
+.vrm-tvb-tete-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-tvb-resume { font-size: var(--d-t-20); font-weight: 700; line-height: var(--d-il-titre); letter-spacing: var(--d-ap-22); }
+.vrm-tvb-sous { font-size: var(--d-t-13); line-height: var(--d-il-ligne); color: var(--d-gris); }
+.vrm-tvb-revoir { flex: 0 0 auto; min-height: 44px; }
+
+/* ── La pastille ── */
+.vrm-tvb-pastille { flex: 0 0 8px; width: 8px; height: 8px; border-radius: var(--d-r-pilule); background: var(--d-gris); opacity: .55; }
+.vrm-tvb-pastille[data-ton="ok"] { background: var(--d-encre); opacity: .9; }
+.vrm-tvb-pastille[data-ton="geste"] { background: var(--d-point-ambre); opacity: 1; }
+.vrm-tvb-pastille[data-ton="passu"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--d-gris); opacity: 1; }
+
+/* ── La rangée ── */
+.vrm-tvb-rangee { position: relative; display: flex; align-items: flex-start; gap: var(--d-e-3); min-height: 44px; padding: 12px 16px; }
+.vrm-tvb-rangee > .vrm-tvb-pastille { margin-top: 7px; }
+.vrm-tvb-rangee + .vrm-tvb-rangee::before { content: ''; position: absolute; top: 0; right: 0; left: 36px; height: .5px; background: var(--d-filet); }
+.vrm-tvb-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-tvb-titre { font-size: var(--d-t-17); line-height: var(--d-il-ligne); letter-spacing: var(--d-ap-17); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-tvb-detail { display: flex; flex-direction: column; font-size: var(--d-t-13); line-height: var(--d-il-ligne); color: var(--d-gris); }
+.vrm-tvb-ligne { overflow-wrap: anywhere; }
+.vrm-tvb-geste { margin-top: 2px; font-size: var(--d-t-13); line-height: var(--d-il-ligne); font-weight: 600; color: var(--d-ambre); overflow-wrap: anywhere; }
+.vrm-tvb-valeur { flex: 0 0 auto; max-width: 42%; font-size: var(--d-t-15); line-height: 24px; color: var(--d-gris); text-align: right; font-variant-numeric: tabular-nums; }
+.vrm-tvb-valeur[data-ton="geste"] { color: var(--d-ambre); font-weight: 600; }
+:root body .vrm-tvb-bouton { min-height: 44px; margin: -10px -6px -10px 0; padding: 0 6px; border: 0; background: transparent; box-shadow: none; font: inherit; font-weight: 600; cursor: pointer; border-radius: var(--d-r-ctrl); }
+.vrm-tvb-bouton:focus-visible { outline: 2px solid var(--d-accent); outline-offset: 2px; }
+
+/* ── Les trois gestes d'une mise à jour ── */
+.vrm-tvb-maj { margin-top: var(--d-e-3); padding: var(--d-e-3) var(--d-e-4); background: var(--d-case); border-radius: var(--d-r-ctrl); }
+.vrm-tvb-maj ol { margin: 0 0 var(--d-e-3); padding-left: 20px; font-size: var(--d-t-15); line-height: var(--d-il-texte); color: var(--d-encre); }
+.vrm-tvb-maj li + li { margin-top: 6px; }
+.vrm-tvb-liens { display: flex; flex-wrap: wrap; gap: var(--d-e-2); }
+.vrm-tvb-lien { min-height: 44px; text-decoration: none; }
+.vrm-tvb-pied { display: flex; justify-content: center; }
+
+/* ── La ligne ambre en haut de l'app ── */
+.vrm-tvb-alerte {
+  display: flex; align-items: flex-start; gap: var(--d-e-3); margin: var(--d-e-3) var(--d-e-4) 0; padding: var(--d-e-3) var(--d-e-4);
+  background: var(--d-carte); border-radius: var(--d-r-case); box-shadow: var(--d-ombre-carte); color: var(--d-encre);
+}
+.vrm-tvb-alerte > .vrm-tvb-pastille { margin-top: 6px; }
+.vrm-tvb-alerte-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--d-t-13); line-height: var(--d-il-ligne); color: var(--d-gris); }
+.vrm-tvb-alerte-texte b { font-size: var(--d-t-15); font-weight: 600; color: var(--d-encre); letter-spacing: var(--d-ap-15); }
+.vrm-tvb-alerte-gestes { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; margin: -10px -8px -10px 0; }
+.vrm-tvb-alerte-gestes .vrm-lien-action { min-height: 44px; padding: 0 8px; }
+:root body .vrm-tvb-fermer { min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--d-gris); font-size: 22px; line-height: 1; cursor: pointer; border-radius: var(--d-r-pilule); }
+@media (min-width: 900px) { .vrm-tvb-alerte { max-width: 760px; } }

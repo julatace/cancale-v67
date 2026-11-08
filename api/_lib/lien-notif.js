@@ -64,6 +64,8 @@ export const DESTINATIONS = {
   journee: () => lienNotif('journee'),
   // (5 nov.) Paramètres → Comptes liés : chaque compte, sa dernière relecture.
   comptes: () => lienNotif('vintedaccounts'),
+  // (8 nov.) Paramètres → « Tout va bien ? » : un compte qui n'arrive plus (api/_lib/garde-capture.js).
+  toutVaBien: () => lienNotif('settings', { section: 'toutvabien' }),
   // (6 nov.) Leboncoin a supprimé une annonce (e-mail sans identité) : Annonces · Leboncoin,
   // où l'app dit d'ouvrir « Mes annonces » sur Leboncoin (api/_lib/lbc-suppression.js).
   lbcAnnonces: () => lienNotif('annonces', { site: 'leboncoin' }),
