@@ -323,6 +323,22 @@ function formulaireRetourDe(attachments) {
         || (/application\/pdf/i.test(x.contentType || '') && /retour/i.test(String(x.filename || '')))));
   return a ? { b64: a.contentB64, nom: String(a.filename || 'Formulaire-retour-commande.pdf') } : null;
 }
+// La photo de l'article dans un e-mail de vente Vinted : la PREMIÈRE image
+// servie par les serveurs de photos d'annonces de Vinted (`https://images<n>.
+// vinted.net/t/…` ou `/tc/…`). Un logo, une icône ou un pixel de suivi n'y sont pas. Rend
+// l'adresse (≤ 500 caractères, sans guillemets ni espaces) ou ''.
+export const RE_PHOTO_VINTED = /^https:\/\/images\d*\.vinted\.net\/tc?\/[^\s"'<>]{8,480}$/i;
+export function photoVenteEmail(html) {
+  const h = String(html || '');
+  if (!h) return '';
+  const re = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(h))) {
+    const u = m[1].replace(/&amp;/g, '&').trim();
+    if (RE_PHOTO_VINTED.test(u)) return u;
+  }
+  return '';
+}
 function parseSaleEmail({ subject, text, html, attachments }) {
   let body = text || '';
   // ⚠️ On ne REMPLACE le texte par la version HTML que si elle apporte
@@ -372,6 +388,14 @@ function parseSaleEmail({ subject, text, html, attachments }) {
   // contiendrait une). Le numéro de transaction est l'identité de la facture.
   data.pro = MARQUE_PRO.test(cleanBody) || MARQUE_PRO.test(htmlToText(html) || '');
   data.transaction = transactionVentePro(cleanBody, attachments);
+  // (8 nov., Julien : « il y a la photo de la vente dans le mail, je veux qu'elle
+  // soit mise tant que l'extension n'a pas capté la vente ») La photo de
+  // l'ARTICLE vendu, telle que Vinted la met dans l'e-mail : une image de ses
+  // serveurs de photos d'annonces (`images*.vinted.net/t/…`), jamais un logo ni
+  // un pixel. Elle s'affiche sur la ligne ; comme toute photo, elle ne relie une
+  // annonce que par le FICHIER exact (§5, `entryKeyByPhoto`), jamais par ressemblance.
+  const ph = photoVenteEmail(html);
+  if (ph) data.photo = ph;
 
   // ── (6 nov.) LA VENTE « AVEC VÉRIFICATION DE L'ARTICLE » ──────────────────
   // Mesuré sur sa base (2 e-mails gardés « reconnu vente, analyse impossible »,

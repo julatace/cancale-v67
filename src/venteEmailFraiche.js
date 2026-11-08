@@ -46,6 +46,9 @@ export const RE_TX_VENTE_EMAIL = /^\d{6,20}$/;
 // au-delà, la liste Vinted a forcément été relue ou le compte est figé —
 // l'indicateur des comptes le dit).
 export const JOURS_VENTES_EMAIL = 30;
+// La photo d'un e-mail de vente : une image d'annonce des serveurs de Vinted (la
+// même règle que `RE_PHOTO_VINTED` d'api/email-inbound.js).
+export const RE_PHOTO_EMAIL = /^https:\/\/images\d*\.vinted\.net\/tc?\/[^\s"'<>]{8,480}$/i;
 
 // La requête PROJETÉE (jamais `select=data` : la ligne porte l'adresse et le
 // nom de l'acheteur, inutiles ici). `meta` est remplie par la base (004).
@@ -53,7 +56,7 @@ export function requeteVentesEmail(maintenant = Date.now()) {
   const depuis = new Date(maintenant - JOURS_VENTES_EMAIL * 86400000).toISOString();
   return 'id=like.email_sale_*&meta->>type=eq.vente&meta->>transaction=not.is.null'
     + `&meta->>receivedAt=gte.${encodeURIComponent(depuis)}`
-    + '&select=id,type:meta->>type,tx:meta->>transaction,uid:meta->>uid,at:meta->>receivedAt,titre:meta->>designation,prix:meta->>prix';
+    + '&select=id,type:meta->>type,tx:meta->>transaction,uid:meta->>uid,at:meta->>receivedAt,titre:meta->>designation,prix:meta->>prix,photo:meta->>photo';
 }
 
 // (a) : la preuve qu'une ligne est une VENTE d'un compte, avec SON n°.
@@ -115,12 +118,17 @@ export function ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectur
     // Deux e-mails du même n° (une copie transférée) : une ligne, la plus ancienne date.
     if (deja && deja._t <= p.t) continue;
     const titre = String(m.titre || '').trim();
+    // (8 nov.) La photo de l'article lue dans l'e-mail (`photoVenteEmail`, le
+    // serveur) : affichée tant que la liste Vinted n'a pas la vente. Même
+    // contrôle qu'au serveur : une image d'annonce de Vinted, rien d'autre.
+    const photo = RE_PHOTO_EMAIL.test(String(m.photo || '')) ? String(m.photo) : null;
     parTx.set(p.tx, {
       transaction_id: p.tx,
       title: titre || 'Vente Vinted',
       price: { amount: montantEmail(m.prix), currency_code: 'EUR' },
       date: new Date(p.t).toISOString(),
       status: STATUT_VENTE_EMAIL,
+      ...(photo ? { photo } : {}),
       _venteEmail: true,
       _fromEmail: true,
       _txMail: p.tx,
