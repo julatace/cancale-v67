@@ -1068,8 +1068,8 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
           <div className="vrm-rm-bloc-tete"><b>Description</b><span>reprise mot pour mot</span></div>
           <label className="vrm-rm-case"><input type="checkbox" data-main-lettre="" checked={regs.lettre} onChange={(ev) => { const on = ev.target.checked; poserRegs({ lettre: on }); }}/><span>Ajouter une lettre au hasard tout en bas{regs.lettre ? <> (ici : « {lettre} »)</> : null}</span></label>
           <div className="vrm-rm-muet" data-main-etiquette={ann.etiquette.pose ? ann.etiquette.place : (ann.etiquette.refus ? 'refus' : 'aucune')}>
-            {etq.place === 'aucune' ? 'Le N° n’est pas écrit dans l’annonce (Réglages → Numéros).'
-              : ann.etiquette.pose ? <>Le N° « {ann.etiquette.texte} » est posé {placeN.ou} (Réglages → Numéros).</>
+            {etq.place === 'aucune' ? 'Le N° n’est pas écrit dans l’annonce (Paramètres → Numéros).'
+              : ann.etiquette.pose ? <>Le N° « {ann.etiquette.texte} » est posé {placeN.ou} (Paramètres → Numéros).</>
               : ann.etiquette.refus === 'pas de numéro' ? 'Cette paire n’a pas de N° à écrire dans l’annonce.'
               : <span className="vrm-rm-ambre">N° pas posé : {ann.etiquette.refus}.</span>}
           </div>

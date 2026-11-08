@@ -25,7 +25,7 @@ function gesteRelire(plateforme, dans) {
   if (plateforme === 'vinted') return `ouvre vinted.fr connecté sur ce compte ${dans}`;
   if (plateforme === 'leboncoin') return `ouvre « Mes annonces » sur leboncoin.fr connecté sur ce compte ${dans}`;
   if (plateforme === 'vestiaire') return `ouvre Vestiaire connecté sur ce compte ${dans}`;
-  if (plateforme === 'ebay') return 'touche « Relire » dans Réglages → Comptes liés';
+  if (plateforme === 'ebay') return 'touche « Relire » dans Paramètres → Comptes liés';
   return '';
 }
 
@@ -80,7 +80,7 @@ export function ligneFraicheur(c, { maintenant = Date.now(), dans = 'dans ce nav
   let bloque = '', geste = false;
   if (c.masque) bloque = 'masqué dans VRM — ton choix';
   else if (etat === 'banni') bloque = 'banni par Vinted (lu dans son profil)';
-  else if (etat === 'delie') { bloque = 'délié — relie-le dans Réglages → Comptes liés'; geste = true; }
+  else if (etat === 'delie') { bloque = 'délié — relie-le dans Paramètres → Comptes liés'; geste = true; }
   else if (etat === 'ouvert') bloque = 'relu à chaque passage sur Vinted';
   else if (etat === 'jamais' || etat === 'a-relire') {
     bloque = etat === 'a-relire' && plateforme === 'ebay' ? `eBay n’a rien rendu depuis — ${gesteRelire(plateforme, dans)}` : gesteRelire(plateforme, dans);
