@@ -584,3 +584,28 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-app-shell .vrm-main .vrm-compta-replis > details + details { border-top: .5px solid var(--d-filet) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-compta-carte:not(.vrm-fu-carte-sombre) { border: 0 !important; }
 :root:root body .vrm-app-shell .vrm-main [data-compta-pas-calcule] { border: 0 !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; border-radius: var(--d-r-carte) !important; }
+
+/* ══ 12. STATISTIQUES (8 nov., passage 2) ══════════════════════════════════
+   Les tuiles parlent comme Santé et Wallet : le libellé en note grise, LE chiffre
+   en grand (20/700 au téléphone, 28/700 à l'ordinateur — l'échelle 28/20/15/13/11 de l'écran, banc stats-premium), la phrase dessous en gris. Un chiffre pas
+   su (« — ») reste gris : il ne pèse pas autant qu'un chiffre lu. Les cartes
+   (« Vendu par semaine », « Quel compte vend le mieux ») : titres 20/700, posées
+   sans cadre ; à l'ordinateur les tuiles tiennent sur une ligne. */
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-tuile {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; padding: var(--d-e-4) !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-tuile-lib { font-size: var(--d-t-13) !important; font-weight: 600 !important; color: var(--d-gris) !important; letter-spacing: 0 !important; text-transform: none !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-tuile-val { font-size: var(--d-t-20) !important; font-weight: 700 !important; letter-spacing: -.022em !important; line-height: 1.15 !important; margin: var(--d-e-1) 0 2px !important; font-variant-numeric: tabular-nums; color: var(--d-encre) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-tuile-val[data-vide] { color: var(--d-gris) !important; font-weight: 500 !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-tuile-sous { font-size: var(--d-t-13) !important; color: var(--d-gris) !important; line-height: var(--d-il-ligne) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-tuiles { gap: var(--d-e-3) !important; }
+@media (min-width: 1024px) {
+  :root:root body .vrm-app-shell .vrm-main .vrm-sv-tuiles { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-sv-tuiles > .vrm-sv-tuile { grid-column: auto !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-sv-tuile-val { font-size: var(--d-t-28) !important; }
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-carte {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-sv-carte-titre { font-size: var(--d-t-20) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-17) !important; }
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-sv-note, .vrm-sv-sous-titre, .vrm-sv-repliee-raison) { color: var(--d-gris) !important; }
