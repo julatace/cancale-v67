@@ -392,6 +392,18 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(/VRM/.test(exp.txt) && exp.champs.some((c) => c.id === 'mail' && c.valeur === 'sophie@exemple.fr'), 'le geste est le même (VRM la reconnecte) ; au mot de passe, l’email est déjà rempli', JSON.stringify(exp.champs));
   });
 
+  // ── 3bis. RENOUVELLEMENT EN COURS (5.329, « ça se déconnecte à chaque fois »)
+  // Le service worker n'a pas fini de renouveler la session en 2 s (téléphone,
+  // réseau lent, réveil) : `incertain`. Ce n'est PAS une déconnexion — la
+  // 5.328 affichait « Session expirée » et le mot de passe.
+  console.log('\n── Renouvellement en cours : toujours connecté');
+  await essaie('incertain', async () => {
+    const inc = await rendre(nav, { ok: true, connecte: false, expiree: true, incertain: true, renouvellement: 'en-cours', email: 'sophie@exemple.fr', user_id: 'u1', cloisonne: true }, { faux: { orion: true } });
+    dit(!inc.champs.some((c) => c.visible) && !/expir/i.test(inc.txt) && /sophie@exemple\.fr/.test(inc.txt), 'renouvellement « pas su » : la fenêtre reste connectée (aucun champ, jamais « Session expirée »)', inc.txt.replace(/\n/g, ' · ').slice(0, 160));
+    const mort = await rendre(nav, { ok: true, connecte: false, expiree: true, mort: true, email: 'sophie@exemple.fr', cloisonne: true }, { geste: ouvrirMdp });
+    dit(mort.champs.some((c) => c.id === 'pw' && c.visible), 'autre sens : une session MORTE redemande bien le mot de passe', JSON.stringify(mort.champs));
+  });
+
   // ── 4. LA CARTE (iframe sur le site, 2 octobre) ──────────────────────────
   console.log('\n── La même connexion, dans la petite carte en bas à droite');
   await essaie('carte', async () => {
