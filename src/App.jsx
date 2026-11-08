@@ -48387,12 +48387,10 @@ function AncreDefilement() {
 // est celle des pastilles de filtre de l'app (`vrm-filtres`, §7).
 function FiltreSites({ tache, site, sites, onSite }) {
   // (5 nov.) Le sélecteur À LOGOS (`SelecteurSites`, règles `src/plateformes.js`) :
-  // les QUATRE sites, toujours, dans le même ordre (« les mêmes onglets que Vinted
-  // pour Leboncoin, eBay et Vestiaire ») ; « Tous » sur Ventes. Un site sans compte
-  // reste choisissable : son onglet dit ce qui manque et le geste (`OngletManque`).
+  // Les sites choisis ou reliés, dans le même ordre ; « Tous » sur Ventes.
+  // Un site choisi avant sa connexion dit ce qui manque et le geste (`OngletManque`).
   const t = TACHES_SITE[tache] || {};
-  // (8 nov.) Affichage Simple : un site PROUVÉ jamais relié ne prend pas de place
-  // (Vinted et le site choisi restent). « Tous » compte toujours tous les sites.
+  // (8 nov.) Ses plateformes, en Simple comme en Complet ; « Tous » conserve tous les calculs.
   const p = useProfilVendeur();
   const ctx = { mode: p.mode, relies: p.relies, choisi: site, plateformes: p.plateformes };
   React.useEffect(() => { if (Array.isArray(p.plateformes) && site !== 'toutes' && !p.plateformes.includes(site) && p.plateformes.length) onSite(t.toutes ? 'toutes' : p.plateformes[0]); }, [site, p.plateformes?.join('|')]);
