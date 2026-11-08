@@ -24,6 +24,8 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, Avancement, BUILD_ID, BlocCompt
 
 // ⟦← App.jsx #1⟧
 import SuiviComptes from '../SuiviComptes.jsx';
+// (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
+import { ToutVaBien } from '../ToutVaBien.jsx';
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
@@ -1651,6 +1653,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // dit en UNE phrase ce que fait le réglage. Les `id` et les attributs `data-*` ne bougent
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
     { id:'comptes', titre:'Mes comptes', items:[
+      // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
+      { id:'toutvabien', type:'panneau', ic:'pulse', lib:'Tout va bien ?', desc:'Chaque compte, sa dernière relecture et l’extension de chaque appareil.', data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.

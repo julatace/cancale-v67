@@ -40,6 +40,8 @@ jobs:
           node scripts/tests/orion-auth-autonome.cjs
           node scripts/tests/orion-connexion.cjs
           node scripts/tests/orion-paquet.cjs
+          node scripts/tests/orion-cors-reel.cjs
+          node scripts/audit-garde-fous-capture.cjs
       - name: Vérifier le périmètre des numéros Vinted
         run: node scripts/tests/numeros-vinted-perimetre-interface.cjs
       - name: Vérifier l’espace emails

@@ -133,7 +133,7 @@ nouveau module** → envoyer `VRM-firefox.zip`.
   la trouve et que l'app propose le bouton) ; « Moi-même » sinon (non listée).
 - **Plateformes** : cocher **Firefox** ET **Firefox pour Android**.
 - **Nom** : VRM — outil du revendeur
-- **Résumé (≤ 250 car.)** : « Relie tes comptes Vinted, Leboncoin et eBay à VRM :
+- **Résumé (≤ 250 car.)** : « Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire Collective à VRM :
   tes annonces, ventes, colis et bordereaux arrivent dans ton tableau de bord,
   depuis ton navigateur. Il faut un compte VRM (vrm.center). »
 - **Description** : « VRM est l'outil de gestion des revendeurs. Cette extension

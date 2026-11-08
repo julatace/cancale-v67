@@ -52,6 +52,8 @@ export const FAMILLE_DE = {
   // (5 nov.) Un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h
   // (api/_lib/comptes-a-relire.js) : un rappel, une fois par jour au plus.
   relecture: 'rappels',
+  // (8 nov.) Un compte qui n'arrive plus alors que l'extension travaille (api/_lib/garde-capture.js) : une fois par panne.
+  capture: 'rappels',
   // (6 nov.) Leboncoin « Suppression de vos annonces » : ouvrir « Mes annonces »
   // (api/_lib/lbc-suppression.js), une fois par jour au plus.
   lbcsuppression: 'rappels',

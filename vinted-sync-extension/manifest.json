@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "VRM — outil du revendeur",
-  "version": "5.326.0",
-  "description": "Relie tes comptes Vinted, Leboncoin et eBay à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
+  "version": "5.327.0",
+  "description": "Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire Collective à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
   "permissions": [
     "cookies",
     "storage",

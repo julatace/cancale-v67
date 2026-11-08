@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.326.0';
+const CODE_VERSION = '5.327.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1684,7 +1684,7 @@ async function appelCommandesServeur(envoi, famille) {
       octets = corps.length;
       const r = await fetch(COMMANDES_API, { method: 'POST', headers: { Authorization: `Bearer ${s.access_token}`, 'Content-Type': 'application/json' }, body: corps, ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : {}) });
       let j = null; try { j = await r.json(); } catch (_) { j = null; }
-      if (r.ok && j && j.ok === true) { try { await effacerReculBase(); } catch (_) {} return { j, octets }; }
+      if (r.ok && j && j.ok === true) { try { await effacerReculBase(); } catch (_) {} try { await effacerEchecsServeur(); } catch (_) {} return { j, octets }; }
       if (r.status === 404) return 'absent';
       statut = String(r.status || 'inconnu');
       // Un 401 : la session a pu vieillir — renouvelée UNE fois, puis rejoué
@@ -1725,7 +1725,12 @@ async function commandesParServeur(uid, type, payload, domain) {
   for (let tour = 0; tour < COMMANDES_TOURS_MAX; tour++) {
     const r = await appelCommandesServeur(Object.assign({}, base, { commandes: aEnvoyer }), famille);
     if (r === 'absent') return ecritUneFois ? 'partiel' : 'absent';
-    if (!r) return ecritUneFois ? 'partiel' : null;
+    if (!r) {
+      if (ecritUneFois) return 'partiel';
+      // 5.327 : la N-ième coupure / erreur 5xx DE SUITE ⇒ la voie de secours (bornée).
+      const n = await compterEchecServeur(_statutDernierRefus);
+      return n >= SECOURS_APRES ? 'secours' : null;
+    }
     if (r.j.ecrit) ecritUneFois = true;
     if (r.j.ecrit && r.j.complet) { await noterFenetreRangee(rowId, emp); noterDiag(`envoi_leger_${type}`); return 'ecrit'; }
     const manq = (Array.isArray(r.j.manquants) ? r.j.manquants : []).map(String).filter((k) => parTx.has(k));
@@ -1737,6 +1742,67 @@ async function commandesParServeur(uid, type, payload, domain) {
   noterDiag(`envoi_leger_incomplet_${type}`);
   return ecritUneFois ? 'partiel' : null;
 }
+// ══ LA VOIE DE SECOURS (5.327, 8 nov.) ══════════════════════════════════════
+// Deux jours sans rien sur son iPhone : vrm.center refusait le préalable CORS
+// d'Orion, chaque envoi léger finissait en « réseau », et rien d'autre ne
+// partait. ⇒ Après `SECOURS_APRES` échecs DE SUITE vers vrm.center (coupure ou
+// 5xx — jamais un 4xx, qui est un refus durable que le secours ne réglerait
+// pas), l'extension reprend l'ancienne voie DIRECTE vers la base (relire,
+// fusionner par n° de transaction — `commandesARanger`, la règle de la 5.323 —,
+// réécrire), MAIS BORNÉE : jamais plus de `SECOURS_MAX_OCTETS` d'un coup (la
+// coupure d'un envoi de 1 Mo sur iOS est la panne d'origine). La taille se juge
+// AVANT toute relecture, sur le compteur scalaire de la ligne (§4.2) ; une liste
+// trop lourde n'est ni relue ni envoyée : RIEN n'est écrit (la ligne en base
+// reste entière, « une capture partielle n'écrase jamais une complète »), et la
+// carte du logo le DIT. Le premier succès de vrm.center remet tout à zéro.
+const SECOURS_STORE = 'vrmSecoursCmd';
+const SECOURS_APRES = 3;
+const SECOURS_MAX_OCTETS = 256 * 1024;
+const SECOURS_OCTETS_COMMANDE = 600;   // ≈ 540 o mesurés par commande allégée (2026-11-08-ventes-envoi-leger.md) + marge
+const echecServeurPassager = (st) => st === 'reseau' || /^5\d\d$/.test(String(st == null ? '' : st));
+async function compterEchecServeur(statut) {
+  try {
+    const cur = (await chrome.storage.local.get(SECOURS_STORE))[SECOURS_STORE] || {};
+    const n = echecServeurPassager(statut) ? (Number(cur.n) || 0) + 1 : 0;
+    await chrome.storage.local.set({ [SECOURS_STORE]: { n, at: Date.now(), statut: statut == null ? null : String(statut) } });
+    return n;
+  } catch (_) { return 0; }                                     // pas su ⇒ pas de secours
+}
+async function effacerEchecsServeur() {
+  const s = await chrome.storage.local.get([SECOURS_STORE, 'vrmFlux']);
+  if (Number((s[SECOURS_STORE] || {}).n) > 0) await chrome.storage.local.set({ [SECOURS_STORE]: { n: 0, at: Date.now() } });
+  const fl = s.vrmFlux || {};
+  if (fl.vinted && fl.vinted.secours) { delete fl.vinted.secours; await chrome.storage.local.set({ vrmFlux: fl }); }
+}
+async function noterSecours(etat, octets, type) {
+  try {
+    const fl = (await chrome.storage.local.get('vrmFlux')).vrmFlux || {};
+    fl.vinted = Object.assign({}, fl.vinted || {}, { secours: { at: Date.now(), etat, octets: Number(octets) || 0, type } });
+    await chrome.storage.local.set({ vrmFlux: fl });
+  } catch (_) {}
+}
+// Rend ce que rend `commandesARanger` ({ payload, emp } · 'inchange' · 'forme' ·
+// `null`), plus 'trop_lourd' (rien relu, rien écrit, dit).
+async function commandesSecours(rowId, type, payload) {
+  const lus = payload && Array.isArray(payload.my_orders) ? payload.my_orders : [];
+  const total = Number(payload && payload.pagination && payload.pagination.total_entries);
+  const complet = isFinite(total) && total > 0 && lus.length >= total;
+  let estime = lus.length * SECOURS_OCTETS_COMMANDE;
+  if (!complet) {
+    const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=n:data->>nItems`);
+    if (rows === null || !Array.isArray(rows)) { noterDiag(`secours_lecture_ratee_${type}`); return null; }
+    estime += (Number(rows[0] && rows[0].n) || 0) * SECOURS_OCTETS_COMMANDE;   // borne haute : base + lus
+  }
+  if (estime > SECOURS_MAX_OCTETS) { noterDiag(`secours_trop_lourd_${type}`); await noterSecours('trop_lourd', estime, type); return 'trop_lourd'; }
+  const c = await commandesARanger(rowId, type, payload);
+  if (!c || typeof c !== 'object') return c;
+  const octets = JSON.stringify(c.payload).length;
+  if (octets > SECOURS_MAX_OCTETS) { noterDiag(`secours_trop_lourd_${type}`); await noterSecours('trop_lourd', octets, type); return 'trop_lourd'; }
+  noterDiag(`secours_${type}`);
+  await noterSecours('envoi', octets, type);
+  return c;
+}
+
 // Ce qui suit un envoi léger, sur les deux voies (passive, active) — les mêmes
 // gestes que l'écriture directe : diagnostic, carte du logo, l'app qui relit.
 // Rend ce que `storeHarvestRow` rend : 'ecrit' seulement si TOUTE la fenêtre est
@@ -2349,6 +2415,9 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
   if (await compteNonCapte(uid)) { noterDiag('ignore_compte_supprime'); return; }
+  // 5.327 : ce compte a été LU dans un onglet de ce navigateur (sa session) — si
+  // rien n'arrive ensuite dans VRM, l'app le dit (api/_lib/garde-capture.js).
+  if (RE_TYPE_CAPTURE_VU.test(String(type || ''))) noterCompteVu('vinted', String(uid));
   let parsed = null;
   try { parsed = JSON.parse(body); } catch (_) {
     noterDiag(`abandon_json_${type || 'inconnu'}`);
@@ -2460,7 +2529,9 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     if (lg === 'inchange' || lg === 'forme') return;
     if (lg === 'ecrit' || lg === 'partiel' || lg === null) { await apresCommandesServeur(uid, type, lg, true); return; }
     // 'absent' (route pas encore déployée) ou 'direct' (complète et petite) : la voie d'avant.
-    const c = await commandesARanger(rowId, type, parsed);
+    // 5.327 : 'secours' (vrm.center muet N fois de suite) : la même voie, BORNÉE.
+    const c = lg === 'secours' ? await commandesSecours(rowId, type, parsed) : await commandesARanger(rowId, type, parsed);
+    if (c === 'trop_lourd') { await apresCommandesServeur(uid, type, null, true); return; }
     if (c === null || c === 'forme' || c === 'inchange') return;   // pas su / forme inconnue (dits) · déjà rangée
     parsed = c.payload;
     fenetreCmd = c.emp;
@@ -7344,7 +7415,9 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
     if (lg === 'forme') return 'forme-inconnue';
     if (lg === 'ecrit' || lg === 'partiel' || lg === null) return apresCommandesServeur(uid, type, lg, false);
     // 'absent' (route pas encore déployée) ou 'direct' (complète et petite) : la voie d'avant.
-    const c = await commandesARanger(`harvest_${uid}_${type}`, type, payload);
+    // 5.327 : 'secours' (vrm.center muet N fois de suite) : la même voie, BORNÉE.
+    const c = lg === 'secours' ? await commandesSecours(`harvest_${uid}_${type}`, type, payload) : await commandesARanger(`harvest_${uid}_${type}`, type, payload);
+    if (c === 'trop_lourd') return apresCommandesServeur(uid, type, null, false);
     if (c === null) return 'lecture-ratee';        // la base n'a pas répondu : rien écrit
     if (c === 'forme') return 'forme-inconnue';    // aucune identité lue : rien écrit (dit) — PAS « lu »
     if (c === 'inchange') return 'inchange';       // fenêtre déjà rangée par nous il y a < 1 h
@@ -7964,6 +8037,8 @@ function surAlarme(a) {
   // 29 oct. : une mise en ligne planifiée (republier « à la suite », comme Vintex)
   // dont l'heure est passée pendant que le service worker dormait repart ici.
   try { miseEnLigneTick(); } catch (_) {}
+  // 5.327 : le signe de vie de CET appareil (version, flux, comptes vus), borné à 30 min.
+  try { publierAppareil(false).catch(() => {}); } catch (_) {}
 }
 // ── LE RATTRAPAGE « QUAND JE REVIENS SUR VINTED » (31 octobre, 5.294) ───────
 // Julien (iPhone, Orion) : « fais le rattrapage quand je reviens sur Vinted ».
@@ -12138,6 +12213,101 @@ async function noterFlux(plateforme, ok) {
     cur[plateforme] = p;
     await chrome.storage.local.set({ vrmFlux: cur });
   } catch (_) {}
+  // 5.327 : l'appareil dit son état à l'app (sa ligne, au plus une fois par
+  // 30 min — tout de suite après un refus neuf). Jamais attendu ici.
+  try { publierAppareil(false).catch(() => {}); } catch (_) {}
+}
+// ══ L'APPAREIL OÙ TOURNE CETTE EXTENSION (5.327, 8 nov.) ════════════════════
+// Deux jours sans rien sur son iPhone, et personne ne l'a vu : la carte du logo
+// le disait, mais seulement à qui l'ouvrait, sur CE téléphone. Chaque
+// navigateur publie maintenant SA ligne `ext_appareil_{id}` (un identifiant
+// tiré au hasard, gardé dans `chrome.storage.local` — jamais l'agent
+// utilisateur ni une adresse) : son nom (Orion · iPhone, Chrome · Mac…), sa
+// version, l'état de ses envois par site (le dernier réussi, les 5 derniers
+// refus : code, famille, taille — ce que la carte montre déjà), la voie de
+// secours, et les comptes qu'il a LUS (`vus`, 48 h). L'app en tire « Tout va
+// bien ? » et l'alerte « compte pas relu » (api/_lib/garde-capture.js), le
+// cron la notification. Petite (≈ 2 Ko), au plus une fois par 30 min, tout de
+// suite après un refus neuf (2 min au moins entre deux). Aucune requête Vinted,
+// rien dans le budget de lecture ni dans les 50 actions/h.
+const APPAREIL_ID_STORE = 'vrmAppareilId';
+const APPAREIL_PUB_STORE = 'vrmAppareilPub';
+const COMPTES_VUS_STORE = 'vrmComptesVus';
+const APPAREIL_PERIODE_MS = 30 * 60000;
+const APPAREIL_KO_MIN_MS = 2 * 60000;
+const COMPTES_VUS_MS = 48 * 3600000;
+const RE_TYPE_CAPTURE_VU = /^(profile|listings|orders_sold|orders_purchased|inbox|billing)$/;
+const PLATEFORMES_APPAREIL = ['vinted', 'leboncoin', 'vestiaire'];
+// Le paquet, le navigateur et le système — ce que l'app NOMME, jamais une capacité
+// (celles-ci se mesurent, `CAP`). Orion : le paquet Orion pose `__vrmOrionCompat` ;
+// sur Mac, Orion prend le paquet Chrome mais se présente comme Safari.
+function decrireAppareil() {
+  let ua = ''; try { ua = String((typeof navigator !== 'undefined' && navigator.userAgent) || ''); } catch (_) {}
+  let man = {}; try { man = chrome.runtime.getManifest() || {}; } catch (_) {}
+  let orion = false; try { orion = !!globalThis.__vrmOrionCompat; } catch (_) {}
+  const gecko = !orion && !!(man.browser_specific_settings && man.browser_specific_settings.gecko);
+  const paquet = orion ? 'orion' : gecko ? 'firefox' : 'chromium';
+  const nav = orion ? 'orion' : gecko ? 'firefox' : /\bEdg\//.test(ua) ? 'edge' : /\bOPR\//.test(ua) ? 'opera'
+    : (!/Chrome\//.test(ua) && /Safari\//.test(ua)) ? 'orion' : 'chrome';
+  const systeme = /iPhone/.test(ua) ? 'iphone' : /iPad/.test(ua) ? 'ipad' : /Android/.test(ua) ? 'android' : /CrOS/.test(ua) ? 'chromeos'
+    : /Macintosh|Mac OS X/.test(ua) ? 'mac' : /Windows/.test(ua) ? 'windows' : /Linux/.test(ua) ? 'linux' : '';
+  return { paquet, nav, systeme };
+}
+async function idAppareil() {
+  try {
+    const g = (await chrome.storage.local.get(APPAREIL_ID_STORE))[APPAREIL_ID_STORE];
+    if (/^[a-f0-9]{16}$/.test(String(g || ''))) return String(g);
+    const b = new Uint8Array(8); crypto.getRandomValues(b);
+    await chrome.storage.local.set({ [APPAREIL_ID_STORE]: Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('') });
+    const r = (await chrome.storage.local.get(APPAREIL_ID_STORE))[APPAREIL_ID_STORE];   // relu : une seule identité
+    return /^[a-f0-9]{16}$/.test(String(r || '')) ? String(r) : null;
+  } catch (_) { return null; }
+}
+async function noterCompteVu(plateforme, id) {
+  if (!id) return;
+  try {
+    const t = Date.now();
+    const tout = (await chrome.storage.local.get(COMPTES_VUS_STORE))[COMPTES_VUS_STORE] || {};
+    const p = Object.assign({}, tout[plateforme] || {});
+    if (t - Number(p[id] || 0) < 60000) return;                 // au plus une écriture locale par minute
+    p[String(id)] = t;
+    tout[plateforme] = Object.fromEntries(Object.entries(p).filter(([, at]) => t - Number(at) <= COMPTES_VUS_MS).sort((a, b) => b[1] - a[1]).slice(0, 30));
+    await chrome.storage.local.set({ [COMPTES_VUS_STORE]: tout });
+  } catch (_) {}
+}
+let _appareilEnVol = null;
+function publierAppareil(force) {
+  if (_appareilEnVol) return _appareilEnVol;
+  _appareilEnVol = publierAppareilUn(force).catch(() => false).finally(() => { _appareilEnVol = null; });
+  return _appareilEnVol;
+}
+async function publierAppareilUn(force) {
+  const s = await loadSession();
+  if (!s || s.mort || !(s.access_token || s.refresh_token)) return false;   // AUCUN réseau sans session
+  let local = {};
+  try { local = await chrome.storage.local.get(['vrmFlux', APPAREIL_PUB_STORE, COMPTES_VUS_STORE]); } catch (_) { return false; }
+  const flux = local.vrmFlux || {}, pub = local[APPAREIL_PUB_STORE] || {};
+  const t = Date.now();
+  const dernierKo = Math.max(0, ...PLATEFORMES_APPAREIL.map((p) => Number((flux[p] || {}).koAt) || 0));
+  const du = force || !pub.at || t - Number(pub.at) >= APPAREIL_PERIODE_MS || (dernierKo > Number(pub.koAt || 0) && t - Number(pub.at) >= APPAREIL_KO_MIN_MS);
+  if (!du) return false;
+  const id = await idAppareil();
+  if (!id) return false;
+  let ver = ''; try { ver = String(chrome.runtime.getManifest().version || ''); } catch (_) {}
+  const fl = {};
+  for (const p of PLATEFORMES_APPAREIL) {
+    const x = flux[p]; if (!x) continue;
+    fl[p] = Object.assign({ okAt: Number(x.okAt) || null, koAt: Number(x.koAt) || null, koStatut: x.koStatut == null ? null : String(x.koStatut),
+      refus: (Array.isArray(x.refus) ? x.refus.slice(-5) : []) }, x.secours ? { secours: x.secours } : {});
+  }
+  const data = { v: 1, appareil: decrireAppareil(), ver, code: CODE_VERSION, at: new Date(t).toISOString(), atMs: t, flux: fl, vus: local[COMPTES_VUS_STORE] || {} };
+  // Son propre échec ne doit pas devenir « le dernier refus » d'une capture.
+  const garde = [_statutDernierRefus, _familleDernierRefus, _octetsDernierRefus];
+  let ok = false;
+  try { ok = await supabaseUpsert('app_data', [{ id: `ext_appareil_${id}`, data }], 'id'); }
+  finally { _statutDernierRefus = garde[0]; _familleDernierRefus = garde[1]; _octetsDernierRefus = garde[2]; }
+  if (ok) { try { await chrome.storage.local.set({ [APPAREIL_PUB_STORE]: { at: t, koAt: dernierKo } }); } catch (_) {} }
+  return ok;
 }
 // Prévenir les onglets de l'app (bridge.js relaie à la page). Sans onglet
 // ouvert : rien, et l'app relira l'état au retour (`cmd:statut`).
