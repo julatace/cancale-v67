@@ -59,12 +59,12 @@ export function compterNumeros(...tables) {
 
 // `preuves` : { extension, vinted, emails, numeros } — chacune 'fait' · 'afaire'
 // · 'encours' · 'passu'. Rend les étapes avec leur état, le nombre FAIT, l'étape
-// courante (la première « à faire », jamais une étape pas sue) et `fini`.
+// courante (la première étape non confirmée, sans sauter une lecture incertaine) et `fini`.
 export function etatGuide(preuves = {}) {
   const ok = new Set(['fait', 'afaire', 'encours', 'passu']);
   const etapes = ETAPES_GUIDE.map((e) => ({ ...e, etat: ok.has(preuves[e.cle]) ? preuves[e.cle] : 'passu' }));
   // Relier Vinted suppose l'extension : tant qu'elle manque, l'étape 2 attend.
   const faites = etapes.filter((e) => e.etat === 'fait').length;
-  const courante = (etapes.find((e) => e.etat === 'afaire') || {}).cle || null;
+  const courante = (etapes.find((e) => e.etat !== 'fait') || {}).cle || null;
   return { etapes, faites, total: etapes.length, courante, fini: faites === etapes.length };
 }

@@ -358,13 +358,13 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       await r.pg.click('[data-conv="301"]');
       await r.pg.waitForTimeout(1200);
       const off = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre]'); return e ? { etat: e.getAttribute('data-offre'), txt: e.innerText } : null; });
-      dit(off && off.etat === 'attente' && /45,00/.test(off.txt), 'l’offre de l’acheteur (45 €) est lue dans le fil', JSON.stringify(off));
+      dit(off && off.etat === 'attente' && /45(?:,00)?\s*€/.test(off.txt), 'l’offre de l’acheteur (45 €) est lue dans le fil', JSON.stringify(off));
       // (27 oct.) Prix mini 40 € posé sur l'annonce 444 ; l'offre 45 € est AU-DESSUS :
       // l'Accepter est mis en avant (« ✓ Accepter 45,00 € · ≥ ton mini »). Rien n'est
       // accepté tout seul — c'est le clic qui suit (ci-dessous) qui vend.
       const cue = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre-au-dessus-mini]'); return e ? { min: e.getAttribute('data-offre-au-dessus-mini'), txt: e.innerText } : null; });
       // (31 oct., maquettes Messages) « Offre de 45 € — ton mini : 40 € », puis Accepter.
-      dit(cue && cue.min === '40' && /Accepter/.test(cue.txt) && /ton mini\s*:\s*40/i.test(cue.txt), 'une offre ≥ ton prix mini est mise en avant pour l’accepter en 1 tap', JSON.stringify(cue));
+      dit(cue && cue.min === '40' && /Accepter/.test(cue.txt) && /Ton minimum\s*40\s*€/i.test(cue.txt), 'une offre ≥ ton prix mini est mise en avant pour l’accepter en 1 tap', JSON.stringify(cue));
       // 7 bis. Le fil commence par la carte de la paire, et se groupe par jour.
       const fil = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); const seps = [...document.querySelectorAll('[data-jour-sep]')].map((x) => x.getAttribute('data-jour-sep'));
         return { carte: c ? { item: c.getAttribute('data-fil-paire'), num: c.getAttribute('data-fil-num'), prix: c.getAttribute('data-fil-prix'), etat: c.getAttribute('data-fil-etat'), txt: c.innerText } : null, seps }; });
@@ -374,8 +374,9 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(await r.pg.locator('.vrm-chat-negociation-etat b').innerText()==='Offre reçue','négociation : offre reçue issue du fil natif');
       // (31 oct.) Le prix affiché est dans la carte de la paire (téléphone) ou la fiche
       // (ordinateur) ; le minimum est sur la carte d'offre, à côté du montant.
-      const tete=await r.pg.locator('.vrm-chat-offre-tete').innerText();
-      dit(tete.includes('45')&&/ton mini\s*:\s*40/.test(tete),'le montant de l’offre et ton minimum exact sont réunis sur la carte d’offre',tete);
+      const tete=await r.pg.locator('.vrm-offre-comparer').innerText();
+      dit(tete.includes('45')&&/Ton minimum\s*40\s*€/.test(tete),'le montant de l’offre et ton minimum exact sont réunis sur la carte d’offre',tete);
+      dit(/Prix affiché\s*59\s*€/.test(tete)&&/Offre reçue\s*45\s*€/.test(tete),'les trois prix sont distingués sans mélanger annonce et offre',tete);
       const boutons=await r.pg.locator('.vrm-chat-offre-actions button').evaluateAll(xs=>xs.map(x=>({top:x.getBoundingClientRect().top,left:x.getBoundingClientRect().left})));
       dit(boutons.length===3&&boutons.every(x=>Math.abs(x.top-boutons[0].top)<2)&&boutons[0].left<boutons[1].left&&boutons[1].left<boutons[2].left,'Refuser, la contre-offre et Accepter sont côte à côte');
       await r.pg.locator('[data-offre-geste="contre"]').click();
@@ -398,7 +399,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const of = r.execs.find((x) => x.method === 'POST' && /offers$/.test(x.endpoint));
       dit(of && of.endpoint === '/api/v2/transactions/9001/offers' && of.body && of.body.offer && of.body.offer.price === '50', 'faire une offre envoie le prix saisi sur la bonne transaction', JSON.stringify(of));
       const txt = await r.pg.evaluate(() => document.body.innerText);
-      dit(/Offre de 50,00\s€ envoyée/.test(txt), 'et le dit');
+      dit(/Offre de 50(?:,00)?\s€ envoyée/.test(txt), 'et le dit');
       // Réponses : double clic, texte édité pendant l'attente et retour incertain.
       const champ=r.pg.getByRole('textbox',{name:'Réponse à la conversation'});
       await champ.fill('Premier message synthétique');

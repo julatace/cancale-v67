@@ -511,6 +511,9 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
+
+
 - **8 nov. · Zéro audit rouge** : les 7 audits rouges depuis des jours sont verts — 1 vrai défaut corrigé (E-mails : la photo de la paire, une photo Vinted, passe par `PhotoVinted`), 5 contrôles mis à la règle actuelle (prop `reserve`, clé non numérique par construction, une phrase par réglage, chaque carte « À faire » comptée, liens partis dans `src/ecrans/`), `pdfjs-dist` absent du conteneur dit en clair. `docs/passation/2026-11-08-zero-audit-rouge.md`. Geste : aucun.
 - **8 nov. · Ventes envoyées légères (5.326)** : la ligne `orders_sold` d'un gros compte (2 000 ventes ≈ 1 055 Ko) n'est plus relue ni réécrite depuis le téléphone (coupée sur iOS) : l'extension envoie la fenêtre abrégée + ce qui manque (61,5 Ko), `vrm.center` fusionne (même règle, `src/commandesFusion.js`) ; la ligne garde sa forme, aucun lecteur ne change. `docs/passation/2026-11-08-ventes-envoi-leger.md`. Geste : installer 5.326, ouvrir Mes commandes sur shop_cancale.
 - **8 nov. · « À envoyer » prouvé** : UNE règle `api/_lib/depart-vente.js` (Colis fait, expédié, panneau, e-mail transporteur du n° EXACT de SON bordereau, `depart_*` ; n° partagé/achat, entrant, étiquette seule ⇒ rien) lue par Colis, Ma journée, cloche, Ventes (« Envoyée »), loupe, widget, rappels, bilan. `docs/passation/2026-11-08-a-envoyer-preuves.md`. Geste : aucun.

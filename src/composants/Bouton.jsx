@@ -26,7 +26,7 @@ export function BoutonBase({ variante = 'secondaire', taille, icone, plein = fal
   const v = VARIANTES_BOUTON.includes(variante) ? variante : 'secondaire';
   const cls = `vrm-b vrm-b-${v}${taille === 'petit' ? ' vrm-b-petit' : ''}${plein ? ' vrm-b-plein' : ''}${!children && icone ? ' vrm-b-icone' : ''}${className ? ' ' + className : ''}`;
   const ic = icone ? rendreIcone(icone, taille === 'petit' ? 16 : 18) : null;
-  const contenu = <>{ic || null}{children}</>;
+  const contenu = <>{occupe?<svg className="vrm-b-indicateur" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="7" opacity=".25"/><path d="M10 3a7 7 0 0 1 7 7" strokeLinecap="round"/></svg>:ic || null}{children}</>;
   const occ = occupe ? { 'aria-busy': 'true', disabled: true } : {};
   if (href) return <a href={href} className={cls} {...rest} {...(occupe ? { 'aria-busy': 'true', 'aria-disabled': 'true' } : {})}>{contenu}</a>;
   // Type écrit en clair (audit-commandes) : « submit » seulement quand on le

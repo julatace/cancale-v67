@@ -313,6 +313,10 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
 function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null }) {
   const [ouvert, setOuvert] = React.useState(false);
   const detailId = React.useId();
+  const [copie,setCopie]=React.useState(false);
+  const copieGen=React.useRef(0);
+  React.useEffect(()=>{copieGen.current++;setCopie(false);return()=>{copieGen.current++;};},[x.cle,x.code]);
+  const voirCode=async()=>{setOuvert(true);if(!x.code)return;const gen=copieGen.current;try{await navigator.clipboard.writeText(String(x.code));if(gen===copieGen.current)setCopie(true);}catch(_){if(gen===copieGen.current)setCopie(false);}};
   const ph = x.photo && Photo ? Photo(x.photo) : null;
   const e = echeance ? echeance(x) : null;
   const st = statut ? statut(x) : null;
@@ -344,7 +348,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         </span>
         <span className="vrm-rpf-chevron" aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span>
         </button>
-        {aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label="Voir le code de retrait" onClick={(ev) => { ev.stopPropagation(); setOuvert(true); }}>Code</button> : null}
+        {aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label="Voir le code de retrait" onClick={(ev) => { ev.stopPropagation(); voirCode(); }}>{copie?'Copié':'Code'}</button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
       {ouvert ? <div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
