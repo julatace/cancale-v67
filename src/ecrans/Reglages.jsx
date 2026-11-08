@@ -52,7 +52,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
-import { etatAbonnement, lienParrainage, lectureSeuleActive } from '../abonnement/etatAbonnement.js';
+import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
@@ -1143,6 +1143,7 @@ async function sourcesExportDonnees() {
   };
 }
 async function exporterMesDonnees() {
+  if (lectureSeuleActive()) { toast(EXPORT_FERME); return; }
   try {
     const src = await sourcesExportDonnees();
     const zip = zipStocke(fichiersExport(feuillesExport(src)));
@@ -1396,9 +1397,9 @@ function StatutSauvegardeReglages() {
   const stockage=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
   const echec=stockage||(attente&&['error','refus'].includes(_syncInfo.etat));
   if(!attente&&!stockage) return null;
-  // (8 nov.) Lecture seule (abonnement expiré) : la base refuse d'écrire, et
+  // (8 nov.) Abonnement terminé (aperçu) : la base refuse d'écrire, et
   // « Réessayer » n'y changerait rien — on dit pourquoi, sans geste trompeur.
-  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Lecture seule : rien n'est enregistré tant que l'abonnement n'est pas actif</span></div>;
+  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Abonnement terminé : rien n'est enregistré tant que tu ne l'as pas repris</span></div>;
   return <div className="vrm-settings-status" role="status" data-statut-reglages={echec?'echec':'encours'} style={{color:echec?C.warn:C.muted}}>
     {!echec&&<span className="vrm-settings-status-pt" aria-hidden="true"/>}
     <span>{stockage?'Refusée par cet appareil':echec?'Pas encore synchronisé':'Enregistrement…'}</span>
@@ -1546,7 +1547,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
   const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
   const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
-  // (8 nov.) La ligne de l'abonnement de la coque (J-3, lecture seule) ouvre cet onglet.
+  // (8 nov.) La ligne de l'abonnement de la coque (J-3, J-1) ouvre cet onglet.
   React.useEffect(() => { const f = () => { setVueBrute('abonnement'); setSous(null); }; window.addEventListener('vrm:voir-abonnement', f); return () => window.removeEventListener('vrm:voir-abonnement', f); }, []);
 
 
@@ -2460,7 +2461,7 @@ function LigneContact() {
 // ⟦← App.jsx #40⟧
 // ── LA PAGE ABONNEMENT (8 nov., « abonnement propre ») ──────────────────────
 // En tête, UNE carte : l'état (essai · abonné · résilié · paiement en échec ·
-// lecture seule · pas d'abonnement), la phrase de ce qui se passe ensuite, et
+// abonnement terminé · pas d'abonnement), la phrase de ce qui se passe ensuite, et
 // les gestes. Puis des rangées iOS : la carte bancaire et la page de gestion de
 // Stripe (factures, carte, adresse — le PORTAIL CLIENT, `mode=portail`, ouvert
 // sur SON client seul, côté serveur), et « Résilier » : deux clics (la rangée,
@@ -2567,7 +2568,8 @@ function MonAbonnement() {
   const texteCarte = cb ? `${cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : 'Carte'} •••• ${cb.fin}${cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}` : (fx === undefined && e.peutGerer ? 'Je regarde…' : null);
   const listeFactures = e.peutGerer ? <FacturesAbonnement fx={fx}/> : null;
   const erreur = msg ? <div role="alert" style={{ fontSize: 13, color: C.warn, margin: '8px 16px 0' }}>{msg}</div> : null;
-  const apresFin = e.lecture === true ? 'Ensuite, tes données restent lisibles : rien n’est supprimé.' : 'Tes données restent intactes : rien n’est supprimé.';
+  // Julien, 8 nov. : sans abonnement, un extrait net, le reste flouté — rien supprimé.
+  const apresFin = e.lecture === true ? 'Ensuite, sans abonnement : un aperçu de tes données, le reste masqué ; rien n’est supprimé.' : 'Tes données restent intactes : rien n’est supprimé.';
   // Les rangées « paiement » : la carte (portail) et la page de gestion Stripe.
   const groupePaiement = (
     <GroupeIos titre="Paiement">
@@ -2632,19 +2634,19 @@ function MonAbonnement() {
     </>);
   }
   if (et.etat === 'expire') {
-    // LECTURE SEULE : tout reste visible ; s'abonner (ou la carte, pour un
-    // impayé) rouvre les écritures. Paiement fermé ⇒ aucune case ni bouton.
+    // SANS ABONNEMENT (Julien, 8 nov.) : ailleurs, un aperçu net et le reste
+    // flouté ; ici, de quoi reprendre. Paiement fermé ⇒ aucune case ni bouton.
     return (<>
       <div data-abonnement="expire" data-abonnement-etat="expire" data-lecture-seule={et.lectureSeule ? '' : undefined}>
-        <Tete etat="Lecture seule" titre={et.impaye ? 'Le prélèvement ne passe plus' : "Ton abonnement n'est plus actif"}
-          phrase={`${e.lecture === true ? 'Tout reste visible et rien n’est supprimé : ventes, compta, factures, numéros.' : 'Tes données sont intactes : rien n’est supprimé.'} Pour enregistrer, publier, imprimer et répondre à nouveau, ${et.impaye ? 'mets ta carte à jour' : `abonne-toi${portePaiementFerme ? '' : ` : ${prixLisible(e.prix)}, sans engagement`}`}.`}>
+        <Tete etat="Abonnement terminé" titre={et.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}
+          phrase={`Tes données sont là, rien n’est supprimé : ${e.lecture === true ? 'un aperçu reste visible, le reste est masqué' : 'elles reviennent telles quelles'}. Pour tout retrouver et agir à nouveau, ${et.impaye ? 'mets ta carte à jour' : `reprends l’abonnement${portePaiementFerme ? '' : ` : ${prixLisible(e.prix)}, sans engagement`}`}.`}>
           {et.impaye
             ? <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
             : portePaiementFerme
               ? <div className="vrm-abo-phrase" data-paiement-ferme="">Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie un peu plus tard.</div>
               : <>
                   <CaseCgv cases={cases} onChange={setCases}/>
-                  <div className="vrm-abo-actions"><button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : "S'abonner"}</button></div>
+                  <div className="vrm-abo-actions"><button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : (et.ancien ? "Reprendre l'abonnement" : "S'abonner")}</button></div>
                 </>}
         </Tete>
         {erreur}

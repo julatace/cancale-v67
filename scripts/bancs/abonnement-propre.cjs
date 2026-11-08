@@ -5,9 +5,12 @@ require('./_porte-banc.cjs');
 //    · essai J-5 : la page dit « Encore 5 jours », la coque se tait ;
 //    · essai J-3 et J-1 : une ligne discrète dans la coque (« dans 3 jours »,
 //      « demain »), qui ouvre l'abonnement et se ferme pour la journée ;
-//    · expiré + la base laisse lire (027) : l'APP RESTE OUVERTE (pas la porte),
-//      les lectures partent, une écriture vers la base est refusée sans partir,
-//      la coque dit « Lecture seule » et mène à « S'abonner » ;
+//    · sans abonnement (Julien, 8 nov. : « un extrait de ses données, le reste
+//      flouté ») : sur Ventes, Colis, Annonces… (données du mode exemple), les
+//      3 premières lignes de chaque liste NETTES, la 4e et la suite FLOUTÉES,
+//      `inert` et `aria-hidden`, ni sélectionnables ; une carte nette « Ton
+//      abonnement a pris fin » ; tout clic dans l'écran est arrêté ; AUCUNE
+//      écriture n'atteint la base ; l'export est fermé ;
 //    · expiré sans la 027 : l'ancienne porte (jamais une app vide) ;
 //    · actif · résilié · impayé · Stripe absent : chacun son état, aucun
 //      bouton qui mènerait nulle part quand Stripe n'est pas branché ;
@@ -22,7 +25,7 @@ const PORT = Number(process.env.BANC_PORT) || 4541;
 const CAPTURES = process.env.BANC_CAPTURES || path.join(os.tmpdir(), 'banc-abonnement-propre');
 fs.mkdirSync(CAPTURES, { recursive: true });
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
-const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
+const SESSION_BANC = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
 const J = 864e5;
 const finDans = (j) => new Date(Date.now() + j * J - 3600e3).toISOString();
 const PRIX = { montant: 16.99, devise: 'eur', intervalle: 'month' };
@@ -51,7 +54,21 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
 });
 
-async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = false, vue = 'abonnement', parrain = PARRAIN }) {
+// Les données inventées du mode exemple (src/exempleDonnees.js), servies par
+// la MÊME règle de table que lui (src/exempleBase.js) : des listes à plus de
+// 3 lignes, à la vraie forme, pour juger l'aperçu.
+let EX = null;
+async function exemple() {
+  if (EX) return EX;
+  const d = await import('file://' + path.join(__dirname, '..', '..', 'src', 'exempleDonnees.js'));
+  const b = await import('file://' + path.join(__dirname, '..', '..', 'src', 'exempleBase.js'));
+  const jeu = d.jeuExemple(Date.now());
+  EX = { uid: d.UID_EXEMPLE, servir: b.servirTable, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes } };
+  return EX;
+}
+async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = false, vue = 'abonnement', parrain = PARRAIN, donnees = false }) {
+  const ex = donnees ? await exemple() : null;
+  const SESSION = ex ? { ...SESSION_BANC, user: { ...SESSION_BANC.user, id: ex.uid } } : SESSION_BANC;
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
@@ -64,6 +81,12 @@ async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = fal
     const u = r.request().url(), m = r.request().method();
     if (!rest.origine) rest.origine = new URL(u).origin;
     if (m === 'GET') rest.lectures++; else if (!/\/rpc\//.test(u)) rest.ecritures++;
+    if (ex && !/\/rpc\//.test(u)) {
+      const url = new URL(u), table = url.pathname.slice('/rest/v1/'.length).split('/')[0];
+      const t = table === 'app_data' ? ex.base : table === 'vinted_accounts' ? ex.comptes : { lignes: [] };
+      const x = ex.servir(t, { methode: m, url: url.pathname + url.search, entetes: r.request().headers(), corps: r.request().postData(), owner: ex.uid });
+      return r.fulfill({ status: x.status, headers: x.headers, body: x.status === 204 || x.body == null ? '' : (typeof x.body === 'string' ? x.body : JSON.stringify(x.body)) });
+    }
     if (/select=owner/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });
   });
@@ -97,6 +120,8 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
   await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }).catch((e) => { console.log('❌ port ' + PORT + ' pris (' + e.code + ')'); process.exit(1); });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
+    const SEUL = process.env.BANC_SEUL || '';
+    if (!SEUL) {
     console.log('\n── L’essai');
     await essaie('J-5', async () => {
       const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS.essai5 });
@@ -129,32 +154,91 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
       await ctx.close();
     });
 
-    console.log('\n── L’expiration : lecture seule, jamais une app vide');
-    for (const [largeur, sombre] of [[1512, false], [390, true]]) {
-      await essaie('expiré ' + largeur, async () => {
-        const { ctx, pg, rest, erreurs } = await ouvrir(nav, { abo: ETATS.expire, tab: 'dashboard', vue: 'reglages', largeur, sombre });
-        const p = await lirePage(pg);
-        dit(!p.porte && p.coque && rest.lectures > 0 && erreurs.length === 0, `${largeur} px : l’app reste OUVERTE (pas la porte) et lit ses données`, `porte=${p.porte} coque=${p.coque} lectures=${rest.lectures} ${erreurs.join('|')}`);
-        dit(p.bandeau && p.bandeau.type === 'lecture-seule' && /rien n'est supprimé/.test(p.bandeau.t), '  la coque dit « Lecture seule » et que rien n’est supprimé', JSON.stringify(p.bandeau));
-        const avant = rest.ecritures;
+    }
+    console.log('\n── L’expiration : un aperçu net, le reste flouté, aucune action');
+    const lireApercu = (pg, tab) => pg.evaluate((tab) => {
+      const r = document.querySelector('[data-attente-ecran="' + tab + '"]');
+      if (!r) return null;
+      const fl = [...r.querySelectorAll('[data-apercu-floute]')];
+      // Une liste « extrait » : ses 3 premières lignes nettes, la 4e floutée.
+      const listes = [...r.querySelectorAll('*')].filter((e) => e.children.length >= 4 && e.children[3].hasAttribute('data-apercu-floute'));
+      const extrait = listes.filter((e) => [0, 1, 2].every((i) => !e.children[i].hasAttribute('data-apercu-floute') && !e.children[i].closest('[data-apercu-floute]')));
+      extrait.sort((x, y) => (y.innerText || '').length - (x.innerText || '').length);
+      const echantillon = fl.map((e) => (e.innerText || '').trim()).find((t) => t.length > 6) || '';
+      const nettes = extrait[0] ? [0, 1, 2].map((i) => (extrait[0].children[i].innerText || '').trim().slice(0, 40)) : [];
+      const s = fl[0] ? getComputedStyle(fl[0]) : null;
+      document.getSelection().removeAllRanges();
+      const plage = document.createRange(); plage.selectNodeContents(r); document.getSelection().addRange(plage);
+      const choisi = document.getSelection().toString(); document.getSelection().removeAllRanges();
+      return {
+        apercu: r.hasAttribute('data-apercu'), floutes: fl.length, listes: listes.length, extraits: extrait.length, nettes,
+        inertes: fl.every((e) => e.hasAttribute('inert') && e.getAttribute('aria-hidden') === 'true'),
+        flou: s ? s.filter : '', selection: s ? (s.userSelect || s.webkitUserSelect) : '',
+        echantillon: echantillon.slice(0, 30), copiable: !!echantillon && choisi.includes(echantillon.slice(0, 12)),
+        carte: (document.querySelector('[data-carte-apercu]') || {}).innerText || '',
+        porte: !!document.querySelector('[data-abonnement-requis]'), coque: !!document.querySelector('.vrm-app-shell'),
+        deborde: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    }, tab);
+    for (const [tab, largeur, sombre] of [['ventes', 1512, false], ['achats', 1512, false], ['annonces', 390, true], ['ventes', 390, false], ['dashboard', 1512, true]]) {
+      if (SEUL && !SEUL.split(',').includes(tab)) continue;
+      await essaie(`aperçu ${tab} ${largeur}`, async () => {
+        const { ctx, pg, rest, erreurs } = await ouvrir(nav, { abo: ETATS.expire, tab, vue: 'reglages', largeur, sombre, donnees: true });
+        await pg.waitForTimeout(1500);
+        const a = await lireApercu(pg, tab);
+        const nom = `${tab} ${largeur}${sombre ? ' sombre' : ''}`;
+        dit(a && !a.porte && a.coque && a.apercu && erreurs.length === 0, `${nom} : l’app s’ouvre en APERÇU (pas la porte), sur des données lues`, JSON.stringify(a && { porte: a.porte, coque: a.coque, apercu: a.apercu, lectures: rest.lectures }) + ' ' + erreurs.join('|'));
+        // Une liste de 4 lignes ou plus (Ventes, Annonces, Ma journée dans l'exemple) : l'extrait.
+        if (tab !== 'achats') dit(a && a.extraits >= 1 && a.nettes.every((t) => t.length > 0), '  un EXTRAIT net : les 3 premières lignes d’une liste, la 4e floutée', JSON.stringify(a && { listes: a.listes, extraits: a.extraits, nettes: a.nettes }));
+        dit(a && a.floutes > 0 && a.inertes && /blur/.test(a.flou) && a.selection === 'none', '  le reste flouté fort, `inert` + `aria-hidden`, non sélectionnable', JSON.stringify(a && { n: a.floutes, inertes: a.inertes, flou: a.flou, sel: a.selection }));
+        const copie = await pg.evaluate((tab) => { const f = document.querySelector('[data-attente-ecran="' + tab + '"] [data-apercu-floute]'); if (!f) return null; const ev = new Event('copy', { bubbles: true, cancelable: true }); f.dispatchEvent(ev); return ev.defaultPrevented; }, tab);
+        dit(copie === true, '  copier dans l’écran est refusé', String(copie));
+        dit(a && /Ton abonnement a pris fin/.test(a.carte) && /rien n'est supprimé/.test(a.carte) && /Reprendre l'abonnement/.test(a.carte), '  la carte nette : « a pris fin · rien n’est supprimé · Reprendre l’abonnement »', a && a.carte.replace(/\n/g, ' · '));
+        dit(a && a.deborde <= 0, '  rien ne déborde', String(a && a.deborde));
+        await capture(pg, `apercu-${tab}-${largeur}${sombre ? '-sombre' : ''}`);
+        // Aucune action : un clic sur un bouton NET de l'écran est arrêté.
+        const avant = { ecr: rest.ecritures, url: pg.url() };
+        const b = pg.locator(`[data-attente-ecran="${tab}"] button:not([data-apercu-floute] button)`).first();
+        const nb = await b.count();
+        if (nb) await b.click({ timeout: 3000 }).catch(() => {});
+        await pg.waitForTimeout(700);
+        const apres = await pg.evaluate(() => ({ signe: (document.querySelector('[data-carte-apercu]') || {}).getAttribute ? document.querySelector('[data-carte-apercu]').getAttribute('data-signe') : null, feuille: !!document.querySelector('[role="dialog"]:not([data-carte-apercu])') }));
+        dit(nb > 0 && apres.signe && !apres.feuille && pg.url() === avant.url, '  aucune action : un bouton net de l’écran ne fait rien d’autre que montrer la carte', JSON.stringify({ boutons: nb, ...apres }));
+        // Les actions de la ligne de titre (« Tout imprimer », « Publier »…), où qu'elles soient rendues.
+        const actions = pg.locator('.vrm-main button:visible', { hasText: /imprimer|publier|répondre|exporter|scanner|générer/i });
+        const na = await actions.count();
+        let fuite = '';
+        for (let i = 0; i < Math.min(na, 4); i++) {
+          const t = (await actions.nth(i).innerText().catch(() => '')).trim();
+          await actions.nth(i).click({ timeout: 2000 }).catch(() => {}); await pg.waitForTimeout(400);
+          if (await pg.evaluate(() => !!document.querySelector('[role="dialog"]:not([data-carte-apercu]), .vrm-sheet, [data-feuille]'))) { fuite = t; break; }
+        }
+        dit(!fuite, `  aucune action de la ligne de titre ne s’ouvre (${na} essayée(s))`, fuite);
+        // Aucune écriture : celles que l'app tente sont refusées AVANT le réseau.
         const r = await pg.evaluate(async (o) => { const x = await fetch(o + '/rest/v1/app_data?on_conflict=owner,id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '[]' }); return { s: x.status, j: await x.json().catch(() => null) }; }, rest.origine || 'https://lgonxzrzjcqthjtbdpzo.supabase.co');
-        dit(r.s === 403 && r.j && r.j.code === 'vrm-lecture-seule' && rest.ecritures === avant, '  une écriture vers la base est refusée SANS partir, avec une phrase', JSON.stringify(r) + ` · parties=${rest.ecritures - avant}`);
-        dit(p.deborde <= 0, '  rien ne déborde', String(p.deborde));
-        await capture(pg, `expire-${largeur}${sombre ? '-sombre' : ''}`);
-        await pg.locator('[data-bandeau-abonnement] button').first().click(); await pg.waitForTimeout(1500);
-        const q = await lirePage(pg);
-        dit(q.etat === 'expire' && /Tout reste visible/.test(q.texte) && q.boutons.some((x) => /abonner/i.test(x)), '  la ligne mène à la page : « tout reste visible » et « S’abonner »', `${q.etat} · ${q.boutons.join(' · ')}`);
-        await capture(pg, `expire-page-${largeur}${sombre ? '-sombre' : ''}`);
+        dit(r.s === 403 && r.j && r.j.code === 'vrm-lecture-seule' && rest.ecritures === 0, '  AUCUNE écriture n’atteint la base (garde : refus sur place)', JSON.stringify(r) + ` · parties=${rest.ecritures}`);
         await ctx.close();
       });
     }
+    if (!SEUL) {
+    await essaie('aperçu : Paramètres', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.expire, tab: 'settings', donnees: true });
+      const q = await lirePage(pg);
+      const c = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-carte-apercu]'), apercu: !!document.querySelector('[data-apercu]') }));
+      dit(q.etat === 'expire' && /a pris fin/.test(q.texte) && /rien n’est supprimé/.test(q.texte) && q.boutons.some((x) => /Reprendre l'abonnement/.test(x)) && !c.apercu && !c.carte,
+        'Paramètres → Abonnement reste NET (de quoi reprendre) : « a pris fin », « Reprendre l’abonnement »', `${q.etat} · ${q.boutons.join(' · ')} · ${JSON.stringify(c)}`);
+      await capture(pg, 'apercu-abonnement-1512');
+      await ctx.close();
+    });
     await essaie('expiré sans 027', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.expireSans027, tab: 'dashboard', vue: 'reglages' });
       const p = await lirePage(pg);
       dit(p.porte && !p.bandeau, 'la base ferme aussi la lecture (027 pas passée) : la porte, jamais une app vide', `porte=${p.porte}`);
       await ctx.close();
     });
+    }
 
+    if (!SEUL) {
     console.log('\n── Les autres états');
     for (const [nom, fin, verifie] of [
       ['actif', 'actif', (p) => /Abonné · 16,99/.test(p.texte) && /Prochain prélèvement le/.test(p.texte) && p.boutons.includes('Résilier') && p.boutons.some((x) => /carte/i.test(x))],
@@ -197,6 +281,7 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
       dit(!(await pg.evaluate(() => !!document.querySelector('[data-lien-parrainage]'))), 'parrainage éteint : aucun lien promis au vendeur');
       await ctx.close();
     });
+    }
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 160)); }
   finally {
     await nav.close(); srv.close();

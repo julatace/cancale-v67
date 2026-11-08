@@ -3,10 +3,11 @@
 // VRAI src/abonnement/etatAbonnement.js, et lit la migration 027 :
 //   1. l'essai : la fin de l'essai est rendue (trialing), les jours restants et
 //      la ligne de la coque à J-3 et J-1, jamais à J-5 ;
-//   2. l'expiration : la base laisse LIRE (027 : USING true, WITH CHECK et
-//      DELETE gardés), le serveur dit `lectureSeule`, l'app n'affiche pas la
-//      porte quand la base laisse lire, et la garde refuse les ÉCRITURES (pas
-//      les lectures, ni rpc/, ni /api/) ;
+//   2. sans abonnement (Julien, 8 nov. : « un extrait de ses données, le reste
+//      flouté ») : la base laisse LIRE (027 : USING true, WITH CHECK et DELETE
+//      gardés), le serveur dit `lectureSeule` (l'aperçu), l'app montre l'aperçu
+//      au lieu de la porte, la garde refuse les ÉCRITURES, l'export est fermé
+//      (le flou lui-même est jugé au banc abonnement-propre) ;
 //   3. le portail Stripe s'ouvre sur le client de SA ligne, jamais sur un
 //      identifiant envoyé par le navigateur ; Stripe absent ⇒ 503 calme, rien
 //      n'est appelé ;
@@ -179,7 +180,7 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     const f = E.creerGardeEcriture(async (u, o) => { vus.push((o && o.method || 'GET') + ' ' + u); return new Response('[]'); }, base, () => actif);
     const ecr = await f(base + '/rest/v1/app_data?on_conflict=owner,id', { method: 'POST', body: '[]' });
     const j = await ecr.json();
-    dit(ecr.status === 403 && j.code === E.CODE_LECTURE_SEULE && /abonne-toi/.test(j.message) && vus.length === 0, 'lecture seule : une écriture vers la base est refusée SANS partir, avec une phrase', `${ecr.status} · ${JSON.stringify(j)} · parti=${vus.length}`);
+    dit(ecr.status === 403 && j.code === E.CODE_LECTURE_SEULE && /reprends l'abonnement/.test(j.message) && vus.length === 0, 'lecture seule : une écriture vers la base est refusée SANS partir, avec une phrase', `${ecr.status} · ${JSON.stringify(j)} · parti=${vus.length}`);
     await f(base + '/rest/v1/app_data?id=eq.x', { method: 'DELETE' });
     await f(base + '/storage/v1/object/photos/x.jpg', { method: 'PUT' });
     dit(vus.length === 0, '  … DELETE et dépôt de fichier aussi');
@@ -189,7 +190,7 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     dit(vus.length === 4, '  abonnement actif : rien n’est retenu');
   });
   await essaie('migration 027', async () => {
-    const sql = lire('supabase/migrations/027-abonnement-lecture-et-parrainage.sql').replace(/--[^\n]*/g, '');
+    const sql = lire('supabase/migrations/027-abonnement-apercu-et-parrainage.sql').replace(/--[^\n]*/g, '');
     dit(/alter policy abonnement_requis on public\.%I using \(true\)/.test(sql), '027 : la restrictive laisse LIRE (USING true)');
     dit(!/with check\s*\(\s*true\s*\)/i.test(sql) && !/alter policy abonnement_requis[^;]*with check/i.test(sql), '  … sans toucher au WITH CHECK (écrire exige toujours l’accès)');
     dit(/as restrictive for delete to authenticated[\s\S]*vrm_acces_ok\(\)/.test(sql), '  … et une restrictive DELETE (USING seul ne garderait plus l’effacement)');
@@ -199,7 +200,9 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     const app = lire('src/App.jsx');
     const p = (/function PorteAbonnement[\s\S]*?\n}\n/.exec(app) || [''])[0];
     dit(/x\.acces === false && x\.lecture !== true/.test(p) && /publierAbonnement\(x\)/.test(p), 'la porte ne ferme l’app QUE si la base ferme aussi la lecture ; elle publie l’état (garde, coque)');
-    dit(/installerGardeEcriture\(SUPABASE_URL\)/.test(app) && /<BandeauAbonnement setTab=\{setTab\}\/>/.test(app), '  la garde est posée, et la ligne de l’abonnement est sur la coque');
+    dit(/installerGardeEcriture\(SUPABASE_URL\)/.test(app) && /<BandeauAbonnement setTab=\{setTab\}\/>/.test(app) && /<ApercuSansAbonnement tab=\{tab\} setTab=\{setTab\}\/>/.test(app), '  la garde est posée ; la ligne de l’abonnement et l’aperçu flouté sont sur la coque');
+    const reg = lire('src/ecrans/Reglages.jsx');
+    dit(/onExport=\{async\(\)=>\{ if\(lectureSeuleActive\(\)\)\{ toast\(EXPORT_FERME\); return; \}/.test(app) && /async function exporterMesDonnees\(\) \{\n  if \(lectureSeuleActive\(\)\) \{ toast\(EXPORT_FERME\); return; \}/.test(reg), '  sans abonnement, les DEUX exports sont fermés (sauvegarde complète, export des données)');
   });
 
   console.log('── 3. Le portail Stripe : SON client, et rien sans Stripe');
@@ -294,7 +297,7 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
   await essaie('textes légaux', async () => {
     const cgv = lire('public/legal/cgv.html');
     dit(/Parrainage/.test(cgv) && /12 mois offerts/.test(cgv) && /se parrainer soi-même/.test(cgv), 'CGV : le parrainage et ses règles sont écrits');
-    dit(/lecture seule/.test(cgv) && /ne sont pas supprimées|aucune n’est supprimée/.test(cgv), 'CGV : l’expiration laisse les données consultables, rien supprimé');
+    dit(/un aperçu de tes données/.test(cgv) && /conservé et masqué/.test(cgv) && /rien n’est supprimé/.test(cgv) && !/lecture seule/.test(cgv), 'CGV (Julien, 8 nov.) : sans abonnement, un aperçu ; le reste conservé et masqué ; rien supprimé');
     dit(/trois jours puis un jour avant la fin de l’essai/.test(cgv) && /Paramètres → Abonnement → Résilier, puis confirmer/.test(cgv), 'CGV : les rappels d’essai et le chemin de résiliation (deux gestes)');
   });
 

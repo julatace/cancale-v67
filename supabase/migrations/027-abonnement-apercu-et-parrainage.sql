@@ -1,17 +1,18 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 027 — ABONNEMENT : À L'EXPIRATION, LES DONNÉES RESTENT LISIBLES · PARRAINAGE
+-- 027 — SANS ABONNEMENT : UN APERÇU, AUCUNE ÉCRITURE · PARRAINAGE
 --       (8 novembre 2026) — PAS ENCORE APPLIQUÉE (geste de Julien,
 --       docs/passation/2026-11-08-abonnement-propre.md).
 -- ════════════════════════════════════════════════════════════════════════════
--- 1. LECTURE SEULE À L'EXPIRATION.
+-- 1. SANS ABONNEMENT : UN APERÇU, AUCUNE ÉCRITURE.
 --    Avant (006, 4 octobre) : qui ne paie plus ne LIT plus rien non plus — la
 --    restrictive `abonnement_requis` porte `for all`, et l'app remplace tout par
---    la porte d'abonnement. Décision du 8 novembre (chantier « abonnement
---    propre ») : un essai fini ou un abonnement arrêté laisse ses données
---    LISIBLES (ventes, compta, factures, numéros : sa compta lui appartient) ;
---    seules les ÉCRITURES (et donc les actions, qui passent toutes par une
---    écriture : commandes à l'extension, publications, réglages) demandent
---    l'abonnement. Rien n'est supprimé, comme avant.
+--    la porte d'abonnement. Décision de Julien du 8 novembre : « on lui montre
+--    un extrait de ses données, le reste sera flouté tant qu'il ne paie pas ».
+--    Le flou est une porte COMMERCIALE (ce sont SES données) : il se fait à
+--    l'écran (src/abonnement/apercu.js). Ce que la base garantit : la LECTURE
+--    de ses propres lignes reste permise, AUCUNE ÉCRITURE ne passe (et donc
+--    aucune action : commandes à l'extension, publications, réglages). Rien
+--    n'est supprimé, comme avant.
 --    ⚠️ Sans DROP (l'outil SQL attend une confirmation humaine, et 016 retouche
 --       déjà cette politique) : on RETOUCHE `abonnement_requis` —
 --         · USING devient `true`  ⇒ SELECT libre (les règles d'owner, de
@@ -20,14 +21,14 @@
 --       et on AJOUTE une restrictive pour DELETE (que USING seul gardait).
 --    Notifications et widget restent coupés (`vrm_acces_pour`, inchangé).
 -- 2. `vrm_acces()` rend aussi `lecture: true` : l'app sait que la base laisse
---    lire, et passe en lecture seule au lieu de fermer la porte. Sans la 027,
+--    lire, et montre l'aperçu (extrait net, reste flouté) au lieu de la porte. Sans la 027,
 --    `lecture` est absent ⇒ l'app garde l'ancienne porte (cohérente avec RLS).
 -- 3. PARRAINAGE : un code par vendeur, une ligne par filleul (une seule fois),
 --    clé de service seule (comme `essais_gratuits`, 022). Éteint par défaut :
 --    `vrm_reglages.parrainage` = '0' — Julien le passe à '1'.
 -- Additif : aucune donnée existante n'est touchée.
 
--- ── 1. La restrictive : lire oui, écrire non ─────────────────────────────────
+-- ── 1. La restrictive : lire (l'aperçu) oui, écrire non ─────────────────────────────────
 do $$
 declare t text;
 begin

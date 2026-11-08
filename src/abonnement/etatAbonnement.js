@@ -11,11 +11,13 @@
 //   essai-resilie · actif · resilie · impaye · expire
 //
 // À l'EXPIRATION (essai fini sans paiement, abonnement arrêté, impayé > 14 j,
-// quand l'abonnement est obligatoire) : la base laisse LIRE (migration 027,
-// `lecture: true`) et refuse d'écrire. L'app passe alors en LECTURE SEULE :
-// tout reste visible, et une garde (ci-dessous) refuse les écritures sans
-// réseau, avec une phrase. Sans la 027 (`lecture` absent), la base ferme aussi
-// la lecture : l'ancienne porte reste, pour ne jamais montrer une app vide.
+// quand l'abonnement est obligatoire) — Julien, 8 nov. : « on lui montre un
+// extrait de ses données, le reste sera flouté tant qu'il ne paie pas ». La
+// base laisse LIRE (migration 027, `lecture: true`) et refuse d'écrire ; l'app
+// montre un APERÇU (src/abonnement/apercu.js : extrait net, reste flouté et
+// inerte, aucun geste) et une garde (ci-dessous) refuse les écritures sans
+// réseau. `lectureSeule` est le nom de cet état côté code. Sans la 027
+// (`lecture` absent), la base ferme aussi la lecture : la porte d'abonnement.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const JOUR_MS = 86400000;
@@ -74,7 +76,8 @@ export function rappelEssai(e) {
 // (REST et stockage) sont visées ; les lectures, les fonctions `rpc/` et nos
 // routes `/api/` (dont le paiement) passent.
 export const CODE_LECTURE_SEULE = 'vrm-lecture-seule';
-export const PHRASE_LECTURE_SEULE = "Lecture seule : ton abonnement n'est plus actif. Tes données sont là ; abonne-toi pour enregistrer à nouveau.";
+export const PHRASE_LECTURE_SEULE = "Ton abonnement a pris fin : rien n'est enregistré. Tes données sont là ; reprends l'abonnement pour agir à nouveau.";
+export const EXPORT_FERME = "Export fermé : ton abonnement a pris fin. Tes données sont là, rien n'est supprimé ; reprends l'abonnement pour les exporter.";
 const ECRITURES = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 export function estEcritureBase(url, methode, base) {
   const b = String(base || '').replace(/\/+$/, '');

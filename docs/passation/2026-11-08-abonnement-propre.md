@@ -7,7 +7,7 @@ d'abonnement) est gardé ; ce chantier le rend clair, cohérent et complet.
 
 ## Les gestes de Julien (Stripe et base), dans l'ordre
 
-1. Supabase → SQL : passer `supabase/migrations/027-abonnement-lecture-et-parrainage.sql` (lecture seule à l'expiration + tables du parrainage ; aucun DROP).
+1. Supabase → SQL : passer `supabase/migrations/027-abonnement-apercu-et-parrainage.sql` (sans abonnement : lire oui, écrire non — pour l'aperçu ; tables du parrainage ; aucun DROP).
 2. Stripe → Paramètres → Billing → **Portail client** : l'activer ; cocher « mettre à jour le moyen de paiement », « historique des factures », « annuler l'abonnement » **en fin de période** ; lien de retour `https://vrm.center/?tab=settings&vue=abonnement`.
 3. Stripe → Développeurs → Webhooks (l'adresse `/api/stripe-webhook` déjà posée) : ajouter l'événement **`invoice.paid`** (le parrainage) à côté de `customer.subscription.*` et `checkout.session.completed`.
 4. Stripe → Paramètres → Billing → E-mails clients : activer les e-mails de **fin d'essai** (rappel avant la fin) et de **résiliation** s'ils sont proposés (la confirmation écrite d'une résiliation ; VRM la dit à l'écran seulement).
@@ -31,23 +31,37 @@ Inchangés : prix `vrm_mensuel` à 16,99 €, `STRIPE_SECRET_KEY`, mentions de `
 - Une seule règle d'affichage : `src/abonnement/etatAbonnement.js` (`etatAbonnement`,
   `rappelEssai`) — la page, la coque et la porte la lisent.
 
-### 2. L'expiration : les données restent LISIBLES
-- **Avant** : 006 (4 oct.) fermait lecture ET écriture (`abonnement_requis for all`), et l'app
-  remplaçait tout par la porte. ⚠️ **C'était la décision de Julien du 4 octobre (« ne doit plus
-  voir ses données »)** ; ce chantier la remplace sur la demande du 8 nov. relayée par
-  l'orchestrateur (« les données restent lisibles, seules les actions demandent
-  l'abonnement ») — **à confirmer par Julien**. Revenir en arrière = ne pas passer la 027.
-- **027** : `abonnement_requis` garde son WITH CHECK (écrire exige l'accès), son USING devient
-  `true` (lire est libre ; les règles d'owner, de confidentialité 021 et d'équipe 016 décident
-  toujours qui lit quoi) ; une restrictive DELETE s'ajoute ; `vrm_acces()` dit `lecture: true`.
-  Notifications et widget restent coupés (`vrm_acces_pour` inchangé).
-- **L'app** : `PorteAbonnement` ne ferme plus l'app quand la base laisse lire ; la garde
-  `installerGardeEcriture` refuse toute écriture vers la base (REST, stockage) sans réseau,
-  avec `vrm-lecture-seule` et une phrase ; lectures, `rpc/` et `/api/` (le paiement) passent.
-  La coque dit « Lecture seule. … tout reste visible, rien n'est supprimé » + « Voir
-  l'abonnement » (ou « Mettre à jour ma carte » pour un impayé > 14 j).
-- **Sans la 027**, `lecture` est absent : la porte d'avant reste (jamais une app vide).
-- Aujourd'hui `abonnement_obligatoire` = '0' : personne n'est coupé, rien ne change en prod.
+### 2. Sans abonnement : un extrait net, le reste flouté, aucune action
+**Décision de Julien du 8 nov.** (après deux allers-retours le même jour : la « lecture
+seule » complète a été REFUSÉE — « non, sans abonnement il a rien » —, puis précisée :
+« on lui montre un extrait de ses données, le reste sera flouté tant qu'il ne paie pas »).
+Elle remplace sa règle du 4 octobre (porte qui cachait tout). Ligne dans CLAUDE.md §3.
+- **Base (027)** : `abonnement_requis` garde son WITH CHECK (écrire exige l'accès), son
+  USING devient `true` (lire ses propres lignes est permis ; owner, 021 et 016 décident
+  toujours qui lit quoi) ; une restrictive DELETE s'ajoute ; `vrm_acces()` dit
+  `lecture: true`. Aucune écriture ne passe. Notifications et widget restent coupés.
+  Le flou est une porte COMMERCIALE (ses données) : il n'est pas tenu par le serveur.
+- **L'écran** (`src/abonnement/apercu.js`, monté par `ApercuSansAbonnement` dans la coque) :
+  sur chaque écran sauf Paramètres, les titres et les **3 premières lignes de chaque liste**
+  (≥ 4 enfants de même forme ; une rangée de filtres n'en est pas une) restent nets ; le
+  reste — lignes suivantes, textes et chiffres des cartes, graphiques, images — est flouté
+  (`blur(7px)`, voile), `aria-hidden`, `inert`, non sélectionnable. La règle lit le DOM
+  rendu (un écran ajouté demain est couvert) et se rejoue à chaque changement
+  (MutationObserver). Une liste de 1 à 3 lignes est floutée en entier (pas reconnue
+  comme liste) : à savoir.
+- **Aucune action** : clic, touche Entrée/Espace, saisie, copier, glisser dans l'écran sont
+  arrêtés et font signe à la carte ; les deux exports (sauvegarde complète, export des
+  données) sont fermés ; la garde d'écriture refuse sur place toute écriture vers la base
+  (`vrm-lecture-seule`) ; « changements en attente d'envoi » ne s'affiche pas.
+- **La carte** (verre, nette, au centre en bas) : « Ton abonnement a pris fin · Tes données
+  sont là, rien n'est supprimé. Voici un aperçu ; reprends l'abonnement pour tout
+  retrouver et agir à nouveau · Reprendre l'abonnement » (impayé > 14 j : « Mettre à jour
+  ma carte », portail). Paramètres → Abonnement reste net : « Ton abonnement a pris fin »,
+  CGV + « Reprendre l'abonnement ».
+- **Sans la 027**, `lecture` est absent : la porte d'avant (rien de visible).
+- Aujourd'hui `abonnement_obligatoire` = '0' : personne n'est coupé.
+- Limites : la loupe du haut (hors de l'écran) n'est pas floutée ; les écritures tentées
+  pendant l'aperçu restent dans la file d'envoi de l'appareil et partiront à la reprise.
 
 ### 3. La page Abonnement
 - Une carte d'en-tête (état · titre · phrase · geste), puis des rangées iOS
@@ -57,7 +71,7 @@ Inchangés : prix `vrm_mensuel` à 16,99 €, `STRIPE_SECRET_KEY`, mentions de `
   navigateur est ignoré, prouvé), « Résilier » (**2 clics** : la rangée puis la confirmation
   — L215-1-1, « résiliation en trois clics » respectée), « Tes factures » en rangées.
 - États : essai · essai résilié · abonné · résilié (« Fin le … ») · paiement en échec ·
-  lecture seule · pas d'abonnement · paiement pas encore ouvert (Stripe absent ou prix ≠ CGV
+  abonnement terminé (aperçu) · pas d'abonnement · paiement pas encore ouvert (Stripe absent ou prix ≠ CGV
   ou mentions vides : dit calmement, **aucun bouton**) · propriétaire.
 - Les `data-abonnement` d'avant sont gardés (le banc `abonnement.cjs` les lit) ;
   `data-abonnement-etat` dit l'état fin.
@@ -89,10 +103,13 @@ Abonnement → Résilier, puis confirmer » et « … → Tes factures ». Les c
 ## Les preuves
 | contrôle | aujourd'hui | sur la branche de départ | mutations |
 |---|---|---|---|
-| `scripts/audit-abonnement-propre.cjs` (exécute `api/compte.js` + le module, lit la 027) | 59 verts | **29 rouges** | portail sur le `customer` du navigateur → 1 · porte qui ferme malgré `lecture` → 1 · crédit sans relire la marque Stripe → 1 |
-| `scripts/bancs/abonnement-propre.cjs` (rendu 390/1512, clair/sombre, faux serveur) | 36 verts | **22 rouges** | porte qui ferme à l’expiration → 6 rouges |
-| `audit-abonnement` 103 · `audit-lancement` 31 · `audit-mentions-paiement` 19 · `audit-fonctions-api` · `audit-variables` · `audit-tdz` | verts | — | — |
+| `scripts/audit-abonnement-propre.cjs` (exécute `api/compte.js` + le module, lit la 027) | 60 verts | **30 rouges** | portail sur le `customer` du navigateur → 1 · porte qui ferme malgré `lecture` → 1 · crédit sans relire la marque Stripe → 1 |
+| `scripts/bancs/abonnement-propre.cjs` (rendu 390/1512, clair/sombre, données du mode exemple, faux serveur) | 71 verts | **19 rouges** | reste lisible (`flouter` neutralisé) → 6 rouges · une action passe (`bloquerGestes` neutralisé) → 4 rouges |
+| `audit-abonnement` 103 · `audit-lancement` 31 · `audit-mentions-paiement` 19 · `audit-fonctions-api` · `audit-variables` · `audit-tdz` · `audit-violet` | verts | — | — |
 | banc `abonnement.cjs` | 108 verts, 1 rouge | **le même rouge** (« retour de Stripe ouvre Abonnement ») | — |
+
+Captures regardées : Ventes 1512 (3 ventes nettes, la suite floutée, carte au centre),
+Statistiques 1512 sombre, Annonces 390 sombre, Achats 1512, Paramètres → Abonnement.
 
 ## Ce qui reste
 - Confirmation de résiliation par e-mail (support durable) : Stripe (geste 4) ou un envoi VRM.
