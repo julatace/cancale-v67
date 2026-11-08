@@ -11,7 +11,7 @@ concurrency:
 jobs:
   comptes-et-reception:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,6 +24,9 @@ jobs:
       - name: Installer le navigateur de contrôle
         run: |
           npx playwright install --with-deps chromium
+          # Des bancs visent /opt/pw-browsers/chromium (le conteneur des sessions), comme dans verifier.yml.
+          sudo mkdir -p /opt/pw-browsers
+          sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
           echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
       - name: Vérifier récupération et fermeture de l'espace privé
         run: |
