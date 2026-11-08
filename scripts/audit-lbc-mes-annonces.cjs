@@ -20,6 +20,7 @@
 //     corps { list_ids:[number] } — VRM ne l'a pas vue.
 // Le VRAI lbc-inject.js, le VRAI lbc-relay.js et le VRAI background.js sont
 // exécutés (vm), avec des identifiants INVENTÉS.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const racine = path.join(__dirname, '..');

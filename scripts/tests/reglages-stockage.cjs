@@ -1,3 +1,4 @@
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('fs'),assert=require('assert/strict');
 const source=fs.readFileSync('src/App.jsx','utf8').match(/const save = \(k,v\) => \{[\s\S]*?\n};/)[0];
 let fail=true,pushes=0;const tasks=[],errors=[];const AUTH={user:{id:'vendeur-a'}};

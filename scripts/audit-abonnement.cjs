@@ -23,6 +23,7 @@
 // 006) — la règle SQL elle-même a été exécutée sur la vraie base dans une
 // transaction annulée, cinq cas, le 4 octobre.
 // Aucune donnée réelle : tout est inventé ici.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), crypto = require('crypto');
 const RACINE = path.join(__dirname, '..');
 

@@ -36,7 +36,7 @@ async function charger(mut) {
   const theme = ecrire('src/themeMineral.js'), cible = ecrire('src/cibleNotif.js');
   fs.writeFileSync(path.join(dir, 'src', 'package.json'), '{"type":"module"}');
   const fusion = mut && mut.fichier === 'src/design/fusion.css' ? mut.fn(lire('src/design/fusion.css')) : lire('src/design/fusion.css');
-  const app = mut && mut.fichier === 'src/App.jsx' ? mut.fn(lire('src/App.jsx')) : lire('src/App.jsx');
+  const app = mut && mut.fichier === 'src/App.jsx' ? mut.fn(require("./_source-app.cjs").sourceApp()) : require("./_source-app.cjs").sourceApp();
   const T = await import('file://' + path.join(dir, 'src', 'themeMineral.js'));
   const C = await import('file://' + path.join(dir, 'src', 'cibleNotif.js'));
   fs.rmSync(dir, { recursive: true, force: true });

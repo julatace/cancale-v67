@@ -1,5 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 import {qrMfa} from '../../src/qrMfa.js';
+import { createRequire as creerRequireSourceApp } from 'node:module';
+creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const app=fs.readFileSync('src/App.jsx','utf8'),ext=fs.readFileSync('vinted-sync-extension/background.js','utf8');
 const A='11111111-1111-4111-8111-111111111111',B='22222222-2222-4222-8222-222222222222';
 const extraire=(s,a,b)=>s.slice(s.indexOf(a),s.indexOf(b,s.indexOf(a)));

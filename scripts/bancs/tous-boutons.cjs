@@ -37,6 +37,7 @@
 // `RAPPORT=<fichier.json>`, `CAPTURES=<dossier>` (capture de chaque défaut).
 // Sortie non nulle s'il reste un défaut hors des EXCEPTIONS ci-dessous.
 'use strict';
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 require('./_porte-banc.cjs');
 const path = require('path');
 let chromium;

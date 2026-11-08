@@ -9,6 +9,7 @@
 //  On EXÉCUTE le vrai `background.js` (vm) et les vrais helpers d'App.jsx, et
 //  on exige que l'app et l'extension rendent les MÊMES clés (§11).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
 const BG = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');

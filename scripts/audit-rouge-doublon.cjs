@@ -110,13 +110,15 @@ function juger(depot) {
         if (!estRouge(rgb)) continue;
         if (m[1] && MARQUES.includes(('#' + hex6(m[1]).map((x) => x.toString(16).padStart(2, '0')).join('')).toLowerCase())) continue;
         if (MARQUEUR.test(fenetre(lignes, i))) continue;
-        parDette[rel] = parDette[rel] || []; parDette[rel].push(`${i + 1}: ${m[0]}`);
+        // (8 nov., démarrage léger) src/ecrans/*.jsx est du code d'App.jsx déménagé : même dette, même plafond.
+        const cle = rel.startsWith('src/ecrans/') ? 'src/App.jsx' : rel;
+        parDette[cle] = parDette[cle] || []; parDette[cle].push(`${cle === rel ? '' : rel.slice(4) + ':'}${i + 1}: ${m[0]}`);
       }
     });
   }
   // R6 — une paire en ligne deux fois n'est pas « deux paires » (la carte ambre suffit).
   {
-    const app = sansCommentaires(lire('src/App.jsx'), false);
+    const app = sansCommentaires(require("./_source-app.cjs").sourceApp(), false);
     const regle = (/function conflitsDeNumeros\(porteurs, memePaires = null\) \{[\s\S]*?\n\}/.exec(app) || [''])[0];
     dit(/uniq\.every\(x => x\.type === 'annonce'\) && Array\.isArray\(memePaires\)/.test(regle) && /ids\.every\(id => g\.some\(/.test(regle), 'R6 `conflitsDeNumeros` dispense des annonces qu’un groupe de la carte ambre réunit TOUTES (jamais une partie)', regle.slice(0, 200));
     dit(/const conflitsNum = useMemo\(\(\) => conflitsDeNumeros\(porteursNum, groupesDeuxFois\)/.test(app) && /const groupesDeuxFois = useMemo\(\(\) => \(enLigneDeux && Array\.isArray\(enLigneDeux\.vinted\)/.test(app), 'R6 le bloc rouge reçoit les groupes de la carte ambre (`enLigneDeux.vinted`)');
@@ -136,7 +138,7 @@ function juger(depot) {
 // ── Les mutations : chaque règle affaiblie DOIT rougir ───────────────────────
 function mutations() {
   const lire = (rel) => fs.readFileSync(path.join(RACINE, rel), 'utf8');
-  const th = lire('src/themeMineral.js'), app = lire('src/App.jsx'), coque = lire('src/styles-coque.css'), jet = lire('src/design/jetons.css');
+  const th = lire('src/themeMineral.js'), app = require("./_source-app.cjs").sourceApp(), coque = lire('src/styles-coque.css'), jet = lire('src/design/jetons.css');
   const cas = [
     ['R1 danger redevient rouge', { 'src/themeMineral.js': th.replace("danger:'#B25000'", "danger:'#D70015'") }],
     ['R2 plus de jeton doublon', { 'src/themeMineral.js': th.replace(/doublon:'#[0-9A-Fa-f]+',/g, '') }],

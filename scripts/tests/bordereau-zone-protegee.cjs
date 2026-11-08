@@ -1,5 +1,6 @@
 // La recherche de zone libre (3 nov.) : exécutée seule, sur des cartes de pixels.
 // Le chemin complet (rendu, bande, fiche, rotation) : scripts/bancs/tampon-bordereau.cjs.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const source=fs.readFileSync(path.join(__dirname,'../../src/App.jsx'),'utf8');
 const region=source.slice(source.indexOf('// ── LE TAMPON DU BORDEREAU'),source.indexOf('// ── IMPRIMANTE NORMALE OU THERMIQUE'));

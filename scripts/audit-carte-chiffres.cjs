@@ -33,7 +33,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; if (!c || process.env.BAVARD) console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
-let APP = lire('src/App.jsx');
+let APP = require("./_source-app.cjs").sourceApp();
 let MODULE = lire('src/design/carteChiffres.js');
 const muter = (avant, apres) => {
   if (!MODULE.includes(avant)) { console.log('❌ mutation impossible : motif absent — ' + avant.slice(0, 90)); process.exit(2); }

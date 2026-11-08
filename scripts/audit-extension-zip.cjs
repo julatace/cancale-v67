@@ -27,6 +27,7 @@
 //      source, s'il a déjà été servi par `main`, doit l'avoir été avec CE contenu.
 //
 // Lecture seule.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 const RACINE = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');

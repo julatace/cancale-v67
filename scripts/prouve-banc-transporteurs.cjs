@@ -15,6 +15,7 @@
 //  `node scripts/audit-statut-transporteurs.cjs --prouve`.
 //  Le banc écoute $BANC_PORT (8505 par défaut) : lancer ce script SEUL.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const os = require('os');

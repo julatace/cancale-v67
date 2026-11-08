@@ -10,6 +10,7 @@
 //   3. l'autre sens : sans retrait, tout reste ;
 //   4. le geste dans Comptes liés range le choix par identifiant de compte, la
 //      carte le dit, et « Les remettre » l'annule.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

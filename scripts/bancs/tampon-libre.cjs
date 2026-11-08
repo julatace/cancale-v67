@@ -22,6 +22,7 @@
 //   6. « Déplacer le tampon » n'existe que dans la modale du résultat (iPhone) —
 //      non jugé ici ; aucune erreur d'app, aucun débordement.
 // Captures : CAPTURES=dossier (aperçu au téléphone et à l'ordinateur).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const RACINE = path.join(__dirname, '..', '..');
 const NM = path.join(RACINE, 'node_modules');

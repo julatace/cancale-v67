@@ -14,6 +14,7 @@
 //   X6 l'app : lectures PAGINÉES (`lireTout`), PROJETÉES (jamais `select=data`),
 //      aucune écriture ni envoi (rien ne part ailleurs), « Exporter mes données »
 //      dans Paramètres, sans texte explicatif.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');
 const MUTS = {
@@ -115,7 +116,13 @@ const imp = (f) => import(require('url').pathToFileURL(path.join(SRC, f)).href);
   dit(achatsLus && /lireTout\('id=like\.email_invoice_\*&select=id,number:/.test(bloc), 'X6 achats et factures lus PAGINÉS (lireTout) et PROJETÉS');
   dit(!/select=(id,)?data\b(?!->)/.test(bloc), 'X6 jamais `select=data`');
   dit(!/method:\s*'(POST|PATCH|PUT|DELETE)'|save\(|modifierDonnee|\/api\//.test(bloc), 'X6 aucune écriture, aucun envoi : le zip est seulement téléchargé');
-  dit(/\{ id:'donnees', type:'action', ic:'[a-z-]+', lib:'Exporter mes données', onClick:exporterMesDonnees, data:\{ 'data-exporter-donnees':'' \} \}/.test(APP), 'X6 Paramètres → « Exporter mes données », sans texte explicatif');
+  // (8 nov.) Depuis le 6 nov. (Onglets D, « Paramètres par intention ») chaque réglage porte UNE
+  // phrase (`desc`) — la règle du visuel : « une ligne d'explication au plus, le reste en feuille ».
+  // « Sans texte explicatif » se juge donc ainsi : au plus une phrase courte (≤ 90 signes, un seul
+  // point final au plus), jamais un paragraphe ni un bloc d'aide.
+  const ligneExport = /\{ id:'donnees', type:'action', ic:'[a-z-]+', lib:'Exporter mes données',(?: desc:'([^'\n]*)',)? onClick:exporterMesDonnees, data:\{ 'data-exporter-donnees':'' \} \}/.exec(APP);
+  const descExport = ligneExport && ligneExport[1] != null ? ligneExport[1] : '';
+  dit(!!ligneExport && descExport.length <= 90 && (descExport.match(/[.!?](\s|$)/g) || []).length <= 1, 'X6 Paramètres → « Exporter mes données », sans texte explicatif (une phrase au plus)', descExport ? `« ${descExport} » (${descExport.length} signes)` : '');
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);
   process.exit(ko ? 1 : 0);
 })();

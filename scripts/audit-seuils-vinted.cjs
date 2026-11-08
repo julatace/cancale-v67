@@ -29,6 +29,7 @@
  *        contrôle au ROUGE (§6.1 : « la fonction n'existait pas avant » n'est
  *        pas une preuve).
  */
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');

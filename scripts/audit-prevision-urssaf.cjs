@@ -6,6 +6,7 @@
 // Contrôles : statut et rythme jamais devinés, échéance déjà notée ⇒ la
 // suivante, mois déjà déclaré pas recompté, « au moins » + ventes à dater.
 // `--mutation=X` : rythme-devine · recompte-declare · pas-de-saut · adater-cache · registre-passu
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const ICI = path.join(__dirname, '..');
 const mut = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);

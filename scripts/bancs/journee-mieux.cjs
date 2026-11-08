@@ -38,6 +38,7 @@
 //      ligne au plus, et le geste « Emballer » reste joignable en un toucher.
 // Captures : CAPTURES=<dossier> ; lancer :
 //   npm run build && NODE_OPTIONS="--require $PWD/scripts/bancs/_porte-banc.cjs" BANC_PORT=96xx node scripts/bancs/journee-mieux.cjs
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }

@@ -18,7 +18,7 @@ process.env.TZ = 'Europe/Paris';
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const R = path.join(__dirname, '..');
 const SRC = path.join(R, 'src', 'ceQuiRapporte.js');
-const APP = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+const APP = require("./_source-app.cjs").sourceAppDe(path.join(R, 'src', 'App.jsx'));
 
 const MUTATIONS = {
   achat_inconnu_zero: (s) => s.replace("const connu = l.achat != null && String(l.achat).trim() !== '' && isFinite(Number(l.achat));", 'const connu = true;'),

@@ -3,6 +3,7 @@
 // (29 octobre, « retire tout de ce compte »). Exécute la VRAIE règle
 // (src/comptesSupprimes.js) et vérifie que `lireTout` (App.jsx) la passe.
 //   --prouve : réaffaiblit la règle (aucun filtre) ⇒ des contrôles rougissent.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const RACINE = path.join(__dirname, '..');

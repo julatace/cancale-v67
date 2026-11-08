@@ -15,7 +15,7 @@ const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
 let src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
-let APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+let APP = require("./_source-app.cjs").sourceAppDe(path.join(racine, 'src', 'App.jsx'));
 if (MUT === 'ext') src = src.replace("if (num != null && String(num).trim() !== '') { const k = cleNum(num); if (k) keys.push(k); }",
   "if (num != null && String(num).trim() !== '') { const k = cleNum(num); if (k) keys.push(k); } { const m = /\\bn\\s*°?\\s*(\\d{1,5})\\b/i.exec(String((o.raw && o.raw.title) || '')); if (m) keys.push(cleNum(m[1])); }");
 if (MUT === 'app') APP = APP.replace("return e.numero ? [cleNum(e.numero)].filter(Boolean) : []; };",

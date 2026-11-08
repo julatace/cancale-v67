@@ -26,6 +26,7 @@
 //    liste vivante et la paire en cours disparaissait). La commande est TENUE
 //    (§6.5) : rien ne dépend d'un délai.
 // §6.1 : sur un build d'origin/main, A et B sont rouges.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

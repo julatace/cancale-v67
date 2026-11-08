@@ -15,6 +15,7 @@
 //   5. Ma journée passe par cette forme (App.jsx l'importe et `decouper` l'appelle).
 // `--src <arbre>` : le lancer sur un autre arbre (preuve sur le code d'avant).
 // ═══════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs');
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : ''; };
 const RACINE = path.resolve(arg('--src') || path.join(__dirname, '..'));

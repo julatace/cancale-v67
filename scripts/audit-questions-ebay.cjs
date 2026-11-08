@@ -21,6 +21,7 @@
 //      « incertain » (504), jamais « envoyé » ;
 //   4. l'écran : « Envoyer » seulement sur une question, la vue « Questions »
 //      par défaut, l'article par l'ItemID / SKU (jamais le titre).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';

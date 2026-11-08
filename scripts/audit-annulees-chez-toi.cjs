@@ -139,7 +139,7 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
 
   }
   console.log('\n── S. Le branchement dans l’app');
-  const APP = sansCommentaires(fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8'));
+  const APP = sansCommentaires(require("./_source-app.cjs").sourceAppDe(path.join(SRC, 'App.jsx')));
   const iR = APP.indexOf('const remettreEnVente = (x) =>');
   const remise = iR >= 0 ? APP.slice(iR, APP.indexOf('\n', iR)) : '';
   dit(/setRepubMainOuvert\(p\)/.test(remise) && !/vmrCmd|recreerVinted|publierBrouillon/.test(remise), 'S1 « Remettre en vente » ouvre « Republier à la main » — aucune commande à l’extension', remise.slice(0, 200));

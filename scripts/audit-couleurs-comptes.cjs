@@ -11,6 +11,7 @@
 //   dans `src/App.jsx` — rien n'est recopié.
 //
 //   node scripts/audit-couleurs-comptes.cjs [chemin/App.jsx]
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const SRC = process.argv[2] || path.join(__dirname, '..', 'src', 'App.jsx');
 const APP = fs.readFileSync(SRC, 'utf8');

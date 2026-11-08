@@ -19,6 +19,7 @@
 //      « Chrome » et dit « Orion » ; un navigateur qu'on ne sait pas nommer
 //      (agent Safari, sans KAGI) : jamais « Chrome » non plus.
 // Lancer : npm run build, puis BANC_PORT=7967 CHROMIUM_PATH=… node scripts/bancs/indicateur-pro.cjs
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

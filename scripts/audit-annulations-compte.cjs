@@ -5,6 +5,7 @@
 // annulations (lien de LA vente), compte pas lu ⇒ « — » et nommé, compte
 // exclu absent, sans date compté à part, autres plateformes « pas comptées ».
 // `--mutation=X` : absence-annulee · ko-zero · hors-periode · exclu-compte · lien-titre
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ICI = path.join(__dirname, '..');
 const mut = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);

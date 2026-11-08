@@ -25,6 +25,7 @@
 //     rangé une ligne par n°, jamais « à retirer » ;
 //   · et, côté serveur (la vraie route du cron du matin) : « 📍 Dernier jour pour
 //     retirer » part une fois, et pas pour un colis retiré sous une autre clé.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

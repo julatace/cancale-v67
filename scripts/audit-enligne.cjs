@@ -38,6 +38,7 @@
 //      confirmer »).
 //  Usage : node scripts/audit-enligne.cjs [--mutation nom] (voir MUTATIONS)
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const { faireFond } = require('./_fond-vm.cjs');
 const { metaVersData } = require('./bancs/_meta.cjs');

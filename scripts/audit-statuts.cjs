@@ -17,6 +17,7 @@
 //   · des étiquettes qui ne contredisent pas cette réponse ;
 //   · le résumé que l'extension pose pour le widget = la même règle.
 // Aucune donnée réelle : seuls des LIBELLÉS de statut Vinted, aucun acheteur.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const R = path.join(__dirname, '..');
 let ko = 0;
@@ -99,6 +100,8 @@ const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat',
   shippedSuivis: new Set(), soldByTxn: {},
   // (8 nov.) les transactions parties d'après le transporteur (api/_lib/depart-colis.js) : aucune ici.
   partisTransp: new Map(),
+  // (8 nov., « à envoyer » prouvé) la règle unique (api/_lib/depart-vente.js) : aucune preuve ici.
+  partisVinted: new Map(), raisonDepartPubliee: () => null,
   // (5 nov.) `achatStage` lit les fins prouvées par `pickupUnion` (aucune ici).
   pickupUnion: { txFinis: new Set() },
 }));

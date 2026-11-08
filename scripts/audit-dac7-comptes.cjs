@@ -65,7 +65,7 @@ if (process.argv.includes('--prouve')) {
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d !== undefined && !c ? ' — ' + d : '')); };
 const lire = (f) => { try { return fs.readFileSync(path.join(R0, f), 'utf8'); } catch (_) { return ''; } };
-const APP = lire('src/App.jsx');
+const APP = require("./_source-app.cjs").sourceApp();
 let MOD = lire('src/dac7Comptes.js');
 if (MUT) {
   const m = MUTATIONS[MUT];

@@ -232,7 +232,7 @@ async function suite(lib, { quiet = false } = {}) {
     await w({ method: 'POST', query: { mode: 'sms', k: 'wA' }, headers: {}, body: { texte: SMS.dispoB } }, res2);
     const c2 = res2.code === 401;
     if (!c2) ko++; console.log(`${c2 ? '✅' : '❌'} D2 la clé du WIDGET n’ouvre pas la route des SMS`);
-    const app = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+    const app = require("./_source-app.cjs").sourceAppDe(path.join(R, 'src/App.jsx'));
     const c3 = /'vrm_sms_token',/.test(app) && /SANS_FICHIER = new Set\(\[[^\]]*'vrm_sms_token'/.test(app) && /<SmsColisSetting /.test(app);
     if (!c3) ko++; console.log(`${c3 ? '✅' : '❌'} D3 l’app synchronise le jeton, ne le met jamais dans un fichier de sauvegarde, et rend la carte`);
     const s = await import('file://' + path.join(R, 'src/smsColis.js'));

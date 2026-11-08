@@ -15,6 +15,7 @@
 // contrôles tombaient sur un artefact. Il attend que le RÉSEAU se taise et que
 // l'écran ne bouge plus (plafond 20 s : une liste qui n'arrive jamais reste
 // rouge).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)

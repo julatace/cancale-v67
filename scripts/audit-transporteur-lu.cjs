@@ -17,6 +17,7 @@
 //     journey « Disponible pour retrait »), n'est plus « Chronopost » sur sa carte.
 // Données INVENTÉES (n° CP000000123IE, XW000000042TS).
 // Usage : node scripts/audit-transporteur-lu.cjs   (RACINE=<arbre> pour l'arbre d'avant)
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs');
 const RACINE = process.env.RACINE || path.join(__dirname, '..');
 let ok = 0, ko = 0;

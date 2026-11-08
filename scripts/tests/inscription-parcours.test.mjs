@@ -1,4 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';
+import { createRequire as creerRequireSourceApp } from 'node:module';
+creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
 function banc(reponse,{captcha=false}={}){let session=null,appels=0,delai;
  const c=vm.createContext({SUPABASE_URL:'https://projet.supabase.co',SUPABASE_KEY:'publique',captchaActif:()=>captcha,routeProtegee:()=>true,jetonCaptcha:()=>false,etatCaptcha:()=>({statut:'attente'}),MSG_CAPTCHA_ATTENTE:'Vérification en cours',corpsAvecCaptcha:(_,b)=>b,consommerCaptcha:()=>{},AbortController,setTimeout:(f)=>{delai=f;return 1},clearTimeout:()=>{},fetch:async(...args)=>{appels++;return reponse(...args)},avecRetour:p=>p,MAIL_QUOTA:'Limite temporaire',writeSession:s=>{session=s},sessionFrom:j=>j});

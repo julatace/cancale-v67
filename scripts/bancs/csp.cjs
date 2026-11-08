@@ -1,3 +1,4 @@
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 require('./_porte-banc.cjs');   // l'« accès direct » est retiré de l'app (22 oct.) : session de banc
 // ════════════════════════════════════════════════════════════════════════════
 //  CSP — la politique de sécurité du contenu de vercel.json, servie POUR DE VRAI

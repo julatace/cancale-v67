@@ -23,6 +23,7 @@
 // deux ventes dispensées, la vente sans identité renumérote) doit rendre
 // l'audit ROUGE.
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
 

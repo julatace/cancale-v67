@@ -70,7 +70,7 @@ async function juger(src) {
 }
 
 function sources() {
-  const app = lire('src/App.jsx');
+  const app = require("./_source-app.cjs").sourceApp();
   // Les offres Vinted : le bloc Messages (liste + fil) de `Comptabilite`, et les règles qu'il lit.
   const debutFil = app.indexOf('const rendreConversation=()=>openConv');
   const finFil = app.indexOf('const rendreFicheConv', debutFil) > 0 ? app.indexOf('const rendreFicheConv', debutFil) : debutFil + 40000;

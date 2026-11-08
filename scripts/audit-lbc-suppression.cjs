@@ -16,6 +16,7 @@
 //   L4 l'écriture de l'e-mail ratée ⇒ 503 (le collecteur rejoue), jamais 200.
 // Données INVENTÉES (le dépôt est public).
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver } = require('./_mutations-audit.cjs');

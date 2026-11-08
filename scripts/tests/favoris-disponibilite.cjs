@@ -1,5 +1,6 @@
 // The actual readiness function must prefer the latest addressed response over
 // an unrelated missed page heartbeat. No network or Vinted message.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('src/App.jsx','utf8'),start=source.indexOf('function etatExtensionFavoris('),end=source.indexOf('\nfunction FavorisConnectes(',start);
 const ctx={__vmrEtat:null,__vmrPlusieurs:null,codePerime:()=>true,textePerime:()=> 'old page',textePlusieurs:()=> 'duplicates',vmrExtPresent:()=>false,vmrExtVersion:()=>'',AUTH:{user:{id:'owner-A'}},EXT_CAPACITES:{favoris:'5.217.0'},cmpVersion:(a,b)=>a.localeCompare(b,undefined,{numeric:true})};vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);

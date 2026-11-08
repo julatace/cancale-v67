@@ -45,6 +45,7 @@
 //    · hors ligne mesuré ⇒ cause « horsligne », jamais « pas su ».
 // Un audit ne meurt pas, il rapporte (`essaie`) : sur le code d'avant
 // (c02ffcf), les fonctions absentes sont des contrôles ROUGES, pas une pile.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const args = process.argv.slice(2);
 const opt = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
@@ -179,6 +180,10 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'AchatsHorsPlateforme :: photoForm': 'photo d’un achat hors plateforme, prise sur l’appareil (data:image, filtrée à la lecture)',
       'AchatsHorsPlateforme :: src': 'photo d’un achat hors plateforme relue de SA ligne (data:image seulement, filtrée à la lecture)',
       'Comptabilite :: qrVivant(t)': 'QR de retrait (transporteur)',
+      // (8 nov.) trois <img> arrivés après la liste, lus un à un (aucun n'affiche une photo Vinted) :
+      'EnGrandHorsLigne :: src': 'QR de retrait « En grand » hors ligne (6 nov.) : `r.qr` en data:image gardé sur l’appareil, sinon adresseQrLocale → /hl-qr?u=… servi par la réserve du service worker (src/journeeHorsLigne.js) — la même source que QrHorsLigne',
+      'ReglagesStream :: STREAM_PHOTO_EXEMPLE': 'dessin d’exemple du mode stream : constante data:image/svg+xml écrite dans Reglages.jsx, aucune URL distante',
+      'RecherchePhoto :: apercu': 'aperçu de SA photo choisie sur l’appareil : URL.createObjectURL(fichier) (blob: local, jamais envoyée), jamais une adresse Vinted',
       'Comptabilite :: qi': 'QR de retrait (transporteur)',
       'Comptabilite :: qrView.img': 'QR de retrait (transporteur)',
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',

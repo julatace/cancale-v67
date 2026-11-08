@@ -13,6 +13,7 @@
 // La marque et les couleurs sont celles de l'APP (extractBrand / extractColors,
 // extraites de src/App.jsx et exécutées), pas une copie.
 // --prouve : chaque mutation de la règle DOIT rougir.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');

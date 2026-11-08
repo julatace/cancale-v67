@@ -20,6 +20,7 @@
 //   T  (point 8) la phrase « code postal inconnu » nomme le geste qui EXISTE (« … » de Colis,
 //      « + Ajouter un n° de suivi »), plus « Achats → À retirer » (écran qui n'existe plus).
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const R = path.join(__dirname, '..');
 const PROUVE = process.argv.includes('--prouve');

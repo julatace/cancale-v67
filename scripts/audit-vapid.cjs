@@ -7,6 +7,7 @@
 // abonnement périmé ou en créait un avec la mauvaise clé, et le service de push
 // le refusait (403, VapidPkHashMismatch chez Apple) — « je ne reçois plus de
 // notif », sans aucune erreur visible.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const R = path.join(__dirname, '..');
 let ko = 0;

@@ -15,6 +15,7 @@
 //   E. un article propre (8002) : aucune feuille, l'envoi part directement ;
 //   F. aucun débordement, aucune erreur ; captures regardées
 //      (<tmp>/verif-publication-*.png).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), zlib = require('zlib'), os = require('os');

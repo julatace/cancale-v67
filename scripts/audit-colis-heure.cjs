@@ -31,6 +31,7 @@
 //      1 à 3 jours plus tard pour 62 ventes sur 202 (mesuré). Elle est comptée
 //      et dite à part : « à vérifier sur Vinted ».
 // `--src <dossier>` : lance l'audit sur une autre copie du dépôt (preuve §6.1).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path'), fs = require('fs');
 const iSrc = process.argv.indexOf('--src');

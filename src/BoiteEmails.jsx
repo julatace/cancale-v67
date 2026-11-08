@@ -41,7 +41,7 @@
 //    pas demandé en mode stream (« Masqué en mode stream » : noms et adresses).
 // ⚠️ §5 : un geste (« Voir le colis… ») ne part QUE d'une identité lue.
 // ⚠️ Au téléphone, la feuille de lecture est OPAQUE dès sa première image.
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RUBRIQUES_BOITE, rubriqueEmail } from '../api/_lib/boite-email.js';
 import { expediteurLisible, dateEmail, poidsLisible, ceQueVrmAFait, titreSimple, titreEnClair, groupesParJour, siteExpediteur, ligneEmail, gesteAmbre, monogramme, empiler, carteHeros, gestesEmail, lireCorps, lieuLisible, codeSurLigne, adresseLisible } from './boiteEmails.js';
@@ -150,6 +150,20 @@ function PuceCode({ code, grande = false, onCopie }) {
   </button>;
 }
 
+// (8 nov.) La photo d'une paire vient de la vente VINTED reliée (`photoDe`) : c'est une photo
+// Vinted. Elle passe par la règle des photos Vinted de l'app (`PhotoVinted` : sans référent,
+// secours par l'extension, le pictogramme plutôt qu'une image cassée), reçue en `Photo` —
+// jamais un <img> nu (audit-photos-vinted). Sans elle, aucune photo n'est montrée.
+// Le cadre (taille, coins, place dans la grille) reste celui de la classe : la photo le
+// remplit, et l'attente ou le pictogramme s'y posent sans déplacer la ligne.
+const PhotoBoite = createContext(null);
+const REMPLIT = { width: '100%', height: '100%', objectFit: 'cover', display: 'block' };
+function PhotoPaire({ src, className, data }) {
+  const Photo = useContext(PhotoBoite);
+  if (!src || !Photo) return null;
+  return <span className={className} {...data} style={{ display: 'block', overflow: 'hidden' }}><Photo src={src} loading="lazy" decoding="async" style={REMPLIT}/></span>;
+}
+
 // ── LA CARTE « CE QU'IL FAUT SAVOIR » ────────────────────────────────────────
 function Heros({ e, h, photo }) {
   if (h.genre === 'retrait') {
@@ -171,7 +185,7 @@ function Heros({ e, h, photo }) {
   }
   if (h.montant || h.article || photo) {
     return <section className="vrm-boite-heros" data-boite-heros={h.genre} aria-label="Ce qu’il faut savoir">
-      {photo ? <img className="vrm-boite-heros-photo" src={photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" data-boite-photo=""/> : null}
+      {photo ? <PhotoPaire className="vrm-boite-heros-photo" src={photo} data={{ 'data-boite-photo': '' }}/> : null}
       <div className="vrm-boite-heros-txt">
         {h.montant ? <p className="vrm-boite-heros-montant" data-boite-montant={h.montant}><b>{h.montant}</b>{h.montantMot ? <span>{h.montantMot}</span> : null}</p> : null}
         {h.article ? <p className="vrm-boite-heros-article">{h.article}</p> : null}
@@ -396,7 +410,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
           </span>}
         </span>
       </span>
-      {!code && photo ? <img className="vrm-boite-vignette" src={photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" data-boite-vignette=""/> : null}
+      {!code && photo ? <PhotoPaire className="vrm-boite-vignette" src={photo} data={{ 'data-boite-vignette': '' }}/> : null}
     </button>
     {code ? <PuceCode code={code}/> : null}
   </li>;
@@ -690,7 +704,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
 const VUES = [['boite', 'Boîte de réception'], ['relier', 'Relier ma boîte']];
 // (6 nov., v36) `ecrireLus(gestes)` : l'écriture des lus (src/emailsLusEcriture.js) ;
 // `photoDe(e)` : la photo de la paire reliée PAR IDENTITÉ (n° de transaction), ou `null`.
-export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier, ecrireLus, photoDe }) {
+export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier, ecrireLus, photoDe, Photo = null }) {
   // L'app repasse un objet neuf à chaque rendu : on le garde tant que son CONTENU ne
   // change pas (sinon les 950 lignes mémoïsées se redessinent à chaque tic de l'app).
   const deliesCle = JSON.stringify(deliesRecus || {});
@@ -725,6 +739,7 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
     try { haut.current && haut.current.scrollIntoView({ block: 'start', behavior: reduitMvt() ? 'auto' : 'smooth' }); } catch (_) {}
   };
   return (
+    <PhotoBoite.Provider value={Photo}>
     <section className="vrm-boite" data-boite-emails="" data-vue={vue}>
       <div className="vrm-boite-vues" role="tablist" aria-label="E-mails">
         {VUES.map(([k, mot]) => <button key={k} type="button" role="tab" aria-selected={vue === k} data-boite-vue={k} onClick={() => setVue(k)}>{mot}</button>)}
@@ -744,5 +759,6 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
         </section>}
       </div>}
     </section>
+    </PhotoBoite.Provider>
   );
 }

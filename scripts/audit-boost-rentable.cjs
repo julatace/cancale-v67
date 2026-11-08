@@ -111,7 +111,7 @@ async function audit(src, bavard) {
 }
 
 function app(ok) {
-  const s = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  const s = require("./_source-app.cjs").sourceAppDe(path.join(__dirname, '..', 'src', 'App.jsx')).replace(/\/\/[^\n]*/g, '');
   ok((s.match(/carte\('sv-boost'/g) || []).length === 1 && !/function BoostRentable\(|<BoostRentable/.test(s), 'B1 UNE seule carte « Boost rentable ? » (l’ancienne du volet replié est retirée)');
   ok(/modeleDe: \(it\) => modeleSur\(\(it && it\.brand\) \|\| '', \(it && it\.title\) \|\| ''\)/.test(s) && /annonces: extras\.items, ventes: ventesCoque, txn: extras\.txn, fiches, de: b\.de, a: b\.a/.test(s), 'B2 la carte passe les annonces, la période choisie et le modèle sûr (`modeleSur`)');
   ok(/Pas assez de données/.test(s) && /montant saisi \{boost\.avecMontant\}\/\{boost\.comparables\.b\}/.test(s), 'B3 « pas assez de données » et la couverture du coût sont dits');

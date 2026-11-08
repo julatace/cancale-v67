@@ -17,6 +17,7 @@
 //   A7  `capterAvis` est appelé par la visite ; `EXT_CAPACITES.avis` existe.
 //  `--src` : une autre copie de background.js (preuve sur le code d'avant).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');
 const SRC = cheminSource();
