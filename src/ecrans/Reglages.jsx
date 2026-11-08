@@ -52,7 +52,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
-import { etatAbonnement, lienParrainage } from '../abonnement/etatAbonnement.js';
+import { etatAbonnement, lienParrainage, lectureSeuleActive } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
@@ -1396,6 +1396,9 @@ function StatutSauvegardeReglages() {
   const stockage=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
   const echec=stockage||(attente&&['error','refus'].includes(_syncInfo.etat));
   if(!attente&&!stockage) return null;
+  // (8 nov.) Lecture seule (abonnement expiré) : la base refuse d'écrire, et
+  // « Réessayer » n'y changerait rien — on dit pourquoi, sans geste trompeur.
+  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Lecture seule : rien n'est enregistré tant que l'abonnement n'est pas actif</span></div>;
   return <div className="vrm-settings-status" role="status" data-statut-reglages={echec?'echec':'encours'} style={{color:echec?C.warn:C.muted}}>
     {!echec&&<span className="vrm-settings-status-pt" aria-hidden="true"/>}
     <span>{stockage?'Refusée par cet appareil':echec?'Pas encore synchronisé':'Enregistrement…'}</span>

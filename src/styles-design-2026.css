@@ -746,13 +746,13 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 /* ── (8 nov.) L'ABONNEMENT : la ligne de la coque et la page ─────────────────
    Une ligne discrète (J-3, J-1 de l'essai ; « lecture seule » à l'expiration) :
    fond de case, texte encre, un seul point ambre quand il y a un geste à faire. */
-.vrm-bandeau-abo { display: flex; align-items: center; gap: var(--d-e-3); margin: var(--d-e-3) var(--d-e-4) 0; padding: 10px 6px 10px var(--d-e-4); min-height: 44px; box-sizing: border-box; border-radius: var(--d-r-case); background: var(--d-case); color: var(--d-encre); font-size: var(--d-t-13); line-height: 1.38; }
+.vrm-bandeau-abo { display: flex; align-items: center; gap: var(--d-e-3); margin: var(--d-e-3) var(--d-e-4) 0; padding: 10px 6px 10px var(--d-e-4); min-height: 44px; box-sizing: border-box; border-radius: var(--d-r-case); background: var(--d-carte); box-shadow: var(--d-ombre-carte); color: var(--d-encre); font-size: var(--d-t-13); line-height: 1.38; }
 .vrm-bandeau-abo-point { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: var(--d-point-ambre); }
 .vrm-bandeau-abo-texte { flex: 1 1 auto; min-width: 0; }
 .vrm-bandeau-abo-texte b { font-weight: 600; }
 .vrm-bandeau-abo-geste { flex: 0 0 auto; min-height: 44px; padding: 0 10px; white-space: nowrap; font-weight: 600; color: var(--d-accent-texte); background: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; }
 .vrm-bandeau-abo-fermer { flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--d-gris); cursor: pointer; border-radius: var(--d-r-ctrl); }
-@media (max-width: 600px) { .vrm-bandeau-abo { flex-wrap: wrap; row-gap: 0; } .vrm-bandeau-abo-texte { flex-basis: calc(100% - 60px); } .vrm-bandeau-abo-geste { margin-left: 14px; padding-left: 6px; } }
+@media (max-width: 600px) { .vrm-bandeau-abo { flex-wrap: wrap; row-gap: 0; padding-bottom: 0; } .vrm-bandeau-abo-texte { flex-basis: calc(100% - 24px); } .vrm-bandeau-abo-geste { padding-left: 0; } .vrm-bandeau-abo-point + .vrm-bandeau-abo-texte ~ .vrm-bandeau-abo-geste { margin-left: 20px; } .vrm-bandeau-abo-fermer { margin-left: auto; } }
 .vrm-abo-tete { padding: var(--d-e-5) var(--d-e-4) var(--d-e-4); border-radius: var(--d-r-carte); background: var(--d-carte); box-shadow: var(--d-ombre-carte); }
 .vrm-abo-etat { font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); }
 .vrm-abo-titre { margin-top: 4px; font-size: var(--d-t-22); font-weight: 700; letter-spacing: -0.022em; line-height: 1.2; color: var(--d-encre); }

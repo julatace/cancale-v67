@@ -90,7 +90,7 @@ Abonnement → Résilier, puis confirmer » et « … → Tes factures ». Les c
 | contrôle | aujourd'hui | sur la branche de départ | mutations |
 |---|---|---|---|
 | `scripts/audit-abonnement-propre.cjs` (exécute `api/compte.js` + le module, lit la 027) | 59 verts | **29 rouges** | portail sur le `customer` du navigateur → 1 · porte qui ferme malgré `lecture` → 1 · crédit sans relire la marque Stripe → 1 |
-| `scripts/bancs/abonnement-propre.cjs` (rendu 390/1512, clair/sombre) | voir le rapport | rouge (aucun des états n'existe) | porte qui ferme à l'expiration → rouge |
+| `scripts/bancs/abonnement-propre.cjs` (rendu 390/1512, clair/sombre, faux serveur) | 36 verts | **22 rouges** | porte qui ferme à l’expiration → 6 rouges |
 | `audit-abonnement` 103 · `audit-lancement` 31 · `audit-mentions-paiement` 19 · `audit-fonctions-api` · `audit-variables` · `audit-tdz` | verts | — | — |
 | banc `abonnement.cjs` | 108 verts, 1 rouge | **le même rouge** (« retour de Stripe ouvre Abonnement ») | — |
 
