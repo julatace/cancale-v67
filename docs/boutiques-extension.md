@@ -126,6 +126,11 @@ toutes les deux.
 
 ## 3. Le kit de publication addons.mozilla.org (Firefox ordinateur, Android, Orion)
 
+> ⚠️ **8 nov. 2026 : la fiche à coller est désormais `docs/boutiques/firefox.md`** (Chrome :
+> `docs/boutiques/chrome-web-store.md`, Edge : `docs/boutiques/edge.md`). Le texte ci-dessous est
+> l'historique : sa description (« elle ne publie rien et n'accepte aucune offre toute seule ») ne
+> correspond plus au code.
+
 Compte gratuit : https://addons.mozilla.org/developers/ → **Soumettre un
 nouveau module** → envoyer `VRM-firefox.zip`.
 

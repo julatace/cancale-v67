@@ -1,3 +1,10 @@
+> ⚠️ **REMPLACÉ le 8 novembre 2026 par `docs/boutiques/`** (fiches Chrome, Edge, Firefox prêtes à coller,
+> paquets `scripts/paquets-boutiques.cjs`, audit `scripts/audit-paquets-boutiques.cjs`, politique
+> `https://vrm.center/legal/extension.html`, visuels du mode exemple). Le texte ci-dessous est gardé pour
+> l'historique : il est **faux** sur plusieurs points (il dit que l'extension « n'accepte jamais une offre »
+> — l'acceptation automatique existe, éteinte par défaut ; il oublie Vestiaire Collective et les
+> transporteurs dans les autorisations). Ne pas le coller.
+
 # Publier l'extension VRM sur le Chrome Web Store
 
 > Edge, Opera, Brave et Firefox (ordinateur et Android) : voir

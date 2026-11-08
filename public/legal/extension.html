@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confidentialité de l’extension — VRM</title>
+<meta name="description" content="Ce que l’extension navigateur VRM lit, ce qu’elle envoie, à qui, et ce qu’elle ne fait jamais.">
+<meta name="robots" content="index,follow">
+<link rel="icon" type="image/png" href="/vrm-icon-v2-192.png">
+<link rel="stylesheet" href="/legal/legal.css">
+</head>
+<body>
+<div class="page">
+<header><img src="/logo-vrm-192.png" alt=""><a href="/">VRM</a></header>
+<nav aria-label="Documents légaux"><a href="/legal/mentions-legales.html">Mentions légales</a><a href="/legal/cgu.html">Conditions d’utilisation</a><a href="/legal/cgv.html">Conditions de vente</a><a href="/legal/confidentialite.html">Confidentialité</a><a href="/legal/extension.html" aria-current="page">Extension</a><a href="/legal/cookies.html">Cookies et traceurs</a></nav>
+<main>
+<h1>Confidentialité de l’extension VRM</h1>
+<p class="maj">Dernière mise à jour : 8 novembre 2026</p>
+
+<!-- Cette page décrit le CODE de l'extension (vinted-sync-extension/), rien de plus.
+     Toute nouvelle lecture, tout nouveau site ou destinataire se déclare ICI avant
+     publication dans une boutique (docs/boutiques/README.md). Elle complète la
+     politique générale (/legal/confidentialite.html), qui reste celle du service. -->
+
+<p>L’extension VRM (Chrome, Edge, Firefox, Orion) relie l’app VRM à <b>tes propres</b> comptes Vinted, Leboncoin, eBay et Vestiaire Collective. Cette page dit exactement ce qu’elle lit, ce qu’elle envoie et à qui. Pour le reste du service (ton compte, la durée de conservation, tes droits), c’est la <a href="/legal/confidentialite.html">politique de confidentialité de VRM</a> qui s’applique.</p>
+
+<h2>1. En bref</h2>
+<ul>
+<li>Elle ne travaille que sur les sites listés au point 2, et seulement pour le compte connecté dans l’onglet.</li>
+<li>Ce qu’elle lit part <b>uniquement dans ton compte VRM</b>. Rien n’est vendu, rien ne sert à la publicité ni au profilage.</li>
+<li>Elle ne lit jamais ton mot de passe, ni ton historique de navigation.</li>
+<li>Tout son code est dans le paquet installé : elle ne télécharge et n’exécute aucun code venu d’ailleurs.</li>
+</ul>
+
+<h2>2. Les sites où elle s’exécute</h2>
+<table>
+<tr><th>Site</th><th>Pourquoi</th></tr>
+<tr><td>vinted.fr, vinted.com, vinted.it, vinted.de</td><td>Tes comptes Vinted : lire ton activité, exécuter les actions que tu demandes.</td></tr>
+<tr><td>vinted.net</td><td>Les photos de tes annonces Vinted (serveur d’images de Vinted), pour les joindre à la même annonce ailleurs.</td></tr>
+<tr><td>amazonaws.com</td><td>Les bordereaux PDF de Vinted sont servis par un stockage Amazon : l’extension les télécharge pour les ranger avec la vente.</td></tr>
+<tr><td>leboncoin.fr</td><td>Tes comptes Leboncoin.</td></tr>
+<tr><td>ebay.fr, ebay.com</td><td>Tes comptes eBay : préparer une annonce depuis VRM.</td></tr>
+<tr><td>vestiairecollective.com</td><td>Tes comptes Vestiaire Collective.</td></tr>
+<tr><td>mondialrelay.fr, mondialrelay.be, ws.chronopost.fr, carrier.vintedgo.com ; et les pages de suivi chronopost.fr et vintedgo.com</td><td>Lire le statut public des colis que tu attends. Sur les pages de suivi, l’extension lit seulement l’<b>adresse</b> de la page (le n° de suivi), jamais son contenu.</td></tr>
+<tr><td>vrm.center (et son ancienne adresse cancale-v67-ten.vercel.app)</td><td>L’app VRM, qui commande l’extension.</td></tr>
+<tr><td>lgonxzrzjcqthjtbdpzo.supabase.co</td><td>La base de données de VRM, où ton espace est rangé (Union européenne, Irlande).</td></tr>
+</table>
+<p>Sur tout autre site, l’extension ne s’exécute pas et ne lit rien.</p>
+
+<h2>3. Ce qu’elle lit</h2>
+<table>
+<tr><th>Quoi</th><th>Comment</th><th>Pour quoi</th></tr>
+<tr><td>Les cookies de session de Vinted (<code>access_token_web</code>, <code>refresh_token_web</code>, <code>anon_id</code>)</td><td>Autorisation « cookies » du navigateur, sur les domaines Vinted seulement</td><td>Savoir quel compte Vinted est connecté, n’agir qu’au nom de celui-là, et exécuter les actions que tu commandes depuis VRM</td></tr>
+<tr><td>Ton activité sur les sites de revente : annonces, ventes, achats, messages, offres, avis reçus, soldes du porte-monnaie, nombre de favoris, bordereaux</td><td>Les réponses que ces sites envoient déjà à ta page quand tu les ouvres, et des lectures faites depuis la page, une à la fois</td><td>Afficher ton activité dans VRM, préparer les colis, calculer tes chiffres</td></tr>
+<tr><td>Le PDF d’un bordereau que tu télécharges depuis Vinted</td><td>Autorisation « téléchargements » : seuls les PDF venant de Vinted sont regardés, tout autre téléchargement est ignoré</td><td>Ranger le bordereau avec sa vente</td></tr>
+<tr><td>Les photos de tes annonces</td><td>Depuis le serveur d’images du site</td><td>Les joindre à la même annonce sur un autre site, quand tu le demandes</td></tr>
+<tr><td>Le statut public d’un colis que tu attends</td><td>Le n° de suivi (et, pour Mondial Relay, le code postal du point relais) envoyé au site du transporteur depuis ton navigateur, au plus 12 fois par heure et par transporteur — seulement quand le serveur de VRM ne peut pas le lire lui-même</td><td>Te dire où en est le colis</td></tr>
+<tr><td>L’adresse des onglets ouverts</td><td>Autorisation « onglets », sur ton appareil</td><td>Retrouver l’onglet Vinted, Leboncoin ou VRM déjà ouvert. Ces adresses ne sont ni gardées ni envoyées</td></tr>
+</table>
+<p>Elle ne lit pas : ton mot de passe, ton historique de navigation, les sites hors de la liste du point 2, ni les données bancaires, d’identité ou de double authentification échangées avec ces sites.</p>
+
+<h2>4. Ce qu’elle envoie, et à qui</h2>
+<table>
+<tr><th>Destinataire</th><th>Ce qui part</th></tr>
+<tr><td><b>Ton espace VRM</b> (base Supabase de VRM, hébergée dans l’Union européenne)</td><td>Ce qui est lu au point 3 sur tes comptes, rangé sous ton compte VRM et séparé de celui des autres utilisateurs ; les jetons de session de tes comptes de revente, pour exécuter les actions que tu commandes ; des relevés techniques de fonctionnement (version de l’extension, étapes, codes d’erreur).</td></tr>
+<tr><td><b>Le site concerné</b> (Vinted, Leboncoin, eBay, Vestiaire Collective)</td><td>Les actions que tu commandes, en ton nom, depuis ta propre page — comme si tu les faisais toi-même.</td></tr>
+<tr><td><b>Les transporteurs</b> (Mondial Relay, Chronopost, Vinted Go)</td><td>Le n° de suivi d’un colis que tu attends (et le code postal du point relais pour Mondial Relay). Jamais ton code de retrait, jamais ton nom.</td></tr>
+<tr><td><b>Photoroom</b>, par le serveur de VRM</td><td>Seulement si tu as posé ta propre clé Photoroom dans VRM : les photos d’une annonce que tu publies sur Vestiaire Collective, pour en retirer le fond.</td></tr>
+</table>
+<p>Personne d’autre ne reçoit ces données. Elles ne sont ni vendues, ni louées, ni utilisées pour de la publicité, du profilage, ou pour évaluer une solvabilité. Personne ne les lit, sauf à ta demande (assistance), pour la sécurité ou pour respecter la loi.</p>
+
+<h2>5. Ce qu’elle fait en ton nom</h2>
+<ul>
+<li><b>Sur ton clic dans VRM</b> : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective ; republier une annonce Vinted (elle est enregistrée, retirée puis remise en ligne) ; répondre à un message ; accepter, refuser ou faire une offre ; générer un bordereau et récupérer son PDF ; supprimer une annonce Leboncoin (après confirmation).</li>
+<li><b>Seulement si tu les allumes dans VRM</b> (éteintes par défaut) : accepter une offre Vinted au-dessus du prix minimum que tu as fixé ; envoyer ton message aux personnes qui mettent ton annonce en favori.</li>
+<li><b>Ses garde-fous</b> : elle n’agit qu’au nom du compte connecté dans l’onglet ; au plus 50 actions par heure et par compte ; une requête à la fois ; elle s’arrête quand le site demande une pause.</li>
+</ul>
+
+<h2>6. Ce qu’elle garde sur ton appareil</h2>
+<p>Dans le stockage de l’extension (<code>storage.local</code>) : ta session VRM, les compteurs du plafond d’actions, les commandes en attente et les dates de ses tâches. Tout disparaît quand tu désinstalles l’extension.</p>
+
+<h2>7. Arrêter</h2>
+<p>« Se déconnecter » dans la fenêtre de l’extension arrête tout envoi vers VRM. Désinstaller l’extension l’arrête définitivement. Les données déjà rangées dans ton espace VRM suivent la <a href="/legal/confidentialite.html">politique de confidentialité de VRM</a> (durée de conservation, export, suppression, tes droits) ; écris à <span data-e="email"></span> pour toute question.</p>
+
+<h2>8. Utilisation limitée</h2>
+<p>L’utilisation des informations reçues des API du navigateur (Chrome, Edge, Firefox) respecte la politique relative aux données utilisateur du Chrome Web Store, y compris ses exigences d’utilisation limitée, et les règles des modules de Mozilla et de Microsoft : ces données servent uniquement à faire fonctionner VRM pour toi.</p>
+
+</main>
+<footer>VRM est un outil indépendant. Il n’est ni affilié, ni approuvé, ni sponsorisé par Vinted, Leboncoin, eBay ou Vestiaire Collective ; ces noms sont des marques de leurs propriétaires respectifs.</footer>
+</div>
+<script src="/legal/editeur.js"></script>
+</body>
+</html>

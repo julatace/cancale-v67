@@ -28,6 +28,7 @@ import SuiviComptes from '../SuiviComptes.jsx';
 import { ToutVaBien } from '../ToutVaBien.jsx';
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
+import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
 // ⟦← App.jsx #2⟧
 import { filtrerReglages } from '../rechercheReglages.js';
 import { preparerApercusModes } from '../apercusBordereaux.js';
@@ -4465,7 +4466,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
       <h3>Extension · ce navigateur</h3><strong style={{color:extension.etat==='action'?C.warn:C.text}}>{extension.titre}</strong><p style={{color:C.muted}}>{extension.detail}</p>
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
       <details><summary>Installer ou mettre à jour l’extension</summary>
-        <div className="vrm-connexions-actions"><a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a><a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a><a href={`/VRM-Orion-dossier.zip?v=${EXT_ATTENDUE}`} download data-orion-dossier="">Orion · en dossier</a></div>
+        <div className="vrm-connexions-actions">{(()=>{const b=installerExtensionIci();return b.boutique?<a href={b.lien} target="_blank" rel="noreferrer" data-ext-boutique={b.nav}>{b.nomBoutique} · mises à jour automatiques</a>:null;})()}<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a>{boutiqueOrion()&&<a href={boutiqueOrion()} target="_blank" rel="noreferrer" data-orion-boutique="">Orion · depuis la boutique (mises à jour automatiques)</a>}<a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a><a href={`/VRM-Orion-dossier.zip?v=${EXT_ATTENDUE}`} download data-orion-dossier="">Orion · en dossier</a></div>
         <p>Le zip se dézippe en un seul dossier « VRM-extension » : mets-le à la place de l'ancien, au même endroit, PUIS dans chaque navigateur où elle est installée, ouvre <code>chrome://extensions</code> et clique ⟳ sur VRM (sans ⟳, le navigateur garde l'ancien code). Sur Edge, utilise <code>edge://extensions</code>.</p>
         <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
         <p>Si Orion refuse le fichier : télécharge « Orion · en dossier », ouvre-le dans l'app Fichiers (le toucher donne un dossier « VRM-Orion »), puis dans Orion, Extensions → + → depuis un fichier, et choisis ce dossier (ou le fichier manifest.json qui est dedans).</p>
