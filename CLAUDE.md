@@ -511,6 +511,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · À retirer : villes, carte, délai** : villes = seulement celles où un colis compté attend, triées par urgence, + « Autres » (`selecteurVilles`) ; carte AUSSI au téléphone (200 px, suit la ville, deux doigts, « Agrandir », hors réseau ⇒ rien) ; barre du délai arrivée lue → limite (lue, sinon « estimée »), ambre ≤ 24 h, jamais rouge, en tête du point si commune (`src/delaiRetrait.js`). `docs/passation/2026-11-08-retirer-carte-delai.md`. Geste : aucun.
 - **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
 
 
@@ -543,7 +544,6 @@ sans la fonction.
 
 - **6 nov. · Loupe universelle (v36)** : une loupe pour tout (N°, pseudo, suivi, code ⇒ colis « En grand », transaction, montant au centime, titre, marque/taille, facture, e-mail par le moteur de l'écran E-mails) ; 50 jumelles = 50 lignes ; texte tapé hors de la coque (frappe 32 ms médiane au banc). `docs/passation/2026-11-06-recherche.md`. Geste : taper un code de retrait.
 
-- **6 nov. · Visuel 2 (v36)** : grand titre qui se replie (téléphone ; barre de verre retirée : CLS au chargement) ; Colis (nom sur sa ligne, adresse dessous), eBay (À faire en Réglages, « Relier » au maillon, photo 64), Ma journée (À faire en UNE carte, paires du jour en pile), états vides dessinés, chiffre qui roule, `montant()` partout ; violet interdit (`audit-violet`, pastilles de compte). `docs/passation/2026-11-06-visuel-2.md`. Geste : regarder Colis et eBay sur l’iPhone.
 
 
 

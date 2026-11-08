@@ -152,7 +152,8 @@ const mesurer = (pg) => pg.evaluate(() => ({
         dit(pub === TOTAL && m.lignes.length === TOTAL && new Set(m.lignes).size === TOTAL, `les ${TOTAL} colis, chacun une fois (= vrm_colis_retirer)`, `${pub} / ${m.lignes.length}`);
         const parV = Object.fromEntries(m.villes.filter((x) => x.v).map((x) => [x.v, Number(x.n)]));
         for (const [v, n] of Object.entries(ATTENDU)) dit(parV[v] === n, `bouton « ${v} » : ${n} colis`, JSON.stringify(m.villes));
-        dit(m.villes.length === Object.keys(ATTENDU).length + 1, 'une ville = un bouton (« CANCALE » = « Cancale », « ST MALO » = « Saint-Malo »), rien d’autre', JSON.stringify(m.villes.map((x) => x.txt)));
+        // (8 nov.) + « Autres » : le point CONNU sans ville lue (nom seul, homonyme) a son bouton, à la fin (`selecteurVilles`).
+        dit(m.villes.length === Object.keys(ATTENDU).length + 2 && m.villes[m.villes.length - 1].v === '__autres' && m.villes[m.villes.length - 1].n === '1', 'une ville = un bouton (« CANCALE » = « Cancale », « ST MALO » = « Saint-Malo »), puis « Autres · 1 », rien d’autre', JSON.stringify(m.villes.map((x) => x.txt)));
         dit(m.villes.some((x) => x.v === 'cp:35350' && /^35350\b/.test(x.txt)), 'le code postal à plusieurs communes dit « 35350 », jamais une ville devinée', '');
         for (const v of Object.keys(ATTENDU)) { const n = m.points.filter((p) => p.ville === v).reduce((t, p) => t + p.n, 0); dit(n === ATTENDU[v], `les points de « ${v} » portent ${ATTENDU[v]} colis (= le bouton)`, String(n)); }
         const carrefour = m.points.find((p) => /carrefour/i.test(p.nom));

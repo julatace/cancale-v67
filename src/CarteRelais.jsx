@@ -30,7 +30,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN } from './relaisColis.js';
-import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
+import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, selecteurVilles as selecteurVillesRegle, CLE_AUTRES, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
 import './styles-colis-colonnes.css';
 import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.jsx';
 import { cleStatTransporteur } from './transporteursVisuels.js';
@@ -179,8 +179,13 @@ const jourFr = (s) => { const t = Date.parse(String(s || '') + 'T12:00:00'); ret
 // (`nombreEpingle` — la ligne du point dit le même) ; `etiquette(p)` ne sert
 // qu'à l'ancien bloc « Par point relais » (arrivés + attendus). Toucher une
 // épingle appelle `onChoisir(cle)` ; l'épingle choisie est entourée.
-export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat, muet = false }) {
+// (8 nov.) `cooperatif` (au doigt) : un doigt fait défiler la PAGE, deux doigts déplacent la carte
+// (`cooperativeGestures` de MapLibre, phrase en français) — la carte ne prend jamais le défilement.
+const PHRASES_GESTES = { 'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + molette pour zoomer la carte', 'CooperativeGesturesHandler.MacHelpText': '⌘ + molette pour zoomer la carte', 'CooperativeGesturesHandler.MobileHelpText': 'Deux doigts pour déplacer la carte' };
+const margesCadre = (h) => (h < 240 ? { top: 42, bottom: 58, left: 28, right: 28 } : { top: 48, bottom: 64, left: 40, right: 40 });
+export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat, muet = false, cooperatif = false }) {
   const boite = React.useRef(null);
+  const carteRef = React.useRef(null);
   const elements = React.useRef(new Map());
   const [etat, setEtat] = React.useState('charge');
   React.useEffect(() => { if (onEtat) onEtat(etat); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [etat]);
@@ -199,10 +204,11 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
       return f.chargerMaplibre().then((ml) => {
         if (!vivant || !boite.current) return;
         const lats = points.map((p) => p.lat), lons = points.map((p) => p.lon);
-        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [(Math.min(...lons) + Math.max(...lons)) / 2, (Math.min(...lats) + Math.max(...lats)) / 2], zoom: 12, attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false });
+        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [(Math.min(...lons) + Math.max(...lons)) / 2, (Math.min(...lats) + Math.max(...lats)) / 2], zoom: 12, attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, ...(cooperatif ? { cooperativeGestures: true, locale: PHRASES_GESTES } : {}) });
+        carteRef.current = carte;
         carte.once('load', () => {
           try { carte.resize(); } catch (_) {}
-          if (points.length > 1) carte.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: { top: 48, bottom: 64, left: 40, right: 40 }, maxZoom: 15, duration: 0 });
+          if (points.length > 1) carte.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: margesCadre(hauteur), maxZoom: 15, duration: 0 });
           else carte.setZoom(14);
           points.forEach((p, i) => {
             const ep = nombreEpingle(p);
@@ -233,10 +239,22 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
         });
       });
     }).catch(() => { if (vivant) setEtat('ko'); });
-    return () => { vivant = false; for (const m of marqueurs) { try { m.remove(); } catch (_) {} } if (carte) carte.remove(); };
+    return () => { vivant = false; carteRef.current = null; for (const m of marqueurs) { try { m.remove(); } catch (_) {} } if (carte) carte.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cle]);
+  }, [cle, cooperatif]);
   React.useEffect(() => { marquerChoisi(elements.current, selection); }, [selection]);
+  // (8 nov.) « Agrandir » / « Réduire » : la boîte change de hauteur, la carte se recadre sur les mêmes points.
+  const premiereHauteur = React.useRef(true);
+  React.useEffect(() => {
+    if (premiereHauteur.current) { premiereHauteur.current = false; return; }
+    const carte = carteRef.current; if (!carte || !points.length) return;
+    try {
+      carte.resize();
+      const lats = points.map((p) => p.lat), lons = points.map((p) => p.lon);
+      if (points.length > 1) carte.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: margesCadre(hauteur), maxZoom: 15, duration: 0 });
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hauteur]);
   const ko = etat === 'ko';
   return (
     <div style={{ position: 'relative' }}>
@@ -310,7 +328,22 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
 // reste (n° de suivi, compte, transporteur, nouvelles, Conversation, Suivre) s'ouvre en touchant la
 // ligne (`detail` + `gestes`, les mêmes qu'avant). « Lieu à confirmer » en carte grise à la fin ;
 // « À vérifier · N » replié, le statut en une puce. Aucune phrase. Mêmes listes, mêmes data-*.
-function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null }) {
+// (8 nov., Julien : « une barre d'évolution avec le délai pour retirer ») UNE BARRE FINE : le temps écoulé
+// entre l'arrivée au point (LUE) et la date limite (LUE, sinon la garde du transporteur, « estimée »), et ce
+// qui reste en mots. Neutre ; AMBRE dans les dernières 24 h et au-delà (un geste à faire, §7) ; jamais
+// rouge. Sans date d'arrivée : pas de barre (la puce d'échéance reste). Règle : src/delaiRetrait.js.
+export function BarreDelai({ d, enTete = false }) {
+  if (!d) return null;
+  return (
+    <span className={'vrm-rpf-delai' + (d.ambre ? ' is-ambre' : '') + (enTete ? ' is-tete' : '')} data-rp-delai={d.code} data-rp-delai-pct={d.pct} data-rp-delai-ambre={d.ambre ? '1' : '0'} data-rp-delai-estimee={d.estimee ? '1' : undefined} data-rp-delai-tete={enTete ? '1' : undefined}>
+      <span className="vrm-rpf-delai-piste" role="progressbar" aria-label="Délai pour retirer" aria-valuemin={0} aria-valuemax={100} aria-valuenow={d.pct} aria-valuetext={d.valeurTexte}>
+        <span className="vrm-rpf-delai-plein" style={{ width: `${d.pct}%` }}/>
+      </span>
+      <span className={'vrm-rpf-delai-txt' + (d.ambre ? ' is-ambre' : '')} data-rp-echeance={d.code} aria-hidden="true">{d.texte}{d.estimee ? <span className="vrm-rpf-delai-est"> · estimée</span> : null}</span>
+    </span>
+  );
+}
+function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false }) {
   const [ouvert, setOuvert] = React.useState(false);
   const detailId = React.useId();
   const [copie,setCopie]=React.useState(false);
@@ -318,7 +351,9 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   React.useEffect(()=>{copieGen.current++;setCopie(false);return()=>{copieGen.current++;};},[x.cle,x.code]);
   const voirCode=async()=>{setOuvert(true);if(!x.code)return;const gen=copieGen.current;try{await navigator.clipboard.writeText(String(x.code));if(gen===copieGen.current)setCopie(true);}catch(_){if(gen===copieGen.current)setCopie(false);}};
   const ph = x.photo && Photo ? Photo(x.photo) : null;
-  const e = echeance ? echeance(x) : null;
+  // La barre dit l'échéance (§7 : jamais deux fois) ; sans barre, la puce d'échéance reste.
+  const dl = !x.horsCompte && delai ? delai(x) : null;
+  const e = (dl || delaiEnTete) ? null : (echeance ? echeance(x) : null);
   const st = statut ? statut(x) : null;
   const aCode = !!(x.code || x.qr || x.code2);
   const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
@@ -351,6 +386,8 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label="Voir le code de retrait" onClick={(ev) => { ev.stopPropagation(); voirCode(); }}>{copie?'Copié':'Code'}</button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
+      {/* La barre hors du bouton de la ligne (un bouton rend ses enfants muets pour un lecteur d'écran). */}
+      {dl && !delaiEnTete ? <div className="vrm-rpf-ligne-delai"><BarreDelai d={dl}/></div> : null}
       {ouvert ? <div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
         <strong className="vrm-rpf-titre-complet">{x.num ? `N°${x.num} · ` : ''}{(titreDe && titreDe(x)) || x.titre || 'Colis'}</strong>
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
@@ -377,6 +414,8 @@ function villeDeLaCarte(p) {
 const optionsVille = () => ({ communes: lireCommunes(), villeCarte: villeDeLaCarte });
 export const villeDuPoint = (p) => villeDuPointRegle(p, optionsVille());
 export const villesDesPoints = (vue) => villesDesPointsRegle(vue, optionsVille());
+// (8 nov.) Le sélecteur de « À retirer » : les villes où un colis attend (urgence, puis nombre), puis « Autres ».
+export const selecteurVilles = (vue) => selecteurVillesRegle(vue, optionsVille());
 export const pointsSansVille = (vue) => pointsSansVilleRegle(vue, optionsVille());
 // Les codes postaux SEULS (sans ville lue) des points : leurs communes sont demandées UNE fois à la
 // Base Adresse (`type=municipality`, code postal exact) et gardées dans ce navigateur ; une panne de
@@ -423,11 +462,27 @@ export function sectionDuColis(x, point) {
   if (!point || point.inconnu) return 'lieu';
   return (x.code || x.qr || x.code2) ? 'prets' : 'avenir';
 }
-function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
+// (8 nov.) Hors réseau MESURÉ (`navigator.onLine === false`) : pas de carte (ni fond, ni Base Adresse) ; la liste marche.
+function useEnLigne() {
+  const [l, setL] = React.useState(() => { try { return typeof navigator === 'undefined' || navigator.onLine !== false; } catch (_) { return true; } });
+  React.useEffect(() => {
+    const on = () => setL(true), off = () => setL(false);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  return l;
+}
+const mouvementReduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+const auDoigt = () => { try { return window.matchMedia('(pointer: coarse)').matches; } catch (_) { return false; } };
+function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
+  const enLigne = useEnLigne();
+  // (8 nov., Julien : « réaffiche la carte ») La carte est AUSSI au téléphone (en haut de la liste, ~200 px) ;
+  // hors réseau, pas de carte.
+  const avecCarte = !!avecCarteVoulu && enLigne;
   const tousConnus = ((vueTout && vueTout.points) || []).filter((p) => !p.inconnu);
   const reperes = useReperes(tousConnus, avecCarte && tousConnus.length > 0);
   useCommunesCp(vueTout, true);
-  const villes = villesDesPoints(vueTout);
+  const villes = selecteurVilles(vueTout);
   const vChoisie = villes.find((v) => v.cle === ville) || null;
   // Une ville choisie montre SES points ; un colis sans ville (lieu à confirmer, ou point sans ville
   // ni code postal lus) n'est JAMAIS caché par ce choix (§5 : un colis caché est un colis perdu).
@@ -438,19 +493,23 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
   const [choisi, setChoisi] = React.useState('');
   const [etatFond, setEtatFond] = React.useState('charge');
   const racine = React.useRef(null);
-  const surCarte = avecCarte ? connus.map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
+  // La carte suit la ville choisie : SES points seuls (le cadrage se fait sur eux).
+  const surCarte = avecCarte ? connus.filter((p) => !vChoisie || vChoisie.points.includes(p.cle)).map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
+  const [grande, setGrande] = React.useState(false);
+  const hauteurCarte = grande ? (ordi ? 420 : 380) : (ordi ? 220 : 200);
   const choisir = (cle) => {
     setChoisi(cle);
     const el = racine.current && [...racine.current.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === cle);
-    if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } }
+    if (el) { try { el.scrollIntoView({ behavior: mouvementReduit() ? 'auto' : 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } }
   };
   const trConnu = (x) => !!(x.transp && !x.trInconnu && cleStatTransporteur(x.transp) !== 'pas-lu');
-  const ligne = (x, parLigne = true) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={x.horsCompte ? null : echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe}/>;
+  const ligne = (x, parLigne = true, delaiEnTete = false) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={x.horsCompte ? null : echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe} delai={delai} delaiEnTete={delaiEnTete}/>;
   // Le rangement : chaque colis dans SA section, avec son point.
   const parSection = { aujourdhui: [], prets: [], avenir: [], lieu: [], verifier: [], double: [] };
   // (3 nov., 19 h) Une ville choisie : un point SANS ville (nom seul, homonyme) va sous « Lieu à
   // confirmer », avec son nom — jamais compté dans la ville, jamais caché.
-  const aConfirmer = (x, p) => !!vChoisie && !p.inconnu && sansVille.has(p.cle) && !x.horsCompte && !(Number.isFinite(x.jours) && x.jours <= 0);
+  // (8 nov.) « Autres » choisi : ses points SONT ceux sans ville, montrés comme les autres.
+  const aConfirmer = (x, p) => !!vChoisie && vChoisie.cle !== CLE_AUTRES && !p.inconnu && sansVille.has(p.cle) && !x.horsCompte && !(Number.isFinite(x.jours) && x.jours <= 0);
   // (5 nov., Julien : « ça me met 2 points de retrait alors que c'est le même ») UN POINT,
   // UNE CARTE : un point qui a un colis prêt ET un colis au code à venir était dessiné deux
   // fois (« Prêts à retirer » puis « Code à venir »). Le point va dans la section de son colis
@@ -473,6 +532,10 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
     const tStats = [...new Set(rows.map((c) => cleStatTransporteur(c.transp)))];
     const tCommun = rows.length && rows.every((c) => c.transp && !c.trInconnu) && tStats.length === 1 && tStats[0] !== 'pas-lu' ? rows[0].transp : null;
     const ep = nombreEpingle(p);
+    // (8 nov.) Tous les colis comptés du point ont la MÊME barre (même arrivée, même limite) : une fois, en tête (§7).
+    const comptesP = rows.filter((c) => !c.horsCompte);
+    const dls = delai && comptesP.length >= 2 ? comptesP.map((c) => delai(c)) : [];
+    const dTete = dls.length && dls.every((d) => d && d.cle === dls[0].cle) ? dls[0] : null;
     const prem = !premiere.has(p.cle); premiere.add(p.cle);
     const attrs = prem ? { 'data-relais-point': p.cle, 'data-relais-numero': p.numero, 'data-relais-point-arrives': p.nArrives, 'data-relais-point-comptes': p.nComptes, 'data-relais-point-attendus': p.nAttendus, 'data-relais-epingle-n': ep.n, 'data-relais-ville': (villeDuPoint(p) || {}).cle || '',
       'data-relais-repere': !avecCarte ? 'sans-carte' : repereDe(p, reperes) ? 'oui' : 'non', 'data-relais-pas-carte': avecCarte ? codePasSurCarte(p, reperes) : undefined, 'data-relais-urgent': p.urgent ? '1' : undefined } : { 'data-relais-point-suite': p.cle };
@@ -488,7 +551,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
             <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n && n < rows.length ? <span data-relais-sans-code={n}> · {n} code à venir</span> : null; })()}</span>
           </span>
         </header>
-        <div className="vrm-rpf-liste">{rows.map((x) => ligne(x, !tCommun))}</div>
+        {dTete ? <div className="vrm-rpf-tete-delai"><BarreDelai d={dTete} enTete/></div> : null}
+        <div className="vrm-rpf-liste">{rows.map((x) => ligne(x, !tCommun, !!dTete && !x.horsCompte))}</div>
       </section>
     );
   };
@@ -500,15 +564,19 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
       <div className="vrm-rpf-section-corps">{parPoint(items).map(({ p, items: its }) => cartePoint(p, its, id))}</div>
     </section>) : null;
   return (
-    <div className="vrm-rp vrm-rpf" ref={racine} data-retirer-ville={vChoisie ? vChoisie.cle : ''} data-retirer-sans-ville={sansVille.size} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'}>
-      {avecCarte && surCarte.length > 0 && etatFond !== 'ko' ? <div className="vrm-rpf-carte">
-        <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={220} onEtat={setEtatFond} muet/>
+    <div className="vrm-rp vrm-rpf" ref={racine} data-retirer-ville={vChoisie ? vChoisie.cle : ''} data-retirer-sans-ville={sansVille.size} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'} data-retirer-carte-etat={avecCarte && surCarte.length ? etatFond : undefined}>
+      {/* (8 nov.) UNE place, toujours la même, pour la carte : un fond indisponible la cache sans la démonter
+          (avant : deux branches, la carte remontait et rechargeait à chaque échec). Au doigt, deux doigts la
+          déplacent, un doigt fait défiler la page ; « Agrandir » lui donne plus de place. */}
+      {avecCarte && surCarte.length > 0 ? <div className="vrm-rpf-carte" data-retirer-carte-h={hauteurCarte} hidden={etatFond === 'ko' ? true : undefined}>
+        <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={hauteurCarte} onEtat={setEtatFond} muet cooperatif={!ordi || auDoigt()}/>
         {/* Obligation de licence : l'attribution reste, en tout petit, DANS la carte. */}
         <span className="vrm-rpf-attrib" data-relais-note="">© OpenFreeMap · OpenMapTiles · OpenStreetMap</span>
-      </div> : (avecCarte && surCarte.length > 0 ? <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={220} onEtat={setEtatFond} muet/> : null)}
+        {etatFond === 'pret' ? <button type="button" className="vrm-rpf-agrandir" data-retirer-agrandir={grande ? '1' : '0'} aria-pressed={grande} onClick={() => setGrande((g) => !g)}>{grande ? 'Réduire' : 'Agrandir'}</button> : null}
+      </div> : null}
       {villes.length ? <div className="vrm-rpf-villes vrm-seg" role="group" aria-label="Choisir une ville" data-retirer-villes={villes.length}>
         <button type="button" className="vrm-seg-btn" aria-pressed={!vChoisie} data-ville="" onClick={() => onVille && onVille('')}>Toutes</button>
-        {villes.map((v) => <button key={v.cle} type="button" className="vrm-seg-btn" aria-pressed={!!vChoisie && vChoisie.cle === v.cle} data-ville={v.cle} data-ville-n={v.n} onClick={() => onVille && onVille(v.cle)}>{v.nom} <span className="vrm-seg-n">{v.n}</span></button>)}
+        {villes.map((v) => <button key={v.cle} type="button" className="vrm-seg-btn" aria-pressed={!!vChoisie && vChoisie.cle === v.cle} data-ville={v.cle} data-ville-n={v.n} data-ville-urgence={v.urgence} onClick={() => onVille && onVille(v.cle)}>{v.nom} <span className="vrm-seg-n">{v.n}</span></button>)}
       </div> : null}
       {section('aujourdhui', 'À retirer aujourd’hui', parSection.aujourdhui, { ambre: true })}
       {/* (5 nov.) Un point y est entier : s'il porte un colis au code à venir, la section dit « À retirer ». */}
@@ -555,8 +623,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
-  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute}/>;
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, ordi = true, delai = null, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
+  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} ordi={ordi} delai={delai} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute}/>;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;
