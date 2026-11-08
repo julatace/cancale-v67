@@ -92,3 +92,7 @@
 .vrm-boite-vue-filtree { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-block:4px; }
 .vrm-boite-vue-filtree>span { min-width:0; color:var(--d-gris,#6e6e73); font-size:12px; line-height:1.45; overflow-wrap:anywhere; }
 .vrm-boite-vue-filtree>button { flex:none; min-height:44px; font-size:12px; padding-inline:10px; }
+/* Les libellés complets restent dans le bouton sur un petit écran. */
+:root:root body .vrm-b:not(.vrm-b-icone) { white-space:normal !important; overflow-wrap:anywhere; height:auto; padding-block:8px; }
+.vrm-boite-aide-recherche { margin:0; color:var(--d-gris,#6e6e73); font-size:12px; line-height:1.4; }
+:root:root body .vrm-b-rangee:not(:has(>:not(.vrm-b))) { align-items:stretch; }

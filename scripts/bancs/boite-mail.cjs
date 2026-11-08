@@ -159,6 +159,14 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
         const ins = await inspecter(pg, nom);
         dit(!ins.mots.length && !ins.deborde && !ins.hors.length, `${nom} : liste — aucun undefined/NaN/null, rien ne dépasse`, JSON.stringify(ins));
         dit(!ins.petits.length, `${nom} : liste — chaque cible au doigt fait 44 px`, JSON.stringify(ins.petits));
+        // Le seuil de recherche est expliqué sans prétendre filtrer un seul caractère.
+        const saisieCourte=pg.locator('[data-boite-cherche-champ]');const avantCourt=journal(appels).length;
+        await saisieCourte.fill('x');await pg.locator('[data-boite-aide-recherche]').waitFor();await pg.clock.runFor(400);
+        const aideId=await saisieCourte.getAttribute('aria-describedby');
+        dit(!!aideId&&await pg.locator('[data-boite-aide-recherche]').getAttribute('id')===aideId&&journal(appels).slice(avantCourt).every(a=>!a.q.cherche),`${nom} : un caractère affiche une aide liée au champ sans lancer une fausse recherche`);
+        await Promise.all([pg.waitForResponse(r=>new URL(r.url()).searchParams.get('cherche')==='Nike'),saisieCourte.fill('Nike')]);
+        dit(await pg.locator('[data-boite-aide-recherche]').count()===0,`${nom} : l’aide disparaît dès que la recherche est valide`);
+        await Promise.all([pg.waitForResponse(r=>{const q=new URL(r.url()).searchParams;return q.get('mode')==='journal'&&!q.has('cherche');}),saisieCourte.fill('')]);
         // Une vue combinant compte et rubrique doit pouvoir revenir à tous les mails.
         const adresseTest=await pg.locator('[data-boite-adresse] option').evaluateAll(es=>es.map(e=>e.value).find(Boolean));
         if(adresseTest){

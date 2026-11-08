@@ -241,7 +241,7 @@ const calme = async (pg) => {
 const feuilleOuverte = (pg) => pg.evaluate(() => !!document.querySelector('[data-feuille]'));
 
 (async () => {
-  const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const nav = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox', '--use-angle=swiftshader'] });
   const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
   const sorties = {};
   for (const theme of ['clair', 'sombre']) sorties[theme] = await construire(theme);
