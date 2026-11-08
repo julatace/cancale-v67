@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// LA FEUILLE « TON ADRESSE VRM » — les mots et les pas-à-pas (8 nov.)
+// LA FEUILLE « TON ADRESSE VRM » — les mots et les pas-à-pas (8 nov.)
 // ══════════════════════════════════════════════════════════════════════════════
 // La règle vit au serveur (api/_lib/adresse-reception.js) : ici, rien que ce que
 // la feuille DIT, pur, testé par le banc `adresse-reception.cjs`.
@@ -8,7 +8,7 @@
 
 export const ROUTE_ADRESSE = '/api/email-rattacher?mode=adresse-unique';
 
-// « il y a 3 min », « il y a 2 h », « le 5 nov. » — d'une date LUE (jamais devinée).
+// « il y a 3 min », « il y a 2 h », « le 5 nov. » — d'une date LUE (jamais devinée).
 export function ilYa(at, maintenant = Date.now()) {
   const t = Date.parse(at || '');
   if (!Number.isFinite(t)) return '';
@@ -52,7 +52,7 @@ export const FOURNISSEURS = [
       'Gmail → ⚙︎ → Voir tous les paramètres → Transfert et POP/IMAP.',
       'Ajouter une adresse de transfert : colle ton adresse VRM, puis Suivant.',
       'Gmail envoie un code à ton adresse VRM : il s’affiche en haut de cette feuille dans la minute. Copie-le dans Gmail, puis Valider.',
-      'Choisis « Transférer une copie des e-mails reçus » et « conserver la copie dans la boîte de réception », puis Enregistrer.',
+      'Choisis « Transférer une copie des e-mails reçus » et « conserver la copie dans la boîte de réception », puis Enregistrer.',
     ],
     ecran: { titre: 'Transfert et POP/IMAP', champ: 'Ajouter une adresse de transfert', bouton: 'Suivant' },
   },
@@ -61,8 +61,8 @@ export const FOURNISSEURS = [
     lien: 'https://www.icloud.com/mail/', lienMot: 'Ouvrir iCloud Mail',
     etapes: [
       'iCloud Mail → ⚙︎ → Réglages → Règles → Ajouter une règle.',
-      'Si un e-mail est « de » vinted (puis une règle par transporteur si tu veux).',
-      'Alors « Transférer à » : colle ton adresse VRM. Terminé.',
+      'Si un e-mail est « de » vinted (puis une règle par transporteur si tu veux).',
+      'Alors « Transférer à » : colle ton adresse VRM. Terminé.',
     ],
     ecran: { titre: 'Règles', champ: 'Transférer à', bouton: 'Terminé' },
   },
@@ -72,7 +72,7 @@ export const FOURNISSEURS = [
     etapes: [
       'Outlook → ⚙︎ → Courrier → Transfert.',
       'Active le transfert et colle ton adresse VRM.',
-      'Coche « Conserver une copie des messages transférés », puis Enregistrer.',
+      'Coche « Conserver une copie des messages transférés », puis Enregistrer.',
     ],
     ecran: { titre: 'Transfert', champ: 'Transférer mon courrier à', bouton: 'Enregistrer' },
   },

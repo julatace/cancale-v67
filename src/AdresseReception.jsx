@@ -1,18 +1,18 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// « TON ADRESSE VRM » — la feuille de l'adresse de réception unique (8 nov.)
+// « TON ADRESSE VRM » — la feuille de l'adresse de réception unique (8 nov.)
 // ══════════════════════════════════════════════════════════════════════════════
-// Julien, 8 nov. : « il faut absolument qu'on mette ça en place » (comme vtools).
+// Julien, 8 nov. : « il faut absolument qu'on mette ça en place » (comme vtools).
 // Chaque vendeur a SA propre adresse VRM : il y fait suivre ses e-mails, ou la
 // donne à un compte Vinted. La règle est au serveur (api/_lib/adresse-reception.js,
 // route `email-rattacher?mode=adresse-unique`) ; cette feuille la MONTRE :
-//   · l'adresse en grand, « Copier », « Envoyer un e-mail d'essai », et la preuve
-//     que ça marche (« Dernier e-mail reçu il y a 3 min ») ;
+//   · l'adresse en grand, « Copier », « Envoyer un e-mail d'essai », et la preuve
+//     que ça marche (« Dernier e-mail reçu il y a 3 min ») ;
 //   · le code de confirmation que Gmail (ou Yahoo) a envoyé à SON adresse — le
-//     geste qui bloque tout le monde ailleurs — avec « Copier » et le lien ;
-//   · « Adresse active », ce que VRM lit, le pas-à-pas par messagerie (schéma du
-//     champ où coller), « Ou l'e-mail d'un compte Vinted », le transfert à la
+//     geste qui bloque tout le monde ailleurs — avec « Copier » et le lien ;
+//   · « Adresse active », ce que VRM lit, le pas-à-pas par messagerie (schéma du
+//     champ où coller), « Ou l'e-mail d'un compte Vinted », le transfert à la
 //     main dit tel qu'il est (mesuré : scripts/audit-adresse-reception.cjs, M) ;
-//   · « Remplacer l'adresse » (confirmé sur place) et « Terminé ».
+//   · « Remplacer l'adresse » (confirmé sur place) et « Terminé ».
 // Trois états : `undefined` en cours · `null` pas su (EtatPanne, Réessayer) · lu.
 // ══════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -124,7 +124,7 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
   const code = codeAMontrer(d, maintenant) ? d.code : null;
 
   return (
-    <SheetShell onClose={onFermer} FermeAuRetour={FermeAuRetour} titre="Ton adresse VRM" maxWidth={560} z={9000} className="vrm-ar-feuille"
+    <SheetShell onClose={onFermer} FermeAuRetour={FermeAuRetour} titre="Ton adresse VRM" maxWidth={600} z={9000} className="vrm-ar-feuille"
       data-feuille-adresse-reception="" data-etat={d === undefined ? 'lecture' : d === null ? 'pas-su' : !d.pret ? 'pas-prete' : d.actif === false ? 'off' : 'active'}>
       <div className="vrm-ar">
         {d === undefined && <div className="vrm-ar-hero vrm-ar-squelette" role="status" aria-label="Lecture de ton adresse…"><span/><span/><span/></div>}
@@ -143,7 +143,7 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
             <p className="vrm-ar-sur">{d.actif === false ? 'Ton adresse de réception · désactivée' : 'Ton adresse de réception'}</p>
             <p className="vrm-ar-adresse" data-adresse-reception={adresse} translate="no"><span>{local}</span><wbr/><span className="vrm-ar-domaine">{domaine}</span></p>
             <div className="vrm-ar-actions">
-              <BoutonCopier texte={adresse} mot="Copier l’adresse" data-copier-adresse=""/>
+              <BoutonCopier texte={adresse} mot="Copier l’adresse" data-copier-adresse="" className={codeAMontrer(d, maintenant) ? 'vrm-b vrm-b-secondaire' : 'vrm-b vrm-b-primaire'}/>
               <a className="vrm-b vrm-b-secondaire" href={lienEssai(adresse)} data-essai="">Envoyer un e-mail d’essai</a>
             </div>
             <p className="vrm-ar-etat" data-ton={e.ton} data-dernier={d.dernier ? d.dernier.at : ''} aria-live="polite">
@@ -180,18 +180,18 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
             <p className="vrm-ar-ou">{f.ou}</p>
             <ol className="vrm-ar-etapes" data-etapes={f.id}>{f.etapes.map((t, i) => <li key={i}><span className="vrm-ar-num" aria-hidden="true">{i + 1}</span><span>{t}</span></li>)}</ol>
             <Schema f={f} adresse={adresse}/>
-            {f.id === 'gmail' ? <p className="vrm-ar-note">Pour ne faire suivre que Vinted et les transporteurs : après l’étape 3, un filtre « De : vinted.fr OR mondialrelay OR chronopost » → Transférer à ton adresse VRM.</p> : null}
+            {f.id === 'gmail' ? <p className="vrm-ar-note">Pour ne faire suivre que Vinted et les transporteurs : après l’étape 3, un filtre « De : vinted.fr OR mondialrelay OR chronopost » → Transférer à ton adresse VRM.</p> : null}
             <a className="vrm-lien-action vrm-ar-lien" href={f.lien} target="_blank" rel="noopener noreferrer">{f.lienMot} ↗</a>
           </section>
 
           <section className="vrm-ar-bloc" data-bloc="vinted">
             <h3>Ou l’e-mail d’un compte Vinted</h3>
-            <p className="vrm-ar-texte">Sur Vinted : Paramètres → Compte → E-mail, mets ton adresse VRM. Vinted t’écrit alors directement ici, sans transfert — tu lis ces e-mails dans ta boîte VRM (plus dans ta boîte habituelle).</p>
+            <p className="vrm-ar-texte">Sur Vinted : Paramètres → Compte → E‑mail, mets ton adresse VRM. Vinted t’écrit alors directement ici, sans transfert — tu lis ces e-mails dans ta boîte VRM (plus dans ta boîte habituelle).</p>
           </section>
 
           <section className="vrm-ar-bloc vrm-ar-avertir" data-bloc="manuel">
             <h3>Pas de transfert à la main</h3>
-            <p className="vrm-ar-texte">« Transférer » un e-mail un par un fait perdre son expéditeur d’origine. VRM lit encore une vente ou un code de colis si le message garde la ligne « De : Vinted » ou « De : Mondial Relay », mais le point relais, la date d’arrivée et le bordereau (s’il n’est pas joint) se perdent. Le transfert automatique garde tout.</p>
+            <p className="vrm-ar-texte">« Transférer » un e-mail un par un fait perdre son expéditeur d’origine. VRM lit encore une vente ou un code de colis si le message garde la ligne « De : Vinted » ou « De : Mondial Relay », mais le point relais, la date d’arrivée et le bordereau (s’il n’est pas joint) se perdent. Le transfert automatique garde tout.</p>
           </section>
 
           <section className="vrm-ar-bloc" data-bloc="boite">
@@ -218,7 +218,7 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
   );
 }
 
-// L'entrée (Paramètres → E-mails → Adresses, « Relier ma boîte ») : une rangée qui ouvre la feuille.
+// L'entrée (Paramètres → E-mails → Adresses, « Relier ma boîte ») : une rangée qui ouvre la feuille.
 export default function CarteAdresseReception({ headers, FermeAuRetour, proprio = false, onBoite, titre = 'Ton adresse VRM', detail = 'Une adresse à toi : fais-y suivre tes e-mails' }) {
   const [ouvert, setOuvert] = useState(false);
   return (
