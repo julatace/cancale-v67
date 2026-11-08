@@ -133,3 +133,25 @@
 /* La phrase du jour, sous « Ma journée » : la voix de la phrase d'écran, un cran plus présente. */
 :root:root body .vrm-app-shell .vrm-day-layout [data-phrase-jour] { font-weight: 600; }
 
+/* ══ 2. LES PHOTOS, PARTOUT LA MÊME VIGNETTE ════════════════════════════════
+   Un carré centré (`object-fit: cover`), le rayon d'une vignette (14), un fond
+   neutre qui tient la place pendant le chargement, et l'image qui arrive en
+   FONDU (opacité seule : la taille est celle du conteneur, rien ne saute).
+   `data-vu` est posé par src/fonduPhotos.js au chargement (ou à l'erreur) ; un
+   filet la montre de toute façon après 1,5 s (une image jamais signalée ne
+   reste pas cachée). Messages garde ses ronds (avatars). */
+:root body .vrm-app-shell .vrm-main :is(.vrm-pile-v, .vrm-colis-photo, .vrm-toutes-photo, .vrm-buy-ph, .vrm-rpf-vignette, .vrm-tournee-photo, .vrm-fiche-photo, .vrm-ledger-photo, .vrm-recherche-photo, .vrm-sale-photo) {
+  background-color: var(--d-case); overflow: hidden;
+}
+:root body .vrm-app-shell .vrm-main :is(.vrm-colis-photo, .vrm-toutes-photo, .vrm-buy-ph, .vrm-tournee-photo, .vrm-fiche-photo, .vrm-ledger-photo, .vrm-sale-photo) { border-radius: var(--d-r-case) !important; }
+:root body .vrm-app-shell .vrm-main :is(.vrm-pile-v, .vrm-colis-photo, .vrm-toutes-photo, .vrm-buy-ph, .vrm-rpf-vignette, .vrm-tournee-photo, .vrm-fiche-photo, .vrm-ledger-photo, .vrm-recherche-photo, .vrm-sale-photo) > img {
+  display: block; width: 100% !important; height: 100% !important; object-fit: cover !important; object-position: center !important;
+}
+.vrm-app-shell :is(.vrm-main, [role="dialog"]) img[data-photo-vinted]:not([data-vu]),
+.vrm-app-shell .vrm-main :is(.vrm-pile-v, .vrm-colis-photo, .vrm-toutes-photo, .vrm-buy-ph, .vrm-rpf-vignette, .vrm-tournee-photo, .vrm-fiche-photo, .vrm-ledger-photo, .vrm-recherche-photo, .vrm-sale-photo) > img:not([data-vu]) {
+  opacity: 0; animation: vrm-photo-filet 1ms linear 1.5s forwards;
+}
+@keyframes vrm-photo-filet { to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .vrm-app-shell img[data-vu] { transition: opacity 220ms var(--d-sortie); }
+}

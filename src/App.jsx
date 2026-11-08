@@ -382,6 +382,8 @@ import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { propsGlisserFait } from "./GlisserColis.js";   // (8 nov., « beauté ») « Colis fait » au glisser vers la droite
 import { phraseDuJour } from "./phraseJour.js";   // (8 nov., « beauté ») la phrase d'en-tête de Ma journée
+import { installerFonduPhotos } from "./fonduPhotos.js";   // (8 nov., « beauté ») les vignettes arrivent en fondu
+installerFonduPhotos();
 // (6 nov., vitesse 2) ScannerColis : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./design/scanner.css";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
