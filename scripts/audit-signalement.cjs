@@ -104,7 +104,8 @@ const corpsRiche = () => ({
   ventes: [{ title: SECRETS.titre, price: { amount: SECRETS.prix }, buyer: SECRETS.acheteur, transaction_id: SECRETS.tx, code: SECRETS.code }],
   main: { vinted_account_labels: { 1: SECRETS.pseudo } },
 });
-const CHAMPS = ['texte', 'ecran', 'ecranAvant', 'version', 'extension', 'navigateur', 'ecranTaille', 'plantages'];
+// (8 nov.) + l'appareil, la connexion, l'état de l'écran, les lectures et la capture schématique (audit-aide-signalement).
+const CHAMPS = ['texte', 'ecran', 'ecranAvant', 'version', 'extension', 'navigateur', 'ecranTaille', 'plantages', 'appareil', 'systeme', 'enLigne', 'theme', 'etatEcran', 'lectures', 'plan'];
 
 // ── La fausse base (forme PostgREST) ─────────────────────────────────────────
 let rows, reglages, journal, pannes;
@@ -228,7 +229,7 @@ const lignesSignalements = () => rows.filter((r) => /^signalement_/.test(r.id));
     dit(l.length === 1 && l[0].owner === JULIEN, 'rangé chez le PROPRIÉTAIRE de l’installation (vrm_reglages), ni chez le vendeur ni chez le neutre', l.map((x) => x.owner));
     const d = l[0] && l[0].data;
     dit(d && d.de === A && d.at === new Date(T0).toISOString() && d.traite === false, '`de` = l’identifiant de SA session (le `de` du corps est ignoré), l’heure du serveur', d && { de: d.de, at: d.at, traite: d.traite });
-    const { de, at, traite, ...reste } = d || {};
+    const { de, at, traite, resume, ...reste } = d || {};   // `resume` : les nombres de la liste (8 nov.)
     dit(JSON.stringify(reste) === JSON.stringify(apercuEnvoye), 'ce qui est rangé = EXACTEMENT l’aperçu montré (même règle)', reste);
     const brut = JSON.stringify(rows.filter((x) => /^signalement_/.test(x.id) || x.id === 'push_journal'));
     const fuite = Object.entries(SECRETS).filter(([, v]) => brut.includes(v));

@@ -28,13 +28,70 @@ const S = {
 };
 
 // Le contexte de l'appareil, lu À L'OUVERTURE (jamais une donnée de vendeur).
-const contexteVide = () => ({ ecran: '', ecranAvant: '', version: '', extension: null, navigateur: 'inconnu', ecranTaille: null, plantages: [] });
+const contexteVide = () => ({ ecran: '', ecranAvant: '', version: '', extension: null, navigateur: 'inconnu', ecranTaille: null, plantages: [], lectures: [], plan: null });
 
-export function SignalerProblemeFeuille({ onClose, contexte, entetes, Feuille = SheetShellBase, Bouton = BoutonBase, envoyer = posterSignalement, z = 10500 }) {
+// (8 nov.) LA CAPTURE SCHÉMATIQUE (src/signalementContexte.js) : des rectangles,
+// à leur place, sans un mot ni une image. Ce que la personne voit ici est ce qui part.
+const DESSIN = [
+  { fill: 'var(--vrm-fill, rgba(118,118,128,.12))' },                                         // bloc
+  { fill: 'var(--vrm-muted)', opacity: 0.38, barre: true },                                    // texte
+  { fill: 'var(--vrm-accent-soft, rgba(0,113,227,.12))', stroke: 'var(--vrm-accent)', sw: 1 }, // bouton
+  { fill: 'var(--vrm-surface)', stroke: 'var(--vrm-muted)', sw: 1 },                           // champ
+  { fill: 'var(--vrm-muted)', opacity: 0.22 },                                                 // image
+  { fill: 'var(--vrm-ink)', opacity: 0.82 },                                                   // masqué
+];
+export function PlanEcran({ plan, hauteurMax = 240 }) {
+  if (!plan || !Array.isArray(plan.b) || !plan.b.length) return null;
+  const ratio = plan.l / plan.h;
+  return (
+    <figure className="vrm-plan-ecran" data-plan-ecran={plan.b.length} style={{ margin: '12px 0 0' }}>
+      <svg viewBox={`0 0 ${plan.l} ${plan.h}`} role="img" aria-label={`Schéma de ton écran : ${plan.b.length} blocs, sans texte ni image`}
+        style={{ display: 'block', width: '100%', maxWidth: Math.round(hauteurMax * ratio), maxHeight: hauteurMax, margin: '0 auto', background: 'var(--vrm-bg, var(--vrm-surface))', border: '1px solid var(--vrm-line)', borderRadius: 12 }}
+        preserveAspectRatio="xMidYMin meet">
+        {plan.b.map(([x, y, w, h, k], i) => {
+          const d = DESSIN[k] || DESSIN[0];
+          if (d.barre) { const hh = Math.max(2, Math.min(h * 0.62, 14)); return <rect key={i} x={x} y={y + (h - hh) / 2} width={w} height={hh} rx={hh / 2} fill={d.fill} opacity={d.opacity}/>; }
+          return <rect key={i} x={x} y={y} width={w} height={h} rx={Math.min(10, h / 4, w / 4)} fill={d.fill} opacity={d.opacity} stroke={d.stroke} strokeWidth={d.sw} vectorEffect="non-scaling-stroke"/>;
+        })}
+      </svg>
+      <figcaption style={{ ...S.muet, fontSize: 12, textAlign: 'center', marginTop: 6 }}>Le schéma de ton écran : chaque bloc à sa place, aucun texte, aucune image. Les blocs foncés sont masqués.</figcaption>
+    </figure>
+  );
+}
+const heureCourte = (iso) => { try { return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); } catch (_) { return ''; } };
+const echec = (x) => !(x.s >= 200 && x.s < 400);
+// Les requêtes et les erreurs, dépliables (même forme dans l'aperçu et chez le propriétaire).
+export function DetailsTechniques({ s }) {
+  if (!s) return null;
+  const sum = { fontSize: 15, color: 'var(--vrm-ink)', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer' };
+  return (
+    <>
+      {s.lectures && s.lectures.length > 0 && (
+        <details style={{ marginTop: 10 }} data-apercu-lectures={s.lectures.length}>
+          <summary style={sum}>Voir les {s.lectures.length} dernières requêtes</summary>
+          <ul style={{ margin: '4px 0 0', padding: '0 0 0 18px', ...S.muet, fontVariantNumeric: 'tabular-nums' }}>
+            {s.lectures.map((x, i) => <li key={i} style={{ margin: '3px 0', overflowWrap: 'anywhere', color: echec(x) ? 'var(--vrm-warn)' : undefined }}>{x.m} {x.quoi} · {x.s ? x.s : 'pas de réponse'}{x.ms != null ? ` · ${x.ms}\u00a0ms` : ''}{x.at ? ` · ${heureCourte(x.at)}` : ''}</li>)}
+          </ul>
+        </details>
+      )}
+      {s.plantages && s.plantages.length > 0 && (
+        <details style={{ marginTop: 4 }} data-apercu-plantages={s.plantages.length}>
+          <summary style={sum}>Voir les {s.plantages.length} erreur{s.plantages.length > 1 ? 's' : ''}</summary>
+          <ul style={{ margin: '4px 0 0', padding: '0 0 0 18px', ...S.muet }}>
+            {s.plantages.map((p, i) => <li key={i} style={{ margin: '4px 0', overflowWrap: 'anywhere' }}>{p.message}{p.ecran ? ` · ${p.ecran}` : ''}{p.at ? ` · ${new Date(p.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}</li>)}
+          </ul>
+        </details>
+      )}
+    </>
+  );
+}
+
+export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Feuille = SheetShellBase, Bouton = BoutonBase, envoyer = posterSignalement, z = 10500 }) {
   const ctx = React.useMemo(() => { try { return { ...contexteVide(), ...(contexte ? contexte() : {}) }; } catch (_) { return contexteVide(); } }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const [texte, setTexte] = React.useState('');
   const [etat, setEtat] = React.useState({ phase: 'ecrire' });      // ecrire · envoi · envoye · refus
-  const apercu = normaliserSignalement({ ...ctx, texte });
+  const opts = masque ? { masque } : {};
+  const apercu = normaliserSignalement({ ...ctx, texte }, opts);
   const pret = !!apercu;
   const vivant = React.useRef(true);
   React.useEffect(() => () => { vivant.current = false; }, []);
@@ -48,7 +105,8 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, Feuille = 
     else setEtat({ phase: 'refus', phrase: phraseRefus(r) });
   };
   // Sans texte, l'aperçu montre déjà le reste (le message est dit « à écrire »).
-  const lignes = lignesApercu(apercu || normaliserSignalement({ ...ctx, texte: 'à écrire' }));
+  const montre = apercu || normaliserSignalement({ ...ctx, texte: 'à écrire' }, opts);
+  const lignes = lignesApercu(montre);
   return (
     <Feuille onClose={onClose} titre="Signaler un problème" z={z} data-feuille-signaler="" maxWidth={560}>
       {etat.phase === 'envoye' ? (
@@ -64,7 +122,7 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, Feuille = 
             placeholder="Ex. : l’écran Colis reste vide depuis ce matin."
             onChange={(e) => { setTexte(e.target.value); if (etat.phase === 'refus') setEtat({ phase: 'ecrire' }); }}
             style={{ width: '100%', boxSizing: 'border-box', minHeight: 112, resize: 'vertical', fontSize: 17, lineHeight: 1.4, padding: '12px 14px', borderRadius: 12, border: '1px solid var(--vrm-line)', background: 'var(--vrm-surface)', color: 'var(--vrm-ink)', fontFamily: 'inherit', outline: 'none' }}/>
-          <p style={{ ...S.muet, margin: '6px 2px 16px' }}>N’écris ni mot de passe ni code : une adresse e-mail ou un long numéro est masqué avant l’envoi.</p>
+          <p style={{ ...S.muet, margin: '6px 2px 16px' }}>N’écris ni mot de passe ni code. Un montant, une adresse e-mail, un pseudo connu ou un long numéro est masqué avant l’envoi.</p>
 
           <section data-signaler-apercu="" aria-label="Ce qui part avec ton message">
             <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--vrm-muted)', margin: '0 0 8px' }}>Ce qui part, exactement</h3>
@@ -76,21 +134,15 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, Feuille = 
                 </div>
               ))}
             </dl>
-            {apercu && apercu.plantages.length > 0 && (
-              <details style={{ marginTop: 10 }} data-apercu-plantages={apercu.plantages.length}>
-                <summary style={{ fontSize: 15, color: 'var(--vrm-ink)', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer' }}>Voir les {apercu.plantages.length} plantage{apercu.plantages.length > 1 ? 's' : ''}</summary>
-                <ul style={{ margin: '4px 0 0', padding: '0 0 0 18px', ...S.muet }}>
-                  {apercu.plantages.map((p, i) => <li key={i} style={{ margin: '4px 0', overflowWrap: 'anywhere' }}>{p.message}{p.ecran ? ` · ${p.ecran}` : ''}{p.at ? ` · ${new Date(p.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}</li>)}
-                </ul>
-              </details>
-            )}
+            <PlanEcran plan={montre && montre.plan}/>
+            <DetailsTechniques s={montre}/>
             {apercu && (
               <details style={{ marginTop: 4 }}>
                 <summary style={{ fontSize: 15, color: 'var(--vrm-ink)', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer' }}>Le texte exact envoyé</summary>
                 <pre data-apercu-json="" style={{ ...S.carte, margin: '4px 0 0', padding: 12, fontSize: 12, lineHeight: 1.45, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: 'var(--vrm-ink)', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace' }}>{JSON.stringify(apercu, null, 2)}</pre>
               </details>
             )}
-            <p style={{ ...S.muet, margin: '10px 2px 0' }}>S’y ajoutent l’identifiant de ton compte VRM (pour savoir à qui répondre) et l’heure. Rien d’autre : ni ventes, ni pseudos, ni adresse e-mail, ni montant.</p>
+            <p style={{ ...S.muet, margin: '10px 2px 0' }}>S’y ajoutent l’identifiant de ton compte VRM (pour savoir à qui répondre) et l’heure. Rien d’autre : ni ventes, ni pseudos, ni adresse e-mail, ni montant, ni le contenu de l’écran.</p>
           </section>
 
           {etat.phase === 'refus' && <p role="alert" data-signalement-refus="" style={{ margin: '14px 0 0', padding: '10px 12px', borderRadius: 12, background: 'var(--vrm-warn-soft)', color: 'var(--vrm-ink)', fontSize: 15, lineHeight: 1.4 }}><b style={{ color: 'var(--vrm-warn)' }}>Pas envoyé.</b> {(() => { const r = etat.phrase.replace(/^Pas envoyé : /, ''); return r.charAt(0).toUpperCase() + r.slice(1); })()}</p>}
@@ -148,6 +200,17 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
     } catch (_) { setMsg('Pas enregistré : pas de connexion. Réessaie.'); }
     setOccupe('');
   };
+  // (8 nov.) Le détail d'UN signalement (capture schématique, erreurs, requêtes) :
+  // lu à la demande — la liste ne porte que ses nombres (§4.4).
+  const [detail, setDetail] = React.useState({});
+  const ouvrirDetail = async (s) => {
+    setDetail((d) => ({ ...d, [s.id]: 'lecture' }));
+    try {
+      const r = await fetcher('/api/compte?mode=signalement&id=' + encodeURIComponent(s.id), { headers: entetes ? entetes() : {} });
+      const j = await r.json().catch(() => null);
+      setDetail((d) => ({ ...d, [s.id]: r.ok && j && j.ok === true && j.signalement ? j.signalement : 'ko' }));
+    } catch (_) { setDetail((d) => ({ ...d, [s.id]: 'ko' })); }
+  };
   if (liste === undefined) return <p style={S.muet} data-signalements="lecture">Lecture des signalements…</p>;
   if (liste === null) return PanneEl ? <PanneEl quoi="Les signalements" raison={raison} onReessayer={lireListe}/> : <p style={S.muet} data-signalements="pas-su">Les signalements : pas su pour l’instant. {raison} <button type="button" className="vrm-lien-action" onClick={lireListe}>Réessayer</button></p>;
   const aTraiter = liste.filter((s) => !s.traite);
@@ -169,13 +232,11 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
               <p style={{ ...S.muet, margin: 0 }}>
                 App {s.version || '—'} · extension {s.extension || 'pas connue'} · {s.navigateur} · {s.ecranTaille ? `${s.ecranTaille.largeur} × ${s.ecranTaille.hauteur}` : 'taille —'} · compte {s.de ? s.de.slice(0, 8) : '—'}
               </p>
-              {s.plantages.length > 0 && (
-                <details style={{ marginTop: 4 }}>
-                  <summary style={{ fontSize: 13, color: 'var(--vrm-ink)', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer' }}>{s.plantages.length} plantage{s.plantages.length > 1 ? 's' : ''} de son appareil</summary>
-                  <ul style={{ margin: 0, padding: '0 0 0 18px', ...S.muet }}>{s.plantages.map((p, i) => <li key={i} style={{ overflowWrap: 'anywhere' }}>{p.message}{p.ecran ? ` · ${p.ecran}` : ''}{p.at ? ` · ${dateCourte(p.at)}` : ''}</li>)}</ul>
-                </details>
-              )}
-              <div style={{ marginTop: 8 }}>
+              {s.resume ? <p style={{ ...S.muet, margin: '2px 0 0' }} data-signalement-resume="">{[s.resume.gardeFou ? 'écran tombé' : '', `${s.resume.plantages} erreur${s.resume.plantages > 1 ? 's' : ''}`, `${s.resume.lectures} requête${s.resume.lectures > 1 ? 's' : ''}${s.resume.echecs ? ` dont ${s.resume.echecs} en échec` : ''}`, s.resume.plan ? 'schéma de l’écran' : 'sans schéma'].filter(Boolean).join(' · ')}</p> : null}
+              {detail[s.id] && typeof detail[s.id] === 'object' ? <div data-signalement-detail={s.id}><PlanEcran plan={detail[s.id].plan}/><DetailsTechniques s={detail[s.id]}/></div> : null}
+              {detail[s.id] === 'ko' ? <p role="alert" style={{ ...S.muet, color: 'var(--vrm-warn)' }}>Le détail n’a pas pu être lu. Réessaie.</p> : null}
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {!detail[s.id] || detail[s.id] === 'ko' ? <Bouton variante="discret" taille="petit" onClick={() => ouvrirDetail(s)} data-signalement-ouvrir={s.id}>Voir le détail</Bouton> : null}
                 <Bouton variante={s.traite ? 'discret' : 'secondaire'} taille="petit" occupe={occupe === s.id} onClick={() => marquer(s, !s.traite)} data-signalement-traiter={s.id}>
                   {s.traite ? 'Rouvrir' : 'Traité'}
                 </Bouton>

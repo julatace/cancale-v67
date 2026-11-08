@@ -20,7 +20,11 @@
 // compte dans une case fermée ne part pas. Hors réseau, il attend (gardé sur
 // l'appareil, `vrm_mesures_lot`). Sans session, rien ne part.
 import { lotVide, ajouterMesure, normaliserLot, typeAppareil, ENVOI_MIN_MS, ecranValide } from './mesuresTerrain.js';
-import { estMorceauPerime } from './plantages.js';
+import { estMorceauPerime, brancherAlertes } from './plantages.js';
+// (8 nov.) L'alerte de plantage pour le propriétaire (src/alertesPlantages.js) :
+// comptée ici, partie avec le lot (`p`), anonyme.
+import { compterErreur, evenementsAEnvoyer, apresEnvoi } from './alertesPlantages.js';
+import { masquerPourEnvoi } from './modeStream.js';
 import { SELECTEUR_ATTENTE } from './demarrage.js';
 
 export const CLE_LOT = 'vrm_mesures_lot';
@@ -33,6 +37,11 @@ const lireJson = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) 
 const ecrireJson = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
 
 let E = null;   // l'état de la collecte (une par page)
+
+export const CLE_ALERTES = 'vrm_alertes_plantages';
+// Branché dès l'import : une erreur du démarrage compte aussi. Rien ne part
+// d'ici — seulement à l'envoi du lot, avec une session.
+brancherAlertes((e) => { ecrireJson(CLE_ALERTES, compterErreur(lireJson(CLE_ALERTES, {}), e, { masque: masquerPourEnvoi })); });
 
 const appareil = () => {
   try { return typeAppareil({ largeur: window.innerWidth, tactile: window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 }); } catch (_) { return 'ordinateur'; }
@@ -107,15 +116,17 @@ export function envoyerMesures() {
     const jeton = E.jeton();
     if (!jeton) return false;
     const lot = normaliserLot(lireJson(CLE_LOT, null));
-    if (!lot) return false;
+    const evts = evenementsAEnvoyer(lireJson(CLE_ALERTES, {}));
+    if (!lot && !evts.length) return false;
     const dernier = Number(lireJson(CLE_ENVOI, 0)) || 0;
     if (Date.now() - dernier < ENVOI_MIN_MS) return false;
-    // Seulement le lot normalisé et le jeton de la session (vérifié, jamais rangé).
-    const corps = JSON.stringify({ v: lot.v, h: lot.h, jeton });
+    // Seulement le lot normalisé, les alertes normalisées (écran, message nettoyé,
+    // version, nombre — sans la clé locale) et le jeton de la session (vérifié, jamais rangé).
+    const corps = JSON.stringify({ v: (lot && lot.v) || 1, h: (lot && lot.h) || {}, ...(evts.length ? { p: evts.map(({ cle, ...ev }) => ev) } : {}), jeton });
     let parti = false;
     if (navigator.sendBeacon) parti = navigator.sendBeacon(E.url, new Blob([corps], { type: 'text/plain;charset=UTF-8' }));
     else if (typeof fetch === 'function') { fetch(E.url, { method: 'POST', keepalive: true, credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: corps }).catch(() => {}); parti = true; }
-    if (parti) { ecrireJson(CLE_ENVOI, Date.now()); ecrireJson(CLE_LOT, null); }
+    if (parti) { ecrireJson(CLE_ENVOI, Date.now()); ecrireJson(CLE_LOT, null); if (evts.length) ecrireJson(CLE_ALERTES, apresEnvoi(lireJson(CLE_ALERTES, {}), evts)); }
     return parti;
   } catch (_) { return false; }
 }
