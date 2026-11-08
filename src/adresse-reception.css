@@ -1,0 +1,103 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   « TON ADRESSE VRM » (8 nov.) — src/AdresseReception.jsx
+   La feuille groupée d'iOS : fond gris, des cartes blanches, une carte « héros »
+   avec l'adresse en monospace. Un seul bleu (« Copier l'adresse »), l'ambre
+   seulement pour le code à recopier (un geste à faire), jamais de rouge.
+   Jetons --d-* (src/styles-design-2026.css), clair et sombre.
+   ══════════════════════════════════════════════════════════════════════════ */
+.vrm-fs.vrm-ar-feuille { background: var(--d-fond, #F2F2F7); }
+.vrm-fs.vrm-ar-feuille .vrm-fs-tete { background: var(--d-fond, #F2F2F7); }
+.vrm-ar { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: var(--d-e-5, 20px); padding: var(--d-e-1, 4px) 0 calc(var(--d-e-6, 24px) + env(safe-area-inset-bottom, 0px)); color: var(--d-encre, #1D1D1F); font-size: var(--d-t-15, 15px); line-height: 1.45; letter-spacing: -0.006em; }
+.vrm-ar h2, .vrm-ar h3, .vrm-ar p { margin: 0; }
+.vrm-ar > *, .vrm-ar-hero > *, .vrm-ar-bloc > *, .vrm-ar-code > * { min-width: 0; }
+.vrm-ar code { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; font-size: .92em; }
+
+/* ── La carte héros : l'adresse ─────────────────────────────────────────── */
+.vrm-ar-hero { background: var(--d-carte, #FFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, 0 .5px 1px rgba(0,0,0,.04), 0 4px 18px -6px rgba(0,0,0,.08)); padding: var(--d-e-5, 20px); display: grid; gap: var(--d-e-3, 12px); }
+.vrm-ar-sur { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6E6E73); }
+.vrm-ar-adresse { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; font-size: clamp(16px, 4.3vw, 21px); font-weight: 600; letter-spacing: -0.01em; line-height: 1.35; overflow-wrap: anywhere; word-break: break-all; font-variant-ligatures: none; user-select: all; -webkit-user-select: all; padding: var(--d-e-3, 12px) var(--d-e-4, 16px); border-radius: var(--d-r-case, 14px); background: var(--d-case, #F2F2F7); }
+.vrm-ar-domaine { display: block; color: var(--d-gris, #6E6E73); font-weight: 500; }
+.vrm-ar-hero[data-actif="0"] .vrm-ar-adresse { opacity: .55; text-decoration: line-through; text-decoration-thickness: 1px; }
+.vrm-ar-actions { display: flex; flex-wrap: wrap; gap: var(--d-e-2, 8px); }
+.vrm-ar-actions > .vrm-b { flex: 1 1 160px; min-height: 44px; justify-content: center; text-align: center; text-decoration: none; }
+.vrm-ar-actions > .vrm-b[data-copie="ok"] { transition: background-color var(--d-m-court, 150ms) var(--d-sortie, ease-out); }
+.vrm-ar-etat { display: flex; align-items: baseline; gap: var(--d-e-2, 8px); font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); min-height: 18px; }
+.vrm-ar-etat b { font-weight: 600; color: var(--d-encre, #1D1D1F); }
+.vrm-ar-sujet { overflow-wrap: anywhere; }
+.vrm-ar-point { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--d-gris, #6E6E73); transform: translateY(-1px); }
+.vrm-ar-etat[data-ton="ok"] .vrm-ar-point { background: var(--d-encre, #1D1D1F); }
+.vrm-ar-etat[data-ton="attente"] .vrm-ar-point { background: var(--d-point-ambre, #FF9F0A); }
+.vrm-ar-etat[data-ton="off"] .vrm-ar-point, .vrm-ar-etat[data-ton="passu"] .vrm-ar-point { background: transparent; box-shadow: inset 0 0 0 1.5px var(--d-gris, #6E6E73); }
+
+/* Squelette (lecture) */
+.vrm-ar-squelette span { display: block; height: 14px; border-radius: 7px; background: var(--d-remplir, rgba(118,118,128,.12)); }
+.vrm-ar-squelette span:nth-child(1) { width: 40%; }
+.vrm-ar-squelette span:nth-child(2) { height: 52px; border-radius: var(--d-r-case, 14px); }
+.vrm-ar-squelette span:nth-child(3) { height: 44px; border-radius: var(--d-r-ctrl, 12px); }
+@media (prefers-reduced-motion: no-preference) { .vrm-ar-squelette span { animation: vrm-ar-pulse 1.4s ease-in-out infinite; } }
+@keyframes vrm-ar-pulse { 50% { opacity: .55; } }
+
+/* Pas encore ouverte */
+.vrm-ar-fermee { justify-items: start; }
+.vrm-ar-fermee h2 { font-size: var(--d-t-20, 20px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.vrm-ar-tuile { width: 44px; height: 44px; border-radius: var(--d-r-ctrl, 12px); display: grid; place-items: center; background: var(--d-remplir-fort, rgba(118,118,128,.2)); color: var(--d-encre, #1D1D1F); }
+
+/* ── Le code de confirmation (un geste à faire : l'ambre) ─────────────── */
+.vrm-ar-code { background: var(--d-carte, #FFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte); padding: var(--d-e-5, 20px); display: grid; gap: var(--d-e-3, 12px); position: relative; }
+.vrm-ar-code::before { content: ''; position: absolute; left: var(--d-e-5, 20px); top: 27px; width: 7px; height: 7px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); }
+.vrm-ar-code-sur { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-encre, #1D1D1F); padding-left: 15px; }
+.vrm-ar-code-valeur { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; font-size: 34px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; line-height: 1.1; user-select: all; -webkit-user-select: all; }
+.vrm-ar-code-source { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); overflow-wrap: anywhere; }
+.vrm-ar-code-source b { color: var(--d-encre, #1D1D1F); font-weight: 600; }
+
+/* ── Les groupes iOS dans la feuille (portail : hors de .vrm-main) ───── */
+.vrm-ar .vrm-ios-groupe { margin: 0; }
+.vrm-ar .vrm-ios-carte { border: 0; border-radius: var(--d-r-carte, 20px); background: var(--d-carte, #FFF); box-shadow: var(--d-ombre-carte); overflow: hidden; }
+.vrm-ar .vrm-ios-groupe-titre { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6E6E73); text-transform: none; letter-spacing: 0; margin: 0 0 6px var(--d-e-4, 16px); }
+.vrm-ar .vrm-ios-groupe-pied { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); margin: 6px var(--d-e-4, 16px) 0; line-height: 1.4; }
+.vrm-ar .vrm-ios-icone { color: var(--d-encre, #1D1D1F); background: var(--d-remplir-fort, rgba(118,118,128,.2)); }
+
+/* ── Les blocs de texte ───────────────────────────────────────────────── */
+.vrm-ar-bloc { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--d-e-3, 12px); background: var(--d-carte, #FFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte); padding: var(--d-e-5, 20px); }
+.vrm-ar-bloc h3 { font-size: var(--d-t-17, 17px); font-weight: 600; letter-spacing: -0.012em; line-height: 1.3; }
+.vrm-ar-texte { color: var(--d-encre, #1D1D1F); }
+.vrm-ar-note, .vrm-ar-ou { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); line-height: 1.4; }
+.vrm-ar-avertir { background: transparent; box-shadow: none; padding: 0 var(--d-e-4, 16px); }
+.vrm-ar-avertir h3 { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
+.vrm-ar-avertir .vrm-ar-texte { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
+.vrm-ar-lien { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; color: var(--d-accent-texte, #0066CC); font-weight: 600; text-decoration: none; background: none; border: 0; padding: 0; font-size: var(--d-t-15, 15px); cursor: pointer; }
+.vrm-ar-seg { width: 100%; }
+
+/* Les étapes numérotées */
+.vrm-ar-etapes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--d-e-3, 12px); counter-reset: none; }
+.vrm-ar-etapes li { display: grid; grid-template-columns: 24px 1fr; gap: var(--d-e-3, 12px); align-items: start; }
+.vrm-ar-num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: var(--d-t-13, 13px); font-weight: 700; font-variant-numeric: tabular-nums; background: var(--d-encre, #1D1D1F); color: var(--d-carte, #FFF); margin-top: -1px; }
+
+/* Le schéma : une fenêtre dessinée, le champ où coller */
+.vrm-ar-schema { margin: 0; border-radius: var(--d-r-case, 14px); background: var(--d-case, #F2F2F7); overflow: hidden; border: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-ar-schema-barre { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: .5px solid var(--d-filet, rgba(60,60,67,.18)); font-size: var(--d-t-12, 12px); color: var(--d-gris, #6E6E73); font-weight: 600; }
+.vrm-ar-schema-barre i { width: 9px; height: 9px; border-radius: 50%; background: var(--d-remplir-fort, rgba(118,118,128,.2)); }
+.vrm-ar-schema-barre span { margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-ar-schema-corps { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: center; padding: 14px 12px 16px; }
+.vrm-ar-schema-libelle { grid-column: 1 / -1; font-size: var(--d-t-12, 12px); color: var(--d-gris, #6E6E73); }
+.vrm-ar-schema-champ { min-width: 0; height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 8px; background: var(--d-carte, #FFF); box-shadow: 0 0 0 2px var(--d-accent, #0071E3); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; overflow: hidden; }
+.vrm-ar-schema-champ span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-ar-schema-bouton { height: 34px; display: grid; place-items: center; padding: 0 12px; border-radius: 8px; background: var(--d-remplir-fort, rgba(118,118,128,.2)); font-size: var(--d-t-12, 12px); font-weight: 600; color: var(--d-encre, #1D1D1F); }
+
+/* ── Le pied ──────────────────────────────────────────────────────────── */
+.vrm-ar-retour { font-size: var(--d-t-13, 13px); color: var(--d-encre, #1D1D1F); padding: 0 var(--d-e-4, 16px); }
+.vrm-ar-pied { display: grid; gap: var(--d-e-3, 12px); }
+.vrm-ar-pied > .vrm-b-discret { justify-self: center; min-height: 44px; }
+.vrm-ar-termine { width: 100%; min-height: 50px; font-size: var(--d-t-17, 17px); font-weight: 600; background: var(--d-carte, #FFF) !important; box-shadow: var(--d-ombre-carte); }
+.vrm-ar-confirmer { background: var(--d-carte, #FFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte); padding: var(--d-e-4, 16px); display: grid; gap: var(--d-e-3, 12px); font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
+@media (prefers-reduced-motion: no-preference) { .vrm-ar-confirmer { animation: vrm-ar-entre var(--d-m-long, 250ms) var(--d-sortie, ease-out); } }
+@keyframes vrm-ar-entre { from { opacity: 0; transform: translateY(6px); } }
+.vrm-ar-destructif { color: var(--d-encre, #1D1D1F); font-weight: 600; }
+
+/* L'entrée (une rangée) */
+.vrm-ar-entree { margin: 0 0 var(--d-e-4, 16px); }
+
+/* Ordinateur : une seule colonne, le schéma sous ses étapes (deux colonnes serraient le texte). */
+@media (min-width: 900px) { .vrm-ar-schema { max-width: 420px; } }
+@media (prefers-contrast: more) { .vrm-ar-hero, .vrm-ar-bloc:not(.vrm-ar-avertir), .vrm-ar-code, .vrm-ar .vrm-ios-carte { box-shadow: none; border: 1px solid var(--d-encre, #1D1D1F); } }
+:root[data-theme="dark"] .vrm-ar-hero, :root[data-theme="dark"] .vrm-ar-bloc:not(.vrm-ar-avertir), :root[data-theme="dark"] .vrm-ar-code, :root[data-theme="dark"] .vrm-ar .vrm-ios-carte, :root[data-theme="dark"] .vrm-ar-confirmer, :root[data-theme="dark"] .vrm-ar-termine { box-shadow: 0 0 0 .5px rgba(255,255,255,.06); }

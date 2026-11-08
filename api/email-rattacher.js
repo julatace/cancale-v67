@@ -36,6 +36,8 @@ import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdress
 import { modifierNeutre } from './_lib/neutre-cas.js';
 import { sbCle } from './_lib/cle.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
+import { idIndexJeton } from './_lib/jeton-index.js';
+import { domaineReception, nouveauJeton, jetonValide, adresseDeJeton, ecrireIndexReception, marquerRemplacee, ID_ADRESSE, ID_VU, ID_CODE } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -366,6 +368,9 @@ async function preuveDemander(req, res) {
   if (!corps) { res.status(400).json({ ok: false, error: 'corps illisible' }); return; }
   const a = normAdresse(corps.adresse);
   if (!adresseVerifiable(a)) { res.status(400).json({ ok: false, error: 'adresse invalide' }); return; }
+  // (8 nov.) Une adresse du domaine de réception VRM n'est la boîte de personne :
+  // elle ne se « prouve » pas (c'est l'adresse unique, déjà à son vendeur).
+  if (domaineReception() && a.endsWith('@' + domaineReception())) { res.status(409).json({ ok: false, raison: 'adresse-vrm', message: "C'est une adresse de réception VRM : elle n'a pas besoin d'être ajoutée ici." }); return; }
   const cl = await sondeCloisonnee();
   if (cl === null) { indispo(res); return; }
   if (!cl) { res.status(409).json({ ok: false, raison: 'non-cloisonnee', message: "Une seule boutique : aucune preuve n'est nécessaire." }); return; }
@@ -461,12 +466,127 @@ async function preuveConfirmer(req, res) {
   res.status(200).json({ ok: true, etat: 'prouvee', adresse: normAdresse(d.adresse) });
 }
 
+// ══ L'ADRESSE DE RÉCEPTION UNIQUE (8 nov., api/_lib/adresse-reception.js) ══════
+//   GET  ?mode=adresse-unique   son adresse (créée au premier appel), active ou non,
+//                               le dernier e-mail reçu dessus, le dernier code de
+//                               confirmation de transfert reçu dessus
+//   POST ?mode=adresse-unique   { geste: 'remplacer' } · { geste: 'actif', actif }
+// Toujours derrière SA session ; la ligne et l'index sont écrits par le serveur
+// seul (clé de service). Domaine non réglé ⇒ 200 { pret: false, manque } : la
+// feuille dit ce qui manque, aucune adresse n'est fabriquée. Pas su ⇒ 503.
+// Écritures : la ligne du vendeur D'ABORD, l'index ENSUITE — un index sans ligne
+// assortie n'est jamais suivi (le jeton est re-comparé), une ligne sans index
+// n'attribue rien (quarantaine) ; « remplacer » se fait par comparer-et-échanger
+// sur l'ancien jeton (deux appareils ne peuvent pas fabriquer deux adresses).
+const lireLigneVendeur = async (owner, id, select = 'data') => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&select=${select}&limit=1`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    return Array.isArray(j) ? (j[0] ? (j[0].data || null) : null) : undefined;
+  } catch (_) { return undefined; }
+};
+const ecrireLigneVendeur = async (owner, id, data, siJeton) => {
+  try {
+    const at = new Date().toISOString();
+    if (siJeton !== undefined) {
+      // Comparer-et-échanger : seulement si la ligne porte encore l'ancien jeton.
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&data->>jeton=eq.${enc(siJeton)}`, {
+        method: 'PATCH', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ data, updated_at: at }),
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return Array.isArray(j) ? j.length > 0 : null;
+    }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify([{ owner, id, data, updated_at: at }]),
+    });
+    if (!r.ok) return null;
+    return true;
+  } catch (_) { return null; }
+};
+async function adresseUnique(req, res) {
+  const u = await utilisateurDuJeton(jetonDe(req));
+  if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  const domaine = domaineReception();
+  if (!domaine) { res.status(200).json({ ok: true, pret: false, manque: 'domaine', message: "L'adresse de réception VRM n'est pas encore ouverte : le domaine de réception n'est pas réglé sur le serveur." }); return; }
+  const cl = await sondeCloisonnee();
+  if (cl === null) { indispo(res); return; }
+  if (!cl) { res.status(200).json({ ok: true, pret: false, manque: 'cloisonnement', message: "L'adresse de réception VRM demande une base séparée par vendeur." }); return; }
+  let ligne = await lireLigneVendeur(u.id, ID_ADRESSE);
+  if (ligne === undefined) { indispo(res); return; }
+  const corps = req.method === 'POST' ? corpsDe(req) : {};
+  if (corps === null) { res.status(400).json({ ok: false, error: 'corps illisible' }); return; }
+  const maintenant = Date.now(), iso = new Date(maintenant).toISOString();
+  // ⚠️ La ligne vit chez le vendeur : sous RLS, SON navigateur peut l'écrire. Il
+  //    pourrait y recopier le jeton d'un AUTRE vendeur pour que le serveur lui en
+  //    réécrive l'index. Un index qui existe déjà au nom d'un autre (ou remplacé)
+  //    n'est donc JAMAIS réécrit : la ligne est tenue pour fausse, une adresse
+  //    neuve est fabriquée.
+  const indexDe = async (jeton) => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${idIndexJeton('reception', jeton)}&select=o:data->>owner,r:data->>remplaceeLe&limit=1`, { headers: HEADERS });
+      if (!r.ok) return undefined;
+      const j = await r.json();
+      if (!Array.isArray(j)) return undefined;
+      return !j[0] ? 'libre' : (!j[0].r && String(j[0].o || '') === u.id) ? 'sien' : 'autre';
+    } catch (_) { return undefined; }
+  };
+  if (ligne && jetonValide(ligne.jeton)) {
+    const ix = await indexDe(ligne.jeton);
+    if (ix === undefined) { indispo(res); return; }
+    if (ix === 'autre') ligne = { ...ligne, faux: true };
+  }
+  // Création au premier passage (et réparation d'un index qui n'aurait pas été écrit).
+  if (!ligne || !jetonValide(ligne.jeton) || ligne.faux) {
+    const neuf = { jeton: nouveauJeton(), actif: true, creeLe: iso };
+    const ok = ligne ? await ecrireLigneVendeur(u.id, ID_ADRESSE, neuf, String(ligne.jeton || '')) : await ecrireLigneVendeur(u.id, ID_ADRESSE, neuf);
+    if (ok === null) { indispo(res); return; }
+    ligne = await lireLigneVendeur(u.id, ID_ADRESSE);   // relue : un autre appareil a pu créer la sienne au même instant
+    if (!ligne || !jetonValide(ligne.jeton) || await indexDe(ligne.jeton) === 'autre') { indispo(res); return; }
+  }
+  // L'index n'est écrit que s'il manque (la feuille relit toutes les 30 s : une lecture, pas une écriture).
+  const ixLigne = await indexDe(ligne.jeton);
+  if (ixLigne === undefined) { indispo(res); return; }
+  if (ixLigne === 'libre' && !await ecrireIndexReception({ url: SUPABASE_URL, headers: HEADERS, jeton: ligne.jeton, owner: u.id, maintenant })) { indispo(res); return; }
+  if (req.method === 'POST' && corps.geste === 'remplacer') {
+    const ancien = ligne.jeton;
+    const neuf = { jeton: nouveauJeton(), actif: true, creeLe: iso, remplaceLe: iso };
+    const ok = await ecrireLigneVendeur(u.id, ID_ADRESSE, neuf, ancien);
+    if (ok === null) { indispo(res); return; }
+    if (ok === false) { res.status(409).json({ ok: false, raison: 'change', message: "Ton adresse vient d'être changée sur un autre appareil : relis-la." }); return; }
+    if (!await ecrireIndexReception({ url: SUPABASE_URL, headers: HEADERS, jeton: neuf.jeton, owner: u.id, maintenant })) { indispo(res); return; }
+    // L'ancienne ne désigne plus personne. Si ce marquage rate, elle est déjà
+    // refusée (sa ligne porte un autre jeton ⇒ « périmé » ⇒ quarantaine).
+    await marquerRemplacee({ url: SUPABASE_URL, headers: HEADERS, jeton: ancien, maintenant });
+    ligne = neuf;
+  } else if (req.method === 'POST' && corps.geste === 'actif') {
+    if (typeof corps.actif !== 'boolean') { res.status(400).json({ ok: false, error: 'actif attendu (vrai ou faux)' }); return; }
+    const ok = await ecrireLigneVendeur(u.id, ID_ADRESSE, { ...ligne, actif: corps.actif, actifLe: iso }, ligne.jeton);
+    if (ok === null) { indispo(res); return; }
+    if (ok === false) { res.status(409).json({ ok: false, raison: 'change', message: "Ton adresse vient d'être changée sur un autre appareil : relis-la." }); return; }
+    ligne = { ...ligne, actif: corps.actif, actifLe: iso };
+  } else if (req.method === 'POST') { res.status(400).json({ ok: false, error: 'geste inconnu' }); return; }
+  const [vu, code] = await Promise.all([lireLigneVendeur(u.id, ID_VU), lireLigneVendeur(u.id, ID_CODE)]);
+  const adresse = adresseDeJeton(ligne.jeton, domaine);
+  // Un dernier e-mail / un code d'avant le dernier remplacement ne prouve rien pour la nouvelle.
+  const depuis = Date.parse(ligne.remplaceLe || ligne.creeLe || '') || 0;
+  const apres = (d, champ) => d && Date.parse(d[champ] || '') >= depuis ? d : null;
+  res.status(200).json({ ok: true, pret: true, adresse, actif: ligne.actif !== false, creeLe: ligne.creeLe || null, remplaceLe: ligne.remplaceLe || null,
+    // Trois états : `null` = rien encore · objet = lu · absent de la réponse = pas su (lecture ratée).
+    ...(vu === undefined ? {} : { dernier: apres(vu, 'at') ? { at: vu.at, sujet: vu.sujet || '', de: vu.de || '' } : null }),
+    ...(code === undefined ? {} : { code: apres(code, 'recuLe') && code.adresse === adresse ? { fournisseur: code.fournisseur, code: code.code || '', lien: code.lien || '', source: code.source || '', signe: !!code.signe, recuLe: code.recuLe } : null }) });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
   if (repondreSansCleService(res)) return;
   const mode = String((req.query && req.query.mode) || '');
   if (req.method === 'GET' && mode === 'preuves') return preuves(req, res);
+  if ((req.method === 'GET' || req.method === 'POST') && mode === 'adresse-unique') return adresseUnique(req, res);
   if (req.method === 'POST' && mode === 'preuve-demander') return preuveDemander(req, res);
   if (req.method === 'POST' && mode === 'preuve-confirmer') return preuveConfirmer(req, res);
   if (req.method === 'GET' && mode === 'reception') {

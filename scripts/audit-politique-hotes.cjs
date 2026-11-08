@@ -105,6 +105,11 @@ const COUPLES = {
   'src/ConfigurerTransfert.jsx|mail.google.com': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|outlook.live.com': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|www.icloud.com': ['lien', LIEN],
+  // (8 nov.) « Ton adresse VRM » : le pas-à-pas ouvre la messagerie choisie, sur son clic.
+  'src/adresseReception.js|mail.google.com': ['lien', LIEN],
+  'src/adresseReception.js|www.icloud.com': ['lien', LIEN],
+  'src/adresseReception.js|outlook.live.com': ['lien', LIEN],
+  'src/adresseReception.js|mail.yahoo.com': ['lien', LIEN],
   'src/navigateurExtension.js|play.google.com': ['lien', LIEN],
   'src/Tournee.jsx|maps.apple.com': ['lien', LIEN + ' — « Ouvrir dans Plans » d’un point de retrait'],
   // Une origine SENTINELLE en `.invalid` (RFC 6761 : ne se résout jamais) quand

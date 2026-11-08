@@ -83,6 +83,8 @@ import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
 const JournalEmails = aLaDemande(() => import('../JournalEmails.jsx'));
+// (8 nov.) « Ton adresse VRM » : l'adresse de réception unique (src/AdresseReception.jsx), à la demande.
+const CarteAdresseReception = aLaDemande(() => import('../AdresseReception.jsx'));
 // ⟦← App.jsx #17⟧
 // Un nom déjà pris (GoTrue refuse deux facteurs au même nom pour un compte) :
 // comparé sans casse ni espaces de bord, pour ne pas laisser « iPhone » et
@@ -4198,6 +4200,7 @@ function EmailsSetting({onComptes}) {
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
+  const proprioEmails = useEstProprietaire();
   const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
   const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
   // (2 nov.) L'Aperçu ouvre le journal sur un état OU un type (« 2 bordereaux ajoutés à Colis » → les bordereaux).
@@ -4421,6 +4424,8 @@ function EmailsSetting({onComptes}) {
     <div ref={racine}>
     <EspaceEmails onglet={rubriqueEmail} onOnglet={(o)=>{if(o==='journal'){setJournalFiltre('');setJournalType('');}setRubriqueEmail(o);}} idBase={espaceId} theme={C}>
     <div id={espaceId+'-adresses'} data-email-panneau="adresses" hidden={rubriqueEmail!=='adresses'}>
+    {/* (8 nov.) L'adresse de réception UNIQUE, en tête : la plus simple (rien à prouver). */}
+    {rubriqueEmail==='adresses'&&<CarteAdresseReception headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioEmails===true} onBoite={()=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:'emails'}));}catch(_){}}}/>}
     <div data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       <p className="vrm-email-intro-adresses">Ajoute les adresses où Vinted t’écrit, puis configure leur transfert vers VRM.</p>

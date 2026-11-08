@@ -26,7 +26,10 @@
 import crypto from 'crypto';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 
-export const CHAMP_JETON = { widget: 'vrm_widget_token', sms: 'vrm_sms_token' };
+export const CHAMP_JETON = { widget: 'vrm_widget_token', sms: 'vrm_sms_token', reception: 'jeton' };
+// La ligne du vendeur qui porte le jeton : `main` pour le widget et les SMS ;
+// (8 nov.) l'ADRESSE DE RÉCEPTION UNIQUE vit dans SA ligne (api/_lib/adresse-reception.js).
+export const LIGNE_JETON = { widget: 'main', sms: 'main', reception: 'vrm_adresse_reception' };
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const empreinteJeton = (jeton) => crypto.createHash('sha256').update(String(jeton || ''), 'utf8').digest('hex');
@@ -44,7 +47,7 @@ export function memeJeton(a, b) {
 // Rend la chaîne ('' si aucun), ou `undefined` si la base n'a pas répondu.
 async function jetonDuVendeur({ url, headers, fetcher, genre, owner }) {
   try {
-    const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&id=eq.main&select=t:data->>${CHAMP_JETON[genre]}&limit=1`, { headers });
+    const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&id=eq.${LIGNE_JETON[genre] || 'main'}&select=t:data->>${CHAMP_JETON[genre]}&limit=1`, { headers });
     if (!r || !r.ok) return undefined;
     const j = await r.json();
     if (!Array.isArray(j)) return undefined;
