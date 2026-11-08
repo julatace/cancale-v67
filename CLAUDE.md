@@ -504,11 +504,15 @@ sans la fonction.
 | `ventesfusion` | `fusionnerCommandes` | **5.323.0** (6 nov.) | une lecture partielle des ventes/achats se FUSIONNE par n° de transaction (rien perdu) ; fenêtre inchangée < 1 h ni relue ni réécrite |
 | `releveidentite` | `txDeLigneReleve` | **5.323.0** (6 nov.) | relevé du porte-monnaie (`wallet/invoices/current`) rangé sans rien de personnel, `tx` si la ligne porte la vente ; forme inconnue ⇒ `harvest_{uid}_forme_releve` |
 | `numeroecrit` | `numeroEcritAllume` | **5.324.0** (7 nov.) | réglage « Je numérote moi-même » allumé : aucun N° réservé ni affiché à côté de « Publier » |
+| `lieroauth` | `fournisseursConnexion` | **5.325.0** (8 nov.) | la fenêtre de l'extension propose « Continuer avec Google / Discord » (fournisseur ACTIVÉ chez Supabase seulement) ; l'app nomme ce bouton à un compte créé ainsi |
+| `ventesleger` | `commandesParServeur` | **5.326.0** (8 nov.) | ventes/achats envoyés LÉGERS : la fenêtre en abrégé (n° : empreinte) + ce que la base n'a pas, fusionnés chez vrm.center (`api/_lib/commandes-leger.js`, même règle que l'extension) ; chaque envoi < 200 Ko ; route absente ⇒ voie d'avant |
 
 ---
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · Ventes envoyées légères (5.326)** : la ligne `orders_sold` d'un gros compte (2 000 ventes ≈ 1 055 Ko) n'est plus relue ni réécrite depuis le téléphone (coupée sur iOS) : l'extension envoie la fenêtre abrégée + ce qui manque (61,5 Ko), `vrm.center` fusionne (même règle, `src/commandesFusion.js`) ; la ligne garde sa forme, aucun lecteur ne change. `docs/passation/2026-11-08-ventes-envoi-leger.md`. Geste : installer 5.326, ouvrir Mes commandes sur shop_cancale.
+- **8 nov. · Extension 5.325 : Google / Discord** : la fenêtre propose « Continuer avec Google / Discord » (fournisseur activé chez Supabase seulement, pas su ⇒ caché) ; VRM part chez le fournisseur puis adresse sa session à CETTE extension ; carte du logo : cause du refus dite + 5 derniers refus datés. `docs/passation/2026-11-08-extension-google-discord.md`. Geste : activer Discord chez Supabase ; installer la 5.325.
 - **8 nov. · Colis vendus partis d'après le transporteur** : vente « à envoyer » (Vestiaire, Vinted) dont le n° EXACT est pris en charge chez Chronopost/Vinted Go ⇒ « Envoyés » avec la raison, partout (Colis, Ma journée, cloche, widget, rappels) ; lignes à part `depart_*` (jamais `transp_`, jamais « à retirer ») ; Mondial Relay/Colissimo pas lus. `docs/passation/2026-11-08-colis-sortants.md`. Geste : aucun.
 - **8 nov. · Retraits : le suivi lu sort un colis en le disant** : un e-mail rangé « vinted »/« autre » se lit par la forme du n° (`carrierLuDeLigne`) ; deux `transp_` pour un n° ⇒ la lue (`indexTranspParSuivi`, app = serveur = cron) ; une lecture après 30 j ; Colis → À retirer « Sortis de « à retirer » » (« Mondial Relay : retiré le 5 nov. », 3 j, hors compte) et « pourquoi pas lu » + geste (`src/retraitSuivi.js`) ; widget : jamais un n° de ses bordereaux. `docs/passation/2026-11-08-retraits-suivi.md`. Geste : aucun.
 
@@ -547,11 +551,6 @@ sans la fonction.
 
 - **6 nov. · Accompagnement (v36)** : visite à 4 bulles ; conseils = 1 bulle non modale sur le VRAI bouton (halo, Plus tard, Ne plus montrer), 2/jour, 1/écran, 3 j de repos, sur un chiffre publié par l'écran (`<ChiffreConseil>`, pas su ⇒ rien), « vu » écrit d'abord dans `vrm_accompagnement` (rev) ; `src/accompagnement.js`, `audit-conseils`. `docs/passation/2026-11-06-accompagnement.md`. Geste : aucun.
 
-- **6 nov. · Facture Pro (v36)** : bouton « Envoyer la facture » sur la LIGNE de la vente seulement si l'acheteur est PROUVÉ (même n° de transaction Vinted + e-mail Pro, heure −2/+15 min, montant ; sinon la raison, `src/facturePro/rattachement.js`, relue par le serveur) ; envoi PAR VRM (From « … via VRM », Reply-To et Cc au vendeur, 50/jour) ; « Ma facture » avec aperçu en direct. `docs/passation/2026-11-06-facture-pro.md`. Geste : remplir Ma facture, poser `RELANCES_SMTP_*`.
-
-- **6 nov. · Onglets D (Annonces, Compta, Statistiques, Paramètres)** : sa base recalculée = l'app (25 mois de CA, 49 en ligne, 19 vendues) ; une vente « à dater » vendue ET lue finalisée la même année compte dans le CA de l'ANNÉE, jamais d'un mois (`src/aDaterAnnee.js` ; seuils, revenus, DAC7, « CA de l'année » de Ventes) ; « Déclarer » en 3 étapes avec « ? » ; Annonces « Prochain geste » ; Paramètres par intention, une phrase par réglage. `docs/passation/2026-11-06-onglets-d.md`. Geste : Compta → Déclarer octobre.
-
-- **6 nov. · Finitions (v36)** : « Plus tard » revient après 7 j (et relu au nuage) ; N° d'archive remis en vente ⇒ « à écrire sur tes cartons » ; Actions à deux comptes dit « Prix mini : possible » ; Colis une voix de fraîcheur ; `data-aller-chercher` ; « — » de Compta au jeton ; une paire en ligne deux fois = ambre seul, plus le rouge ; banc transporteurs à la forme du 3 nov. + ambre sombre, phrase « code postal », « transporteur pas encore connu ». `docs/passation/2026-11-06-finitions.md`. Geste : aucun.
 
 
 

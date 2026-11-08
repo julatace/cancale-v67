@@ -39,6 +39,9 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 l'installation, 5/h/compte, notifié) ; GET la
 //                                 liste et POST {action:'traite'} au PROPRIÉTAIRE
 //                                 seul — voir api/_lib/signalement.js
+//   /api/compte?mode=commandes    (POST, session de l'extension) les ventes/achats
+//                                 envoyés LÉGERS, fusionnés dans la ligne
+//                                 `harvest_{uid}_orders_*` — api/_lib/commandes-leger.js
 //   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
 //                                 efface ses données, puis son compte (refusé au
 //                                 propriétaire de l'installation)
@@ -68,6 +71,7 @@ import { routeCommunaute, effacerCommunaute } from './_lib/communaute.js';
 import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
+import { routeCommandes } from './_lib/commandes-leger.js';
 import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
@@ -1328,6 +1332,12 @@ export default async function handler(req, res) {
     return repondre(res,resultat.ok?200:503,{...resultat,...(resultat.ok?{uid:u.id}:{})});
   }
   if (mode === 'operations') return routeOperations(req, res);
+  // (8 nov., extension 5.326) Les ventes/achats envoyés LÉGERS par l'extension :
+  // la fenêtre lue en abrégé, fusionnée ici dans la ligne (api/_lib/commandes-leger.js).
+  if (mode === 'commandes') {
+    if (m === 'POST') { req.body = await lireCorpsJson(req); if (req.body === null) return repondre(res, 400, { ok: false, erreur: 'json' }); }
+    return routeCommandes(req, res);
+  }
   if(mode==='favoris'){
     if(m==='POST')req.body=await lireCorpsJson(req);
     return routeFavoris(req,res);

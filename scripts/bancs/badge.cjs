@@ -246,8 +246,29 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     const l = await lire(pg);
     dit(/ça réessaie tout seul/i.test(l.carte), 'autre sens : un 5xx (la base ne répond pas) garde bien « ça réessaie tout seul »', l.carte.replace(/\n/g, ' · ').slice(0, 240));
     dit(!/abonnement/i.test(l.carte), 'et ne parle pas d’abonnement sur un simple hoquet');
+    dit(/code 503/.test(l.carte), '5.325 : un 5xx DIT son code (« la base a répondu une erreur (code 503) »)', l.carte.replace(/\n/g, ' · ').slice(0, 240));
     await ctx.close();
   });
+  // 5.325 (8 nov., vu sur son iPhone) : « la base n'a pas répondu » couvrait
+  // réseau, 5xx, inconnu — indiagnosticable. Chaque cause dit la sienne, et les
+  // 5 derniers refus datés (code, famille, taille) sont en repli sous la ligne.
+  for (const [code, attendu, nom] of [['reseau', /réseau coupé \(le navigateur a interrompu l.envoi\)/, 'réseau'], ['inconnu', /code inconnu/, 'inconnu'], [null, /code inconnu/, 'absent']]) {
+    await essaie('refus ' + nom, async () => {
+      const t0 = Date.now();
+      const refus = [1, 2, 3, 4, 5, 6].map((i) => ({ at: t0 - i * 3 * MIN, statut: i === 2 ? '503' : code, famille: 'harvest_orders_sold', octets: i === 1 ? 3200000 : 41000 })).reverse();   // rangés du plus ancien au plus récent, comme `noterFlux`
+      const etat = JSON.parse(JSON.stringify(ETATS.refuse503));
+      etat.flux = { okAt: t0 - 60 * MIN, koAt: t0 - 2 * MIN, koStatut: code, refus };
+      const { ctx, pg } = await rendre(nav, etat, { url: 'https://www.leboncoin.fr/mes-annonces' });
+      await survoler(pg);
+      const l = await lire(pg);
+      dit(attendu.test(l.carte) && /ça réessaie tout seul/.test(l.carte), `refus « ${nom} » : la carte dit sa cause`, l.carte.replace(/\n/g, ' · ').slice(0, 260));
+      dit(!/n.a pas répondu/.test(l.carte), `refus « ${nom} » : plus la phrase fourre-tout`, l.carte.replace(/\n/g, ' · ').slice(0, 260));
+      const h = await pg.evaluate(() => { const hb = document.getElementById('vrm-badge'); const d = hb && hb.shadowRoot ? hb.shadowRoot.querySelector('[data-refus-historique]') : null; return d ? { n: d.getAttribute('data-refus-historique'), li: d.querySelectorAll('li').length, txt: d.textContent, ouvert: d.open } : null; });
+      dit(h && h.n === '5' && h.li === 5 && !h.ouvert, `refus « ${nom} » : les 5 derniers refus en repli fermé`, JSON.stringify(h));
+      dit(h && /3,2 Mo/.test(h.txt) && /harvest_orders_sold/.test(h.txt) && /code 503/.test(h.txt), `refus « ${nom} » : chacun daté avec sa cause, sa famille et sa taille`, h && h.txt.slice(0, 260));
+      await ctx.close();
+    });
+  }
 
   // ── 4ter. À RETIRER DE LEBONCOIN (29 oct.) ───────────────────────────────
   // Julien : « J'ai vendu une paire sur Vinted et VRM ne m'a pas dit de la

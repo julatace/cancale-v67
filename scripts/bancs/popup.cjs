@@ -35,13 +35,13 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
 // lui dit. `etat` est ce que `authEtat` renvoie côté service worker.
 // `geste(pg)` : ce qu'on fait dans la fenêtre avant de relever.
 async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux = {}, scheme = 'dark', mobile = null } = {}) {
-  // La carte (2 octobre) : la même page, dans un iframe de 300 × 380 posé par
+  // La carte (2 octobre) : la même page, dans un iframe de 300 × 460 (5.325 ; 380 avant) posé par
   // vrm-badge.js sur le site — `?mode=carte`.
   // `mobile` (19 oct.) : un VRAI téléphone au doigt — Firefox pour Android
   // ouvre cette fenêtre dans un onglet entier ; Orion, dans une feuille.
   const ctx = await nav.newContext(mobile
     ? Object.assign({ colorScheme: scheme, viewport: { width: mobile.largeur || 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, mobile.ua ? { userAgent: mobile.ua } : {})
-    : { colorScheme: scheme, viewport: carte ? { width: 300, height: 380 } : { width: 360, height: 900 } });
+    : { colorScheme: scheme, viewport: carte ? { width: 300, height: 460 } : { width: 360, height: 900 } });
   const pg = await ctx.newPage();
   const html = fs.readFileSync(path.join(EXT, 'popup.html'), 'utf8')
     .replace('<script src="popup.js"></script>', '')
@@ -84,6 +84,12 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
             : { ok: true };
           if (faux.codeMuet && msg.action === 'codeVersion') return;   // ne répond jamais
           if (faux.permisMuet && msg.action === 'transpPermis') return; // ne répond jamais
+          // 5.325 : les fournisseurs activés chez Supabase (lus par le fond).
+          if (msg.action === 'fournisseursConnexion') {
+            if (faux.fournisseurs === 'muet') return;                  // code périmé : ne répond jamais
+            if (faux.fournisseurs === 'ferme') { setTimeout(() => { window.chrome.runtime.lastError = { message: 'The message port closed before a response was received.' }; try { cb && cb(undefined); } finally { window.chrome.runtime.lastError = null; } }, 5); return; }
+            setTimeout(() => cb && cb(faux.fournisseurs || { ok: false }), 0); return;
+          }
           setTimeout(() => cb && cb(r), (r && r.__lent) || 0);
         },
         lastError: null,
@@ -111,6 +117,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
     window.addEventListener('click', () => { window.__enClic = false; }, false);
     if (!faux.sansApiPermis) window.chrome.permissions = { request: (q, cb) => { window.__permisDemandes.push({ origins: (q && q.origins) || [], dansLeGeste: window.__enClic === true }); setTimeout(() => cb && cb(faux.permisAccorde === true), 0); } };
     window.close = () => { window.__ferme = true; };
+    if (faux.orion) window.__vrmOrionCompat = true;
   }, { e: etat, faux });
   await pg.addScriptTag({ content: js });
   await pg.waitForTimeout(400);
@@ -152,8 +159,16 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
     };
   });
   if (carte && process.env.BANC_CAPTURES) await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `popup-carte-${etat.connecte ? 'co' : 'deco'}.png`) });
+  if (faux.capture && process.env.BANC_CAPTURES) await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, faux.capture), fullPage: true });
+  const fourn = await pg.evaluate(() => ({
+    attr: document.body.getAttribute('data-fournisseurs'),
+    boutons: Array.from(document.querySelectorAll('button[data-fournisseur]')).filter((b) => b.offsetParent).map((b) => ({ id: b.getAttribute('data-fournisseur'), txt: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height), svg: !!b.querySelector('svg'), y: Math.round(b.getBoundingClientRect().top) })),
+    lierY: (() => { const b = document.getElementById('lierBtn'); return b && b.offsetParent ? Math.round(b.getBoundingClientRect().top) : null; })(),
+    formY: (() => { const b = document.getElementById('mdpForm'); return b && !b.hidden ? Math.round(b.getBoundingClientRect().top) : null; })(),
+    mot: (() => { const m = document.getElementById('mdpOauthMot'); return m && !m.hidden && m.offsetParent ? m.textContent : ''; })(),
+  }));
   await ctx.close();
-  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours, look, transp };
+  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours, look, transp, fourn };
 }
 const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { await a.click(); await pg.waitForTimeout(120); } };
 
@@ -244,6 +259,66 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(/E-?mail ou mot de passe incorrect/.test(r.txt) && !r.boutons.includes('captchaLierBtn') && !/plus possible depuis/.test(r.txt), 'un mauvais mot de passe reste un mauvais mot de passe (pas de phrase captcha)', r.txt.replace(/\n/g, ' · ').slice(0, 200));
   });
 
+  // ── 1 bis. « CONTINUER AVEC GOOGLE / DISCORD » (5.325, 8 nov.) ───────────
+  // Julien : « une personne qui a créé son compte avec Google ou Discord et qui
+  // veut se connecter à l'extension, il ne va pas pouvoir ». Deux boutons sous
+  // « Se connecter avec VRM », SEULEMENT pour un fournisseur que Supabase dit
+  // activé ; « pas su » ⇒ rien (jamais un bouton qui mène à une erreur).
+  console.log('\n── Continuer avec Google / Discord');
+  const LES_DEUX = { ok: true, google: true, discord: true };
+  await essaie('fournisseurs activés', async () => {
+    for (const scheme of ['dark', 'light']) {
+      const r = await rendre(nav, { ok: true, connecte: false }, { scheme, faux: { fournisseurs: LES_DEUX, capture: `popup-oauth-${scheme}.png` } });
+      const b = r.fourn.boutons;
+      dit(!r.erreurs.length, `${scheme} : sans erreur`, r.erreurs[0]);
+      dit(b.length === 2 && b[0].id === 'google' && b[1].id === 'discord' && b[0].txt === 'Continuer avec Google' && b[1].txt === 'Continuer avec Discord', `${scheme} : « Continuer avec Google » puis « Continuer avec Discord »`, JSON.stringify(b));
+      dit(b.every((x) => x.svg && x.h >= 44), `${scheme} : chacun avec son logo, au moins 44 px`, JSON.stringify(b));
+      dit(r.fourn.lierY != null && b.every((x) => x.y > r.fourn.lierY), `${scheme} : SOUS « Se connecter avec VRM » (qui reste le geste principal)`, JSON.stringify({ lier: r.fourn.lierY, b: b.map((x) => x.y) }));
+      dit(r.look.accent === (scheme === 'dark' ? 'rgb(61, 123, 255)' : 'rgb(36, 88, 230)'), `${scheme} : le bouton principal garde le bleu`, r.look.accent);
+    }
+  });
+  for (const [nom, rep, attendu] of [['Google seul', { ok: true, google: true, discord: false }, ['google']], ['Discord seul', { ok: true, google: false, discord: true }, ['discord']], ['aucun activé', { ok: true, google: false, discord: false }, []], ['pas su (ok:false)', { ok: false }, []], ['pas su (fond muet)', 'muet', []], ['pas su (code périmé)', 'ferme', []]]) {
+    await essaie('fournisseurs ' + nom, async () => {
+      const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: rep }, geste: nom === 'pas su (fond muet)' ? (pg) => pg.waitForTimeout(3200) : null });
+      const ids = r.fourn.boutons.map((x) => x.id);
+      dit(JSON.stringify(ids) === JSON.stringify(attendu), `${nom} : ${attendu.length ? 'seulement ' + attendu.join(', ') : 'aucun bouton'}`, JSON.stringify({ ids, attr: r.fourn.attr }));
+      dit(r.boutons.includes('lierBtn') && !r.erreurs.length, `${nom} : « Se connecter avec VRM » reste, sans erreur`, JSON.stringify(r.boutons));
+    });
+  }
+  for (const fourn of ['google', 'discord']) {
+    await essaie('clic ' + fourn, async () => {
+      const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX }, geste: (pg) => pg.click('#oauth-' + fourn) });
+      const m = r.messages.find((x) => x.action === 'lierAvecVRM');
+      dit(!!m && m.connexion === fourn && /vinted\.fr/.test(m.urlActive || ''), `clic « Continuer avec ${fourn} » : le fond ouvre VRM avec connexion=${fourn}`, JSON.stringify(m));
+      dit(r.ferme && !r.envoyes.includes('authLogin'), 'la fenêtre se referme, aucun mot de passe envoyé', JSON.stringify(r.envoyes));
+      const p = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX, lierFerme: true, codeFerme: true, manifeste: '5.325.0' }, geste: async (pg) => { await pg.click('#oauth-' + fourn); await pg.waitForTimeout(400); } });
+      dit(p.ouvert === `https://vrm.center/?tab=plat_vinted&lier-extension=abcdefghijklmnopabcdefghijklmnop&connexion=${fourn}`, `fond sans réponse : la fenêtre ouvre VRM elle-même, avec connexion=${fourn}`, String(p.ouvert));
+    });
+  }
+  await essaie('« Se connecter avec VRM » ne porte pas de fournisseur', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX }, geste: (pg) => pg.click('#lierBtn') });
+    const m = r.messages.find((x) => x.action === 'lierAvecVRM');
+    dit(!!m && !('connexion' in m), 'le bouton principal n’envoie aucun `connexion` (un clic passe un événement, pas un nom)', JSON.stringify(m));
+  });
+  await essaie('le mot de passe le dit', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX }, geste: ouvrirMdp });
+    dit(r.fourn.mot === 'Compte créé avec Google ou Discord ? Utilise les boutons au-dessus.', 'formulaire : « Compte créé avec Google ou Discord ? Utilise les boutons au-dessus. »', r.fourn.mot);
+    const g = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: { ok: true, google: true, discord: false } }, geste: ouvrirMdp });
+    dit(g.fourn.mot === 'Compte créé avec Google ? Utilise le bouton au-dessus.', 'un seul activé : la phrase ne nomme que lui', g.fourn.mot);
+    const n = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: { ok: false } }, geste: ouvrirMdp });
+    dit(n.fourn.mot === '', 'pas su : la phrase ne renvoie pas vers des boutons absents', n.fourn.mot);
+  });
+  await essaie('Orion', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX, orion: true } });
+    dit(r.fourn.boutons.length === 2 && r.fourn.formY != null && r.fourn.boutons.every((x) => x.y < r.fourn.formY), 'Orion : les deux boutons apparaissent AU-DESSUS du formulaire', JSON.stringify(r.fourn));
+    dit(r.fourn.mot === 'Compte créé avec Google ou Discord ? Utilise les boutons au-dessus.', 'Orion : et la phrase est vraie (« au-dessus »)', r.fourn.mot);
+  });
+  await essaie('carte', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { carte: true, faux: { fournisseurs: LES_DEUX, capture: 'popup-oauth-carte.png' } });
+    dit(r.fourn.boutons.length === 2, 'dans la petite carte aussi', JSON.stringify(r.fourn.boutons));
+    dit(!r.deborde, 'et tout y tient (300 × 460, la hauteur de la carte du logo), sans défilement');
+  });
+
   // ── 2. CONNECTÉ — on ne redemande rien ───────────────────────────────────
   console.log('\n── Connecté : la fenêtre ne redemande pas de mot de passe');
   await essaie('connecté', async () => {
@@ -314,7 +389,7 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     const cd = await rendre(nav, { ok: true, connecte: false, cloisonne: true }, { carte: true });
     dit(!cd.erreurs.length, 'elle s’exécute sans erreur', cd.erreurs[0]);
     dit(cd.boutons.includes('lierBtn') && !cd.champs.some((c) => c.visible), 'pas connecté : « Se connecter avec VRM », sans champ visible', JSON.stringify(cd.boutons));
-    dit(!cd.deborde, 'tout tient dans la carte (300 × 380), sans défilement');
+    dit(!cd.deborde, 'tout tient dans la carte (300 × 460), sans défilement');
     const cl = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: (pg) => pg.click('#lierBtn') });
     dit(cl.envoyes.includes('lierAvecVRM') && !cl.ferme, 'dans la carte : le clic demande au service worker d’ouvrir VRM (la carte, elle, reste dans le site)', JSON.stringify(cl.envoyes));
     const cm = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: async (pg) => { await ouvrirMdp(pg); await pg.fill('#mail', 'a@b.fr'); await pg.fill('#pw', 'x'); await pg.click('#inBtn'); } });

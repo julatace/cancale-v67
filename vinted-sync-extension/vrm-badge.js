@@ -80,6 +80,10 @@
   .val { margin-top: 2px; word-break: break-word; }
   .val.alerte { color: var(--ambre); }
   .val.gris { color: var(--doux); }
+  .refus { margin-top: 4px; font-size: 11px; color: var(--doux); }
+  .refus summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+  .refus ul { margin: 0; padding-left: 16px; }
+  .refus li { margin: 2px 0; word-break: break-word; }
   .pied { margin-top: 8px; font-size: 12px; color: var(--doux); }
   .pied b { color: var(--texte); font-weight: 600; }
   .b { display: block; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 8px;
@@ -90,7 +94,8 @@
   .q { font-size: 14px; font-weight: 600; margin: 2px 0 4px; }
   .q b { font-weight: 700; }
   .err { margin-top: 8px; font-size: 12px; color: var(--ambre); }
-  .connexion { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); height: min(400px, calc(100vh - 90px)); border: 1px solid var(--bord); border-radius: 12px;
+  /* 5.325 : 460 (était 400) — « Continuer avec Google / Discord » y tiennent sans défiler. */
+  .connexion { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); height: min(460px, calc(100vh - 90px)); border: 1px solid var(--bord); border-radius: 12px;
     overflow: hidden; background: var(--fond); box-shadow: var(--ombre); display: none; }
   @media (prefers-color-scheme: light) { .connexion { background: #F4F6FA; } }
   .connexion.on { display: block; }
@@ -210,7 +215,30 @@
     if (st === '401') return ' — la base a refusé ta session. Reconnecte-toi à VRM (clique le logo). Ça ne repartira pas tout seul.';
     if (st === '400') return ' — la base n’est pas dans l’état attendu. Rien ne part ; préviens le support VRM.';
     if (/^4\d\d$/.test(st)) return ` — la base a refusé l’envoi (code ${st}). Reconnecte-toi à VRM ; si ça persiste, préviens le support.`;
-    return ' — la base n’a pas répondu, ça réessaie tout seul';
+    // 5.325 (8 nov., vu sur son iPhone) : une seule phrase couvrait le réseau,
+    // les 5xx et l'inconnu — on ne pouvait rien diagnostiquer. Chaque cause DIT
+    // la sienne ; toutes trois réessaient d'elles-mêmes.
+    return ' — ' + causeRefus(st) + ', ça réessaie tout seul';
+  }
+  // La cause d'un refus, d'après son code (même texte dans la ligne et l'historique).
+  function causeRefus(st) {
+    const c = String(st == null ? '' : st);
+    if (c === 'reseau') return 'réseau coupé (le navigateur a interrompu l’envoi)';
+    if (/^5\d\d$/.test(c)) return `la base a répondu une erreur (code ${c})`;
+    if (c === 'sans_session') return 'pas de session VRM';
+    if (/^4\d\d$/.test(c)) return `refusé par la base (code ${c})`;
+    return 'code inconnu';
+  }
+  // 5.325 : les 5 derniers refus, datés, en petit sous la ligne (repli fermé).
+  // Famille de la ligne et taille de l'envoi : de quoi voir un envoi trop gros
+  // qui échoue en boucle. Jamais un identifiant (la famille n'en porte pas).
+  const tailleLisible = (n) => { const o = Number(n) || 0; if (!o) return ''; return o >= 1e6 ? `${(o / 1e6).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(o / 1000))} Ko`; };
+  function historiqueRefus(f) {
+    const h = f && Array.isArray(f.refus) ? f.refus.slice(-5).reverse() : [];
+    if (!h.length) return '';
+    const heure = (t) => { try { return new Date(Number(t)).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+    const lignes = h.map((r) => `<li data-refus-statut="${esc(r.statut == null ? 'inconnu' : r.statut)}">${esc(heure(r.at))} · ${esc(causeRefus(r.statut))}${r.famille ? ' · ' + esc(r.famille) : ''}${r.octets ? ' · ' + esc(tailleLisible(r.octets)) : ''}</li>`).join('');
+    return `<details class="refus" data-refus-historique="${h.length}"><summary>${h.length > 1 ? `Les ${h.length} derniers refus` : 'Le dernier refus'}</summary><ul>${lignes}</ul></details>`;
   }
 
   function rendre() {
@@ -266,7 +294,7 @@
     else if (e.capte) {
       const f = e.flux || {};
       if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
-        flux = `<div class="val alerte">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>`;
+        flux = `<div class="val alerte" data-refus-cause="${esc(String(f.koStatut == null ? 'inconnu' : f.koStatut))}">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>${historiqueRefus(f)}`;
       } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val">Envoyées à VRM ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
     }
