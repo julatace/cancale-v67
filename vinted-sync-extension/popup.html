@@ -17,7 +17,19 @@
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; width: 300px; margin: 0; padding: 16px;
       background: var(--fond); color: var(--texte); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
-    body.carte { width: auto; min-height: 100vh; padding: 16px 16px 14px; }
+    /* 5.328 : la carte du logo pose ce cadre DANS son verre : fond transparent,
+       hauteur du contenu (le cadre la donne à la carte), une colonne. */
+    body.carte { width: auto; padding: 12px 14px 14px; background: transparent; }
+    html.carte { color-scheme: normal; background: transparent; }
+    body.carte .head, body.carte #auth > .who { display: none; }
+    .lab { display: block; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--doux); }
+    .lab + input { margin-top: 4px; }
+    .ou { display: flex; align-items: center; gap: 10px; margin: 14px 0 2px; color: var(--doux); font-size: 12px; }
+    .ou::before, .ou::after { content: ""; flex: 1; height: 1px; background: var(--bord); }
+    #oubliLien { display: inline-flex; align-items: center; min-height: 44px; }
+    button.lien { background: transparent; color: var(--doux); border: 0; font-weight: 500; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; margin-top: 10px; }
+    button.lien:hover { color: var(--texte); filter: none; }
+    #lierEtat.err { color: var(--ambre); }
     .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
     body.carte .head { padding-right: 44px; }
     .logo { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: block; box-shadow: 0 0 0 1px rgba(61,123,255,.38); }

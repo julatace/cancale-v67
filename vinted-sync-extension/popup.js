@@ -12,12 +12,30 @@
 // « Comptes captés », « Fraîcheur » et « Synchroniser » sont parties : leur
 // place est dans l'app.
 // 11 octobre (Julien) : « quand j'appuie sur se connecter ça doit envoyer
-// directement dans l'application VRM ». Le bouton principal OUVRE VRM, qui
-// connecte l'extension tout seul (session adressée à CETTE extension) ; le
-// mot de passe VRM ne se tape plus ici que si on le demande exprès.
+// directement dans l'application VRM ». Le bouton principal OUVRAIT VRM.
+// ⚠️ 8 nov. (5.328, Julien sur son iPhone, Orion : « mets directement l'endroit
+// de connexion avec le mot de passe, le Google, Discord, parce que "Se
+// connecter" change de page VRM et ça ne se connecte pas ») : partout, dans cet
+// ordre — e-mail + mot de passe VRM (« Me connecter », Entrée), « Mot de passe
+// oublié ? », puis « Continuer avec Google / Discord » (seulement activés), puis
+// « Se connecter avec VRM » en dernier recours. Le mot de passe part UNE fois au
+// service worker (`authLogin`), jamais gardé, jamais dans une adresse.
 const CARTE = /[?&]mode=carte\b/.test(location.search);
 const REPARER = /[?&]mode=reparer\b/.test(location.search);
-if (CARTE) document.body.classList.add('carte');
+if (CARTE) { document.body.classList.add('carte'); document.documentElement.classList.add('carte'); }
+// 5.328 : dans la carte du logo, le cadre dit à la carte qu'il s'affiche et sa
+// hauteur (pour qu'elle le montre en entier, sans second défilement). Seulement
+// ces deux messages : ni e-mail, ni mot de passe, ni état ne sortent d'ici.
+function direALaCarte(quoi) {
+  if (!CARTE || window.parent === window) return;
+  try {
+    const h = Math.ceil(document.documentElement.scrollHeight || document.body.scrollHeight || 0);
+    window.parent.postMessage(quoi === 'hauteur' ? { __vrmCarte: 'hauteur', h } : { __vrmCarte: 'prete' }, '*');
+  } catch (_) {}
+}
+if (CARTE) {
+  try { new ResizeObserver(() => direALaCarte('hauteur')).observe(document.body); } catch (_) {}
+}
 
 // Un email est du texte saisi : il n'entre jamais dans du HTML sans être échappé.
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -158,6 +176,48 @@ function lireFournisseurs(cb) {
     });
   } catch (_) { fin(null); }
 }
+// 5.328 : le clic lance l'OAuth DANS l'extension (`oauthDepart`) — Google ou
+// Discord s'ouvre dans un onglet, revient sur la page de retour de
+// l'extension, l'onglet se ferme : aucun écran de VRM à utiliser. Le service
+// worker muet (code d'avant) ⇒ l'ancien chemin par VRM, dit comme tel.
+let oauthEnCours = '';
+function direOAuth(t, erreur) {
+  const st = document.getElementById('lierEtat');
+  if (!st) return;
+  st.textContent = t; st.hidden = !t;
+  st.classList.toggle('err', !!erreur);
+  try { document.body.setAttribute('data-oauth', erreur ? 'erreur' : (t ? 'attente' : '')); } catch (_) {}
+  direALaCarte('hauteur');
+}
+function connexionFournisseur(id) {
+  const f = FOURNISSEURS.find((x) => x.id === id);
+  if (!f) return;
+  oauthEnCours = id;
+  direOAuth(`${f.nom} s’ouvre dans un nouvel onglet. Connecte-toi : l’onglet se ferme tout seul et l’extension est connectée.`);
+  let fini = false;
+  const t = setTimeout(() => { if (!fini) { fini = true; lierAvecVRM(id); } }, 5000);
+  try {
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'oauthDepart', fournisseur: id }, (r) => {
+      let e = null; try { e = chrome.runtime.lastError; } catch (_) { e = null; }
+      if (fini) return; fini = true; clearTimeout(t);
+      if (e || !r) { lierAvecVRM(id); return; }
+      if (!r.ok) { oauthEnCours = ''; direOAuth(r.message || 'La connexion n’a pas pu démarrer.', true); return; }
+      if (r.ouvrirIci && r.url) ouvrirSansTabs(r.url);
+      if (!CARTE && !globalThis.__vrmOrionCompat) { try { window.close(); } catch (_) {} }
+    });
+  } catch (_) { if (!fini) { fini = true; clearTimeout(t); lierAvecVRM(id); } }
+}
+// Le résultat arrive par le stockage (le service worker l'y écrit) : erreur dite,
+// compte neuf dit ; la réussite, elle, se voit par la session (chargerAuth).
+try {
+  chrome.storage.onChanged.addListener((ch, zone) => {
+    if (zone !== 'local') return;
+    if (ch.vrmSession && !REPARER) chargerAuth(true);
+    const v = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
+    if (v && v.etat === 'erreur' && oauthEnCours) { oauthEnCours = ''; direOAuth(v.message || 'La connexion n’a pas abouti.', true); }
+    if (v && v.etat === 'ok' && v.neuf) { try { sessionStorage.setItem('vrmOAuthNeuf', '1'); } catch (_) {} }
+  });
+} catch (_) {}
 function rendreFournisseurs(r) {
   const box = document.getElementById('oauthBox');
   if (!box) return;
@@ -165,13 +225,14 @@ function rendreFournisseurs(r) {
   try { document.body.setAttribute('data-fournisseurs', r ? (actifs.map((f) => f.id).join(',') || 'aucun') : 'pas-su'); } catch (_) {}
   if (!actifs.length) { box.hidden = true; return; }
   poserHtml(box, actifs.map((f) => `<button class="sec fourn" id="oauth-${f.id}" data-fournisseur="${f.id}" aria-label="Continuer avec ${f.nom}">${f.logo}<span>Continuer avec ${f.nom}</span></button>`).join(''));
-  for (const f of actifs) document.getElementById('oauth-' + f.id).addEventListener('click', () => lierAvecVRM(f.id));
+  for (const f of actifs) document.getElementById('oauth-' + f.id).addEventListener('click', () => connexionFournisseur(f.id));
   box.hidden = false;
   // Le formulaire du mot de passe le dit : un compte Google/Discord n'en a pas.
   const mot = document.getElementById('mdpOauthMot');
   if (mot) {
     const noms = actifs.map((f) => f.nom).join(' ou ');
     mot.textContent = `Compte créé avec ${noms} ? Utilise ${actifs.length > 1 ? 'les boutons' : 'le bouton'} au-dessus.`;
+    box.after(mot);
     mot.hidden = false;
   }
 }
@@ -190,11 +251,13 @@ function rendreAuth(e) {
     // qu'on s'est trompé), et le geste suivant est d'ouvrir VRM.
     poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
       <div class="muted" style="margin-top:4px">L’extension est connectée. Les données peuvent être transmises pendant que la plateforme est ouverte ici, sans onglet VRM.</div>
+      ${(() => { let n = false; try { n = sessionStorage.getItem('vrmOAuthNeuf') === '1'; } catch (_) {} return n ? '<div class="err" data-compte-neuf>Ce compte n’était relié à aucun compte VRM : un compte VRM neuf vient d’être créé. Si tu as déjà un compte VRM, clique « Se déconnecter » et connecte-toi avec son email et son mot de passe.</div>' : ''; })()}
       <div id="transpBox" hidden></div>
       <button id="vrmBtn">Ouvrir VRM</button>
       <button class="sec" id="outBtn">Se déconnecter</button>`);
     document.getElementById('vrmBtn').addEventListener('click', ouvrirVRM);
     rendreTranspPermis(e.transp);
+    direALaCarte('prete'); direALaCarte('hauteur');
     document.getElementById('outBtn').addEventListener('click', () => {
       chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogout' }, () => chargerAuth(true));
     });
@@ -202,49 +265,37 @@ function rendreAuth(e) {
   }
   const expiree = e && e.expiree;
   poserHtml(box, `<div class="who"><span class="dot warn"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
-    <div class="muted" style="margin-top:2px">${expiree
-      ? 'Reconnecte l’extension à ton compte VRM : un clic, VRM s’ouvre et la reconnecte tout seul.'
-      : 'Connecte l’extension à ton compte VRM : un clic, VRM s’ouvre et la connecte tout seul. Rien à taper ici.'}</div>
-    <button id="lierBtn">Se connecter avec VRM</button>
-    <div class="muted" id="lierEtat" hidden></div>
-    <div id="oauthBox" hidden></div>
-    <div class="muted" style="margin-top:12px"><a href="#" id="mdpLien">avec mon mot de passe VRM</a></div>
-    <div id="mdpForm" hidden>
-      <div class="muted" id="mdpOauthMot" hidden></div>
-      <div class="muted" style="margin-top:6px">${quelCompte}</div>
-      <input id="mail" type="email" placeholder="Email de ton compte VRM" autocomplete="username" value="${esc(expiree && e.email ? e.email : '')}">
-      <input id="pw" type="password" placeholder="Mot de passe VRM" autocomplete="current-password">
-      <button class="sec" id="inBtn">Me connecter</button>
-      <div class="err" id="authErr" hidden></div>
+    <div class="muted" style="margin-top:6px">${quelCompte}</div>
+    <div id="mdpForm">
+      <label class="lab" for="mail">Email de ton compte VRM</label>
+      <input id="mail" type="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Email de ton compte VRM" autocomplete="username" value="${esc(expiree && e.email ? e.email : '')}">
+      <label class="lab" for="pw">Mot de passe VRM</label>
+      <input id="pw" type="password" placeholder="Mot de passe VRM" autocomplete="current-password" enterkeyhint="go">
+      <button id="inBtn">Me connecter</button>
+      <div class="err" id="authErr" role="alert" hidden></div>
+      <div class="muted" style="margin-top:4px"><a href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer" id="oubliLien">Mot de passe oublié ?</a></div>
     </div>
     <div id="captchaBox" hidden>
       <div class="err" id="captchaMsg"></div>
       <button id="captchaLierBtn">Se connecter avec VRM</button>
     </div>
+    <div class="ou" id="ouSep"><span>ou</span></div>
+    <div id="oauthBox" hidden></div>
+    <div class="muted" id="mdpOauthMot" hidden></div>
+    <div class="muted" id="lierEtat" role="status" hidden></div>
+    <button class="lien" id="lierBtn">Rien ne marche ? Se connecter en passant par le site VRM</button>
     <div class="muted">Pas encore de compte ? <a href="https://vrm.center/?inscription" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.</div>`);
   document.getElementById('lierBtn').addEventListener('click', lierAvecVRM);
-  document.getElementById('mdpLien').addEventListener('click', (ev) => {
+  // « Mot de passe oublié ? » : VRM s'ouvre sur la récupération. Fenêtre de
+  // l'icône sans `target` utilisable (Orion : une feuille) ⇒ comme une page.
+  document.getElementById('oubliLien').addEventListener('click', (ev) => {
+    const url = ev.currentTarget.href;
+    if (CARTE) return;                       // l'iframe ouvre un onglet de lui-même
     ev.preventDefault();
-    const f = document.getElementById('mdpForm');
-    f.hidden = !f.hidden;
-    if (!f.hidden) { const m = document.getElementById('mail'); if (m && !m.value) m.focus(); else { const p = document.getElementById('pw'); if (p) p.focus(); } }
+    try { chrome.tabs.create({ url }, () => { void chrome.runtime.lastError; try { window.close(); } catch (_) {} }); } catch (_) { ouvrirSansTabs(url); }
   });
-  // Orion : le chemin principal est email + mot de passe dans l'extension.
-  // Le lien vers VRM reste facultatif pour les autres méthodes et le captcha.
-  if (globalThis.__vrmOrionCompat) {
-    const formulaire = document.getElementById('mdpForm');
-    formulaire.hidden = false;
-    document.getElementById('mdpLien').parentElement.hidden = true;
-    const autre = document.getElementById('lierBtn');
-    autre.textContent = 'Autre méthode de connexion';
-    autre.classList.add('sec');
-    formulaire.after(autre, document.getElementById('lierEtat'));
-    document.getElementById('inBtn').classList.remove('sec');
-    const phrase = box.querySelector('.who + .muted');
-    if (phrase) phrase.textContent = 'Connecte l’extension avec ton email et ton mot de passe VRM. Aucun onglet VRM à ouvrir.';
-    // 5.325 : Google / Discord AU-DESSUS du formulaire (« Utilise les boutons au-dessus »).
-    formulaire.before(document.getElementById('oauthBox'));
-  }
+  const mailVide = !document.getElementById('mail').value;
+  if (!CARTE) { try { document.getElementById(mailVide ? 'mail' : 'pw').focus(); } catch (_) {} }
   lireFournisseurs(rendreFournisseurs);
   const err = document.getElementById('authErr');
   // ⚠️ CAPTCHA (21 oct.) : Supabase peut exiger une vérification anti-robot
@@ -264,23 +315,45 @@ function rendreAuth(e) {
   //    plusieurs sessions pour une seule connexion (mesuré : 4 × Entrée ⇒ 2 à 3
   //    sessions, dont les autres restent orphelines).
   let enVol = false;
+  const dire = (t) => { err.textContent = t; err.hidden = false; direALaCarte('hauteur'); };
   const go = () => {
     if (enVol) return;
     const email = document.getElementById('mail').value, password = document.getElementById('pw').value;
+    // 5.328 : les champs vides se disent ici, sans rien envoyer.
+    if (!String(email).trim() || !password) {
+      dire(!String(email).trim() && !password ? 'Tape l’email et le mot de passe de ton compte VRM.' : !String(email).trim() ? 'Tape l’email de ton compte VRM.' : 'Tape ton mot de passe VRM.');
+      try { document.getElementById(!String(email).trim() ? 'mail' : 'pw').focus(); } catch (_) {}
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) { dire('Cet email n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
     const btn = document.getElementById('inBtn');
     enVol = true; btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
+    let fini = false;
+    const finir = (r, muet) => {
+      if (fini) return; fini = true; clearTimeout(attente);
+      enVol = false; btn.textContent = 'Me connecter'; btn.disabled = false;
+      if (r && r.ok) { rendreAuth({ connecte: true, email: r.email || email.trim() }); direALaCarte('hauteur'); }
+      else if (refusCaptcha(r)) montrerRefusCaptcha();
+      else if (muet) dire('L’extension n’a pas répondu. Réessaie dans un instant ; si ça dure, utilise « Se connecter avec VRM » plus bas.');
+      else dire((r && r.error) || 'Connexion refusée.');
+    };
+    // iOS peut suspendre le service worker en route : jamais un bouton figé.
+    const attente = setTimeout(() => finir(null, true), 20000);
     // Rester sur la plateforme après le mot de passe : la capture repart
     // depuis la session conservée par le moteur, sans ouvrir un onglet VRM.
-    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, ouvrir: false }, (r) => {
-      enVol = false; btn.textContent = 'Me connecter'; btn.disabled = false;
-      if (r && r.ok) { rendreAuth({ connecte: true, email: r.email || email.trim() }); }
-      else if (refusCaptcha(r)) montrerRefusCaptcha();
-      else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
-    });
+    try {
+      chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, ouvrir: false }, (r) => {
+        let e2 = null; try { e2 = chrome.runtime.lastError; } catch (_) { e2 = null; }
+        finir(e2 ? null : r, !!e2 || r === undefined);
+      });
+    } catch (_) { finir(null, true); }
   };
   document.getElementById('inBtn').addEventListener('click', go);
   // Entrée depuis le champ mot de passe : sinon il faut viser le bouton.
   document.getElementById('pw').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
+  document.getElementById('mail').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); const p = document.getElementById('pw'); if (p && !p.value) p.focus(); else go(); } });
+  direALaCarte('prete');
+  direALaCarte('hauteur');
 }
 
 // ── L'ICÔNE OUVRE VRM (Julien, 30 septembre) ──────────────────────────────

@@ -67,7 +67,14 @@
   //    un même « ping » (`sonderPonts`) — avec l'identifiant, deux copies de la
   //    MÊME version se distinguent aussi. Rien d'autre ne part.
   const idExt = (() => { try { return String(rt.id || ''); } catch (_) { return ''; } })();
-  function announce() { if (!vivant()) { retirer(); return; } poster({ __vmr: 'ready', version, id: idExt }); }
+  // 5.328 (8 nov., Orion iPhone) : une extension SANS canal direct (le paquet
+  //    Orion et Firefox n'ont pas `externally_connectable` dans leur manifeste)
+  //    le DIT dans son « ready » : l'app lui parle alors d'emblée par ce pont
+  //    (`adresse`, toujours adressé à notre identifiant), au lieu d'attendre 5 s
+  //    un canal direct qui ne répond jamais. Mesuré dans NOTRE manifeste, jamais
+  //    deviné d'après le navigateur.
+  const sansCanalDirect = (() => { try { const m = rt.getManifest(); return !!m && !m.externally_connectable; } catch (_) { return false; } })();
+  function announce() { if (!vivant()) { retirer(); return; } poster(Object.assign({ __vmr: 'ready', version, id: idExt }, sansCanalDirect ? { canal: 'pont' } : {})); }
 
   // ══ LE CODE QUI RÉPOND EST-IL CELUI DU MANIFESTE ? (11 octobre) ══════════
   // ⚠️⚠️ MESURÉ chez lui : 5 Chrome sur 6 exécutaient une 5.95–5.129 sous un

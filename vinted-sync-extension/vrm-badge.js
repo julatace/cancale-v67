@@ -13,6 +13,9 @@
 //  - aucun formulaire dans la page. Le mot de passe se tape dans un iframe de
 //    l'EXTENSION (popup.html?mode=carte) : les scripts du site ne peuvent ni lire
 //    le champ ni écouter le clavier. Dans le DOM de vinted.fr, ils le pouvaient.
+//    5.328 (Julien, 8 nov., iPhone Orion : « mets directement l'endroit de
+//    connexion avec le mot de passe, le Google, Discord ») : cet iframe est
+//    posé DANS la carte dès qu'on n'est pas connecté — plus de détour par VRM.
 //  - aucune lecture de données, aucune requête vers le site : l'état vient du
 //    service worker (session VRM, cookie du site, ce que les écritures ont noté).
 //  - aucune couleur quand tout va bien (§7). L'ambre ne s'allume que s'il y a
@@ -52,11 +55,11 @@
      suivent le système ; rayons 5 / 8 / 10 / 12 ; une seule forme de bouton. */
   :host { all: initial;
     --fond: #07090D; --carte: #10141B; --bord: #1E2530; --filet: #1A202A; --texte: #E8ECF2; --doux: #8A93A3; --pale: #6B7485;
-    --accent: #3D7BFF; --ambre: #F5A524; --survol: #1A202A;
+    --accent: #3D7BFF; --ambre: #F5A524; --survol: #1A202A; --verre: rgba(16,20,27,.88);
     --ombre: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.36); }
   @media (prefers-color-scheme: light) {
     :host { --carte: #FFFFFF; --bord: #DCE1EA; --filet: #E8ECF2; --texte: #10151B; --doux: #5B6577; --pale: #7A8494;
-      --accent: #2458E6; --ambre: #A15C00; --survol: #EEF1F6;
+      --accent: #2458E6; --ambre: #A15C00; --survol: #EEF1F6; --verre: rgba(255,255,255,.9);
       --ombre: 0 1px 2px rgba(16,21,27,.08), 0 16px 40px rgba(16,21,27,.14); }
   }
   * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; }
@@ -69,8 +72,10 @@
   .btn .txt { color: #E8ECF2; font-weight: 800; font-size: 12px; letter-spacing: .04em; line-height: 42px; text-align: center; display: block; }
   .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: var(--ambre); border: 2px solid #07090D; display: none; }
   .pt.on { display: block; }
-  .carte, .question { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto; background: var(--carte); color: var(--texte); border: 1px solid var(--bord);
-    border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: var(--ombre); display: none; }
+  /* 5.328 : verre (clair et sombre), une colonne ; la connexion y est posée. */
+  .carte, .question { position: absolute; right: 0; bottom: 54px; width: min(320px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto; background: var(--verre); color: var(--texte); border: 1px solid var(--bord);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: var(--ombre); display: none; }
   .carte.on, .question.on { display: block; }
   .tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   .tete b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
@@ -94,12 +99,12 @@
   .q { font-size: 14px; font-weight: 600; margin: 2px 0 4px; }
   .q b { font-weight: 700; }
   .err { margin-top: 8px; font-size: 12px; color: var(--ambre); }
-  /* 5.325 : 460 (était 400) — « Continuer avec Google / Discord » y tiennent sans défiler. */
-  .connexion { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); height: min(460px, calc(100vh - 90px)); border: 1px solid var(--bord); border-radius: 12px;
-    overflow: hidden; background: var(--fond); box-shadow: var(--ombre); display: none; }
-  @media (prefers-color-scheme: light) { .connexion { background: #F4F6FA; } }
-  .connexion.on { display: block; }
-  .connexion iframe { width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+  /* 5.328 : la connexion (iframe de l'extension) est DANS la carte, sous l'état ;
+     sa hauteur suit le formulaire (le cadre la donne) : un seul défilement. */
+  .connexion { margin: 4px -14px -12px; border-top: 1px solid var(--filet); }
+  .connexion[hidden] { display: none; }
+  .connexion iframe { width: 100%; height: 470px; border: 0; display: block; background: transparent; }
+  .connexion .secours { padding: 10px 14px 12px; }
   .fermer { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent;
     color: var(--doux); font-size: 18px; cursor: pointer; line-height: 44px; padding: 0; }
   .fermer:hover { background: var(--survol); color: var(--texte); }
@@ -109,15 +114,15 @@
      de surlignage gris du navigateur, et aucun double-tap qui zoome. */
   .btn, .b, .fermer { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 </style>
-<div class="carte" part="carte"></div>
+<div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
-<div class="connexion"><button class="fermer" title="Fermer" aria-label="Fermer">×</button></div>
 <button class="btn" title="VRM" aria-label="VRM"><span class="pt"></span></button>`;
 
   const btn = ombre.querySelector('.btn');
   const pt = ombre.querySelector('.pt');
   const carte = ombre.querySelector('.carte');
-  const connexion = ombre.querySelector('.connexion');
+  const contenu = carte.querySelector('.contenu');
+  const connexion = carte.querySelector('.connexion');
   const question = ombre.querySelector('.question');
 
   // Le logo de l'app (le même qu'en haut de chaque écran de VRM). S'il ne
@@ -185,6 +190,10 @@
     } catch (_) { res(null); }
   });
 
+  // 5.328 : un refus noté AVANT que cette session soit donnée (mot de passe dans
+  // la carte, liaison) ne demande plus « connecte-toi » : c'est fait. `depuis`
+  // vient du service worker ; 0 (pas su) ⇒ rien n'est conclu, la phrase d'avant.
+  const refusAvantConnexion = (f, v) => !!(v && v.connecte === true && Number(v.depuis) > 0 && f && Number(f.koAt) > 0 && Number(f.koAt) < Number(v.depuis));
   // Ce qui demande un geste (et seulement ça) allume l'ambre.
   const aFaire = (e) => {
     if (!e) return false;
@@ -193,7 +202,7 @@
     if (e.bascule) return true;                                               // une autre session VRM a été adoptée
     if (e.site && e.site.choix === 'non' && e.plateforme === 'vinted') return false;   // un CHOIX n'est pas une panne
     const f = e.flux;
-    if (f && f.koAt && (!f.okAt || f.koAt > f.okAt)) return true;            // dernier envoi refusé
+    if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
     if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
     return false;
   };
@@ -206,7 +215,7 @@
   // extension < 5.189 n'a pas `koStatut` : on retombe sur le message d'attente,
   // comme avant.
   function raisonRefus(f, v) {
-    if (v && v.connecte === false) return ' — connecte-toi à VRM pour que ça reparte';
+    if (v && v.connecte === false) return ' — connecte-toi ci-dessous pour que ça reparte';
     const st = String((f && f.koStatut) || '');
     // 5.193 : rien n'est parti, faute de session VRM vivante (morte ou en pause
     // de renouvellement) — ce n'est ni une panne ni un refus de la base.
@@ -273,18 +282,20 @@
       : '';
     if (!e) {
       carte.classList.toggle('doigt', doigt);
-      poserHtml(carte, `${doigt ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b></div>
+      poserHtml(contenu, `${doigt ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b></div>
         ${lignePerime || `<div class="ligne"><div class="val gris">${pasSu ? SI_MUETTE : 'Vérification…'}</div></div>`}`);
       const fermerV = carte.querySelector('[data-fermer-carte]');
-      if (fermerV) fermerV.addEventListener('click', () => { doigt = false; carte.classList.remove('on'); });
+      if (fermerV) fermerV.addEventListener('click', fermerCarte);
+      poserFormulaire(formulaireDemande);
       return;
     }
     const v = e.vrm;
     let compteVrm;
     if (!v) compteVrm = '<div class="val gris">pas su pour l\'instant</div>';
     else if (v.connecte) compteVrm = `<div class="val">${esc(v.email || 'connecté')}</div>`;
-    else if (v.expiree) compteVrm = `<div class="val alerte">Session expirée${v.email ? ' (' + esc(v.email) + ')' : ''} — clique pour te reconnecter</div>`;
-    else compteVrm = '<div class="val alerte">Pas connecté — clique pour te connecter</div>';
+    else if (v.expiree) compteVrm = `<div class="val alerte">Session expirée${v.email ? ' (' + esc(v.email) + ')' : ''} — reconnecte-toi ci-dessous</div>`;
+    else compteVrm = '<div class="val alerte">Pas connecté — connecte-toi ci-dessous</div>';
+    if (v && v.connecte && justeConnecte) compteVrm += `<div class="val" data-juste-connecte>C’est fait : l’extension est connectée${v.email ? ' à <b>' + esc(v.email) + '</b>' : ''}.</div>`;
 
     const nomSite = NOM_SITE[e.plateforme] || 'ce site';
     let compteSite;
@@ -304,7 +315,9 @@
     if (e.capte && ignore) flux = '<div class="val gris">Rien n’est capté pour ce compte — ton choix.</div>';
     else if (e.capte) {
       const f = e.flux || {};
-      if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
+      if (f.koAt && (!f.okAt || f.koAt > f.okAt) && refusAvantConnexion(f, v)) {
+        flux = `<div class="val gris" data-refus-avant>Dernier envoi refusé ${esc(depuis(f.koAt))}, avant ta connexion — les prochains partent avec ta session.</div>${historiqueRefus(f)}`;
+      } else if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
         flux = `<div class="val alerte" data-refus-cause="${esc(String(f.koStatut == null ? 'inconnu' : f.koStatut))}">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>${historiqueRefus(f)}`;
       } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val">Envoyées à VRM ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
@@ -357,9 +370,9 @@
       bascule = `<div class="ligne"><div class="lib">Attention</div><div class="val alerte">Le ${esc(quand)}, ce Chrome est passé du compte VRM ${esc(b.de || '?')} à ${esc(b.vers || '?')}. Les captures suivent le compte connecté : si ce n'est pas le tien, reconnecte-toi avec le bon.</div></div>`;
     }
 
-    const pied = doigt
-      ? (v && v.connecte ? '' : '<b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.')
-      : v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo : <b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.';
+    // 5.328 : pas connecté ⇒ le formulaire est juste en dessous, rien à dire de plus.
+    const formulaire = !!(v && v.connecte === false) || (!v && formulaireDemande);
+    const pied = (doigt || !(v && v.connecte)) ? '' : 'Clique sur le logo pour <b>ouvrir VRM</b>.';
     // Julien, 27 oct. : « je veux pouvoir me connecter à mon compte VRM depuis
     // Vestiaire et Leboncoin aussi ». Les gestes sont dans la carte sur TOUS
     // les sites et à la souris comme au doigt ; « Changer de compte VRM » ouvre
@@ -367,9 +380,9 @@
     // celle du navigateur : elle vaut pour Vinted, Leboncoin et Vestiaire).
     const gesteDoigt = v && v.connecte
       ? `<div class="gestes">${doigt ? '<button class="b" data-ouvrir-vrm>Ouvrir VRM</button>' : ''}<button class="b sec" data-changer-vrm>Changer de compte VRM</button></div>`
-      : `<button class="b" data-ouvrir-vrm>Se connecter avec VRM</button>`;
-    carte.classList.toggle('doigt', doigt);
-    poserHtml(carte, `${doigt ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
+      : formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`;
+    carte.classList.toggle('doigt', doigt || formulaire);
+    poserHtml(contenu, `${doigt || formulaire ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
       ${lignePerime}
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
@@ -385,7 +398,10 @@
     const ouvrir = carte.querySelector('[data-ouvrir-vrm]');
     if (ouvrir) ouvrir.addEventListener('click', () => { carte.classList.remove('on'); actionLogo(); });
     const fermerC = carte.querySelector('[data-fermer-carte]');
-    if (fermerC) fermerC.addEventListener('click', () => { doigt = false; carte.classList.remove('on'); });
+    if (fermerC) fermerC.addEventListener('click', fermerCarte);
+    const montrer = carte.querySelector('[data-montrer-connexion]');
+    if (montrer) montrer.addEventListener('click', () => { formulaireDemande = true; rendre(); });
+    poserFormulaire(formulaire);
     const capter = carte.querySelector('[data-capter]');
     if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
   }
@@ -440,35 +456,59 @@
     const r = await demander();
     if (r === undefined) { hote.remove(); return; }
     pasSu = r === null;
+    const avant = !!(etat && etat.vrm && etat.vrm.connecte === false) || !!iframe;
     if (r) etat = r;
+    // 5.328 : connecté depuis la carte ⇒ elle reste ouverte et NOMME le compte.
+    if (avant && etat && etat.vrm && etat.vrm.connecte) { justeConnecte = true; formulaireDemande = false; }
     rendre();
-    if (etat && etat.vrm && etat.vrm.connecte) fermerConnexion();
   }
 
   // ── La connexion : un iframe de l'EXTENSION, jamais un champ dans la page ──
-  let iframe = null;
-  function ouvrirConnexion() {
-    carte.classList.remove('on');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.title = 'Connexion à VRM';
-      try { iframe.src = chrome.runtime.getURL('popup.html') + '?mode=carte'; } catch (_) { return; }
-      connexion.appendChild(iframe);
+  // 5.328 : posé DANS la carte (sous l'état) tant qu'on n'est pas connecté, gardé
+  // d'un rendu à l'autre (ce qui est tapé ne se perd pas quand l'état change).
+  // Le cadre dit qu'il est prêt et sa hauteur (`__vrmCarte`, rien d'autre — ni
+  // e-mail ni mot de passe ne sortent du cadre). Pas prêt en 6 s (navigateur qui
+  // refuse le cadre) ⇒ le dire, et « Se connecter avec VRM » en dernier recours.
+  let iframe = null, cadrePret = false, cadreTimer = null, formulaireDemande = false, justeConnecte = false;
+  function poserFormulaire(montrer) {
+    if (!montrer) {
+      connexion.hidden = true;
+      clearTimeout(cadreTimer);
+      if (iframe) { iframe.remove(); iframe = null; }
+      if (connexion.childNodes.length) connexion.replaceChildren();
+      return;
     }
-    connexion.classList.add('on');
+    connexion.hidden = false;
+    if (iframe || connexion.querySelector('.secours')) return;
+    iframe = document.createElement('iframe');
+    iframe.title = 'Connexion à VRM';
+    cadrePret = false;
+    try { iframe.src = chrome.runtime.getURL('popup.html') + '?mode=carte'; } catch (_) { iframe = null; secoursFormulaire(); return; }
+    connexion.appendChild(iframe);
+    clearTimeout(cadreTimer);
+    cadreTimer = setTimeout(() => { if (!cadrePret) secoursFormulaire(); }, 6000);
   }
-  function fermerConnexion() {
-    connexion.classList.remove('on');
+  function secoursFormulaire() {
     if (iframe) { iframe.remove(); iframe = null; }
+    poserHtml(connexion, `<div class="secours" data-secours-formulaire><div class="val gris">Le formulaire de connexion ne s’affiche pas dans cette page. Touche l’icône VRM du navigateur pour t’y connecter avec ton e-mail et ton mot de passe — ou :</div><button class="b sec" data-lier-secours>Se connecter avec VRM</button></div>`);
+    const b = connexion.querySelector('[data-lier-secours]');
+    if (b) b.addEventListener('click', lierVRM);
   }
-  ombre.querySelector('.fermer').addEventListener('click', fermerConnexion);
+  window.addEventListener('message', (ev) => {
+    if (!iframe || ev.source !== iframe.contentWindow) return;
+    const d = ev.data;
+    if (!d || typeof d !== 'object') return;
+    if (d.__vrmCarte === 'prete') { cadrePret = true; clearTimeout(cadreTimer); }
+    if (d.__vrmCarte === 'hauteur') { const h = Math.round(Number(d.h) || 0); if (h >= 120) iframe.style.height = Math.min(h, 720) + 'px'; }
+  }, false);
+  function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
+  function fermerCarte() { doigt = false; justeConnecte = false; carte.classList.remove('on'); }
 
   btn.addEventListener('click', async () => {
-    if (connexion.classList.contains('on')) { fermerConnexion(); return; }
     // Au doigt : toucher le logo ouvre (ou referme) la carte — c'est elle qui
     // porte le geste « Ouvrir VRM », et le moyen de revenir sur un « Non ».
     if (auDoigt()) {
-      if (carte.classList.contains('on')) { doigt = false; carte.classList.remove('on'); return; }
+      if (carte.classList.contains('on')) { fermerCarte(); return; }
       doigt = true;
       if (question.classList.contains('on')) return;     // la question a déjà ses boutons
       carte.classList.add('on');
@@ -484,14 +524,12 @@
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'ouvrirVRM' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
       return;
     }
-    // ⚠️ 11 octobre (Julien : « quand j'appuie sur se connecter ça doit envoyer
-    //    directement dans l'application VRM ») : le logo OUVRE VRM à chaque
-    //    fois. Pas connecté, session expirée ou pas su : VRM s'ouvre avec
-    //    l'identifiant de CETTE extension, et l'app (connectée, ou après sa
-    //    connexion) lui adresse sa session. La carte de mot de passe ne revient
-    //    qu'en secours, si le service worker ne sait pas faire la liaison
-    //    (code périmé : il ne connaît pas ce message).
-    lierVRM();
+    // ⚠️ 8 nov. (5.328, Julien sur Orion : « "Se connecter" change de page VRM
+    //    et ça ne se connecte pas ») : pas connecté, le logo ouvre la carte AVEC
+    //    le formulaire (e-mail + mot de passe VRM, puis Google / Discord, puis
+    //    « Se connecter avec VRM » en dernier recours). Plus de détour par VRM.
+    //    (11 octobre, retiré : le logo ouvrait VRM, qui adressait sa session.)
+    ouvrirConnexion();
   }
   function lierVRM() {
     let repondu = false;
@@ -514,7 +552,7 @@
   let minuteur = null;
   hote.addEventListener('pointerenter', (e) => {
     if (e.pointerType && e.pointerType !== 'mouse') return;
-    if (connexion.classList.contains('on') || question.classList.contains('on')) return;
+    if (question.classList.contains('on')) return;
     clearTimeout(minuteur);
     doigt = false;
     rafraichir();
@@ -522,7 +560,7 @@
   });
   hote.addEventListener('pointerleave', (e) => {
     if (e.pointerType && e.pointerType !== 'mouse') return;
-    if (doigt) return;
+    if (doigt || !connexion.hidden) return;             // un formulaire ouvert ne se ferme pas au survol
     clearTimeout(minuteur); minuteur = setTimeout(() => carte.classList.remove('on'), 180);
   });
   // Au doigt, toucher ailleurs dans la page referme la carte (sans rien cliquer
@@ -530,7 +568,7 @@
   document.addEventListener('pointerdown', (e) => {
     if (!carte.classList.contains('on')) return;
     let dedans = false; try { dedans = e.composedPath().includes(hote); } catch (_) {}
-    if (!dedans) { doigt = false; carte.classList.remove('on'); }
+    if (!dedans) fermerCarte();
   }, true);
 
   // Une connexion réussie, un envoi noté, une bascule : la carte suit, sans
