@@ -263,6 +263,14 @@ const ouvrir = async (b, vp, sombre) => {
           await pg.waitForTimeout(300);
           const det = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte*="9301"]'); const d = l && l.querySelector('[data-rp-detail]'); return d ? { code: !!d.querySelector('[data-code-retrait="012345"], .vrm-rp-gestes'), txt: d.innerText.slice(0, 200) } : null; });
           dit(!!det && det.code, 'toucher la ligne ouvre son détail (code, gestes)', JSON.stringify(det));
+          await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>{window.__codeCopie=t;}}}));
+          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-code').first().click();
+          dit(await pg.evaluate(()=>window.__codeCopie)==='012345','Code copie le texte exact en conservant le zéro initial');
+          const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang button').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
+          dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir, code et retrait restent côte à côte');
+          await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('refus');}}}));
+          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-code').first().click();
+          dit(await pg.locator('[data-cc-carte*="9301"] [data-rp-detail]').count()===1,'un presse-papiers refusé garde le détail disponible');
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.waitForTimeout(300);
           const nl = await pg.evaluate(() => [...document.querySelectorAll('[data-en-route-liste] [data-en-route-achat]')].filter((x) => x.getBoundingClientRect().height > 0).length);

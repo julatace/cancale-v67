@@ -33,6 +33,7 @@ export function EtatPanne({ quoi, raison, onReessayer, compact = false, classNam
   };
   return (
     <div role="status" className={`vrm-etat-panne${compact ? ' vrm-etat-panne-compact' : ''}${className ? ' ' + className : ''}`} data-etat-panne="" {...rest}>
+      <span className="vrm-etat-panne-repere" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M19 11a7 7 0 1 0-2 6M19 5v6h-6" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
       <div className="vrm-etat-panne-texte">
         <p className="vrm-etat-panne-phrase">{PAS_SU.phrase(quoi || 'Cette lecture')}</p>
         <p className="vrm-etat-panne-raison">{raison || PAS_SU.sansRaison}</p>

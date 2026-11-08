@@ -103,7 +103,7 @@ function fenetre(cle) {
   const g1 = e({ extension: G.preuveExtension('absente', []), vinted: G.preuveListe([]), emails: G.preuveListe([]), numeros: G.preuveNombre(0) });
   dit(g1.faites === 0 && g1.courante === 'extension' && !g1.fini, 'G1 rien de prouvé : 0, on commence par l’extension', g1);
   const g2 = e({ extension: G.preuveExtension('absente', [{}]), vinted: G.preuveListe([{}]), emails: G.preuveListe(null), numeros: G.preuveNombre(undefined) });
-  dit(g2.etapes[2].etat === 'passu' && g2.etapes[3].etat === 'encours' && g2.courante === null && g2.faites === 2, 'G2 « pas su » et « en cours » ne sont ni cochés ni proposés', g2);
+  dit(g2.etapes[2].etat === 'passu' && g2.etapes[3].etat === 'encours' && g2.courante === 'emails' && g2.faites === 2, 'G2 une preuve incertaine garde son étape courante sans cocher ni avancer', g2);
   dit(G.preuveExtension('demande', []) === 'encours' && G.preuveExtension('connectee', []) === 'fait' && G.preuveExtension('muette', []) === 'fait', 'G3 l’extension qui répond est installée ; la question en cours ne coche rien');
   dit(G.compterNumeros({ a: { numero: '1' }, b: { numero: '' } }, { c: { numero: 'B12' } }) === 2 && G.compterNumeros(undefined) === undefined && G.compterNumeros(null) === null, 'G4 compter les N° : trois états', [G.compterNumeros(undefined), G.compterNumeros(null)]);
   dit(e({}).etapes.every((x) => x.etat === 'passu'), 'G4 une preuve absente vaut « pas su », jamais « fait »');

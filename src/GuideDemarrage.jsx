@@ -13,7 +13,7 @@ import './guide-demarrage.css';
 
 const ETAT_MOT = { fait: 'Fait', encours: 'Je vérifie…', passu: 'Pas pu vérifier', afaire: '' };
 
-export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, onExemple = null, onMasquer = null }) {
+export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, onExemple = null, onMasquer = null, onVerifier = null }) {
   if (!guide) return null;
   const { etapes, faites, total, courante } = guide;
   const pct = Math.round((faites / total) * 100);
@@ -38,9 +38,10 @@ export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, on
                   <span className="vrm-guide-nom">{e.cle === 'extension' && nav ? `${e.titre} ${nav}` : e.titre}</span>
                   {ETAT_MOT[e.etat] ? <span className="vrm-guide-etat" data-guide-etat-mot={e.etat}>{ETAT_MOT[e.etat]}</span> : null}
                 </div>
-                {e.etat !== 'fait' && <p className="vrm-guide-pourquoi">{e.pourquoi}</p>}
+                {ici && e.etat !== 'fait' && <p className="vrm-guide-pourquoi">{e.pourquoi}</p>}
                 {ici && (e.cle === 'extension' || e.cle === 'vinted') && detail ? <div className="vrm-guide-detail" data-guide-detail={e.cle}>{detail}</div> : null}
-                {ici && geste ? (
+                {ici&&e.etat==='passu'&&onVerifier?<button type="button" className="vrm-b vrm-b-secondaire" onClick={onVerifier}>Réessayer la vérification</button>:null}
+                {ici && e.etat!=='passu' && e.etat!=='encours' && geste ? (
                   <div className="vrm-guide-geste">
                     <button type="button" className="vrm-b vrm-b-primaire" data-guide-geste={e.cle} onClick={geste.onClick}>{geste.libelle}</button>
                   </div>

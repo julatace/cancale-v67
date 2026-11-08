@@ -57,6 +57,7 @@ import CadreEmail from './CadreEmail.jsx';
 import { streamAllume } from './modeStream.js';
 import { prendreDemande, DEMANDE_RECHERCHE } from './rechercheEcran.js';
 import './boite-emails.css';
+import {CompteEmailAVerifier} from './ActionsClaires.jsx';
 
 const PAR_PAGE = 50;
 const formeListe = (j) => j && j.ok === true && Array.isArray(j.emails) && j.compteurs && typeof j.compteurs.sur === 'number';
@@ -231,7 +232,7 @@ function MessageOrigine({ e, stream }) {
 }
 
 // ── LIRE UN E-MAIL ───────────────────────────────────────────────────────────
-function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAuRetour, lu, onLu, photoDe }) {
+function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAuRetour, lu, onLu, photoDe, onRelier }) {
   const [m, setM] = useState(undefined); // undefined en cours · null pas su · {email}
   const [essai, setEssai] = useState(0);
   const titre = useRef(null);
@@ -279,6 +280,7 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
               <p className="vrm-boite-haut-de">{expediteurLisible(e.from)}{e.compte ? <> · <span className="vrm-sensible" data-stream-type="compte">{e.compte.nom}</span></> : e.compteAmbigu ? ' · plusieurs comptes' : ''} · <time dateTime={dateEmail(e) || ''}>{heure(dateEmail(e))}</time></p>
             </div>
           </div>
+          {!e.compte&&(e.compteAmbigu||siteExpediteur(e.from)==='vinted')&&<CompteEmailAVerifier ambigu={e.compteAmbigu} onVerifier={onRelier}/> }
           <Heros e={e} h={h} photo={photo}/>
           {details.length > 0 && <p className="vrm-boite-details">{details.join(' · ')}</p>}
           {aVerifier && <div className="vrm-boite-averif" data-boite-averif="">
@@ -673,10 +675,10 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
         {pages && !pages.suite && pages.emails.length > 0 && <p className="vrm-boite-fin" data-boite-fin="">{pages.emails.length} e-mail{pages.emails.length > 1 ? 's' : ''}{filtre || rubrique || adresse ? ' dans cette vue' : ''} · c’est tout</p>}
       </div>
       {large && <div className="vrm-boite-lecture-col">
-        {ouvert ? <Lecture key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={onAller} onNum={onNum} plein={false} lu={(() => { const e = pages && pages.emails.find((x) => x.id === ouvert); return e ? luDe(e) : null; })()} onLu={onLu} photoDe={photoDe}/>
+        {ouvert ? <Lecture onRelier={onRelier} key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={onAller} onNum={onNum} plein={false} lu={(() => { const e = pages && pages.emails.find((x) => x.id === ouvert); return e ? luDe(e) : null; })()} onLu={onLu} photoDe={photoDe}/>
           : <div className="vrm-boite-vide-lecture" data-boite-vide-lecture=""><Dessin k="vide"/><p>Choisis un e-mail pour le lire.</p></div>}
       </div>}
-      {!large && ouvert && <Lecture key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={(u) => { setOuvert(''); onAller && onAller(u); }} onNum={(n) => { setOuvert(''); onNum && onNum(n); }} plein FermeAuRetour={FermeAuRetour}
+      {!large && ouvert && <Lecture onRelier={onRelier} key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={(u) => { setOuvert(''); onAller && onAller(u); }} onNum={(n) => { setOuvert(''); onNum && onNum(n); }} plein FermeAuRetour={FermeAuRetour}
         lu={(() => { const e = pages && pages.emails.find((x) => x.id === ouvert); return e ? luDe(e) : null; })()} onLu={onLu} photoDe={photoDe}/>}
       {avis ? createPortal(<div className="vrm-boite-avis" role="status" data-boite-avis="">{avis}</div>, document.body) : null}
     </div>
