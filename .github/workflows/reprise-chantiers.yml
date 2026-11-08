@@ -37,7 +37,7 @@ jobs:
           done
   ecrans:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -53,6 +53,9 @@ jobs:
       - name: Installer Chromium
         run: |
           npx playwright install --with-deps chromium
+          # Des bancs visent /opt/pw-browsers/chromium (le conteneur des sessions), comme dans verifier.yml.
+          sudo mkdir -p /opt/pw-browsers
+          sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
           echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
       - name: Vérifier les écrans sur données fictives
         env:

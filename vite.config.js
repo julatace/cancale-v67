@@ -62,7 +62,20 @@ const prechargerApp = () => ({
       const js = [app.fileName, ...(app.imports || [])].filter((f) => !deja.has(f));
       const css = [...((app.viteMetadata && app.viteMetadata.importedCss) || [])];
       for (const f of app.imports || []) { const c = bundle[f]; if (c && c.viteMetadata) for (const x of c.viteMetadata.importedCss) if (!css.includes(x)) css.push(x); }
-      return [{ tag: 'script', attrs: { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(',') }, injectTo: 'head-prepend' }];
+      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(',') };
+      // ⚠️ (8 nov., CI verte) JAMAIS avant `<meta name="referrer">` : posée en
+      // `head-prepend`, cette balise (et les préchargements qu'elle pose) partait
+      // avant que la page ait lu sa politique de référent — avec l'en-tête de Vercel
+      // (strict-origin-when-cross-origin), ces requêtes emportaient l'URL COMPLÈTE,
+      // donc le `?code=` / `#access_token` d'un lien de récupération
+      // (banc recuperation-retour). On la pose juste après la meta.
+      const meta = html.match(/<meta\s+name="referrer"[^>]*>/i);
+      if (meta) {
+        const balise = '<script ' + Object.entries(attrs).map(([k, v]) => `${k}="${String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`).join(' ') + '></script>';
+        const i = meta.index + meta[0].length;
+        return html.slice(0, i) + '\n  ' + balise + html.slice(i);
+      }
+      return [{ tag: 'script', attrs, injectTo: 'head-prepend' }];
     },
   },
 });

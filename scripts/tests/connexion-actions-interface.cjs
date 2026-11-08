@@ -20,7 +20,7 @@ const { build } = require("esbuild"),
  const sondeLectureSansCompte=async()=>false,useSecondesRestantes=()=>0,useCaptcha=()=>({statut:'pret'}),captchaActif=()=>false,confirmRequired=()=>false,CaptchaConnexion=()=>null,LiensLegaux=()=>null,BrandMark=()=>null;
  const etatAuthSettings=()=>({statut:'pret'}),onAuthSettingsChange=()=>()=>{},loadAuthSettings=async()=>{};
  const OAUTH_PROVIDERS=[{id:'google',label:'Google'},{id:'discord',label:'Discord'}],providerEnabled=()=>true,delaiDemandeEmail=()=>null,TEXTE_DELAI_EMAIL_BOUTON='',texteDelaiEmail=()=>'',save=()=>{};
- let RECOVERY_PENDING=false;window.forcerRecuperation=()=>{RECOVERY_PENDING=true;window.remonter();};
+ let RECOVERY_PENDING=false;let __lierConnexion=null,__lierRetourPerime=false;window.forcerRecuperation=()=>{RECOVERY_PENDING=true;window.remonter();};
  window.appels=[];window.attentes={};const demande=(action)=>{window.appels.push(action);return new Promise((resolve,reject)=>{window.attentes[action]={resolve,reject};});};
  const oauthStart=p=>demande(p),authSignIn=()=>demande('connexion'),authSignUp=()=>demande('inscription'),authReset=()=>demande('reset'),authSetPassword=()=>demande('motdepasse'),authResendConfirm=()=>demande('renvoyer'),authMagicLink=()=>demande('lien'),authConfirmFromLink=()=>demande('confirmer');
  ${s.slice(a, b)}
