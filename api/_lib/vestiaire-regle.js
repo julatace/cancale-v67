@@ -31,6 +31,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cleNum } from './numerotation.js';
 import { joursAvant } from './ebay-a-expedier.js';
+import { departProuve, suivisAmbigus } from './depart-colis.js';
+import { normaliserSuivi } from './etat-colis-email.js';
 
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
 
@@ -131,7 +133,12 @@ export function colisVcAPoster(d, maintenant = Date.now()) {
   // { [id de vente]: ts }) : le colis sort de « à poster », comme Vinted et
   // Leboncoin. Vestiaire le dira « envoyée » ensuite.
   const fait = objet(d.fait) || {};
-  return Object.entries(ventes).filter(([id, v]) => objet(v) && v.aExpedier === true && !fait[String(id)]).map(([id, v]) => {
+  // (8 nov.) PARTI, PROUVÉ CHEZ LE TRANSPORTEUR (api/_lib/depart-colis.js) : une
+  // vente encore « à expédier » chez Vestiaire (pas relu) dont le n° de suivi
+  // EXACT a été pris en charge sort de « à poster » — un état DÉDUIT, recalculé,
+  // jamais écrit. `d.departs` absent ou illisible ⇒ rien ne change (pas su).
+  const parti = departsVc(d, ventes);
+  return Object.entries(ventes).filter(([id, v]) => objet(v) && v.aExpedier === true && !fait[String(id)] && !parti.has(String(id))).map(([id, v]) => {
     const t = Date.parse(v.limite || '');
     return {
       id: String(id), num: numVcVente(v, liens, d.auto), productId: v.productId == null ? '' : String(v.productId), limite: v.limite || '', suivi: v.suivi || '', transporteur: v.transporteur || '',
@@ -145,6 +152,32 @@ export function colisVcAPoster(d, maintenant = Date.now()) {
       montant: objet(v.montant) ? v.montant : null, compte: typeof v.compte === 'string' ? v.compte : '',
     };
   }).sort((a, z) => String(a.limite || '9999').localeCompare(String(z.limite || '9999')));
+}
+// (8 nov.) Les ventes Vestiaire « à expédier » PARTIES d'après le transporteur :
+// Map id de vente → preuve ({ suivi, carrier, nom, at, phrase }). Identité : le
+// n° de suivi exact ; un n° porté par deux ventes (ou par un achat Vestiaire,
+// `d.achats`) est ambigu ⇒ rien.
+export function departsVc(d, ventesObj = null) {
+  const out = new Map();
+  const ventes = ventesObj || objet(d && d.ventes);
+  if (!ventes || !d || !d.departs) return out;
+  const liste = Object.entries(ventes).filter(([, v]) => objet(v) && v.suivi).map(([id, v]) => ({ cle: id, suivi: v.suivi }));
+  const entrants = new Set(Object.values(objet(d.achats) || {}).map((a) => normaliserSuivi(a && a.suivi)).filter(Boolean));
+  const ambigus = suivisAmbigus(liste, entrants);
+  for (const [id, v] of Object.entries(ventes)) {
+    if (!objet(v) || v.aExpedier !== true || !v.suivi) continue;
+    const p = departProuve(v.suivi, d.departs, { venteMs: Date.parse(v.date || '') || null, ambigus });
+    if (p) out.set(String(id), p);
+  }
+  return out;
+}
+// Les ventes « parties d'après le transporteur », pour la ligne « Déjà postés »
+// de Colis (la raison dite : « Chronopost l'a pris en charge le 7 nov. »).
+export function colisVcPartisLus(d, maintenant = Date.now()) {
+  if (!d || !objet(d.ventes) || !d.departs) return [];
+  const parti = departsVc(d);
+  if (!parti.size) return [];
+  return (colisVcAPoster({ ...d, departs: null, fait: {} }, maintenant) || []).filter((v) => parti.has(v.id)).map((v) => ({ ...v, depart: parti.get(v.id) }));
 }
 // Les nombres du widget et des rappels : total · en retard · aujourd'hui ·
 // demain · sans date limite. `null`/`undefined` restent ce qu'ils sont.

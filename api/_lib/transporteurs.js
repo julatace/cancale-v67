@@ -101,6 +101,51 @@ export function carrierLisible(carrier, suivi) {
   return k;
 }
 export const FORME_CHRONO_STRICTE = /^[A-Z]{2}\d{9}[A-Z]{2}$/;
+// ── (8 nov., retraits) LE TRANSPORTEUR LU D'UNE LIGNE D'E-MAIL ────────────────
+// Julien (8 nov.) : « l'application doit pouvoir lire les informations de suivi
+// afin de pouvoir enlever si nécessaire ». Un e-mail que la route range sous un
+// transporteur PAR DÉFAUT — `vinted` (l'expéditeur shipping@relay.vinted.com,
+// « ce n'est pas une preuve », 29 oct.), `autre` (le filet générique) ou rien —
+// et dont le n° a une forme PROPRE à un transporteur lu (8 chiffres = Mondial
+// Relay, « XW/ZW + 9 chiffres + TS/SP » = Chronopost, « VGS… » = Vinted Go) n'était
+// JAMAIS interrogé : `carrierLisible('vinted', '12345678')` rend null. Le même n°
+// saisi à la main ou relevé par Vinted, lui, l'était (`carrierParForme`). Un
+// transporteur NOMMÉ qu'on ne lit pas (Colissimo, DPD, UPS…) ne se remplace
+// jamais par la forme. Une règle pour le serveur (`suivisAInterroger`) et l'app
+// (la carte qui dit pourquoi un colis n'est pas lu), §11.
+const CARRIER_PAR_DEFAUT = /^(?:|vinted|autre)$/;
+export function carrierLuDeLigne(carrier, suivi) {
+  const k = normaliserSuivi(suivi);
+  const direct = carrierLisible(carrier, k);
+  if (direct) return direct;
+  if (!CARRIER_PAR_DEFAUT.test(String(carrier || '').trim().toLowerCase())) return null;
+  return carrierLisible(carrierParForme(k), k);
+}
+// (8 nov., retraits) DEUX LIGNES `transp_` POUR LE MÊME N° (deux transporteurs
+// essayés : avant le 29 oct., un n° de forme Chronopost lu chez Vinted Go ; un n°
+// vu sous deux transporteurs). L'app gardait la PREMIÈRE que la base renvoie,
+// le serveur la DERNIÈRE — l'ordre de PostgREST n'est pas garanti : la carte
+// pouvait dire « Vinted Go n'a pas répondu » sous un colis que Chronopost dit
+// retiré. La règle : une lecture RÉUSSIE (état + heure de lecture) l'emporte ;
+// entre deux lectures, la plus RÉCENTE ; sans lecture, le dernier ESSAI.
+const tempsDe = (v) => { const x = Date.parse(String(v || '')); return Number.isFinite(x) ? x : -Infinity; };
+export function ligneTranspPreferee(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  const luA = !!(a.etat && a.lu), luB = !!(b.etat && b.lu);
+  if (luA !== luB) return luA ? a : b;
+  if (luA) return tempsDe(b.lu) > tempsDe(a.lu) ? b : a;
+  return tempsDe(b.essai) > tempsDe(a.essai) ? b : a;
+}
+// Les lignes `transp_` par n° normalisé, une par n° (la préférée).
+export function indexTranspParSuivi(lignes) {
+  const m = new Map();
+  for (const t of (Array.isArray(lignes) ? lignes : (lignes instanceof Map ? [...lignes.values()] : []))) {
+    const k = normaliserSuivi(t && t.suivi); if (!k) continue;
+    m.set(k, ligneTranspPreferee(m.get(k), t));
+  }
+  return m;
+}
 // Le transporteur d'un n° vu sur PLUSIEURS lignes : une règle, jamais l'ordre des
 // lignes (PostgREST ne le garantit pas). Un transporteur NOMMÉ (Mondial Relay,
 // Chronopost) l'emporte sur « vinted » (le défaut d'un e-mail shipping@).
@@ -804,7 +849,8 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     if (!l) continue;
     const k = normaliserSuivi(l.suivi != null ? l.suivi : l.su) || '';
     if (!k) continue;
-    const c = carrierLisible(l.carrier != null ? l.carrier : l.c, k);
+    // (8 nov.) Le transporteur par défaut d'un e-mail cède à la forme propre du n° (`carrierLuDeLigne`).
+    const c = carrierLuDeLigne(l.carrier != null ? l.carrier : l.c, k);
     const e = ajoute(k, c);
     e.lignes.push(l);
     const sens = sensDeLigne(l, envoyesN);
@@ -847,7 +893,11 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     if (!e.carrier) continue;
     // JAMAIS un n° sortant (bordereau ou sens), jamais un sens « pas su ».
     if (envoyesN.has(e.k) || e.sortant || !e.entrant) continue;
-    const t = transp instanceof Map ? transp.get(e.k) : null;
+    let t = transp instanceof Map ? transp.get(e.k) : null;
+    // (8 nov., retraits) La ligne d'un AUTRE transporteur, jamais lue et abandonnée (`fini` :
+    // introuvable 3 fois, expiré), ne ferme pas CE n° chez le bon transporteur : sans ça, un
+    // n° essayé un jour chez Vinted Go n'était plus jamais lu chez Chronopost.
+    if (t && t.carrier && t.carrier !== e.carrier && t.fini && !t.lu && !t.etat) t = null;
     // Mondial Relay : le code postal d'abord — un n° fermé par trois « introuvable »
     // sous l'ancienne règle, jamais prouvé à un code postal, se relit quand un
     // AUTRE code postal est connu (saisi, appris), une fois par 6 h (revue n° 7).
@@ -869,6 +919,13 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     // jusqu'à une première lecture réussie (tour 2 n° 18 : un hoquet unique
     // consommait la seule lecture prévue), `FERMETURE_ESSAIS_MAX` essais au plus.
     else if ((!t || jamaisLueAvecSucces(t)) && !finEmail && avecFermeture) raison = 'fermeture';
+    // (8 nov., retraits) UNE DERNIÈRE LECTURE APRÈS LA FENÊTRE. Un n° lu « disponible », « en
+    // route », « incident » ou « inconnu » dont l'e-mail et l'évènement ont plus de 30 jours
+    // n'était plus jamais relu : le colis restait « à vérifier » (garde dépassée) pour toujours,
+    // alors que le transporteur savait s'il avait été retiré ou rendu. Il est relu UNE fois
+    // après la fermeture de sa fenêtre (la lecture suivante est datée après elle), au plus
+    // `FERMETURE_ESSAIS_MAX` essais ratés de suite.
+    else if (!finEmail && avecFermeture && relireApresFenetre(t, e.dernierMs)) raison = 'fermeture';
     else continue;
     let quand = raison === 'page' ? (msDe(t && t.essai) != null ? msDe(t.essai) + RELECTURE_PAGE_MS : 0) : prochainEssai(t);
     // Un code postal APPRIS depuis (saisi, lu dans un e-mail) : le n° redevient
@@ -915,6 +972,16 @@ export function ordreAInterroger(a, b) {
 // dont le dernier essai a raté sans rien conclure, et pas trop souvent (tour 2
 // n° 18). « introuvable », « expiré », « code postal inconnu » ont leur propre règle.
 export const FERMETURE_ESSAIS_MAX = 5;
+const ETATS_A_RELIRE = new Set(['disponible', 'en_route', 'incident', 'inconnu']);
+export function relireApresFenetre(t, dernierMs = null) {
+  if (!t || t.fini || !t.lu || !ETATS_A_RELIRE.has(t.etat)) return false;
+  if ((Number(t.essais) || 0) >= FERMETURE_ESSAIS_MAX) return false;
+  const bornes = [Number.isFinite(dernierMs) ? dernierMs : null, msDe(t.etatAt)].filter((x) => x != null);
+  if (!bornes.length) return false;
+  const finFenetre = Math.max(...bornes) + FENETRE_ACTIFS_J * 86400000;
+  const lu = msDe(t.lu);
+  return lu != null && lu < finFenetre;
+}
 export const jamaisLueAvecSucces = (t) => !!t && !t.lu && !t.etat && !t.fini
   && (t.essaiRes === 'passu' || t.essaiRes === 'bloque' || t.essaiRes === 'forme')
   && (Number(t.essais) || 0) < FERMETURE_ESSAIS_MAX;
@@ -924,6 +991,7 @@ export const jamaisLueAvecSucces = (t) => !!t && !t.lu && !t.etat && !t.fini
 // le nomme : un n° postal international (S10, « CP…IE ») n'est PAS Chronopost —
 // interrogé chez Chronopost, il laissait une ligne `transp_chronopost_…` jamais
 // lue, que l'écran prenait pour le transporteur (voir suivi-colis.js).
+export function carrierParForme(n) { return transporteurDeFormeT(n); }
 function transporteurDeFormeT(n) {
   const s = normaliserSuivi(n);
   if (/^\d{8}$/.test(s)) return 'mondialrelay';

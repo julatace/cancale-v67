@@ -97,6 +97,8 @@ const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat',
   // « Posté », plus « À expédier ») : ici, aucune ne l'est.
   isShipDone: () => false,
   shippedSuivis: new Set(), soldByTxn: {},
+  // (8 nov.) les transactions parties d'après le transporteur (api/_lib/depart-colis.js) : aucune ici.
+  partisTransp: new Map(),
   // (5 nov.) `achatStage` lit les fins prouvées par `pickupUnion` (aucune ici).
   pickupUnion: { txFinis: new Set() },
 }));
