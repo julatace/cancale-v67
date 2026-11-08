@@ -45,10 +45,11 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // Vestiaire du bilan : les règles de l'app (un propriétaire, importé).
 import { resumeColisSites } from './_lib/colis-sites.js';
 import { ventesVcDe, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
+import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
-import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS } from './_lib/transporteurs-lecture.js';
+import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances } from './_lib/relances-essai.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
@@ -202,7 +203,7 @@ const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 // Lit tout ce que le bilan d'UN vendeur demande. Chaque source vaut `null`
 // quand sa lecture a échoué — jamais `[]` à sa place (« rien lu » ≠ « rien »).
 async function lireDonneesBilan() {
-  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn, vcV, vcL] = await Promise.all([
+  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn, vcV, vcL, dep] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_BILAN),
     getRow('panel_accounts_off'),
@@ -216,7 +217,10 @@ async function lireDonneesBilan() {
     // (1er nov.) Les ventes Vestiaire et les liens de ses annonces (identité).
     getRowProjete('vc_ventes', ['ventes']),
     getRowProjete('vc_listings', ['liens']),
+    // (8 nov.) Les départs prouvés chez le transporteur (api/_lib/depart-colis.js).
+    fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)),
   ]);
+  const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
   const comptes = Array.isArray(comptesL)
     ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || ''), login: String((c && c.login) || '') })).filter((c) => c.uid)
     : null;
@@ -238,7 +242,8 @@ async function lireDonneesBilan() {
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
     // Les colis Leboncoin et Vestiaire à poster (`txsAExpedier`) : les mêmes lignes.
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
-    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens), fait: (mm && mm.vrm_vc_colis_done) || {} },
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens), fait: (mm && mm.vrm_vc_colis_done) || {}, departs },
+    departs,
     ebay: ebayL,
     versements: versementsDeLignes(txn),
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
@@ -266,7 +271,10 @@ function txsAExpedier(d) {
   const vivants = new Set(d.comptes.map((c) => c.uid));
   const shipDone = objet(d.main.vinted_ship_done), bordsShipped = objet(d.main.vinted_bords_shipped);
   const masquees = new Set();   // (29 oct.) une vente ne se masque plus
-  const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !masquees.has(t);
+  // (8 nov.) + parti d'après le transporteur (le n° du bordereau de CETTE
+  // transaction pris en charge, api/_lib/depart-colis.js — la règle de Colis).
+  const partisTransp = Array.isArray(d.bords) ? txVintedParties(bordsDuVendeur(d), d.departs) : new Map();
+  const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !masquees.has(t) && !partisTransp.has(String(t));
   const resume = new Set(); let resumeTrouve = false;
   const parTx = {};
   for (const [uid, l] of Object.entries(d.commandes)) {
@@ -592,7 +600,7 @@ async function lireTransporteursDuVendeur() {
   let minuteur;
   try {
     const r = await Promise.race([
-      passageTransporteurs({ max: MAX_CRON, budgetMs: BUDGET_CRON_MS - 2000, signal: arret.signal }),
+      passageTransporteurs({ max: MAX_CRON, maxDeparts: MAX_DEPARTS_CRON, budgetMs: BUDGET_CRON_MS - 2000, signal: arret.signal }),
       new Promise((ok) => { minuteur = setTimeout(() => ok({ ok: false, raison: 'delai' }), BUDGET_CRON_MS); }),
     ]);
     if (!r || !r.ok) return { fait: false, reason: (r && r.raison) || 'pas-su' };
@@ -787,7 +795,7 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens'];
 async function lireDonneesColis() {
   const BORD = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
-  const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL] = await Promise.all([
+  const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL, dep] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_COLIS),
     fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
@@ -797,7 +805,10 @@ async function lireDonneesColis() {
     getRowProjete('lbc_ventes', ['ventes']),
     getRowProjete('vc_ventes', ['ventes']),
     getRowProjete('vc_listings', ['liens']),
+    // (8 nov.) Les départs prouvés chez le transporteur (api/_lib/depart-colis.js).
+    fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)),
   ]);
+  const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
   const comptes = Array.isArray(comptesL) ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || '') })).filter((c) => c.uid) : null;
   let commandes = null;
   if (Array.isArray(lignes)) {
@@ -807,9 +818,9 @@ async function lireDonneesColis() {
       if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null };
     }
   }
-  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords,
+  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords, departs,
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
-    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {} } };
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {}, departs } };
 }
 // Les ventes par transaction (leur DATE sert à la limite estimée), des seuls
 // comptes encore liés — la même portée que `txsAExpedier`.

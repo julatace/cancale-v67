@@ -927,6 +927,64 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(tx.length === 2 && /cherche/.test(tx[0]) && !/ajoute/.test(tx[0]) && /ajoute/.test(tx[1]), 'n° 2 : la cause dite UNE fois en tête : « cherche » sans geste, « inconnu » avec le geste', tx.join(' | '));
   });
 
+  // ══ (8 nov.) LES COLIS VENDUS : LA PREUVE DE DÉPART (api/_lib/depart-colis.js) ══
+  // Julien : « tu as le numéro de suivi donc tu peux très bien regarder le statut du
+  // colis et voir qu'il a été expédié ». Le serveur lit les n° SORTANTS (vente
+  // Vestiaire « à expédier », bordereau Vinted) dans des lignes `depart_…` à part —
+  // JAMAIS `transp_…` : un colis vendu arrivé au point de l'acheteur ne devient
+  // jamais « à retirer », rien ne sonne.
+  await essaie('(8 nov.) colis vendus : départ lu chez le transporteur, jamais « à retirer »', async () => {
+    resetBase(); await oublis();
+    const P = 'XW000000201TS', PREP = 'XW000000202TS', VT = 'XW000000203TS', ACH = 'XW000000204TS', MR = '87654321';
+    base.set(`${A}|main`, mainRetrait({}));
+    base.set(`${A}|vc_ventes`, { ventes: {
+      v1: { aExpedier: true, suivi: P, transporteur: 'Chronopost', date: iso(NOW - 48 * H), titre: 'Nike Dunk Low' },
+      v2: { aExpedier: true, suivi: PREP, transporteur: 'Chronopost', date: iso(NOW - 48 * H), titre: 'Nike Dunk Low' },
+      v3: { aExpedier: true, suivi: ACH, transporteur: 'Chronopost', date: iso(NOW - 48 * H), titre: 'Nike Dunk Low' },
+      v4: { aExpedier: true, suivi: MR, transporteur: 'Mondial Relay', date: iso(NOW - 48 * H), titre: 'Nike Dunk Low' },
+    } });
+    base.set(`${A}|vc_listings`, { liens: {} });
+    base.set(`${A}|email_bord_123`, { transaction: '123', suivi: VT, receivedAt: iso(NOW - 30 * H), filename: 'b.pdf' });
+    // Le MÊME n° qu'une vente, porté par un ACHAT (un e-mail entrant) : ambigu, jamais lu comme départ.
+    base.set(`${A}|email_track_chronopost_${ACH}`, ligneCp({ suivi: ACH, receivedAt: iso(NOW - 40 * H) }));
+    const pointAcheteur = { infos: { 'Point de livraison': 'TABAC ACHETEUR - 1 RUE EXEMPLE - 99999 - TESTVILLE' } };
+    transporteur = (u) => {
+      if (u.hostname !== 'ws.chronopost.fr') return null;
+      const n = u.searchParams.get('skybillNumber');
+      if (n === P) return { status: 200, ctype: 'text/xml', body: cpXml(P, [cpEv('DC', NOW - 30 * H, 'Envoi en cours de préparation'), cpEv('DB', NOW - 20 * H, 'Pris en charge'), cpEv('AB', NOW - 2 * H, 'Colis disponible au point de retrait', pointAcheteur)]) };
+      if (n === PREP) return { status: 200, ctype: 'text/xml', body: cpXml(PREP, [cpEv('DC', NOW - 30 * H, 'Envoi en cours de préparation')]) };
+      if (n === VT) return { status: 200, ctype: 'text/xml', body: cpXml(VT, [cpEv('DB', NOW - 20 * H, 'Pris en charge'), cpEv('D', NOW - 3 * H, 'Livré', { infos: { 'Type de retrait': 'Destinataire' } })]) };
+      if (n === ACH) return { status: 200, ctype: 'text/xml', body: cpXml(ACH, [cpEv('DB', NOW - 20 * H, 'Pris en charge')]) };
+      return null;
+    };
+    const r = await passage();
+    const dep = (n) => base.get(`${A}|depart_chronopost_${n}`) || null;
+    const cpAppels = appels.filter((x) => x.host === 'ws.chronopost.fr').map((x) => new URL(x.url).searchParams.get('skybillNumber'));
+    dit(dep(P) && dep(P).priseAt === iso(NOW - 20 * H) && dep(P).fini === true, 'vente Vestiaire « à expédier » : son n° lu chez Chronopost, prise en charge datée du 1er évènement après l\'étiquette (DB)', JSON.stringify(dep(P)));
+    dit(dep(PREP) && !dep(PREP).priseAt && !dep(PREP).fini, '« étiquette créée » seule (DC) ne prouve rien : pas de prise en charge, relu plus tard', JSON.stringify(dep(PREP)));
+    dit(dep(VT) && !!dep(VT).priseAt, 'bordereau Vinted (n° du bordereau de SA transaction) : lu, pris en charge', JSON.stringify(dep(VT)));
+    dit(!dep(ACH), 'un n° porté par une vente ET un achat est ambigu : jamais lu comme départ', JSON.stringify(dep(ACH)));
+    dit(!appels.some((x) => x.host === 'www.mondialrelay.fr' && /87654321/.test(x.url)), 'Mondial Relay sortant : pas lu (il faudrait le code postal de l\'acheteur, jamais deviné)');
+    dit(!base.has(`${A}|transp_chronopost_${P}`) && !base.has(`${A}|transp_chronopost_${VT}`) && !base.has(`${A}|transp_chronopost_${PREP}`), 'les lectures de départ ne créent AUCUNE ligne `transp_` (le chemin de « à retirer »)', [...base.keys()].filter((k) => /transp_/.test(k)).join(' · '));
+    dit(!pushes.some((p) => new RegExp(`${P}|${VT}|TABAC ACHETEUR`).test(JSON.stringify(p))), 'arrivé au point de l\'ACHETEUR : aucune notification', JSON.stringify(pushes.map((p) => p.title)));
+    dit(Array.isArray(r.departs) && r.departs.filter((x) => x.prisEnCharge).length === 2, 'le passage rend ses lectures de départ', JSON.stringify(r.departs));
+    dit(appels.every((x) => /^VRM-suivi\//.test(x.ua) && x.redirect === 'error'), 'mêmes garde-fous réseau : User-Agent honnête, aucune redirection');
+    const n0 = appels.length;
+    await passage();
+    const encore = appels.slice(n0).filter((x) => x.host === 'ws.chronopost.fr').map((x) => new URL(x.url).searchParams.get('skybillNumber'));
+    dit(!encore.includes(P) && !encore.includes(VT) && !encore.includes(PREP), 'relancé : un départ prouvé n\'est plus jamais relu, « étiquette créée » attend son rythme (2 h)', encore.join(',') || 'aucun appel');
+    const w = await widget();
+    const vc = w.ship && w.ship.vestiaire;
+    // v1 parti (prouvé) ; v2 « prepare », v3 ambigu, v4 Mondial Relay ⇒ toujours à envoyer.
+    dit(vc && vc.total === 3, 'widget : la vente partie sort de « à envoyer » Vestiaire (3 restent : étiquette seule, ambigu, Mondial Relay)', JSON.stringify(vc));
+    dit(w.pickup === 0, 'widget : le colis vendu arrivé au point de l\'acheteur n\'est JAMAIS « à retirer »', `pickup=${w.pickup}`);
+    // Lecture des départs en panne ⇒ rien ne change (pas su ⇒ pas « parti »).
+    pannes.add('lire:depart_');
+    const w2 = await widget();
+    dit(w2.ship && w2.ship.vestiaire && w2.ship.vestiaire.total === 4, 'départs illisibles ⇒ rien ne change : les 4 restent « à envoyer » (« pas su » ne vaut pas « oui »)', JSON.stringify(w2.ship && w2.ship.vestiaire));
+    pannes.delete('lire:depart_');
+  });
+
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s).` : '\n✅ Le statut lu chez les transporteurs suit la règle (serveur, secours, pause, échos, fins, notifications).');
   process.exit(ko ? 1 : 0);
 })();

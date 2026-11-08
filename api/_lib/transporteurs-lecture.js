@@ -62,6 +62,7 @@ import { normaliserSuivi } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { relireLigneMeta, SELECT_SUIVI_META, txDuColis, liensDesLignes, suiviDeLigne } from './suivi-colis.js';
 import * as T from './transporteurs.js';
+import * as D from './depart-colis.js';
 import { envoyerNotifTransp, notifEncoreValable } from './transporteurs-notif.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 import { ordreStable } from './ordre-stable.js';
@@ -435,7 +436,7 @@ export function placesParTransporteur(items, max, maxFermeture = MAX_FERMETURE) 
 // Rend { ok, raison?, lus: [{carrier, suivi, res, etat, change}], besoinNavigateur, pause }.
 // `signal` : l'arrêt (le cron qui a déjà répondu) — plus aucune lecture, aucune
 // écriture, aucune notification ne part après lui (revue n° 20).
-export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_APP_MS, suivi = null, force = false, cpPage = '', maintenant = null, signal = null } = {}) {
+export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_APP_MS, suivi = null, force = false, cpPage = '', maintenant = null, signal = null, maxDeparts = MAX_DEPARTS_APP } = {}) {
   const t0 = Date.now();
   const fin = t0 + budgetMs;
   const b = await lireBaseTransp();
@@ -516,10 +517,98 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
     }
   };
   await Promise.all([traiterServeur('chronopost'), traiterServeur('vinted'), traiterServeur('mondialrelay')]);
+  // (8 nov.) LES COLIS VENDUS, APRÈS les achats et avec ce qui reste du budget :
+  // la preuve de départ (api/_lib/depart-colis.js). Jamais pour un n° demandé
+  // seul (la page « suivi » d'un achat).
+  const departs = (!suivi && maxDeparts > 0 && !(signal && signal.aborted)) ? await passageDeparts(b, { max: maxDeparts, fin, signal, maintenant: now }) : [];
   // Ce que le serveur n'a pas pu lire, pour l'extension : la règle de C3, sur la
   // base à jour de ce passage (un n° demandé seul : lui seul).
   const besoin = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: pauseConnue(b.pause), maintenant: Date.now(), seul: suivi, cpSeul: cpPage, max: MAX_C3 });
-  return { ok: true, lus, besoinNavigateur: besoin, pause: T.pausePublique(pauseConnue(b.pause)), arrete: !!(signal && signal.aborted) };
+  return { ok: true, lus, departs, besoinNavigateur: besoin, pause: T.pausePublique(pauseConnue(b.pause)), arrete: !!(signal && signal.aborted) };
+}
+
+// ── (8 nov.) LES COLIS VENDUS : LA PREUVE DE DÉPART ─────────────────────────
+// Julien : « tu as le numéro de suivi donc tu peux très bien regarder le statut
+// du colis et voir qu'il a été expédié ». La RÈGLE vit dans api/_lib/depart-colis.js.
+// Les MÊMES garde-fous que les achats : la même file par transporteur (1,5 s
+// d'écart, le User-Agent honnête), la même pause sur 403/429/défi, la même borne
+// de temps. Ce qui CHANGE, exprès :
+//   · la ligne est `depart_{transporteur}_{n°}` — JAMAIS `transp_` : aucun
+//     lecteur de « à retirer », du widget, du rappel ni des notifications ne la
+//     lit ; aucune notification ne part d'ici ;
+//   · un n° d'ACHAT (ligne `transp_` déjà là, e-mail entrant, suivi saisi, suivi
+//     Vinted d'un achat) n'est jamais lu comme départ (ambigu) ;
+//   · la lecture s'arrête dès que la prise en charge est prouvée.
+export const MAX_DEPARTS_APP = 3;
+export const MAX_DEPARTS_CRON = 6;
+async function lireBaseDeparts() {
+  const [rows, vc, bords] = await Promise.all([
+    lireTout(`app_data?id=like.depart_*&select=${D.SELECT_DEPART_META}`),
+    lireTout('app_data?id=eq.vc_ventes&select=ventes:data->ventes'),
+    lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt'),
+  ]);
+  if (![rows, vc, bords].every(Array.isArray)) return null;
+  const departs = D.departsParSuivi(rows) || new Map();
+  const vcVentes = vc[0] && vc[0].ventes && typeof vc[0].ventes === 'object' ? vc[0].ventes : {};
+  return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords }) };
+}
+// Les n° ENTRANTS connus de ce passage (ses achats) : jamais lus comme départ.
+export function entrantsDe(b) {
+  const out = new Set();
+  if (!b) return out;
+  const env = new Set((b.envoyes || []).map(normaliserSuivi).filter(Boolean));
+  for (const k of (b.transp instanceof Map ? b.transp.keys() : [])) out.add(k);
+  for (const m of b.manuels || []) { const k = normaliserSuivi(m && m.suivi); if (k) out.add(k); }
+  for (const v of b.vinted || []) { const k = normaliserSuivi(v && v.suivi); if (k) out.add(k); }
+  for (const l of b.lignes || []) {
+    const k = suiviDeLigne(l); if (!k) continue;
+    const st = l.status != null ? l.status : l.s;
+    if (T.sensDeLigne(l, env) === 'entrant' || (st === 'available' && !env.has(k))) out.add(k);
+  }
+  return out;
+}
+async function prendreBailDepart(id, it, vu, maintenant = Date.now()) {
+  const r = await modifierCas(id, (d) => {
+    const enVol = Date.parse(d && d.enVol || '');
+    if (Number.isFinite(enVol) && maintenant - enVol < BAIL_MS) return undefined;
+    if (((d && d.essai) || null) !== ((vu && vu.essai) || null)) return undefined;
+    const o = d ? { ...d } : { v: 1, sens: 'sortant', suivi: normaliserSuivi(it.suivi), carrier: it.carrier };
+    delete o.rev;
+    o.enVol = new Date(maintenant).toISOString();
+    return o;
+  });
+  return r === true;
+}
+export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now() + BUDGET_APP_MS, signal = null, maintenant = Date.now() } = {}) {
+  const lus = [];
+  const bd = await lireBaseDeparts();
+  if (!bd) return lus;   // pas su ⇒ aucune lecture chez un transporteur
+  const items = D.departsAInterroger({ sortants: bd.sortants, departs: bd.departs, entrants: entrantsDe(b), maintenant, max, parTransporteur: max });
+  for (const it of items) {
+    if (signal && signal.aborted) break;
+    if (Date.now() + _delaiMs + _ecartMs + MARGE_RANGEMENT_MS > fin) break;
+    if (pauseEnCours(b && b.pause, it.carrier)) continue;
+    const id = D.cleDepart(it.carrier, it.suivi);
+    if (!(await prendreBailDepart(id, it, bd.departs.get(it.suivi), Date.now()))) continue;
+    const rep = await lireTransporteur(it.carrier, it.suivi, { fin, signal });
+    if (rep.echec === 'pause' || rep.echec === 'budget') continue;
+    if (signal && signal.aborted) break;
+    let lu;
+    if (rep.echec) lu = { res: 'passu' };
+    else {
+      lu = rep.defi ? { res: 'bloque' } : T.lireReponse(it.carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, voie: T.VOIE_SERVEUR[it.carrier] });
+      if (lu.res === 'bloque') { await poserPause(rep, it.carrier, Date.now()); if (b) b.pause = pauseConnue(b.pause); }
+      else if (lu.res === 'ok' || lu.res === 'introuvable' || lu.res === 'expire') { if (b) await leverPause(b, it.carrier); }
+    }
+    let apres = null;
+    const ecrit = await modifierCas(id, (d) => {
+      if (signal && signal.aborted) return undefined;
+      apres = D.ligneDepartApresEssai(d, lu, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now() });
+      return apres;
+    });
+    lus.push({ carrier: it.carrier, suivi: it.suivi, res: lu.res, prisEnCharge: !!(ecrit === true && apres && apres.priseAt) });
+  }
+  return lus;
 }
 
 // ── C3 : CE QUE L'EXTENSION DOIT LIRE DEPUIS LE NAVIGATEUR ──────────────────

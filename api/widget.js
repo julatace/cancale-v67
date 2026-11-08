@@ -7,6 +7,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : la règle de Colis.
 import { resumeColisSites } from './_lib/colis-sites.js';
 import { numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
+import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
 // La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
@@ -208,13 +209,18 @@ async function colisEbayDuVendeur() {
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster — la règle de
 // Colis (`resumeColisSites`), sur leurs seules ventes (§4.4, jamais le blob).
 // Une lecture ratée ⇒ ce site vaut `null` : le widget dit « au moins » et le nomme.
-async function colisAutresSites(fait, m) {
+// (8 nov.) Les départs PROUVÉS chez le transporteur (`depart_*`, scalaires —
+// api/_lib/depart-colis.js) : illisibles ⇒ `null`, et rien ne change (pas su).
+async function lireDeparts() {
+  try { const r = await fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)); return Array.isArray(r) ? departsParSuivi(r) : null; } catch (_) { return null; }
+}
+async function colisAutresSites(fait, m, departs = null) {
   try {
     const [l, v, li] = await Promise.all([ligneProjetee('lbc_ventes', ['ventes']), ligneProjetee('vc_ventes', ['ventes']), ligneProjetee('vc_listings', ['liens'])]);
     return resumeColisSites({
       lbc: l === undefined ? null : ((l && l.ventes && typeof l.ventes === 'object') ? l.ventes : {}),
       // (2 nov., soir) « Colis fait » Vestiaire et les N° donnés (main), la règle de Colis.
-      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {}, auto: numerosVcAvecLiens((m && m.vrm_vc_numeros) || {}, m && m.vrm_vc_liens), fait: (m && m.vrm_vc_colis_done) || {} },
+      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {}, auto: numerosVcAvecLiens((m && m.vrm_vc_numeros) || {}, m && m.vrm_vc_liens), fait: (m && m.vrm_vc_colis_done) || {}, departs },
       fait,
     });
   } catch (_) { return { leboncoin: null, vestiaire: null }; }
@@ -690,12 +696,12 @@ export default async function handler(req, res) {
     // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
     // c'est-à-dire tant que l'extension n'a pas recapté une fois.
     const vivants = await comptesVivants();
-    const [bords, txSold, txBuy, sales, m, snap, eb] = await Promise.all([
+    const [bords, txSold, txBuy, sales, m, snap, eb, departs] = await Promise.all([
       bordRows(), comptesAExpedierOuRetirer('sold', vivants), comptesAExpedierOuRetirer('purchased', vivants),
-      rows('email_sale_*'), main(), snapshot(), colisEbayDuVendeur(),
+      rows('email_sale_*'), main(), snapshot(), colisEbayDuVendeur(), lireDeparts(),
     ]);
     const sold = txSold ? [] : await harvestOrders('sold', vivants);
-    const autres = m ? await colisAutresSites(m.vrm_lbc_colis_done, m) : { leboncoin: null, vestiaire: null };
+    const autres = m ? await colisAutresSites(m.vrm_lbc_colis_done, m, departs) : { leboncoin: null, vestiaire: null };
     const lbcC = autres.leboncoin, vcC = autres.vestiaire;
     const purchased = txBuy ? [] : await harvestOrders('purchased', vivants);
 
@@ -733,7 +739,12 @@ export default async function handler(req, res) {
     const bordsShipped = (m.vinted_bords_shipped && typeof m.vinted_bords_shipped === 'object') ? m.vinted_bords_shipped : {};
     const ventesMasquees = new Set();   // (29 oct.) une vente ne se masque plus
     const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !ventesMasquees.has(t);
-    const shipTxns = new Set((txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter(pasPartie));
+    // (8 nov.) + parti d'après le transporteur : le n° du bordereau de CETTE
+    // transaction pris en charge (api/_lib/depart-colis.js, la règle de Colis).
+    const bKey0 = (b) => String(b.transaction || b.suivi || b.numero || '');
+    const cachees0 = (m.vinted_bords_hidden && typeof m.vinted_bords_hidden === 'object') ? m.vinted_bords_hidden : {};
+    const partisTransp = txVintedParties(bordsParTransaction(bords, (b) => !!cachees0[bKey0(b)]), departs);
+    const shipTxns = new Set((txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter(pasPartie).filter((t) => !partisTransp.has(t)));
     const shipTotal = shipTxns.size;
     const pickupVinted = txBuy
       ? txBuy.filter(t => !pickupDone[String(t)]).length
