@@ -211,15 +211,13 @@ const { build } = require("esbuild"),
       await p
         .getByRole("heading", { name: "Mot de passe oublié", exact: true })
         .waitFor();
+      // (8 nov.) Plus de « Ouvrir la récupération dans VRM, puis colle le lien
+      // reçu » : la phrase dit d'ouvrir le lien depuis l'e-mail.
       assert.equal(
-        await p
-          .getByRole("link", {
-            name: "Ouvrir la récupération dans VRM",
-            exact: true,
-          })
-          .getAttribute("href"),
-        "/recuperation.html",
+        await p.getByRole("link", { name: "Ouvrir la récupération dans VRM" }).count(),
+        0,
       );
+      assert.equal(await p.getByText(/colle le lien reçu/i).count(), 0);
       assert.equal(await p.locator("[data-auth-renvoyer]").count(), 0);
       await p.evaluate(() => window.forcerRecuperation());
       await p

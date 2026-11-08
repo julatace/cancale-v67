@@ -13,9 +13,9 @@
   },
   "magic_link": {
     "onglet": "Magic Link",
-    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Your VRM sign-in link{{ else }}Ton lien de connexion VRM{{ end }}",
-    "sujetFr": "Ton lien de connexion VRM",
-    "sujetEn": "Your VRM sign-in link"
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Your VRM code{{ else }}Ton code VRM{{ end }}",
+    "sujetFr": "Ton code VRM",
+    "sujetEn": "Your VRM code"
   },
   "email_change": {
     "onglet": "Change Email Address",
@@ -31,8 +31,8 @@
   },
   "reauthentication": {
     "onglet": "Reauthentication",
-    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Your VRM code{{ else }}Ton code VRM{{ end }}",
-    "sujetFr": "Ton code VRM",
-    "sujetEn": "Your VRM code"
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Your VRM confirmation code{{ else }}Ton code de confirmation VRM{{ end }}",
+    "sujetFr": "Ton code de confirmation VRM",
+    "sujetEn": "Your VRM confirmation code"
   }
 }

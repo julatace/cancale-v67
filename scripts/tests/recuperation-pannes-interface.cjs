@@ -10,7 +10,7 @@ const root=process.env.VRM_RECUPERATION_ROOT||path.join(__dirname,'../../public'
  });
  await new Promise(r=>serveur.listen(0,'127.0.0.1',r));
  const origine='http://127.0.0.1:'+serveur.address().port;
- const nav=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+ const nav=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});
  try{
   for(const width of [390,1512]){
    const page=await nav.newPage({viewport:{width,height:900}});
@@ -27,9 +27,12 @@ const root=process.env.VRM_RECUPERATION_ROOT||path.join(__dirname,'../../public'
    });
    const lien=origine+'/recuperation.html#type=recovery&token_hash=abcdefghijklmnopqrstuvwxyz';
    await page.goto(lien);
-   await page.getByText('Le service sécurisé est momentanément indisponible.',{exact:false}).waitFor();
+   await page.getByText('Le service ne répond pas pour l’instant.',{exact:false}).waitFor();
    assert.doesNotMatch(await page.locator('#message').innerText(),/expiré/);
-   verification=200;await page.locator('#lien').fill(lien);await page.locator('#secours [type=submit]').click();
+   // (8 nov.) Une panne n'est pas un lien mort : ni renvoi d'e-mail, ni « coller » ;
+   // « Réessayer » rejoue le MÊME lien gardé en mémoire.
+   assert.equal(await page.locator('#renvoi').isVisible(),false);assert.equal(await page.locator('#autre').isVisible(),false);
+   verification=200;await page.locator('#reessayer').click();
    await page.locator('#password').waitFor({state:'visible'});
    await page.locator('#password').fill('NouveauSecret123');await page.locator('#confirmation').fill('NouveauSecret123');
    const attente=await page.evaluate(()=>{
@@ -46,7 +49,7 @@ const root=process.env.VRM_RECUPERATION_ROOT||path.join(__dirname,'../../public'
    assert.equal(await page.evaluate(()=>localStorage.length),0);
    assert.equal(new URL(page.url()).hash,'');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-   await page.close();console.log(`OK ${width}px : panne distincte de l’expiration, reprise manuelle, ancien Safari, succès certain et fermeture non confirmée explicitée.`);
+   await page.close();console.log(`OK ${width}px : panne distincte de l’expiration, « Réessayer » avec le même lien, ancien Safari, succès certain et fermeture non confirmée explicitée.`);
   }
  }finally{await nav.close();await new Promise(r=>serveur.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

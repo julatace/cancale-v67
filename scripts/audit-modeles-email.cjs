@@ -28,8 +28,8 @@ function regles(id, src) {
   exige(fr.includes(m.fr.titre) && en.includes(m.en.titre), 'titres FR/EN absents ou inversés');
   exige(!fr.includes(m.en.titre) && !en.includes(m.fr.titre), 'langues mélangées');
   for (const [nom, bloc] of [['fr', fr], ['en', en]]) {
-    if (m.code) exige(bloc.includes('{{ .Token }}'), `${nom} : le code {{ .Token }} manque`);
-    else {
+    if (m.code) exige(bloc.includes('{{ .Token }}') && /class="c-code"[^>]*user-select:all/.test(bloc), `${nom} : le code {{ .Token }} manque (en grand, copiable)`);
+    if (m.lien) {
       const hrefs = [...bloc.matchAll(/href="([^"]+)"/g)].map((x) => x[1]).filter((h) => h !== 'https://vrm.center');
       exige(hrefs.length === 2 && hrefs.every((h) => h === m.lien), `${nom} : bouton et lien de secours doivent pointer sur ${m.lien}`);
       exige(/bgcolor="#0071E3"/.test(bloc) && /padding:12px 24px;[^"]*line-height:20px/.test(bloc), `${nom} : bouton bleu Apple de 44 px absent`);
@@ -39,7 +39,8 @@ function regles(id, src) {
     exige(/width="520"[^>]*max-width:520px/.test(bloc), `${nom} : largeur 520 absente`);
   }
   if (id === 'recovery') exige(m.lien === LIEN_RECUPERATION && src.includes('https://vrm.center/recuperation.html#token_hash={{ .TokenHash }}&amp;type=recovery'), 'le lien de récupération n’a plus la forme qui marche');
-  else if (!m.code) exige(src.includes('{{ .ConfirmationURL }}') && !src.includes('TokenHash'), 'le lien n’est pas {{ .ConfirmationURL }}');
+  else if (m.lien) exige(src.includes('{{ .ConfirmationURL }}') && !src.includes('TokenHash'), 'le lien n’est pas {{ .ConfirmationURL }}');
+  if (id === 'magic_link') exige(!!(m.code && m.lien), 'le lien de connexion doit porter le code {{ .Token }} ET le bouton (extension 5.330)');
   exige(!/<link\b|@import|<script\b/i.test(src), 'feuille ou script externe');
   exige(!/#(?:7c3aed|8b5cf6|6d28d9|a855f7|9333ea|5b21b6)/i.test(src) && !/violet|purple/i.test(src), 'violet (refusé)');
   exige(/lang="\{\{ if \$en \}\}en\{\{ else \}\}fr\{\{ end \}\}"/.test(src), 'attribut lang pas suivi');
@@ -80,7 +81,8 @@ if (go) {
       const ok = fr.includes('lang="fr"') && en.includes('lang="en"') && fr.includes(m.fr.titre.replace(/’/g, '’')) && !fr.includes(m.en.titre)
         && ['sans-langue', 'sans-donnees', 'sans-cle'].every((c) => lire(c) === fr)
         && !/\{\{|\}\}/.test(fr + en)
-        && (m.code ? fr.includes('482913') : m.id === 'recovery' ? fr.includes('recuperation.html#token_hash=0123456789abcdef') : fr.includes('lgonxzrzjcqthjtbdpzo.supabase.co/auth/v1/verify'))
+        && (!m.code || (fr.includes('482913') && en.includes('482913')))
+        && (!m.lien ? true : m.id === 'recovery' ? fr.includes('recuperation.html#token_hash=0123456789abcdef') : fr.includes('lgonxzrzjcqthjtbdpzo.supabase.co/auth/v1/verify'))
         && sujets[m.id].fr === m.sujet.fr && sujets[m.id].en === m.sujet.en && sujets[m.id]['sans-cle'] === m.sujet.fr;
       if (!ok) { console.error(`✗ ${m.id} : le rendu Go ne donne pas FR par défaut / EN si "en" / sujet par langue`); rouge++; }
     }
@@ -97,6 +99,7 @@ if (process.argv.includes('--prouve')) {
     ['bouton violet', (s) => ({ ...s, magic_link: s.magic_link.split('#0071E3').join('#7C3AED') })],
     ['feuille externe', (s) => ({ ...s, invite: s.invite.replace('</head>', '<link rel="stylesheet" href="https://exemple.test/a.css"></head>') })],
     ['code absent', (s) => ({ ...s, reauthentication: s.reauthentication.split('{{ .Token }}').join('') })],
+    ['code de connexion absent', (s) => ({ ...s, magic_link: s.magic_link.split('{{ .Token }}').join('') })],
     ['pied retiré', (s) => ({ ...s, email_change: s.email_change.split('Tu reçois cet e-mail parce qu').join('') })],
   ];
   for (const [nom, f] of mutations) {

@@ -65,21 +65,28 @@ const MODELES = [
   },
   {
     id: 'magic_link', onglet: 'Magic Link', cle: 'magic_link',
-    sujet: { fr: 'Ton lien de connexion VRM', en: 'Your VRM sign-in link' },
+    // (8 nov.) L'extension 5.330 connecte par CODE reçu par e-mail
+    // (signInWithOtp puis verify type email) : le code en grand, ET le bouton.
+    sujet: { fr: 'Ton code VRM', en: 'Your VRM code' },
     lien: '{{ .ConfirmationURL }}',
+    code: '{{ .Token }}',
     fr: {
-      apercu: 'Connecte-toi à VRM sans mot de passe.',
-      titre: 'Ton lien de connexion',
-      texte: 'Touche le bouton pour te connecter à VRM, sans mot de passe. Le lien ne marche qu’une fois.',
+      apercu: 'Ton code VRM pour te connecter, valable 1 h.',
+      titre: 'Ton code de connexion',
+      texte: 'Saisis ce code là où VRM te le demande (l’extension ou l’app) pour te connecter sans mot de passe.',
+      legende: 'Ton code VRM — valable 1 h, une seule fois',
+      ou: 'Ou touche le bouton pour te connecter sur cet appareil :',
       bouton: 'Me connecter',
-      pied: 'Tu reçois cet e-mail parce qu’un lien de connexion a été demandé pour {{ .Email }}. Si ce n’est pas toi, ignore-le : personne ne peut se connecter sans ce lien.',
+      pied: 'Tu reçois cet e-mail parce qu’une connexion a été demandée pour {{ .Email }}. Si ce n’est pas toi, ignore-le et ne donne ce code à personne : personne ne peut se connecter sans lui.',
     },
     en: {
-      apercu: 'Sign in to VRM without a password.',
-      titre: 'Your sign-in link',
-      texte: 'Tap the button to sign in to VRM, no password needed. The link only works once.',
+      apercu: 'Your VRM code to sign in, valid for 1 hour.',
+      titre: 'Your sign-in code',
+      texte: 'Enter this code where VRM asks for it (the extension or the app) to sign in without a password.',
+      legende: 'Your VRM code — valid for 1 hour, single use',
+      ou: 'Or tap the button to sign in on this device:',
       bouton: 'Sign me in',
-      pied: 'You’re receiving this email because a sign-in link was requested for {{ .Email }}. If this wasn’t you, ignore it: nobody can sign in without this link.',
+      pied: 'You’re receiving this email because a sign-in was requested for {{ .Email }}. If this wasn’t you, ignore it and don’t share this code: nobody can sign in without it.',
     },
   },
   {
@@ -126,15 +133,17 @@ const MODELES = [
   },
   {
     id: 'reauthentication', onglet: 'Reauthentication', cle: 'reauthentication',
-    sujet: { fr: 'Ton code VRM', en: 'Your VRM code' },
+    sujet: { fr: 'Ton code de confirmation VRM', en: 'Your VRM confirmation code' },
     code: '{{ .Token }}',
     fr: {
+      legende: 'Ton code VRM — une seule fois',
       apercu: 'Ton code pour confirmer que c’est bien toi.',
       titre: 'Ton code de confirmation',
       texte: 'Saisis ce code dans VRM pour confirmer que c’est bien toi. Il ne marche qu’une fois.',
       pied: 'Tu reçois cet e-mail parce qu’une action protégée a été demandée sur ton compte VRM ({{ .Email }}). Si ce n’est pas toi, ne donne ce code à personne et change ton mot de passe.',
     },
     en: {
+      legende: 'Your VRM code — single use',
       apercu: 'Your code to confirm it’s really you.',
       titre: 'Your confirmation code',
       texte: 'Enter this code in VRM to confirm it’s really you. It only works once.',
@@ -148,11 +157,16 @@ const SECOURS = { fr: 'Le bouton ne marche pas ? Copie ce lien dans ton navigate
 
 const bloc = (m, l) => {
   const t = m[l];
-  const action = m.code
-    ? `<tr><td style="padding:4px 0 20px"><div class="c-code" style="font-family:${POLICE};font-size:34px;line-height:44px;font-weight:700;letter-spacing:8px;color:#1D1D1F;background:#F2F2F7;border-radius:12px;padding:12px 16px;text-align:center">${m.code}</div></td></tr>`
-    : `<tr><td style="padding:4px 0 20px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#0071E3" style="background:#0071E3;border-radius:12px"><a class="c-btn" href="${m.lien}" style="display:inline-block;padding:12px 24px;font-family:${POLICE};font-size:17px;line-height:20px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:12px">${t.bouton}</a></td></tr></table></td></tr>`;
+  // Le code : chiffres espacés par l'interlettrage (une copie rend « 123456 »,
+  // sans espace), sélectionnable d'un geste.
+  const code = m.code
+    ? `<tr><td style="padding:4px 0 20px"><div class="c-doux" style="font-family:${POLICE};font-size:13px;line-height:18px;color:#6E6E73;padding:0 0 6px">${t.legende}</div><div class="c-code" style="font-family:'SF Mono',ui-monospace,Menlo,Consolas,monospace;font-size:34px;line-height:44px;font-weight:700;letter-spacing:10px;color:#1D1D1F;background:#F2F2F7;border-radius:12px;padding:12px 16px;text-align:center;-webkit-user-select:all;user-select:all">${m.code}</div></td></tr>`
+    : '';
+  const ou = m.code && m.lien ? `<tr><td class="c-texte" style="padding:0 0 12px;font-family:${POLICE};font-size:15px;line-height:22px;color:#424245">${t.ou}</td></tr>` : '';
+  const action = code + ou + (!m.lien ? ''
+    : `<tr><td style="padding:4px 0 20px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#0071E3" style="background:#0071E3;border-radius:12px"><a class="c-btn" href="${m.lien}" style="display:inline-block;padding:12px 24px;font-family:${POLICE};font-size:17px;line-height:20px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:12px">${t.bouton}</a></td></tr></table></td></tr>`);
   const note = t.note ? `<tr><td class="c-doux" style="padding:0 0 16px;font-family:${POLICE};font-size:14px;line-height:20px;color:#6E6E73">${t.note}</td></tr>` : '';
-  const secours = m.code ? '' : `<tr><td class="c-trait" style="padding:16px 0 0;border-top:1px solid #E5E5EA;font-family:${POLICE};font-size:13px;line-height:19px;color:#6E6E73"><span class="c-doux">${SECOURS[l]}</span><br><a class="c-lien" href="${m.lien}" style="color:#0066CC;text-decoration:underline;word-break:break-all">${m.lien}</a></td></tr>`;
+  const secours = !m.lien ? '' : `<tr><td class="c-trait" style="padding:16px 0 0;border-top:1px solid #E5E5EA;font-family:${POLICE};font-size:13px;line-height:19px;color:#6E6E73"><span class="c-doux">${SECOURS[l]}</span><br><a class="c-lien" href="${m.lien}" style="color:#0066CC;text-decoration:underline;word-break:break-all">${m.lien}</a></td></tr>`;
   return [
     `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${t.apercu}</div>`,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="c-fond" style="background:#F2F2F7"><tr><td align="center" style="padding:32px 16px">`,

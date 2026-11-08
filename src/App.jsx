@@ -15663,7 +15663,9 @@ function AuthScreen() {
 
   const changerMode = (suivant) => {
     if(busy||demandeEnCours.current)return;
-    setMode(suivant);setErr('');setInfo('');setNeedConfirm(false);setConfirmLink('');setResetEnvoye('');
+    setMode(suivant);setErr('');setInfo('');setNeedConfirm(false);setConfirmLink('');
+    // L'attente posée par NOTRE envoi réussi ne suit pas sur un autre écran (un refus de Supabase, lui, garde la sienne).
+    if(resetEnvoye){setResetEnvoye('');setFinAttente(0);}
   };
 
   const oauth = async (p) => {
