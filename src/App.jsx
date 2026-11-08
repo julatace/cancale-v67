@@ -43407,8 +43407,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{montant(o.price, { etrangere: 'ecarter' })}</span>}
                         </div>
                         {(!num || (plusieursComptesColis && (acc || (b && b.account)))) ? <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          {/* (8 nov.) Vue par e-mail, sans N° sûr : le tampon part sans N° (src/bordereauVenteEmail.js). */}
-                          {!num ? <span className="vrm-colis-num" data-colis-sans-num={e.venteEmail?'1':undefined} title={e.venteEmail ? "Aucun numéro sûr pour cette vente vue par e-mail : le bordereau s'imprime avec le titre seul." : "Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main."} style={{fontSize:12,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>{e.venteEmail ? MENTION_SANS_NUM : 'N° en attente'}</span> : null}
+                          {!num ? <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:12,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span> : null}
                           {!plusieursComptesColis ? null : acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
                         </div> : null}
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
@@ -43455,7 +43454,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             </div>
                           );
                         })()}
-                        {sansNumC ? <div data-imprime-sans-num={num?'avec':'sans'} style={{fontSize:12,fontWeight:600,marginTop:5,color:C.warn,overflowWrap:'anywhere'}}>{sansNumC}</div> : null}
+                        {/* (8 nov.) Vue par e-mail, sans N° sûr : le tampon part avec le titre seul (src/bordereauVenteEmail.js) ;
+                            imprimé sans N° : la carte le redit, avec le N° sûr apparu depuis. */}
+                        {sansNumC ? <div data-imprime-sans-num={num?'avec':'sans'} style={{fontSize:12,fontWeight:600,marginTop:5,color:C.warn,overflowWrap:'anywhere'}}>{sansNumC}</div>
+                          : (e.venteEmail && !num) ? <div data-colis-sans-num="1" style={{fontSize:12,fontWeight:600,marginTop:5,color:C.warn,overflowWrap:'anywhere'}}>{MENTION_SANS_NUM}</div> : null}
                         {b && !e.venteEmail && (()=>{ const lit=numLitige(b); return lit ? (
                           <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <span className="vrm-aide" style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
