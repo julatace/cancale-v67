@@ -149,7 +149,10 @@ async function signaux(pg) {
     for (const t of ['journee', 'cat_bord', 'ventes', 'annonces', 'journee']) { premier[t] = await toucher(pg, t); await calme(lectures, 1500); }
     // Un repère sur chaque écran (seul l'écran montré est dans la page : on repasse sur chacun).
     for (const t of ['cat_bord', 'ventes', 'annonces', 'journee']) { await toucher(pg, t); await marquer(pg, t, 'vu-' + t); await calme(lectures, 800); }
-    for (const t of ['cat_bord', 'ventes', 'annonces', 'journee']) {
+    // Annonces n'est PAS gardée (sa grille rattachée d'un bloc s'affichait plus tard) : remontée à chaque visite.
+    await toucher(pg, 'annonces'); await calme(lectures, 800);
+    dit((await repere(pg, 'annonces')) !== 'vu-annonces', '1. annonces : remontée à chaque visite (pas gardée, comme avant)');
+    for (const t of ['cat_bord', 'ventes', 'journee']) {
       const l0 = lectures.length;
       await pg.evaluate(() => { window.__rendusCompta = []; window.__releve = true; window.__vrmGardeEcarts = []; });
       const r = await toucher(pg, t);
@@ -175,12 +178,16 @@ async function signaux(pg) {
     // (vues sur Réglages) : ce que ferait en double un écran caché qui n'aurait pas tu ses écoutes.
     await signaux(pg); await calme(lectures, 2500);
     const lj = lectures.length; await signaux(pg); await calme(lectures, 2500);
-    const lecturesEcran = new Set(lectures.slice(lj).filter((u) => !lecturesReference.includes(u)));
+    // Hors la lecture PARTAGÉE des ventes Vestiaire (`lireVentesVestiaire` : une seule pour toute
+    // l'app, coque comprise, mémorisée 5 s — jamais en double) : selon l'instant, la coque la
+    // refait ou non dans la fenêtre (vu 1 fois sur 4).
+    const PARTAGEES = /^app_data\?id=in\.\(vc_ventes,vc_listings\)&select=id,ventes:data->ventes,liens:data->liens$/;
+    const lecturesEcran = new Set(lectures.slice(lj).filter((u) => !lecturesReference.includes(u) && !PARTAGEES.test(u)));
     dit(lecturesEcran.size > 0, '2. (témoin) Ma journée montrée relit sur ces signaux', lecturesEcran.size);
     // ── 2. Caché : rien ne rend, ne publie, ne lit.
     await versReglages(pg); await calme(lectures, 2500);
     const gardes = await pg.evaluate(() => (document.querySelector('[data-ecrans-gardes]') || {}).getAttribute ? document.querySelector('[data-ecrans-gardes]').getAttribute('data-ecrans-gardes') : '');
-    dit(/journee/.test(gardes) && /cat_bord/.test(gardes), '2. Ma journée et Colis sont gardés pendant Réglages', gardes);
+    dit(/journee/.test(gardes) && /cat_bord/.test(gardes) && !/annonces/.test(gardes), '2. Ma journée et Colis sont gardés pendant Réglages (pas Annonces)', gardes);
     await pg.evaluate(() => { window.__rendusCaches = []; window.__saves = []; window.__releve = true; });
     await signaux(pg); await calme(lectures, 2500);                 // le même premier passage que la référence
     const l1 = lectures.length;

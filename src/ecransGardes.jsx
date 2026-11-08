@@ -4,7 +4,7 @@
 //  Mesuré (docs/passation/2026-11-08-vitesse-calcul-partage.md) : revenir sur
 //  Ma journée, Colis, Ventes ou Annonces REMONTAIT tout l'écran — le moteur
 //  `Comptabilite` repartait de zéro (tous ses `useMemo`), le DOM était refait, et
-//  12 à 30 lectures repartaient. Ici, les écrans de la barre du bas déjà vus
+//  12 à 30 lectures repartaient. Ici, Ma journée, Colis et Ventes déjà vus
 //  restent MONTÉS, hors de la page, et reviennent tels quels.
 //
 //  Les règles (chacune tient un risque) :
@@ -37,7 +37,10 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-export const ECRANS_GARDABLES = ['journee', 'cat_bord', 'ventes', 'annonces'];
+// ⚠️ Pas Annonces (mesuré le 8 nov., CPU ×4) : sa grille rattachée d'un bloc (style et mise
+// en page de toutes les fiches) s'affichait ~0,6 s PLUS TARD qu'un écran remonté, qui dessine
+// d'abord le haut ; elle reste remontée à chaque visite, comme avant.
+export const ECRANS_GARDABLES = ['journee', 'cat_bord', 'ventes'];
 export const MAX_GARDES = 4;
 export const AGE_MAX_CACHE_MS = 10 * 60 * 1000;
 // Clés dont la sauvegarde ne rend aucun écran périmé : des préférences d'affichage
