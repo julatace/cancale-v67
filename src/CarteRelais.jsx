@@ -32,7 +32,7 @@ import React from 'react';
 import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN } from './relaisColis.js';
 import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
 import './styles-colis-colonnes.css';
-import PastilleTransporteur from './PastilleTransporteur.jsx';
+import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.jsx';
 import { cleStatTransporteur } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
 import { explicationEnDouble } from './retraitPreuves.js';
@@ -329,6 +329,9 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         <button type="button" className="vrm-rpf-ouvrir" aria-expanded={ouvert} aria-controls={detailId} onClick={basculer}>
         <span className={'vrm-rpf-vignette' + (ph ? '' : ' is-sans')} aria-hidden="true" data-sans-photo={ph ? undefined : ''}>
           {ph || <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>}
+          {/* (7 nov.) Le logo du transporteur LU, dans le coin de la vignette — seulement quand le nom
+              est dit par l'en-tête du point (sinon la puce de la ligne le porte déjà, logo compris). */}
+          {!avecTransp && x.transp ? <BadgeTransporteur t={x.transp}/> : null}
         </span>
         <span className="vrm-rpf-quoi">
           <span className="vrm-rpf-titre" title={x.titre} data-rp-titre="">{x.num ? `N°${x.num} · ` : ''}{(titreDe && titreDe(x)) || x.titre || 'Colis'}</span>

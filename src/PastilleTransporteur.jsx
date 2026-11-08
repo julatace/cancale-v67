@@ -34,6 +34,22 @@ export function LogoTransporteur({ cle, taille, decale = false, repli = null }) 
   </>);
 }
 
+// (7 nov., Julien : « mets le logo du transporteur à côté […] pour Colis aussi ») LE BADGE :
+// le logo seul, posé dans le coin de la vignette d'un colis (comme le badge d'une app). Il
+// lit le MÊME `t` que la puce (`transporteurDuColis` / `transporteurVente`) : rien lu ⇒
+// rien posé, jamais un transporteur deviné. Le nom reste dit par l'en-tête du groupe ou la
+// puce (une ligne ne redit pas deux fois la même chose, §7) : ici, une image et un titre.
+// Tant que le logo n'est pas chargé (ou s'il ne charge pas), la tuile reste cachée (CSS).
+export function BadgeTransporteur({ t, className = '', ...rest }) {
+  const cle = (t && t.cle) || null;
+  if (!cle) return null;
+  return (
+    <span className={`vrm-colis-logo-transp ${className}`.trim()} data-colis-logo-transp={cle} title={`Transporteur : ${(t && t.nom) || ''}`} {...rest}>
+      <LogoTransporteur key={cle} cle={cle} taille={22}/>
+    </span>
+  );
+}
+
 // `t` : le résultat de `transporteurDuColis` ; `C` : le thème de l'app.
 // `seul` : sans cadre (dans une ligne de texte, la carte des relais) ; sinon LA
 // PUCE (2 nov. au soir, Julien sur la maquette FusionVentes) : 44 px de haut,

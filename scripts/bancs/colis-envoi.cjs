@@ -198,7 +198,13 @@ async function scenario(b, vp, sombre) {
     // ── F : À envoyer (9301 rien d'imprimé ⇒ aucune encre ; 9302 imprimé ⇒ « Imprimé » seul à l'encre).
     const fE = jugerFrises(await lireFrises(pg, '[data-bord-card] [data-fu-frise]'), nom, 'À envoyer');
     const f9301 = fE.find((f) => f.cle === '9301');
-    dit(!!f9301 && f9301.derniere === -1 && f9301.segs.every((s) => s.mot !== f9301.encre), `${nom} : F rien d'imprimé ⇒ aucun mot de la frise à l'encre`, JSON.stringify(f9301 && f9301.segs.map((s) => s.mot)));
+    // (7 nov., design) La règle est devenue plus forte : rien de fait ⇒ AUCUNE frise posée (quatre
+    // traits gris ne disaient rien). Une frise qui serait là quand même ne doit toujours rien encrer ;
+    // et la carte imprimée (9302) garde la sienne — sinon « pas de frise » passerait pour la règle.
+    const f9302 = fE.find((f) => f.cle === '9302');
+    dit((!f9301 || (f9301.derniere === -1 && f9301.segs.every((s) => s.mot !== f9301.encre))) && !!f9302 && f9302.derniere >= 0, `${nom} : F rien d'imprimé ⇒ pas de frise (ou aucun mot à l'encre) ; imprimé ⇒ sa frise`, JSON.stringify({ f9301: f9301 ? f9301.segs.map((s) => s.mot) : 'absente', f9302: !!f9302 }));
+    const sansFrise = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].filter((c) => { const f = c.querySelector('[data-fu-frise]'); return f && !f.querySelector('[data-fait="1"]'); }).map((c) => c.getAttribute('data-tx-colis')));
+    dit(!sansFrise.length, `${nom} : F une frise n'est posée que si une étape est faite`, JSON.stringify(sansFrise));
     // ── P : temps de préparation.
     const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].map((c) => ({ tx: c.getAttribute('data-tx-colis'), att: c.getAttribute('data-attente-j'),
       txt: (c.querySelector('[data-colis-attente]') || {}).textContent || '', lim: (c.querySelector('[data-colis-limite-texte]') || {}).textContent || '' })));
