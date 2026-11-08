@@ -117,7 +117,11 @@ le processeur passe surtout son temps à CALCULER les écrans (`Comptabilite`, v
     chaque côté : CLS 0,001 / 0,001 / 0,006 (branche) et 0,001 ×3 (main) — passager.
     Au passage : contenu de Messages à 390 4G en **11,9 / 14,1 / 12,7 s** (branche)
     contre **15,8 / 15,9 / 17,8 s** (main).
-  - `tous-boutons` : voir ci-dessous.
+  - `tous-boutons` (complet, 390 + 1512) : 2 défauts, tous deux E2 « écran blanc dès
+    l'ouverture » (Ventes · Vinted 390, Colis 1512 — la zone principale encore vide au
+    premier relevé) ; aucune erreur JS, aucun garde-fou. Relancé sur Ventes et Colis
+    seuls : branche **0 défaut**, `origin/main` **les mêmes 2 E2** (Ventes · Vinted 390,
+    Colis 390) — un relevé trop tôt, déjà sur main, pas une régression.
 
 ## Ce qui reste
 1. **Découper `Comptabilite`** (1,6 Mo, ~40 % du morceau App) : les vues `only=…` qui ne
