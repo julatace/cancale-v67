@@ -138,7 +138,7 @@ const { chromium } = require("playwright"),
       );
 
       await p
-        .getByRole("textbox", { name: "Adresse email", exact: true })
+        .getByRole("textbox", { name: /^Adresse e-?mail$/ })
         .fill("Client@exemple.test");
       await p.getByLabel("Mot de passe", { exact: true }).fill("Secret123");
       if (largeur < 900) {
@@ -197,7 +197,7 @@ const { chromium } = require("playwright"),
       );
       assert.equal(
         await p
-          .getByRole("textbox", { name: "Adresse email", exact: true })
+          .getByRole("textbox", { name: /^Adresse e-?mail$/ })
           .inputValue(),
         "Client@exemple.test",
       );
@@ -224,7 +224,7 @@ const { chromium } = require("playwright"),
       const aide = p.locator(".vrm-cx-aide-confirmation");
       assert.equal(await aide.getAttribute("open"), null);
       assert.equal(
-        await p.getByLabel("Lien de confirmation reçu par email").isVisible(),
+        await p.getByLabel(/Lien de confirmation reçu par e-?mail/).isVisible(),
         false,
       );
       assert.equal(await p.locator("[data-auth-renvoyer]").isVisible(), true);
@@ -234,7 +234,7 @@ const { chromium } = require("playwright"),
       });
       await aide.locator("summary").click();
       assert.equal(
-        await p.getByLabel("Lien de confirmation reçu par email").isVisible(),
+        await p.getByLabel(/Lien de confirmation reçu par e-?mail/).isVisible(),
         true,
       );
       assert.equal(

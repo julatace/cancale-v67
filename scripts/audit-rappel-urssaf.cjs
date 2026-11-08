@@ -157,7 +157,7 @@ if (process.argv.includes('--recopie')) {
     const y = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...SANS_SEPT, aDater: { n: 3 }, at: Date.parse('2026-10-01T06:00:00Z') } });
     dit(!!(y && y.apayer == null && !/0,00/.test(y.sub)), 'publiée après la fin, aucun mois de septembre mais des ventes sans date : aucun montant (« au moins 0 » ne dit rien)', y && y.sub);
     const z = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...SANS_SEPT, at: Date.parse('2026-10-01T06:00:00Z') } });
-    dit(!!(z && z.ca === 0 && z.apayer === 0 && !z.partiel && /0,00 € reçus/.test(z.sub) && !/au moins/i.test(z.sub)), 'l\'autre sens : publiée APRÈS la fin, lue et sans vente de septembre : un vrai 0,00 €, dit tel quel', z && z.sub);
+    dit(!!(z && z.ca === 0 && z.apayer === 0 && !z.partiel && /0,00\s€ reçus/.test(z.sub) && !/au moins/i.test(z.sub)), 'l\'autre sens : publiée APRÈS la fin, lue et sans vente de septembre : un vrai 0,00 €, dit tel quel', z && z.sub);
   });
   const code = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
   dit(!/Nouveau mois : pense à ta déclaration URSSAF/.test(code), 'l\'ancien rappel fixe du 1er du mois a disparu');
@@ -227,11 +227,11 @@ if (process.argv.includes('--recopie')) {
   await essaie('notification : mois à déclarer', () => {
     const n = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB });
     dit(!!(n && n.envoyer), 'mensuel, 1er octobre, septembre pas noté : la notification part', n && n.raison);
-    dit(!!(n && n.montant === 584.67 && /4330,90 €/.test(n.corps) && /584,67 €/.test(n.corps)), 'elle donne le montant de la ligne PUBLIÉE (4 330,90 € reçus, 584,67 € à payer)', n && n.corps);
+    dit(!!(n && n.montant === 584.67 && /4330,90\s€/.test(n.corps) && /584,67\s€/.test(n.corps)), 'elle donne le montant de la ligne PUBLIÉE (4 330,90 € reçus, 584,67 € à payer)', n && n.corps);
     dit(!!(n && /31 octobre/.test(n.corps)), 'et l\'échéance (avant le 31 octobre)', n && n.corps);
     dit(!!(n && !/au moins/i.test(n.corps)), 'ligne publiée après la fin du mois : le montant se dit tel quel', n && n.corps);
     const p = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: { ...PUB, at: Date.parse('2026-09-27T18:00:00Z') } });
-    dit(!!(p && p.envoyer && /au moins 4330,90 €/i.test(p.corps)), 'ligne publiée le 27 septembre : « au moins » (les ventes versées depuis n\'y sont pas)', p && p.corps);
+    dit(!!(p && p.envoyer && /au moins 4330,90\s€/i.test(p.corps)), 'ligne publiée le 27 septembre : « au moins » (les ventes versées depuis n\'y sont pas)', p && p.corps);
     const app = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 12), ligne: PUB });
     dit(!!(n && app && n.corps === `${app.text}. ${app.sub}`), 'mot pour mot la phrase de Ma journée (même règle, §11)', n && n.corps);
   });
@@ -330,7 +330,7 @@ if (process.argv.includes('--recopie')) {
       const res = await lancer({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB });
       const u = urssafDe();
       dit(u.length === 1, 'le 1er octobre, septembre pas noté : UNE notification URSSAF part', `${u.length}`);
-      dit(!!(u[0] && /4330,90 €/.test(u[0].body) && /584,67 €/.test(u[0].body)), 'elle porte le montant publié (4 330,90 € · 584,67 €)', u[0] && u[0].body);
+      dit(!!(u[0] && /4330,90\s€/.test(u[0].body) && /584,67\s€/.test(u[0].body)), 'elle porte le montant publié (4 330,90 € · 584,67 €)', u[0] && u[0].body);
       dit(!!(u[0] && u[0].url === '/?tab=compta&cible=urssaf'), 'elle ouvre Comptabilité → « Ta déclaration URSSAF », où vit « C\'est déclaré » (31 oct.)', u[0] && u[0].url);
       dit(ecrits.includes('urssaf_reminder_dedup'), 'le mémo du mois est écrit (une fois par mois)');
       const corps = JSON.stringify(res.corps || {});

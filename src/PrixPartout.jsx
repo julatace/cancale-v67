@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { prixTape, minisAuDessus, NOM_SITE } from './prixPartout.js';
 import './styles-annonces-outils.css';
 
-const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')} €`);
+const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const ETAT = { envoi: 'Envoi…', fait: 'Fait', refuse: 'Refusé', incertain: 'Pas sûr', 'a-faire': 'À faire sur le site', ignore: '' };
 
 export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour }) {

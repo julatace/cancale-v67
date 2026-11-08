@@ -115,7 +115,7 @@ export const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = n
   const text = proche
     ? `Déclaration URSSAF ${due.label} à faire avant le ${date} (${quand})`
     : `Nouveau mois : déclaration URSSAF ${due.label} à faire avant le ${date}`;
-  const eur = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+  const eur = (n) => Number(n).toFixed(2).replace('.', ',') + '\u00a0€';
   const sub = apayer == null
     ? 'Le montant se calcule dans Ventes (ouvre-le une fois).'
     : `${partiel ? 'Au moins ' : ''}${eur(ca)} reçus · à payer ≈ ${partiel ? 'au moins ' : ''}${eur(apayer)}`;

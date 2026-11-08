@@ -116,7 +116,8 @@ async function audit(M, dire) {
   ok(t43 && t43.brut === null && t43.marge === null && t43.parPaire === null && t43.net === null, 'taille 43, aucun prix d’achat : ni bénéfice ni marge (null, jamais 0)', t43);
 
   const Dl = M.delaisPar(DELAIS, (l) => M.tranchePrix(l.eur));
-  const t3060 = Dl && Dl.groupes.find((g) => g.k === '30 à 60 €'), t100 = Dl && Dl.groupes.find((g) => g.k === '100 € et plus');
+  const kSp = (g) => String(g.k).replace(/\u00a0/g, ' '); // (6 nov., finition) les tranches s'écrivent à l'espace insécable
+  const t3060 = Dl && Dl.groupes.find((g) => kSp(g) === '30 à 60 €'), t100 = Dl && Dl.groupes.find((g) => kSp(g) === '100 € et plus');
   ok(Dl && Dl.n === 5 && Dl.nDelai === 3 && Dl.moyenne === 6 && Dl.mediane === 6, 'délai : 3 ventes datées sur 5, moyenne 6 j, médiane 6 j', Dl && { n: Dl.n, nDelai: Dl.nDelai, moyenne: Dl.moyenne, mediane: Dl.mediane });
   ok(t3060 && t3060.n === 3 && t3060.nDelai === 2 && t3060.moyenne === 4, '30 à 60 € : 2 datées sur 3 (une republiée après la vente), 4 j', t3060);
   ok(t100 && t100.nDelai === 0 && t100.moyenne === null, '100 € et plus : aucune date, délai « — »', t100);
@@ -153,7 +154,7 @@ async function audit(M, dire) {
   const vp = M.ventesPar(VENDU, (l) => l.plateforme);
   ok(vp && vp.groupes.map((g) => `${g.k}:${g.n}:${g.eur}`).join(' ') === 'Vinted:7:410 eBay:1:30 Leboncoin:1:20' && vp.groupes.reduce((a, g) => a + g.n, 0) === 9, 'par compte/plateforme : Vinted 7 (410 €), eBay 1, Leboncoin 1 — la somme = les 9 ventes datées', vp);
   const rap = M.plusRapides(Dl, 5);
-  ok(rap && rap.map((g) => `${g.k}:${g.mediane}`).join(' | ') === '30 à 60 €:4 | moins de 30 €:10', 'ce qui part vite : 4 j puis 10 j ; un groupe sans date n’y est pas', rap);
+  ok(rap && rap.map((g) => `${kSp(g)}:${g.mediane}`).join(' | ') === '30 à 60 €:4 | moins de 30 €:10', 'ce qui part vite : 4 j puis 10 j ; un groupe sans date n’y est pas', rap);
 
   ok(M.rythmeVendu(null) === null && M.quandTuVends(null) === null && M.margesPar(null, (l) => l.marque) === null && M.delaisPar(null, () => '') === null && M.stockQuiDort(null) === null && M.tauxAnnulation(null) === null, '« pas su » : une liste illisible rend null partout, jamais 0');
   return ko;

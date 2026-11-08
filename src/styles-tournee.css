@@ -84,7 +84,7 @@
 .vrm-tr-quand.is-ambre { color: var(--vrm-warn); font-weight: 600; }
 .vrm-tr-plans { align-self: flex-start; margin: -6px 0 10px 58px; min-height: 44px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: var(--vrm-b-lien, var(--vrm-accent)); text-decoration: none; }
 @media (min-width: 768px) {
-  .vrm-tr-plein { left: auto; width: min(520px, 100vw); border-left: 1px solid var(--vrm-line); box-shadow: -12px 0 40px rgba(0,0,0, .12); }
+  .vrm-tr-plein { left: auto; width: min(520px, var(--vrm-vw100, 100vw)); border-left: 1px solid var(--vrm-line); box-shadow: -12px 0 40px rgba(0,0,0, .12); }
 }
 
 /* (1er nov.) Une phrase par point pas sur la carte, sous son arrêt ; la carte et la liste défilent ensemble. */

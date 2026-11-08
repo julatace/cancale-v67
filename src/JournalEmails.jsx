@@ -101,7 +101,7 @@ export default function JournalEmails({ headers, filtreInitial = '', typeInitial
   const c = pages && pages.compteurs;
   const segments = [['', 'Tout'], ['a-verifier', 'À vérifier'], ['erreur', 'En attente']];
   return (
-    <section className="vrm-journal" data-journal-emails="" aria-label="Tes emails, ce que VRM en a fait">
+    <section className="vrm-journal" data-journal-emails="" aria-label="Tes e-mails, ce que VRM en a fait">
       <header className="vrm-journal-entete">
         <div>
           <h3>Tes e-mails, un par un</h3>
@@ -110,7 +110,7 @@ export default function JournalEmails({ headers, filtreInitial = '', typeInitial
         {/* (5 nov., chantier G, revue 3.8) Pas d'« Actualiser » à côté du « Réessayer » d'une panne. */}
         {pages !== null && <button type="button" className="vrm-journal-actualiser" onClick={() => charger(0)} disabled={lecture}>{lecture ? 'Lecture…' : 'Actualiser'}</button>}
       </header>
-      <div className="vrm-journal-filtres" role="group" aria-label="Filtrer les emails">
+      <div className="vrm-journal-filtres" role="group" aria-label="Filtrer les e-mails">
         <div className="vrm-journal-segments">
           {segments.map(([k, mot]) => {
             const n = !c ? null : k === 'a-verifier' ? c.aVerifier : k === 'erreur' ? c.erreur : null;

@@ -101,7 +101,7 @@ async function ouvrir(nav, { registre, vues = [], etats = {}, installation = fal
 const ouvrirAdresses = async (pg) => {
   const s = pg.locator('[data-sous-ouvrir="adresses"]').first();
   if (await s.isVisible().catch(() => false)) { await s.click(); await pg.locator('[data-reglage-adresses]').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {}); }
-  const nav = pg.getByRole('navigation',{name:'Rubriques des emails'});
+  const nav = pg.getByRole('navigation',{name: /^Rubriques des e-?mails$/});
   if (!await nav.isVisible().catch(()=>false)) return;
   await nav.getByRole('button',{name:/Comptes et transfert/}).click();
   const aide=pg.locator('.vrm-email-aide-adresses');
@@ -129,7 +129,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
         dit(appels.some((a) => a.mode === 'preuves' && a.auth === 'Bearer jeton-de-banc'), 'l’état est demandé à la ROUTE, avec la session', JSON.stringify(appels.map((a) => a.mode)));
         dit(l['ok@exemple.test'] && l['ok@exemple.test'].etat === 'prouvee' && /confirmée/.test(l['ok@exemple.test'].texte) && !l['ok@exemple.test'].bouton, 'confirmée : dit, sans geste', JSON.stringify(l['ok@exemple.test']));
         dit(l['envoye@exemple.test'] && l['envoye@exemple.test'].etat === 'envoyee' && /lien envoyé le/.test(l['envoye@exemple.test'].texte) && l['envoye@exemple.test'].bouton === 'Renvoyer', 'lien envoyé : la date, et « Renvoyer »', JSON.stringify(l['envoye@exemple.test']));
-        dit(l['rien@exemple.test'] && l['rien@exemple.test'].etat === 'aucune' && /pas confirmée — ses emails sont mis de côté/.test(l['rien@exemple.test'].texte) && l['rien@exemple.test'].bouton === 'Confirmer', 'pas confirmée : ce que ça coûte (mis de côté) et le geste', JSON.stringify(l['rien@exemple.test']));
+        dit(l['rien@exemple.test'] && l['rien@exemple.test'].etat === 'aucune' && /pas confirmée — ses e-?mails sont mis de côté/.test(l['rien@exemple.test'].texte) && l['rien@exemple.test'].bouton === 'Confirmer', 'pas confirmée : ce que ça coûte (mis de côté) et le geste', JSON.stringify(l['rien@exemple.test']));
         dit(p && p.expl.length === 1 && p.expl[0] === 'vendeur' && (p.texte.match(/Chaque adresse se confirme une fois/g) || []).length === 1, 'la règle est dite UNE fois au-dessus des lignes (§7)', JSON.stringify(p && p.expl));
         dit(p && !/Les tiennes restent reçues/.test(p.texte), 'à un vendeur, jamais « les tiennes restent reçues » (c’est faux pour lui)', '');
         // (22 oct., revue) La phrase qui promet suit la règle : pour un vendeur,

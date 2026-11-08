@@ -136,7 +136,7 @@ export const margesPar = (lignes, cle) => {
 // `lignes` : { ts (vente), enLigne (ms | null), eur, plateforme, marque… }.
 // Une vente sans date de mise en ligne, ou datée AVANT (republiée ensuite),
 // n'entre pas dans le délai : elle reste dans `n` (la couverture « sur N »).
-export const TRANCHES_PRIX = [[0, 30, 'moins de 30 €'], [30, 60, '30 à 60 €'], [60, 100, '60 à 100 €'], [100, Infinity, '100 € et plus']];
+export const TRANCHES_PRIX = [[0, 30, 'moins de 30\u00a0€'], [30, 60, '30 à 60\u00a0€'], [60, 100, '60 à 100\u00a0€'], [100, Infinity, '100\u00a0€ et plus']];
 export const tranchePrix = (eur) => { const x = Number(eur); if (!isFinite(x)) return ''; const t = TRANCHES_PRIX.find(([a, b]) => x >= a && x < b); return t ? t[2] : ''; };
 const resumeJours = (js) => {
   if (!js.length) return { nDelai: 0, moyenne: null, mediane: null };

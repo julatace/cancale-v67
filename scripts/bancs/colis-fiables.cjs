@@ -357,7 +357,7 @@ async function main() {
                  btn: (() => { const r = document.querySelector('[data-suivis-reessayer]'); return r ? r.getBoundingClientRect().height : 0; })() }; });
       dit(K.n === '—' && (K.seg === '' || /^Au moins \d/.test(K.seg.trim())), '[défaut 6] e-mails de suivi illisibles : le nombre dit « — » (attribut), et la phrase « au moins » — jamais un total partiel présenté comme complet', `data-n=${K.n} · « ${K.seg.replace(/\n/g, ' ')} »`);
       dit(K.ko === 'jamais' && /n'ont pas pu être lus/.test(K.texte) && K.btn >= 44, '[défaut 6] … la panne est DITE, avec « Réessayer » (44 px)', `ko=${K.ko} · bouton ${K.btn}px`);
-      dit(!/aucun email de suivi reçu/i.test(K.texte), '[défaut 6] … jamais « aucun email de suivi reçu »');
+      dit(!/aucun e-?mail de suivi reçu/i.test(K.texte), '[défaut 6] … jamais « aucun email de suivi reçu »');
       // « Réessayer » sur la MÊME page (pas un rechargement, qui relirait de toute façon).
       etat.suivis = 'ok';
       const btn = pg.locator('[data-suivis-reessayer]');

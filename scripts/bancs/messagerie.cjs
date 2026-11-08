@@ -340,10 +340,11 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const ordre = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), c: x.getAttribute('data-conv-compte'), q: x.getAttribute('data-conv-quand') })));
       const i301 = ordre.findIndex((x) => x.id === '301'), i303 = ordre.findIndex((x) => x.id === '303');
       dit(i301 >= 0 && i303 >= 0 && i301 < i303, 'une conversation avec une offre en attente passe devant une plus récente sans offre', JSON.stringify(ordre));
-      // (27 oct.) Bandeau « N offres au-dessus de ton prix mini » dans la liste :
+      // (27 oct.) Bandeau « N offres au-dessus de ton prix mini » dans la liste
+      // (7 nov., finition : « en 1 tap » est devenu « d'un geste » — la règle jugée est la même : un geste, rien tout seul) :
       // l'offre 45 € de la 301 est ≥ au mini 40 € posé sur l'annonce 444.
       const banMini = await r.pg.evaluate(() => { const e = document.querySelector('[data-offres-au-mini]'); return e ? { n: e.getAttribute('data-offres-au-mini'), txt: e.innerText } : null; });
-      dit(banMini && banMini.n === '1' && /prix mini/i.test(banMini.txt) && /1 tap/i.test(banMini.txt) && /rien n['’]est accepté tout seul/i.test(banMini.txt), 'le bandeau dit « 1 offre au-dessus de ton prix mini » + 1 tap + rien tout seul', JSON.stringify(banMini));
+      dit(banMini && banMini.n === '1' && /prix mini/i.test(banMini.txt) && /1 tap|d['’]un geste/i.test(banMini.txt) && /rien n['’]est accepté tout seul/i.test(banMini.txt), 'le bandeau dit « 1 offre au-dessus de ton prix mini » + 1 tap + rien tout seul', JSON.stringify(banMini));
       await r.pg.locator('[data-a-repondre]').click();
       dit(JSON.stringify(await r.pg.locator('[data-conv]').evaluateAll(xs=>xs.map(x=>x.getAttribute('data-conv'))))==='["301"]','À répondre : le vendeur et l’auteur non vérifié sont exclus');
       await r.pg.getByRole('button',{name:/^Toutes /}).click();
@@ -397,7 +398,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const of = r.execs.find((x) => x.method === 'POST' && /offers$/.test(x.endpoint));
       dit(of && of.endpoint === '/api/v2/transactions/9001/offers' && of.body && of.body.offer && of.body.offer.price === '50', 'faire une offre envoie le prix saisi sur la bonne transaction', JSON.stringify(of));
       const txt = await r.pg.evaluate(() => document.body.innerText);
-      dit(/Offre de 50,00 € envoyée/.test(txt), 'et le dit');
+      dit(/Offre de 50,00\s€ envoyée/.test(txt), 'et le dit');
       // Réponses : double clic, texte édité pendant l'attente et retour incertain.
       const champ=r.pg.getByRole('textbox',{name:'Réponse à la conversation'});
       await champ.fill('Premier message synthétique');

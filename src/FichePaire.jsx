@@ -11,7 +11,7 @@ import './styles-annonces-outils.css';
 import { texteDuree } from './etatArticle.js';
 
 const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'grid', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore' };
-const eur = (c) => (c == null ? '—' : `${(c / 100).toFixed(Number.isInteger(c / 100) ? 0 : 2).replace('.', ',')} €`);
+const eur = (c) => (c == null ? '—' : `${(c / 100).toFixed(Number.isInteger(c / 100) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const signe = (c) => (c == null ? '—' : `${c > 0 ? '+' : c < 0 ? '−' : ''}${eur(Math.abs(c))}`);
 const quand = (iso) => {
   const t = Date.parse(iso || ''); if (!Number.isFinite(t)) return '';

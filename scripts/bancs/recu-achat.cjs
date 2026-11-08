@@ -268,7 +268,7 @@ async function fermerParEchap(pg) {
       await essaie('A2. reçu sans Montant payé', async () => {
         await ouvrirDepuisListe(pg, /Escarpin merci banc/);
         const f = await lireFeuille(pg);
-        dit(f && /Total payé : 24,93 €/.test(f.texte) && !/ne sont peut-être pas toutes là/.test(f.texte) && f.lignes.length === 0,
+        dit(f && /Total payé : 24,93\s€/.test(f.texte) && !/ne sont peut-être pas toutes là/.test(f.texte) && f.lignes.length === 0,
           'A2. un reçu sans « Montant payé » montre le texte de l’email (« Total payé : 24,93 € »), sans en-tête vide ni phrase « lignes incomplètes »', f && JSON.stringify(f.texte.slice(0, 160)));
         await fermerParEchap(pg);
       });
@@ -414,7 +414,7 @@ async function fermerParEchap(pg) {
       await essaie('D. somme fausse', async () => {
         await ouvrirDepuisListe(pg, /Botte banc ecart/);
         const f = await lireFeuille(pg);
-        dit(f && f.somme === 'ecart' && f.phraseVisible && /regarde l'email de Vinted/.test(f.phrase), 'D. des lignes qui ne font pas le total : la feuille le DIT', f && `${f.somme} ${JSON.stringify(f.phrase)}`);
+        dit(f && f.somme === 'ecart' && f.phraseVisible && /regarde l'e-?mail de Vinted/.test(f.phrase), 'D. des lignes qui ne font pas le total : la feuille le DIT', f && `${f.somme} ${JSON.stringify(f.phrase)}`);
         await fermerParEchap(pg);
       });
 

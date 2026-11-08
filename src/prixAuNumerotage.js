@@ -61,7 +61,7 @@ export function prixADemander(fiche, prixConnu) {
 // ligne de détail. `null` sans suggestion. N'écrit rien, ne pré-remplit rien.
 export function suggestionNumerotage(texte, fmt) {
   if (!texte) return null;
-  const f = typeof fmt === 'function' ? fmt : (n) => `${n.toFixed(2).replace('.', ',')} €`;
+  const f = typeof fmt === 'function' ? fmt : (n) => `${n.toFixed(2).replace('.', ',')}\u00a0€`;
   const prop = texte.proposition && Number.isSafeInteger(texte.proposition.centimes) && !texte.lot ? texte.proposition : null;
   return {
     bouton: prop ? `Relier · ${f(prop.centimes / 100)}` : 'Relier',

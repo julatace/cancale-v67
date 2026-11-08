@@ -271,7 +271,7 @@ export function EbayEvaluations({compte='principal',headers,confirm,theme:C}){
 // Chaque geste : un clic, une confirmation qui DIT la conséquence d'argent, puis
 // le serveur relit l'état chez eBay avant d'écrire. Trois issues : fait (dit par
 // eBay) · refusé (la raison d'eBay) · incertain (« regarde sur eBay »).
-const euros=m=>!m?'':m.currency==='EUR'?`${String(m.value).replace('.',',')} €`:`${m.value} ${m.currency}`;
+const euros=m=>!m?'':m.currency==='EUR'?`${String(m.value).replace('.',',')}\u00a0€`:`${m.value} ${m.currency}`;
 const MOTIFS_RETOUR={DOES_NOT_FIT:'ne convient pas (taille)',NOT_AS_DESCRIBED:'pas conforme à l’annonce',DEFECTIVE_ITEM:'défectueux',WRONG_ITEM:'mauvais article',ORDERED_ACCIDENTALLY:'commandé par erreur',CHANGED_MIND:'a changé d’avis',ARRIVED_DAMAGED:'arrivé abîmé',FOUND_BETTER_PRICE:'moins cher ailleurs',MISSING_PARTS:'incomplet'};
 const issueTexte=(f,C)=>f==='fait'?<p role="status" style={{fontSize:12,margin:'8px 0 0'}}>Fait, confirmé par eBay.</p>:f==='incertain'?<p role="status" style={{fontSize:12,margin:'8px 0 0',color:C.warn}}>Je ne sais pas si c’est parti : regarde sur eBay avant de recommencer.</p>:null;
 export function EbayRetours({compte='principal',headers,confirm,theme:C,onCommandeAnnulee}){
@@ -341,11 +341,11 @@ export function EbayPromotion({compte='principal',headers,confirm,theme:C}){
   {data && !lignes.length && <p style={{fontSize:12,color:C.muted}}>Aucune annonce eBay en ligne à promouvoir.</p>}
   <div style={{display:'grid',gap:8}}>{lignes.map(a=>{const p=promues.get(a.itemId),t=taux[a.itemId] ?? (p?String(p.taux).replace('.',','):'5');return <article key={a.itemId} data-ebay-promo={a.itemId} data-promue={p?'oui':'non'} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:12,background:C.card}}>
    <b style={{fontSize:13,display:'block',overflowWrap:'anywhere'}}>{a.titre || 'Annonce '+a.itemId}</b>
-   <div style={{fontSize:12,color:C.muted,marginTop:3}}>{p?`Promue à ${String(p.taux).replace('.',',')} %`:'Pas promue'}</div>
+   <div style={{fontSize:12,color:C.muted,marginTop:3}}>{p?`Promue à ${String(p.taux).replace('.',',')}\u00a0%`:'Pas promue'}</div>
    <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
     <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:C.muted}}>Taux <input aria-label={`Taux pour ${a.titre || a.itemId}`} inputMode="decimal" value={t} onChange={e=>setTaux(x=>({...x,[a.itemId]:e.target.value}))} style={{...S.input,width:70,fontSize:17}}/> %</label>
-    {!p && <button type="button" disabled={busy} data-geste="promouvoir" style={{...S.button,minHeight:44}} onClick={()=>geste('promouvoir',{listingId:a.itemId,taux:t},{title:`Promouvoir à ${t} % ?`,desc:`${a.titre || a.itemId}\n\n${FRAIS}`,ok:'Promouvoir',cancel:'Annuler'})}>Promouvoir</button>}
-    {p && <button type="button" disabled={busy || String(t).replace(',','.')===String(p.taux)} data-geste="changer-taux" style={{...S.button,minHeight:44}} onClick={()=>geste('changertaux',{listingId:a.itemId,taux:t,tauxVu:p.taux},{title:`Passer à ${t} % ?`,desc:`${a.titre || a.itemId}\nTaux actuel : ${String(p.taux).replace('.',',')} %\n\n${FRAIS}`,ok:'Changer le taux',cancel:'Annuler'})}>Changer le taux</button>}
+    {!p && <button type="button" disabled={busy} data-geste="promouvoir" style={{...S.button,minHeight:44}} onClick={()=>geste('promouvoir',{listingId:a.itemId,taux:t},{title:`Promouvoir à ${t}\u00a0% ?`,desc:`${a.titre || a.itemId}\n\n${FRAIS}`,ok:'Promouvoir',cancel:'Annuler'})}>Promouvoir</button>}
+    {p && <button type="button" disabled={busy || String(t).replace(',','.')===String(p.taux)} data-geste="changer-taux" style={{...S.button,minHeight:44}} onClick={()=>geste('changertaux',{listingId:a.itemId,taux:t,tauxVu:p.taux},{title:`Passer à ${t}\u00a0% ?`,desc:`${a.titre || a.itemId}\nTaux actuel : ${String(p.taux).replace('.',',')} %\n\n${FRAIS}`,ok:'Changer le taux',cancel:'Annuler'})}>Changer le taux</button>}
     {p && <button type="button" disabled={busy} data-geste="arreter-promo" style={{...S.button,minHeight:44}} onClick={()=>geste('arreterpromo',{listingId:a.itemId},{title:'Arrêter la promotion ?',desc:`${a.titre || a.itemId}\n\nL’annonce reste en ligne, sans promotion.`,ok:'Arrêter',cancel:'Annuler'})}>Arrêter</button>}
    </div>
   </article>;})}</div>

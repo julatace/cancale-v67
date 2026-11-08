@@ -226,7 +226,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     for (let i = 1; i <= doc.numPages; i++) { const p = await doc.getPage(i); const tc = await p.getTextContent(); pdfTexte += tc.items.map((x) => x.str).join(' ') + '\n'; }
   } catch (e) { pdfTexte = ''; dit(false, 'le PDF se crée et se relit', e.message); }
   const totTxt = M.eurosTexte(nov.total).replace(/[  ]/g, ' ').replace('−', '-');
-  dit(!!pdfTexte && pdfTexte.replace(/[  ]/g, ' ').includes(totTxt) && /au moins/.test(pdfTexte) && /Livre des recettes/.test(pdfTexte), 'R6 · le PDF dit le total (« au moins »)', totTxt);
+  dit(!!pdfTexte && pdfTexte.replace(/[  ]/g, ' ').includes(String(totTxt).replace(/[\u00a0\u202f]/g, ' ')) && /au moins/.test(pdfTexte) && /Livre des recettes/.test(pdfTexte), 'R6 · le PDF dit le total (« au moins »)', totTxt);
 
   // ── Registre des achats ───────────────────────────────────────────────────
   console.log('── Registre des achats');

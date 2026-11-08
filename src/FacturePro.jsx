@@ -113,7 +113,7 @@ export function ApercuFacture({ contenu, provisoire = false, numeroLibelle = '',
       <table className="vrm-fp-a-table"><thead><tr><th>Désignation</th><th>Qté</th><th>{marge ? 'Prix unitaire' : 'Prix unit. HT'}</th><th>{marge ? 'Total' : 'Total HT'}</th></tr></thead>
         <tbody>{c.lignes.map((l, i) => <tr key={i}><td>{l.designation}</td><td>{l.quantite}</td><td>{euros(l.unite)}</td><td>{euros(l.total)}</td></tr>)}</tbody></table>
       <dl className="vrm-fp-a-totaux">
-        {c.regime === 'normal' ? <><div><dt>Total HT</dt><dd>{euros(T.ht)}</dd></div><div><dt>TVA {String(c.taux).replace('.', ',')} %</dt><dd>{euros(T.tva)}</dd></div><div className="is-fort"><dt>Total TTC</dt><dd>{euros(T.ttc)}</dd></div></>
+        {c.regime === 'normal' ? <><div><dt>Total HT</dt><dd>{euros(T.ht)}</dd></div><div><dt>TVA {String(c.taux).replace('.', ',')}&nbsp;%</dt><dd>{euros(T.tva)}</dd></div><div className="is-fort"><dt>Total TTC</dt><dd>{euros(T.ttc)}</dd></div></>
           : c.regime === 'franchise' ? <><div><dt>Total HT</dt><dd>{euros(T.ht)}</dd></div><div><dt>TVA</dt><dd>non applicable</dd></div><div className="is-fort"><dt>{c.type === 'avoir' ? 'Montant à rembourser' : 'Net à payer'}</dt><dd>{euros(T.ttc)}</dd></div></>
           : <div className="is-fort"><dt>{c.type === 'avoir' ? 'Montant à rembourser' : 'Total à payer'}</dt><dd>{euros(T.ttc)}</dd></div>}
       </dl>
@@ -305,7 +305,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           {cfg.tva_regime === 'normal' ? <div className="vrm-fp-champ" data-fp-champ="tva_taux" data-fp-manque={champManque.has('tva_taux') ? '1' : undefined}>
             <span>Taux de TVA</span>
             <select value={cfg.tva_taux || ''} onChange={(e) => upd('tva_taux', Number(e.target.value))} aria-label="Taux de TVA">
-              <option value="">Choisir…</option>{TAUX_TVA.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')} %</option>)}
+              <option value="">Choisir…</option>{TAUX_TVA.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')}&nbsp;%</option>)}
             </select></div> : null}
           {cfg.tva_regime === 'normal' || cfg.tva_regime === 'marge' ? champ({ k: 'tva', label: 'N° de TVA intracommunautaire', placeholder: 'FR12345678901', majuscules: true }) : null}
         </section>

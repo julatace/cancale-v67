@@ -118,7 +118,7 @@ export function MesuresTerrain({ entetes, nomEcran = (e) => e, Bouton = BoutonBa
           </tbody>
         </table>
       </div>
-      <p style={{ ...S.petit, marginTop: 6 }}>« — » : pas mesuré (Safari ne mesure ni le toucher ni le décalage). En ambre : un p75 qui monte de plus de 30 % sur la veille (au moins {MESURES_MIN_VEILLE} mesures chaque jour) — la veille du matin te prévient aussi.</p>
+      <p style={{ ...S.petit, marginTop: 6 }}>« — » : pas mesuré (Safari ne mesure ni le toucher ni le décalage). En ambre : un p75 qui monte de plus de 30&nbsp;% sur la veille (au moins {MESURES_MIN_VEILLE} mesures chaque jour) — la veille du matin te prévient aussi.</p>
     </div>
   );
 }

@@ -193,7 +193,7 @@ const lireApercu = (pg) => pg.evaluate(() => {
   const ap = q('[data-emails-apercu]');
   const pos = (x) => { const e = q(x); return e ? e.getBoundingClientRect().top + (document.scrollingElement || document.documentElement).scrollTop : null; };
   const avant = (a, b) => { const x = q(a), y = q(b); return !!(x && y && (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING)); };
-  const nav = q('[aria-label="Rubriques des emails"]');
+  const nav = q('[aria-label^="Rubriques des e"]');
   const lignes = (sel, cle) => Object.fromEntries([...document.querySelectorAll(sel)].map((e) => [e.getAttribute(cle), Number(e.getAttribute('data-n'))]));
   const visibles = ap ? [...ap.querySelectorAll('button')].filter((b) => b.offsetParent) : [];
   const geste = q('[data-apercu-geste] .vrm-apercu-geste');
@@ -332,7 +332,7 @@ if (require.main === module && EXPLORE) (async () => {  await new Promise((r) =>
           await capture(pg, `emails-${suf}`);
           console.log('──── EMAILS ' + suf + '\n' + (await texte(pg, '[data-espace-emails]')));
           for (const ong of ['Journal', 'Comptes', 'À rattacher']) {
-            const bt = pg.getByRole('navigation', { name: 'Rubriques des emails' }).getByRole('button', { name: new RegExp(ong) });
+            const bt = pg.getByRole('navigation', { name: /^Rubriques des e-?mails$/ }).getByRole('button', { name: new RegExp(ong) });
             if (await bt.count()) { await bt.first().click(); await pg.waitForTimeout(1200); await capture(pg, `emails-${ong.replace(/\W+/g, '')}-${suf}`); console.log('──── ' + ong + '\n' + (await texte(pg, '[data-espace-emails]'))); }
           }
         }

@@ -27,7 +27,7 @@ export const ORDRE_HISTOIRE = ['achat', 'numero', 'stock', 'annonces', 'prix', '
 const str = (v) => String(v == null ? '' : v).trim();
 const t = (iso) => { const x = Date.parse(iso || ''); return Number.isFinite(x) ? x : null; };
 const iso = (v) => (t(v) != null ? new Date(t(v)).toISOString() : null);
-const eur = (n) => (n == null || !Number.isFinite(Number(n)) ? null : `${(Math.round(Number(n) * 100) / 100).toFixed(Number.isInteger(Number(n)) ? 0 : 2).replace('.', ',')} €`);
+const eur = (n) => (n == null || !Number.isFinite(Number(n)) ? null : `${(Math.round(Number(n) * 100) / 100).toFixed(Number.isInteger(Number(n)) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const NOM = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
 const parDate = (a, b) => { const ta = t(a.at), tb = t(b.at); if (ta == null && tb == null) return 0; if (ta == null) return 1; if (tb == null) return -1; return ta - tb; };
 

@@ -124,6 +124,8 @@ import './design/mode-stream.css';
 import './styles-barre-iphone.css';
 // (5 nov., chantier B) Les composants partagés (SheetShell, ChampRecherche, PhotoVide, Numero,
 // EtatPanne, bouton « danger » ambre) — après tout le reste : ils portent leur propre forme.
+// (6 nov., finition) Lisible pour tous : texte en grand de l'appareil (src/grandTexte.js), cibles de 44 px, contrastes (ses règles portent leur propre poids).
+import './styles-lisible.css';
 import './styles-composants.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }

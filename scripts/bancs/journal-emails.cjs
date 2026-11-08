@@ -85,7 +85,7 @@ async function ouvrir(nav, { viewport, tab = 'settings', tactile = false }) {
 async function versJournal(pg) {
   const sousAdr = pg.locator('[data-sous-ouvrir="adresses"]').first();
   if (await sousAdr.isVisible().catch(() => false)) { await sousAdr.click(); await pg.waitForTimeout(500); }
-  await pg.getByRole('navigation', { name: 'Rubriques des emails' }).getByRole('button', { name: /Journal/ }).click();
+  await pg.getByRole('navigation', { name: /^Rubriques des e-?mails$/ }).getByRole('button', { name: /Journal/ }).click();
   await pg.locator('[data-journal-emails] .vrm-journal-ligne').first().waitFor();
 }
 
@@ -109,7 +109,7 @@ async function versJournal(pg) {
         dit(await ligne(1).getAttribute('data-etat') === 'range' && await ligne(1).locator('[data-journal-lien="cat_bord"]').count() === 1 && await ligne(1).locator('[data-journal-num="42"]').count() === 1, `${w} : bordereau rangé, lien Colis, « Tout sur le N°42 »`);
         dit(/^Code de retrait 418 205 chez Relais Tabac du Port/.test(await q(2)) && (await f(2)) === 'Rangé avec le colis n° 12345678' && /Mondial Relay/.test(await ligne(2).innerText()), `${w} : code de retrait — Mondial Relay, code lisible, colis par son n°`, await q(2));
         dit(await ligne(3).getAttribute('data-etat') === 'verifier' && await ligne(3).locator('[data-journal-num]').count() === 0 && /retrouvé par le titre/.test(await ligne(3).locator('[data-journal-raison]').innerText()) && /carton/.test(await ligne(3).locator('[data-journal-raison]').innerText()), `${w} : N° deviné par le titre — à vérifier, raison + geste, aucun lien vers ce N°`);
-        dit((await q(4)) === 'Reçu d’achat · Nike Air Force 1 (45,00 €)' && (await f(4)) === 'Reçu rangé avec ton achat n° 98765432101' && await ligne(4).locator('[data-journal-lien="achats"]').count() === 1, `${w} : reçu d'achat — relié par son n° de transaction, lien Achats`);
+        dit((await q(4)) === 'Reçu d’achat · Nike Air Force 1 (45,00\u00a0€)' && (await f(4)) === 'Reçu rangé avec ton achat n° 98765432101' && await ligne(4).locator('[data-journal-lien="achats"]').count() === 1, `${w} : reçu d'achat — relié par son n° de transaction, lien Achats`);
         dit(await ligne(5).getAttribute('data-etat') === 'verifier' && /n° de transaction/.test(await ligne(5).innerText()) && await ligne(5).locator('[data-journal-delier]').count() === 0, `${w} : reçu au MÊME titre sans n° — à vérifier, jamais relié, rien à délier`);
         dit((await q(6)) === 'Colis livré' && /Chronopost/.test(await ligne(6).innerText()), `${w} : colis livré, de Chronopost`);
         dit(await ligne(7).getAttribute('data-etat') === 'incompris' && /jamais jeté/.test(await f(7)), `${w} : pas compris — gardé, jamais jeté`);

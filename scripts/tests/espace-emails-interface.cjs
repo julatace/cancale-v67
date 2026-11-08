@@ -57,7 +57,7 @@ const root=createRoot(document.getElementById('root'));window.afficher=()=>root.
         .waitFor({ state: "attached" });
       await p.locator('[data-apercu-reponse="oui"]').waitFor();
       p.setDefaultTimeout(8000);
-      const nav = p.getByRole("navigation", { name: "Rubriques des emails" });
+      const nav = p.getByRole("navigation", { name: /^Rubriques des e-?mails$/ });
       check(
         !(await p.locator("[data-reglage-adresses]").isVisible()),
         "la réception ne mélange plus les réglages",
@@ -115,7 +115,7 @@ const root=createRoot(document.getElementById('root'));window.afficher=()=>root.
       );
       await nav.getByRole("button", { name: /Réception/ }).click();
       await p
-        .getByRole("button", { name: "Vérifier les emails mis de côté" })
+        .getByRole("button", { name: /Vérifier les e-?mails mis de côté/ })
         .click();
       check(
         (await nav

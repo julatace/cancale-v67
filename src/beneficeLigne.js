@@ -37,6 +37,6 @@ export const euros = (v) => {
 export function texteBenefice(r) {
   if (!r || r.etat === 'annulee') return '';
   if (r.benefice == null) return '—';
-  const s = (r.benefice >= 0 ? '+' : '−') + euros(Math.abs(r.benefice)) + ' €';
+  const s = (r.benefice >= 0 ? '+' : '−') + euros(Math.abs(r.benefice)) + '\u00a0€';
   return r.etat === 'partiel' ? `au plus ${s}` : s;
 }

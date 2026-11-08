@@ -212,7 +212,7 @@ const secondes = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1).replace('.', ',
 // « VRM : Colis plus lent sur téléphone (premier écran utile p75 1,2 s → 1,8 s, +50 %). »
 export function texteLenteurs(liste, nomEcran = (e) => e) {
   if (!liste || !liste.length) return null;
-  const un = (d) => `${nomEcran(d.ecran)} sur ${NOM_APPAREIL[d.appareil] || d.appareil} (${NOM_METRIQUE[d.metrique]} p75 ${secondes(d.avant)} → ${secondes(d.apres)}, +${d.hausse} %)`;
+  const un = (d) => `${nomEcran(d.ecran)} sur ${NOM_APPAREIL[d.appareil] || d.appareil} (${NOM_METRIQUE[d.metrique]} p75 ${secondes(d.avant)} → ${secondes(d.apres)}, +${d.hausse}\u00a0%)`;
   if (liste.length === 1) return { title: 'VRM', body: `VRM : plus lent hier — ${un(liste[0])}.` };
   return { title: 'VRM', body: `VRM : ${liste.length} écrans plus lents hier — ${liste.slice(0, 3).map(un).join(' · ')}${liste.length > 3 ? ' …' : ''}.` };
 }

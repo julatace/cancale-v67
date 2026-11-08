@@ -257,7 +257,7 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
   const photo = e && photoDe ? photoDe(e) : null;
   const aVerifier = lecture && (lecture.etat === 'verifier' || lecture.etat === 'incompris');
   // Un nombre, une fois : ce que la carte dit déjà sort de la ligne de détails.
-  const dejaDit = (x) => (h && ((h.code && /^code /.test(x)) || (h.lieu && h.lieu.nom && x === (h && e.resume && e.resume.lieu)) || (h.limite && /avant le /.test(x)) || (h.montant && x.endsWith('€') && x.includes(h.montant.replace(' €', ''))) || (h.article && (x === h.article || x === `sur ${h.article}`)) || (h.num && x === `N°${h.num}`)));
+  const dejaDit = (x) => (h && ((h.code && /^code /.test(x)) || (h.lieu && h.lieu.nom && x === (h && e.resume && e.resume.lieu)) || (h.limite && /avant le /.test(x)) || (h.montant && x.endsWith('€') && x.includes(h.montant.replace(/\s*€$/, ''))) || (h.article && (x === h.article || x === `sur ${h.article}`)) || (h.num && x === `N°${h.num}`)));
   const details = t ? [...t.details.filter((x) => !dejaDit(x) && !/^code pas encore lu$/.test(x)), ...(t.rien ? ['rien à faire'] : [])] : [];
   const pdfConnu = e && e.resume && e.resume.pdf === 1;
   const aller = (g) => (g.k === 'num' ? onNum && onNum(g.num) : onAller && onAller(g.url));

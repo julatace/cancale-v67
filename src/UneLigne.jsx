@@ -10,6 +10,10 @@
 import React from 'react';
 
 const SEPARATEURS_FIN = /[\s·,:;—–-]+$/u;
+// (7 nov., finition) On coupe aux espaces ORDINAIRES seulement : une espace insécable
+// (« 14\u00a0€ », « 30\u00a0% ») lie deux mots qui ne se séparent jamais — ni à la ligne,
+// ni à la coupe — et `join(' ')` la remplaçait par une espace ordinaire.
+const ESPACES_SECABLES = /[^\S\u00a0\u202f]+/u;
 
 export function couperAuMot(mots, n) {
   return mots.slice(0, n).join(' ').replace(SEPARATEURS_FIN, '') + '…';
@@ -101,7 +105,7 @@ export function UneLigne({ texte, className = '', lignesTel = 1, ...rest }) {
       },
       proposer: () => {
         const m = j.mesure;
-        const mots = t.split(/\s+/);
+        const mots = t.split(ESPACES_SECABLES);
         if (!m || largeurTexte(m.police, m.espacement, 'x') == null) { j.couper(); return; }
         let lo = 1, hi = mots.length - 1, meilleur = couperAuMot(mots, 1);
         while (lo <= hi) {
@@ -113,7 +117,7 @@ export function UneLigne({ texte, className = '', lignesTel = 1, ...rest }) {
         el.setAttribute('data-une-ligne-coupee', '');
       },
       couper: () => {
-        const mots = t.split(/\s+/);
+        const mots = t.split(ESPACES_SECABLES);
         let lo = 1, hi = mots.length - 1, meilleur = couperAuMot(mots, 1);
         while (lo <= hi) {
           const mi = (lo + hi) >> 1;

@@ -10,8 +10,10 @@
 // Les nombres sont portés en `data-*` pour le banc (§6.4).
 import React from 'react';
 import { DAC7, OU_TROUVER, PLATEFORMES } from './dac7Comptes.js';
+import { montant } from './format.js';
 
-const eur = (c) => (c == null ? '—' : (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €');
+// (6 nov., finition) l'écriture unique des euros (montant) : « 665 € », jamais « 665,00 € ».
+const eur = (c) => (c == null ? '—' : montant(c, { enCentimes: true }));
 const eurRond = (c) => (c / 100).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
 const jour = (t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }); };
 const NOM_P = { Vinted: 'Vinted', Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire: 'Vestiaire Collective' };

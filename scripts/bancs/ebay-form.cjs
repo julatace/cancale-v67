@@ -233,7 +233,7 @@ const envoisEbay = []; let avertir = false;
   await pg.fill('input[placeholder="ex. 74"]', '74');
   await pg.waitForTimeout(250);
   txt = await T();
-  dit(/74,00 €/.test(txt), 'l\'aperçu montre le prix formaté (74,00 €)');
+  dit(/74,00\s€/.test(txt), 'l\'aperçu montre le prix formaté (74,00 €)');
   dit(/Vérifier sans publier/.test(txt) && /Publier sur eBay/.test(txt), 'les deux gestes sont là (vérifier à blanc + publier)');
   // ── (9 octobre) LA RÈGLE D'OFFRE À LA CRÉATION ────────────────────────────
   // « Accepter les offres dès » : c'est eBay qui acceptera, au montant fixé.

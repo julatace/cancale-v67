@@ -30,7 +30,7 @@ const SANS_TAILLE = new Set(['sacs', 'accessoires', 'bijoux']);
 
 const vide = (v) => v == null || String(v).trim() === '';
 const num = (v) => { if (v == null || v === '') return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : null; };
-const eur = (v) => (Number.isInteger(v) ? `${v} €` : `${v.toFixed(2).replace('.', ',')} €`);
+const eur = (v) => (Number.isInteger(v) ? `${v}\u00a0€` : `${v.toFixed(2).replace('.', ',')}\u00a0€`);
 
 // Le geste, selon où l'annonce se corrige : sur la fiche de VRM (Leboncoin,
 // eBay) ou à la source, sur Vinted (Vestiaire et Republier reprennent Vinted).

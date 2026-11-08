@@ -129,13 +129,13 @@ const attendreNuage = async (b, test) => { for (let i = 0; i < 30; i++) { const 
         dit(avant.photos.every((p) => !p.attr && p.px === 0), `A ${tag} : hors stream, aucune photo floutée`, JSON.stringify(avant.photos.filter((p) => p.attr || p.px)));
         await capture(pg, `A-${tag}-defaut`);
         await pg.click('.vrm-app-header [data-bouton-montants]').catch(() => {}); await attendre(500);
-        const oeil = await pg.evaluate(() => { const t = document.body.innerText || ''; return { montants: (t.match(/\d(?:[\d   .,]*\d)?[   ]?€/g) || []).length, racine: document.documentElement.getAttribute('data-stream'), memo: localStorage.getItem('vrm_montants_caches'), presse: (document.querySelector('[data-bouton-montants]') || { getAttribute: () => null }).getAttribute('aria-pressed') }; });
+        const oeil = await pg.evaluate(() => { const t = document.body.innerText || ''; return { montants: (t.match(/\d(?:[\d \u00a0\u202f.,]*\d)?[ \u00a0\u202f]?€/g) || []).length, racine: document.documentElement.getAttribute('data-stream'), memo: localStorage.getItem('vrm_montants_caches'), presse: (document.querySelector('[data-bouton-montants]') || { getAttribute: () => null }).getAttribute('aria-pressed') }; });
         const p2 = await PHOTOS(pg);
         dit(oeil.montants === 0 && oeil.racine === 'm' && oeil.memo === '1' && oeil.presse === 'true', `A ${tag} : un tap sur l'œil cache les montants (sur cet appareil, le bouton le dit)`, JSON.stringify(oeil));
         dit(p2.texte && p2.photos.every((p) => !p.attr && p.px === 0), `A ${tag} : l'œil ne cache QUE les montants (marque lisible, photos nettes)`, JSON.stringify({ texte: p2.texte, floues: p2.photos.filter((p) => p.attr || p.px).length }));
         await capture(pg, `A-${tag}-oeil`);
         await pg.click('.vrm-app-header [data-bouton-montants]').catch(() => {}); await attendre(400);
-        const rendu = await pg.evaluate(() => ({ montants: ((document.body.innerText || '').match(/\d(?:[\d   .,]*\d)?[   ]?€/g) || []).length, racine: document.documentElement.getAttribute('data-stream') }));
+        const rendu = await pg.evaluate(() => ({ montants: ((document.body.innerText || '').match(/\d(?:[\d \u00a0\u202f.,]*\d)?[ \u00a0\u202f]?€/g) || []).length, racine: document.documentElement.getAttribute('data-stream') }));
         dit(rendu.montants > 0 && rendu.racine === '0', `A ${tag} : un second tap rend les montants`, JSON.stringify(rendu));
       }
       // ── B. Réglages : l'option, l'aperçu, le nuage ─────────────────────────

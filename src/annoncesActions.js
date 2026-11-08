@@ -278,7 +278,7 @@ export function miniDepuisPrix(prix, mode, valeur) {
 export function minisSelection({ annonces, mini, refuse = null } = {}) {
   const liste = Array.isArray(annonces) ? annonces.filter((a) => a && a.id != null) : [];
   const m = mini || {};
-  if (!MINI_MODES.includes(m.mode) || valeurReduction(m.valeur, m.mode) == null) return { lignes: [], aPoser: 0, erreur: m.mode === 'pct' ? 'Une réduction entre 1 et 99 %.' : 'Une réduction en euros (ex : 5).' };
+  if (!MINI_MODES.includes(m.mode) || valeurReduction(m.valeur, m.mode) == null) return { lignes: [], aPoser: 0, erreur: m.mode === 'pct' ? 'Une réduction entre 1 et 99\u00a0%.' : 'Une réduction en euros (ex : 5).' };
   const avecRefus = !!(refuse && String(refuse.valeur == null ? '' : refuse.valeur).trim() !== '');
   if (avecRefus && (!MINI_MODES.includes(refuse.mode) || valeurReduction(refuse.valeur, refuse.mode) == null)) return { lignes: [], aPoser: 0, erreur: 'Le seuil « Refuser sous » est illisible.' };
   const lignes = liste.map((a) => {
@@ -286,7 +286,7 @@ export function minisSelection({ annonces, mini, refuse = null } = {}) {
     const base = { id: String(a.id), numero: a.numero ? String(a.numero) : '', titre: String(a.titre || ''), prix: Number.isFinite(prix) && prix > 0 ? prix : null, mini: null, refuse: null, sousAchat: false, raison: '' };
     if (base.prix == null) return { ...base, raison: 'prix pas lu : rien n’est posé' };
     const mn = miniDepuisPrix(base.prix, m.mode, m.valeur);
-    if (mn == null) return { ...base, raison: 'mini sous 1 € : rien n’est posé' };
+    if (mn == null) return { ...base, raison: 'mini sous 1\u00a0€ : rien n’est posé' };
     let rf = null, raison = '';
     if (avecRefus) {
       rf = miniDepuisPrix(base.prix, refuse.mode, refuse.valeur);

@@ -21,7 +21,7 @@ const dist=process.env.BANC_DIST||path.join(__dirname,'../../dist');
    if(u.startsWith(origine+'/'))return r.continue();return r.abort();
   });
   await p.goto(origine+'/?inscription');await p.getByPlaceholder('Email',{exact:true}).fill('Client@exemple.test');await p.getByPlaceholder('Mot de passe',{exact:true}).fill('Secret123');
-  assert.equal(await p.getByRole('textbox',{name:'Adresse email',exact:true}).count(),1,'Libellé email permanent');
+  assert.equal(await p.getByRole('textbox',{name: /^Adresse e-?mail$/}).count(),1,'Libellé email permanent');
   const secret=p.locator('#vrm-cx-password');
   assert.equal(await secret.getAttribute('type'),'password');
   await p.getByRole('button',{name:'Afficher le mot de passe',exact:true}).click();

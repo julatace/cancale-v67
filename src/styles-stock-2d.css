@@ -96,8 +96,8 @@
 /* (5 nov.) PLUS EN LIGNE : rangée, mais plus une annonce actuelle (retirée,
    supprimée) — un geste à faire, donc AMBRE (§7), fixe (rien ne respire). */
 .vrm-s2d-case.is-plusenligne { z-index: 1; box-shadow: 0 0 0 3px var(--vrm-warn, #B25000); }
-.vrm-s2d-num[data-hors-ligne] { background: var(--vrm-warn, #B25000); color: #FFFFFF; }
-.vrm-s2d-horsligne { position: absolute; right: 4px; top: 4px; background: var(--vrm-warn, #B25000); color: #FFFFFF; font-size: 11px; font-weight: 800; line-height: 1.35; padding: 0 6px; border-radius: 999px; }
+.vrm-s2d-num[data-hors-ligne] { background: var(--vrm-warn, #B25000); color: var(--vrm-on-warn, #FFFFFF); }
+.vrm-s2d-horsligne { position: absolute; right: 4px; top: 4px; background: var(--vrm-warn, #B25000); color: var(--vrm-on-warn, #FFFFFF); font-size: 11px; font-weight: 800; line-height: 1.35; padding: 0 6px; border-radius: 999px; }
 .vrm-s2d-etagere[data-zoom="loin"] .vrm-s2d-horsligne { display: none; }
 /* Les annonces actuelles : chiffres en tête, liste, filtres. */
 .vrm-s2d-resume { display: flex; flex-direction: column; gap: 4px; }

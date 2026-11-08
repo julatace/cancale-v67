@@ -231,7 +231,7 @@ async function tournee(nav, { W, theme, scenario }) {
   if (scenario === 'gros') {
     dit(t.lignesToutes === 60 && /Afficher les 60 suivantes/.test(t.plus), 'G', `${T} Tous : 60 lignes puis « Afficher les 60 suivantes »`, JSON.stringify({ n: t.lignesToutes, plus: t.plus }));
     const long = await o.pg.evaluate((L) => { const r = [...document.querySelectorAll('[data-toutes-vente]')].find((x) => (x.innerText || '').includes(L.slice(0, 30))); if (!r) return null; const p = r.querySelector('[data-toutes-prix]'); return { prix: p ? p.innerText : '', droite: Math.round(r.getBoundingClientRect().right) }; }, LONG);
-    dit(long && long.prix === '249,50 €' && long.droite <= W, 'G', `${T} Tous : titre très long à la ligne, prix « 249,50 € » entier`, JSON.stringify(long));
+    dit(long && long.prix === '249,50\u00a0€' && long.droite <= W, 'G', `${T} Tous : titre très long à la ligne, prix « 249,50 € » entier`, JSON.stringify(long));
   }
   if (scenario === 'vide') {
     dit(!t.jamaisOuverts.length && /extension/i.test(t.videTxt) && !/jamais lu/i.test(t.videTxt), 'G', `${T} Tous (vendeur neuf) : l’état vide dit quoi faire, sans phrase « jamais lu » ouverte`, JSON.stringify({ vide: t.videTxt, ouverts: t.jamaisOuverts }));

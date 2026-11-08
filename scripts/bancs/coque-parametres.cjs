@@ -189,7 +189,7 @@ async function parametres(nav, { W, theme }) {
   if (W >= 1024) {
     dit(m.gauche != null && m.gauche <= 24, 'H3', `${T} la colonne commence où commencent les autres écrans (titre à ${m.gauche} px du bord du contenu)`, String(m.gauche));
   }
-  const ECARTES = /\b(r[ée]gime fiscal|comptes connect[ée]s|emails)\b/i;
+  const ECARTES = /\b(r[ée]gime fiscal|comptes connect[ée]s|e-?mails)\b/i;
   dit(!ECARTES.test(m.texte), 'H3', `${T} Réglages : aucun mot écarté (« régime fiscal », « comptes connectés », « emails »)`, (m.texte.match(ECARTES) || [''])[0]);
   await capture(pg, `ch-reglages-${W}-${theme}`);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ch-reglages-${W}-${theme}-page.png`), fullPage: true }).catch(() => {});

@@ -16,7 +16,7 @@
 
 /* Ordinateur : la fenêtre sous le bouton. */
 .vrm-cal-pop {
-  position: absolute; top: calc(100% + 8px); z-index: 75; width: 660px; max-width: calc(100vw - 32px);
+  position: absolute; top: calc(100% + 8px); z-index: 75; width: 660px; max-width: calc(var(--vrm-vw100, 100vw) - 32px);
   box-sizing: border-box; padding: 16px 18px 14px; border: 1px solid var(--vrm-line); border-radius: 20px;
   background: var(--vrm-surface); color: var(--vrm-ink);
   box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 22px 48px -12px rgba(0,0,0,.28);

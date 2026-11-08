@@ -328,7 +328,8 @@ const feuilleOuverte = (pg) => pg.evaluate(() => !!document.querySelector('[data
     // EtatPanne
     dit(m.ep.bouton && m.ep.bouton.boutons === 1 && /pas su pour l’instant/.test(m.ep.bouton.texte) && /Réessayer/.test(m.ep.bouton.texte) && m.ep.bouton.bouton.h >= (tel ? 44 : 32) - 0.5, `${T} EtatPanne : la phrase, la raison, UN bouton « Réessayer »`, JSON.stringify(m.ep.bouton));
     dit(m.ep.sans && m.ep.sans.boutons === 0 && /Comptes liés/.test(m.ep.sans.texte), `${T} EtatPanne sans relecture : aucun bouton, la raison dit le geste`);
-    dit(m.montants === `65 € · 249,50 € · 1 234,50 € · — · 12,50 GBP`, `${T} montant() : « ${m.montants} »`);
+    // (6 nov., finition) L'espace avant la devise est INSÉCABLE (U+00A0), les milliers à l'espace fine (U+202F) : jugé au caractère près.
+    dit(m.montants === '65\u00a0€ · 249,50\u00a0€ · 1\u202f234,50\u00a0€ · — · 12,50\u00a0GBP', `${T} montant() : « ${m.montants} » (insécable avant la devise)`);
 
     // ── Les gestes (une fois par passage) ────────────────────────────────────
     // ChampRecherche : la croix efface et rend le focus.

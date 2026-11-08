@@ -63,7 +63,7 @@ const REGLES = [
   const dA = dist(ebay, hex('#3D7BFF')), dC = dist(ebay, hex('#2458E6'));
   dit(ebay && dA > 120 && dC > 120, 'le point eBay ne se confond pas avec l’accent bleu (distance RVB > 120)', `${Math.round(dA)} et ${Math.round(dC)}`);
   const f = typeof euros === 'function' ? euros(1244.5) : '';
-  dit(/^1[   ]244,50 €$/.test(f), 'les montants s’écrivent à la française : « 1 244,50 € »', JSON.stringify(f));
+  dit(/^1[   ]244,50[\u00a0 ]€$/.test(f), 'les montants s’écrivent à la française : « 1 244,50 € »', JSON.stringify(f));
 
   if (prouve) {
     // Chaque règle, réaffaiblie seule, doit tomber. On modifie la table d'UN cran.

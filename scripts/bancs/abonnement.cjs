@@ -225,11 +225,11 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
           dit(f === '2' && !sab && b.length === 0, '  ancien abonné, prix Stripe ≠ CGV : ses factures restent (sa compta), aucun bouton pour payer', `factures=${f} · s’abonner=${sab} · ${b.join(' · ')}`);
         }
         if (nom === 'actifPrixDifferent') dit(/abonné/i.test(t) && !/16,99/.test(t) && !/9,99/.test(t), '  abonné actif, prix de son abonnement pas su : « Abonné » sans montant — jamais le prix des CGV', t.replace(/\n/g, ' ').slice(0, 140));
-        if (nom === 'actifAncienPrix') dit(/Abonné · 9,99 € \/ mois/.test(t) && !/16,99/.test(t), '  abonné à 9,99 € quand l’offre est à 16,99 € : la carte dit le prix de SON abonnement', t.replace(/\n/g, ' ').slice(0, 140));
+        if (nom === 'actifAncienPrix') dit(/Abonné · 9,99\s€ \/ mois/.test(t) && !/16,99/.test(t), '  abonné à 9,99 € quand l’offre est à 16,99 € : la carte dit le prix de SON abonnement', t.replace(/\n/g, ' ').slice(0, 140));
         if (nom === 'proprietaireUsd' || nom === 'proprietairePaliers') {
           const w = await pg.evaluate(() => { const e = document.querySelector('[data-prix-stripe="different"]'); const x = document.querySelector('[data-prix-stripe-texte]'); return { t: e ? e.innerText : '', x: x ? x.innerText : null }; });
           const attendu = ETATS[nom].prixStripe.texte;
-          const nCgv = (w.t.match(/16,99 € \/ mois/g) || []).length;
+          const nCgv = (w.t.match(/16,99\s€ \/ mois/g) || []).length;
           dit(w.x === attendu && nCgv <= 1 && !/0,00/.test(w.t), `  propriétaire, prix Stripe « ${attendu} » : l’alerte écrit le texte du serveur — jamais deux prix identiques ni 0,00 €`, `texte=${w.x} · « 16,99 € / mois » ×${nCgv} · ${w.t.replace(/\n/g, ' ').slice(0, 160)}`);
         }
         if (nom === 'actif') dit(b.some((x) => /^résilier$/i.test(x)) && b.some((x) => /carte/i.test(x)) && !b.some((x) => /abonner/i.test(x)) && /prochain prélèvement le 4 novembre 2026/i.test(t), '  abonné : la date du prochain prélèvement, « changer de carte » et « résilier », jamais un second « s’abonner »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));

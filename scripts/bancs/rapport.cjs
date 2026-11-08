@@ -166,11 +166,11 @@ const brancher = async (pg, etat = {}) => {
       dit(L.some((t) => /Puma Suede/.test(t)), 'une vente du mois DERNIER versée ce mois-ci compte CE mois (mois du versement)');
       dit(!L.some((t) => /Spezial/.test(t)), 'une vente finalisée sans date de versement n’est dans AUCUN mois (jamais la date de vente à la place)');
       // (6 nov.) `montant()` (chantier B) n'écrit « ,00 » que s'il y a des centimes : « 75 € ». On juge la valeur (§6.4).
-      dit(L.some((t) => /Leboncoin/.test(t) && /\b75(?:,00)? ?€/.test(t)) && L.some((t) => /eBay/.test(t) && /\b60(?:,00)? ?€/.test(t)), 'la vente Leboncoin (centimes → 75 €) et la vente eBay sont dans le registre, avec leur plateforme');
+      dit(L.some((t) => /Leboncoin/.test(t) && /\b75(?:,00)?\s?€/.test(t)) && L.some((t) => /eBay/.test(t) && /\b60(?:,00)?\s?€/.test(t)), 'la vente Leboncoin (centimes → 75 €) et la vente eBay sont dans le registre, avec leur plateforme');
       dit(!L.some((t) => /sans date|côté inconnu/.test(t)), 'ni la vente sans date, ni la transaction au côté inconnu');
       const couv = await pg.evaluate(() => (document.querySelector('[data-registre-couverture]') || {}).innerText || '');
-      dit(/dont Vinted/.test(couv) && /Leboncoin \b75(?:,00)? ?€/.test(couv) && /eBay \b60(?:,00)? ?€/.test(couv), 'la répartition par plateforme est dite à côté du total', couv.slice(0, 120));
-      dit(/2 ventes finalisées sans date \(\b103(?:,00)? ?€/.test(couv), 'les ventes sans date (Leboncoin 58 € + Vinted non versée 45 €) sont annoncées avec leur montant, hors du mois', couv.slice(0, 200));
+      dit(/dont Vinted/.test(couv) && /Leboncoin \b75(?:,00)?\s?€/.test(couv) && /eBay \b60(?:,00)?\s?€/.test(couv), 'la répartition par plateforme est dite à côté du total', couv.slice(0, 120));
+      dit(/2 ventes finalisées sans date \(\b103(?:,00)?\s?€/.test(couv), 'les ventes sans date (Leboncoin 58 € + Vinted non versée 45 €) sont annoncées avec leur montant, hors du mois', couv.slice(0, 200));
       dit(!L.some((t) => /Kayano|990/.test(t)), 'la vente en cours et l’annulée n’y sont pas');
       const somme = L.reduce((a, t) => a + nombre(t.split('\n').pop()), 0);
       const caTxt = (/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(r.modale) || [])[1] || '';
@@ -217,7 +217,7 @@ const brancher = async (pg, etat = {}) => {
         await pg.click('[data-decl-ouvrir]');
         await pg.waitForTimeout(300);
         const radios = await pg.evaluate(() => [...document.querySelectorAll('[data-decl-form] label')].map((l) => l.innerText));
-        dit(radios.some((t) => /date de versement/.test(t) && /\b30(?:,00)? ?€/.test(t)) && radios.some((t) => /date de vente/.test(t) && /\b120(?:,00)? ?€/.test(t)),
+        dit(radios.some((t) => /date de versement/.test(t) && /\b30(?:,00)?\s?€/.test(t)) && radios.some((t) => /date de vente/.test(t) && /\b120(?:,00)?\s?€/.test(t)),
           'les DEUX totaux sont écrits côte à côte (versement 30 € · vente 120 €), c’est lui qui choisit', radios.join(' | ').slice(0, 200));
         await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-decl-form] label')].find((x) => /date de vente/.test(x.innerText)); if (l) l.querySelector('input').click(); });
         await pg.fill('[data-decl-form] input[inputmode="decimal"]', '120');
@@ -228,14 +228,14 @@ const brancher = async (pg, etat = {}) => {
         const aout = reg && reg['2026-08'];
         dit(aout && aout.regle === 'vente' && [...(aout.ids || [])].sort().join(',') === 'vinted:9101,vinted:9102' && aout.montant === 120,
           'la déclaration retient l’IDENTITÉ des ventes déclarées (9101, 9102), la règle choisie et le montant tapé', JSON.stringify(aout).slice(0, 160));
-        dit(a.decl === 'declare' && /\b120(?:,00)? ?€/.test(a.declTxt) && /C'est le montant de ta déclaration/.test(a.declTxt), 'août dit qu’il est déclaré, et que le montant tapé est celui qu’il retrouve', a.declTxt.slice(0, 160));
+        dit(a.decl === 'declare' && /\b120(?:,00)?\s?€/.test(a.declTxt) && /C'est le montant de ta déclaration/.test(a.declTxt), 'août dit qu’il est déclaré, et que le montant tapé est celui qu’il retrouve', a.declTxt.slice(0, 160));
         dit(caDe(a.modale) === 120 && a.L.length === 2, 'août compte maintenant les deux ventes déclarées (120 €)', `CA ${caDe(a.modale)} · ${a.L.length} ligne(s)`);
         dit(await choisirMois('^septembre'), 'septembre s’ouvre');
         const sp = await lireMois();
         const sSomme = sp.L.reduce((t, x) => t + nombre(x.split('\n').pop()), 0);
         dit(caDe(sp.modale) === 40 && sp.L.length === 1 && !sp.L.some((t) => /fin aout/.test(t)), 'septembre ne recompte PAS la vente déjà déclarée en août (40 €, pas 130 €)', `CA ${caDe(sp.modale)} · ${sp.L.length} ligne(s)`);
         dit(Math.abs(sSomme - caDe(sp.modale)) < 0.005, 'la somme des lignes reste le CA affiché', `${sSomme} · ${caDe(sp.modale)}`);
-        dit(/1 vente versée ce mois-ci \(\b90(?:,00)? ?€/.test(sp.ailleurs) && /août 2026/.test(sp.ailleurs), 'septembre DIT qu’une vente versée chez lui est déjà déclarée en août (90 €)', sp.ailleurs.slice(0, 160));
+        dit(/1 vente versée ce mois-ci \(\b90(?:,00)?\s?€/.test(sp.ailleurs) && /août 2026/.test(sp.ailleurs), 'septembre DIT qu’une vente versée chez lui est déjà déclarée en août (90 €)', sp.ailleurs.slice(0, 160));
       } catch (e) { dit(false, '« J’ai déclaré ce mois » se déroule jusqu’au bout', String(e.message).slice(0, 160)); }
       // ── Repère d'achat par modèle (proposition 10) : sous la modale, sur l'écran.
       try {
@@ -254,7 +254,7 @@ const brancher = async (pg, etat = {}) => {
           txt: (document.querySelector('[data-repere-modeles]') || {}).innerText || '',
         }));
         dit(rp.ok, 'le repère par modèle est sur l’écran Ventes');
-        dit(/revendue \b60(?:,00)? ?€ \(3\)/.test(rp.samba) && /achetée \b40(?:,00)? ?€ \(3\)/.test(rp.samba) && /\+\b20(?:,00)? ?€/.test(rp.samba),
+        dit(/revendue \b60(?:,00)?\s?€ \(3\)/.test(rp.samba) && /achetée \b40(?:,00)?\s?€ \(3\)/.test(rp.samba) && /\+\b20(?:,00)?\s?€/.test(rp.samba),
           'Samba : revendue 60 € (3, l’annulée à 999 € ne compte pas), achetée 40 € (3) ⇒ +20 €/paire', rp.samba.replace(/\n/g, ' '));
         dit(!rp.gazelle, 'une seule Gazelle revendue et achetée : pas de ligne (une moyenne sur une paire est un hasard)');
         dit(/n'entre dans aucun total, rapport ni export/.test(rp.txt), 'il dit que ce n’est PAS de la compta');
@@ -366,7 +366,7 @@ const brancher = async (pg, etat = {}) => {
       if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'rapport-passu-mois.png') });
       const caM = valeurApres(m.modale, 'CA des ventes finalisées');
       const somme = m.L.reduce((t, x) => t + nombre(x.split('\n').pop()), 0);
-      dit(m.L.length === 2 && m.L.some((t) => /Leboncoin/.test(t) && /\b75(?:,00)? ?€/.test(t)) && m.L.some((t) => /eBay/.test(t) && /\b60(?:,00)? ?€/.test(t)),
+      dit(m.L.length === 2 && m.L.some((t) => /Leboncoin/.test(t) && /\b75(?:,00)?\s?€/.test(t)) && m.L.some((t) => /eBay/.test(t) && /\b60(?:,00)?\s?€/.test(t)),
         'Leboncoin et eBay, lus correctement, restent dans le registre du mois', `${m.L.length} ligne(s)`);
       dit(caM === 135 && Math.abs(somme - caM) < 0.005, 'le CA rendu est celui qu’on connaît (75 + 60), la somme des lignes', `CA ${caM} · lignes ${somme}`);
       dit(m.vinted === 'passu', 'et l’écran DIT que Vinted manque (dates de versement illisibles)', `vinted=${m.vinted}`);
@@ -454,7 +454,7 @@ const brancher = async (pg, etat = {}) => {
       // redit que ce qui distingue. On compte le geste rendu, pas un libellé.
       const gestes = await pg.evaluate(() => (document.body.innerText.match(/Ouvre (?:ce|ces) comptes? sur vinted\.fr/g) || []).length);
       dit(gestes === 1, 'le geste « ouvre ce compte sur vinted.fr » n’est dit qu’UNE fois pour un compte illisible (pas une seconde fois sous le repère)', `${gestes} fois`);
-      dit(/revendue \b60(?:,00)? ?€ \(3\)/.test(rp.samba), 'et ce qui EST lu reste dit (Samba du compte lisible)', rp.samba.replace(/\n/g, ' '));
+      dit(/revendue \b60(?:,00)?\s?€ \(3\)/.test(rp.samba), 'et ce qui EST lu reste dit (Samba du compte lisible)', rp.samba.replace(/\n/g, ' '));
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
       const n = await ouvrirPage({ width: 1512, height: 950 }, {});
