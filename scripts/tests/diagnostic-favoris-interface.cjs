@@ -20,7 +20,7 @@ const racine=path.resolve(__dirname,'../..');
   await p.setContent('<html><body><div id="root"></div></body></html>');
   await p.addStyleTag({content:':root{--vrm-line:#d9e3e0;--vrm-surface:#fff;--vrm-card2:#edf1ee;--vrm-ink:#213b41;--vrm-muted:#53696d}body{font-family:Arial;margin:16px}'+fs.readFileSync(path.join(racine,'src/styles-captures.css'),'utf8')});
   await p.addScriptTag({content:bundle.outputFiles[0].text});
-  const verifier=p.getByRole('button',{name:'Vérifier la capture des notifications'});
+  const verifier=p.getByRole('button',{name:'Vérifier que l’extension lit tes notifications'});
   await p.locator('summary').click();
   check(await p.evaluate(()=>window.appels.length)===0,'aucune lecture au montage ou au dépliage');
   await verifier.click();await p.locator('pre').waitFor();
