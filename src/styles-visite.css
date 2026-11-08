@@ -67,3 +67,7 @@ html .vrm-app-shell .vrm-fu-tete .vrm-phrase-ecran.vrm-fu-phrase-tete { color: v
 /* Une phrase n'est jamais coupée en « … » : elle passe à la ligne, et ne s'étire pas au-delà d'une lecture. */
 html .vrm-app-shell .vrm-phrase-ecran { white-space: normal; max-width: 60ch; }
 /* (3 nov.) Le grand titre ne se tait plus au téléphone : c'est la barre du haut qui ne le redit pas. */
+/* (8 nov., clarté) La phrase passe TOUJOURS sous le grand titre, jamais à côté (Stock, E-mails,
+   Communauté la posaient sur la ligne du titre à l'ordinateur). */
+html .vrm-app-shell :is(.vrm-screen-head-titre, .vrm-tache-tete) { flex-wrap: wrap; }
+html .vrm-app-shell :is(.vrm-screen-head-titre, .vrm-tache-tete) > .vrm-phrase-ecran { flex-basis: 100%; max-width: none; }
