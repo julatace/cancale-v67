@@ -23,6 +23,7 @@
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
+import { reglageCalme } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
@@ -465,7 +466,7 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
   for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
     const t = texteRappelRetrait(x);
-    envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
+    envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, echeance: x.limiteAt || null, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
   }
   // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
   return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
@@ -1042,14 +1043,17 @@ async function rappelDuSoir() {
 // mémo pas écrit ⇒ rien ne part.
 async function traiterVendeurReveil(maintenant = Date.now()) {
   const prefs = await prefsDuVendeur();
-  if (!prefs || !prefs.calme || prefs.calme.actif !== true) return { reveil: 'calme-eteint' };
+  // (8 nov.) Heures calmes allumées par défaut : seul un `actif: false` posé les éteint.
+  // Préférences pas sues ⇒ rien (« pas su » n'envoie pas un récapitulatif inventé).
+  if (!prefs) return { reveil: 'pas-su' };
+  if (!reglageCalme(prefs).actif) return { reveil: 'calme-eteint' };
   const memo = await getRow(ID_REVEIL);
   if (memo === undefined) return { reveil: 'pas-su' };
   const [journal, lu] = await Promise.all([lireJournal(), lireLu()]);
   const r = resumeReveil({ prefs, journal, lu, dejaJour: memo && memo.jour, maintenant });
   if (!r.envoyer) return { reveil: r.raison };
   if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString() }))) return { reveil: 'memo-non-ecrit' };
-  const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url });
+  const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url, tag: 'vrm-reveil' });
   return { reveil: 'envoye', n: r.n, sent: envoi && envoi.sent };
 }
 async function traiterVendeurSoir() {
@@ -1077,7 +1081,10 @@ async function veilleDesPlantages(maintenant = Date.now()) {
     lireMemo: () => getRow(ID_MEMO_VEILLE),
     lireLignes: (depuisIso) => fetchPaginated(`app_data?id=like.plantage_*&meta->>at=gte.${encodeURIComponent(depuisIso)}&select=${SELECT_VEILLE}`),
     ecrireMemo: (memo) => ecrireDedup(ID_MEMO_VEILLE, memo),
-    envoyer: (notif) => sendPushToAll(notif),
+    // (8 nov.) Rangée dans la cloche SANS sonner : l'alerte groupée de l'heure
+    // (api/_lib/alertes-plantages.js) sonne déjà pour ce qui se répète — la veille du
+    // matin en était le doublon, sans geste (« c'est noté, on corrige »).
+    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement', discret: true }),
   }));
 }
 
@@ -1092,7 +1099,10 @@ async function veilleDesLenteurs(maintenant = Date.now()) {
     // (7 nov.) Les éclats du jour additionnés (et l'ancienne ligne d'avant les éclats).
     lireJours: (jours) => histosDesJours({ lire: fetchPaginated, proprio: proprietaire, jours }),
     ecrireMemo: (memo) => ecrireDedup(ID_MEMO_LENTEURS, memo),
-    envoyer: (notif) => sendPushToAll(notif),
+    // (8 nov.) Rangée dans la cloche SANS sonner : l'alerte groupée de l'heure
+    // (api/_lib/alertes-plantages.js) sonne déjà pour ce qui se répète — la veille du
+    // matin en était le doublon, sans geste (« c'est noté, on corrige »).
+    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement', discret: true }),
   }));
 }
 

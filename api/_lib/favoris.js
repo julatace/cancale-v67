@@ -46,7 +46,12 @@ async function notifierFinFavoris(owner,fin){
   return contexteVendeur.run({owner},async()=>{
     if(!(await pushCategorieActive('favoris')))return {envoye:false};
     const {title,body}=texteFinFavoris(fin);
-    return sendPushToAll({cat:'favoris',title,body,url:DESTINATIONS.favorisFile(),tag:'favoris-file-'+String(fin.lot||'')});
+    // (8 nov.) Une file finie sans souci (lancée par lui, tout envoyé) n'appelle aucun
+    // geste : rangée dans la cloche, elle ne sonne plus. Interrompue, ou des messages
+    // à vérifier sur Vinted : elle sonne (il y a quelque chose à faire).
+    const {interrompue=false,incertains=0,interrompus=0}=fin||{};
+    const discret=!interrompue&&!incertains&&!interrompus;
+    return sendPushToAll({cat:'favoris',title,body,url:DESTINATIONS.favorisFile(),tag:'favoris-file-'+String(fin.lot||''),...(discret?{discret:true}:{})});
   });
 }
 // ── LE TOUR DU MODE AUTOMATIQUE (2 nov.) ─────────────────────────────────────

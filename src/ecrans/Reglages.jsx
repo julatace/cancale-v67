@@ -46,6 +46,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // ⟦← App.jsx #4⟧
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
+import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
 // ⟦← App.jsx #5⟧
 import GuideIphone, { useGuideIphone } from '../GuideIphone.jsx';
 // (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
@@ -1318,7 +1319,8 @@ function PushPrefsSetting({ comptes, onMuets }) {
   const bascule = (c) => ecrirePrefs({ ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } }, `« ${c.titre} »`);
   const calme = reglageCalme(prefs || {});
   const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
-  const regroupe = !!(prefs && prefs.regrouper === true);
+  // (8 nov.) Allumé par défaut (api/_lib/notif-textes.js, `regrouper`) : seul un `false` posé l'éteint.
+  const regroupe = !(prefs && prefs.regrouper === false);
   const n = prefs ? PUSH_FAMILLES.filter(actif).length : 0;
   return (
     <>
@@ -1358,7 +1360,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
         d'envoyer (api/_lib/notif-textes.js) — pas un filtre d'affichage. */}
     <div data-np-reglages="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
       <div className="vrm-np-ligne" data-np-calme={calme.actif?'on':'off'} style={{borderTop:0}}>
-        <span className="vrm-np-lib">Heures calmes<small>Rien ne sonne ; tout reste dans la cloche de VRM.</small></span>
+        <span className="vrm-np-lib">Heures calmes<small>Rien ne sonne la nuit, sauf la double vente et ce qui expire avant 10 h. Au réveil, une seule notification dit ce qui est arrivé.</small></span>
         <Interrupteur on={calme.actif} onClick={()=>poserCalme({ actif: !calme.actif })} disabled={!prefs||busy} label={`Heures calmes : ${calme.actif?'activées':'désactivées'}`}/>
       </div>
       {calme.actif && (
@@ -1374,8 +1376,8 @@ function PushPrefsSetting({ comptes, onMuets }) {
         </div>
       )}
       <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
-        <span className="vrm-np-lib">Regrouper par type<small>Une notification par type sur le téléphone, avec le nombre d’autres.</small></span>
-        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper par type : ${regroupe?'activé':'désactivé'}`}/>
+        <span className="vrm-np-lib">Regrouper<small>« 3 bordereaux prêts à imprimer » au lieu de trois notifications.</small></span>
+        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper : ${regroupe?'activé':'désactivé'}`}/>
       </div>
       <div className="vrm-np-ligne">
         <Bouton variante="secondaire" data-np-voir-centre="" onClick={()=>{ try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }}>Voir les notifications envoyées</Bouton>
@@ -1396,7 +1398,6 @@ const GROUPES_NOTIF = [
   { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
 ];
-const ICONE_FAMILLE_NOTIF = { ventes: 'cash', doublevente: 'alert', rappels: 'clock', poster: 'box', arrives: 'pin', offres: 'tag', messages: 'chat' };
 function groupesFamillesNotif(familles) {
   const vus = new Set();
   const out = GROUPES_NOTIF.map(g => { const f = g.ids.map(id => familles.find(x => x.id === id)).filter(Boolean); f.forEach(x => vus.add(x.id)); return { ...g, familles: f }; }).filter(g => g.familles.length);
@@ -1424,14 +1425,14 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
         </button>
         {vue ? <div className="vrm-notif-apercu" id={idAp} data-apercu-famille={c.id} data-apercu-coupee={on?undefined:'1'}>
           {!on ? <p className="vrm-notif-apercu-coupee">Coupée : rien de cette famille ne sonne.</p> : null}
-          {ap.exemples.map((e, i) => (
+          {ap.exemples.map((e, i) => { const v = embellirNotif(e); return (
             <div key={i} className="vrm-notif-bulle" data-apercu-notif={i} data-apercu-exemple={e.exemple?'1':undefined}>
               <div className="vrm-notif-bulle-tete"><img src="/vrm-icon-v5-192.png" alt="" width="18" height="18"/><span>VRM</span><span className="vrm-notif-bulle-quand">maintenant</span></div>
-              <b className="vrm-notif-bulle-titre">{e.title}</b>
-              <span className="vrm-notif-bulle-corps">{e.body}</span>
+              <b className="vrm-notif-bulle-titre">{v.title}</b>
+              <span className="vrm-notif-bulle-corps">{v.body}</span>
               <span className="vrm-notif-bulle-mene" data-apercu-mene="">Toucher ouvre : {e.mene}</span>
             </div>
-          ))}
+          ); })}
           <p className="vrm-notif-apercu-note">Exemples inventés ; les vraies portent ton article, ton compte et ton code.</p>
         </div> : null}
       </> : null}
