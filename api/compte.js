@@ -520,7 +520,9 @@ async function abonnement(req, res) {
 // 27 octobre : prix 16,99 €, et essai gratuit de 7 jours (une seule fois par
 //   adresse e-mail ET par compte Vinted).
 // 31 octobre : prix 16,99 € (sa décision), essai de 7 jours inchangé.
-const CGV_VERSION = '2026-10-31';
+// 8 novembre : fin de l'essai et rappels, lecture seule à l'expiration,
+//   parrainage (article 2), chemins Paramètres → Abonnement.
+const CGV_VERSION = '2026-11-08';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
