@@ -47518,7 +47518,7 @@ function EcranEmails({ comptes, ...props }) {
   //    (chargé à la demande) suspend et React rejoue l'initialiseur — la demande était déjà vidée.
   const [compteInitial] = useState(() => DEMANDE_ADRESSES.compte || '');
   useEffect(() => { DEMANDE_ADRESSES.compte = ''; const f = () => { DEMANDE_ADRESSES.compte = ''; }; window.addEventListener('vrm:relier-compte', f); return () => window.removeEventListener('vrm:relier-compte', f); }, []);
-  return <BoiteEmails {...props} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}/>;
+  return <BoiteEmails {...props} Photo={PhotoVinted} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}/>;
 }
 // Colis : une ligne quand un compte dont les e-mails n'arrivent pas a des colis À ENVOYER
 // (`aExpedier`, la règle unique) : leur bordereau et leur date limite ne viennent pas par
