@@ -475,6 +475,7 @@ import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
+import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -1623,7 +1624,7 @@ const authConfirmFromLink = async (raw, email) => {
   }
   if (!q) return { ok: false, error: "Ce n'est ni un lien, ni un code à 6 chiffres." };
   const type = q.get('type') || 'signup';
-  if(type==='recovery'||typeFragment==='recovery')return{ok:false,recovery:true,error:'Ce lien sert à changer ton mot de passe. Ouvre la récupération ci-dessous, puis colle le lien reçu.'};
+  if(type==='recovery'||typeFragment==='recovery')return{ok:false,recovery:true,error:'Ce lien sert à changer ton mot de passe : ouvre-le directement depuis l’e-mail, sur cet appareil. Sinon, redemande un e-mail ci-dessous.'};
   const hash = q.get('token_hash');
   const token = q.get('token');
   if (!hash && !token) return { ok: false, error: "Ce lien ne contient pas de jeton de confirmation." };
@@ -1714,7 +1715,8 @@ const useSecondesRestantes = (fin) => {
   return fin > Date.now() ? Math.ceil((fin - Date.now()) / 1000) : 0;
 };
 const authSignUp  = async (email, password) => {
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password });
+  // (8 nov.) `data.langue` : la langue des e-mails de compte (modèles Supabase).
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur() } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
@@ -2047,6 +2049,10 @@ const authBoot = async () => {
   if (AUTH.user && AUTH.user.id) ensureLocalOwner(AUTH.user.id);
   prechargerDemarrage();
   _emitAuth();
+  // (8 nov.) Un compte créé avant que la langue soit rangée la reçoit une fois,
+  // plus tard (rien ne doit retarder le premier écran). Raté ⇒ réessayé au
+  // prochain chargement ; jamais par-dessus une langue déjà rangée.
+  setTimeout(() => { if (RECOVERY_PENDING) return; const s2 = AUTH.session; poserLangueUneFois({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s2 && s2.access_token, uid: s2 && s2.user && s2.user.id, stockage: (() => { try { return localStorage; } catch (_) { return null; } })() }).catch(() => {}); }, 8000);
 };
 // ── LE PREMIER ÉCRAN N'ATTEND PLUS SON PROPRE RENDU (16 octobre) ─────────────
 // Mesuré au banc `vitesse.cjs` (téléphone, processeur ×4) : Ma journée enchaînait
@@ -15633,6 +15639,7 @@ function AuthScreen() {
   const [info, setInfo] = React.useState('');
   const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
   const [confirmLink, setConfirmLink] = React.useState('');      // lien du mail, collé à la main
+  const [resetEnvoye, setResetEnvoye] = React.useState('');      // (8 nov.) adresse à qui le lien vient de partir
   // 22 oct. : GoTrue a refusé un email redemandé trop tôt (« after N seconds »)
   // ⇒ les boutons qui envoient un email restent grisés jusqu'à `finAttente`, et
   // la phrase dit le temps qui reste. Une autre adresse tapée remet à zéro.
@@ -15656,7 +15663,7 @@ function AuthScreen() {
 
   const changerMode = (suivant) => {
     if(busy||demandeEnCours.current)return;
-    setMode(suivant);setErr('');setInfo('');setNeedConfirm(false);setConfirmLink('');
+    setMode(suivant);setErr('');setInfo('');setNeedConfirm(false);setConfirmLink('');setResetEnvoye('');
   };
 
   const oauth = async (p) => {
@@ -15727,7 +15734,11 @@ function AuthScreen() {
         if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un e-mail, utilise le lien le plus récent.');return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
-        setInfo("Si un compte existe avec cet e-mail, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
+        // (8 nov.) La phrase dit le geste ; « Renvoyer » attend l'intervalle de
+        // Supabase (60 s) sur le bouton lui-même.
+        const adresse=String(email).trim().toLowerCase();
+        setResetEnvoye(adresse);setFinAttente(Date.now()+60*1000);
+        setInfo(`On t’a envoyé un e-mail à ${adresse}. Ouvre-le sur cet appareil.`);
       } else if (mode === 'up') {
         // On l'écrit AVANT de partir : `save` range dans le navigateur et le
         // nuage suivra à la première synchro. Écrit seulement s'il l'a donné —
@@ -15946,7 +15957,7 @@ function AuthScreen() {
           {mode!=='newpw' && (
             <label className="vrm-cx-champ"><span>Adresse e-mail</span>
               <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" required
-                disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={field}/>
+                disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);setResetEnvoye('');}} style={field}/>
             </label>
           )}
           {mode!=='reset' && (
@@ -15972,7 +15983,7 @@ function AuthScreen() {
           {err  && <div role="alert" style={{fontSize:13,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {/* Le décompte vit sur le bouton qui envoie (inscription, mot de passe
               oublié, « Renvoyer » d'un compte pas confirmé) ; sinon dans la phrase. */}
-          {enAttenteEmail && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? TEXTE_DELAI_EMAIL_BOUTON : texteDelaiEmail(resteAttente)}</div>}
+          {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? TEXTE_DELAI_EMAIL_BOUTON : texteDelaiEmail(resteAttente)}</div>}
           {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
@@ -16014,13 +16025,15 @@ function AuthScreen() {
           )}
           {info && <div role="status" aria-live="polite" style={{fontSize:13,color:C.accentTexte,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
-          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Tu as déjà un lien qui ne s’ouvre pas ? <a href="/recuperation.html" style={{color:C.accentTexte}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
+          {/* (8 nov., Julien) « Tu as déjà un lien qui ne s'ouvre pas ? … colle le
+              lien reçu » le déroutait : la page de récupération propose elle-même
+              un nouvel e-mail (et la voie « coller ») quand un lien a échoué. */}
           {/* L'attente ne porte que sur ce qui ENVOIE un email (inscription, lien de
               mot de passe) — jamais sur « Se connecter ». */}
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && mode==='reset' && resetEnvoye) ? `Renvoyer dans ${resteAttente} s` : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? (resetEnvoye ? 'Renvoyer l’e-mail' : 'Envoyer le lien') : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
