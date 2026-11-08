@@ -9,9 +9,13 @@
 //   1. chaque famille de sites (Vinted, Leboncoin, eBay, Vestiaire) reçoit
 //      vrm-badge.js — la même carte, le même logo ;
 //   2. aucun script injecté ne porte plus l'ancien bouton orange ni un panneau ;
-//   3. aucun champ mot de passe n'est fabriqué dans la page d'un site (la
-//      connexion vit dans un iframe de l'EXTENSION : les scripts du site ne
-//      voient ni le champ ni le clavier) ;
+//   3. aucun champ mot de passe n'est fabriqué dans la page d'un site — SAUF
+//      (5.329, Julien : « les outils de connexion directement là, sans aucun
+//      autre onglet » ; l'iframe de la 5.328 ne s'affichait pas sur Orion) la
+//      carte du logo, et seulement : dans une shadow root FERMÉE, champs en
+//      `autocomplete="off"`, événements du clavier et de saisie arrêtés à la
+//      frontière (`bouclier`), mot de passe envoyé au service worker
+//      (`authLogin`) et jamais par `postMessage` ni dans une adresse ;
 //   4. le manifeste a ses icônes (sans elles, Chrome montre une pièce de puzzle).
 //  Les commentaires sont retirés avant de juger : un commentaire qui RACONTE
 //  l'ancien panneau n'en est pas un.
@@ -33,7 +37,14 @@ for (const [nom, url] of Object.entries(SITES)) {
   for (const f of js) {
     const t = sansCommentaires(fs.readFileSync(path.join(EXT, f), 'utf8'));
     dit(!/#D2401E|vrm-fab|vrm-panel|vrm-propo/i.test(t), `${nom} · ${f} : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative`);
-    dit(!/type\s*=\s*["']password["']|\.type\s*=\s*['"]password['"]/.test(t), `${nom} · ${f} : aucun champ mot de passe dans la page du site`);
+    const mdp = /type\s*=\s*["']password["']|\.type\s*=\s*['"]password['"]/.test(t);
+    if (f !== 'vrm-badge.js') dit(!mdp, `${nom} · ${f} : aucun champ mot de passe dans la page du site`);
+    else if (mdp) {
+      dit(/attachShadow\(\{\s*mode:\s*'closed'\s*\}\)/.test(t), `${nom} · ${f} : le formulaire de la carte vit dans une shadow root FERMÉE`);
+      dit((t.match(/autocomplete="off"/g) || []).length >= 2 && !/autocomplete="(?:current-password|username)"/.test(t), `${nom} · ${f} : champs de la carte en autocomplete="off"`);
+      dit(/stopImmediatePropagation\(\)/.test(t) && /'keydown'/.test(t) && /'input'/.test(t), `${nom} · ${f} : clavier et saisie arrêtés à la frontière de la carte (bouclier)`);
+      dit(/action:\s*'authLogin'/.test(t) && !/postMessage\([^)]*password/.test(t) && !/[?&]password=/.test(t), `${nom} · ${f} : le mot de passe part au service worker, jamais par postMessage ni dans une adresse`);
+    }
   }
 }
 dit(!fs.existsSync(path.join(EXT, 'vinted-panel.js')), "l'ancien panneau Vinted n'est plus livré");
