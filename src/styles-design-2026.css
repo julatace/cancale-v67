@@ -531,3 +531,16 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 }
 /* « Réponses rapides », « Comptes Vinted », « Données » : des rangées posées, plus des cadres. */
 :root:root body .vrm-app-shell .vrm-main :is(details.vrm-quick-settings, details.vrm-sync-comptes, details.vrm-bilan-sync) { border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; }
+
+/* ══ 10. E-MAILS (8 nov., passage 2) ═══════════════════════════════════════
+   La boîte était déjà dessinée sur Mail (6 nov.) : elle prend les jetons (même
+   ombre posée, même filet, mêmes gris que les autres écrans), et le volet de
+   lecture vide n'est plus une grande carte blanche à l'ordinateur — Mail laisse
+   le fond, un dessin et une phrase grise, rien d'autre. */
+:root:root body .vrm-boite, :root:root body .vrm-boite-feuille {
+  --bx-carte: var(--d-carte); --bx-ombre: var(--d-ombre-carte); --bx-doux: var(--d-gris); --bx-encre: var(--d-encre);
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-boite-vide-lecture { background: transparent !important; box-shadow: none !important; padding-top: 120px !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-boite-vide-lecture p { font-size: var(--d-t-15) !important; color: var(--d-gris) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-boite-jour-titre { font-size: var(--d-t-13) !important; font-weight: 600 !important; color: var(--d-gris) !important; letter-spacing: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-boite-ligne :is(time, .vrm-boite-quand) { font-variant-numeric: tabular-nums; }
