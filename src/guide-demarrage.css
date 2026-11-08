@@ -1,43 +1,143 @@
-/* ── LE GUIDE DE DÉMARRAGE ET LE BANDEAU DE L'EXEMPLE (6 nov.) ────────────────
-   Neutre ; l'accent seulement sur la barre de progrès et le geste de l'étape
-   courante. Jetons de la coque (src/themeMineral.js), clair et sombre. */
+/* ── LE PARCOURS DES PREMIÈRES MINUTES ET LE BANDEAU DE L'EXEMPLE (6 nov., 8 nov.) ──
+   Jetons du design 2026 (`--d-*`, src/styles-design-2026.css) avec repli sur ceux de
+   la coque. UNE carte (rayon 20, ombre posée, pas de cadre), des rangées séparées par
+   un filet .5 px, l'accent seulement sur la barre et le geste de l'étape courante.
+   Clair et sombre par les jetons ; mouvement réduit respecté. */
 .vrm-guide {
-  box-sizing: border-box; margin: 12px 0 16px; padding: 18px 18px 14px;
-  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
-  border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 14px;
+  --g-carte: var(--d-carte, var(--vrm-surface, #fff));
+  --g-case: var(--d-case, #F2F2F7);
+  --g-encre: var(--d-encre, var(--vrm-ink, #1D1D1F));
+  --g-gris: var(--d-gris, var(--vrm-muted, #6E6E73));
+  --g-filet: var(--d-filet, rgba(60,60,67,.18));
+  --g-remplir: var(--d-remplir, rgba(118,118,128,.12));
+  --g-accent: var(--d-accent, var(--vrm-accent, #0071E3));
+  --g-accent-texte: var(--d-accent-texte, #0066CC);
+  box-sizing: border-box; margin: 12px 0 16px; padding: 20px 20px 8px;
+  background: var(--g-carte); color: var(--g-encre);
+  border: 0; border-radius: var(--d-r-carte, 20px);
+  box-shadow: var(--d-ombre-carte, 0 .5px 1px rgba(0,0,0,.04), 0 4px 18px -6px rgba(0,0,0,.08));
 }
+:root[data-theme="dark"] .vrm-guide { box-shadow: inset 0 0 0 .5px rgba(255,255,255,.06); }
+@media (prefers-contrast: more) { .vrm-guide { border: 1px solid var(--g-encre); } }
+
 .vrm-guide-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.vrm-guide-titre { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; color: var(--vrm-ink, #1D1D1F); }
-.vrm-guide-compte { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vrm-guide-barre { height: 4px; margin: 10px 0 6px; border-radius: 999px; background: var(--vrm-line, #E5E5EA); overflow: hidden; }
-.vrm-guide-barre > span { display: block; height: 100%; border-radius: inherit; background: var(--vrm-accent, #0071E3); transition: width .4s cubic-bezier(.23,1,.32,1); }
-@media (prefers-reduced-motion: reduce) { .vrm-guide-barre > span { transition: none; } }
+.vrm-guide-titre { margin: 0; font-size: var(--d-t-22, 22px); font-weight: 700; letter-spacing: -.022em; line-height: 1.2; color: var(--g-encre); text-wrap: balance; }
+.vrm-guide-compte { font-size: 13px; font-weight: 600; color: var(--g-gris); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-guide-sous { margin: 4px 0 0; font-size: 13px; line-height: 1.4; color: var(--g-gris); }
+
+/* La barre : un segment par étape. Fait = accent ; l'étape courante = accent pâle. */
+.vrm-guide-barre { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; height: 4px; margin: 14px 0 6px; }
+.vrm-guide-barre > span { display: block; border-radius: 999px; background: var(--g-remplir); transition: background-color .4s cubic-bezier(.23,1,.32,1); }
+.vrm-guide-barre > span[data-ici="1"] { background: color-mix(in srgb, var(--g-accent) 32%, transparent); }
+.vrm-guide-barre > span[data-fait="1"] { background: var(--g-accent); }
+
+/* Les étapes : des rangées iOS. */
 .vrm-guide-etapes { list-style: none; margin: 0; padding: 0; }
-.vrm-guide-etape { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--vrm-line, #E5E5EA); }
-.vrm-guide-etape:first-child { border-top: 0; }
+.vrm-guide-etape { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 12px 0; }
+.vrm-guide-etape + .vrm-guide-etape::before { content: ""; position: absolute; top: 0; left: 40px; right: 0; height: .5px; background: var(--g-filet); }
 .vrm-guide-marque {
-  width: 26px; height: 26px; border-radius: 50%; box-sizing: border-box;
+  width: 28px; height: 28px; border-radius: 50%; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
-  color: var(--vrm-muted, #6E6E73); border: 1.5px solid var(--vrm-line, #E5E5EA);
+  color: var(--g-gris); background: var(--g-remplir);
 }
-.vrm-guide-marque svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.vrm-guide-etape[data-etat="fait"] .vrm-guide-marque { border-color: transparent; background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #fff); }
-.vrm-guide-etape[data-courante="1"] .vrm-guide-marque { border-color: var(--vrm-accent, #0071E3); color: var(--vrm-ink, #1D1D1F); }
+.vrm-guide-marque svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.vrm-guide-etape[data-etat="fait"] .vrm-guide-marque { background: var(--g-encre); color: var(--g-carte); }
+.vrm-guide-etape[data-courante="1"]:not([data-etat="fait"]) .vrm-guide-marque { background: var(--g-accent); color: #fff; }
 .vrm-guide-corps { min-width: 0; }
-.vrm-guide-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 26px; }
-.vrm-guide-nom { font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--vrm-ink, #1D1D1F); }
-.vrm-guide-etape[data-etat="fait"] .vrm-guide-nom { font-weight: 500; color: var(--vrm-muted, #6E6E73); }
-.vrm-guide-etat { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #6E6E73); white-space: nowrap; }
-.vrm-guide-pourquoi { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: var(--vrm-muted, #6E6E73); }
-.vrm-guide-detail { margin-top: 10px; }
-.vrm-guide-geste { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
-.vrm-guide-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--vrm-line, #E5E5EA); }
+.vrm-guide-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 28px; }
+.vrm-guide-nom { font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -.008em; color: var(--g-encre); }
+.vrm-guide-etape[data-etat="fait"] .vrm-guide-nom,
+.vrm-guide-etape[data-reportee="1"] .vrm-guide-nom { font-weight: 500; color: var(--g-gris); }
+.vrm-guide-etape[data-courante="1"] .vrm-guide-nom { font-size: 17px; letter-spacing: -.012em; }
+.vrm-guide-etat { font-size: 13px; font-weight: 500; color: var(--g-gris); white-space: nowrap; }
+
+/* L'étape ouverte : un fondu court, rien sous mouvement réduit. */
+.vrm-guide-ouverte { margin-top: 6px; animation: vrmGuideOuvre .32s cubic-bezier(.23,1,.32,1) both; }
+@keyframes vrmGuideOuvre { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.vrm-guide-pourquoi { margin: 0; max-width: 62ch; font-size: 15px; line-height: 1.45; color: var(--g-gris); }
+.vrm-guide-detail { margin-top: 12px; }
+.vrm-guide-geste { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+
+/* Les dessins (SVG simples, aux jetons). */
+.vrm-guide-dessin { display: block; width: 100%; max-width: 260px; height: auto; margin: 4px 0 12px; }
+.vrm-guide .g-case { fill: var(--g-case); stroke: var(--g-filet); stroke-width: 1.5; }
+.vrm-guide .g-carte { fill: var(--g-carte); stroke: var(--g-filet); stroke-width: 1.5; }
+.vrm-guide .g-trait { fill: none; stroke: var(--g-gris); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.vrm-guide .g-fleche { fill: none; stroke: var(--g-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.vrm-guide .g-ligne { fill: var(--g-remplir); }
+.vrm-guide .g-ligne-fort { fill: color-mix(in srgb, var(--g-encre) 70%, transparent); }
+.vrm-guide .g-plein { fill: color-mix(in srgb, var(--g-gris) 55%, transparent); }
+.vrm-guide .g-accent { fill: var(--g-accent); }
+.vrm-guide .g-accent-doux { fill: color-mix(in srgb, var(--g-accent) 14%, transparent); }
+.vrm-guide .g-accent-texte { fill: var(--g-accent-texte); font: 700 7.4px/1 -apple-system, BlinkMacSystemFont, sans-serif; }
+.vrm-guide .g-num { fill: var(--g-encre); }
+.vrm-guide .g-num-texte { fill: var(--g-carte); font: 700 7.5px/1 -apple-system, BlinkMacSystemFont, sans-serif; }
+.vrm-guide .g-point { fill: var(--g-accent); }
+.vrm-guide .g-onde { fill: none; stroke: var(--g-accent); stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: vrmGuideOnde 2.4s cubic-bezier(.23,1,.32,1) infinite; }
+@keyframes vrmGuideOnde { 0% { opacity: .6; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(2.6); } }
+
+/* La question de la numérotation : deux choix côte à côte (empilés sur un téléphone étroit). */
+.vrm-guide-question { margin: 10px 0 6px; padding: 14px; border-radius: var(--d-r-case, 14px); background: var(--g-case); }
+.vrm-guide-question-titre { margin: 0 0 10px; font-size: 15px; font-weight: 600; letter-spacing: -.008em; color: var(--g-encre); }
+.vrm-guide-choix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.vrm-guide-choix-carte {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 44px; min-width: 0;
+  padding: 12px; border: 0; border-radius: var(--d-r-ctrl, 12px); background: var(--g-carte); color: var(--g-encre);
+  font: inherit; text-align: left; cursor: pointer; box-shadow: 0 .5px 1px rgba(0,0,0,.05);
+  transition: transform 120ms cubic-bezier(.23,1,.32,1), box-shadow .2s;
+}
+.vrm-guide-choix-carte:active { transform: scale(.97); }
+@media (hover: hover) { .vrm-guide-choix-carte:hover { box-shadow: 0 0 0 1.5px var(--g-accent); } }
+.vrm-guide-choix-carte:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 2px; }
+.vrm-guide-choix-dessin { width: 84px; height: auto; margin-bottom: 4px; }
+.vrm-guide-choix-titre { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.vrm-guide-choix-texte { font-size: 13px; line-height: 1.4; color: var(--g-gris); }
+.vrm-guide-question-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-top: 8px; font-size: 13px; color: var(--g-gris); }
+@media (max-width: 360px) { .vrm-guide-choix { grid-template-columns: 1fr; } }
+
+/* Le pied : l'exemple, puis les gestes discrets. */
+.vrm-guide-pied { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 0 10px; }
+.vrm-guide-pied::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: .5px; background: var(--g-filet); }
 .vrm-guide-exemple { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; flex: 1 1 320px; min-width: 0; }
-.vrm-guide-exemple p { margin: 0; flex: 1 1 220px; font-size: 13px; line-height: 1.5; color: var(--vrm-muted, #6E6E73); }
+.vrm-guide-exemple p { margin: 0; flex: 1 1 220px; font-size: 13px; line-height: 1.45; color: var(--g-gris); }
+.vrm-guide-pied-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 0 18px; }
 
 /* Le détail de l'étape courante : la carte `PremiersPas`, SANS son cadre. */
 .vrm-guide-detail .vrm-premiers-sans-cadre { padding: 0 !important; border: 0 !important; background: transparent !important; }
+
+/* « Vérifier mon installation » : une case dans la carte du guide, ou seule dans Paramètres. */
+.vrm-verif { box-sizing: border-box; margin: 4px 0 12px; padding: 4px 14px; border-radius: var(--d-r-case, 14px); background: var(--d-case, #F2F2F7); color: var(--d-encre, #1D1D1F); }
+.vrm-verif-cadre { display: grid; gap: 10px; justify-items: start; }
+/* Dans Paramètres, le panneau est déjà une carte : pas de carte dans la carte. */
+.vrm-verif-cadre .vrm-verif { width: 100%; margin: 0; padding: 0; background: transparent; box-shadow: none; }
+.vrm-verif-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.vrm-verif-titre { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.008em; }
+.vrm-verif-liste { list-style: none; margin: 0; padding: 0; }
+.vrm-verif-rangee { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 10px 0; }
+.vrm-verif-rangee::before { content: ""; position: absolute; top: 0; left: 32px; right: 0; height: .5px; background: var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-verif-marque { width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--d-remplir, rgba(118,118,128,.12)); }
+.vrm-verif-marque svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.vrm-verif-rangee[data-etat="ok"] .vrm-verif-marque { background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff); }
+.vrm-verif-rangee[data-etat="action"] .vrm-verif-marque { background: transparent; }
+.vrm-verif-rangee[data-etat="action"] .vrm-verif-marque::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); }
+.vrm-verif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.vrm-verif-nom { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.vrm-verif-etat { font-size: 13px; font-weight: 500; color: var(--d-gris, #6E6E73); white-space: nowrap; }
+.vrm-verif-rangee[data-etat="action"] .vrm-verif-etat { color: var(--d-encre, #1D1D1F); font-weight: 600; }
+.vrm-verif-detail { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--d-gris, #6E6E73); }
+.vrm-verif-geste { margin-top: 8px; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
+/* Dans la case grise, le geste se pose en blanc (un remplissage gris sur gris ne se voit pas). */
+.vrm-verif .vrm-b.vrm-verif-geste,
+.vrm-app-shell .vrm-main .vrm-verif .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-carte, #fff) !important; color: var(--d-accent-texte, #0066CC) !important; box-shadow: 0 .5px 1px rgba(0,0,0,.06); }
+.vrm-verif-cadre .vrm-b.vrm-verif-geste,
+.vrm-app-shell .vrm-main .vrm-verif-cadre .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-remplir, rgba(118,118,128,.12)) !important; box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-guide-ouverte, .vrm-guide .g-onde { animation: none !important; }
+  .vrm-guide-barre > span, .vrm-guide-choix-carte { transition: none !important; }
+  .vrm-guide .g-onde { opacity: 0; }
+}
 
 /* ── Le bandeau du mode exemple : hors de <main>, il ne défile jamais. Neutre (une
    bande de surface et un filet), distinct de la tête sombre de Ma journée. ── */
@@ -47,12 +147,12 @@
      actions du haut occupe le coin droit et le couvrirait. */
   display: flex; align-items: center; justify-content: flex-start; gap: 8px 20px;
   padding: 8px 16px; margin: 0;
-  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
-  border-bottom: 1px solid var(--vrm-line, #E5E5EA);
+  background: var(--d-carte, var(--vrm-surface, #fff)); color: var(--d-encre, var(--vrm-ink, #1D1D1F));
+  border-bottom: .5px solid var(--d-filet, var(--vrm-line, #E5E5EA));
 }
 .vrm-exemple-texte { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 0 1 auto; }
 .vrm-exemple-texte b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
-.vrm-exemple-texte span { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
+.vrm-exemple-texte span { font-size: 12px; line-height: 1.4; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
 .vrm-exemple-bandeau .vrm-b { flex: 0 0 auto; }
 @media (max-width: 560px) {
   .vrm-exemple-bandeau { padding: 6px 12px; justify-content: space-between; }
