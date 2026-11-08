@@ -460,6 +460,9 @@ import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à «
 import "./styles-design-2026.css";
 import "./styles-parcours-clairs.css";
 import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos, glisser, tournée, statistiques, apparence — EN DERNIER
+// (8 nov., direction artistique) Ma journée, Ventes, Colis au niveau « premium » : une couche
+// CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
+import "./styles-premium.css";
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
