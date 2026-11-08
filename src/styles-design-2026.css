@@ -389,3 +389,75 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-ledger-drawer.vrm-recap h2.vrm-recap-nom { font-size: var(--d-t-20) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-17) !important; line-height: 1.2 !important; }
 :root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-gestes .vrm-b-secondaire { background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte); }
 :root:root body .vrm-ledger-drawer.vrm-recap .vrm-recap-modifier > summary { background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte); border-radius: var(--d-r-carte) !important; }
+
+/* ══ 7. ANNONCES (8 nov., passage 2) ═══════════════════════════════════════
+   La photo porte la carte (choix Vitrine, gardé). Ce qui change :
+   · à l'ordinateur, la grille passe de 3 à 5 colonnes : une photo de 475 px de haut
+     pour une vignette de chaussure faisait défiler 8 écrans pour 72 paires ;
+   · les six cases (état, achat, accepter dès, refuser sous, boost, marge) deviennent
+     DEUX bandes posées (une case grise chacune, des filets entre les valeurs) au lieu
+     d'un mur de six tuiles ; un champ vide (« — », à saisir) s'écrit en gris
+     (`data-vide`), une valeur saisie à l'encre ;
+   · « Numéros à vérifier » : plus de trait ambre à gauche, un point ambre devant le titre ;
+     à l'ordinateur, une rangée par article (photo · titre · gestes) ;
+   · le prochain geste : un point ambre devant la phrase, l'étiquette « Prochain geste » se tait
+     (elle reste lue au lecteur d'écran). */
+@media (min-width: 1024px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches.vrm-fiches { grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)) !important; gap: var(--d-e-8) var(--d-e-4) !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo { aspect-ratio: 1 / 1 !important; height: auto !important; }
+  /* Les gestes sur deux lignes dans une colonne étroite : « Changer le prix » en entier, puis le reste et « … ». */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes { display: grid !important; grid-template-columns: minmax(0, 1fr) 44px; gap: var(--d-e-2) !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > * { min-width: 0 !important; width: auto !important; margin: 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste-prix { grid-column: 1 / -1; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste-plus { grid-column: 2; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste:only-child { grid-column: 1 / -1; }
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo { border-radius: var(--d-r-carte) !important; background: var(--d-case) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-size: var(--d-t-15) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-15) !important; line-height: 1.3 !important;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span[data-prix][data-prix] { font-size: var(--d-t-20) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-17) !important; }
+/* Les deux bandes : une case grise, les valeurs côte à côte, un filet entre elles. */
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche :is(.vrm-fiche-duo, .vrm-fiche-chiffres) {
+  gap: 0 !important; background: var(--d-carte); border-radius: var(--d-r-case); box-shadow: var(--d-ombre-carte); overflow: hidden;
+}
+/* (la carte n'a pas de fond : la photo la porte ; les bandes sont donc blanches sur le gris) */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres > .vrm-fiche-cell:nth-child(3)::before { display: none; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres > .vrm-fiche-cell:nth-child(n+3) { border-top: .5px solid var(--d-filet) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche :is(.vrm-fiche-duo, .vrm-fiche-chiffres) > .vrm-fiche-cell {
+  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; min-height: 0 !important; padding: var(--d-e-2) var(--d-e-3) !important; position: relative;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche :is(.vrm-fiche-duo, .vrm-fiche-chiffres) > .vrm-fiche-cell + .vrm-fiche-cell::before {
+  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: .5px; background: var(--d-filet);
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres > .vrm-fiche-cell { padding: var(--d-e-2) var(--d-e-2) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres > .vrm-fiche-cell > span:first-child { font-size: var(--d-t-11) !important; color: var(--d-gris) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell [data-vide] { color: var(--d-gris) !important; font-weight: 500 !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { color: var(--d-gris) !important; }
+@media (max-width: 600px) {
+  /* Au téléphone, l'état et le prix d'achat l'un sous l'autre : le filet devient horizontal. */
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo > .vrm-fiche-cell + .vrm-fiche-cell::before { left: 12px; right: 12px; top: 0; bottom: auto; width: auto; height: .5px; }
+}
+/* « Numéros à vérifier » : une carte posée, un point ambre devant son titre. */
+:root:root body .vrm-app-shell .vrm-main details[data-numeros-a-verifier] {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte); padding: var(--d-e-1) var(--d-e-4) var(--d-e-3) !important;
+}
+:root:root body .vrm-app-shell .vrm-main details[data-numeros-a-verifier] > summary { min-height: 44px; display: flex; align-items: center; gap: var(--d-e-2); font-size: var(--d-t-17) !important; font-weight: 600 !important; }
+:root:root body .vrm-app-shell .vrm-main details[data-numeros-a-verifier] > summary::before {
+  content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre);
+}
+:root:root body .vrm-app-shell .vrm-main details[data-numeros-a-verifier] > [data-verif-carton] { border-top: .5px solid var(--d-filet) !important; }
+@media (min-width: 1024px) {
+  :root:root body .vrm-app-shell .vrm-main details[data-numeros-a-verifier] > [data-verif-carton] { flex-wrap: nowrap !important; }
+  :root:root body .vrm-app-shell .vrm-main details[data-numeros-a-verifier] > [data-verif-carton] > div:nth-of-type(1) { flex: 1 1 auto; min-width: 0; }
+  :root:root body .vrm-app-shell .vrm-main details[data-numeros-a-verifier] > [data-verif-carton] > div:last-child { flex: 0 0 auto !important; width: auto !important; }
+}
+/* Le prochain geste : une rangée posée, un point ambre, la phrase à l'encre. */
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-geste { border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; padding: 6px 6px 6px var(--d-e-4) !important; align-items: center !important; min-height: 56px; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-geste .vrm-ann-geste-texte > b { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-geste .vrm-ann-geste-texte > span { font-size: var(--d-t-15) !important; font-weight: 600 !important; color: var(--d-encre) !important; line-height: var(--d-il-ligne); }
+:root:root body .vrm-app-shell .vrm-main .vrm-ann-geste .vrm-ann-geste-texte > span::before {
+  content: ''; display: inline-block; width: 8px; height: 8px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--d-point-ambre); vertical-align: middle;
+}
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-ann-avis, .vrm-ann-achats) { border: 0 !important; }
+
