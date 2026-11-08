@@ -60,7 +60,7 @@
 .vrm-tvb-alerte-gestes .vrm-lien-action { min-height: 44px; padding: 0 8px; }
 :root body .vrm-tvb-fermer { min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--d-gris); font-size: 22px; line-height: 1; cursor: pointer; border-radius: var(--d-r-pilule); }
 @media (min-width: 900px) { .vrm-tvb-alerte { max-width: 760px; } }
-:root body .vrm-tvb-revoir { border: 0; background: transparent; box-shadow: none; padding: 0 4px; color: var(--d-accent-texte); font-weight: 600; }
+:root body .vrm-tvb-pied .vrm-lien-action, :root body .vrm-tvb-revoir { border: 0; background: transparent; box-shadow: none; padding: 0 4px; color: var(--d-accent-texte); font-weight: 600; }
 .vrm-tvb-maj-titre { margin: 0 0 4px; font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); }
 .vrm-tvb-alerte-geste { color: var(--d-ambre); font-weight: 600; }
 :root body .vrm-tvb-alerte-gestes .vrm-lien-action { border: 0; background: transparent; box-shadow: none; color: var(--d-accent-texte); font-weight: 600; }
