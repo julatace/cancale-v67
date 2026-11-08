@@ -155,3 +155,51 @@
 @media (prefers-reduced-motion: no-preference) {
   .vrm-app-shell img[data-vu] { transition: opacity 220ms var(--d-sortie); }
 }
+
+/* ══ 4. LA TOURNÉE DE DÉPÔT, LISIBLE DEBOUT AU COMPTOIR ═════════════════════
+   (Colis → « Préparer la tournée de dépôt ») Le téléphone à bout de bras, un
+   colis dans l'autre main : de grands caractères, une rangée par colis (photo 64,
+   N° et nom en 20/600), « Déposé » en grand bouton rond à droite (le geste
+   « Colis fait », annulable 5 s), la progression « 3 / 7 » en tête, et le QR de
+   dépôt Leboncoin en grand quand il est LU. Les groupes restent par
+   transporteur : le point relais d'un dépôt n'est relié au colis par aucune
+   identité (jamais deviné, c'est dit en tête). */
+.vrm-tournee-comptoir { gap: var(--d-e-5) !important; }
+.vrm-tournee-progres {
+  display: grid; grid-template-columns: auto 1fr; grid-template-areas: "n l" "barre barre"; align-items: baseline; column-gap: 10px; row-gap: 10px;
+  padding: 16px 18px; border-radius: var(--d-r-carte); background: var(--d-carte); box-shadow: var(--d-ombre-carte);
+}
+.vrm-tournee-progres-n { grid-area: n; font-size: var(--d-t-34); font-weight: 800; letter-spacing: var(--d-ap-34); line-height: 1; color: var(--d-gris); font-variant-numeric: tabular-nums; }
+.vrm-tournee-progres-n b { color: var(--d-encre); font-weight: 800; }
+.vrm-tournee-progres-l { grid-area: l; font-size: var(--d-t-17); font-weight: 600; color: var(--d-gris); }
+.vrm-tournee-progres-barre { grid-area: barre; display: block; height: 6px; border-radius: 3px; background: var(--d-remplir); overflow: hidden; }
+.vrm-tournee-progres-barre > span { display: block; height: 100%; border-radius: inherit; background: var(--d-accent); transition: width 320ms var(--d-sortie); }
+@media (prefers-reduced-motion: reduce) { .vrm-tournee-progres-barre > span { transition: none; } }
+.vrm-tournee-comptoir .vrm-tournee-note { font-size: var(--d-t-15) !important; line-height: 1.4; color: var(--d-gris); }
+.vrm-tournee-comptoir .vrm-fu-groupe-transp h3 { font-size: var(--d-t-22) !important; font-weight: 700 !important; letter-spacing: var(--d-ap-22) !important; }
+.vrm-tournee-comptoir .vrm-fu-groupe-transp > span:last-child { font-size: var(--d-t-17) !important; }
+.vrm-tournee-comptoir .vrm-tournee-liste { border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte); overflow: hidden; }
+.vrm-tournee-comptoir .vrm-tournee-colis { gap: 14px !important; min-height: 88px !important; padding: 12px 12px 12px 14px !important; }
+.vrm-tournee-comptoir .vrm-tournee-colis + .vrm-tournee-colis { box-shadow: none !important; background-image: linear-gradient(var(--d-filet), var(--d-filet)); background-size: calc(100% - 92px) .5px; background-position: 92px 0; background-repeat: no-repeat; }
+.vrm-tournee-comptoir .vrm-tournee-photo { width: 64px !important; height: 64px !important; border-radius: var(--d-r-case) !important; background: var(--d-case); }
+.vrm-tournee-comptoir .vrm-tournee-photo > img { width: 100%; height: 100%; object-fit: cover; }
+.vrm-tournee-comptoir .vrm-tournee-quoi { gap: 4px !important; }
+.vrm-tournee-comptoir .vrm-tournee-titre { font-size: var(--d-t-20) !important; font-weight: 600 !important; line-height: 1.25 !important; letter-spacing: -.016em; -webkit-line-clamp: 2; }
+.vrm-tournee-comptoir .vrm-tournee-titre .vrm-num, .vrm-tournee-comptoir .vrm-tournee-titre [data-numero-pastille] { font-size: var(--d-t-17) !important; }
+.vrm-tournee-comptoir .vrm-tournee-sous { font-size: var(--d-t-15) !important; color: var(--d-gris); }
+/* « Déposé » : un grand rond à cocher, 56 px, au pouce. */
+.vrm-tournee-comptoir [data-tournee-depose] {
+  flex: 0 0 auto; min-width: 104px; height: 56px !important; min-height: 56px !important; border-radius: var(--d-r-pilule) !important;
+  font-size: var(--d-t-17) !important; font-weight: 600 !important;
+}
+.vrm-tournee-comptoir .vrm-tournee-colis.is-attente { background-color: color-mix(in srgb, var(--d-accent) 8%, var(--d-carte)) !important; }
+.vrm-tournee-comptoir .vrm-tournee-colis.is-attente .vrm-tournee-titre { color: var(--d-gris); }
+.vrm-tournee-comptoir [data-tournee-annuler] { min-height: 56px !important; font-size: var(--d-t-17) !important; }
+.vrm-tournee-qr { margin-top: 6px; }
+.vrm-tournee-qr > summary { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--d-t-15); font-weight: 600; color: var(--d-accent-texte); cursor: pointer; list-style: none; }
+.vrm-tournee-qr > summary::-webkit-details-marker { display: none; }
+.vrm-tournee-qr-grand { display: grid; place-items: center; margin-top: 8px; padding: 16px; border-radius: var(--d-r-case); background: #FFFFFF; width: max-content; max-width: 100%; }
+@media (max-width: 420px) {
+  .vrm-tournee-comptoir .vrm-tournee-colis { flex-wrap: wrap; }
+  .vrm-tournee-comptoir .vrm-tournee-quoi { flex: 1 1 0; min-width: 0; }
+}

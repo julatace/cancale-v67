@@ -43593,12 +43593,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (x.__autre === 'vc') return faitsVc[x.v.id] ? null : { cle: 'vc:' + x.v.id, site: 'vestiaire', v: x.v, num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, att, pret: !!(x.v.bordereau || x.v.etiquette), x };
                   if (x.__autre === 'eb') return { cle: x.key, site: 'ebay', num: x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '', titre: x.x.titre || `Commande ${x.x.orderId}`, photo: x.x.ordre ? photoCommande(x.x.ordre) : null, lien: lienCommandeEbay(x.x.orderId, x.x.compte), att, pret: true, x };
                   if (x.__autre === 'lbc') { if (faitsLbc[x.x.txId]) return null; const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
-                    return { cle: 'lbc:' + x.x.txId, site: 'leboncoin', txId: x.x.txId, num: (f && f.numero != null) ? String(f.numero).trim() : '', titre: x.x.titre || (x.o && x.o.title) || '(sans titre)', photo: photoArticle(x.o || {}), att, pret: !!(x.o && x.o.label && x.o.label.voucherUrl), x }; }
+                    return { cle: 'lbc:' + x.x.txId, site: 'leboncoin', txId: x.x.txId, num: (f && f.numero != null) ? String(f.numero).trim() : '', titre: x.x.titre || (x.o && x.o.title) || '(sans titre)', photo: photoArticle(x.o || {}), att, pret: !!(x.o && x.o.label && x.o.label.voucherUrl), qr: (x.o && x.o.label && /^https?:\/\//.test(String(x.o.label.qrUrl || ''))) ? x.o.label.qrUrl : '', x }; }
                   const o = x.o, b = x.b; if (o ? isShipDone(o) : isBordShippedManual(b)) return null;
                   return { cle: 'v:' + (x.txn || x.key), site: 'vinted', o, b, num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis', photo: o ? orderPhoto(o) : bordPhoto(b), att, pret: !!x.pret, x };
                 }).filter(Boolean);
                 const groupesT = groupesTournee(tourneeItems, { trNom: (t) => trNomDe(t.x), cle: (t) => t.cle });
                 const enAttenteT = deposeScan.attente ? String(deposeScan.attente.cle) : '';
+                // (8 nov., « beauté ») LA PROGRESSION DU COMPTOIR : « 3 / 7 ». Déposés = les « Colis fait »
+                // d'aujourd'hui (Vinted, Vestiaire, Leboncoin : les coches de toujours, `gestesDepuis`) ;
+                // le total = déposés + ceux qu'on peut déposer (avec bordereau). Le colis en attente de ses
+                // 5 s « Annuler » compte déjà déposé (il l'est à l'écran) — annulé, il revient.
+                const deposesAujT = (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const t0 = m0.getTime(); return gestesDepuis(shipDone, t0) + gestesDepuis(faitsLbc, t0) + gestesDepuis(faitsVc, t0); })();
+                const nDeposablesT = tourneeItems.filter((t) => t.pret && t.site !== 'ebay').length;
+                const faitsT = deposesAujT + (enAttenteT && tourneeItems.some((t) => t.cle === enAttenteT) ? 1 : 0);
+                const totalT = deposesAujT + nDeposablesT;
                 const tourneeEl = (tourneeItems.length || tourneeDepot) ? (
                   <div key="__tournee" className="vrm-tournee-tete" >
                     {tourneeItems.length ? <span style={{display:'inline-flex',alignItems:'center',gap:2}}><Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Préparer la tournée de dépôt</Bouton>
@@ -43606,11 +43614,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <Pourquoi label="À quoi sert la tournée ?" titre="La tournée de dépôt">Les colis prêts à déposer, rangés par transporteur, pour tout faire en un passage. Au point relais, touche « Déposé » (ou scanne le bordereau) : il est noté déposé.</Pourquoi></span> : null}
                     {tourneeDepot ? (
                       <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet=""
-                        sousTitre={(() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const d = gestesDepuis(shipDone, m0.getTime()); // (6 nov., audit des chiffres) « à déposer » = les colis qui ONT leur bordereau (ceux qu'on peut
+                        className="vrm-tournee-feuille"
+                        sousTitre={(() => { const d = deposesAujT; // (6 nov., audit des chiffres) « à déposer » = les colis qui ONT leur bordereau (ceux qu'on peut
                           // déposer) ; une vente qui attend le sien est dite à part, jamais comptée « à déposer ».
                           const nDep = tourneeItems.filter((t) => t.pret).length, nAtt = tourneeItems.length - nDep;
                           return `${nDep} colis à déposer${nAtt ? ` · ${nAtt} ${nAtt > 1 ? 'attendent leur' : 'attend son'} bordereau` : ''}${d ? ` · ${d} déjà déposé${d > 1 ? "s" : ""} aujourd’hui` : ""}`; })()}>
-                        <div className="vrm-tournee">
+                        <div className="vrm-tournee vrm-tournee-comptoir">
+                          {totalT > 0 ? (
+                            <div className="vrm-tournee-progres" data-tournee-progres={`${faitsT}/${totalT}`} role="progressbar" aria-valuemin={0} aria-valuemax={totalT} aria-valuenow={faitsT} aria-label={`${faitsT} colis déposés sur ${totalT}`}>
+                              <span className="vrm-tournee-progres-n"><b>{faitsT}</b>{'\u202F'}/{'\u202F'}{totalT}</span>
+                              <span className="vrm-tournee-progres-l">{faitsT >= totalT ? 'Tout est déposé' : 'déposés'}</span>
+                              <span className="vrm-tournee-progres-barre" aria-hidden="true"><span style={{ width: `${Math.round((faitsT / totalT) * 100)}%` }}/></span>
+                            </div>
+                          ) : null}
                           <div className="vrm-tournee-haut">
                             <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
                             <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton>
@@ -43635,6 +43651,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                         <span className="vrm-tournee-quoi">
                                           <span className="vrm-tournee-titre">{t.num ? <><Numero n={t.num} taille="petit"/>{' '}</> : null}{t.titre}</span>
                                           <span className="vrm-tournee-sous">{enAttente ? 'Déposé · annulable quelques secondes' : t.site === 'ebay' ? 'Étiquette eBay : le dépôt se suit dans eBay' : !t.pret ? 'Bordereau pas encore là' : texteAttenteVente(t.att) || '—'}</span>
+                                          {/* (8 nov., « beauté ») Le QR de dépôt (Leboncoin, LU sur l'étiquette) en grand, à montrer au comptoir. */}
+                                          {t.qr && !enAttente ? (
+                                            <details className="vrm-tournee-qr" data-tournee-qr={t.cle}>
+                                              <summary>Montrer le QR</summary>
+                                              <span className="vrm-tournee-qr-grand"><QrColis url={t.qr} size={220}/></span>
+                                            </details>
+                                          ) : null}
                                         </span>
                                         {enAttente
                                           ? <Bouton variante="discret" data-tournee-annuler={t.cle} onClick={deposeScan.annuler}>Annuler</Bouton>
