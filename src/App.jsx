@@ -271,6 +271,7 @@ import { AideEcran as AideEcranBase } from "./composants/AideEcran.jsx";
 import { SignalerProbleme as SignalerProblemeBase, SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from "./composants/SignalerProbleme.jsx";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
+import { apparenceDe, sombreEffectif, prochainChangement, ecrituresApparence } from "./apparence.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
@@ -453,6 +454,7 @@ import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à «
 // ci-dessus. Le système est écrit dans DESIGN.md.
 import "./styles-design-2026.css";
 import "./styles-parcours-clairs.css";
+import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos, glisser, tournée, statistiques, apparence — EN DERNIER
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
@@ -1971,7 +1973,7 @@ const authSignOut = () => {
 // le cloud sous SON compte. On efface donc toutes les clés de données quand
 // l'identité change (on garde les préférences d'affichage, elles ne trahissent
 // personne).
-const KEEP_ON_SWITCH = ['vinted_dark', SESSION_KEY, 'schema_cloisonne'];
+const KEEP_ON_SWITCH = ['vinted_dark', 'vrm_apparence', SESSION_KEY, 'schema_cloisonne'];
 const wipeLocalData = () => {
   try {
     const doomed = [];
@@ -2328,6 +2330,8 @@ const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
+  // (8 nov.) L'apparence choisie (Clair · Sombre · Automatique · Le soir, src/apparence.js).
+  'vrm_apparence',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -3224,6 +3228,20 @@ function ChipsModeles({ valeur, surChange, champ, vars }) {
   const [modeles, setModeles] = React.useState(() => lireModelesRanges());
   React.useEffect(() => { const f = () => setModeles(lireModelesRanges()); const off = onCloudReady(f); window.addEventListener('vrm:save', f); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', f); }; }, []);
   return <InsererModele modeles={modeles} valeur={valeur} surChange={surChange} champ={champ} vars={vars}/>;
+}
+// (8 nov.) La préférence de l'appareil (`prefers-color-scheme`), pour l'apparence
+// « Automatique » : lue à l'instant, et suivie en direct quand on l'écoute.
+const systemeSombreMaintenant = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch (_) { return false; } };
+function useSystemeSombre(ecouter) {
+  const [v, setV] = React.useState(systemeSombreMaintenant);
+  React.useEffect(() => {
+    if (!ecouter || !window.matchMedia) return undefined;
+    let mq = null; try { mq = window.matchMedia('(prefers-color-scheme: dark)'); } catch (_) { return undefined; }
+    const f = () => setV(!!mq.matches); f();
+    try { mq.addEventListener('change', f); } catch (_) { try { mq.addListener(f); } catch (__) {} }
+    return () => { try { mq.removeEventListener('change', f); } catch (_) { try { mq.removeListener(f); } catch (__) {} } };
+  }, [ecouter]);
+  return v;
 }
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
@@ -13504,6 +13522,8 @@ const ICON_PATHS = {
   box:    <><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16V8Z"/><path d="M3.5 8 12 12.5 20.5 8M12 12.5V20.5"/></>,
   image:  <><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></>,
   moon:   <><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></>,
+  // (8 nov.) L'apparence (Réglages → Affichage) : un disque à moitié plein.
+  contraste: <><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></>,
   search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m15.8 15.8 4.4 4.4"/></>,
   gear:   <><circle cx="12" cy="12" r="3.2"/><path d="M19.6 14.4a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></>,
   cloud:  <><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.6 3.7 3.7 0 0 1-.3 7.4Z"/></>,
@@ -48130,7 +48150,8 @@ export default function App() {
   //    l'écran « Colis à préparer » d'un membre d'équipe (et la porte de la
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
-  C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
+  // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
+  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
@@ -48813,10 +48834,35 @@ function AppCoeur() {
     window.addEventListener('vrm:aller',onAller);
     return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
-  const [dark,setDark]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  // (8 nov., « beauté ») L'APPARENCE CHOISIE : Clair · Sombre · Automatique (le système) · Le soir
+  // (19 h–7 h). `vrm_apparence` absent ⇒ le choix d'avant (`vinted_dark`), rien ne change pour lui.
+  // La règle (src/apparence.js) est la même que celle du script de démarrage (aucun flash) ;
+  // `dark` reste le nom de « sombre MAINTENANT » pour tout le reste de l'app.
+  const [apparenceLue,setApparenceLue]=useStateCle('vrm_apparence', ()=>load('vrm_apparence',null));
+  const apparence = apparenceDe(apparenceLue, choixSombre);
+  const systemeSombre = useSystemeSombre(apparence === 'auto');
+  const [, setTicTheme] = useState(0);
+  useEffect(() => {
+    // « Le soir » : la teinte change à 19 h et à 7 h ; un téléphone réveillé après des heures
+    // (minuterie gelée) se recale à son retour au premier plan.
+    if (apparence !== 'soir') return undefined;
+    let t = null;
+    const armer = () => { if (t) clearTimeout(t); const ms = prochainChangement('soir', new Date()); t = setTimeout(() => { setTicTheme((n) => n + 1); armer(); }, Math.min(ms, 2147000000)); };
+    const vu = () => { if (document.visibilityState === 'visible') { setTicTheme((n) => n + 1); armer(); } };
+    armer(); document.addEventListener('visibilitychange', vu);
+    return () => { if (t) clearTimeout(t); document.removeEventListener('visibilitychange', vu); };
+  }, [apparence]);
+  const dark = sombreEffectif(apparence, { date: new Date(), systemeSombre });
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu
   C = dark ? THEMES.dark : THEMES.light;
-  const toggleDark=()=>{ const d=!dark; setDark(d); save('vinted_dark',d); };
+  const choisirApparence = (mode) => {
+    const w = ecrituresApparence(mode); if (!w) return;
+    setApparenceLue(mode); save('vrm_apparence', mode);
+    if ('vinted_dark' in w) { setChoixSombre(w.vinted_dark); save('vinted_dark', w.vinted_dark); }
+  };
+  // L'interrupteur « Mode sombre » : un choix EXPLICITE (il quitte Automatique / Le soir).
+  const toggleDark=()=>choisirApparence(dark ? 'clair' : 'sombre');
   // ⚠️⚠️ LE THÈME NE VIVAIT QUE DANS REACT. `C` était bien remplacé, mais le
   //    DOCUMENT lui-même restait clair : mesuré le 9 septembre, app en sombre,
   //    `document.body` à `rgb(246,247,249)` et `theme-color` à `#F2F2F7` —
@@ -51863,7 +51909,7 @@ function AppCoeur() {
             }
             toast('⚠ Fichier de sauvegarde invalide.');
           }catch(err){toast('Erreur : '+err.message);} }; inp.click(); }}
-          dark={dark} toggleDark={toggleDark}/></GardeEcran>}
+          dark={dark} toggleDark={toggleDark} apparence={apparence} onApparence={choisirApparence}/></GardeEcran>}
         {/* ⚠️ MA JOURNÉE EST MONTÉE ICI, PAS DANS LA TABLE `map` CI-DESSUS —
             et elle ne recevait donc PAS `baseKO`. Mon premier correctif a réparé
             Colis, Achats et le tableau de bord… et laissé l'écran d'ACCUEIL

@@ -9,6 +9,7 @@ import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { L, PAS_SU } from '../libelles.js';
 import { useReglageConseils } from '../Conseils.jsx';
 import { PHRASES_ECRAN } from '../phrasesEcran.js';
+import { APPARENCES, LIBELLES_APPARENCE, PHRASES_APPARENCE } from '../apparence.js';
 import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from '../composants/SignalerProbleme.jsx';
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
 import { PLATEFORMES_COMPTES, etatCompteLie, ageLecture, nomCompteLie, LIBELLE_ETAT } from '../comptesLies.js';
@@ -1428,7 +1429,7 @@ function ActionsReglages({comptes,onOuvrir}) {
   </section>;
 }
 
-function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif, ebayCompte = null, ouvrir = null, onOuvert }) {
+function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dark, toggleDark, apparence = null, onApparence = null, notifEnabled, onToggleNotif, ebayCompte = null, ouvrir = null, onOuvert }) {
   // (1er nov., VRM vendu à d'autres) « Import des emails Vinted · Date de début »
   // n'agit que sur la boîte du PROPRIÉTAIRE de l'installation : la réception
   // collective (le script Gmail) ne lit pas la date d'un autre vendeur
@@ -1725,7 +1726,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
-      { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc:'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : 'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
+      // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
+      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:'Apparence', desc:'Clair, sombre, comme l’appareil, ou sombre le soir.', val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
@@ -3460,6 +3464,22 @@ function ReglagesStream() {
   );
 }
 // ⟦← App.jsx #43⟧
+// (8 nov., « beauté ») L'APPARENCE : quatre choix en liste d'iOS (une coche sur le choisi).
+// Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
+function ApparenceSetting({ valeur, onChoisir }) {
+  return (
+    <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
+      {APPARENCES.map((m) => (
+        <button key={m} type="button" role="radio" aria-checked={valeur === m} className={'vrm-apparence-ligne' + (valeur === m ? ' is-choisi' : '')}
+          data-apparence={m} onClick={() => onChoisir && onChoisir(m)}>
+          <span className={'vrm-apparence-apercu is-' + m} aria-hidden="true"><span/></span>
+          <span className="vrm-apparence-txt"><b>{LIBELLES_APPARENCE[m]}</b><small>{PHRASES_APPARENCE[m]}</small></span>
+          <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+        </button>
+      ))}
+    </div>
+  );
+}
 function ZoomSetting({ nu = false }) {
   const [z, setZ] = React.useState(readZoom);
   const [telephone, setTelephone] = React.useState(() => window.matchMedia('(max-width: 767px)').matches);
