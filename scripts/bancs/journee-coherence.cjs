@@ -293,8 +293,10 @@ async function tournee(nav, { W, theme, scenario }) {
     const b = pg.locator('[data-stock-sortie] .vrm-day-task-action, [data-stock-sortie]').first();
     await b.click().catch(() => {});
     await pg.waitForTimeout(2200);
-    const lieu = await pg.evaluate(() => ({ url: location.search, stock: !!document.querySelector('[data-stock-annonce], .vrm-s2d, [data-case-num]'), q: [...document.querySelectorAll('.vrm-main input')].map((i) => i.value).join('|') }));
-    dit(/42/.test(lieu.q), 'E9', `${T} « Voir » ouvre le Stock sur le N°42`, JSON.stringify(lieu));
+    const lieu = await pg.evaluate(() => ({ url: location.search, stock: !!document.querySelector('[data-stock-annonce], .vrm-s2d, [data-case-num]'), q: [...document.querySelectorAll('.vrm-main input')].map((i) => i.value).join('|'), vise: [...document.querySelectorAll('[data-case-vise]')].map((e) => e.getAttribute('data-case-num')) }));
+    // (8 nov.) Depuis la vague 3 (6 nov.), un N° qui a SA case est visé sur la case (recherche vide) ;
+    // sans case, la recherche s'ouvre sur lui. L'un OU l'autre, et seulement CE N°.
+    dit(/42/.test(lieu.q) || (lieu.vise.length === 1 && lieu.vise[0] === '42'), 'E9', `${T} « Voir » ouvre le Stock sur le N°42`, JSON.stringify(lieu));
     await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
     await pg.waitForSelector('.vrm-fu-journee', { timeout: 20000 }).catch(() => {});
     await pg.waitForTimeout(4000);
