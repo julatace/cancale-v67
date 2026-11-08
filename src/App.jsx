@@ -29952,7 +29952,7 @@ function joursAvantVc(iso) { const t = Date.parse(iso || ''); return isFinite(t)
 // attente »), « vendue le … · à envoyer avant … », le transporteur écrit UNE
 // fois avec son n° de suivi (« Chronopost · suivi … » était écrit deux fois),
 // puis Imprimer (tamponné titre + N°) · Imprimé · Colis fait.
-function CarteColisVc({ v, imprime, fait, depart = null }) {
+function CarteColisVc({ v, imprime, fait }) {
   const j = joursAvantVc(v.limite);
   const verse = montantRecuVc(v).eur;
   const titre = v.titre || 'Article Vestiaire';
@@ -29960,8 +29960,7 @@ function CarteColisVc({ v, imprime, fait, depart = null }) {
   const sec = { flex: '0 1 auto', minHeight: 44, borderRadius: 12, padding: '0 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
   return (
     <div data-bord-card="" data-vc-colis={v.id} data-colis-ident={'vc:' + v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} data-jours={j == null ? '' : String(j)} data-plateforme-colis="vestiaire"
-      data-colis-depart-lu={depart ? depart.carrier : undefined}
-      className="vrm-colis-carte" style={{ position: 'relative', padding: '14px', border: `1px solid ${j != null && j < 0 && !depart ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12, opacity: fait || depart ? 0.55 : 1 }}>
+      className="vrm-colis-carte" style={{ position: 'relative', padding: '14px', border: `1px solid ${j != null && j < 0 ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12, opacity: fait ? 0.55 : 1 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 12, background: '#fff', border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <PhotoVc src={v.photo || ''} style={{ width: '100%', height: '100%' }}/>
@@ -29982,8 +29981,6 @@ function CarteColisVc({ v, imprime, fait, depart = null }) {
             <span data-colis-dates="">{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}{v.date && joursAttente(v.date) != null ? <span className="vrm-colis-vendue" data-colis-attente={joursAttente(v.date)} title={`Vendue le ${dateCourteVc(v.date)}`}>{urg ? ' · ' : ''}{texteAttenteVente(joursAttente(v.date))}</span> : null}</span>
             {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · déposé</span> : null}
           </div>
-          {/* (8 nov.) PARTI, LU CHEZ LE TRANSPORTEUR : la raison, de la même ligne que la preuve (api/_lib/depart-colis.js). */}
-          {depart ? <div data-colis-depart-phrase="" style={{ fontSize: 12, color: C.text, fontWeight: 600, marginTop: 4 }}>{depart.phrase}</div> : null}
           {/* Le transporteur est écrit UNE fois : la pastille à côté du bouton bordereau. */}
           {v.suivi ? <div data-vc-colis-transport="" style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>suivi {v.suivi}</div> : null}
         </div>
@@ -29993,7 +29990,7 @@ function CarteColisVc({ v, imprime, fait, depart = null }) {
       </div>
       {/* (3 nov.) LA FRISE D'UN COLIS, comme Vinted : « imprimé » = sa coche (`vrm_vc_imprimes`), « déposé » =
           « Colis fait » ; « en route » / « livré » ne sont pas lus pour Vestiaire ⇒ jamais cochés. */}
-      {imprime || fait || depart ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!(fait || depart), enroute: !!depart }, { geste: j != null && j <= 1 && !fait && !depart })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+      {imprime || fait ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!fait }, { geste: j != null && j <= 1 && !fait })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
@@ -30051,11 +30048,11 @@ function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
   // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
-  const E = vc.aEnvoyer || [], F = vc.faits || [], P = vc.partis || [];
-  if (!E.length && !F.length && !P.length) return null;
+  const E = vc.aEnvoyer || [], F = vc.faits || [];
+  if (!E.length && !F.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
-    <div data-colis-vestiaire={E.length} data-colis-vestiaire-faits={F.length} data-colis-vestiaire-partis={P.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+    <div data-colis-vestiaire={E.length} data-colis-vestiaire-faits={F.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
         <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Le bordereau est là : imprime (titre et N° tamponnés), colle, dépose. ' : 'Un bordereau qui n’est pas encore là se prend sur Vestiaire : il arrive ici quand tu ouvres la vente sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
@@ -30063,12 +30060,9 @@ function ColisVestiaireBloc({ vc }) {
           {E.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={null}/>)}
         </div>
       </>}
-      {F.length + P.length > 0 && <>
+      {F.length > 0 && <>
         <span data-groupe="fait" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted, marginTop: E.length ? 12 : 0 }}>Vestiaire · déjà postés</span>
-        {/* (8 nov.) Encore « à expédier » chez Vestiaire (pas relu), mais pris en charge chez le transporteur. */}
-        {P.length > 0 ? <div className="vrm-aide" data-colis-vestiaire-partis-aide="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Vestiaire dit encore « à expédier » ; le suivi du transporteur dit qu’il est parti.</div> : null}
         <div className="vrm-colis-grille" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {P.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={null} depart={v.depart}/>)}
           {F.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={loc.fait[v.id] || true}/>)}
         </div>
       </>}
@@ -54413,6 +54407,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b),
             lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue) } });
         }
+        // (8 nov.) Encore « à expédier » chez Vinted (pas relu), mais le n° du bordereau de CETTE
+        // transaction est pris en charge chez le transporteur (`partisTransp`) : sorti de « À envoyer »,
+        // il est ICI, avec la raison — jamais caché. Un colis déjà coché reste dans sa ligne « coche ».
+        for (const o of sales.items) {
+          const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+          if (!tx || hiddenSales.has(tx) || !aExpedier(o) || isShipDone(o)) continue;
+          const dp = partisTransp.get(tx); if (!dp) continue;
+          const b = bordsParTxn[tx] || null;
+          if (b && isBordShippedManual(b)) continue;
+          const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          out.push({ cle: 'v:' + tx, site: 'vinted', type: 'transp', o, b, j, depart: dp, rang: 1.5,
+            photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b),
+            lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: true } });
+        }
       }
       if (voitSite('vestiaire')) {
         const cv = colisVestiaire(vcEtat);
@@ -61252,7 +61260,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (5 nov., chantier D) Les mots de l'app (src/libelles.js) : « En route » (plus « En transit »), « Livré »
             // pour un colis ; l'étiquette brute de Vinted reste dans `data-parti` (les règles la lisent).
             if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
-            if (x.type === 'vc') return { t: 'Vestiaire · coché « Colis fait »', ambre: false };
+            if (x.type === 'vc') return { t: x.depart ? `Vestiaire · ${x.depart.phrase}` : 'Vestiaire · coché « Colis fait »', ambre: false };
+            // (8 nov.) Parti d'après le transporteur (le site ne l'a pas encore dit) : la raison, de la même ligne que la preuve.
+            if (x.type === 'transp') return { t: `${x.depart.phrase}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
             return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
           };
           return (
@@ -61266,7 +61276,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const annuler = x.type === 'coche'
                     ? <button type="button" data-annuler-poste={tx || (x.e && x.e.key)} className="vrm-colis-sec" onClick={()=>{ if(x.o && isShipDone(x.o)) toggleShipDone(x.o); if(x.b && isBordShippedManual(x.b)) unmarkBordShipped(x.b); }}
                         title="Le colis est encore chez toi : il revient dans « À envoyer », avec son bordereau" style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Pas encore déposé</button>
-                    : x.type === 'vc'
+                    : x.type === 'vc' && !x.depart
                       ? <button type="button" data-vc-fait={x.v.id} className="vrm-colis-sec" onClick={() => marquerVc('vrm_vc_colis_done', x.v.id, false)} style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} title="Le colis est encore chez toi : il revient dans « À envoyer »">Pas encore déposé</button>
                       : null;
                   return (
@@ -61278,7 +61288,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span>{nParT[nomT(x)]} colis</span>
                         </div>
                       )}
-                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site}
+                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site} data-depart-lu={x.depart ? x.depart.carrier : undefined}
                         {...(x.type === 'coche' && x.np ? { 'data-tx': tx, 'data-limite': x.np.limiteDepassee ? 'depassee' : 'ok' } : {})} {...(x.type === 'coche' ? { 'data-postes-pas-partis': x.np ? '1' : undefined, 'data-postes-recents': x.np ? undefined : '1' } : {})}
                         style={{padding:'14px',border:`1px solid ${so.ambre ? C.warn + '66' : C.border}`,background:C.card,borderRadius:12}}>
                         <div style={{display:'flex',gap:12,alignItems:'center'}}>
