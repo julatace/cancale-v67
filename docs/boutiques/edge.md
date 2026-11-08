@@ -78,7 +78,7 @@ d'usage sans rapport avec l'objectif unique ; pas d'usage pour la solvabilité o
 
 - **Extension name** et **Short description** : lus dans le paquet (non modifiables ici).
 <!-- resume -->
-Relie tes comptes Vinted, Leboncoin et eBay à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.
+Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.
 <!-- /resume -->
 - **Description** ⚠️ 250 caractères au moins, 10 000 au plus (celle-ci en fait plus de 1 500) — ne PAS utiliser
   « Generate with AI » (elle inventerait des fonctions) :

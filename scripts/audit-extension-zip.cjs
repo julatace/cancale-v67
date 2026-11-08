@@ -153,7 +153,16 @@ dit((APP.match(/VRM-extension\.zip/g) || []).length >= 2,
     const iRemp = F.search(/remplace|à la place/i), iRech = F.indexOf('⟳');
     dit(iRemp >= 0 && iRech > iRemp, `${ou} : dans cet ordre (remplacer, PUIS ⟳)`, `remplacer@${iRemp} · ⟳@${iRech}`);
   };
-  juge(chaineApres('Ton extension VRM est en retard', 'detail='), 'bandeau « en retard »');
+  // (8 nov.) Deux variantes : boutique publiée (mise à jour automatique, pas de
+  // dossier à remplacer) et zip. La règle des deux gestes vaut pour la variante
+  // ZIP — elle doit exister et être juste ; on la cherche parmi les occurrences.
+  {
+    const titre = 'Ton extension VRM est en retard';
+    const vus = []; let k = -1;
+    while ((k = APP.indexOf(titre, k + 1)) >= 0) { const j = APP.indexOf('detail=', k); if (j < 0 || j - k > 4000) continue; const m = /^\s*\{?\s*"([^"]*)"|^\s*\{?\s*`([^`]*)`/.exec(APP.slice(j + 7)); if (m) vus.push(m[1] || m[2] || ''); }
+    const zip = vus.find((t) => /Dézippe|dézippe/.test(t)) || vus[vus.length - 1] || '';
+    juge(zip, 'bandeau « en retard »');
+  }
   // Réglages : la phrase sous le bouton de téléchargement.
   const k = APP.indexOf('Le zip se dézippe en un seul dossier');
   const R = k < 0 ? '' : APP.slice(k, APP.indexOf('\n', k));

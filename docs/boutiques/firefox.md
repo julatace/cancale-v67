@@ -32,7 +32,7 @@ Cocher **Firefox** ET **Firefox pour Android**.
 - **Adresse du module** : `vrm`
 - **Résumé** (250 caractères au plus) :
 <!-- resume -->
-Relie tes comptes Vinted, Leboncoin et eBay à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.
+Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.
 <!-- /resume -->
 - **Description** :
 <!-- description -->
