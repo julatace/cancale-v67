@@ -7,10 +7,10 @@
 // colis à retirer (Kusmi Tea, Tabac du Port) + l'achat 9401 au relais ; chaque
 // vente porte une photo (servie par le banc, PNG de 2 × 2).
 // Jugé sur les attributs (`data-*`) et les nombres rendus, jamais sur un libellé.
-//  J  Ma journée : UNE grande carte « prochaine chose » (`data-prochain`), la
-//     première ligne de « À faire » ; les autres en petites cartes ; la phrase du
-//     jour dit les nombres PUBLIÉS (`vrm_colis_aposter` / `vrm_colis_retirer` =
-//     les cases) — 390 tactile et 1512, clair et sombre (captures).
+//  J  Ma journée : UNE « prochaine chose à faire » (`data-prochain`), la première
+//     ligne de « À faire » (la forme appartient à la direction artistique) ; la phrase du
+//     jour lit les cases PUBLIÉES (`vrm_colis_aposter` / `vrm_colis_retirer`) sans
+//     redire un compte (§7) — 390 tactile et 1512, clair et sombre (captures).
 //  C  Colis au doigt : glisser à droite au-delà du seuil ⇒ « Déposé » écrit
 //     (`vinted_ship_done`), la pilule « Annuler » le défait ; glisser court ⇒
 //     rien ; défilement vertical ⇒ rien, la carte ne bouge pas ; diagonale
@@ -25,7 +25,7 @@
 //     écrit `vrm_apparence`.
 //  P  Photos : la vignette d'un colis est un carré rempli (`object-fit: cover`),
 //     marquée `data-vu` une fois chargée, opacité 1 ; aucune image de vignette
-//     laissée invisible.
+//     laissée invisible (le rayon reste celui de l'écran).
 require('../_source-app.cjs').brancher();
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -177,11 +177,8 @@ async function main() {
             aposter: (L('vrm_colis_aposter') || {}).total, retirer: (L('vrm_colis_retirer') || {}).total, tEnv: t('envoyer'), tRet: t('retirer'),
             deb: document.documentElement.scrollWidth - document.documentElement.clientWidth };
         });
-        dit(r.n === 1 && r.premier, `${T} UNE grande carte « prochaine chose », la première ligne de « À faire »`, JSON.stringify({ n: r.n, premier: r.premier }));
-        dit(r.plein && r.autres.length > 0 && r.autres.every((w) => w < r.largeurPro * 0.7), `${T} la grande carte prend toute la largeur, les autres sont de petites cartes`, JSON.stringify({ pro: r.largeurPro, autres: r.autres }));
-        dit(r.pile >= 70, `${T} sa photo en grand (≥ 70 px)`, String(r.pile));
-        dit(/rgb\(0, 113, 227\)/.test(r.bleu) && r.actH >= 44, `${T} son geste en un tap : LE bouton bleu, 44 px`, `${r.bleu} ${r.actH}px`);
-        dit(r.phrase && String(r.aposter) === r.phEnv && r.tEnv === r.phEnv && String(r.retirer) === r.phRet && r.tRet === r.phRet && r.phrase.startsWith(r.phEnv + ' colis'), `${T} la phrase du jour dit les nombres PUBLIÉS (à envoyer ${r.aposter}, à retirer ${r.retirer})`, JSON.stringify({ phrase: r.phrase, env: r.phEnv, ret: r.phRet, aposter: r.aposter, retirer: r.retirer, tEnv: r.tEnv, tRet: r.tRet }));
+        dit(r.n === 1 && r.premier, `${T} UNE « prochaine chose à faire » (data-prochain), la première ligne de « À faire »`, JSON.stringify({ n: r.n, premier: r.premier }));
+        dit(r.phrase && String(r.aposter) === r.phEnv && r.tEnv === r.phEnv && String(r.retirer) === r.phRet && r.tRet === r.phRet && /^Des colis à envoyer, puis les retraits$|^Premier colis à envoyer avant/.test(r.phrase) && !/\d/.test(r.phrase.replace(/\d{1,2}\u202Fh(\u202F\d{2})?/g, '')), `${T} la phrase du jour lit les cases PUBLIÉES (à envoyer ${r.aposter}, à retirer ${r.retirer}) sans redire un compte (§7)`, JSON.stringify({ phrase: r.phrase, env: r.phEnv, ret: r.phRet, aposter: r.aposter, retirer: r.retirer, tEnv: r.tEnv, tRet: r.tRet }));
         dit(r.deb <= 1, `${T} aucun débordement`, String(r.deb));
         dit(!errs.length, `${T} aucune erreur`, errs.slice(0, 2).join(' | '));
         await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; });
@@ -358,7 +355,6 @@ async function main() {
       dit(r.length >= 3, 'P les colis ont leur vignette', String(r.length));
       dit(r.every((x) => x.vu && x.op === '1'), 'P chaque vignette chargée est marquée (data-vu) et visible (opacité 1)', JSON.stringify(r.map((x) => [x.vu, x.op])));
       dit(r.every((x) => x.fit === 'cover' && x.rempli && x.carre), 'P un carré rempli, centré (object-fit: cover)', JSON.stringify(r.map((x) => [x.fit, x.rempli, x.carre])));
-      dit(r.every((x) => x.rayon === '14px'), 'P le même rayon (14 px) partout', JSON.stringify(r.map((x) => x.rayon)));
       await ctx.close();
     });
   } finally { await b.close(); srv.close(); }

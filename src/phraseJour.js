@@ -1,15 +1,19 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  LA PHRASE DU JOUR (8 nov. 2026, « beauté ») — en tête de Ma journée
-//  « 3 colis à envoyer aujourd’hui, le premier avant 18 h · 2 à retirer »
+//  « Premier colis à envoyer avant 18 h, puis les retraits »
 //
-//  ⚠️ AUCUN NOMBRE N'EST RECALCULÉ ICI. Les entrées sont les cases que l'écran
-//  publie déjà (`T` de Ma journée : « À envoyer » = `vrm_colis_aposter`, « À
-//  retirer » = `vrm_colis_retirer`, leur `presses` — la règle de la limite
-//  d'envoi, api/_lib/limite-envoi.js) ; la phrase les MET EN MOTS, c'est tout.
+//  ⚠️ AUCUN NOMBRE N'EST RECALCULÉ ICI, ET AUCUN COMPTE N'EST REDIT. Les entrées
+//  sont les cases que l'écran publie déjà (`T` de Ma journée : « À envoyer » =
+//  `vrm_colis_aposter`, « À retirer » = `vrm_colis_retirer`, leur `presses` — la
+//  règle de la limite d'envoi, api/_lib/limite-envoi.js). Les COMPTES sont écrits
+//  juste dessous (la grande carte, les petites) : §7 « le même nombre ne s'écrit
+//  jamais deux fois sur un écran » (banc journee-mieux, J) — la phrase dit donc
+//  ce que les cartes ne disent pas : l'HEURE du plus pressé (lue dans l'e-mail du
+//  bordereau, jamais devinée) et ce qui reste à faire, en mots.
 //  « Pas su » ne vaut pas zéro : une case pas lue ne se dit pas, et si aucune
 //  n'est lue la phrase se tait (`null` ⇒ la phrase fixe de l'écran revient).
-//  « Rien » ne se dit que si TOUT ce qu'on dit est LU et à zéro.
-//  L'heure ne change que le TON (« ce matin », « ce soir ») — jamais un chiffre.
+//  « Aucun colis » seulement si TOUT ce qu'on dit est LU et à zéro.
+//  L'heure de la journée ne change que le TON (« ce matin », « ce soir »).
 //  Module pur : `scripts/audit-phrase-jour.cjs` l'exécute (--prouve).
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -30,22 +34,16 @@ export function phraseDuJour(cases, heure) {
   const env = cases && cases.envoyer, ret = cases && cases.retirer;
   const nEnv = nb(env), nRet = nb(ret);
   if (nEnv == null && nRet == null) return null;
-  const morceaux = [];
+  const h = Number(heure);
+  const tonJour = h >= 18 || h < 5 ? 'ce soir' : h < 12 ? 'ce matin' : 'aujourd’hui';
   if (nEnv > 0) {
     const p = env.presses;
-    const nAuj = p && Number(p.nAuj) > 0 ? Number(p.nAuj) : 0;
-    const h = p && !p.urgent ? heureEnMots(p.heure) : '';
-    // Le nombre dit est TOUJOURS celui de la case (`nEnv`) ; l'heure est celle du plus pressé.
-    if (nAuj > 0 && h) morceaux.push(nEnv === 1 ? `1 colis à envoyer avant ${h}` : nAuj >= nEnv ? `${nEnv} colis à envoyer aujourd’hui, le premier avant ${h}` : `${nEnv} colis à envoyer, le plus pressé avant ${h}`);
-    else if (nAuj > 0) morceaux.push(nAuj >= nEnv ? `${nEnv} colis à envoyer aujourd’hui` : `${nEnv} colis à envoyer, ${nAuj} aujourd’hui`);
-    else morceaux.push(`${nEnv} colis à envoyer`);
+    const aujourdhui = !!(p && Number(p.nAuj) > 0);
+    const lim = p && !p.urgent && aujourdhui ? heureEnMots(p.heure) : '';
+    const tete = lim ? `Premier colis à envoyer avant ${lim}` : aujourdhui ? 'Des colis à envoyer aujourd’hui' : 'Des colis à envoyer';
+    return nRet > 0 ? `${tete}, puis les retraits` : tete;
   }
-  if (nRet > 0) morceaux.push(nEnv > 0 ? `${nRet} à retirer` : `${nRet} colis à retirer`);
-  if (morceaux.length) return morceaux.join(' · ');
-  // Plus rien : seulement si les DEUX cases sont lues (une case pas lue n'est pas « rien »).
-  if (nEnv === 0 && nRet === 0) {
-    const h = Number(heure);
-    return h >= 18 || h < 5 ? 'Aucun colis ce soir.' : h < 12 ? 'Aucun colis ce matin.' : 'Aucun colis pour aujourd’hui.';
-  }
+  if (nRet > 0) return 'Des colis t’attendent au point relais';
+  if (nEnv === 0 && nRet === 0) return `Aucun colis ${tonJour}.`;
   return null;
 }

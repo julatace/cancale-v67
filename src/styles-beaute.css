@@ -55,86 +55,15 @@
   :root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-glisse-actif]::after { transition: none; transform: none; }
 }
 
-/* ══ 1. MA JOURNÉE FAÇON ÉCRAN D'ACCUEIL ════════════════════════════════════
-   « À faire » n'est plus une liste plate : la PREMIÈRE ligne (l'ordre de toujours,
-   le plus pressé d'abord) est une grande carte — sa photo, son titre, son geste
-   en un bouton bleu (le seul de l'écran) ; les autres sont de petites cartes en
-   grille de deux (les widgets de l'écran d'accueil d'iOS). Une ligne qui porte
-   deux gestes (URSSAF, litige, Leboncoin) garde sa rangée pleine largeur.
-   Mêmes éléments, mêmes attributs (`data-tuile`, `data-job`…) : la forme seule. */
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-day-task-list.vrm-accueil-jour {
-  display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important;
-  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important; padding: 0 !important;
-}
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour > .vrm-day-task,
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour > [data-alertes-argent] > .vrm-day-task {
-  position: relative; background: var(--d-carte) !important; border: 0 !important; border-radius: var(--d-r-carte) !important;
-  box-shadow: var(--d-ombre-carte) !important; margin: 0 !important; overflow: hidden;
-}
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task + .vrm-day-task { border-top: 0 !important; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task::before { content: none !important; }
-/* Une ligne à deux gestes : sa rangée, pleine largeur. */
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-groupe { grid-column: 1 / -1; }
-
-/* La petite carte : la vignette en haut, le titre sur deux lignes, la note dessous. */
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task:not(.is-prochain) {
-  display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: flex-start !important;
-  gap: 10px !important; min-height: 128px !important; padding: 14px 14px 12px !important; text-align: left;
-}
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task:not(.is-prochain) > .vrm-day-task-textes { width: 100%; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task:not(.is-prochain) > .vrm-day-task-action { display: none !important; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task:not(.is-prochain) .vrm-day-task-title { font-size: var(--d-t-15) !important; line-height: 1.3 !important; }
-
-/* La grande carte : « la prochaine chose à faire ». */
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain { grid-column: 1 / -1; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task.is-prochain,
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain.is-groupe > .vrm-day-task-ouvrir {
-  display: grid !important; grid-template-columns: auto minmax(0, 1fr) !important; grid-template-areas: "photo textes" "geste geste";
-  align-items: center !important; column-gap: 16px !important; row-gap: 16px !important; padding: 18px !important; min-height: 0 !important;
-}
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain.is-groupe { padding: 0 0 18px !important; display: flex !important; flex-direction: column !important; align-items: stretch !important; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain.is-groupe > .vrm-day-task-ouvrir { padding-bottom: 0 !important; grid-template-areas: "photo textes"; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain.is-groupe > :not(.vrm-day-task-ouvrir):not(.vrm-cycle-tete) { margin: 14px 18px 0 !important; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-pile { grid-area: photo; width: 84px; height: 80px; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-pile-v { width: 72px; height: 72px; border-radius: var(--d-r-case); }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-pile:not(.is-pile) { width: 72px; height: 72px; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-pile:not(.is-pile) .vrm-pile-v { top: 0; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-pile-v.is-tuile svg { width: 28px; height: 28px; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-day-task-textes { grid-area: textes; gap: 4px !important; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-day-task-title {
-  font-size: var(--d-t-20) !important; font-weight: 700 !important; line-height: 1.22 !important; letter-spacing: -.018em !important;
-}
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour .vrm-day-task.is-prochain .vrm-day-task-note { font-size: var(--d-t-15) !important; line-height: 1.35 !important; }
-/* Le geste en un tap : LE bouton bleu de l'écran (toute la carte répond, le bouton le dit). */
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task.is-prochain > .vrm-day-task-action {
-  grid-area: geste; display: flex !important; align-items: center; justify-content: center; gap: 6px; height: 44px; margin: 0 !important; padding: 0 16px !important;
-  border-radius: var(--d-r-ctrl) !important; background: var(--d-accent) !important; color: #FFFFFF !important;
-  font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-17);
-}
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task.is-prochain > .vrm-day-task-action .vrm-day-task-action-mot { display: inline !important; }
-:root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task.is-prochain > .vrm-day-task-action > [aria-hidden] { display: none; }
-@media (hover: hover) and (pointer: fine) {
-  :root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task:hover { background: color-mix(in srgb, var(--d-case) 45%, var(--d-carte)) !important; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  :root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task { transition: transform 140ms var(--d-sortie), background-color 140ms ease; }
-  :root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task:active { transform: scale(.98); }
-}
-/* L'ordinateur : la grande carte se couche (photo · texte · geste sur une ligne), petites cartes par trois. */
-@media (min-width: 1280px) {
-  :root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-day-task-list.vrm-accueil-jour { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
-}
-@media (min-width: 1024px) {
-  :root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task.is-prochain {
-    grid-template-columns: auto minmax(0, 1fr) auto !important; grid-template-areas: "photo textes geste"; padding: 18px 20px !important;
-  }
-  :root:root:root:root body .vrm-app-shell .vrm-day-layout .vrm-accueil-jour button.vrm-day-task.is-prochain > .vrm-day-task-action { min-width: 132px; }
-}
-/* La phrase du jour, sous « Ma journée » : la voix de la phrase d'écran, un cran plus présente. */
-:root:root body .vrm-app-shell .vrm-day-layout [data-phrase-jour] { font-weight: 600; }
+/* ══ 1. MA JOURNÉE ══════════════════════════════════════════════════════════
+   (8 nov., changement de cap du coordinateur) La refonte visuelle de Ma journée
+   appartient à la branche `claude/direction-artistique` : ici, seulement la
+   LOGIQUE — la première ligne de « À faire » porte `data-prochain` / `is-prochain`
+   (la prochaine chose à faire) et la phrase du jour ; aucune forme changée. */
 
 /* ══ 2. LES PHOTOS, PARTOUT LA MÊME VIGNETTE ════════════════════════════════
-   Un carré centré (`object-fit: cover`), le rayon d'une vignette (14), un fond
+   Un carré centré (`object-fit: cover`) — le rayon reste celui de chaque écran
+   (la direction artistique le décide) —, un fond
    neutre qui tient la place pendant le chargement, et l'image qui arrive en
    FONDU (opacité seule : la taille est celle du conteneur, rien ne saute).
    `data-vu` est posé par src/fonduPhotos.js au chargement (ou à l'erreur) ; un
@@ -143,7 +72,6 @@
 :root body .vrm-app-shell .vrm-main :is(.vrm-pile-v, .vrm-colis-photo, .vrm-toutes-photo, .vrm-buy-ph, .vrm-rpf-vignette, .vrm-tournee-photo, .vrm-fiche-photo, .vrm-ledger-photo, .vrm-recherche-photo, .vrm-sale-photo) {
   background-color: var(--d-case); overflow: hidden;
 }
-:root body .vrm-app-shell .vrm-main :is(.vrm-colis-photo, .vrm-toutes-photo, .vrm-buy-ph, .vrm-tournee-photo, .vrm-fiche-photo, .vrm-ledger-photo, .vrm-sale-photo) { border-radius: var(--d-r-case) !important; }
 :root body .vrm-app-shell .vrm-main :is(.vrm-pile-v, .vrm-colis-photo, .vrm-toutes-photo, .vrm-buy-ph, .vrm-rpf-vignette, .vrm-tournee-photo, .vrm-fiche-photo, .vrm-ledger-photo, .vrm-recherche-photo, .vrm-sale-photo) > img {
   display: block; width: 100% !important; height: 100% !important; object-fit: cover !important; object-position: center !important;
 }
