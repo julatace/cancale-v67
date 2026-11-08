@@ -96,7 +96,10 @@ async function passe(mut) {
 
   // A4 / A5 / A6 — Ma journée (source, sans commentaires).
   const BAVARD_A4 = !!process.env.BAVARD;
-  const z = (app.split('const libCase = (id, n)')[1] || '').split('Les cases à zéro restent lisibles')[0] || app.split('const libCase = (id, n)')[1] || '';
+  const z0 = (app.split('const libCase = (id, n)')[1] || '').split('Les cases à zéro restent lisibles')[0] || app.split('const libCase = (id, n)')[1] || '';
+  // (8 nov., « beauté ») La première carte devient « la prochaine chose à faire » : chaque carte passe par
+  // `P(…)` (la même carte, une classe en plus). La règle se juge sur la carte, pas sur l'enveloppe.
+  const z = z0.replace(/\bP\((carte\w+\(\)|tache\([^()]*\))\)/g, '$1');
   // (6 nov., vague 3) + la carte « en ligne deux fois » (`deuxFois`, src/enLigneDeuxFois.js).
   // (8 nov.) La règle, plus une liste figée : CHAQUE carte rendue dans la liste « À faire »
   // (`{cond ? carteX() : null}`, `{liste.map(…)}`, `{urssafJob ? tache(…) : null}`) a son terme
