@@ -310,6 +310,7 @@ import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
+import { creerLectureGroupee, idGroupable } from "./lectureGroupee.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
@@ -4728,6 +4729,29 @@ const noterReglage = (id, rate) => {
 // Une ligne que « Supprimer des données… » a vidée (`{supprime:true, purgedAt}`) :
 // le DELETE ne passe pas sur `app_data`, on la vide à la place (§deleteVintedAccount).
 const ligneVideeParToi = (row) => !!(row && row.data && row.data.supprime === true && !row.data.payload);
+// (8 nov., démarrage) Une ligne de moisson projetée (`SEL_MOISSON`) : `[ligne]`,
+// `[]` (pas de ligne) ou `null` (pas su). Groupée avec les autres demandes du même
+// tour et de la même session (src/lectureGroupee.js).
+const _lireLigneMoissonSeule = async (id, auth) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch (_) { return null; }
+};
+const _groupeMoisson = creerLectureGroupee(async (ids, auth) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });
+    if (!res.ok) return { ok: false, statut: res.status };
+    const rows = await res.json();
+    return Array.isArray(rows) ? { ok: true, rows } : { ok: false, statut: 0 };
+  } catch (_) { return { ok: false, statut: 0 }; }
+}, _lireLigneMoissonSeule);
+const lireMoissonGroupee = (id) => {
+  const auth = sbAuth().Authorization || '';
+  return idGroupable(id) ? _groupeMoisson.charger(id, auth) : _lireLigneMoissonSeule(id, auth);
+};
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
   if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
@@ -4739,12 +4763,12 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
   try {
     // (6 nov., vitesse 2) Projetée (§4.4, `SEL_MOISSON`) : date de capture,
     // marque « vidée par toi » et `payload` — tout ce qui est lu plus bas.
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=${SEL_MOISSON}`, {
-      headers: sbAuth(),
-    });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    const row = Array.isArray(rows) && rows[0] ? ligneCommandes(rows[0]) : undefined;
+    // (8 nov., démarrage) Les comptes lus au même moment partent ENSEMBLE
+    // (`id=in.(…)`, src/lectureGroupee.js) : 14 lectures → 1 au banc. Mêmes
+    // lignes, même « pas su » (`null`) qu'une lecture seule.
+    const rows = await lireMoissonGroupee(`harvest_${uid}_${type}`);
+    if (!Array.isArray(rows)) return null;
+    const row = rows[0] ? ligneCommandes(rows[0]) : undefined;
     // 5.167 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
     // règle « en ligne » — la lecture complète la plus récente (son dressing ou
     // sa lecture publique), sans les supprimées, et « à confirmer » au-delà de
