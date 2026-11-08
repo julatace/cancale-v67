@@ -510,6 +510,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **8 nov. · Aide et signalement** : « ? » après la phrase de chaque écran (3 questions, article, « Signaler ») ; signalement enrichi (capture SCHÉMATIQUE en nombres, 30 requêtes par famille, 50 erreurs, montants/pseudos masqués) ; centre d'aide `vrm.center/aide` (généré par `scripts/aide-generer.cjs`) ; alertes de plantage groupées (1/h) au propriétaire. `docs/passation/2026-11-08-aide-signalement.md`. Geste : ouvrir vrm.center/aide.
 
 - **8 nov. · À retirer : villes, carte, délai** : villes = seulement celles où un colis compté attend, triées par urgence, + « Autres » (`selecteurVilles`) ; carte AUSSI au téléphone (200 px, suit la ville, deux doigts, « Agrandir », hors réseau ⇒ rien) ; barre du délai arrivée lue → limite (lue, sinon « estimée »), ambre ≤ 24 h, jamais rouge, en tête du point si commune (`src/delaiRetrait.js`). `docs/passation/2026-11-08-retirer-carte-delai.md`. Geste : aucun.
 - **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
@@ -541,7 +542,6 @@ sans la fonction.
 
 - **7 nov. · PASSATION GÉNÉRALE** : prod = PR #1027 ; 4 chantiers finis ou presque en attente sur `claude/attente-*` (hors réseau, e-mails HTML, audit des chiffres, finition textes/grand texte/sombre — dans cet ordre) ; découpage d'App.jsx et relecture finale pas commencés ; au plus 2 agents de bancs (le conteneur tombe). `docs/passation/2026-11-07-passation-generale.md`.
 
-- **6 nov. · E-mails mis en page (v36)** : HTML d'origine ASSAINI des seuls e-mails à geste, 30 jours, ligne à part `email_html_*` (liste blanche, images sur geste, pixels retirés, 150 Ko ; jamais 503 pour lui ; purge au cron du matin ; relu et ré-assaini), cadre `sandbox` sans scripts, masqué en stream. `docs/passation/2026-11-06-emails-html.md`. Geste : aucun.
 
 
 
