@@ -316,7 +316,7 @@ const EbayEvaluations = _ecranEbay("EbayEvaluations"), EbayRetours = _ecranEbay(
 import {repereAdmis} from "./repereEbay.js";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
-import { boutiqueIci, boutiqueOrion, installerExtensionIci, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur, motsNavigateur } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, installerExtensionIci, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur, motsNavigateur, ouExtensionIci } from "./navigateurExtension.js";
 // (5 nov., Julien sur Orion : « elle affiche Chrome alors que je suis sur Orion »)
 // Les mots du navigateur D'ICI, une fois : « ce Chrome », « Orion », « ce
 // navigateur »… — jamais « Chrome » en dur dans une phrase qui parle de lui.
@@ -9437,7 +9437,10 @@ function raisonExtGlobale(sansSouris, opt) {
     // 19 oct. : Firefox pour Android accepte l'extension — dit seulement si sa
     // fiche est PUBLIÉE (`LIENS_BOUTIQUES`), jamais une boutique devinée.
     const ffAndroid = mobileIci() === 'firefox-android' && LIENS_BOUTIQUES.firefox;
-    return { code: 'telephone', relais: rl.niveau, mobile: mobileIci(), texte: `Depuis ton ordinateur${ffAndroid ? ' — ou installe l’extension dans ce Firefox' : ''}`, role };
+    // (8 nov., iPhone seul) Sur iPhone, l'extension peut vivre dans ORION, sur ce même
+    // téléphone : « ordinateur » seul enverrait chercher un appareil qu'il n'a peut-être pas.
+    const orionIos = mobileIci() === 'ios' && !!boutiqueOrion();
+    return { code: 'telephone', relais: rl.niveau, mobile: mobileIci(), texte: `Depuis ton ordinateur${ffAndroid ? ' — ou installe l’extension dans ce Firefox' : orionIos ? ' — ou depuis Orion, sur cet iPhone' : ''}`, role };
   }
   if (!vmrExtPresent()) return { code: 'absente', texte: 'Extension VRM pas détectée dans ce navigateur', role };
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
@@ -17244,7 +17247,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Paramètres → État des connexions), puis recharge-la dans la page des extensions de son navigateur (⟳ sur Chrome).</span>;
   // (29 oct.) Une ligne : le geste, sans la liste de ce qu'il débloque (le titre
   // « Lecture seule » et la ligne « Extension » le disent déjà, §7).
-  else if (code === 'telephone') geste = <span data-etat-geste="telephone">Pour agir, ouvre VRM sur ton ordinateur.{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
+  else if (code === 'telephone') geste = <span data-etat-geste="telephone">{mobileIci() === 'ios' && boutiqueOrion() ? 'Pour agir, ouvre VRM sur ton ordinateur ou dans Orion (l’extension y vit).' : 'Pour agir, ouvre VRM sur ton ordinateur.'}{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" className="vrm-b vrm-b-primaire" onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
@@ -17945,7 +17948,7 @@ function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null
   }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
   const comptes = aLaCoque ? comptesCoque : comptesLus;
   const v = pont.v || vmrExtVersion();
-  const verif = verifierInstallation({ pont: { etape: pont.on ? etape : 'absente', version: v, enRetard: !!v && extEnRetard(v), telephone: sansSouris }, comptes, emails, relu });
+  const verif = verifierInstallation({ pont: { etape: pont.on ? etape : 'absente', version: v, enRetard: !!v && extEnRetard(v), telephone: sansSouris, ici: ['ios-orion', 'firefox-android'].includes(mobileIci()), ou: ouExtensionIci() }, comptes, emails, relu });
   const lienGeste = (cle) => cle === 'installer' ? lienInstallerIci(sansSouris) : cle === 'maj' ? (lienInstallerIci(sansSouris) || '/VRM-extension.zip') : (cle === 'vinted' || cle === 'relire') ? 'https://www.vinted.fr' : '';
   const onGeste = (cle) => {
     if (cle === 'emails') { ouvrirEmailsRelier(); return; }
@@ -38425,7 +38428,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // « 1 sur 3 », « — ») ; l'explication longue passe en infobulle (title).
         // Aucune règle de calcul n'a changé : mêmes variables qu'avant.
         const libMois = moisNom;
-        const aDaterTitre = adVinted > 0 ? ` ${adVinted} vente${adVinted>1?'s':''} Vinted sans date de versement : ${extSait('versement')==='ok' ? `l'extension ${adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted` : extSait('versement')==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.versement}) pour ${adVinted>1?'les':'la'} récupérer` : `l'extension, sur ton ordinateur, ${adVinted>1?'les':'la'} récupère`}.` : '';
+        const aDaterTitre = adVinted > 0 ? ` ${adVinted} vente${adVinted>1?'s':''} Vinted sans date de versement : ${extSait('versement')==='ok' ? `l'extension ${adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted` : extSait('versement')==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.versement}) pour ${adVinted>1?'les':'la'} récupérer` : `l'extension, ${ouExtensionIci()}, ${adVinted>1?'les':'la'} récupère`}.` : '';
         const auMoinsRecu = adTous > 0 || nomsVentesKO.length > 0 || !!phraseNcRecu;
         W.vendu = vuHero ? (
           <div className="vrm-day-money vrm-day-card vrm-jc" style={{border:`1px solid ${C.border}`,background:C.card}}>
@@ -48239,7 +48242,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     else if (ventesVinted === null) etats.push(['vinted', 'pas-su', 'Vinted : ventes pas lues — rien n’est perdu, réessaie dans un moment.']);
     // (1er nov., vendeur neuf) Aucun compte relié : ce n'est pas « aucune vente »,
     // c'est « rien lu » — le geste, comme les autres sites (« jamais lu »).
-    else if (Array.isArray(comptes) && comptes.length === 0 && !(Array.isArray(ventesVinted) && ventesVinted.length)) etats.push(['vinted', 'jamais', 'Vinted : aucun compte relié — installe l’extension VRM sur ton ordinateur, puis ouvre vinted.fr une fois connecté.']);
+    else if (Array.isArray(comptes) && comptes.length === 0 && !(Array.isArray(ventesVinted) && ventesVinted.length)) etats.push(['vinted', 'jamais', `Vinted : aucun compte relié — installe l’extension VRM ${ouExtensionIci()}, puis ouvre vinted.fr une fois connecté.`]);
     else if (ventesKO && ventesKO.length) {
       const labels = load('vinted_account_labels', {}) || {};
       const noms = ventesKO.map((u) => labels[u] || ((comptes || []).find((a) => String(a.vinted_user_id) === String(u)) || {}).login || ('#' + u));
@@ -48306,7 +48309,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         ? <div data-toutes-vide="" className="vrm-toutes-vide">
             {enCours ? <p>{PAS_SU.enCours}</p>
               : visibles.some((e) => e[1] === 'pas-su' || e[1] === 'partiel') ? <p>Aucune vente lue : une lecture a échoué (ci-dessus). Rien n’est perdu.</p>
-              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p data-toutes-etat-site="vinted" data-etat="jamais">Vinted : aucun compte relié — installe l’extension VRM sur ton ordinateur, puis ouvre vinted.fr une fois connecté : elle range tes ventes toute seule.</p></>
+              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p data-toutes-etat-site="vinted" data-etat="jamais">Vinted : aucun compte relié — installe l’extension VRM {ouExtensionIci()}, puis ouvre vinted.fr une fois connecté : elle range tes ventes toute seule.</p></>
               : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part, il apparaît ici, sur tous tes sites.</p></>}
           </div>
         : (
@@ -51881,7 +51884,7 @@ function AppCoeur() {
         </GardeEcran>
         </BarreHautSlot.Provider>
       </main>
-      {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark}
+      {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark} vend={vendActuel()} ouInstaller={ouExtensionIci()}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
         onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/></GardeEcran>}
       {visite && !bienvenue && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}

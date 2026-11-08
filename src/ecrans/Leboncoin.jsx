@@ -2205,9 +2205,9 @@ function LeboncoinScreen() {
                 {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
               </>);
               return (<>
-                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</> })}
+                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, là où est l’extension : ses photos arrivent ici au passage.</> })}
                 {pretes.length > 0 && Groupe({ titre: "Prêtes", liste: pretes })}
-                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois sur ton ordinateur : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
+                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois, là où est l’extension : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
               </>);
             })()}
           </>)}
