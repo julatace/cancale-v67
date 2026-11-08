@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.324.0';
+const CODE_VERSION = '5.325.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -184,7 +184,10 @@ function ouvrirVRMDepuis(urlActive, opts) {
   const p = plateformeDe(urlActive);
   let idExt = ''; try { idExt = String(chrome.runtime.id || ''); } catch (_) {}
   const lier = !!(opts && opts.lier && idExt);
-  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '');
+  // 5.325 : « Continuer avec Google / Discord » — un nom de la liste, jamais
+  // un texte reçu tel quel ; seulement avec une liaison.
+  const connexion = lier && FOURNISSEURS_CONNEXION.includes(String((opts && opts.connexion) || '')) ? String(opts.connexion) : '';
+  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
   try {
     chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
       const t = (ouverts || [])[0];
@@ -542,11 +545,41 @@ function nonceAleatoire() {
 // « Se connecter » (fenêtre de l'icône, carte du logo) : on note la demande, et
 // on ouvre VRM TOUT DE SUITE — aucune attente avant l'ouverture (la carte de
 // connexion pouvait disparaître avant d'avoir ouvert VRM : 5 fois sur 50).
-async function lierAvecVRM(urlActive) {
+async function lierAvecVRM(urlActive, connexion) {
   const l = (await lireLiaison()) || {};
   await ecrireLiaison(Object.assign({}, l, { demandeAt: Date.now() }));
-  ouvrirVRMDepuis(urlActive, { lier: true });
+  ouvrirVRMDepuis(urlActive, { lier: true, connexion });
   return { ok: true };
+}
+// ── 5.325 (8 nov.) : « CONTINUER AVEC GOOGLE / DISCORD » ──────────────────
+// Julien : « une personne qui a créé son compte avec Google ou Discord […] ne
+// va pas pouvoir » se connecter à l'extension — elle n'a pas de mot de passe
+// VRM. La fenêtre propose ces deux boutons SEULEMENT si Supabase dit que le
+// fournisseur est activé (`/auth/v1/settings`, la clé publique, la même
+// lecture que l'écran de connexion de l'app). « Pas su » (réseau, forme
+// inattendue) ⇒ `ok:false` et aucun bouton : jamais un bouton qui mène à une
+// erreur. Le clic ne fait rien d'autre que « Se connecter avec VRM » : VRM
+// s'ouvre avec `connexion=<fournisseur>` et l'app ADRESSE sa session à CETTE
+// extension (nonce, `demanderLiaison`) — aucun jeton ne passe par l'adresse.
+// Lu au plus une fois par 10 minutes (`chrome.storage.local`, §4.9).
+const FOURNISSEURS_CONNEXION = ['google', 'discord'];
+const FOURNISSEURS_STORE = 'vrmFournisseurs';
+async function fournisseursConnexion() {
+  try {
+    const c = (await chrome.storage.local.get(FOURNISSEURS_STORE))[FOURNISSEURS_STORE];
+    if (c && typeof c.google === 'boolean' && typeof c.discord === 'boolean' && Date.now() - Number(c.at || 0) < 10 * 60000 && Date.now() >= Number(c.at || 0)) return { ok: true, google: c.google, discord: c.discord };
+  } catch (_) {}
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return { ok: false };
+    const j = await r.json();
+    const ext = j && j.external;
+    if (!ext || typeof ext !== 'object' || Array.isArray(ext)) return { ok: false };
+    if (FOURNISSEURS_CONNEXION.some((id) => ext[id] !== undefined && typeof ext[id] !== 'boolean')) return { ok: false };
+    const out = { google: ext.google === true, discord: ext.discord === true };
+    try { await chrome.storage.local.set({ [FOURNISSEURS_STORE]: Object.assign({ at: Date.now() }, out) }); } catch (_) {}
+    return Object.assign({ ok: true }, out);
+  } catch (_) { return { ok: false }; }
 }
 const UUID_VRM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function demanderLiaison(msg) {
@@ -852,6 +885,12 @@ function renouvelerUneFois() {
 // qui vient de le poser — donc toujours frais, même en cas d'écritures en
 // parallèle.
 let _statutDernierRefus = null;
+// 5.325 (8 nov., carte vue sur son iPhone : « la base n'a pas répondu » pour
+// tout, sans distinction) : la FAMILLE de la ligne et la TAILLE du corps du
+// dernier refus voyagent avec son code — `noterFlux` en garde les 5 derniers,
+// datés, que la carte montre en repli. Jamais le corps ni un identifiant.
+let _familleDernierRefus = '';
+let _octetsDernierRefus = 0;
 async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
@@ -870,16 +909,18 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
     if (!(s && s.access_token && s.user_id)) return 'sans_session';
     if(ownerAttendu!=null&&String(s.user_id)!==String(ownerAttendu))return 'sans_session';
     const owned = list.map((r) => Object.assign({}, r, { owner: s.user_id }));
+    const corps = JSON.stringify(owned);
+    octets = corps.length;
     let target = onConflict;
     if (table === 'app_data' && onConflict === 'id') target = 'owner,id';
     if (table === 'vinted_accounts' && onConflict === 'vinted_user_id') target = 'owner,vinted_user_id';
     return fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${target}`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${(s && s.access_token) || SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(owned),
+      body: corps,
     });
   };
-  let statut = 'reseau';
+  let statut = 'reseau', octets = 0;
   try {
     let res = await envoyer();
     if (res === 'sans_session') throw Object.assign(new Error('sans_session'), { statut: 'sans_session' });
@@ -908,6 +949,8 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   //    depuis la chaîne du tampon — attendre `noterDiag` l'y bloquerait.
   try { noterDiag(`ecriture_ratee_${familleEcriture(table, list)}_${statut}`); } catch (_) {}
   _statutDernierRefus = statut;
+  try { _familleDernierRefus = familleEcriture(table, list); } catch (_) { _familleDernierRefus = ''; }
+  _octetsDernierRefus = octets;
   return false;
 }
 
@@ -2511,7 +2554,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // « Se connecter avec VRM » : ouvre l'app, qui connecte l'extension.
     // Le logo des sites (vrm-badge) aussi : il ouvre VRM à chaque fois (11 octobre).
     if (msg && (msg.from === 'cancale-popup' || msg.from === 'vrm-badge') && msg.action === 'lierAvecVRM') {
-      lierAvecVRM((sender && sender.tab && sender.tab.url) || msg.urlActive || '').then(sendResponse, () => sendResponse({ ok: false }));
+      const connexion = msg.from === 'cancale-popup' && FOURNISSEURS_CONNEXION.includes(String(msg.connexion || '')) ? String(msg.connexion) : '';
+      lierAvecVRM((sender && sender.tab && sender.tab.url) || msg.urlActive || '', connexion).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.325 : les fournisseurs activés chez Supabase (Google, Discord) — la
+    // fenêtre n'affiche un bouton que pour un `true` lu.
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'fournisseursConnexion') {
+      fournisseursConnexion().then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
     // La version du CODE qui tourne (la page de réparation la compare au
@@ -11928,7 +11978,14 @@ async function noterFlux(plateforme, ok) {
   try {
     const cur = (await chrome.storage.local.get('vrmFlux')).vrmFlux || {};
     const p = cur[plateforme] || {};
-    if (ok) { p.okAt = Date.now(); p.koStatut = null; } else { p.koAt = Date.now(); p.koStatut = _statutDernierRefus; }
+    if (ok) { p.okAt = Date.now(); p.koStatut = null; }
+    else {
+      p.koAt = Date.now(); p.koStatut = _statutDernierRefus;
+      // 5.325 : les 5 derniers refus, datés (code, famille, taille du corps).
+      const h = Array.isArray(p.refus) ? p.refus.slice(-4) : [];
+      h.push({ at: p.koAt, statut: _statutDernierRefus == null ? null : String(_statutDernierRefus), famille: String(_familleDernierRefus || ''), octets: Number(_octetsDernierRefus) || 0 });
+      p.refus = h;
+    }
     cur[plateforme] = p;
     await chrome.storage.local.set({ vrmFlux: cur });
   } catch (_) {}

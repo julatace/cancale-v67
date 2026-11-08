@@ -33,6 +33,12 @@
     button:disabled { opacity: .6; cursor: default; }
     button.sec { background: transparent; color: var(--texte); border-color: var(--bord); margin-top: 8px; }
     button.sec:hover { background: var(--survol); filter: none; }
+    /* 5.325 : « Continuer avec Google / Discord » — bouton neutre, logo à gauche
+       (chartes de Google et de Discord), une ligne. */
+    button.fourn { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    button.fourn svg { flex-shrink: 0; }
+    #oauthBox { margin-top: 0; }
+    #mdpOauthMot { margin-top: 10px; }
     .muted { font-size: 12px; color: var(--doux); margin-top: 10px; line-height: 1.5; }
     .muted a { color: var(--accent); }
     #mdpLien { display: inline-flex; align-items: center; min-height: 44px; }

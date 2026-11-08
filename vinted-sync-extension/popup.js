@@ -85,9 +85,9 @@ function ongletActif() {
 //    elle, est lue depuis le disque : sans réponse, elle ouvre VRM elle-même
 //    (avec l'identifiant de CETTE extension), répare le code (le ⟳), et si elle
 //    ne peut pas, déplie le mot de passe VRM et dit le geste.
-function ouvrirVRMPourLier(urlActive) {
+function ouvrirVRMPourLier(urlActive, connexion) {
   let id = ''; try { id = String(chrome.runtime.id || ''); } catch (_) {}
-  const cible = ongletVRM(urlActive) + (id ? '&lier-extension=' + encodeURIComponent(id) : '');
+  const cible = ongletVRM(urlActive) + (id ? '&lier-extension=' + encodeURIComponent(id) + (connexion ? '&connexion=' + connexion : '') : '');
   return new Promise((res) => {
     const t = setTimeout(() => res(false), 3000);
     const fin = (ok) => { clearTimeout(t); res(ok); };
@@ -100,14 +100,17 @@ function ouvrirVRMPourLier(urlActive) {
     } catch (_) { try { chrome.tabs.create({ url: cible }, () => fin(true)); } catch (_) { fin(ouvrirSansTabs(cible)); } }
   });
 }
-async function lierAvecVRM() {
+// `connexion` (5.325) : « Continuer avec Google / Discord » — un nom de la
+// liste, sinon rien (un clic sur « Se connecter avec VRM » passe un événement).
+async function lierAvecVRM(fournisseur) {
+  const connexion = typeof fournisseur === 'string' && FOURNISSEURS.some((f) => f.id === fournisseur) ? fournisseur : '';
   const st = document.getElementById('lierEtat');
   if (st) { st.textContent = 'J’ouvre VRM…'; st.hidden = false; }
   const urlActive = CARTE ? '' : await ongletActif();
   const r = await new Promise((res) => {
     const t = setTimeout(() => res(null), 4000);
     try {
-      chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'lierAvecVRM', urlActive }, (x) => {
+      chrome.runtime.sendMessage(Object.assign({ from: 'cancale-popup', action: 'lierAvecVRM', urlActive }, connexion ? { connexion } : {}), (x) => {
         clearTimeout(t);
         let e = null; try { e = chrome.runtime.lastError; } catch (_) { e = null; }
         res(e ? null : (x || null));
@@ -116,7 +119,7 @@ async function lierAvecVRM() {
   });
   if (r && r.ok) { if (!CARTE) window.close(); return; }
   // Pas de réponse : le code qui tourne n'est pas celui de cette page.
-  await ouvrirVRMPourLier(urlActive);
+  await ouvrirVRMPourLier(urlActive, connexion);
   const rep = await reparerSiPerime();          // 'recharge' : l'extension redémarre (et cette fenêtre avec)
   try { document.body.setAttribute('data-lier-secours', rep); } catch (_) {}
   if (rep === 'recharge') return;
@@ -125,6 +128,52 @@ async function lierAvecVRM() {
     : 'L’extension de ce Chrome tourne encore sur son ancien code : ouvre chrome://extensions et clique ⟳ sur VRM — ou connecte-toi ici avec ton mot de passe VRM.';
   const f = document.getElementById('mdpForm');
   if (f) { f.hidden = false; const m = document.getElementById('mail'); if (m) m.focus(); }
+}
+
+// ── 5.325 (8 nov.) : « CONTINUER AVEC GOOGLE / DISCORD » ─────────────────
+// Julien : « une personne qui a créé son compte avec Google ou Discord et qui
+// veut se connecter à l'extension, il ne va pas pouvoir ». Elle n'a pas de mot
+// de passe VRM. Deux boutons, SOUS « Se connecter avec VRM », affichés
+// seulement pour un fournisseur que Supabase dit ACTIVÉ (le service worker lit
+// `/auth/v1/settings`, `fournisseursConnexion`). Pas de réponse (code périmé,
+// réseau) ⇒ aucun bouton : jamais un bouton qui mène à une erreur. Le clic
+// ouvre VRM comme « Se connecter avec VRM », avec `connexion=<fournisseur>` :
+// l'app part chez Google/Discord si personne n'y est connecté, puis ADRESSE sa
+// session à CETTE extension. Aucun jeton ne passe par ici.
+// Logos : le « G » aux quatre couleurs de Google, la manette de Discord en
+// blurple — sur un bouton neutre (chartes « Sign in with Google » et Discord).
+const FOURNISSEURS = [
+  { id: 'google', nom: 'Google', logo: '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg>' },
+  { id: 'discord', nom: 'Discord', logo: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true" focusable="false"><path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/></svg>' },
+];
+// Trois états : `null` pas su (rien affiché) · `{google, discord}` lus.
+function lireFournisseurs(cb) {
+  let fini = false;
+  const fin = (v) => { if (fini) return; fini = true; cb(v); };
+  setTimeout(() => fin(null), 3000);
+  try {
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'fournisseursConnexion' }, (r) => {
+      let e = null; try { e = chrome.runtime.lastError; } catch (_) { e = null; }
+      fin(!e && r && r.ok === true ? r : null);
+    });
+  } catch (_) { fin(null); }
+}
+function rendreFournisseurs(r) {
+  const box = document.getElementById('oauthBox');
+  if (!box) return;
+  const actifs = r ? FOURNISSEURS.filter((f) => r[f.id] === true) : [];
+  try { document.body.setAttribute('data-fournisseurs', r ? (actifs.map((f) => f.id).join(',') || 'aucun') : 'pas-su'); } catch (_) {}
+  if (!actifs.length) { box.hidden = true; return; }
+  poserHtml(box, actifs.map((f) => `<button class="sec fourn" id="oauth-${f.id}" data-fournisseur="${f.id}" aria-label="Continuer avec ${f.nom}">${f.logo}<span>Continuer avec ${f.nom}</span></button>`).join(''));
+  for (const f of actifs) document.getElementById('oauth-' + f.id).addEventListener('click', () => lierAvecVRM(f.id));
+  box.hidden = false;
+  // Le formulaire du mot de passe le dit : un compte Google/Discord n'en a pas.
+  const mot = document.getElementById('mdpOauthMot');
+  if (mot) {
+    const noms = actifs.map((f) => f.nom).join(' ou ');
+    mot.textContent = `Compte créé avec ${noms} ? Utilise ${actifs.length > 1 ? 'les boutons' : 'le bouton'} au-dessus.`;
+    mot.hidden = false;
+  }
 }
 
 function rendreAuth(e) {
@@ -158,8 +207,10 @@ function rendreAuth(e) {
       : 'Connecte l’extension à ton compte VRM : un clic, VRM s’ouvre et la connecte tout seul. Rien à taper ici.'}</div>
     <button id="lierBtn">Se connecter avec VRM</button>
     <div class="muted" id="lierEtat" hidden></div>
+    <div id="oauthBox" hidden></div>
     <div class="muted" style="margin-top:12px"><a href="#" id="mdpLien">avec mon mot de passe VRM</a></div>
     <div id="mdpForm" hidden>
+      <div class="muted" id="mdpOauthMot" hidden></div>
       <div class="muted" style="margin-top:6px">${quelCompte}</div>
       <input id="mail" type="email" placeholder="Email de ton compte VRM" autocomplete="username" value="${esc(expiree && e.email ? e.email : '')}">
       <input id="pw" type="password" placeholder="Mot de passe VRM" autocomplete="current-password">
@@ -191,7 +242,10 @@ function rendreAuth(e) {
     document.getElementById('inBtn').classList.remove('sec');
     const phrase = box.querySelector('.who + .muted');
     if (phrase) phrase.textContent = 'Connecte l’extension avec ton email et ton mot de passe VRM. Aucun onglet VRM à ouvrir.';
+    // 5.325 : Google / Discord AU-DESSUS du formulaire (« Utilise les boutons au-dessus »).
+    formulaire.before(document.getElementById('oauthBox'));
   }
+  lireFournisseurs(rendreFournisseurs);
   const err = document.getElementById('authErr');
   // ⚠️ CAPTCHA (21 oct.) : Supabase peut exiger une vérification anti-robot
   //    (Turnstile) que cette fenêtre ne sait pas afficher. Le refus se traduit

@@ -452,7 +452,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.324.0';
+const EXT_ATTENDUE = '5.325.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -879,7 +879,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
+const EXT_CAPACITES = { lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1759,6 +1759,8 @@ const oauthStart = async (provider) => {
     // l'appareil. Seul, il ne sert à rien : il faut aussi le code du retour.
     try { localStorage.setItem(PKCE_KEY, JSON.stringify({ v: verifier, at: Date.now() })); } catch (_) {}
     const challenge = await makeChallenge(verifier);
+    // Une liaison d'extension en cours survit au retour dans un NOUVEL onglet (10 min).
+    try { garderLierPourRetourOAuth(); } catch (_) {}
     const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${encodeURIComponent(provider)}`
       + `&redirect_to=${encodeURIComponent(window.location.origin + window.location.pathname)}`
       + `&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256`;
@@ -9148,17 +9150,62 @@ let __lier = null;   // { id, at, etat: 'attente'|'encours'|'ok'|'deja'|'erreur'
 const __lierSubs = new Set();
 const lierNotifier = () => __lierSubs.forEach((fn) => { try { fn(); } catch (_) {} });
 const poserLier = (v) => { __lier = v; try { if (v && (v.etat === 'attente' || v.etat === 'encours')) sessionStorage.setItem(LIER_CLE, JSON.stringify({ id: v.id, at: v.at })); else sessionStorage.removeItem(LIER_CLE); } catch (_) {} lierNotifier(); __vmrNotifier(); };
+// ── 8 nov. (5.325) : « CONTINUER AVEC GOOGLE / DISCORD » DANS L'EXTENSION ────
+// Un compte créé avec Google ou Discord n'a pas de mot de passe VRM : la
+// fenêtre de l'extension ouvre `?lier-extension=<id>&connexion=google|discord`.
+//   · déjà connecté ici ⇒ la liaison part comme aujourd'hui (le fournisseur est
+//     ignoré : la session de cette page fait foi) ;
+//   · pas connecté ⇒ l'écran de connexion part TOUT DE SUITE chez le
+//     fournisseur (`AuthScreen`, seulement s'il est activé chez Supabase) ;
+//   · un autre nom que google/discord ⇒ rien.
+// `connexion=` quitte l'adresse aussitôt (un rechargement ne relance rien).
+// Le retour de Google revient sur `origin + pathname` : dans le MÊME onglet le
+// `sessionStorage` garde la liaison ; dans un NOUVEL onglet (téléphone), on la
+// retrouve par une marque de 10 min (la durée du vérificateur PKCE), lue une
+// fois seulement au retour (`?code=`/`?error=`), jamais un jeton.
+const LIER_RETOUR_CLE = 'vrm_lier_extension_oauth';
+const FOURNISSEURS_LIER = ['google', 'discord'];
+let __lierConnexion = null;      // { fournisseur, at } — consommé par AuthScreen
+let __lierRetourPerime = false;  // retour de Google après 10 min : le dire, avec le geste
+// Le bouton à nommer dans la fenêtre de l'extension : à un compte CRÉÉ avec
+// Google ou Discord, et seulement à une extension qui l'a (`lieroauth`, 5.325 —
+// « pas su » ne vaut pas « oui »), son bouton à lui ; sinon « Se connecter avec
+// VRM », que toutes les fenêtres depuis la 5.169 portent.
+function boutonLierExt() {
+  let f = ''; try { f = String((AUTH.user && AUTH.user.app_metadata && AUTH.user.app_metadata.provider) || ''); } catch (_) { f = ''; }
+  return (FOURNISSEURS_LIER.includes(f) && extSait('lieroauth') === 'ok') ? `« Continuer avec ${f === 'google' ? 'Google' : 'Discord'} »` : '« Se connecter avec VRM »';
+}
+function garderLierPourRetourOAuth() {
+  try {
+    if (__lier && (__lier.etat === 'attente' || __lier.etat === 'encours')) localStorage.setItem(LIER_RETOUR_CLE, JSON.stringify({ id: __lier.id, at: Date.now() }));
+  } catch (_) {}
+}
 if (typeof window !== 'undefined') {
   try {
     const q = new URLSearchParams(window.location.search || '');
     const id = q.get('lier-extension');
+    const fourn = String(q.get('connexion') || '').toLowerCase();
+    // Un nom de fournisseur quitte l'adresse ; `?connexion` nu (page d'accueil) reste.
+    const retirerConnexion = !!fourn;
     if (id && ID_EXT.test(id)) {
       __lier = { id, at: Date.now(), etat: 'attente' };
       try { sessionStorage.setItem(LIER_CLE, JSON.stringify({ id, at: Date.now() })); } catch (_) {}
-      try { q.delete('lier-extension'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {}
+      let session = null; try { session = localStorage.getItem('vrm_session'); } catch (_) { session = null; }
+      if (FOURNISSEURS_LIER.includes(fourn) && !session) __lierConnexion = { fournisseur: fourn, at: Date.now() };
+      try { q.delete('lier-extension'); if (retirerConnexion) q.delete('connexion'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {}
     } else {
+      if (retirerConnexion) { try { q.delete('connexion'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {} }
       const g = JSON.parse(sessionStorage.getItem(LIER_CLE) || 'null');
       if (g && ID_EXT.test(String(g.id || '')) && Date.now() - Number(g.at || 0) < 15 * 60000) __lier = { id: String(g.id), at: Number(g.at), etat: 'attente' };
+      if (q.has('code') || q.has('error') || q.has('error_description')) {
+        let m = null; try { m = JSON.parse(localStorage.getItem(LIER_RETOUR_CLE) || 'null'); localStorage.removeItem(LIER_RETOUR_CLE); } catch (_) { m = null; }
+        if (!__lier && m && ID_EXT.test(String(m.id || ''))) {
+          if (Date.now() - Number(m.at || 0) <= 10 * 60000) {
+            __lier = { id: String(m.id), at: Date.now(), etat: 'attente' };
+            try { sessionStorage.setItem(LIER_CLE, JSON.stringify({ id: __lier.id, at: __lier.at })); } catch (_) {}
+          } else __lierRetourPerime = true;
+        }
+      }
     }
   } catch (_) {}
 }
@@ -18326,6 +18373,24 @@ function AuthScreen() {
     // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
     // le libère si l’utilisateur revient en arrière avec le cache du navigateur.
   };
+  // 8 nov. (5.325) : arrivé de l'extension par « Continuer avec Google /
+  // Discord » (`__lierConnexion`, posé au chargement si aucune session) : on
+  // part chez le fournisseur sans second clic — seulement s'il est ACTIVÉ chez
+  // Supabase (lu, jamais supposé). Pas activé ⇒ cet écran, et la phrase.
+  // « Pas su » (lecture ratée) ⇒ la phrase, la demande reste : « Réessayer »
+  // la relance. Une fois, puis oubliée (deux minutes au plus après l'arrivée).
+  const [lierFournisseur] = React.useState(() => (__lierConnexion && mode === 'in' && Date.now() - __lierConnexion.at < 2 * 60000) ? __lierConnexion.fournisseur : '');
+  const [lierFournisseurMot, setLierFournisseurMot] = React.useState('');
+  React.useEffect(() => {
+    if (!lierFournisseur || !__lierConnexion) return;
+    const nom = lierFournisseur === 'google' ? 'Google' : 'Discord';
+    if (moyensConnexion.statut === 'pret') {
+      __lierConnexion = null;
+      if (providerEnabled(lierFournisseur)) { setLierFournisseurMot(''); oauth(lierFournisseur); }
+      else setLierFournisseurMot(`La connexion avec ${nom} n’est pas encore ouverte sur VRM. Connecte-toi ici avec ton e-mail et ton mot de passe VRM : l’extension sera connectée en même temps.`);
+    } else if (moyensConnexion.statut === 'erreur') setLierFournisseurMot(`Je n’ai pas pu vérifier la connexion avec ${nom}. Réessaie les moyens de connexion ci-dessous, ou connecte-toi avec ton e-mail : l’extension sera connectée en même temps.`);
+    else if (moyensConnexion.statut === 'initial') loadAuthSettings();
+  }, [moyensConnexion.statut]);
 
   const actionConfirmation = async (action) => {
     if(busy||demandeEnCours.current||(action!=='confirmer'&&enAttenteEmail))return;
@@ -18527,6 +18592,8 @@ function AuthScreen() {
               Connecte-toi ici : l'extension {NAV.de} sera connectée en même temps — rien à taper dans l'extension.
             </div>
           )}
+          {lierFournisseurMot && (mode==='in' || mode==='up') && <div role="status" data-lier-fournisseur-mot={lierFournisseur} style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>{lierFournisseurMot}</div>}
+          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>La connexion a pris plus de 10 minutes : l’extension n’a pas été connectée. Connecte-toi ici, puis reclique « Continuer avec Google » ou « Continuer avec Discord » dans la fenêtre de l’extension VRM.</div>}
 
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12}}>
@@ -20463,7 +20530,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
           : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe}, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton e-mail VRM'}</b>).</>)
         : voie === 'page'
           ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM.</>
-          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM {NAV.hautDe}, puis « Se connecter avec VRM ».</>}</span>; }
+          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM {NAV.hautDe}, puis {boutonLierExt()}.</>}</span>; }
   // Autre compte : une extension CONNECTÉE ouvre VRM quand on clique son icône
   // (sa fenêtre n'apparaît plus) — « clique l'icône, Se déconnecter » serait
   // impossible à suivre. Avant la 5.171 elle n'entend pas le canal adressé : le
@@ -20777,7 +20844,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
            message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
         <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : recharge cette page, ou clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’e-mail et le mot de passe de ton compte VRM</b> (pas ceux de Vinted).</p>
       ) : (
-        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône {NAV.hautDe}, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône {NAV.hautDe}, puis <b style={{color:C.text}} data-bouton-lier-ext="">{boutonLierExt()}</b>.</p>
       )}
     </>
   ) : etape === 'connectee' ? (
