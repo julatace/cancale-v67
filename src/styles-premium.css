@@ -218,7 +218,7 @@
 .vrm-main[data-ecran="journee"] .vrm-day-task-title { font-size: var(--p-t-rangee) !important; font-weight: var(--p-g-rangee) !important; letter-spacing: var(--p-ap-rangee) !important; }
 .vrm-main[data-ecran="journee"] .vrm-day-task-note { font-size: var(--p-t-note) !important; font-weight: 400 !important; }
 /* Une pile de 3 photos de 64 px qui déborde de sa rangée : 44 px, comme les autres icônes. */
-.vrm-main[data-ecran="journee"] .vrm-day-task .vrm-pile { width: 44px !important; height: 44px !important; flex: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task .vrm-pile { width: 44px !important; height: 44px !important; flex: none !important; margin-right: 6px !important; }
 .vrm-main[data-ecran="journee"] .vrm-day-task .vrm-pile .vrm-pile-v { width: 40px !important; height: 40px !important; border-radius: var(--p-r-vignette) !important; }
 .vrm-main[data-ecran="journee"] .vrm-day-task .vrm-pile-plus {
   font: 700 11px/16px var(--vrm-police) !important; min-width: 22px !important; height: 18px !important; padding: 0 5px !important; border-radius: 9px !important;
@@ -245,12 +245,12 @@
 .vrm-main[data-ecran="ventes"] .vrm-toutes-montant { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; letter-spacing: -.008em !important; }
 @media (max-width: 1023px) {
   .vrm-main[data-ecran="ventes"] .vrm-toutes-ligne { position: relative !important; min-height: 64px !important; padding-top: 10px !important; padding-bottom: 10px !important; align-items: center !important; column-gap: 12px !important; }
-  /* Titre sur toute la ligne (le montant à sa droite) ; dessous, la note et l'état
-     se partagent la ligne : l'état prend sa largeur, la note le reste. */
+  /* Titre (le montant à sa droite), puis la note entière, puis l'état SUR SA LIGNE
+     (règle du banc ventes-e2 V2 : l'état n'est jamais coupé ni fondu dans la note). */
   .vrm-main[data-ecran="ventes"] .vrm-toutes-titre { display: grid !important; grid-template-columns: minmax(0,1fr) auto !important; column-gap: 10px !important; row-gap: 1px !important; min-width: 0 !important; padding-right: 0 !important; }
   .vrm-main[data-ecran="ventes"] .vrm-toutes-titre > span:first-child { grid-column: 1 / -1 !important; padding-right: 64px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-  .vrm-main[data-ecran="ventes"] .vrm-toutes-meta { grid-column: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
-  .vrm-main[data-ecran="ventes"] .vrm-toutes-etat { grid-column: 2 !important; grid-row: 2 !important; margin: 0 !important; text-align: right !important; font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-meta { grid-column: 1 / -1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-etat { grid-column: 1 / -1 !important; grid-row: 3 !important; margin: 0 !important; text-align: left !important; font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; }
   .vrm-main[data-ecran="ventes"] .vrm-toutes-etat[data-ton="action"] { color: var(--p-encre) !important; font-weight: 600 !important; }
   .vrm-main[data-ecran="ventes"] .vrm-toutes-montant { position: absolute !important; right: 16px !important; top: 11px !important; }
 }
