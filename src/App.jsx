@@ -1978,7 +1978,7 @@ const ensureLocalOwner = (uid) => {
 
 // (8 nov., CI verte) L'adresse TELLE QU'À L'OUVERTURE. La navigation par `?tab=`
 // (`goto`, dans AppCoeur) l'efface aussitôt ; un écran chargé à la demande
-// (src/ecrans/*.jsx, découpage du 8 nov.) qui la lisait à SON chargement trouvait
+// (dossier src/ecrans, découpage du 8 nov.) qui la lisait à SON chargement trouvait
 // une adresse déjà vide : le retour de Stripe (`?abonnement=merci`) et
 // `?vue=compte` (retour de Google/Discord, de la gestion Stripe) étaient perdus
 // (banc comptes-securite). Capté ici, au chargement de l'app, une fois.
