@@ -20,3 +20,9 @@ Dépendances réinstallées avec npm ci (l'ancien lien node_modules ne contenait
 Contre-preuves : les nouveaux tests du contrôleur et du hook sont rouges sur l'arbre de base (progression démarrée trop tôt ; ancienne réponse reçue après changement de propriétaire). Une mutation retirant le recontrôle après fusion PDF échoue avec deux marquages indus. Les tests sont intégrés à la CI de reprise.
 
 Aucune écriture de test en production, aucun envoi réel, aucun compte vendeur réel vérifié. Les bancs vérifient le comportement du code avec des réponses synthétiques, pas la disponibilité d'une session Vinted.
+
+## Résultats et limites de la vérification générale
+
+- Boîte mail : 104 verts ; retraits : 129 verts ; sélection des bordereaux : 54 verts ; synchronisation React : 39 contrôles ; messagerie : tout vert ; règles ciblées : 20 tests verts. Compilation finale réussie. Le banc bureau/chargement est vert localement (320/390/1512).
+- Les cibles Questions/Tout et navigation 1/2 d'eBay étaient trop petites dans la base (35 × 44 sur mobile, hauteur 36 sur ordinateur). Le correctif couvre aussi le panneau rendu hors de la coque en portail.
+- La CI générale n'est pas entièrement verte. Reproduction sur `0e6f3656` : `audit-parcours-production` donne déjà 7/9 groupes (deux extractions de tests d'isolation obsolètes, attente 401/503 dans reception-email, liste fermée des images dans audit-photos-vinted). `orion-base-validee.py` compare encore la livraison actuelle à la contrainte « popup.js seulement » de la 5.322 ; il est déjà rouge après les livraisons 5.323–5.326 de main. Aucun de ces verrous n'a été affaibli pour livrer du visuel. Le banc bureau est rouge en CI mais vert localement. Ne pas prétendre avoir certifié l'ensemble des services ni la production à partir de cette PR.

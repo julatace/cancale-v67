@@ -19,6 +19,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Vérifier les parcours et changements de propriétaire
+        run: |
+          node --test scripts/tests/parcours-clairs.test.mjs
+          node scripts/tests/lot-preparation-reprise.cjs
+          node scripts/tests/guide-reception-isolation.cjs
       - name: Vérifier les archives portables des extensions
         run: |
           python3 scripts/tests/paquets-portables.py
@@ -26,9 +31,7 @@ jobs:
           python3 scripts/tests/orion-base-validee.py
       - name: Vérifier les calculs, le handler et les changements de session
         run: |
-          node --test scripts/tests/finance-reprise.test.mjs scripts/tests/appareils-route.test.mjs scripts/tests/deconnexion-proprietaire.test.mjs scripts/tests/parcours-quotidien.test.mjs scripts/tests/bordereau-vestiaire-ouverture.test.mjs scripts/tests/parcours-clairs.test.mjs
-          node scripts/tests/lot-preparation-reprise.cjs
-          node scripts/tests/guide-reception-isolation.cjs
+          node --test scripts/tests/finance-reprise.test.mjs scripts/tests/appareils-route.test.mjs scripts/tests/deconnexion-proprietaire.test.mjs scripts/tests/parcours-quotidien.test.mjs scripts/tests/bordereau-vestiaire-ouverture.test.mjs
           for audit in argent-a-venir comparer-mois frais-plateformes journal-semaine objectif-mois questions-ebay stats-offres achats-sourcing comptes-securite selection-bordereaux; do
             node "scripts/audit-$audit.cjs"
           done

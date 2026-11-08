@@ -73,3 +73,6 @@
   :root:root body .vrm-app-shell .vrm-main .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case { padding:7px 5px; min-height:64px; }
   :root:root body .vrm-app-shell .vrm-main .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case span { font-size:11px; white-space:normal; }
 }
+/* Les fils eBay sont aussi rendus en portail, hors de .vrm-main. */
+:root:root body .vrm-chat-panel [data-q-aller]:not(#vrm-touche),
+:root:root body .vrm-app-shell [data-ebay-vue]:not(#vrm-touche) { min-width:44px !important; min-height:44px !important; }
