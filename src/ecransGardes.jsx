@@ -134,7 +134,7 @@ export function egalRendu(a, b, budget = { n: 20000 }, pile = null) {
   return true;
 }
 
-function Vivant({ actif, hote, children }) {
+function Vivant({ actif, hote, evincer, children }) {
   const dernier = React.useRef(null);
   let rendu = children;
   if (actif) {
@@ -153,7 +153,7 @@ function Vivant({ actif, hote, children }) {
   return (
     <VivantCtx.Provider value={vivant.current}>
       <MontreCtx.Provider value={actif}>
-        <Attacheur actif={actif} hote={hote} conteneur={conteneur} vivant={vivant.current} setFige={setFige} dejaMontre={dejaMontre}/>
+        <Attacheur actif={actif} hote={hote} conteneur={conteneur} vivant={vivant.current} setFige={setFige} dejaMontre={dejaMontre} evincer={evincer}/>
         <React.Suspense fallback={null}>
           <GelMemo fige={fige && !actif} actif={actif}>{createPortal(rendu, conteneur)}</GelMemo>
         </React.Suspense>
@@ -161,15 +161,39 @@ function Vivant({ actif, hote, children }) {
     </VivantCtx.Provider>
   );
 }
+// Une FEUILLE de l'écran ouverte hors de lui (un portail vers <body> ou la coque :
+// fiche, visionneuse, choix…) ? Elle resterait affichée par-dessus l'écran suivant
+// (React ne cache pas un portail d'une limite suspendue — essayé) : l'écran n'est
+// alors pas gardé, il se démonte comme avant. Reconnu par l'arbre de React (la
+// fibre portée par le nœud) : on remonte jusqu'au portail de CET écran.
+function feuilleOuverte(conteneur) {
+  try {
+    const hors = [...document.body.children];
+    const coque = document.querySelector('.vrm-app-shell');
+    if (coque) hors.push(...coque.children);
+    for (const n of hors) {
+      if (n.id === 'root' || n.hidden || n.contains(conteneur)) continue;
+      const cle = Object.keys(n).find((k) => k.startsWith('__reactFiber'));
+      for (let f = cle ? n[cle] : null; f; f = f.return) {
+        if (f.tag === 4 && f.stateNode && f.stateNode.containerInfo === conteneur) return true;
+      }
+    }
+  } catch (_) {}
+  return false;
+}
 // Premier enfant de `Vivant` : ses effets de mise en page passent AVANT ceux de
 // l'écran (ordre de l'arbre) — l'écran qui revient est déjà dans la page quand
 // il se mesure.
-function Attacheur({ actif, hote, conteneur, vivant, setFige, dejaMontre }) {
+function Attacheur({ actif, hote, conteneur, vivant, setFige, dejaMontre, evincer }) {
+  const evincerRef = React.useRef(evincer); evincerRef.current = evincer;
   React.useLayoutEffect(() => {
     vivant.actif = actif;
     const h = hote.current;
     if (actif) { if (h && conteneur.parentNode !== h) h.appendChild(conteneur); }
-    else if (conteneur.parentNode) conteneur.parentNode.removeChild(conteneur);
+    else {
+      if (feuilleOuverte(conteneur)) { evincerRef.current(); return; }   // démonté, sa feuille avec lui
+      if (conteneur.parentNode) conteneur.parentNode.removeChild(conteneur);
+    }
     setFige(!actif);
   }, [actif, hote, conteneur, vivant, setFige]);
   React.useEffect(() => {
@@ -187,6 +211,7 @@ function Attacheur({ actif, hote, conteneur, vivant, setFige, dejaMontre }) {
 export function EcransGardes({ ecran, cle = '', pret = true, children }) {
   const hote = React.useRef(null);
   const etat = React.useRef({ liste: [], dernier: null, cle, n: 0 });
+  const [, forcer] = React.useState(0);
   const e = etat.current;
   if (e.cle !== cle) { e.liste = []; e.dernier = null; e.cle = cle; PRETS.clear(); }
   const gardable = ECRANS_GARDABLES.includes(ecran);
@@ -200,20 +225,27 @@ export function EcransGardes({ ecran, cle = '', pret = true, children }) {
       if (ici && !garder) ici.cle = ecran + '#' + (++e.n);       // remonté, comme avant
       if (!ici) e.liste.push({ tab: ecran, cle: ecran + '#' + (++e.n), quitte: 0, gen: generation });
       PRETS.delete(ecran);
-      // Le plus récemment montré en dernier ; au-delà de MAX_GARDES, le plus ancien part.
-      const moi = e.liste.find((x) => x.tab === ecran);
-      e.liste = [...e.liste.filter((x) => x !== moi), moi];
-      while (e.liste.length > MAX_GARDES) { const v = e.liste.shift(); PRETS.delete(v.tab); }
+      // Au-delà de MAX_GARDES, le plus anciennement quitté part (l'ordre de la liste ne bouge pas).
+      while (e.liste.length > MAX_GARDES) {
+        const v = e.liste.filter((x) => x.tab !== ecran).sort((a, b) => a.quitte - b.quitte)[0];
+        e.liste = e.liste.filter((x) => x !== v); PRETS.delete(v.tab);
+      }
     }
     e.dernier = ecran;
   }
+  const evincer = React.useCallback((cleV) => {
+    const x = etat.current.liste.find((y) => y.cle === cleV);
+    if (!x) return;
+    etat.current.liste = etat.current.liste.filter((y) => y !== x); PRETS.delete(x.tab);
+    forcer((n) => n + 1);
+  }, []);
   // `pret` faux (la section de l'écran n'est pas encore posée) : l'écran visé reste gelé
   // un rendu de plus — jamais rendu avec la section de l'écran d'avant.
   const montre = gardable && pret ? ecran : null;
   return (
     <>
       <div ref={hote} className="vrm-ecrans-gardes" data-ecrans-gardes={e.liste.map((x) => x.tab).join(' ')}/>
-      {e.liste.map((x) => <Vivant key={x.cle} actif={x.tab === montre} hote={hote}>{x.tab === montre ? children : null}</Vivant>)}
+      {e.liste.map((x) => <Vivant key={x.cle} actif={x.tab === montre} hote={hote} evincer={() => evincer(x.cle)}>{x.tab === montre ? children : null}</Vivant>)}
       {!gardable && children}
     </>
   );

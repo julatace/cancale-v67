@@ -15,6 +15,7 @@
 //  PROFIL=<fichier> : profil CPU (CDP, 500 µs) de chaque changement, agrégé par
 //  fonction:ligne (temps propre et inclusif), écrit en JSON (build NON minifié pour
 //  des noms lisibles : npx vite build --minify false --outDir …).
+//  REDUIT=1 : « réduire les animations » (ni fondu, ni fondu enchaîné : le calcul seul).
 //  Rien de réel : la base est inventée ; aucune écriture n'arrive nulle part.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
@@ -55,7 +56,7 @@ function agreger(profil) {
 
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
-  const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: process.env.REDUIT ? 'reduce' : 'no-preference' });
   await ctx.addInitScript((DEBUG_GARDE) => {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1');
     window.__lt = []; new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push([e.startTime, e.duration]); }).observe({ type: 'longtask', buffered: true });
@@ -96,7 +97,7 @@ function agreger(profil) {
     const r0 = reqs.length, e0 = ecritures.length;
     if (process.env.PROFIL) await cdp.send('Profiler.start');
     const tracer = process.env.TRACE && i === SUITE.length - 1 - (+process.env.TRACE_RECUL || 0);
-    if (tracer) await b.startTracing(pg, { path: process.env.TRACE, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink', 'disabled-by-default-devtools.timeline.invalidationTracking'] });
+    if (tracer) await b.startTracing(pg, { path: process.env.TRACE, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink'] });
     await pg.evaluate((t) => {
       window.__sq = 0; window.__tf = null; window.__saves = []; window.__lt0 = performance.now();
       const visee = t;

@@ -20709,14 +20709,15 @@ function useVentesVestiaire() { return ventesVcDeMemo(useVentesVestiaireBrut());
 function ventesVcDeMemo(d) { const loc = useVcLocal(); const k = JSON.stringify(loc.auto); return React.useMemo(() => ventesVcDe(avecNumerosVc(d)), [d, k]); }
 function useVentesVestiaireBrut() {
   const [d, setD] = React.useState(_vcVentesLecture.d);
+  const ecranGarde = useVivant();   // (8 nov.) caché dans un écran gardé : il ne relit pas (src/ecransGardes.jsx)
   React.useEffect(() => {
     let vivant = true;
     const lire = (force) => lireVentesVestiaire(force).then((r) => { if (vivant) setD((v) => (v !== undefined && JSON.stringify(v) === JSON.stringify(r)) ? v : r); });
     lire(false);
-    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(true); };
+    const f = (e) => { if (estCache(ecranGarde)) return; const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(true); };
     window.addEventListener('vrm:ext', f);
     return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
-  }, []);
+  }, [ecranGarde]);
   return d;
 }
 // La phrase des ventes FAITES dont l'argent n'est compté nulle part (prix pas
@@ -36469,7 +36470,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   useEffect(() => {
     if (curSub !== 'bordereaux') return undefined;
-    const f = () => { DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
+    const f = () => { if (cache()) return; DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
     window.addEventListener('vrm:emballer', f);
     return () => window.removeEventListener('vrm:emballer', f);
   }, [curSub]);
@@ -36924,7 +36925,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
-    const f=()=>setTimeout(appliquer,0);
+    // (8 nov.) Caché (écran gardé), il ne PREND pas la demande : elle est pour l'écran qui s'ouvre.
+    const f=()=>{ if(cache()) return; setTimeout(appliquer,0); };
     window.addEventListener('vrm:vue',f);
     return ()=>window.removeEventListener('vrm:vue',f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
