@@ -381,6 +381,7 @@ const JOURNEE_AVEC_WIDGETS = false;
 import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
 import { propsGlisserFait } from "./GlisserColis.js";   // (8 nov., « beauté ») « Colis fait » au glisser vers la droite
+import { phraseDuJour } from "./phraseJour.js";   // (8 nov., « beauté ») la phrase d'en-tête de Ma journée
 // (6 nov., vitesse 2) ScannerColis : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./design/scanner.css";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
@@ -38836,7 +38837,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
                 <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
                 <h1 className="vrm-fu-titre-tete">Ma journée</h1>
-                <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>
+                {/* (8 nov., « beauté ») LA PHRASE DU JOUR : les cases publiées (« À envoyer », « À retirer »,
+                    leur limite) mises en mots, le ton selon l'heure (src/phraseJour.js) ; rien de lu ⇒ la
+                    phrase fixe de l'écran. Aucun nombre recalculé. */}
+                {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
+                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
+                    : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
                 {/* Les sept derniers jours, aujourd'hui à droite (maquette). */}
                 <ol className="vrm-fu-semaine" aria-label="Les sept derniers jours" data-fu-semaine="">
                   {[6,5,4,3,2,1,0].map((k)=>{ const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-k);
@@ -39017,16 +39023,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
                 <section className="vrm-fu-afaire" aria-label="À faire">
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
-                  <div className="vrm-day-task-list" data-barre-jour="">
-                    {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map(tache)}</div> : null}
-                    {carteAilleurs ? carteVendusAilleurs() : null}
-                    {deuxFois.length ? carteDeuxFois() : null}
-                    {cases.map(carteCase)}
-                    {comptesARelierJour.length ? carteARelier() : null}
-                    {sortiesStock.length ? carteSortieStock() : null}
-                    {autres.map(tache)}
-                    {urssafJob ? tache(urssafJob, 99) : null}
-                  </div>
+                  {/* (8 nov., « beauté ») L'ÉCRAN D'ACCUEIL : la PREMIÈRE ligne (l'ordre de toujours, le plus
+                      pressé d'abord) devient la grande carte « prochaine chose à faire » (sa photo par identité,
+                      son titre, son geste en un tap) ; les autres, une rangée de petites cartes. Les MÊMES
+                      éléments, les mêmes attributs : seule la forme change (`is-prochain`, styles-beaute.css). */}
+                  {(() => { let premier = true; const P = (el) => { if (!premier || !el || !React.isValidElement(el)) return el; premier = false;
+                    return React.cloneElement(el, { className: ((el.props && el.props.className) || '') + ' is-prochain', 'data-prochain': '' }); };
+                  return (
+                  <div className="vrm-day-task-list vrm-accueil-jour" data-barre-jour="" data-accueil-n={nGestes}>
+                    {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map((j, i) => P(tache(j, i)))}</div> : null}
+                    {carteAilleurs ? P(carteVendusAilleurs()) : null}
+                    {deuxFois.length ? P(carteDeuxFois()) : null}
+                    {cases.map((x) => P(carteCase(x)))}
+                    {comptesARelierJour.length ? P(carteARelier()) : null}
+                    {sortiesStock.length ? P(carteSortieStock()) : null}
+                    {autres.map((j, i) => P(tache(j, i)))}
+                    {urssafJob ? P(tache(urssafJob, 99)) : null}
+                  </div>); })()}
                   {feuilleAilleurs ? (
                     <SheetShell titre="Vendus ailleurs" sousTitre={carteAilleurs && carteAilleurs.n ? `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} à retirer` : undefined} onClose={() => setFeuilleAilleurs(false)} maxWidth={560} data-feuille-ailleurs="">
                       <div className="vrm-bilan-sync vrm-va-feuille">
