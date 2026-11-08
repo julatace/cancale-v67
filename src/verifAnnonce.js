@@ -16,7 +16,8 @@
 //   famille    : 'chaussures' · 'vetements' · 'sacs' · 'accessoires' · 'bijoux' · '' ;
 //   marque, categorie : string ;
 //   nPhotos    : le nombre de photos qui partiront (number) ;
-//   prix, achat : nombres (achat null = pas connu ⇒ pas jugé).
+//   prix, achat : nombres (achat null = pas connu ⇒ pas jugé) ;
+//   facultatifs : true ⇒ taille et marque jamais jugées (vendeur hors sneakers).
 //
 // Les limites de titre sont celles MESURÉES dans le code existant :
 //   Leboncoin 50 (`LBC_TITRE_MAX`, app et extension) · eBay 80 (champ
@@ -56,6 +57,9 @@ export function champsNonJuges(a, site) {
   if (site !== 'vinted') return [];
   return Object.keys(CLES_LUES).filter((k) => {
     if (k === 'taille' && SANS_TAILLE.has(String(x.famille || ''))) return false;
+    // (8 nov.) Hors sneakers (`facultatifs`, src/profilVendeur.js) : taille et
+    // marque ne sont pas « à vérifier » — un livre n'en a pas.
+    if ((k === 'taille' || k === 'marque') && x.facultatifs === true) return false;
     return x[CLES_LUES[k]] === undefined || x[CLES_LUES[k]] === null;
   }).map((k) => NOMS_CHAMPS[k]);
 }
@@ -72,7 +76,10 @@ export function problemesAnnonce(a, site) {
     if (!Number.isFinite(n) || n < PHOTOS_MIN) pose('photos', !Number.isFinite(n) || n <= 0 ? 'Aucune photo' : `${n} photo${n > 1 ? 's' : ''} seulement`);
   }
   // Taille : seulement pour une famille qui en porte une (un sac n'a pas de taille).
-  if (x.taille !== undefined && !SANS_TAILLE.has(String(x.famille || '')) && vide(x.taille)) pose('taille', 'Taille absente');
+  // (8 nov.) Hors sneakers (`facultatifs: true`, réglage « Je vends : Autre ») :
+  // taille et marque sont FACULTATIVES — jamais « absente », jamais un geste.
+  const fac = x.facultatifs === true;
+  if (!fac && x.taille !== undefined && !SANS_TAILLE.has(String(x.famille || '')) && vide(x.taille)) pose('taille', 'Taille absente');
   // Prix sous le prix d'achat CONNU (jamais deviné, §2.5) — aucun prix proposé.
   const p = num(x.prix), ac = num(x.achat);
   if (p != null && ac != null && ac > 0 && p < ac) pose('prix', `Prix ${eur(p)} sous ton prix d’achat ${eur(ac)}`);
@@ -82,7 +89,7 @@ export function problemesAnnonce(a, site) {
     const t = String(x.titre || '').replace(/\s+/g, ' ').trim();
     if (t.length > max) pose('titre', `Titre trop long : ${t.length}/${max}`);
   }
-  if (x.marque !== undefined && vide(x.marque)) pose('marque', 'Marque absente');
+  if (!fac && x.marque !== undefined && vide(x.marque)) pose('marque', 'Marque absente');
   if (x.categorie !== undefined && vide(x.categorie)) pose('categorie', 'Catégorie absente');
   if (site === 'vinted') {
     // Ce que Vinted refuse à la mise en ligne (`champsManquantsAvant`), jugé

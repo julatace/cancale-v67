@@ -19,8 +19,9 @@ import { noterTicketDiscord } from '../communaute/discordAttente.js';
 import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit, apercuNumeroEcrit } from '../numeroEcrit.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
-import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi } from '../App.jsx';
+import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import SuiviComptes from '../SuiviComptes.jsx';
@@ -1646,6 +1647,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
   // ── LES GROUPES ────────────────────────────────────────────────────────────
   // Réglages de l'APP.
+  const profilV = useProfilVendeur();
   const GROUPES_REGLAGES = [
     // (1er nov.) Le groupe portait « Comptes Vinted » mais rangeait aussi eBay, les
     // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
@@ -1716,6 +1718,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
+      // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
+      { id:'affichage-mode', type:'panneau', nu:true, ic:'grid', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
+      { id:'je-vends', type:'panneau', nu:true, ic:'tag', lib:'Je vends', desc:'Sneakers, ou autre chose : les mots et les vérifications suivent.', val: profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre', data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc:'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
@@ -2854,6 +2859,59 @@ function resumeApercu(a) {
   const c = a.comptes || {};
   return { lus: (c['a-poser'] || 0) + (c.accord || 0), rien: (c.rien || 0) + (c['sans-ecrit'] || 0), ambigus: c.ambigu || 0, contredits: c.contredit || 0, autres: (c.archive || 0) + (c.avant || 0), garde: c.garde || 0, total: a.total || 0 };
 }
+// (8 nov.) AFFICHAGE SIMPLE / COMPLET et « JE VENDS » (src/profilVendeur.js) : deux
+// réglages synchronisés. « Automatique » est un choix à part entière : il suit la
+// règle (Simple pour un seul compte Vinted et moins de 30 ventes sur 30 jours,
+// jamais pour le propriétaire de l'installation) et le dit en une phrase.
+function phraseAffichageAuto(p) {
+  const c = (p && p.contexte) || {};
+  if (c.proprietaire === true) return 'Automatique : Complet (ta boutique).';
+  if (p.mode === 'simple') return `Automatique : Simple — un compte Vinted, ${c.nVentes30j} vente${c.nVentes30j > 1 ? 's' : ''} sur ${JOURS_VENTES_SIMPLE} jours.`;
+  if (c.nComptesVinted == null || c.nVentes30j == null || c.proprietaire == null) return 'Automatique : Complet tant que VRM n’a pas tout lu.';
+  return c.nComptesVinted > 1 ? `Automatique : Complet — ${c.nComptesVinted} comptes Vinted.` : `Automatique : Complet — ${SEUIL_VENTES_SIMPLE} ventes ou plus sur ${JOURS_VENTES_SIMPLE} jours.`;
+}
+function AffichageSetting() {
+  const p = useProfilVendeur();
+  const [r, setR] = React.useState(() => lireReglageAffichage(load(CLE_AFFICHAGE, null)));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lireReglageAffichage(load(CLE_AFFICHAGE, null))); }), []);
+  const choisir = (choix) => {
+    touche.current = true;
+    const n = { choix, at: new Date().toISOString() };
+    setR(n); save(CLE_AFFICHAGE, n);
+    toast(choix === 'simple' ? 'Affichage simple : ce qui ne sert pas encore se range. Rien n’est supprimé.' : choix === 'complet' ? 'Affichage complet : tous les écrans sont là.' : 'Affichage automatique.');
+  };
+  return (
+    <div data-reglage-affichage-mode={p.mode} data-reglage-affichage-choix={r.choix}>
+      <Segmente label="Affichage" plein value={r.choix} onChange={choisir}
+        options={[['auto', 'Automatique'], ['simple', 'Simple'], ['complet', 'Complet']].map(([v, l]) => ({ v, l, data: { 'data-affichage-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{r.choix === 'auto' ? phraseAffichageAuto(p) : r.choix === 'simple' ? 'Simple, choisi par toi.' : 'Complet, choisi par toi.'}</div>
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
+        En simple, le menu ne montre pas ce qui ne sert pas encore : Stock (sans meuble), Republier (jamais lancé), les sites jamais reliés. Ma journée garde tous les gestes dus. <Pourquoi label="Rien n’est perdu ?">Aucun écran n’est supprimé et aucun chiffre ne change : chaque total compte toujours tout. Dès que tu ranges un meuble, relies Leboncoin ou republies, l’entrée revient d’elle-même. « Complet » remet tout, tout de suite.</Pourquoi>
+      </div>
+    </div>
+  );
+}
+function JeVendsSetting() {
+  const p = useProfilVendeur();
+  const [r, setR] = React.useState(() => lireReglageJeVends(load(CLE_JE_VENDS, null)));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lireReglageJeVends(load(CLE_JE_VENDS, null))); }), []);
+  const choisir = (choix) => {
+    touche.current = true;
+    const n = { choix, at: new Date().toISOString() };
+    setR(n); save(CLE_JE_VENDS, n);
+  };
+  const vend = p.vend || 'autre';
+  return (
+    <div data-reglage-je-vends={vend} data-reglage-je-vends-choix={r.choix}>
+      <Segmente label="Je vends" plein value={r.choix} onChange={choisir}
+        options={[['auto', 'Automatique'], ['sneakers', 'Sneakers'], ['autre', 'Autre']].map(([v, l]) => ({ v, l, data: { 'data-je-vends-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{vend === 'sneakers' ? 'Sneakers : VRM parle de « paires » et vérifie taille et marque avant de publier.' : 'Autre : VRM parle d’« articles » ; taille et marque sont facultatives.'}</div>
+    </div>
+  );
+}
+
 function NumeroEcritSetting({ onAnnonces }) {
   const lire = () => lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null));
   const [r, setR] = React.useState(lire);

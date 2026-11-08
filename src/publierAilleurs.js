@@ -98,14 +98,15 @@ export function apercuEnvoi(site, p, r = {}) {
 // la publication Leboncoin de VRM part d'une annonce Vinted EN LIGNE (la file
 // « À publier » et l'extension lisent le dressing) : sans elle, « Publier »
 // n'ouvrirait rien (relecture du 5 nov.). Le geste est dit, rien n'est deviné.
-export function manquesEnvoi(site, ap, { achat = null, famille = '', mpLbc = true, horsVinted = false } = {}) {
+// `facultatifs` (8 nov.) : vendeur hors sneakers ⇒ taille et marque jamais jugées.
+export function manquesEnvoi(site, ap, { achat = null, famille = '', mpLbc = true, horsVinted = false, facultatifs = false } = {}) {
   if (!ap) return [];
   const out = [];
   if (!ap.num) out.push({ code: 'numero', texte: 'Pas de N°', geste: 'Mets un N° à cet article d’abord (Annonces)', bloque: true });
   if (site === 'leboncoin' && mpLbc === false) out.push({ code: 'retire', texte: 'Retiré de Leboncoin par toi', geste: 'Remets la case « Leboncoin » sur la fiche de l’annonce (Annonces)', bloque: true });
   if (site === 'leboncoin' && horsVinted === true) out.push({ code: 'hors-vinted', texte: 'Plus en ligne sur Vinted', geste: `VRM publie sur Leboncoin depuis une annonce Vinted en ligne : remets-la en ligne sur Vinted, ou publie-la à la main sur leboncoin.fr avec la référence ${ap.ref || 'VRM-{n°}'}`, bloque: true });
   if (ap.prix == null) out.push({ code: 'prix-absent', texte: 'Prix pas lu', geste: 'Ouvre l’annonce sur Vinted : son prix arrive ici', bloque: false });
-  for (const pb of problemesAnnonce({ titre: ap.titre, taille: ap.taille, famille, marque: ap.marque, nPhotos: ap.nPhotos, prix: ap.prix, achat }, SITE_VERIF[site])) {
+  for (const pb of problemesAnnonce({ titre: ap.titre, taille: ap.taille, famille, marque: ap.marque, nPhotos: ap.nPhotos, prix: ap.prix, achat, facultatifs: facultatifs === true }, SITE_VERIF[site])) {
     out.push({ ...pb, bloque: pb.code === 'photos' && !(ap.nPhotos > 0) });
   }
   return out;
