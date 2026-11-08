@@ -1,0 +1,90 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   « shop_x EST RELIÉ À VRM » (8 nov.) — src/CompteRelie.jsx
+   Jetons --d-* seulement (clair et sombre). L'accent bleu UNE fois : la pastille
+   cochée sur l'avatar. Les étapes lues : une coche à l'encre ; en cours : un
+   cercle qui respire ; pas su : un cercle creux. Le geste à faire : ambre (§7).
+   Le mouvement : l'avatar entre avec un léger ressort, la coche se dessine, les
+   étapes arrivent l'une après l'autre ; « réduire les animations » ⇒ rien ne bouge.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-cr { display: flex; flex-direction: column; gap: var(--d-e-4); padding: var(--d-e-2) var(--d-e-4) var(--d-e-4); color: var(--d-encre); }
+
+/* ── L'en-tête : l'avatar, la coche, une phrase ── */
+.vrm-cr-tete { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--d-e-2); padding-top: var(--d-e-2); }
+.vrm-cr-avatars { position: relative; display: flex; justify-content: center; height: 76px; margin-bottom: var(--d-e-1); }
+.vrm-cr-avatar-pos { display: block; margin-left: -18px; animation: vrm-cr-pop 560ms cubic-bezier(.34, 1.45, .64, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.vrm-cr-avatar-pos:first-child { margin-left: 0; }
+.vrm-cr-avatar {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto; overflow: hidden;
+  width: 32px; height: 32px; border-radius: var(--d-r-pilule); background: var(--d-case); color: var(--d-encre);
+  font-size: var(--d-t-15); font-weight: 600;
+}
+.vrm-cr-avatar.is-grand { width: 76px; height: 76px; font-size: var(--d-t-28); box-shadow: 0 0 0 3px var(--d-carte); }
+.vrm-cr-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-cr-badge {
+  position: absolute; right: -6px; bottom: -2px; width: 28px; height: 28px; border-radius: var(--d-r-pilule);
+  display: flex; align-items: center; justify-content: center; background: var(--d-accent); color: #fff;
+  box-shadow: 0 0 0 3px var(--d-carte); animation: vrm-cr-pop 420ms cubic-bezier(.34, 1.45, .64, 1) 260ms both;
+}
+.vrm-cr-coche { width: 18px; height: 18px; display: block; }
+.vrm-cr-coche path { stroke-dasharray: 22; stroke-dashoffset: 0; animation: vrm-cr-trait 380ms cubic-bezier(.23, 1, .32, 1) both; }
+.vrm-cr-coche.is-badge path { animation-delay: 480ms; }
+.vrm-cr-titre { margin: 0; font-size: var(--d-t-22); font-weight: 700; line-height: var(--d-il-titre); letter-spacing: var(--d-ap-22); overflow-wrap: anywhere; animation: vrm-cr-monte 360ms var(--d-sortie) 120ms both; }
+.vrm-cr-phrase { margin: 0; font-size: var(--d-t-15); line-height: var(--d-il-texte); color: var(--d-gris); animation: vrm-cr-monte 360ms var(--d-sortie) 180ms both; }
+
+/* ── Une carte par compte ── */
+.vrm-cr-carte { display: flex; flex-direction: column; gap: var(--d-e-3); padding: var(--d-e-4); background: var(--d-carte); border-radius: var(--d-r-case); box-shadow: var(--d-ombre-carte); animation: vrm-cr-monte 380ms var(--d-sortie) 240ms both; }
+.vrm-cr-carte-tete { display: flex; align-items: center; gap: var(--d-e-3); min-width: 0; }
+.vrm-cr-carte-nom { flex: 1 1 auto; min-width: 0; font-size: var(--d-t-17); font-weight: 600; letter-spacing: var(--d-ap-17); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cr-carte-plat { flex: 0 0 auto; font-size: var(--d-t-13); color: var(--d-gris); }
+.vrm-cr-sous-titre { font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); letter-spacing: var(--d-ap-13); }
+
+/* ── Les étapes ── */
+.vrm-cr-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vrm-cr-etape { position: relative; display: flex; align-items: flex-start; gap: var(--d-e-3); min-height: 44px; padding: 10px 0; animation: vrm-cr-monte 320ms var(--d-sortie) both; animation-delay: calc(320ms + var(--i, 0) * 70ms); }
+.vrm-cr-etape + .vrm-cr-etape::before { content: ''; position: absolute; top: 0; right: 0; left: 34px; height: .5px; background: var(--d-filet); }
+.vrm-cr-indic { flex: 0 0 22px; width: 22px; height: 22px; margin-top: 1px; border-radius: var(--d-r-pilule); display: flex; align-items: center; justify-content: center; }
+.vrm-cr-etape[data-cr-etat="lu"] .vrm-cr-indic { background: var(--d-encre); color: var(--d-carte); }
+.vrm-cr-etape[data-cr-etat="lu"] .vrm-cr-coche { width: 14px; height: 14px; }
+.vrm-cr-etape[data-cr-etat="en-cours"] .vrm-cr-indic { box-shadow: inset 0 0 0 2px var(--d-filet); }
+.vrm-cr-etape[data-cr-etat="en-cours"] .vrm-cr-indic::after { content: ''; width: 8px; height: 8px; border-radius: var(--d-r-pilule); background: var(--d-gris); animation: vrm-cr-respire 1.4s ease-in-out infinite; }
+.vrm-cr-etape[data-cr-etat="pas-su"] .vrm-cr-indic { box-shadow: inset 0 0 0 1.5px var(--d-gris); }
+.vrm-cr-etape-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-cr-etape-titre { font-size: var(--d-t-17); line-height: var(--d-il-ligne); letter-spacing: var(--d-ap-17); }
+.vrm-cr-geste { font-size: var(--d-t-13); line-height: var(--d-il-ligne); font-weight: 600; color: var(--d-ambre); overflow-wrap: anywhere; }
+.vrm-cr-etape-valeur { flex: 0 0 auto; max-width: 48%; font-size: var(--d-t-15); line-height: 24px; color: var(--d-gris); text-align: right; font-variant-numeric: tabular-nums; }
+.vrm-cr-etape[data-cr-etat="lu"] .vrm-cr-etape-valeur { color: var(--d-encre); }
+
+/* ── Les choix ── */
+.vrm-cr-choix { display: flex; flex-direction: column; gap: var(--d-e-3); padding-top: var(--d-e-3); border-top: .5px solid var(--d-filet); }
+.vrm-cr-champ { display: flex; flex-direction: column; gap: 6px; }
+.vrm-cr-champ-lib { display: block; font-size: var(--d-t-13); font-weight: 600; color: var(--d-encre); }
+.vrm-cr-saisie {
+  width: 100%; max-width: 320px; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 0; border-radius: var(--d-r-ctrl);
+  background: var(--d-case); color: var(--d-encre); font: inherit; font-size: 16px;
+}
+.vrm-cr-saisie:focus-visible { outline: 2px solid var(--d-accent); outline-offset: 1px; }
+.vrm-cr-ligne-choix { display: flex; align-items: center; gap: var(--d-e-3); min-height: 44px; cursor: pointer; }
+.vrm-cr-ligne-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-cr-aide { font-size: var(--d-t-13); line-height: var(--d-il-ligne); color: var(--d-gris); }
+.vrm-cr-switch { position: relative; flex: 0 0 51px; width: 51px; height: 44px; display: flex; align-items: center; }
+.vrm-cr-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+.vrm-cr-switch span { position: relative; width: 51px; height: 31px; border-radius: var(--d-r-pilule); background: var(--d-remplir-fort); transition: background-color var(--d-m-moyen) var(--d-sortie); }
+.vrm-cr-switch span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: var(--d-r-pilule); background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .18); transition: transform var(--d-m-long) var(--d-tiroir); }
+.vrm-cr-switch input:checked + span { background: var(--d-encre); }
+.vrm-cr-switch input:checked + span::after { transform: translateX(20px); }
+.vrm-cr-switch input:focus-visible + span { outline: 2px solid var(--d-accent); outline-offset: 2px; }
+.vrm-cr-regle { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--d-t-13); line-height: var(--d-il-ligne); color: var(--d-gris); }
+
+/* ── Le pied ── */
+.vrm-cr-pied { display: flex; flex-direction: column; align-items: stretch; gap: var(--d-e-1); padding-top: var(--d-e-2); }
+.vrm-cr-pied .vrm-b { min-height: 50px; }
+
+/* ── Le mouvement ── */
+@keyframes vrm-cr-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes vrm-cr-trait { from { stroke-dashoffset: 22; } to { stroke-dashoffset: 0; } }
+@keyframes vrm-cr-monte { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+@keyframes vrm-cr-respire { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
+.vrm-cr.is-reduit *, .vrm-cr.is-reduit *::before, .vrm-cr.is-reduit *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-cr *, .vrm-cr *::before, .vrm-cr *::after { animation: none !important; transition: none !important; }
+}

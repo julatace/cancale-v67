@@ -181,6 +181,8 @@ const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ 
 // chargement (pas de squelette sur chaque ligne de la liste).
 // (8 nov.) La ligne ambre « compte pas relu » : son morceau à part (il importe App.jsx).
 const AlerteCaptureParesseuse = lazy(() => import('./ToutVaBien.jsx').then((m) => ({ default: m.AlerteCapture })));
+// (8 nov.) « shop_x est relié à VRM » : la feuille d'accueil d'un compte relié pour la première fois (src/CompteRelie.jsx).
+const AccueilComptesReliesParesseux = lazy(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
 const FactureVenteLigneParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
 const FactureVenteLigne = (props) => <Suspense fallback={null}><FactureVenteLigneParesseuse ligne {...props}/></Suspense>;
 // (8 nov.) Le refus de facture commun à plusieurs lignes, dit une fois en tête de la liste (§7).
@@ -52220,6 +52222,12 @@ function AppCoeur() {
         contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi, vend: PROFIL_VENDEUR.vend || vendActuel() }}
         onEchec={(m)=>toast(m)}
         onAction={(a)=>{ if(String(a).startsWith('reglages:')){ DEMANDE_REGLAGE_SOUS.id=String(a).slice(9); if(tab==='settings'){ try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } else setTab('settings'); } }}/></GardeEcran>
+      {/* (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS (src/CompteRelie.jsx) : la feuille, une fois par
+          compte et par vendeur (sa ligne `vrm_comptes_relies`), jamais pendant Bienvenue ni la visite,
+          ni en mode exemple, hors ligne ou base injoignable ; rattrapable dans Comptes liés. */}
+      <GardeEcran nom="compte-relie"><Suspense fallback={null}><AccueilComptesReliesParesseux comptesVinted={vintedAccounts}
+        pret={!!accountsLoaded && nuagePret && !baseKO && !horsLigne && !exempleActif() && !!(authState.user && authState.user.id)}
+        silence={!!(bienvenue || visite)} onNav={setTab}/></Suspense></GardeEcran>
       {/* Les chiffres que la COQUE publie pour les conseils (la même règle que leurs bandeaux). */}
       {ordi ? <ChiffreConseilExtension/> : <ChiffreConseil cle="coque.iphone" valeur={estIphoneSafari() ? (estInstallee() ? 'installee' : 'a-installer') : 'autre'}/>}
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>

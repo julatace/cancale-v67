@@ -1050,6 +1050,11 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             : <div className="vrm-cl-vide" data-comptes-vide="vinted"><a className="vrm-b vrm-b-discret vrm-cl-bouton" href={URL_SITE_COMPTE.vinted} target="_blank" rel="noreferrer">Ouvrir Vinted</a></div>)
           : accounts.map(carteVinted)}/>
       <ComptesAutresSites lu={autres} relire={relireAutres}/>
+      {/* (8 nov.) L'accueil d'un compte relié (src/CompteRelie.jsx), rattrapable ici : la feuille revient
+          avec les derniers comptes reliés, leur première lecture et leurs choix. */}
+      <div className="vrm-cl-revoir" style={{display:'flex',justifyContent:'center'}}>
+        <Bouton variante="discret" icone="link" data-comptes-relies-revoir="" onClick={()=>{ try{ window.dispatchEvent(new Event('vrm:comptes-relies-revoir')); }catch(_){} }}>Revoir l’accueil des comptes reliés</Bouton>
+      </div>
 
       {/* ── MODALE : SUPPRIMER LES DONNÉES D'UN COMPTE (ciblé, récupérable) ──── */}
       {delCible && (()=>{ const acc = delCible;
@@ -1395,8 +1400,9 @@ const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
   { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
+  { id: 'comptes', titre: 'Comptes', ids: ['comptes'] },
 ];
-const ICONE_FAMILLE_NOTIF = { ventes: 'cash', doublevente: 'alert', rappels: 'clock', poster: 'box', arrives: 'pin', offres: 'tag', messages: 'chat' };
+const ICONE_FAMILLE_NOTIF = { comptes: 'link', ventes: 'cash', doublevente: 'alert', rappels: 'clock', poster: 'box', arrives: 'pin', offres: 'tag', messages: 'chat' };
 function groupesFamillesNotif(familles) {
   const vus = new Set();
   const out = GROUPES_NOTIF.map(g => { const f = g.ids.map(id => familles.find(x => x.id === id)).filter(Boolean); f.forEach(x => vus.add(x.id)); return { ...g, familles: f }; }).filter(g => g.familles.length);
