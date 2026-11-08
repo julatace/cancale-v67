@@ -1,0 +1,26 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LES ÉCRANS GARDÉS ET LA PASTILLE DE LA BARRE DU BAS (8 nov.) —
+   src/ecransGardes.jsx, src/passageOnglet.js (le fondu), BottomBar (App.jsx).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* La place des écrans gardés : aucune boîte en plus pour la mise en page de la
+   coque (l'écran montré se pose comme avant, enfant de `.vrm-main`). */
+.vrm-ecrans-gardes, .vrm-ecran-vivant { display: contents; }
+/* La règle de styles-bureau.css (`.vrm-main > :not(.vrm-barre-haut)`) pour l'écran gardé montré. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { .vrm-app-shell .vrm-main .vrm-ecran-vivant > .vrm-attente { min-width: 0; } }
+
+/* ── La pastille de l'onglet choisi (BottomBar) ──────────────────────────────
+   Une capsule neutre (l'encre à 7 % : l'accent reste à l'icône, §7) qui GLISSE
+   vers l'onglet touché — un `transform`, interrompu proprement par un second
+   toucher (transition, jamais une animation par images clés). */
+.vrm-tab-pastille-ancre { position: relative; flex: 0 0 0; width: 0; min-width: 0; padding: 0; margin: 0; align-self: stretch; pointer-events: none; }
+.vrm-tab-pastille {
+  position: absolute; left: 0; top: 0; height: 0; width: 0;
+  border-radius: 16px; pointer-events: none;
+  background: color-mix(in srgb, var(--vrm-ink, #1D1D1F) 7%, transparent);
+}
+.vrm-tab-pastille[data-prete] { transition: transform 280ms cubic-bezier(.32, .72, 0, 1), width 280ms cubic-bezier(.32, .72, 0, 1); }
+html .vrm-app-shell .vrm-tabbar > .vrm-tab { position: relative; }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-tab-pastille[data-prete] { transition: none; }
+}

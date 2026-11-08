@@ -4,7 +4,7 @@ import './styles-chargement.css';
 export function DemarrageVRM() {
   return <main className="vrm-demarrage" aria-busy="true" data-demarrage-vrm="">
     <section role="status" aria-live="polite" className="vrm-demarrage-carte">
-      <img src="/vrm-icon-v4-192.png" alt="" width="56" height="56"/>
+      <img src="/vrm-icon-v5-192.png" alt="" width="56" height="56"/>
       <h1>VRM</h1>
       <p>Ouverture de ton espace…</p>
       <span className="vrm-demarrage-rail" aria-hidden="true"><span/></span>

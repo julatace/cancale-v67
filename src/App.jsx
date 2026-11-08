@@ -272,6 +272,7 @@ import { AideEcran as AideEcranBase } from "./composants/AideEcran.jsx";
 import { SignalerProbleme as SignalerProblemeBase, SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from "./composants/SignalerProbleme.jsx";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
+import { apparenceDe, sombreEffectif, prochainChangement, ecrituresApparence } from "./apparence.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
@@ -380,6 +381,10 @@ const TOURNEE_SUR_JOURNEE = false;
 const JOURNEE_AVEC_WIDGETS = false;
 import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
+import { propsGlisserFait } from "./GlisserColis.js";   // (8 nov., « beauté ») « Colis fait » au glisser vers la droite
+import { phraseDuJour } from "./phraseJour.js";   // (8 nov., « beauté ») la phrase d'en-tête de Ma journée
+import { installerFonduPhotos } from "./fonduPhotos.js";   // (8 nov., « beauté ») les vignettes arrivent en fondu
+installerFonduPhotos();
 // (6 nov., vitesse 2) ScannerColis : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./design/scanner.css";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
@@ -454,6 +459,7 @@ import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à «
 // ci-dessus. Le système est écrit dans DESIGN.md.
 import "./styles-design-2026.css";
 import "./styles-parcours-clairs.css";
+import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos, glisser, tournée, statistiques, apparence — EN DERNIER
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
@@ -466,6 +472,8 @@ import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAb
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
+import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
+import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
@@ -499,7 +507,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.328.0';
+const EXT_ATTENDUE = '5.329.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -926,7 +934,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
+const EXT_CAPACITES = { cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1972,7 +1980,7 @@ const authSignOut = () => {
 // le cloud sous SON compte. On efface donc toutes les clés de données quand
 // l'identité change (on garde les préférences d'affichage, elles ne trahissent
 // personne).
-const KEEP_ON_SWITCH = ['vinted_dark', SESSION_KEY, 'schema_cloisonne'];
+const KEEP_ON_SWITCH = ['vinted_dark', 'vrm_apparence', SESSION_KEY, 'schema_cloisonne'];
 const wipeLocalData = () => {
   try {
     const doomed = [];
@@ -2329,6 +2337,8 @@ const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
+  // (8 nov.) L'apparence choisie (Clair · Sombre · Automatique · Le soir, src/apparence.js).
+  'vrm_apparence',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -3227,6 +3237,20 @@ function ChipsModeles({ valeur, surChange, champ, vars }) {
   const [modeles, setModeles] = React.useState(() => lireModelesRanges());
   React.useEffect(() => { const f = () => setModeles(lireModelesRanges()); const off = onCloudReady(f); window.addEventListener('vrm:save', f); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', f); }; }, []);
   return <InsererModele modeles={modeles} valeur={valeur} surChange={surChange} champ={champ} vars={vars}/>;
+}
+// (8 nov.) La préférence de l'appareil (`prefers-color-scheme`), pour l'apparence
+// « Automatique » : lue à l'instant, et suivie en direct quand on l'écoute.
+const systemeSombreMaintenant = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch (_) { return false; } };
+function useSystemeSombre(ecouter) {
+  const [v, setV] = React.useState(systemeSombreMaintenant);
+  React.useEffect(() => {
+    if (!ecouter || !window.matchMedia) return undefined;
+    let mq = null; try { mq = window.matchMedia('(prefers-color-scheme: dark)'); } catch (_) { return undefined; }
+    const f = () => setV(!!mq.matches); f();
+    try { mq.addEventListener('change', f); } catch (_) { try { mq.addListener(f); } catch (__) {} }
+    return () => { try { mq.removeEventListener('change', f); } catch (_) { try { mq.removeListener(f); } catch (__) {} } };
+  }, [ecouter]);
+  return v;
 }
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
@@ -11954,7 +11978,7 @@ function pushNotif(title, body, vers){
   try{
     if(typeof Notification!=='undefined' && Notification.permission==='granted'){
       // (5 nov.) En mode stream, la notification affichée suit la même règle que l'écran.
-      const n=new Notification(textePourStream(title), { body: textePourStream(body), icon:'/vrm-icon-v4-192.png', badge:'/vrm-icon-v4-192.png' });
+      const n=new Notification(textePourStream(title), { body: textePourStream(body), icon:'/vrm-icon-v5-192.png', badge:'/vrm-icon-v5-192.png' });
       if(vers) n.onclick=()=>{ try{ window.focus(); }catch(_){} try{ window.dispatchEvent(new CustomEvent('vrm:aller',{detail:vers})); }catch(_){} try{ n.close(); }catch(_){} };
       return true;
     }
@@ -13448,7 +13472,7 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
 let _logoSeq = 0;
 // Identité officielle : logo VRM angulaire choisi par Julien (piste 02).
 function VrmLogo({ size = 40, style, anim = false }) {
-  return <img src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-brand-asset vrm-logo-anim' : 'vrm-logo vrm-brand-asset'}
+  return <img src="/vrm-logo-v5-192.png" srcSet="/vrm-logo-v5-96.png 96w, /vrm-logo-v5-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-brand-asset vrm-logo-anim' : 'vrm-logo vrm-brand-asset'}
     style={{ width: size, height: size, borderRadius: 0, objectFit: 'contain', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
@@ -13533,6 +13557,8 @@ const ICON_PATHS = {
   box:    <><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16V8Z"/><path d="M3.5 8 12 12.5 20.5 8M12 12.5V20.5"/></>,
   image:  <><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></>,
   moon:   <><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></>,
+  // (8 nov.) L'apparence (Réglages → Affichage) : un disque à moitié plein.
+  contraste: <><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></>,
   search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m15.8 15.8 4.4 4.4"/></>,
   gear:   <><circle cx="12" cy="12" r="3.2"/><path d="M19.6 14.4a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></>,
   cloud:  <><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.6 3.7 3.7 0 0 1-.3 7.4Z"/></>,
@@ -14525,6 +14551,9 @@ function EspacePlateforme({ nom, children }) {
 const BarreHautSlot = React.createContext(null);
 function DansBarreHaut({ children }) {
   const el = React.useContext(BarreHautSlot);
+  // (8 nov.) Un écran gardé caché (src/ecransGardes.jsx) ne laisse rien dans la barre de la coque.
+  const montre = useEcranGardeMontre();
+  if (!montre) return null;
   return el ? createPortal(children, el) : children;
 }
 // (31 oct., Julien : « quand on appuie sur la barre de recherche, ça fait un
@@ -14897,6 +14926,9 @@ function ouvrirEntree(t, setTab) {
     demanderVue(t.cle || t.vue);
     try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: t.cle || t.vue })); } catch (_) {}
   }
+  // (8 nov.) Une entrée SANS demande est un simple changement d'écran : un écran gardé
+  // revient tel quel (src/ecransGardes.jsx). Avec une demande, il est remonté (il la lit au montage).
+  if (!t.vue && typeof t.avant !== 'function') noterNavigationSimple(t.id);
   setTab(t.id);
 }
 // L'entrée est-elle « l'écran où l'on est » ? Une entrée qui ouvre une VUE d'un
@@ -15208,11 +15240,41 @@ function BottomBar({tab,setTab,sites,badges}) {
   const [vise,setVise]=React.useState(null);
   const [enCours,demarrer]=React.useTransition();
   React.useEffect(()=>{ if(!enCours) setVise(null); },[enCours,tab]);
-  const allerA=(id)=>{ setVise(id); demarrer(()=>setTab(id)); };
+  // (8 nov.) Un toucher de la barre est un simple changement d'écran : un écran GARDÉ
+  // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
+  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
   const tabMontre=vise||tab;
   const navRef=React.useRef(null);
+  // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
+  // fluide, pas robotique »). Les places des onglets sont relevées quand la barre change de
+  // taille (jamais au toucher : aucune lecture de mise en page pendant le changement d'écran) ;
+  // le toucher ne fait que poser un `transform` (styles-ecrans-gardes.css). Mouvement réduit :
+  // elle saute, sans glisser.
+  const pastilleRef=React.useRef(null);
+  const placesRef=React.useRef(new Map());
+  const poserPastille=React.useCallback((id)=>{
+    const p=pastilleRef.current; if(!p) return;
+    const pl=placesRef.current.get(id);
+    if(!pl){ p.style.opacity='0'; return; }
+    // Une capsule DANS l'onglet (6 px de chaque côté, 4 px en haut et en bas).
+    p.style.width=Math.max(0,pl.w-12)+'px'; p.style.top=(pl.y+4)+'px'; p.style.height=Math.max(0,pl.h-8)+'px';
+    p.style.transform=`translateX(${pl.x+6}px)`; p.style.opacity='';
+    if(!p.hasAttribute('data-prete')) requestAnimationFrame(()=>{ try{ p.setAttribute('data-prete',''); }catch(_){} });
+  },[]);
+  const ouPastille=React.useRef(null);
   // La hauteur de la barre (zone sûre comprise), pour poser le panneau « Plus »
   // juste au-dessus d'elle : `--vrm-barre-bas` sur la racine.
+  // L'onglet qui porte la pastille : celui de la barre, ou « Plus » pour un écran rangé dedans.
+  ouPastille.current=BOTTOM_TABS.some(t=>t.id===(BAR_GROUPE[tabMontre]||tabMontre))?(BAR_GROUPE[tabMontre]||tabMontre):'__plus';
+  React.useLayoutEffect(()=>{ poserPastille(ouPastille.current); },[tabMontre,poserPastille]);
+  React.useEffect(()=>{
+    const el=navRef.current; if(!el||typeof ResizeObserver==='undefined') return undefined;
+    // Les places sont relevées par rapport à l'ANCRE de la pastille (premier enfant de la barre) :
+    // elles restent justes quand la barre se déplace sans changer de taille.
+    const relever=()=>{ const m=new Map(); try{ const a=pastilleRef.current&&pastilleRef.current.parentNode; if(!a) return; for(const b of el.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')){ const id=b.classList.contains('vrm-nav-more')?'__plus':b.getAttribute('data-nav-entree'); if(id&&b.offsetWidth>0) m.set(id,{x:b.offsetLeft-a.offsetLeft,w:b.offsetWidth,y:b.offsetTop-a.offsetTop,h:b.offsetHeight}); } }catch(_){} placesRef.current=m; poserPastille(ouPastille.current); };
+    const ro=new ResizeObserver(relever); ro.observe(el);
+    return ()=>ro.disconnect();
+  },[poserPastille]);
   React.useLayoutEffect(()=>{
     const el=navRef.current; if(!el) return undefined;
     const poser=()=>{ try{ const h=Math.round(el.getBoundingClientRect().height); if(h>0) document.documentElement.style.setProperty('--vrm-barre-bas', h+'px'); }catch(_){} };
@@ -15255,6 +15317,7 @@ function BottomBar({tab,setTab,sites,badges}) {
     <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-en-cours={enCours?'1':undefined} data-plus-ouvert={plusOuvert?'1':'0'} aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
+      <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
       {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tabMontre]||tabMontre)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
         <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-label={lib+(n?` · ${n} à faire`:'')} aria-current={on?'page':undefined}>
           <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
@@ -15783,7 +15846,7 @@ function AuthScreen() {
         <div className="vrm-cx-etiquettes" aria-hidden="true"><span>Colis prêt</span><span>Bordereau imprimé</span><span>Vendu sur Vinted</span><span>Retirée de Leboncoin</span></div>
         <div className="vrm-cx-haut">
           <a href="/" className="vrm-cx-logo" aria-label="VRM — page d'accueil">
-            <img src="/vrm-logo-v4-192.png" alt="" width="36" height="36"/><b>VRM</b>
+            <img src="/vrm-logo-v5-192.png" alt="" width="36" height="36"/><b>VRM</b>
           </a>
           {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
               pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
@@ -20999,14 +21062,15 @@ function useVentesVestiaire() { return ventesVcDeMemo(useVentesVestiaireBrut());
 function ventesVcDeMemo(d) { const loc = useVcLocal(); const k = JSON.stringify(loc.auto); return React.useMemo(() => ventesVcDe(avecNumerosVc(d)), [d, k]); }
 function useVentesVestiaireBrut() {
   const [d, setD] = React.useState(_vcVentesLecture.d);
+  const ecranGarde = useVivant();   // (8 nov.) caché dans un écran gardé : il ne relit pas (src/ecransGardes.jsx)
   React.useEffect(() => {
     let vivant = true;
     const lire = (force) => lireVentesVestiaire(force).then((r) => { if (vivant) setD((v) => (v !== undefined && JSON.stringify(v) === JSON.stringify(r)) ? v : r); });
     lire(false);
-    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(true); };
+    const f = (e) => { if (estCache(ecranGarde)) return; const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(true); };
     window.addEventListener('vrm:ext', f);
     return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
-  }, []);
+  }, [ecranGarde]);
   return d;
 }
 // La phrase des ventes FAITES dont l'argent n'est compté nulle part (prix pas
@@ -26584,7 +26648,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
 //   L'ancienne palette violait 3 fois (bleu≈accent, rouge≈danger, ambre≈warn).
 //   Ces 6 teintes (6 nov., v36-visuel-2 : plus aucun violet ni indigo, §3 — audit-violet.cjs) sont toutes loin des couleurs réservées (des deux thèmes) et
 //   distinctes entre elles — vérifié par `audit-couleurs-comptes.cjs`.
-const ACCT_COLORS = ['#27ae60','#00b8a9','#9acd32','#17a9c9','#5f7f9b','#8e8e93'];
+const ACCT_COLORS = ['#4F8A68','#3A8C8C','#8C8A4A','#5F7F9B','#9A846C','#7C7C82'];   // (8 nov., « beauté ») sauge · sarcelle · olive · ardoise · grège · graphite : calmes, distinctes, aucune ne crie
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 // ── « RETOURS EN COURS » (Colis, 21 octobre) ─────────────────────────────────
 // Rend la sortie de `retoursEnCours` (src/retoursStock.js) — aucune règle ici.
@@ -27070,6 +27134,11 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+  // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
+  // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
+  // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
+  const vivant = useVivant();
+  const cache = () => estCache(vivant);
   // (7 nov., vitesse) COLIS EN DEUX TEMPS : dessiner 70 cartes d'un coup gelait l'écran
   // 1 à 2 s au toucher (revue du 7 nov., 4 400 éléments). Les 24 plus pressées sont
   // dessinées tout de suite ; toutes les autres arrivent juste après, en tâche
@@ -27311,7 +27380,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
     relireVersements.current = lire;
     lire();
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
+    const f = (e) => { if (cache()) return; const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
     window.addEventListener('vrm:ext', f);
     return () => { mort = true; window.removeEventListener('vrm:ext', f); };
   }, []);
@@ -27530,7 +27599,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [accounts]);
   // L'extension prévient : un bordereau vient d'être rangé → on relit CE compte.
   useEffect(() => {
-    const ecoute = (e) => { const ev = e && e.detail; if (ev && ev.type === 'maj' && ev.quoi === 'label' && ev.uid) rechargerLabels(ev.uid); };
+    const ecoute = (e) => { if (cache()) return; const ev = e && e.detail; if (ev && ev.type === 'maj' && ev.quoi === 'label' && ev.uid) rechargerLabels(ev.uid); };
     window.addEventListener('vrm:ext', ecoute);
     return () => window.removeEventListener('vrm:ext', ecoute);
   }, [rechargerLabels]);
@@ -28714,9 +28783,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // liste les relit aussitôt (même lecture, rien de neuf).
   // « Réessayer » (e-mails de suivi) touché sous Colis → « À retirer » (les outils) : la
   // liste par point relit aussi (sinon elle garderait « pas lu »).
-  useEffect(() => { const f = () => { if (curSub === 'bordereaux') lireSuivis({ force: true }); }; window.addEventListener('vrm:suivis-relire', f); return () => window.removeEventListener('vrm:suivis-relire', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const f = () => { if (cache()) return; if (curSub === 'bordereaux') lireSuivis({ force: true }); }; window.addEventListener('vrm:suivis-relire', f); return () => window.removeEventListener('vrm:suivis-relire', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const relireSuivisManuelsPartout = async () => { await relireSuivisManuels(); try { window.dispatchEvent(new Event('vrm:suivis-manuels')); } catch (_) {} };
-  useEffect(() => { const f = () => { if (curSub === 'bordereaux' || curSub === 'achats') relireSuivisManuels(); }; window.addEventListener('vrm:suivis-manuels', f); return () => window.removeEventListener('vrm:suivis-manuels', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const f = () => { if (cache()) return; if (curSub === 'bordereaux' || curSub === 'achats') relireSuivisManuels(); }; window.addEventListener('vrm:suivis-manuels', f); return () => window.removeEventListener('vrm:suivis-manuels', f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -33388,6 +33457,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let hiddenAt = 0;
     const onVis = () => {
       if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (cache()) { hiddenAt = 0; return; }   // écran gardé caché : il sera remonté à son retour (src/ecransGardes.jsx)
       if (!hiddenAt || Date.now() - hiddenAt < 20000 || !accounts.length) { hiddenAt = 0; return; }
       hiddenAt = 0;
       viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
@@ -33428,6 +33498,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       loadOrders('sold', setSales, false, { silencieux: true });
     };
     const ecoute = (e) => {
+      if (cache()) return;
       const ev = e && e.detail; if (!ev || ev.type !== 'maj') return;
       if (ev.quoi === 'ventes') relire(ev.uid);
       // Achats rangés par l'extension (5.155) : on relit les achats s'ils sont
@@ -33460,12 +33531,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     window.addEventListener('vrm:ext', ecoute);
     // (24 oct.) La relecture chez les transporteurs (`useRelectureTransporteurs`)
     // a changé un état : on relit les lignes `transp_*`.
-    const transpMaj = () => lireTransp();
+    const transpMaj = () => { if (!cache()) lireTransp(); };
     window.addEventListener('vrm:transp-maj', transpMaj);
     if (ecrans.includes(curSub) && ventesPerimees.current) relire();
     const vus = vusSonde.current;
     const sonde = async () => {
-      if (document.hidden || !ecrans.includes(curSub)) return;
+      if (document.hidden || !ecrans.includes(curSub) || cache()) return;
       try {
         // (31 oct.) Même orthographe (`*`) que l'âge des ventes lu par la coque :
         // une adresse, donc une lecture partagée (`lecturesPartagees`).
@@ -33483,16 +33554,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     // Et on demande à l'extension (si elle tourne ici) de relire les ventes du
     // compte connecté : à l'ouverture de l'écran et au retour sur l'onglet.
-    const demander = () => { if (curSub!=='messages' && vmrExtPresent() && ecrans.includes(curSub)) vmrCmd({ cmd: 'ventes' }, 3000); };
+    const demander = () => { if (curSub!=='messages' && vmrExtPresent() && ecrans.includes(curSub) && !cache()) vmrCmd({ cmd: 'ventes' }, 3000); };
     const onVis = () => { if (!document.hidden) demander(); };
     document.addEventListener('visibilitychange', onVis);
     demander();
     sonde();
+    // Un écran gardé qui revient tel quel (src/ecransGardes.jsx) fait ce qu'il faisait en
+    // s'ouvrant : demander les ventes à l'extension, sonder l'âge des ventes captées.
+    const offRetour = vivant ? vivant.surRetour(() => { demander(); sonde(); }) : null;
     // (6 nov., charge) Au rythme commun : plus lentement quand personne ne
     // touche l'écran, tout de suite quand la main revient.
     const t = setInterval(() => { if (rythme().doitLire('sonde-ventes', 60000)) sonde(); }, 60000);
     const reveil = rythme().surReveil(() => { rythme().noter('sonde-ventes'); sonde(); });
-    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); reveil(); signalAnnonces.arreter(); };
+    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); reveil(); signalAnnonces.arreter(); if (offRetour) offRetour(); };
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
@@ -33937,6 +34011,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let arrete = false, timer;
     const captures = new Map();
     const ecoute = e => {
+      if (cache()) return;
       const d = e?.detail;
       if (d?.type !== 'maj' || d.quoi !== 'messages' || !accounts.some(a=>String(a.vinted_user_id)===String(d.uid))) return;
       const uid=String(d.uid);
@@ -36763,7 +36838,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   useEffect(() => {
     if (curSub !== 'bordereaux') return undefined;
-    const f = () => { DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
+    const f = () => { if (cache()) return; DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
     window.addEventListener('vrm:emballer', f);
     return () => window.removeEventListener('vrm:emballer', f);
   }, [curSub]);
@@ -37218,7 +37293,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
-    const f=()=>setTimeout(appliquer,0);
+    // (8 nov.) Caché (écran gardé), il ne PREND pas la demande : elle est pour l'écran qui s'ouvre.
+    const f=()=>{ if(cache()) return; setTimeout(appliquer,0); };
     window.addEventListener('vrm:vue',f);
     return ()=>window.removeEventListener('vrm:vue',f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -38855,7 +38931,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
                 <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
                 <h1 className="vrm-fu-titre-tete">Ma journée</h1>
-                <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>
+                {/* (8 nov., « beauté ») LA PHRASE DU JOUR : les cases publiées (« À envoyer », « À retirer »,
+                    leur limite) mises en mots, le ton selon l'heure (src/phraseJour.js) ; rien de lu ⇒ la
+                    phrase fixe de l'écran. Aucun nombre recalculé. */}
+                {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
+                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
+                    : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
                 {/* Les sept derniers jours, aujourd'hui à droite (maquette). */}
                 <ol className="vrm-fu-semaine" aria-label="Les sept derniers jours" data-fu-semaine="">
                   {[6,5,4,3,2,1,0].map((k)=>{ const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-k);
@@ -39038,16 +39119,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
                 <section className="vrm-fu-afaire" aria-label="À faire">
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
-                  <div className="vrm-day-task-list" data-barre-jour="">
-                    {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map(tache)}</div> : null}
-                    {carteAilleurs ? carteVendusAilleurs() : null}
-                    {deuxFois.length ? carteDeuxFois() : null}
-                    {cases.map(carteCase)}
-                    {comptesARelierJour.length ? carteARelier() : null}
-                    {sortiesStock.length ? carteSortieStock() : null}
-                    {autres.map(tache)}
-                    {urssafJob ? tache(urssafJob, 99) : null}
-                  </div>
+                  {/* (8 nov., « beauté ») L'ÉCRAN D'ACCUEIL : la PREMIÈRE ligne (l'ordre de toujours, le plus
+                      pressé d'abord) devient la grande carte « prochaine chose à faire » (sa photo par identité,
+                      son titre, son geste en un tap) ; les autres, une rangée de petites cartes. Les MÊMES
+                      éléments, les mêmes attributs : seule la forme change (`is-prochain`, styles-beaute.css). */}
+                  {(() => { let premier = true; const P = (el) => { if (!premier || !el || !React.isValidElement(el)) return el; premier = false;
+                    return React.cloneElement(el, { className: ((el.props && el.props.className) || '') + ' is-prochain', 'data-prochain': '' }); };
+                  return (
+                  <div className="vrm-day-task-list vrm-accueil-jour" data-barre-jour="" data-accueil-n={nGestes}>
+                    {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map((j, i) => P(tache(j, i)))}</div> : null}
+                    {carteAilleurs ? P(carteVendusAilleurs()) : null}
+                    {deuxFois.length ? P(carteDeuxFois()) : null}
+                    {cases.map((x) => P(carteCase(x)))}
+                    {comptesARelierJour.length ? P(carteARelier()) : null}
+                    {sortiesStock.length ? P(carteSortieStock()) : null}
+                    {autres.map((j, i) => P(tache(j, i)))}
+                    {urssafJob ? P(tache(urssafJob, 99)) : null}
+                  </div>); })()}
                   {feuilleAilleurs ? (
                     <SheetShell titre="Vendus ailleurs" sousTitre={carteAilleurs && carteAilleurs.n ? `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} à retirer` : undefined} onClose={() => setFeuilleAilleurs(false)} maxWidth={560} data-feuille-ailleurs="">
                       <div className="vrm-bilan-sync vrm-va-feuille">
@@ -43599,12 +43687,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (x.__autre === 'vc') return faitsVc[x.v.id] ? null : { cle: 'vc:' + x.v.id, site: 'vestiaire', v: x.v, num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, att, pret: !!(x.v.bordereau || x.v.etiquette), x };
                   if (x.__autre === 'eb') return { cle: x.key, site: 'ebay', num: x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '', titre: x.x.titre || `Commande ${x.x.orderId}`, photo: x.x.ordre ? photoCommande(x.x.ordre) : null, lien: lienCommandeEbay(x.x.orderId, x.x.compte), att, pret: true, x };
                   if (x.__autre === 'lbc') { if (faitsLbc[x.x.txId]) return null; const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
-                    return { cle: 'lbc:' + x.x.txId, site: 'leboncoin', txId: x.x.txId, num: (f && f.numero != null) ? String(f.numero).trim() : '', titre: x.x.titre || (x.o && x.o.title) || '(sans titre)', photo: photoArticle(x.o || {}), att, pret: !!(x.o && x.o.label && x.o.label.voucherUrl), x }; }
+                    return { cle: 'lbc:' + x.x.txId, site: 'leboncoin', txId: x.x.txId, num: (f && f.numero != null) ? String(f.numero).trim() : '', titre: x.x.titre || (x.o && x.o.title) || '(sans titre)', photo: photoArticle(x.o || {}), att, pret: !!(x.o && x.o.label && x.o.label.voucherUrl), qr: (x.o && x.o.label && /^https?:\/\//.test(String(x.o.label.qrUrl || ''))) ? x.o.label.qrUrl : '', x }; }
                   const o = x.o, b = x.b; if (o ? isShipDone(o) : isBordShippedManual(b)) return null;
                   return { cle: 'v:' + (x.txn || x.key), site: 'vinted', o, b, num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis', photo: o ? orderPhoto(o) : bordPhoto(b), att, pret: !!x.pret, x };
                 }).filter(Boolean);
                 const groupesT = groupesTournee(tourneeItems, { trNom: (t) => trNomDe(t.x), cle: (t) => t.cle });
                 const enAttenteT = deposeScan.attente ? String(deposeScan.attente.cle) : '';
+                // (8 nov., « beauté ») LA PROGRESSION DU COMPTOIR : « 3 / 7 ». Déposés = les « Colis fait »
+                // d'aujourd'hui (Vinted, Vestiaire, Leboncoin : les coches de toujours, `gestesDepuis`) ;
+                // le total = déposés + ceux qu'on peut déposer (avec bordereau). Le colis en attente de ses
+                // 5 s « Annuler » compte déjà déposé (il l'est à l'écran) — annulé, il revient.
+                const deposesAujT = (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const t0 = m0.getTime(); return gestesDepuis(shipDone, t0) + gestesDepuis(faitsLbc, t0) + gestesDepuis(faitsVc, t0); })();
+                const nDeposablesT = tourneeItems.filter((t) => t.pret && t.site !== 'ebay').length;
+                const faitsT = deposesAujT + (enAttenteT && tourneeItems.some((t) => t.cle === enAttenteT) ? 1 : 0);
+                const totalT = deposesAujT + nDeposablesT;
                 const tourneeEl = (tourneeItems.length || tourneeDepot) ? (
                   <div key="__tournee" className="vrm-tournee-tete" >
                     {tourneeItems.length ? <span style={{display:'inline-flex',alignItems:'center',gap:2}}><Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Préparer la tournée de dépôt</Bouton>
@@ -43612,11 +43708,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <Pourquoi label="À quoi sert la tournée ?" titre="La tournée de dépôt">Les colis prêts à déposer, rangés par transporteur, pour tout faire en un passage. Au point relais, touche « Déposé » (ou scanne le bordereau) : il est noté déposé.</Pourquoi></span> : null}
                     {tourneeDepot ? (
                       <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet=""
-                        sousTitre={(() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const d = gestesDepuis(shipDone, m0.getTime()); // (6 nov., audit des chiffres) « à déposer » = les colis qui ONT leur bordereau (ceux qu'on peut
+                        className="vrm-tournee-feuille"
+                        sousTitre={(() => { const d = deposesAujT; // (6 nov., audit des chiffres) « à déposer » = les colis qui ONT leur bordereau (ceux qu'on peut
                           // déposer) ; une vente qui attend le sien est dite à part, jamais comptée « à déposer ».
                           const nDep = tourneeItems.filter((t) => t.pret).length, nAtt = tourneeItems.length - nDep;
                           return `${nDep} colis à déposer${nAtt ? ` · ${nAtt} ${nAtt > 1 ? 'attendent leur' : 'attend son'} bordereau` : ''}${d ? ` · ${d} déjà déposé${d > 1 ? "s" : ""} aujourd’hui` : ""}`; })()}>
-                        <div className="vrm-tournee">
+                        <div className="vrm-tournee vrm-tournee-comptoir">
+                          {totalT > 0 ? (
+                            <div className="vrm-tournee-progres" data-tournee-progres={`${faitsT}/${totalT}`} role="progressbar" aria-valuemin={0} aria-valuemax={totalT} aria-valuenow={faitsT} aria-label={`${faitsT} colis déposés sur ${totalT}`}>
+                              <span className="vrm-tournee-progres-n"><b>{faitsT}</b>{'\u202F'}/{'\u202F'}{totalT}</span>
+                              <span className="vrm-tournee-progres-l">{faitsT >= totalT ? 'Tout est déposé' : 'déposés'}</span>
+                              <span className="vrm-tournee-progres-barre" aria-hidden="true"><span style={{ width: `${Math.round((faitsT / totalT) * 100)}%` }}/></span>
+                            </div>
+                          ) : null}
                           <div className="vrm-tournee-haut">
                             <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
                             <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton>
@@ -43641,6 +43745,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                         <span className="vrm-tournee-quoi">
                                           <span className="vrm-tournee-titre">{t.num ? <><Numero n={t.num} taille="petit"/>{' '}</> : null}{t.titre}</span>
                                           <span className="vrm-tournee-sous">{enAttente ? 'Déposé · annulable quelques secondes' : t.site === 'ebay' ? 'Étiquette eBay : le dépôt se suit dans eBay' : !t.pret ? 'Bordereau pas encore là' : texteAttenteVente(t.att) || '—'}</span>
+                                          {/* (8 nov., « beauté ») Le QR de dépôt (Leboncoin, LU sur l'étiquette) en grand, à montrer au comptoir. */}
+                                          {t.qr && !enAttente ? (
+                                            <details className="vrm-tournee-qr" data-tournee-qr={t.cle}>
+                                              <summary>Montrer le QR</summary>
+                                              <span className="vrm-tournee-qr-grand"><QrColis url={t.qr} size={220}/></span>
+                                            </details>
+                                          ) : null}
                                         </span>
                                         {enAttente
                                           ? <Bouton variante="discret" data-tournee-annuler={t.cle} onClick={deposeScan.annuler}>Annuler</Bouton>
@@ -43779,7 +43890,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span>{nParT[trNomDe(e)]} colis</span>
                     </div>
                   )}
-                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -47494,7 +47605,7 @@ function AbonnementRequis({ info }) {
   return (
     <div data-abonnement-requis="" style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
-        <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 12, display: 'block' }}/>
+        <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v5-192.png" srcSet="/vrm-logo-v5-96.png 96w, /vrm-logo-v5-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 12, display: 'block' }}/>
         <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
         <div style={{ fontSize: 15, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined} data-paiement-ferme={paiementFerme ? '' : undefined}>
           {impaye
@@ -47644,7 +47755,7 @@ const boiteEquipe = () => ({ maxWidth: 760, margin: '0 auto' });
 function TeteEquipe({ titre, sous, onPropre }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-      <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="44px" alt="VRM" width="36" height="36" style={{ borderRadius: 12, display: 'block' }}/>
+      <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v5-192.png" srcSet="/vrm-logo-v5-96.png 96w, /vrm-logo-v5-192.png 192w" sizes="44px" alt="VRM" width="36" height="36" style={{ borderRadius: 12, display: 'block' }}/>
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: -0.3 }}>{titre}</div>
         {sous && <div style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{sous}</div>}
@@ -48202,7 +48313,8 @@ export default function App() {
   //    l'écran « Colis à préparer » d'un membre d'équipe (et la porte de la
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
-  C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
+  // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
+  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
@@ -48630,16 +48742,15 @@ function AppCoeur() {
   mesuresEcran(tab);
   useEffect(() => { if (!exempleActif()) demarrerMesures({ jeton: () => (exempleActif() ? '' : String((readSession() || {}).access_token || '')), ouverture: SESSION_AU_CHARGEMENT }); }, []);
   // (27 oct., « des effets entre les pages ») Changer d'écran se VOIT : le
-  // contenu arrive en fondu, d'un léger glissé (styles-mouvement.css). Rien
-  // n'est remonté — on rejoue une classe sur `<main>` — et rien ne bouge si
-  // la personne a demandé de réduire les animations.
-  useEffect(() => {
+  // contenu arrive en fondu. Rien ne bouge si la personne a demandé de réduire
+  // les animations. (8 nov.) Par Web Animations, opacité seule (src/passageOnglet.js) :
+  // la classe rejouée sur `<main>` (et sa lecture forcée `offsetWidth`) faisait
+  // recalculer le style de TOUT l'écran à chaque onglet (0,8 s mesuré au téléphone) ;
+  // posé avant l'affichage (plus d'image pleine puis vide).
+  React.useLayoutEffect(() => {
     const m = document.querySelector('.vrm-main');
-    if (!m) return;
-    m.classList.remove('vrm-ecran-anime'); void m.offsetWidth; m.classList.add('vrm-ecran-anime');
-    const fin = (e) => { if (e.target === m) m.classList.remove('vrm-ecran-anime'); };
-    m.addEventListener('animationend', fin);
-    return () => m.removeEventListener('animationend', fin);
+    const a = fonduEntree(m);
+    return () => { try { if (a) a.cancel(); } catch (_) {} };
   }, [tab]);
   // (17 oct., Julien) TROIS ÉCRANS QUITTENT LE MENU, SANS DISPARAÎTRE : « Prix
   // qui marche » devient une rubrique de Statistiques, « Factures » une rubrique
@@ -48701,9 +48812,13 @@ function AppCoeur() {
   const subVoulue=React.useRef(null);
   const sectionsPlateformes=React.useRef({});
   const dernierePlateforme=React.useRef(tab);
+  // (8 nov., écrans gardés) La section de l'écran visé est posée : il peut revenir.
+  // Un écran gardé (src/ecransGardes.jsx) n'est jamais rendu avec la section de l'écran d'AVANT.
+  const [subPose,setSubPose]=useState(tab);
   React.useLayoutEffect(()=>{
     const precedent=dernierePlateforme.current;
     if(precedent!==tab){
+      setSubPose(tab);
       sectionsPlateformes.current[precedent]=platSub;
       // Une tâche (Ventes, Annonces, Messages) rouvre sur le dernier filtre de
       // site choisi (mémorisé sur l'appareil), sinon son défaut.
@@ -48889,10 +49004,35 @@ function AppCoeur() {
     window.addEventListener('vrm:aller',onAller);
     return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
-  const [dark,setDark]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  // (8 nov., « beauté ») L'APPARENCE CHOISIE : Clair · Sombre · Automatique (le système) · Le soir
+  // (19 h–7 h). `vrm_apparence` absent ⇒ le choix d'avant (`vinted_dark`), rien ne change pour lui.
+  // La règle (src/apparence.js) est la même que celle du script de démarrage (aucun flash) ;
+  // `dark` reste le nom de « sombre MAINTENANT » pour tout le reste de l'app.
+  const [apparenceLue,setApparenceLue]=useStateCle('vrm_apparence', ()=>load('vrm_apparence',null));
+  const apparence = apparenceDe(apparenceLue, choixSombre);
+  const systemeSombre = useSystemeSombre(apparence === 'auto');
+  const [, setTicTheme] = useState(0);
+  useEffect(() => {
+    // « Le soir » : la teinte change à 19 h et à 7 h ; un téléphone réveillé après des heures
+    // (minuterie gelée) se recale à son retour au premier plan.
+    if (apparence !== 'soir') return undefined;
+    let t = null;
+    const armer = () => { if (t) clearTimeout(t); const ms = prochainChangement('soir', new Date()); t = setTimeout(() => { setTicTheme((n) => n + 1); armer(); }, Math.min(ms, 2147000000)); };
+    const vu = () => { if (document.visibilityState === 'visible') { setTicTheme((n) => n + 1); armer(); } };
+    armer(); document.addEventListener('visibilitychange', vu);
+    return () => { if (t) clearTimeout(t); document.removeEventListener('visibilitychange', vu); };
+  }, [apparence]);
+  const dark = sombreEffectif(apparence, { date: new Date(), systemeSombre });
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu
   C = dark ? THEMES.dark : THEMES.light;
-  const toggleDark=()=>{ const d=!dark; setDark(d); save('vinted_dark',d); };
+  const choisirApparence = (mode) => {
+    const w = ecrituresApparence(mode); if (!w) return;
+    setApparenceLue(mode); save('vrm_apparence', mode);
+    if ('vinted_dark' in w) { setChoixSombre(w.vinted_dark); save('vinted_dark', w.vinted_dark); }
+  };
+  // L'interrupteur « Mode sombre » : un choix EXPLICITE (il quitte Automatique / Le soir).
+  const toggleDark=()=>choisirApparence(dark ? 'clair' : 'sombre');
   // ⚠️⚠️ LE THÈME NE VIVAIT QUE DANS REACT. `C` était bien remplacé, mais le
   //    DOCUMENT lui-même restait clair : mesuré le 9 septembre, app en sombre,
   //    `document.body` à `rgb(246,247,249)` et `theme-color` à `#F2F2F7` —
@@ -51787,6 +51927,9 @@ function AppCoeur() {
         <BlocNumerosPerimes/>
         {/* (6 nov.) L'ÉCRAN ATTEND SES DONNÉES ESSENTIELLES (src/AttenteEcran.jsx) : monté mais
             invisible, son squelette à sa place, puis il arrive d'un bloc — au plus ~2,5 s. */}
+        {/* (8 nov.) Ma journée, Colis, Ventes, Annonces déjà vues restent montées, gelées et hors de
+            la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
+        <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque}>
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
@@ -51966,7 +52109,7 @@ function AppCoeur() {
             }
             toast('⚠ Fichier de sauvegarde invalide.');
           }catch(err){toast('Erreur : '+err.message);} }; inp.click(); }}
-          dark={dark} toggleDark={toggleDark}/></GardeEcran>}
+          dark={dark} toggleDark={toggleDark} apparence={apparence} onApparence={choisirApparence}/></GardeEcran>}
         {/* ⚠️ MA JOURNÉE EST MONTÉE ICI, PAS DANS LA TABLE `map` CI-DESSUS —
             et elle ne recevait donc PAS `baseKO`. Mon premier correctif a réparé
             Colis, Achats et le tableau de bord… et laissé l'écran d'ACCUEIL
@@ -52061,6 +52204,7 @@ function AppCoeur() {
         )}
         {tab==='vintedaccounts'&&<GardeEcran nom="vintedaccounts"><VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/></GardeEcran>}
         </AttenteEcran>
+        </EcransGardes>
         </>)}
         </GardeEcran>
         </BarreHautSlot.Provider>

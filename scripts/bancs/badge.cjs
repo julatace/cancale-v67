@@ -107,6 +107,8 @@ const lire = (pg) => pg.evaluate(() => {
     carte: (r.querySelector('.carte') || {}).innerText || '',
     carteVisible: r.querySelector('.carte') ? getComputedStyle(r.querySelector('.carte')).display !== 'none' : false,
     iframe: r.querySelector('.connexion iframe') ? r.querySelector('.connexion iframe').getAttribute('src') : null,
+    // 5.329 : le formulaire est DESSINÉ dans la carte (shadow root fermée), sans iframe.
+    form: !!r.querySelector('.connexion:not([hidden]) form[data-connexion-carte]'),
     modes: window.__modes,
     envoyes: window.__envoyes.map((m) => m.action),
     choix: window.__envoyes.filter((m) => m.action === 'choixCompte').map((m) => m.uid + ':' + m.choix),
@@ -116,8 +118,10 @@ const lire = (pg) => pg.evaluate(() => {
     fondQ: r.querySelector('.question') ? getComputedStyle(r.querySelector('.question')).backgroundColor : '',
     accentQ: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundColor : '',
     hauteursQ: Array.from(r.querySelectorAll('.question button')).map((b) => Math.round(b.getBoundingClientRect().height)),
-    // Le mot de passe ne doit JAMAIS être un champ de la page.
-    champsPage: Array.from(document.querySelectorAll('input')).length + Array.from(r.querySelectorAll('input')).length,
+    // Le mot de passe ne doit JAMAIS être un champ du DOM de la page (5.329 : il
+    // est dans la shadow root FERMÉE de la carte, que la page ne peut pas lire).
+    champsPage: Array.from(document.querySelectorAll('input')).length,
+    champsCarte: Array.from(r.querySelectorAll('input')).length,
     // Rien de l'ancien bouton orange.
     orange: /#D2401E|rgb\(210, 64, 30\)/i.test(document.documentElement.outerHTML + r.innerHTML),
   };
@@ -147,15 +151,15 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     dit(l.carteVisible && /Pas connecté/i.test(l.carte), 'au survol, la carte dit « pas connecté »', l.carte.replace(/\n/g, ' · ').slice(0, 160));
     await cliquer(pg);
     l = await lire(pg);
-    // 5.328 (8 nov., Julien sur Orion : « mets directement l'endroit de
-    // connexion avec le mot de passe ») : pas connecté, la carte s'ouvre AVEC la
-    // connexion dedans (iframe de l'extension) — plus aucun détour par VRM.
-    dit(!l.envoyes.includes('lierAvecVRM') && /popup\.html\?mode=carte$/.test(l.iframe || '') && l.carteVisible, 'pas connecté : le clic ouvre la carte AVEC la connexion dedans — VRM ne s’ouvre pas', JSON.stringify({ envoyes: l.envoyes, iframe: l.iframe }));
-    dit(l.champsPage === 0, 'et AUCUN champ (mot de passe compris) dans le DOM du site : il est dans l’iframe de l’extension', 'champs : ' + l.champsPage);
+    // 5.329 (8 nov., 22 h, Julien sur Orion : « que ça n'ouvre AUCUN autre
+    // onglet ») : pas connecté, la carte s'ouvre AVEC le formulaire dessiné
+    // dedans — plus d'iframe (Orion ne l'affichait pas), plus de détour par VRM.
+    dit(!l.envoyes.includes('lierAvecVRM') && l.form && !l.iframe && l.carteVisible, 'pas connecté : le clic ouvre la carte AVEC le formulaire dedans, sans iframe — VRM ne s’ouvre pas', JSON.stringify({ envoyes: l.envoyes, iframe: l.iframe, form: l.form }));
+    dit(l.champsPage === 0 && l.champsCarte === 2, 'AUCUN champ dans le DOM du site : e-mail et mot de passe sont dans la shadow root fermée', JSON.stringify({ page: l.champsPage, carte: l.champsCarte }));
     dit(!/rien à taper|VRM s’ouvre et connecte/.test(l.carte), 'la carte ne promet plus « VRM s’ouvre… rien à taper »', l.carte.replace(/\n/g, ' · ').slice(0, 200));
     dit(/connecte-toi ci-dessous/.test(l.carte), '« Pas connecté — connecte-toi ci-dessous »', l.carte.slice(0, 120));
-    const hIframe = await pg.evaluate(() => Math.round(document.getElementById('vrm-badge').shadowRoot.querySelector('.connexion iframe').getBoundingClientRect().height));
-    dit(hIframe === 388, 'le cadre prend la hauteur que la connexion lui donne (un seul défilement)', 'hauteur ' + hIframe);
+    const hBtn = await pg.evaluate(() => Math.round(document.getElementById('vrm-badge').shadowRoot.querySelector('[data-me-connecter]').getBoundingClientRect().height));
+    dit(hBtn >= 44, '« Me connecter » fait 44 px au moins', 'hauteur ' + hBtn);
     await pg.mouse.move(200, 200); await pg.waitForTimeout(400);
     l = await lire(pg);
     dit(l.carteVisible, 'la souris qui sort ne referme pas une carte qui porte le formulaire', '');
@@ -166,17 +170,19 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
       const { ctx, pg } = await rendre(nav, ETATS.deconnecte, { scheme, mobile: { largeur: 390 } });
       await pg.tap('#vrm-badge'); await pg.waitForTimeout(400);
       const l = await lire(pg);
-      dit(/popup\.html\?mode=carte$/.test(l.iframe || '') && l.carteVisible && !l.envoyes.includes('lierAvecVRM'), `${scheme} : un toucher du logo montre la connexion dans la carte`, JSON.stringify({ iframe: l.iframe, envoyes: l.envoyes }));
+      dit(l.form && !l.iframe && l.carteVisible && !l.envoyes.includes('lierAvecVRM'), `${scheme} : un toucher du logo montre le formulaire dans la carte`, JSON.stringify({ iframe: l.iframe, form: l.form, envoyes: l.envoyes }));
       await pg.screenshot({ path: path.join(SORTIE, 'badge-connexion-doigt-' + scheme + '.png') });
       await ctx.close();
     }
   });
-  await essaie('cadre muet', async () => {
+  await essaie('page d’extension muette (Orion)', async () => {
+    // 5.329 : la page d'extension ne s'affiche jamais (Orion) — la carte n'en
+    // dépend plus : au bout de 6,5 s, toujours le formulaire, jamais « Se
+    // connecter avec VRM » (qui ouvrait VRM).
     const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.deconnecte, { __cadreMuet: true }));
     await cliquer(pg); await pg.waitForTimeout(6600);
     const l = await lire(pg);
-    const sec = await pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-secours-formulaire]'));
-    dit(sec && !l.iframe && /ne s’affiche pas/.test(l.carte), 'un cadre qui ne se montre pas en 6 s : la carte le DIT et propose « Se connecter avec VRM »', JSON.stringify({ sec, iframe: l.iframe }));
+    dit(l.form && !l.iframe && !/Se connecter avec VRM|ne s’affiche pas/.test(l.carte) && !l.envoyes.includes('lierAvecVRM'), 'page d’extension muette : 6,5 s après, toujours le formulaire, jamais « Se connecter avec VRM »', JSON.stringify({ form: l.form, iframe: l.iframe, envoyes: l.envoyes }));
     await ctx.close();
   });
   await essaie('connecté depuis la carte', async () => {
@@ -192,7 +198,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await pg.waitForTimeout(400);
     const l = await lire(pg);
-    dit(l.carteVisible && /sophie@exemple\.fr/.test(l.carte) && /C’est fait/.test(l.carte) && !l.iframe, 'connecté : le formulaire part, la carte reste ouverte et NOMME le compte', l.carte.replace(/\n/g, ' · ').slice(0, 200));
+    dit(l.carteVisible && /sophie@exemple\.fr/.test(l.carte) && /C’est fait/.test(l.carte) && !l.iframe && !l.form, 'connecté : le formulaire part, la carte reste ouverte et NOMME le compte', l.carte.replace(/\n/g, ' · ').slice(0, 200));
     dit(!/connecte-toi|Reconnecte-toi|refusé/i.test(l.carte) && /prochains envois partent/.test(l.carte) && !l.point, '« Tes données » : un refus d’avant la connexion ne dit plus « connecte-toi », et rien ne s’allume', l.carte.replace(/\n/g, ' · ').slice(0, 260));
     await pg.screenshot({ path: path.join(SORTIE, 'badge-connecte-depuis-carte.png') });
     await ctx.close();
@@ -217,7 +223,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.deconnecte, { __lierMuet: true }));
     await cliquer(pg); await pg.waitForTimeout(200);
     const l = await lire(pg);
-    dit(/popup\.html\?mode=carte$/.test(l.iframe || '') && l.champsPage === 0, 'service worker d’avant : la connexion est aussi dans l’iframe de l’extension, jamais dans le site', JSON.stringify({ iframe: l.iframe, champs: l.champsPage }));
+    dit(l.form && !l.iframe && l.champsPage === 0, 'service worker d’avant : la connexion est aussi dans la carte (shadow root fermée), jamais dans le DOM du site', JSON.stringify({ iframe: l.iframe, form: l.form, champs: l.champsPage }));
     await pg.screenshot({ path: path.join(SORTIE, 'badge-connexion.png') });
     await ctx.close();
   });
@@ -258,7 +264,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await cliquer(pg);
     l = await lire(pg);
     dit(l.envoyes.includes('ouvrirVRM'), 'un clic ouvre VRM', JSON.stringify(l.envoyes));
-    dit(!l.iframe, 'et ne montre aucun formulaire', l.iframe);
+    dit(!l.iframe && !l.form, 'et ne montre aucun formulaire', JSON.stringify({ iframe: l.iframe, form: l.form }));
     await ctx.close();
   });
 
