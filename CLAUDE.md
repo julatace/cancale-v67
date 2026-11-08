@@ -513,6 +513,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · Restes ventes** : une phrase répétée sur ≥ 2 lignes de Ventes (note « vue par e-mail » par compte, refus de facture commun) dite une fois en tête ; widget, rappels et bilan comptent les ventes vues par e-mail avec leur bordereau (`api/_lib/colis-ventes-email.js` importe les règles de l'app) ; Mondial Relay au départ : aucune identité sûre, 3 mesures à faire. `docs/passation/2026-11-08-restes-ventes.md`. Geste : aucun.
 - **8 nov. · Recherche et filtres** : réinitialisation des filtres cumulés de la boîte mail, dictée annulée sans retour tardif et composition de texte protégée. `docs/passation/2026-11-08-recherches-filtres.md`. Aucune mise à jour d’extension.
 
 - **8 nov. · Actions et offres** : repère au minimum saisi, liens occupés réellement bloqués, relecture sans double départ, indicateur lisible et mouvement réduit. `docs/passation/2026-11-08-actions-offres-finitions.md`. Aucune extension à réinstaller.
@@ -540,7 +541,6 @@ sans la fonction.
 - **7 nov. · Je numérote moi-même (5.324)** : réglage `vrm_numero_ecrit`, éteint par défaut ; allumé, VRM ne DONNE plus aucun N° (annonce, vente à expédier, doublon, Vestiaire, réservation de l'extension) et LIT le sien (`src/numeroEcrit.js` : fin de description, titre, SKU eBay, CustomRef Leboncoin ; jamais un nombre nu ; deux N° = ambigu ; contredit = « à vérifier », son clic). Aperçu des 4 sites dans Réglages → Numéros. `docs/passation/2026-11-07-numero-ecrit.md`. Geste : aucun (Vinted pro à mesurer).
 - **8 nov. · Finition : intégration** : branche `claude/attente-v36-finition-integ` fusionnée avec main ; les 221 bancs restants lancés un à un et chaque rouge relancé sur main : 1 défaut corrigé (`UneLigne` perdait l'insécable de « 14 € » à la coupe), 5 bancs jugés à l'insécable/tournure (`rapport`, `mode-stream`, `stream-photos`, `messagerie`, `pave-vinted`), le reste identique sur main ; insécable avant « : ; ? ! » pas appliquée. `docs/passation/2026-11-07-finition-bancs.md`. Geste : aucun.
 - **7 nov. · Vitesse au téléphone** : Colis 20 → 6-9 s de gel, Ma journée 11,6 → 3,0 s (CPU ×4) — formateurs de dates créés une fois, `UneLigne` mesurée en groupe, règles d'identité mémorisées pour UN calcul (`memoRendu`), index des suivis ; reste : `Comptabilite` remonté à chaque écran (découpage) et `email_track` lu en entier. `docs/passation/2026-11-07-vitesse.md`. Geste : aucun.
-- **7 nov. · Colis sans réseau : intégration** : branche `claude/attente-v36-hors-reseau` fusionnée ; purge à 90 jours des `mesures_jour_*` du propriétaire au cron du matin (`purgerMesuresAnciennes`, lecture `select=id` paginée, jour lu dans l'id, lecture ratée ⇒ rien supprimé ; `audit-purge-mesures` + `--prouve`). `docs/passation/2026-11-06-hors-reseau.md` §Purge. Geste : couper le réseau sur l'iPhone et rouvrir Colis.
 
 
 
