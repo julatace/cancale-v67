@@ -197,7 +197,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
   const taches = liste ? [...liste.querySelectorAll('.vrm-day-task')].filter(vis) : [];
   const lignes = taches.map((t) => {
     const p = t.querySelector('[data-pile]');
-    return { cas: t.getAttribute('data-case') || t.getAttribute('data-job') || '', n: t.getAttribute('data-n'), pile: p ? { n: p.getAttribute('data-pile-n'), photos: Number(p.getAttribute('data-pile-photos')), plus: Number(p.getAttribute('data-pile-plus')), estPile: p.classList.contains('is-pile'), srcs: [...p.querySelectorAll('[data-vignette-src]')].map((v) => v.getAttribute('data-vignette-src')), imgs: [...p.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth > 0).length, w: Math.round(p.querySelector('.vrm-pile-v').getBoundingClientRect().width), rayon: getComputedStyle(p.querySelector('.vrm-pile-v')).borderTopLeftRadius } : null,
+    return { cas: t.getAttribute('data-case') || t.getAttribute('data-job') || '', n: t.getAttribute('data-n'), prochain: t.hasAttribute('data-prochain'), pile: p ? { n: p.getAttribute('data-pile-n'), photos: Number(p.getAttribute('data-pile-photos')), plus: Number(p.getAttribute('data-pile-plus')), estPile: p.classList.contains('is-pile'), srcs: [...p.querySelectorAll('[data-vignette-src]')].map((v) => v.getAttribute('data-vignette-src')), imgs: [...p.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth > 0).length, w: Math.round(p.querySelector('.vrm-pile-v').getBoundingClientRect().width), rayon: getComputedStyle(p.querySelector('.vrm-pile-v')).borderTopLeftRadius } : null,
       fond: getComputedStyle(t).backgroundColor, titre: (t.querySelector('.vrm-day-task-title') || {}).textContent || '' };
   });
   // Une « pastille pleine colorée » : un élément de 20 px ou plus, fond plein ambre ou encre/noir.
@@ -250,7 +250,8 @@ const mesureJournee = (pg) => pg.evaluate(() => {
               } else dit(!env.pile.estPile && env.pile.photos === 1 && env.pile.plus === 0, 'J2 · un seul colis ⇒ une vignette, pas de pile ni de « +k »', JSON.stringify(env.pile));
               if (!SANS) dit(env.pile.imgs === env.pile.photos, 'les photos se chargent (pas de cadre vide)', `${env.pile.imgs}/${env.pile.photos}`);
               // (échelle fermée, 3 nov.) Le rayon 10 n'est pas sur l'échelle Fusion (6·12·14·20·24) : 12.
-              dit(env.pile.w === 44 && env.pile.rayon === '12px', 'vignette 44 px, rayon 12 (échelle fermée, 3 nov.)', `${env.pile.w}px ${env.pile.rayon}`);
+              // (8 nov., « beauté ») La « prochaine chose à faire » montre sa photo en grand (72, rayon 14) ; les autres 44 / 12.
+              dit(env.prochain ? env.pile.w === 72 && env.pile.rayon === '14px' : env.pile.w === 44 && env.pile.rayon === '12px', 'vignette 44 px, rayon 12 (échelle fermée, 3 nov.) — 72 / 14 sur la grande carte', `${env.pile.w}px ${env.pile.rayon}${env.prochain ? ' (grande carte)' : ''}`);
               dit(/^\d+ colis à poster/.test(env.titre.trim()), 'le titre dit le nombre (« 3 colis à poster »)', env.titre);
             }
             if (JEU === 'base' || SANS) {
