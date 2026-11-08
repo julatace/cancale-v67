@@ -81,6 +81,7 @@ import { etatPublic } from './_lib/etat-public.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
+import { corsExtension } from './_lib/cors-extension.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -1316,6 +1317,7 @@ async function sante(req, res) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (corsExtension(req, res)) return;   // (8 nov.) Orion : préalable CORS des appels de l'extension
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
   if(mode==='profil-avatar')return routeProfilAvatar(req,res);

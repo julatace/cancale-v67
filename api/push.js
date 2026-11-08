@@ -16,6 +16,7 @@ import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
 import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
+import { corsExtension } from './_lib/cors-extension.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -33,6 +34,7 @@ const PAS_ECRIT = { erreur: 'base-injoignable', message: "Je n'ai pas pu enregis
 const SANS_SESSION = { erreur: 'session', message: "Reconnecte-toi à VRM, puis réactive les notifications sur cet appareil." };
 
 export default async function handler(req, res) {
+  if (corsExtension(req, res)) return;   // (8 nov.) Orion : préalable CORS des appels de l'extension
   res.setHeader?.('Cache-Control','no-store');
   const u = await utilisateurDe(req);
   if (u === undefined) { res.status(503).json({ erreur: 'connexion-injoignable', message: "Le service de connexion ne répond pas — rien n'est activé, réessaie dans un instant." }); return; }
