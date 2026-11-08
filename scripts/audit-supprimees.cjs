@@ -183,8 +183,14 @@ function lecteurAnnoncesApp(ligne, ids) {
   // Absentes d'un code d'avant : rien à charger.
   const sm = /const SEL_MOISSON = '[^']*';\n/.exec(F.app);
   const lcm = /function ligneCommandes\(r\) \{[\s\S]*?\n\}\n/.exec(F.app);
-  const moisson = (sm ? sm[0] : '') + (lcm ? lcm[0] : '');
-  const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
+  // 8 nov. (démarrage) : `fetchHarvestBrut` lit par `lireMoissonGroupee` (les comptes
+  // lus au même moment partent en `id=in.(…)`, src/lectureGroupee.js). Le VRAI
+  // lecteur groupé est chargé (absent d'un code d'avant : rien à charger).
+  const lg = /const _lireLigneMoissonSeule = [\s\S]*?\nconst lireMoissonGroupee = [\s\S]*?\n\};\n/.exec(F.app);
+  const flg = path.join(racine, 'src', 'lectureGroupee.js');
+  const groupee = lg && fs.existsSync(flg) ? fs.readFileSync(flg, 'utf8').replace(/^export /gm, '') + '\n' + lg[0] : '';
+  const moisson = (sm ? sm[0] : '') + (lcm ? lcm[0] : '') + groupee;
+  const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, Promise, setTimeout, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
     busyStart() {}, busyEnd() {}, load: (k, d) => d, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids, lireEnLigneTous: async () => [], lecturesPubliquesKO: () => false,   // (5.167 revue : `dressingEnLigne` dit si les lectures publiques ont pu être lues)
    
     fetch: async (url) => {

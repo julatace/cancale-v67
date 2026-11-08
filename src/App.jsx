@@ -309,6 +309,9 @@ import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
+import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
+import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
@@ -4596,7 +4599,25 @@ const viderCacheLignes = () => { _rowCache.clear(); try { viderLecturesMemo(); }
 // boucle qui guette un changement) garde `fetch`.
 const _memoLectures = new Map();       // clé -> { at, promesse }
 const viderLecturesMemo = () => _memoLectures.clear();
+const viderMemoPourEcriture = (url, methode, init, base) => fonctionVidage(_memoLectures, url, methode, init, base);
+const viderMemoLignes = (ids) => viderLignesMemo(_memoLectures, ids, SUPABASE_URL);
 const _cloner = (v) => { try { return typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)); } catch (_) { return JSON.parse(JSON.stringify(v)); } };
+// (8 nov., démarrage) Les petites lignes `select=data` du montage, groupées par session.
+const _groupeLignesData = creerLectureGroupee(async (ids, auth) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=id,data`, { headers: { apikey: SUPABASE_KEY, Authorization: auth } });
+    if (!r.ok) return { ok: false, statut: r.status };
+    const j = await r.json();
+    return Array.isArray(j) ? { ok: true, rows: j } : { ok: false, statut: 0 };
+  } catch (_) { return { ok: false, statut: 0 }; }
+}, async (id, auth) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: { apikey: SUPABASE_KEY, Authorization: auth } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
+});
 const fetchMemo = (url, init = {}) => {
   const m = String((init && init.method) || 'GET').toUpperCase();
   if (m !== 'GET') return fetch(url, init);
@@ -4606,7 +4627,13 @@ const fetchMemo = (url, init = {}) => {
   let promesse;
   if (e && (Date.now() - e.at) < ROW_TTL_MS) promesse = e.promesse;
   else {
-    promesse = fetch(url, init).then(async (r) => {
+    // (8 nov., démarrage) Une petite ligne `id=eq.X&select=data` part avec les autres
+    // du même tour en `id=in.(…)` (src/lectureGroupee.js) : mêmes lignes, même « pas su ».
+    const idSeul = idLigneData(url, SUPABASE_URL, h);
+    promesse = idSeul ? _groupeLignesData.charger(idSeul, String(h.Authorization || h.authorization || '')).then((rows) => {
+      if (!Array.isArray(rows)) { _memoLectures.delete(cle); return { ok: false, status: 0, headers: new Headers() }; }
+      return { ok: true, status: 200, headers: new Headers(), v: rows.map((x) => ({ data: x ? x.data : null })) };
+    }) : fetch(url, init).then(async (r) => {
       if (!r || !r.ok) { _memoLectures.delete(cle); return { ok: false, status: r ? r.status : 0, headers: r ? r.headers : null }; }
       const texte = await r.text();
       let v; try { v = texte === '' ? null : JSON.parse(texte); } catch (_) { _memoLectures.delete(cle); return { ok: false, status: r.status, headers: r.headers }; }
@@ -4629,16 +4656,29 @@ try {
         // DÉPART et au RETOUR (une lecture partie pendant l'écriture ne garde pas
         // l'état d'avant).
         if (m !== 'GET' && m !== 'HEAD' && (/\/rest\/v1\//.test(u) || /^(\/|https?:\/\/[^/]*vrm\.center\/)api\//.test(u))) {
-          viderLecturesMemo();
+          // (8 nov., démarrage) Une écriture de LIGNES NOMMÉES de notre base (upsert
+          // dont le corps porte les `id`, PATCH/DELETE `id=eq.`/`in.`) ne vide que
+          // les lectures qui PEUVENT porter ces lignes — la règle de
+          // `lecturesPartagees` (src/memoEcritures.js). Mesuré : la publication de
+          // `widget_stats` puis de `lbc_a_retirer` au démarrage vidait tout, et les
+          // transactions (2 pages, ~95 Ko), Vestiaire, les réserves de N° repartaient
+          // sur le réseau. Tout ce qui n'est pas sûr (route `/api/`, `main`, corps
+          // illisible, `Request`) vide tout, comme avant.
+          const vider = viderMemoPourEcriture(u, m, init, SUPABASE_URL);
+          vider();
           const p = _fetchBrut(input, init);
-          p.then(viderLecturesMemo, viderLecturesMemo);
+          p.then(vider, vider);
           return p;
         }
       } catch (_) {}
       return _fetchBrut(input, init);
     };
     window.addEventListener('vrm:ext', viderLecturesMemo);
-    window.addEventListener('vrm:nuage-relu', viderLecturesMemo);
+    // (8 nov.) Une relecture du nuage change des clés de la ligne `main` : seules les
+    // lectures qui peuvent porter `main` sont périmées (au premier chargement, toutes
+    // les clés « changent » et la mémoire entière partait — les transactions étaient
+    // relues 3 s après l'ouverture).
+    window.addEventListener('vrm:nuage-relu', () => viderMemoLignes(['main']));
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') viderLecturesMemo(); });
   }
 } catch (_) {}
@@ -4714,6 +4754,35 @@ const noterReglage = (id, rate) => {
 // Une ligne que « Supprimer des données… » a vidée (`{supprime:true, purgedAt}`) :
 // le DELETE ne passe pas sur `app_data`, on la vide à la place (§deleteVintedAccount).
 const ligneVideeParToi = (row) => !!(row && row.data && row.data.supprime === true && !row.data.payload);
+// (8 nov., démarrage) Une ligne de moisson projetée (`SEL_MOISSON`) : `[ligne]`,
+// `[]` (pas de ligne) ou `null` (pas su). Groupée avec les autres demandes du même
+// tour et de la même session (src/lectureGroupee.js).
+const _lireLigneMoissonSeule = async (id, auth) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch (_) { return null; }
+};
+const _groupeMoisson = creerLectureGroupee(async (ids, cle) => {
+  const auth = authDeCleMoisson(cle);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });
+    if (!res.ok) return { ok: false, statut: res.status };
+    const rows = await res.json();
+    return Array.isArray(rows) ? { ok: true, rows } : { ok: false, statut: 0 };
+  } catch (_) { return { ok: false, statut: 0 }; }
+}, (id, cle) => _lireLigneMoissonSeule(id, authDeCleMoisson(cle)));
+// La clé du lot = la session ET la famille (`listings`, `inbox`…) : sur un réseau lent,
+// les boîtes de réception (Messages) n'attendent pas les dressings (mesuré au banc
+// `chargement`, 390 px réseau lent : un seul lot de 337 Ko retardait Messages).
+const authDeCleMoisson = (cle) => String(cle).slice(0, Math.max(0, String(cle).lastIndexOf('|')));
+const lireMoissonGroupee = (id) => {
+  const auth = sbAuth().Authorization || '';
+  const famille = String(id).slice(String(id).lastIndexOf('_') + 1);
+  return idGroupable(id) ? _groupeMoisson.charger(id, `${auth}|${famille}`) : _lireLigneMoissonSeule(id, auth);
+};
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
   if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
@@ -4725,12 +4794,12 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
   try {
     // (6 nov., vitesse 2) Projetée (§4.4, `SEL_MOISSON`) : date de capture,
     // marque « vidée par toi » et `payload` — tout ce qui est lu plus bas.
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=${SEL_MOISSON}`, {
-      headers: sbAuth(),
-    });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    const row = Array.isArray(rows) && rows[0] ? ligneCommandes(rows[0]) : undefined;
+    // (8 nov., démarrage) Les comptes lus au même moment partent ENSEMBLE
+    // (`id=in.(…)`, src/lectureGroupee.js) : 14 lectures → 1 au banc. Mêmes
+    // lignes, même « pas su » (`null`) qu'une lecture seule.
+    const rows = await lireMoissonGroupee(`harvest_${uid}_${type}`);
+    if (!Array.isArray(rows)) return null;
+    const row = rows[0] ? ligneCommandes(rows[0]) : undefined;
     // 5.167 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
     // règle « en ligne » — la lecture complète la plus récente (son dressing ou
     // sa lecture publique), sans les supprimées, et « à confirmer » au-delà de
@@ -5277,12 +5346,17 @@ const fetchEmailTrackingBrut = async () => {
   try {
     // (1er nov.) Toutes les pages : au-delà de 1 000 suivis, la fin de la liste
     // (les colis les plus récents) tombait en silence. Une page ratée = pas su.
-    const rows = await lireTout('id=like.email_track_*&select=id,data', { strict: true });
+    // (8 nov., démarrage) SANS l'image du QR des colis retirés (src/suivisSansQr.js) :
+    // `meta` + les champs longs par leur chemin, le QR des colis encore en jeu en
+    // parallèle. Une lecture ratée ⇒ null, comme avant.
+    const lireUne = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+    const rows = await lireSuivisSansQr({ lireTout: (q) => lireTout(q, { strict: true }), lire: lireUne, besoinQr: (d) => { const x = reclassifyTrack(d); return !!x && x.status !== 'delivered'; } });
     if (!Array.isArray(rows)) return null;       // pas su ≠ aucun suivi (voir fetchEmailBordereaux)
     // (23 oct.) + le n° de suivi écrit dans le SUJET après « # » (Vinted Go :
     // « Ton colis arrive aujourd'hui ! #… ») pour une ligne qui n'en porte pas —
     // une IDENTITÉ, jamais un statut changé (api/_lib/suivi-colis.js, §11).
-    const liste = rows.map(r => avecSuiviDuSujet(reclassifyTrack(r.data))).filter(Boolean)
+    // `_ligne` : l'id de la ligne, pour relire le QR d'un colis retiré à la vue en grand.
+    const liste = rows.map(r => { const t = avecSuiviDuSujet(reclassifyTrack(r.data)); if (t && t.qrOmis) t._ligne = r.id; return t; }).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
     // (2 nov., 23 h) Un colis au point relais dont le lieu rangé n'a pas d'adresse
     // (locker d'une autre ville) : relu dans le texte gardé de SON e-mail, même règle
@@ -6468,7 +6542,7 @@ const fetchVersementsVinted = async () => {
     // la transaction 450 ne date pas — par SON n° de transaction seulement
     // (src/versementReleve.js). Relevé illisible : les dates 450 restent, rien n'est deviné.
     let releve = null;
-    try { releve = versementsDuReleve(await lireTout('id=like.harvest_%25_releve_%25&select=id,l:data->lignes')); } catch (_) { releve = null; }
+    try { releve = versementsDuReleve(await lireTout('id=like.harvest_%25_releve_%25&select=id,l:data->lignes', { memo: true })); } catch (_) { releve = null; }   // (8 nov.) mémorisée comme les transactions
     return completerVersementsParReleve(map, releve);
   } catch (_) { return null; }
 };
@@ -23688,6 +23762,7 @@ function relireTransporteursSiVieux({ force = false } = {}) {
       if (Array.isArray(j.departs) && j.departs.some((x) => x && x.prisEnCharge)) chargerDeparts(true);
       if (change) {
         try { if (window.__vrmLecturesPartagees) window.__vrmLecturesPartagees.invalider(); } catch (_) {}
+        try { viderLecturesMemo(); } catch (_) {}   // (8 nov.) la mémoire des lectures de montage aussi
         try { window.dispatchEvent(new Event('vrm:transp-maj')); } catch (_) {}
       }
       return { fait: true, change };
@@ -45359,6 +45434,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ (5 nov.) UN VRAI QR SE MONTRE TOUJOURS, quel que soit le mode préféré du transporteur :
     // Mondial Relay (« au code ») a désormais un QR quand il vient de son compte. Code ET QR, ensemble.
     if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true, mode: 'qr' }); return; }
+    // (8 nov., démarrage) Un colis RETIRÉ ne fait plus lire l'image de son QR à chaque
+    // ouverture (src/suivisSansQr.js) : elle se relit ici, à la demande.
+    if (t.qrOmis && t._ligne) {
+      const q = await lireQrDeLigne(async (qq) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${qq}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } }, t._ligne);
+      if (q) { setQrView({ ...base, img: `data:${q.qrType || 'image/png'};base64,${q.qrB64}`, real: true, mode: 'qr' }); return; }
+    }
     if (qrImage(t)) { setQrView({ ...base, img: qrImage(t), real: true, hosted: true, mode: 'qr' }); return; }
     setQrView({ ...base, img: null, real: false });
   };
