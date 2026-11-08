@@ -161,6 +161,8 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'PorteConfidentialite :: "/vrm-icon-v4-192.png"': 'icône de l’app v4 (fichier du site)',
       'AbonnementRequis :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'Accueil :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
+      'Accueil :: "/vrm-logo-v4-96.png"': 'logo de l’app v4 (fichier du site, logo officiel), page d’accueil du 8 nov.',
+      'Capture :: `/accueil/${nom}-clair.webp`': 'capture de l’app en MODE EXEMPLE (public/accueil/, scripts/accueil-captures.cjs), fichier du site — jamais une photo Vinted',
       'CarteJourEcran :: "/vrm-logo-v4-96.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'Plateau :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'TeteEquipe :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',

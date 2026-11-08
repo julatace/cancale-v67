@@ -162,12 +162,14 @@ export function calculerBilan(e) {
   // ── VENDU : `ventesFaites`, au jour de la VENTE ──
   const excluAutre = excluAutreDe(e.exclusAutres);
   const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre });
-  let n = 0, eur = 0;
-  for (const l of vf.lignes) if (dansSemaine(l.ts, debut, fin)) { n += 1; eur += l.eur; }
+  let n = 0, eur = 0, meilleure = null;
+  // (8 nov.) La plus haute vente de la fenêtre (le bilan du MOIS la cite : son
+  // montant, son site, son n° de transaction — jamais dans la réponse du cron).
+  for (const l of vf.lignes) if (dansSemaine(l.ts, debut, fin)) { n += 1; eur += l.eur; if (!meilleure || l.eur > meilleure.eur) meilleure = { eur: l.eur, plateforme: l.plateforme, tx: l.tx || '' }; }
   const manqueVendu = [...manque];
   if (vf.sansDate) manqueVendu.push(`${vf.sansDate} vente${vf.sansDate > 1 ? 's' : ''} Leboncoin sans date`);
   manqueVendu.push(...phraseNc((vf.nonComptees || []).filter((x) => x.ts == null || dansSemaine(x.ts, debut, fin))));
-  out.vendu = { etat: manqueVendu.length ? 'partiel' : 'su', n, eur: Math.round(eur * 100) / 100, manque: manqueVendu };
+  out.vendu = { etat: manqueVendu.length ? 'partiel' : 'su', n, eur: Math.round(eur * 100) / 100, manque: manqueVendu, meilleure };
 
   // ── REÇU : `ventesDeclarables`, au jour du VERSEMENT ──
   if (e.versements == null && vintedLisible) {

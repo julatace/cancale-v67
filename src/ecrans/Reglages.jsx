@@ -1213,6 +1213,50 @@ function RelancesEssaiSetting() {
   );
 }
 
+// ── LE BILAN DU MOIS PAR E-MAIL (8 nov., api/_lib/bilan-mois.js) ─────────────
+// Un résumé (ventes, vendu, reçu, bénéfice brut, sa plus belle vente) le 1er du
+// mois, à l'adresse de son compte. ÉTEINT par défaut : le choix est écrit par le
+// serveur (`?mode=bilan-mois`), jamais deviné. Trois états : allumé · éteint ·
+// « — » (pas su : aucun interrupteur qui mentirait).
+function BilanMoisSetting() {
+  const [r, setR] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { let mort = false;
+    (async () => {
+      try {
+        const x = await fetch('/api/compte?mode=bilan-mois', { headers: enTeteSession(), cache: 'no-store' });
+        const j = x.ok ? await x.json() : null;
+        if (!mort) setR(j && j.ok ? j : null);
+      } catch (_) { if (!mort) setR(null); }
+    })();
+    return () => { mort = true; };
+  }, []);
+  if (r === undefined) return null;
+  const basculer = async () => {
+    if (busy || !r || r.actif === null) return; setBusy(true);
+    try {
+      const x = await fetch('/api/compte?mode=bilan-mois', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ actif: !r.actif }) });
+      const j = x.ok ? await x.json() : null;
+      if (j && j.ok) setR({ ...r, actif: j.actif }); else toast('Choix non enregistré — réessaie dans un instant.');
+    } catch (_) { toast('Choix non enregistré — réessaie quand tu as du réseau.'); }
+    setBusy(false);
+  };
+  const etat = !r || r.actif === null ? 'passu' : r.actif ? 'on' : 'off';
+  const dernier = r && r.envois ? Object.entries(r.envois).filter(([, e]) => e && e.issue === 'envoye').map(([k]) => k).sort().pop() : null;
+  return (
+    <div data-bilan-mois={etat} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-ligne">
+        <span className="vrm-np-lib">Bilan du mois par e-mail<small>{!r ? 'Pas su pour l’instant — réessaie plus tard.'
+          : !r.configure ? 'L’envoi d’e-mails n’est pas encore configuré : aucun ne part.'
+          : dernier ? `Le 1er du mois : ventes, vendu, reçu, bénéfice. Dernier envoyé : ${dernier}.`
+          : 'Le 1er du mois, à l’adresse de ton compte : ventes, vendu, reçu, bénéfice et ta plus belle vente.'}</small></span>
+        {etat === 'passu' ? <span className="vrm-np-relance">—</span>
+          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={`Bilan du mois par e-mail : ${r.actif ? 'activé' : 'désactivé'}`}/>}
+      </div>
+    </div>
+  );
+}
+
 // (3 nov., 5 nov.) Sept types, un interrupteur chacun (api/_lib/notif-textes.js, la
 // règle que le serveur applique avant d'envoyer). Les anciennes catégories
 // fines restent lues comme réglage d'avant tant qu'une famille n'est pas posée.
@@ -1688,7 +1732,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
-        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.

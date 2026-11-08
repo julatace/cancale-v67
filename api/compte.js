@@ -80,6 +80,7 @@ import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
+import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
@@ -1306,6 +1307,49 @@ async function relances(req, res) {
   });
 }
 
+// ── LE BILAN DU MOIS PAR E-MAIL (8 nov., api/_lib/bilan-mois.js) ─────────────
+//   GET  ?d=<jeton>        le lien « ne plus recevoir ce bilan » : N'ÉCRIT RIEN,
+//                          une page avec UN bouton (un antivirus ouvre les liens) ;
+//   POST ?d=<jeton>&page=1 ce bouton : éteint le bilan de CE compte ;
+//   POST ?d=<jeton>        le « un clic » du logiciel de messagerie (RFC 8058) ;
+//   GET  (session)         { actif: true|false|null, configure, envois } — Réglages ;
+//   POST (session) {actif} son choix depuis Réglages. ÉTEINT par défaut.
+async function bilanMois(req, res) {
+  const m = req.method;
+  const d = String((req.query && req.query.d) || '');
+  if (d) {
+    const owner = lireJetonBilan(d);
+    if (!owner) return m === 'GET' ? pageRelance(res, 400, 'Lien non reconnu', "Ce lien n'est pas valable. Tu peux aussi couper le bilan dans VRM : Réglages → Notifications.") : repondre(res, 400, { ok: false });
+    if (m === 'GET') return pageRelance(res, 200, 'Ne plus recevoir le bilan du mois ?', 'Un seul geste : le bouton ci-dessous. Tu pourras le réactiver dans VRM : Réglages → Notifications.', `/api/compte?mode=bilan-mois&d=${encodeURIComponent(d)}&page=1`);
+    if (m !== 'POST') return repondre(res, 405, { ok: false });
+    const ok = await ecrireChoixBilan(owner, false);
+    if (String((req.query && req.query.page) || '') !== '1') return repondre(res, ok ? 200 : 503, { ok });
+    return ok
+      ? pageRelance(res, 200, "C'est fait", 'Tu ne recevras plus le bilan du mois par e-mail. Tu peux le réactiver dans VRM : Réglages → Notifications.')
+      : pageRelance(res, 503, 'Pas encore enregistré', "Le serveur n'a pas pu enregistrer ton choix. Réessaie dans un instant avec le même lien.");
+  }
+  const u = await utilisateurDe(req);
+  if (u === undefined) return repondre(res, 503, { ok: false, raison: 'connexion-injoignable' });
+  if (!u) return repondre(res, 401, { ok: false, raison: 'session' });
+  if (m === 'POST') {
+    const corps = await lireCorpsJson(req);
+    if (!corps || typeof corps.actif !== 'boolean') return repondre(res, 400, { ok: false, raison: 'corps' });
+    if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 503, { ok: false, raison: 'non-configure' });
+    const ok = await ecrireChoixBilan(u.id, corps.actif);
+    return repondre(res, ok ? 200 : 503, { ok, actif: ok ? corps.actif : undefined });
+  }
+  const [choix, envois] = await Promise.all([lireChoixBilan(u.id), lireEnvoisBilan(u.id)]);
+  return repondre(res, 200, {
+    ok: true,
+    configure: configurationRelances().pret,
+    // Trois états : true allumé · false éteint (le défaut : jamais choisi) · null pas su.
+    actif: choix === undefined ? null : !!(choix && choix.actif === true),
+    envois: envois && envois.mois && typeof envois.mois === 'object'
+      ? Object.fromEntries(Object.entries(envois.mois).slice(-6).map(([k, v]) => [k, { at: v && v.at, issue: v && v.issue }]))
+      : (envois === undefined ? null : {}),
+  });
+}
+
 // ── « SIGNALER UN PROBLÈME » (6 nov., api/_lib/signalement.js) ───────────────
 // La session d'abord : l'identifiant du compte VRM est celui de SA session,
 // jamais un champ du corps. Le reste (où c'est rangé, l'anti-abus, la
@@ -1422,5 +1466,7 @@ export default async function handler(req, res) {
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   // (5 nov.) Les e-mails de l'essai gratuit : état, choix, lien de désinscription.
   if (mode === 'relances') return (m === 'GET' || m === 'POST') ? relances(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  // (8 nov.) Le bilan du mois par e-mail : état, choix, lien « ne plus recevoir ».
+  if (mode === 'bilan-mois') return (m === 'GET' || m === 'POST') ? bilanMois(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

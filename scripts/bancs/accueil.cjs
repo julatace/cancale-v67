@@ -2,39 +2,42 @@ require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « PAGE D'ACCUEIL » — ce que voit quelqu'un qui ne connaît pas VRM.
 //
-//  Julien, 11 octobre : « on ne comprend pas trop ce que c'est, il faut vraiment
-//  qu'il soit super celui-là » — puis « un motion design de ouf ».
-//
-//  Ce banc juge ce qui est RENDU, jamais la formulation (un contrat d'attributs
-//  `data-*`, des nombres, des couleurs, des positions, des temps) :
-//   • qui voit la page : un visiteur sans session — et PERSONNE d'autre ;
-//   • un visiteur ne télécharge ni l'application (`App-*`) ni le film ;
-//   • les boutons ouvrent le BON formulaire ; la barre garde « Se connecter » ;
-//   • la carte « Aujourd'hui » joue UNE fois et s'ARRÊTE (aucune boucle), sans
-//     curseur (c'est VRM qui travaille) ; les écrans du bas ne jouent que quand
-//     on les regarde, en moins de 5 s, et le curseur n'y paraît que pour un
-//     geste de l'utilisateur ;
-//   • les chiffres dessinés tiennent (la table src/accueil-demo.js) ;
-//   • « réduire les animations » donne l'état final, sans rien qui bouge ;
-//   • le premier écran dit ce qu'est VRM, le prix, et qu'il faut un ordinateur ;
-//   • lisible (aucun texte sous 12 px), contrasté (4,5:1), l'accent rare ;
-//   • honnête : prix = CGV, aucun chiffre de clientèle, aucune adresse en dur,
-//     rien de ce qui n'est pas branché (Vestiaire, détourage) ;
-//   • le poids de ce qui se charge AVANT l'app ;
-//   • le film : ses plans, jamais de noir, une fonction pure du temps.
+//  (8 nov.) La page refaite pour VENDRE (src/Accueil.jsx) : la promesse, la
+//  journée en quatre moments montrée par de VRAIES captures de l'app en mode
+//  exemple (scripts/accueil-captures.cjs), le prix et l'essai, les questions.
+//  Ce banc juge ce qui est RENDU, jamais la formulation (attributs `data-*`,
+//  nombres, couleurs, positions, octets) :
+//   • rendu à 390 px (doigt) et 1512 px (souris), CLAIR et SOMBRE : le premier
+//     écran dit ce qu'est VRM (h1), le prix des CGV, l'essai, le prérequis ;
+//     aucun débordement, aucun texte sous 12 px, contraste 4,5:1 partout,
+//     l'accent bleu rare (le fond d'un bouton principal seulement), aucun violet ;
+//   • les captures : chaque image affichée est une capture du registre
+//     public/accueil/captures.json (empreinte du fichier produit en MODE
+//     EXEMPLE — une image posée à la main ne passe pas), en WebP, ≤ 80 Ko,
+//     la version sombre en thème sombre ; une légende « Données d'exemple » ;
+//     seules les images du premier écran sont chargées avant le défilement ;
+//   • LCP raisonnable (< 2,5 s, servi en local) ; le visiteur ne télécharge ni
+//     l'app ni le film ; la page ne lit rien en base ;
+//   • honnête : prix = CGV = PRIX_MOIS ; essai = CGV = serveur = ESSAI_JOURS ;
+//     aucun témoignage, aucun chiffre de clientèle, aucune étoile, rien de non
+//     branché (Vestiaire, détourage) ; aucune adresse e-mail en dur ;
+//   • les liens : légaux, aide (et ses pages), état du service — tous servis ;
+//     « Créer mon compte » / « Se connecter » ouvrent le BON formulaire
+//     (`?inscription` / `?connexion`) ; personne d'autre ne voit la page ;
+//   • le poids de ce qui se charge avant l'app ; le film (`?film`) inchangé.
 //  ⚠️ AUCUNE FIXTURE : une page publique ne lit aucune donnée.
-//  PORT=… pour lancer à côté d'un autre banc (défaut 4523).
+//  PORT=… pour lancer à côté d'un autre banc (défaut 4523). SEUL=rendu,captures…
+//  CAPTURES=dossier : une capture par taille et par thème (à REGARDER, §6.2).
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
-const http = require('http'), fs = require('fs'), path = require('path'), zlib = require('zlib');
-const { pathToFileURL } = require('url');
+const http = require('http'), fs = require('fs'), path = require('path'), zlib = require('zlib'), crypto = require('crypto');
 
 const RACINE = path.join(__dirname, '..', '..');
 const DIST = path.join(RACINE, 'dist');            // ⚠️ jamais un chemin absolu (§6.1)
 const PORT = Number(process.env.PORT) || 4523;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.zip': 'application/zip', '.webmanifest': 'application/manifest+json' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.zip': 'application/zip', '.webmanifest': 'application/manifest+json' };
 const CAPT = process.env.CAPTURES || '';
-const SEUL = (process.env.SEUL || '').split(',').filter(Boolean);   // ex. SEUL=film,honnetete
+const SEUL = (process.env.SEUL || '').split(',').filter(Boolean);
 const veut = (bloc) => !SEUL.length || SEUL.includes(bloc);
 
 let ko = 0, ok = 0;
@@ -46,9 +49,21 @@ const dit = (bon, quoi, detail) => {
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, 'le contrôle a levé : ' + String(e && e.message || e).slice(0, 200)); } };
 const lire = (rel) => { try { return fs.readFileSync(path.join(RACINE, rel), 'utf8'); } catch (_) { return null; } };
 const constante = (src, nom) => { const m = src && new RegExp(`export const ${nom}\\s*=\\s*([^;]+);`).exec(src); return m ? m[1].trim() : undefined; };
+const sansCommentaires = (x) => (x || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
+// Les réécritures de vercel.json (`/aide`, `/aide/x`, `/etat`) : un lien de la
+// page vaut ce que Vercel sert, pas seulement un fichier au même nom.
+const REECRIT = (() => { try { return (JSON.parse(lire('vercel.json')).rewrites || []).filter((r) => !/^\/api\//.test(r.source)); } catch (_) { return []; } })();
+const fichierDe = (url) => {
+  const p = url.split('?')[0].split('#')[0];
+  for (const r of REECRIT) {
+    const re = new RegExp('^' + r.source.replace(/\(([^)]+)\)/g, '($1)') + '$');
+    const m = re.exec(p); if (m) return r.destination.replace(/\$(\d)/g, (_, i) => m[Number(i)]);
+  }
+  return p;
+};
 const srv = http.createServer((q, r) => {
-  let f = q.url.split('?')[0].split('#')[0];
+  let f = fichierDe(q.url);
   if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(DIST, f);
   if (!p.startsWith(DIST) || !fs.existsSync(p)) { r.writeHead(404); return r.end('nope'); }
@@ -63,37 +78,8 @@ const ecouter = () => new Promise((res, rej) => {
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } };
 const ORDI = { largeur: 1512, hauteur: 900 }, TEL = { largeur: 390, hauteur: 844, mobile: true };
 
-// Ce que la page fait, noté par elle-même dès le premier octet : les états de la
-// carte et des écrans (avec l'heure), la notification, les vols, le curseur, et
-// le nombre d'images demandées (pour prouver que rien ne boucle).
-const SONDE = () => {
-  window.__raf = 0;
-  const raf0 = window.requestAnimationFrame.bind(window);
-  window.requestAnimationFrame = (f) => { window.__raf++; return raf0(f); };
-  const V = window.__vu = { carte: [], notif: false, vols: 0, volLa: false, curseurCarte: false, curseurColis: false, scenes: {}, curseurs: 0 };
-  const note = (L, e) => { if (!L.length || L[L.length - 1].e !== e) L.push({ e, t: performance.now() }); };
-  const scan = () => {
-    const c = document.querySelector('[data-demo-animee]');
-    if (c) {
-      note(V.carte, c.getAttribute('data-etat'));
-      if (c.querySelector('[data-notif]')) V.notif = true;
-      const vol = !!c.querySelector('[data-vol]');
-      if (vol && !V.volLa) V.vols++;
-      V.volLa = vol;
-      if (c.querySelector('[data-curseur]')) V.curseurCarte = true;
-    }
-    document.querySelectorAll('[data-scene]').forEach((s) => {
-      const n = s.getAttribute('data-scene');
-      note(V.scenes[n] = V.scenes[n] || [], s.getAttribute('data-etat'));
-      if (n === 'colis' && s.querySelector('[data-curseur]')) V.curseurColis = true;
-    });
-    if (document.querySelector('[data-notif],[data-vol],[data-curseur]')) V.bougeVu = true;
-  };
-  new MutationObserver(scan).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-etat'] });
-};
-
-async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, session = false, url = '/', reduit = false } = {}) {
-  const ctx = await nav.newContext({ viewport: { width: largeur, height: hauteur }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 2 : 1, reducedMotion: reduit ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
+async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, session = false, url = '/', reduit = false, sombre = false } = {}) {
+  const ctx = await nav.newContext({ viewport: { width: largeur, height: hauteur }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 2 : 1, colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
   const lectures = [];
   await ctx.route(/supabase\.co|\/api\//, (rt) => { lectures.push(rt.request().url()); rt.fulfill({ status: 200, contentType: 'application/json', body: '[]' }); });
   await ctx.route(/^https?:\/\/(?!localhost)/, (rt) => rt.abort());
@@ -102,34 +88,19 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
     window.__accueilVu = false;
     new MutationObserver(() => { if (document.querySelector('[data-accueil]')) window.__accueilVu = true; })
       .observe(document, { childList: true, subtree: true });
+    window.__lcp = 0;
+    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lcp = e.startTime; }).observe({ type: 'largest-contentful-paint', buffered: true }); } catch (_) {}
   });
-  await ctx.addInitScript(SONDE);
   const pg = await ctx.newPage();
-  const scripts = [];
-  pg.on('request', (rq) => { if (/\.js(\?|$)/.test(rq.url())) scripts.push(rq.url().split('/').pop()); });
+  const scripts = [], images = [];
+  pg.on('request', (rq) => { const u = rq.url(); if (/\.js(\?|$)/.test(u)) scripts.push(u.split('/').pop()); if (/\/accueil\/.*\.webp/.test(u)) images.push(u.split('/').pop()); });
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 160)));
-  const t0 = Date.now();
   await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => { const r = document.getElementById('root'); return r && r.children.length && r.innerText.trim().length > 3; }, null, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(300);
-  return { ctx, pg, scripts, erreurs, lectures, t0 };
+  return { ctx, pg, scripts, images, erreurs, lectures };
 }
-// Un texte coupé par des points de suspension (ou rogné) dans une zone : son
-// contenu déborde de sa boîte alors qu'elle cache le débordement. Mesuré, pas lu.
-const coupes = (pg, sel) => pg.evaluate((s) => {
-  const x = [];
-  document.querySelectorAll(s).forEach((z) => z.querySelectorAll('*').forEach((e) => {
-    if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return;
-    const cs = getComputedStyle(e);
-    if (cs.overflowX === 'visible' && cs.textOverflow !== 'ellipsis') return;
-    let o = 1; for (let a = e; a && a.nodeType === 1; a = a.parentElement) o *= Number(getComputedStyle(a).opacity);
-    if (o <= 0.1 || !e.clientWidth) return;
-    if (e.scrollWidth > e.clientWidth + 1) x.push(`« ${e.textContent.trim().slice(0, 40)} » ${e.scrollWidth}/${e.clientWidth} px`);
-  }));
-  return x;
-}, sel);
-const attendreEtat = (pg, sel, etat, ms = 12000) => pg.waitForFunction(([s, e]) => { const el = document.querySelector(s); return el && el.getAttribute('data-etat') === e; }, [sel, etat], { timeout: ms }).then(() => true, () => false);
 const visibleDansEcran = (pg, sel) => pg.evaluate((s) => {
   const e = document.querySelector(s); if (!e) return null;
   const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
@@ -161,134 +132,84 @@ function decodePng(buf) {
   return { w, h, bpp, px };
 }
 
-// Les contrôles de rendu qui se répètent aux deux tailles.
-async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
-  const { ctx, pg, scripts, erreurs, lectures } = await page(nav, opt);
+// Les contrôles de rendu, à chaque taille et dans chaque thème.
+async function controlesRendu(nav, nom, opt, S) {
+  const { ctx, pg, scripts, images, erreurs, lectures } = await page(nav, opt);
   const H = opt.hauteur;
   try {
     dit(await pg.evaluate(() => !!document.querySelector('[data-accueil]')), `${nom} : la page d'accueil s'affiche`);
     const texte = await pg.evaluate(() => document.body.innerText);
     dit(!/n'a pas pu s'afficher|Cannot access|is not defined/.test(texte), `${nom} : aucun écran tombé`);
-
-    // 10. Le premier écran porte tout, sans défiler.
-    const def = await visibleDansEcran(pg, '[data-definition]');
-    dit(def && def.bottom <= H && def.top >= 0 && /revendeurs/i.test(def.texte), `${nom} : la pastille dit ce qu'est VRM, dans le premier écran`, def ? `${Math.round(def.top)}–${Math.round(def.bottom)} « ${def.texte} »` : 'absente');
-    const carte = await visibleDansEcran(pg, '[data-demo-animee]');
-    dit(carte && carte.top < H, `${nom} : la carte « Aujourd'hui » commence dans le premier écran`, carte ? `haut à ${Math.round(carte.top)} px` : 'absente');
+    // Le premier écran : ce qu'est VRM (h1), le prix, l'essai, le prérequis.
+    const h1 = await pg.evaluate(() => { const l = document.querySelectorAll('[data-accueil] h1'); if (l.length !== 1) return { n: l.length }; const r = l[0].getBoundingClientRect(); return { n: 1, top: r.top, bottom: r.bottom, t: l[0].innerText }; });
+    dit(h1.n === 1 && h1.bottom <= H && /ventes/i.test(h1.t) && /colis/i.test(h1.t) && /compta/i.test(h1.t), `${nom} : un seul h1, dans le premier écran, la promesse (ventes, colis, compta)`, JSON.stringify(h1));
     const prix = await pg.evaluate((p) => {
       const re = new RegExp(`${p.replace(',', '\\,')}\\s*€\\s*par mois`);
-      // ⚠️ L'élément le plus PROFOND qui porte la phrase — pas le premier venu :
-      //    le conteneur du haut de page la contient aussi, et son bas est celui
-      //    de la carte. Sur ordinateur il tenait dans l'écran : vert par accident.
       const tous = [...document.querySelectorAll('[data-section="hero"] *')].filter((e) => re.test(e.innerText || ''));
       const el = tous.find((e) => ![...e.children].some((c) => re.test(c.innerText || '')));
-      if (!el) return null; const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom };
-    }, prixCgv || '12,99');
-    dit(!!prix && prix.bottom <= H, `${nom} : le prix (${prixCgv} € par mois, celui des CGV) est dans le premier écran`, prix ? `bas à ${Math.round(prix.bottom)} px` : 'absent du haut de page');
+      if (!el) return null; const r = el.getBoundingClientRect(); return { bottom: r.bottom, texte: el.closest('[data-prix-ligne]') ? el.closest('[data-prix-ligne]').innerText : el.innerText };
+    }, S.prixCgv || '?');
+    dit(!!prix && prix.bottom <= H, `${nom} : le prix des CGV (${S.prixCgv} € par mois) est dans le premier écran`, prix ? `bas à ${Math.round(prix.bottom)} px` : 'absent du haut de page');
+    dit(!!prix && new RegExp(`${S.essaiCgv}\\s*jours d.essai gratuit`).test(prix.texte), `${nom} : l'essai (${S.essaiCgv} jours, celui des CGV) est dit à côté du prix`, prix && prix.texte);
     const pre = await visibleDansEcran(pg, '[data-prerequis]');
-    dit(pre && pre.bottom <= H && /ordinateur/i.test(pre.texte), `${nom} : le prérequis (un ordinateur avec Chrome) est dans le premier écran`, pre ? `bas à ${Math.round(pre.bottom)} px` : 'absent');
-    if (opt.mobile) {
-      const ret = await visibleDansEcran(pg, '[data-vers="ailleurs"]');
-      dit(ret && ret.bottom <= H, `${nom} : les lignes « Colis à poster » et « Annonces à retirer » se voient sans défiler`, ret ? `bas de « Annonces à retirer » à ${Math.round(ret.bottom)} px` : 'absente');
-    }
-    // 11. La bonne variante du prérequis.
+    dit(pre && pre.bottom <= H && /ordinateur/i.test(pre.texte), `${nom} : le prérequis (un ordinateur) est dans le premier écran`, pre ? `bas à ${Math.round(pre.bottom)} px` : 'absent');
     const variante = await pg.evaluate(() => { const e = document.querySelector('[data-prerequis]'); return e && e.getAttribute('data-variante'); });
-    dit(variante === (opt.mobile ? 'tactile' : 'souris'), `${nom} : le prérequis parle à ${opt.mobile ? 'un téléphone (« crée ton compte dès maintenant »)' : 'un ordinateur'}`, `variante ${variante}`);
-    // 12. ACCES_OFFERT suivi.
-    const offert = reglages.ACCES_OFFERT;
-    const off = await pg.evaluate(() => {
-      const a = [...document.querySelectorAll('[data-acces-offert]')].map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; });
-      return { a, carte: document.querySelectorAll('[data-sans-carte]').length };
-    });
-    if (offert === 'true') dit(off.a.some((r) => r.bottom <= H && r.top >= 0) && off.carte > 0, `${nom} : ACCES_OFFERT = true → « Gratuit pour l'instant » dans le premier écran et « Aucune carte bancaire »`, JSON.stringify(off));
-    else if (offert === 'false') dit(off.a.length === 0 && off.carte === 0, `${nom} : ACCES_OFFERT = false → ni « gratuit », ni « aucune carte » dans la page`, JSON.stringify(off));
-    else dit(false, `${nom} : src/accueil-reglages.js porte ACCES_OFFERT`, 'constante introuvable');
+    dit(variante === (opt.mobile ? 'tactile' : 'souris'), `${nom} : le prérequis parle à ${opt.mobile ? 'un téléphone' : 'un ordinateur'}`, `variante ${variante}`);
+    const cta = await visibleDansEcran(pg, '[data-section="hero"] [data-cta="inscription"]');
+    dit(cta && cta.bottom <= H && cta.top >= 0, `${nom} : « Créer mon compte » est dans le premier écran`, cta ? `${Math.round(cta.top)}–${Math.round(cta.bottom)}` : 'absent');
+    const offert = S.reglages.ACCES_OFFERT;
+    const off = await pg.evaluate(() => ({ a: document.querySelectorAll('[data-acces-offert]').length, carte: document.querySelectorAll('[data-sans-carte]').length }));
+    if (offert === 'true') dit(off.a > 0 && off.carte > 0, `${nom} : ACCES_OFFERT = true → « Gratuit pour l'instant » et « Aucune carte bancaire »`, JSON.stringify(off));
+    else dit(off.a === 0 && off.carte === 0, `${nom} : ACCES_OFFERT ≠ true → ni « gratuit », ni « aucune carte »`, JSON.stringify(off));
 
-    // 1. La carte vit, puis s'arrête.
-    const fin = await attendreEtat(pg, '[data-demo-animee]', 'fin', 14000);
-    const vu = await pg.evaluate(() => window.__vu);
-    const etats = vu.carte.map((x) => x.e);
-    const tFin = (vu.carte.find((x) => x.e === 'fin') || {}).t, tOng = (vu.carte.find((x) => x.e === 'onglets') || {}).t;
-    dit(fin && etats.includes('onglets') && etats.includes('vente') && (tFin || 0) < 8000, `${nom} : la carte passe par « onglets », « vente » et s'arrête sur « fin » en moins de 8 s`, `${etats.join(' → ')} · fin à ${Math.round(tFin || -1)} ms`);
-    dit(vu.notif && vu.vols >= 2, `${nom} : une vente tombe (notification) et son numéro file deux fois`, `notif ${vu.notif} · vols ${vu.vols}`);
-    dit(await pg.evaluate(() => document.querySelectorAll('[data-demo-animee]').length) === 1, `${nom} : une seule démo animée sur la page`);
-    // 3. Moins de 5 s.
-    dit(tFin && tOng && tFin - tOng <= 5000, `${nom} : le déroulé de la carte dure moins de 5 s`, `${Math.round((tFin || 0) - (tOng || 0))} ms`);
-    // 4. Aucun curseur dans la carte : c'est VRM qui travaille.
-    dit(vu.curseurCarte === false, `${nom} : aucun curseur dans la carte (ce que VRM fait arrive sans curseur)`);
-    // 7. Les chiffres de la carte tiennent.
-    const nb = await pg.evaluate(() => {
-      const lu = (v) => { const b = document.querySelector(`[data-vers="${v}"]`); if (!b) return null; const s = [...b.querySelectorAll('.cj-nb span')].filter((x) => Number(getComputedStyle(x).opacity) > 0.5 && /\d/.test(x.textContent)); return s.map((x) => x.textContent.trim()).join('|'); };
-      return { colis: lu('colis'), ailleurs: lu('ailleurs') };
-    });
-    dit(nb.colis === String(demo.jour.colisApres) && nb.ailleurs === String(demo.jour.aRetirerApres), `${nom} : en fin, la carte affiche ${demo.jour.colisApres} colis à poster et ${demo.jour.aRetirerApres} annonces à retirer (la table de démo)`, JSON.stringify(nb));
-    const cc = await coupes(pg, '[data-demo-animee]');
-    dit(cc.length === 0, `${nom} : en fin, aucune ligne de la carte n'est coupée par des points de suspension`, cc.slice(0, 3).join(' · '));
-    // 2. Aucune boucle : plus aucune image demandée une fois tout arrêté.
-    await pg.waitForTimeout(400);
-    const joue = await pg.evaluate(() => [...document.querySelectorAll('[data-scene]')].filter((s) => s.getAttribute('data-etat') === 'joue').length);
-    const r0 = await pg.evaluate(() => window.__raf); await pg.waitForTimeout(1500); const r1 = await pg.evaluate(() => window.__raf);
-    dit(joue === 0 && r1 - r0 <= 2, `${nom} : rien ne boucle — une fois la carte arrêtée, aucune image n'est calculée`, `${r1 - r0} image(s) demandée(s) en 1,5 s · ${joue} écran(s) en cours`);
-    // 15. L'accent est rare dans le premier écran (hors écrans dessinés).
-    const accent = await pg.evaluate(() => {
-      const BLEUS = ['rgb(36, 88, 230)', 'rgb(61, 123, 255)', 'rgb(36, 66, 184)'];   // (31 oct.) + le cobalt de Vitrine
-      const dedans = (e) => e.closest('[data-demo-animee],[data-scene]');
-      let n = 0; const qui = [], hors = [];
-      document.querySelectorAll('[data-accueil] *').forEach((e) => {
-        if (dedans(e)) return;
-        const r = e.getBoundingClientRect(); if (!r.width || !r.height || r.bottom <= 0 || r.top >= innerHeight) return;
-        let o = 1; for (let a = e; a && a.nodeType === 1; a = a.parentElement) o *= Number(getComputedStyle(a).opacity);
-        if (o <= 0.1) return;
-        const cs = getComputedStyle(e);
-        const aTexte = [...e.childNodes].some((x) => x.nodeType === 3 && x.textContent.trim());
-        const fond = BLEUS.includes(cs.backgroundColor), texte = aTexte && BLEUS.includes(cs.color);
-        if (fond || texte) { n++; qui.push(e.tagName + (e.className ? '.' + String(e.className).split(' ')[0] : '') + (texte ? ' (texte)' : '')); }
-        // Le budget d'accent du cadre : le FOND d'un bouton principal. Un mot
-        // bleu dans un titre, un sur-titre ou une coche, c'est hors budget.
-        if (texte || (fond && !e.classList.contains('acc-p'))) hors.push(e.tagName + ' « ' + (e.textContent || '').trim().slice(0, 24) + ' »');
-      });
-      return { n, qui, hors };
-    });
-    dit(accent.n <= 2 && accent.hors.length === 0, `${nom} : l'accent bleu est rare dans le premier écran (≤ 2 éléments, et seulement le fond d'un bouton principal)`, `${accent.n} : ${accent.qui.join(', ')}${accent.hors.length ? ' · hors budget : ' + accent.hors.join(', ') : ''}`);
-    // 16. Ambre et couleurs de plateformes : seulement dans les écrans dessinés.
-    const hors = await pg.evaluate(() => {
-      const INTERDITS = ['rgb(255, 178, 62)', 'rgb(18, 183, 190)', 'rgb(245, 107, 42)', 'rgb(134, 184, 23)'];
-      const x = [];
-      document.querySelectorAll('[data-accueil] *').forEach((e) => {
-        if (e.closest('[data-demo-animee],[data-scene]')) return;
-        const r = e.getBoundingClientRect(); if (!r.width || !r.height) return;
-        const cs = getComputedStyle(e);
-        if (INTERDITS.includes(cs.color) || INTERDITS.includes(cs.backgroundColor) || INTERDITS.includes(cs.borderTopColor)) x.push(e.tagName + '.' + String(e.className).split(' ')[0]);
-      });
-      return x;
-    });
-    dit(hors.length === 0, `${nom} : ni ambre ni couleur de plateforme dans le cadre de la page`, hors.slice(0, 5).join(', '));
-    // 14. Contraste : le bouton principal, et tout texte visible hors écrans dessinés.
+    // Les images du premier écran seulement, avant tout défilement.
+    await pg.waitForTimeout(600);
+    const avant = [...new Set(images)];
+    const attenduesHaut = opt.mobile ? ['journee'] : ['journee', 'bureau'];
+    dit(avant.length <= attenduesHaut.length && avant.every((f) => attenduesHaut.some((a) => f.startsWith(a + '-'))), `${nom} : avant de défiler, seules les captures du premier écran se chargent (${attenduesHaut.join(', ')})`, avant.join(', '));
+    const theme = opt.sombre ? 'sombre' : 'clair';
+    dit(avant.length > 0 && avant.every((f) => f.endsWith(`-${theme}.webp`)), `${nom} : le thème ${theme} charge les captures ${theme}s`, avant.join(', '));
+    const lcp = await pg.evaluate(() => window.__lcp);
+    dit(lcp > 0 && lcp < 2500, `${nom} : LCP raisonnable (< 2,5 s, servi en local)`, `${Math.round(lcp)} ms`);
+
+    // On fait défiler toute la page (les images paresseuses arrivent).
+    const Ht = await pg.evaluate(() => document.documentElement.scrollHeight);
+    for (let y = 0; y < Ht; y += Math.round(H * 0.6)) { await pg.evaluate((y) => window.scrollTo(0, y), y); await pg.waitForTimeout(90); }
+    await pg.waitForTimeout(500);
+    const caps = await pg.evaluate(() => [...document.querySelectorAll('[data-accueil] picture[data-capture] img')].filter((i) => i.getBoundingClientRect().width > 0)
+      .map((i) => ({ src: (i.currentSrc || i.src).split('/').pop(), ok: i.complete && i.naturalWidth > 0, alt: i.getAttribute('alt'), w: i.getBoundingClientRect().width, nw: i.naturalWidth, lazy: i.getAttribute('loading') })));
+    dit(caps.length >= 4 && caps.every((c) => c.ok), `${nom} : les ${caps.length} captures affichées sont chargées`, caps.filter((c) => !c.ok).map((c) => c.src).join(', '));
+    dit(caps.every((c) => c.src.endsWith(`-${theme}.webp`)), `${nom} : toutes en version ${theme}`, caps.map((c) => c.src).join(', '));
+    dit(caps.every((c) => c.nw >= c.w * 1.5), `${nom} : chaque capture est servie à plus de 1,5× sa taille affichée (nette sur Retina)`, caps.map((c) => `${c.src} ${c.nw}/${Math.round(c.w)}`).join(', '));
+    const pasReg = caps.filter((c) => !S.registre[c.src]);
+    dit(pasReg.length === 0, `${nom} : chaque capture affichée est au registre des captures en mode exemple`, pasReg.map((c) => c.src).join(', '));
+    const legende = await pg.evaluate(() => [...document.querySelectorAll('[data-accueil] picture[data-capture]')].filter((p) => p.getBoundingClientRect().width > 0)
+      .every((p) => { const f = p.closest('figure,article'); const img = p.querySelector('img'); return /exemple/i.test((f && f.innerText) || '') || /exemple/i.test(img.getAttribute('alt') || '') || (img.getAttribute('alt') === '' && p.closest('[aria-hidden="true"]')); }));
+    dit(legende, `${nom} : chaque capture dit « Données d'exemple » (légende ou texte alternatif)`);
+    if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}-${theme}.png`), fullPage: true }); }
+
+    // Contraste : tout texte visible tient 4,5:1 sur son fond réel.
     const contraste = await pg.evaluate(() => {
       const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const v = m[1].split(',').map((x) => parseFloat(x)); return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 }; };
       const lum = (c) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
-      const BG = { r: 7, g: 9, b: 13, a: 1 };
+      const BG = rgb(getComputedStyle(document.body).backgroundColor) || { r: 255, g: 255, b: 255, a: 1 };
       const sur = (c, f) => ({ r: c.r * c.a + f.r * (1 - c.a), g: c.g * c.a + f.g * (1 - c.a), b: c.b * c.a + f.b * (1 - c.a), a: 1 });
       const fond = (e) => { const pile = []; for (let a = e; a && a.nodeType === 1; a = a.parentElement) { const c = rgb(getComputedStyle(a).backgroundColor); if (c && c.a > 0) { pile.push(c); if (c.a >= 1) break; } } let f = BG; for (let i = pile.length - 1; i >= 0; i--) f = sur(pile[i], f); return f; };
       const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-      const cta = document.querySelector('.acc-hero [data-cta="inscription"]');
-      const rc = cta ? ratio(rgb(getComputedStyle(cta).color), fond(cta)) : 0;
       const pires = [];
       document.querySelectorAll('[data-accueil] *').forEach((e) => {
-        if (e.closest('[data-demo-animee],[data-scene]')) return;
         if (![...e.childNodes].some((x) => x.nodeType === 3 && x.textContent.trim())) return;
         const r = e.getBoundingClientRect(); if (!r.width || !r.height) return;
+        if (getComputedStyle(e).visibility === 'hidden') return;
         let o = 1; for (let a = e; a && a.nodeType === 1; a = a.parentElement) o *= Number(getComputedStyle(a).opacity);
-        if (o <= 0.1 || getComputedStyle(e).visibility === 'hidden') return;
+        if (o <= 0.1) return;
         const c = rgb(getComputedStyle(e).color); if (!c) return;
         const v = ratio(sur(c, fond(e)), fond(e));
         if (v < 4.5) pires.push(`${e.tagName}.${String(e.className).split(' ')[0]} « ${e.textContent.trim().slice(0, 24)} » ${v.toFixed(2)}:1`);
       });
-      return { rc, pires };
+      return pires;
     });
-    dit(contraste.rc >= 4.5, `${nom} : le texte du bouton principal se lit sur son fond (≥ 4,5:1)`, `${contraste.rc.toFixed(2)}:1`);
-    dit(contraste.pires.length === 0, `${nom} : tout texte visible hors écrans dessinés tient 4,5:1 sur son fond réel`, contraste.pires.slice(0, 4).join(' · '));
-    // Aucun débordement, aucun texte sous 12 px nulle part sur la page.
+    dit(contraste.length === 0, `${nom} : tout texte visible tient 4,5:1 sur son fond réel`, contraste.slice(0, 4).join(' · '));
     const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     dit(deb <= 1, `${nom} : aucun débordement horizontal`, `${deb} px de trop`);
     const petits = await pg.evaluate(() => {
@@ -296,322 +217,155 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
       document.querySelectorAll('[data-accueil] *').forEach((e) => {
         if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return;
         const r = e.getBoundingClientRect(); if (!r.width || !r.height) return;
-        if (parseFloat(getComputedStyle(e).fontSize) < 11.99) x.push(`${e.tagName}.${String(e.className).split(' ')[0]} ${getComputedStyle(e).fontSize} « ${e.textContent.trim().slice(0, 20)} »`);
+        if (parseFloat(getComputedStyle(e).fontSize) < 11.99) x.push(`${e.tagName} ${getComputedStyle(e).fontSize} « ${e.textContent.trim().slice(0, 20)} »`);
       });
       return x;
     });
-    dit(petits.length === 0, `${nom} : aucun texte rendu sous 12 px sur la page`, petits.slice(0, 4).join(' · '));
-    // Le téléchargement : ni l'app, ni le film.
+    dit(petits.length === 0, `${nom} : aucun texte sous 12 px`, petits.slice(0, 4).join(' · '));
+    // Cibles au doigt : chaque lien et bouton fait 44 px de haut au moins.
+    if (opt.mobile) {
+      const minus = await pg.evaluate(() => [...document.querySelectorAll('[data-accueil] a, [data-accueil] button')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden' && !e.closest('p') && r.height < 43.5; }).map((e) => `« ${e.innerText.trim().slice(0, 20)} » ${Math.round(e.getBoundingClientRect().height)} px`));
+      dit(minus.length === 0, `${nom} : chaque lien et bouton isolé fait 44 px au doigt`, minus.slice(0, 5).join(' · '));
+    }
+    // La couleur : l'accent rare (fond du bouton principal), aucun violet.
+    const couleurs = await pg.evaluate(() => {
+      const BLEUS = ['rgb(0, 113, 227)', 'rgb(0, 119, 237)', 'rgb(10, 132, 255)'];
+      const violet = (s) => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(s || ''); if (!m) return false; const [r, g, b] = m.slice(1).map(Number); const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx - mn < 40) return false; let h; if (mx === r) h = ((g - b) / (mx - mn)) * 60; else if (mx === g) h = (2 + (b - r) / (mx - mn)) * 60; else h = (4 + (r - g) / (mx - mn)) * 60; h = (h + 360) % 360; return h >= 255 && h <= 320; };
+      const fonds = [], violets = [];
+      document.querySelectorAll('[data-accueil] *').forEach((e) => {
+        const r = e.getBoundingClientRect(); if (!r.width || !r.height || e.closest('picture')) return;
+        const cs = getComputedStyle(e);
+        if (BLEUS.includes(cs.backgroundColor) && !e.classList.contains('av-btn')) fonds.push(e.tagName + '.' + String(e.className).split(' ')[0]);
+        if (violet(cs.color) || violet(cs.backgroundColor)) violets.push(e.tagName + '.' + String(e.className).split(' ')[0]);
+      });
+      const enHaut = [...document.querySelectorAll('[data-accueil] .av-btn')].filter((b) => { const r = b.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && Number(getComputedStyle(b).opacity) > 0.5; }).length;
+      return { fonds, violets, enHaut };
+    });
+    dit(couleurs.fonds.length === 0, `${nom} : le bleu d'Apple ne sert de fond qu'au bouton principal`, couleurs.fonds.slice(0, 4).join(', '));
+    dit(couleurs.violets.length === 0, `${nom} : aucun violet (refusé)`, couleurs.violets.slice(0, 4).join(', '));
     dit(!scripts.some((s) => /^App-/.test(s)), `${nom} : le visiteur ne télécharge PAS l'application`, scripts.join(', '));
     dit(!scripts.some((s) => /^AccueilFilm-/.test(s)), `${nom} : le visiteur ne télécharge PAS le film`, scripts.filter((s) => /Film/.test(s)).join(', '));
     dit(lectures.length === 0, `${nom} : la page publique ne lit rien en base`, lectures.slice(0, 3).join(' · '));
     dit(erreurs.length === 0, `${nom} : aucune erreur de page`, erreurs.join(' | '));
-    // Les liens légaux, la ligne Contact.
-    const liens = await pg.evaluate(() => [...document.querySelectorAll('[data-accueil] a[href^="/legal/"]')].map((a) => a.getAttribute('href')));
-    const manquants = liens.filter((h) => !fs.existsSync(path.join(DIST, h)));
-    dit(liens.length >= 5 && manquants.length === 0, `${nom} : les ${liens.length} liens légaux mènent à une vraie page`, manquants.join(', ') || `${liens.length} lien(s)`);
+    // Un seul bouton principal à la fois ; « Se connecter » reste joignable.
+    await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(400);
+    const navCta = () => pg.evaluate(() => { const b = document.querySelector('.av-nav [data-cta-nav="inscription"]'); return b ? { op: Number(getComputedStyle(b).opacity), tab: b.tabIndex, d: getComputedStyle(b).display } : null; });
+    const haut = await navCta();
+    dit(haut && (haut.op === 0 || haut.d === 'none') && haut.tab === -1, `${nom} : en haut de page, « Créer mon compte » n'est PAS doublé dans la barre`, JSON.stringify(haut));
+    if (!opt.mobile) {
+      await pg.evaluate(() => window.scrollTo(0, 1600));
+      await pg.waitForFunction(() => { const b = document.querySelector('.av-nav [data-cta-nav="inscription"]'); return b && getComputedStyle(b).opacity === '1'; }, null, { timeout: 2000 }).catch(() => {});
+      const bas = await navCta();
+      dit(bas && bas.op === 1 && bas.tab === 0, `${nom} : le bouton du haut sorti, la barre le propose (atteignable au clavier)`, JSON.stringify(bas));
+    }
+    await pg.evaluate(() => window.scrollTo(0, 3000)); await pg.waitForTimeout(400);
+    const sc = await visibleDansEcran(pg, '.av-nav [data-cta-nav="connexion"]');
+    dit(sc && sc.display !== 'none' && sc.top >= 0 && sc.bottom <= sc.h && sc.right <= sc.w, `${nom} : « Se connecter » reste dans la barre en défilant`, sc ? `${Math.round(sc.left)},${Math.round(sc.top)}` : 'absent');
+    // Les liens : légaux, aide, état du service — tous servis.
+    const liens = await pg.evaluate(() => [...new Set([...document.querySelectorAll('[data-accueil] a[href^="/"]')].map((a) => a.getAttribute('href')).filter((h) => !/^\/(\?|$)/.test(h) && !/^\/#/.test(h)))]);
+    const manquants = liens.filter((h) => { const f = fichierDe(h); return !fs.existsSync(path.join(DIST, f)) || !fs.statSync(path.join(DIST, f)).isFile(); });
+    const veutLiens = ['/legal/cgv.html', '/legal/confidentialite.html', '/aide', '/statut'];
+    dit(veutLiens.every((h) => liens.includes(h)) && manquants.length === 0, `${nom} : CGV, confidentialité, aide et état du service sont là, et les ${liens.length} liens mènent à une vraie page`, `manquants : ${manquants.join(', ') || '—'} · absents : ${veutLiens.filter((h) => !liens.includes(h)).join(', ') || '—'}`);
     let cst = ''; try { cst = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(lire('src/contact.js') || '') || [])[1] || '').trim(); } catch (_) { cst = ''; }
     const contact = await pg.evaluate(() => { const e = document.querySelector('[data-accueil] [data-contact]'); return e ? { texte: e.innerText, absent: e.hasAttribute('data-contact-absent'), href: e.getAttribute('href') || '' } : null; });
-    dit(!!contact && (cst ? contact.href === `mailto:${cst}` : contact.absent && /à venir/.test(contact.texte) && !contact.href),
-      `${nom} : une ligne Contact — ${cst ? 'l’adresse de src/contact.js' : '« adresse de contact à venir », aucune adresse inventée'}`, contact ? `${contact.texte} ${contact.href}` : 'absente');
-    // 19. Un seul bouton principal à la fois ; 18. « Se connecter » reste joignable.
-    const navCta = () => pg.evaluate(() => { const b = document.querySelector('.acc-nav [data-cta-nav="inscription"]'); return b ? { op: Number(getComputedStyle(b).opacity), tab: b.tabIndex } : null; });
-    const avantDef = await navCta();
-    dit(avantDef && avantDef.op === 0 && avantDef.tab === -1, `${nom} : en haut de page, « Créer mon compte » n'est PAS doublé dans la barre`, JSON.stringify(avantDef));
-    await pg.evaluate(() => window.scrollTo(0, 1500));
-    await pg.waitForFunction(() => { const b = document.querySelector('.acc-nav [data-cta-nav="inscription"]'); return b && getComputedStyle(b).opacity === '1'; }, null, { timeout: 2000 }).catch(() => {});
-    const apresDef = await navCta();
-    dit(apresDef && apresDef.op === 1 && apresDef.tab === 0, `${nom} : une fois le bouton du haut sorti, la barre le propose (et il est atteignable au clavier)`, JSON.stringify(apresDef));
-    await pg.evaluate(() => window.scrollTo(0, 3000)); await pg.waitForTimeout(400);
-    const barre = await pg.evaluate(() => { const n = document.querySelector('[data-accueil] .acc-nav'); return n ? Math.round(n.getBoundingClientRect().top) : null; });
-    dit(barre === 0, `${nom} : la barre du haut reste visible en faisant défiler`, `haut de la barre à ${barre} px`);
-    const sc = await visibleDansEcran(pg, '.acc-nav [data-cta-nav="connexion"]');
-    dit(sc && sc.display !== 'none' && sc.top >= 0 && sc.bottom <= sc.h && sc.right <= sc.w && sc.left >= 0, `${nom} : « Se connecter » reste dans la barre, même après avoir défilé`, sc ? `${Math.round(sc.left)},${Math.round(sc.top)} ${sc.display}` : 'absent');
-    // 17. La longueur.
-    const hauteurs = await pg.evaluate(() => ({ total: document.documentElement.scrollHeight, secs: [...document.querySelectorAll('[data-section]')].map((s) => [s.getAttribute('data-section'), Math.round(s.getBoundingClientRect().height)]) }));
-    return { ctx, pg, hauteurs };
-  } catch (e) { await ctx.close(); throw e; }
+    dit(!!contact && (cst ? contact.href === `mailto:${cst}` : contact.absent && /à venir/.test(contact.texte) && !contact.href), `${nom} : une ligne Contact (src/contact.js)`, contact ? `${contact.texte} ${contact.href}` : 'absente');
+  } finally { await ctx.close(); }
 }
 
 (async () => {
   try { await ecouter(); } catch (e) { console.log('❌ ' + e.message); process.exit(1); }
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ dist/ absent — lance npm run build'); process.exit(1); }
-  // Les sources de vérité : la table de démo, les réglages, les CGV.
-  let demo = null;
-  try { demo = (await import(pathToFileURL(path.join(RACINE, 'src', 'accueil-demo.js')).href)).DEMO; } catch (_) { demo = null; }
+  // Les sources de vérité : les réglages, les CGV, le serveur, le registre des captures.
   const srcReglages = lire('src/accueil-reglages.js') || '';
-  const reglages = { ACCES_OFFERT: constante(srcReglages, 'ACCES_OFFERT'), DETOURAGE_POUR_TOUS: constante(srcReglages, 'DETOURAGE_POUR_TOUS'), PRIX_MOIS: (constante(srcReglages, 'PRIX_MOIS') || '').replace(/['"]/g, '') };
+  const reglages = { ACCES_OFFERT: constante(srcReglages, 'ACCES_OFFERT'), DETOURAGE_POUR_TOUS: constante(srcReglages, 'DETOURAGE_POUR_TOUS'), PRIX_MOIS: (constante(srcReglages, 'PRIX_MOIS') || '').replace(/['"]/g, ''), ESSAI_JOURS: (constante(srcReglages, 'ESSAI_JOURS') || '').replace(/['"]/g, '') };
   const cgv = lire('public/legal/cgv.html') || '';
   const prixCgv = (/abonnement à (\d+,\d{2})\s€ par mois/i.exec(cgv) || [])[1] || null;
-  const DEMO = demo || { jour: { colisApres: '?', aRetirerApres: '?' }, mois: { apres: NaN } };
-  if (!demo) dit(false, 'src/accueil-demo.js se charge (la table de démo)', 'introuvable');
-
-  // ⚠️ `--disable-gpu-compositing` : mesuré le 11 octobre, le compositeur GL
-  //    logiciel (swiftshader) rend la page de 1512 px à 4-5 images/s sur ce
-  //    conteneur chargé (médiane 217 ms, des trous de 2 s) — la page d'AVANT
-  //    faisait pire (8 images en 7 s). L'horloge de la page borne un pas à
-  //    0,25 s : elle « perdait » donc du temps, et une carte de 4,5 s en
-  //    durait 8. C'est la MACHINE qu'on mesurait, pas la page. Composée par le
-  //    processeur, la même page tourne à 60 images/s (médiane 17 ms) — ce que
-  //    voit un vrai visiteur. Rien d'autre ne change (couleurs, polices, tailles).
+  const essaiCgv = (/essai gratuit de (\d+) jours/i.exec(cgv) || [])[1] || null;
+  const essaiStripe = (/trial_period_days:\s*(\d+)/.exec(lire('api/compte.js') || '') || [])[1] || null;
+  const essaiRelances = (/DUREE_ESSAI_JOURS\s*=\s*(\d+)/.exec(lire('api/_lib/relances-essai.js') || '') || [])[1] || null;
+  let registre = {}; try { registre = JSON.parse(lire('public/accueil/captures.json')); } catch (_) { registre = {}; }
+  const S = { reglages, prixCgv, essaiCgv, registre };
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-gpu-compositing'] });
   try {
     if (veut('rendu')) {
-      console.log('\n── UN VISITEUR SANS SESSION : LE PREMIER ÉCRAN, LA CARTE, LA BARRE');
-      // ⚠️ Le cahier du 11 octobre visait ≤ 5 000 px sur téléphone (la page
-      //    d'avant : 7 338). Après ses CINQ coupes autorisées (précisions cachées,
-      //    réponses courtes, « Et sur mon téléphone ? » et « Comment j'arrête ? »
-      //    retirés du téléphone, texte de la fin caché) et un resserrage de la
-      //    typographie, la page mesure 6 070 px : ses propres textes (la réponse,
-      //    VRM / Toi) et ses trois écrans, qu'il interdit de couper, n'y tiennent
-      //    pas. Le plafond du téléphone est donc la MESURE (+2 %) : le contrôle
-      //    passe au rouge dès que la page regrossit, il ne prétend pas qu'elle
-      //    fait 5 000 px. L'ordinateur tient le budget du cahier.
-      const BUDGET = {
-        ordi: { total: 4600, hero: 780, colis: 600, ailleurs: 600, urssaf: 580, questions: 460, comment: 480, prix: 600, fin: 300 },
-        tel: { total: 6200, hero: 930, colis: 780, ailleurs: 790, urssaf: 770, questions: 620, comment: 840, prix: 900, fin: 380 },
-      };
-      for (const [nom, opt, cle] of [['ordinateur (1512 px)', ORDI, 'ordi'], ['téléphone (390 px)', TEL, 'tel']]) {
-        await essaie(`rendu · ${nom}`, async () => {
-          const { ctx, pg, hauteurs } = await controlesRendu(nav, nom, opt, DEMO, reglages, prixCgv);
-          const B = BUDGET[cle];
-          const trop = hauteurs.secs.filter(([s, h]) => B[s] && h > B[s]).map(([s, h]) => `${s} ${h} > ${B[s]}`);
-          console.log(`     hauteurs : ${hauteurs.secs.map(([s, h]) => `${s} ${h}`).join(' · ')} · total ${hauteurs.total}`);
-          dit(hauteurs.total <= B.total && trop.length === 0, `${nom} : la page tient dans son budget de hauteur (≤ ${B.total} px)`, `${hauteurs.total} px${trop.length ? ' · ' + trop.join(', ') : ''}`);
-          if (CAPT) {
-            await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300);
-            await pg.screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}-haut.png`) });
-            await pg.screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}.png`), fullPage: true });
-          }
-          await ctx.close();
-        });
+      for (const [nom, opt] of [['390 · clair', TEL], ['390 · sombre', { ...TEL, sombre: true }], ['1512 · clair', ORDI], ['1512 · sombre', { ...ORDI, sombre: true }]]) {
+        console.log(`\n── UN VISITEUR SANS SESSION — ${nom}`);
+        await essaie(nom, () => controlesRendu(nav, nom, opt, S));
       }
     }
 
-    if (veut('tailles')) {
-      console.log('\n── LES AUTRES TAILLES : PORTABLE 1 366, TABLETTES, PETIT TÉLÉPHONE');
-      // ⚠️ `overflow-x: clip` sur la racine cache un débordement sans le mesurer :
-      //    vu au rendu à 1 366 px, le repère « 8 h 02 » du fil sortait par la
-      //    gauche de l'écran, coupé net — et « aucun débordement » restait vert.
-      //    On mesure donc la boîte de chaque texte visible, pas `scrollWidth`.
-      for (const [nom, opt, premier] of [
-        ['portable (1366 × 768)', { largeur: 1366, hauteur: 768 }, true],
-        ['tablette (1024 × 768)', { largeur: 1024, hauteur: 768 }, false],
-        ['tablette (820 × 1180)', { largeur: 820, hauteur: 1180 }, false],
-        ['petit téléphone (360 × 740)', { largeur: 360, hauteur: 740, mobile: true }, false],
-      ]) {
-        await essaie(`tailles · ${nom}`, async () => {
-          const { ctx, pg, erreurs } = await page(nav, opt);
-          await attendreEtat(pg, '[data-demo-animee]', 'fin', 14000);
-          await pg.waitForFunction(() => document.querySelectorAll('[data-scene][data-pret]').length === 4, null, { timeout: 15000 }).catch(() => {});
-          const dehors = await pg.evaluate(() => {
-            const x = [];
-            document.querySelectorAll('[data-accueil] *').forEach((e) => {
-              if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return;
-              const r = e.getBoundingClientRect(); if (!r.width || !r.height) return;
-              let o = 1; for (let a = e; a && a.nodeType === 1; a = a.parentElement) o *= Number(getComputedStyle(a).opacity);
-              if (o <= 0.1 || getComputedStyle(e).visibility === 'hidden') return;
-              if (r.left < -1 || r.right > innerWidth + 1) x.push(`« ${e.textContent.trim().slice(0, 24)} » ${Math.round(r.left)}→${Math.round(r.right)}`);
-            });
-            return x;
-          });
-          dit(dehors.length === 0, `${nom} : aucun texte ne sort de l'écran (ni coupé au bord)`, dehors.slice(0, 4).join(' · '));
-          const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-          dit(deb <= 1, `${nom} : aucun débordement horizontal`, `${deb} px`);
-          const cc = await coupes(pg, '[data-demo-animee]');
-          // ⚠️ Le bord du TITRE ne suffit pas : son conteneur rétrécit (min-width 0)
-          //    pendant que la puce « exemple » déborde par-dessus la pile — vert sur
-          //    le défaut vu à 360 px. On mesure le dernier élément du titre.
-          const tete = await pg.evaluate(() => { const t = document.querySelector('.cj-titre > :last-child'), p = document.querySelector('.cj-pile'); if (!t || !p) return null; return { titre: Math.round(t.getBoundingClientRect().right), pile: Math.round(p.getBoundingClientRect().left) }; });
-          dit(cc.length === 0 && tete && tete.titre <= tete.pile, `${nom} : la carte tient — rien de coupé, l'en-tête ne se chevauche pas`, `${cc.slice(0, 2).join(' · ')} · titre→${tete && tete.titre} pile←${tete && tete.pile}`);
-          if (premier) {
-            const H = opt.hauteur;
-            const v = await pg.evaluate(() => ['[data-definition]', '.acc-hero [data-cta="inscription"]', '[data-prerequis]'].map((sel) => { const e = document.querySelector(sel); return e ? Math.round(e.getBoundingClientRect().bottom) : null; }));
-            dit(v.every((b) => b != null && b <= H), `${nom} : la pastille, « Créer mon compte » et le prérequis tiennent dans le premier écran`, v.join(' · '));
-          }
-          dit(erreurs.length === 0, `${nom} : aucune erreur de page`, erreurs.join(' | '));
-          if (CAPT) await pg.screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}x${opt.hauteur}-haut.png`) });
-          await ctx.close();
-        });
-      }
-    }
-
-    if (veut('scenes')) {
-      console.log('\n── LES ÉCRANS DU BAS : ILS NE JOUENT QUE QUAND ON LES VOIT');
-      for (const [nom, opt] of [['ordinateur (1512 px)', ORDI], ['téléphone (390 px)', TEL]]) {
-        await essaie(`écrans · ${nom}`, async () => {
-          const { ctx, pg, scripts } = await page(nav, opt);
-          await pg.waitForFunction(() => document.querySelectorAll('[data-scene][data-pret]').length === 4, null, { timeout: 15000 }).catch(() => {});
-          const debut = await pg.evaluate(() => [...document.querySelectorAll('[data-scene]')].map((s) => `${s.getAttribute('data-scene')}:${s.getAttribute('data-etat')}`));
-          dit(debut.length === 4 && debut.filter((x) => /^(colis|ailleurs|urssaf):/.test(x)).every((x) => /:debut$/.test(x)), `${nom} : au chargement, les trois écrans attendent (« debut »)`, debut.join(' '));
-          const ordre = ['colis', 'ailleurs', 'urssaf'];
-          for (let i = 0; i < ordre.length; i++) {
-            const n = ordre[i], sel = `[data-scene="${n}"]`;
-            await pg.evaluate((s) => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
-            const t0 = Date.now();
-            const joue = await attendreEtat(pg, sel, 'joue', 6000);
-            const fin = await attendreEtat(pg, sel, 'fin', 7000);
-            const autres = await pg.evaluate((suivants) => suivants.map((x) => document.querySelector(`[data-scene="${x}"]`).getAttribute('data-etat')), ordre.slice(i + 1));
-            dit(joue && fin && Date.now() - t0 <= 6500 && autres.every((e) => e === 'debut'), `${nom} : « ${n} » joue quand on le regarde, finit, et les suivants attendent encore`, `joue ${joue} · fin ${fin} · ${Date.now() - t0} ms · suivants ${autres.join(',') || '—'}`);
-            const L = await pg.evaluate((x) => window.__vu.scenes[x] || [], n);
-            const tj = (L.find((x) => x.e === 'joue') || {}).t, tf = (L.find((x) => x.e === 'fin') || {}).t;
-            dit(tj && tf && tf - tj <= 5000, `${nom} : « ${n} » dure moins de 5 s`, `${Math.round((tf || 0) - (tj || 0))} ms`);
-            const cs = await coupes(pg, sel);
-            dit(cs.length === 0, `${nom} : en fin, aucun texte de « ${n} » n'est coupé`, cs.slice(0, 3).join(' · '));
-            if (CAPT) await (await pg.$(`[data-section="${n}"]`)).screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}-${n}-fin.png`) });
-          }
-          // 4. Le curseur paraît dans l'écran Colis (un geste de l'utilisateur).
-          dit(await pg.evaluate(() => window.__vu.curseurColis), `${nom} : le curseur dessiné paraît dans l'écran Colis (ce que TU fais)`);
-          // 6. Le numéro voyage.
-          const n128 = await pg.evaluate((n) => {
-            const s = document.querySelector('[data-scene="colis"]');
-            const tampon = s.querySelector('[data-bordereau] [data-tampon]');
-            const tuile = s.querySelector('.sc-tuile');
-            // Le tampon est dans le DOM dès le départ (caché) : on ne lit son texte
-            // que s'il est POSÉ — opaque et sans découpe.
-            const pose = tampon && Number(getComputedStyle(tampon).opacity) > 0.9 && ['none', ''].includes(getComputedStyle(tampon).clipPath);
-            return { tampon: pose ? tampon.textContent : '', badge: tuile ? tuile.innerText.includes(`N°${n}`) : false,
-              sorti: (s.querySelector(`[data-carton="${n}"]`) || {}).getAttribute ? s.querySelector(`[data-carton="${n}"]`).getAttribute('data-sorti') : null,
-              autres: [...s.querySelectorAll('[data-carton][data-sorti]')].filter((c) => c.getAttribute('data-carton') !== n).length };
-          }, (demo && demo.vente.n) || '128');
-          dit(/128/.test(n128.tampon) && n128.badge && n128.sorti === '1' && n128.autres === 0, `${nom} : le N°128 est tamponné sur le bordereau, reste sur sa ligne, et SEUL le carton 128 sort`, JSON.stringify(n128));
-          // 7. Le total du mois tient.
-          const total = await pg.evaluate(() => { const e = document.querySelector('[data-scene="urssaf"] [data-total]'); return e ? e.textContent : ''; });
-          const lu = Number(total.replace(/[^\d,]/g, '').replace(',', '.'));
-          dit(Math.round(lu * 100) === Math.round(DEMO.mois.apres * 100), `${nom} : en fin, le total à déclarer vaut celui de la table (${DEMO.mois.apres})`, `« ${total} »`);
-          // 5 (suite). « Revoir » rejoue.
-          const rv = await pg.$('[data-scene="urssaf"] ~ .sc-revoir-l [data-revoir], [data-section="urssaf"] [data-revoir]');
-          if (rv) {
-            await rv.click();
-            const re = await pg.waitForFunction(() => { const e = document.querySelector('[data-scene="urssaf"]').getAttribute('data-etat'); return e === 'joue' || e === 'debut'; }, null, { timeout: 3000 }).then(() => true, () => false);
-            const refin = await attendreEtat(pg, '[data-scene="urssaf"]', 'fin', 7000);
-            dit(re && refin, `${nom} : « ↻ Revoir » rejoue l'écran, puis il s'arrête de nouveau`);
-          } else dit(false, `${nom} : « ↻ Revoir » sous l'écran fini`, 'introuvable');
-          // 13. Lisible : aucun texte rendu sous 12 px dans les écrans, et échelle 1.
-          const lisible = await pg.evaluate(() => {
-            const zones = [...document.querySelectorAll('[data-demo-animee],[data-scene]')];
-            let min = 99, pire = '', echelle = 1;
-            zones.forEach((z) => {
-              const k = z.offsetHeight ? z.getBoundingClientRect().height / z.offsetHeight : 1;
-              if (Math.abs(k - 1) > 0.01) echelle = k;
-              z.querySelectorAll('*').forEach((e) => {
-                if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return;
-                const f = parseFloat(getComputedStyle(e).fontSize) * k;
-                if (f < min) { min = f; pire = `${e.textContent.trim().slice(0, 20)} (${z.getAttribute('data-scene') || 'carte'})`; }
-              });
-            });
-            return { min, pire, echelle };
-          });
-          dit(lisible.min >= 11.99 && Math.abs(lisible.echelle - 1) <= 0.01, `${nom} : dans la carte et les écrans, aucun texte rendu sous 12 px, aucune mise à l'échelle`, `${lisible.min.toFixed(1)} px « ${lisible.pire} » · échelle ${lisible.echelle}`);
-          // 20. Rien qui ne soit branché, dans les écrans dessinés.
-          const dessine = await pg.evaluate(() => [...document.querySelectorAll('[data-demo-animee],[data-scene]')].map((e) => e.innerText).join('\n'));
-          const interdits = ['Vestiaire', 'À publier', 'encaissé', 'Photoroom', 'détour'].filter((m) => new RegExp(m, 'i').test(dessine));
-          dit(interdits.length === 0, `${nom} : les écrans dessinés ne montrent rien qui ne soit branché (Vestiaire, détourage, « encaissé »…)`, interdits.join(', '));
-          dit(!scripts.some((s) => /^App-/.test(s)), `${nom} : toujours pas d'application téléchargée après avoir tout parcouru`);
-          await ctx.close();
-        });
-      }
-    }
-
-    if (veut('sommaire')) {
-      console.log('\n── LA CARTE SERT DE SOMMAIRE');
-      for (const [nom, opt] of [['ordinateur (1512 px)', ORDI], ['téléphone (390 px)', TEL]]) {
-        await essaie(`sommaire · ${nom}`, async () => {
-          const { ctx, pg } = await page(nav, opt);
-          for (const id of ['colis', 'ailleurs', 'urssaf']) {
-            await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300);
-            await pg.click(`[data-vers="${id}"]`);
-            await pg.waitForTimeout(1200);
-            const r = await pg.evaluate((x) => { const e = document.getElementById(x); return e ? e.getBoundingClientRect().top / innerHeight : null; }, id);
-            dit(r != null && r >= -0.01 && r <= 0.4, `${nom} : un clic sur la ligne mène à #${id}`, `haut à ${r == null ? '—' : Math.round(r * 100) + ' %'} de l'écran`);
-          }
-          await ctx.close();
-        });
-      }
-    }
-
-    if (veut('reduit')) {
-      console.log('\n── « RÉDUIRE LES ANIMATIONS » : L\'ÉTAT FINAL, ET RIEN QUI BOUGE');
-      for (const [nom, opt] of [['ordinateur (1512 px)', ORDI], ['téléphone (390 px)', TEL]]) {
-        await essaie(`réduit · ${nom}`, async () => {
-          const { ctx, pg } = await page(nav, { ...opt, reduit: true });
-          await pg.waitForFunction(() => document.querySelectorAll('[data-scene][data-pret]').length === 4, null, { timeout: 15000 }).catch(() => {});
-          const etats = await pg.evaluate(() => ({ carte: document.querySelector('[data-demo-animee]').getAttribute('data-etat'), scenes: [...document.querySelectorAll('[data-scene]')].map((s) => s.getAttribute('data-etat')) }));
-          dit(etats.carte === 'fin' && etats.scenes.length === 4 && etats.scenes.every((e) => e === 'fin'), `${nom} : carte et écrans sont dans leur état final sans avoir défilé`, JSON.stringify(etats));
-          const photo = () => pg.evaluate(() => [...document.querySelectorAll('[data-demo-animee],[data-scene]')].map((e) => e.getAttribute('data-etat') + '|' + e.innerText).join('#'));
-          const a = await photo(); await pg.waitForTimeout(5000); const b = await photo();
-          dit(a === b, `${nom} : rien ne change en 5 s`);
-          const vu = await pg.evaluate(() => ({ bouge: !!window.__vu.bougeVu, revoir: document.querySelectorAll('[data-revoir]').length }));
-          dit(!vu.bouge, `${nom} : jamais de notification, de vol ni de curseur`);
-          dit(vu.revoir === 0, `${nom} : aucun « ↻ Revoir » (il n'y a rien à rejouer)`, `${vu.revoir}`);
-          const fins = await pg.evaluate((n) => {
-            const s = document.querySelector('[data-scene="colis"]'), u = document.querySelector('[data-scene="urssaf"] [data-total]'), a = document.querySelector('[data-scene="ailleurs"]');
-            const tp = s.querySelector('[data-bordereau] [data-tampon]');
-            const pose = tp && Number(getComputedStyle(tp).opacity) > 0.9 && ['none', ''].includes(getComputedStyle(tp).clipPath);
-            return { tampon: pose ? tp.textContent : '', sorti: s.querySelector(`[data-carton="${n}"]`).getAttribute('data-sorti'), total: u ? u.textContent : '', ailleurs: a ? a.innerText : '' };
-          }, (demo && demo.vente.n) || '128');
-          const lu = Number(fins.total.replace(/[^\d,]/g, '').replace(',', '.'));
-          dit(/128/.test(fins.tampon) && fins.sorti === '1' && Math.round(lu * 100) === Math.round(DEMO.mois.apres * 100), `${nom} : l'état final est là — tampon N°128, carton sorti, total ${DEMO.mois.apres}`, JSON.stringify({ tampon: fins.tampon, sorti: fins.sorti, total: fins.total }));
-          dit(/Retirée d.eBay/.test(fins.ailleurs) && /À retirer/.test(fins.ailleurs), `${nom} : l'écran « vendu ailleurs » montre « À retirer » et « Retirée d'eBay »`);
-          if (CAPT) await pg.screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}-reduit.png`) });
-          await ctx.close();
-        });
-      }
+    if (veut('captures')) {
+      console.log('\n── LES CAPTURES : LA VRAIE APP, EN MODE EXEMPLE, LÉGÈRES');
+      await essaie('captures', async () => {
+        const src = sansCommentaires(lire('src/Accueil.jsx'));
+        const noms = [...new Set([...src.matchAll(/(?:nom|capture):\s*'([a-z]+)'|nom="([a-z]+)"/g)].map((m) => m[1] || m[2]))];
+        dit(noms.length >= 5, `la page montre ${noms.length} écrans de l'app (${noms.join(', ')})`);
+        const fichiers = noms.flatMap((n) => ['clair', 'sombre'].map((t) => `${n}-${t}.webp`));
+        const absents = fichiers.filter((f) => !fs.existsSync(path.join(RACINE, 'public', 'accueil', f)));
+        dit(absents.length === 0, 'chaque écran existe en clair ET en sombre (public/accueil/)', absents.join(', '));
+        const presents = fichiers.filter((f) => !absents.includes(f));
+        const empreinte = (f) => crypto.createHash('sha256').update(fs.readFileSync(path.join(RACINE, 'public', 'accueil', f))).digest('hex');
+        const faux = presents.filter((f) => !registre[f] || registre[f].modeExemple !== true || registre[f].sha256 !== empreinte(f));
+        dit(Object.keys(registre).length > 0 && faux.length === 0, 'chaque fichier est celui que scripts/accueil-captures.cjs a produit EN MODE EXEMPLE (empreinte au registre)', faux.join(', ') || (Object.keys(registre).length ? '' : 'registre public/accueil/captures.json absent'));
+        const webp = presents.filter((f) => fs.readFileSync(path.join(RACINE, 'public', 'accueil', f)).slice(8, 12).toString('ascii') === 'WEBP');
+        dit(webp.length === presents.length, 'chaque capture est un vrai WebP (en-tête RIFF/WEBP)', presents.filter((f) => !webp.includes(f)).join(', '));
+        const lourds = presents.map((f) => [f, fs.statSync(path.join(RACINE, 'public', 'accueil', f)).size]).filter(([, s]) => s > 80 * 1024);
+        dit(lourds.length === 0, 'chaque capture pèse ≤ 80 Ko', lourds.map(([f, s]) => `${f} ${Math.round(s / 1024)} Ko`).join(', '));
+        const sc = sansCommentaires(lire('scripts/accueil-captures.cjs'));
+        dit(/vrm_mode_exemple/.test(sc) && /mode exemple n'est pas actif/.test(sc) && /route\(\/\^https\?:/.test(sc), 'le script de capture n\'ouvre l\'app qu\'en mode exemple, refuse sinon, et coupe tout le réseau extérieur');
+        // Le registre ne garde pas de capture que la page n'affiche plus.
+        const orphelins = Object.keys(registre).filter((f) => !fichiers.includes(f));
+        dit(orphelins.length === 0, 'le registre ne garde pas de capture que la page n’affiche plus', orphelins.join(', '));
+      });
     }
 
     if (veut('honnetete')) {
-      console.log('\n── HONNÊTETÉ : LE PRIX VIENT DES CGV, AUCUN CHIFFRE INVENTÉ, RIEN DE NON BRANCHÉ');
+      console.log('\n── HONNÊTETÉ : PRIX ET ESSAI = CGV = SERVEUR, AUCUNE PREUVE INVENTÉE');
       await essaie('honnêteté', async () => {
         const { ctx, pg } = await page(nav, ORDI);
-        await attendreEtat(pg, '[data-demo-animee]', 'fin', 14000);
-        await pg.evaluate(() => document.querySelectorAll('[data-faq] details').forEach((d) => { d.open = true; }));
         const t = await pg.evaluate(() => document.querySelector('[data-accueil]').innerText);
-        const gratuitCgv = /VRM est gratuit/i.test(cgv);
-        if (gratuitCgv) dit(/gratuit/i.test(t) && /0\s€/.test(t), 'le prix affiché est celui des CGV (« gratuit »)');
-        else {
-          const montants = [...t.matchAll(/(\d+,\d{2})\s*€\s*(?:\/\s*mois|par mois)/gi)].map((m) => m[1]);
-          // « 0 € » ou « 0,00 € » : un compteur qui partirait de zéro se lirait
-          //    comme un prix nul (aucun montant de la démo ne vaut zéro).
-          const zero = /(^|[\s+])0(,00)?\s*€/.test(t);
-          dit(!!prixCgv && montants.length > 0 && montants.every((m) => m === prixCgv) && !zero, `le prix affiché est celui des CGV (${prixCgv} € par mois), aucun autre, jamais « 0 € »`, `CGV ${prixCgv} · page ${montants.join(', ')}${zero ? ' · un « 0 € » est affiché' : ''}`);
-          dit(reglages.PRIX_MOIS === prixCgv, 'src/accueil-reglages.js (PRIX_MOIS) dit le prix des CGV', `${reglages.PRIX_MOIS} / ${prixCgv}`);
-          dit(/sans engagement/i.test(t) && /résili/i.test(t), '  et il dit « sans engagement » et comment résilier (comme les CGV)');
-        }
+        const montants = [...t.matchAll(/(\d+,\d{2})\s*€\s*(?:\/\s*mois|par mois)/gi)].map((m) => m[1]);
+        const montantsCarte = await pg.evaluate(() => [...document.querySelectorAll('[data-prix]')].map((e) => e.innerText.replace(/\s+/g, ' ')));
+        dit(!!prixCgv && montants.length > 0 && montants.every((m) => m === prixCgv) && montantsCarte.length === 1 && montantsCarte[0].includes(prixCgv), `le prix affiché est celui des CGV (${prixCgv} € par mois), aucun autre`, `CGV ${prixCgv} · page ${montants.join(', ')} · carte ${montantsCarte.join(' | ')}`);
+        dit(reglages.PRIX_MOIS === prixCgv, 'PRIX_MOIS (src/accueil-reglages.js) = CGV', `${reglages.PRIX_MOIS} / ${prixCgv}`);
+        dit(!!essaiCgv && reglages.ESSAI_JOURS === essaiCgv && essaiStripe === essaiCgv && essaiRelances === essaiCgv, `l'essai : ESSAI_JOURS = CGV = Stripe (trial_period_days) = relances (DUREE_ESSAI_JOURS)`, `page ${reglages.ESSAI_JOURS} · CGV ${essaiCgv} · Stripe ${essaiStripe} · relances ${essaiRelances}`);
+        const essais = [...t.matchAll(/(\d+)\s*jours d.essai/g)].map((m) => m[1]);
+        dit(essais.length >= 2 && essais.every((d) => d === essaiCgv), 'chaque « N jours d’essai » rendu dit la durée des CGV', essais.join(', '));
+        dit(/sans engagement/i.test(t) && /résili/i.test(t), 'elle dit « sans engagement » et comment résilier (comme les CGV)');
         const invente = t.match(/\d[\d\s.,]*\s*(\+|k|K)?\s*(vendeurs|revendeurs|utilisateurs|clients|avis|étoiles|\/\s*5|%\s*de\s*(ventes|chiffre|temps))/i);
         dit(!invente, 'aucun chiffre de clientèle ni de résultat inventé', invente ? invente[0] : '');
-        dit(!/(★|⭐)/.test(t), 'aucune note en étoiles (aucun avis réel à afficher)');
+        dit(!/(★|⭐)/.test(t), 'aucune note en étoiles');
+        const temoins = await pg.evaluate(() => document.querySelectorAll('[data-accueil] blockquote, [data-accueil] q, [data-accueil] cite').length);
+        dit(temoins === 0 && !/témoign|ils (nous )?font confiance|nos clients|« [^»]{10,} » —/i.test(t), 'aucun témoignage (ni citation, ni « ils nous font confiance »)', `${temoins} citation(s)`);
         const conf = lire('public/legal/confidentialite.html') || '';
-        dit(!/donnée revendue|ne vend aucune donnée/i.test(t) || /ne vend aucune donnée/i.test(conf), '« aucune donnée revendue » s\'appuie sur la politique publiée');
-        dit(/favori/i.test(t) && /republi/i.test(t), 'la page dit qu\'elle refuse les relances en série aux favoris et la republication en boucle', `favori=${/favori/i.test(t)} republi=${/republi/i.test(t)}`);
-        // 21. Les fausses phrases mesurées le 11 octobre ne reviennent pas.
-        const faux = [];
-        if (/rien ne part sans ton clic|rien n['’]est envoyé à ta place/i.test(t)) faux.push('« rien ne part / n’est envoyé à ta place »');
-        if (/(deux|2) minutes/i.test(t)) faux.push('« deux minutes »');
-        const phrases = t.split(/[.!?\n]+/);
-        if (phrases.some((p) => /publi\w*.{0,40}Leboncoin/i.test(p))) faux.push('« publie… Leboncoin »');
-        // ⚠️ Le texte RENDU ne suffit pas : une phrase qui vit dans un écran pas
-        //    encore affiché (un carrousel, une scène du bas) n'est pas dans
-        //    `innerText` au moment où on lit. Mesuré sur la page d'avant : « Rien
-        //    n'est envoyé à ta place » passait. On lit aussi les FICHIERS de la page.
-        const SRC_PAGE = ['src/Accueil.jsx', 'src/accueil-carte.jsx', 'src/accueil-scenes.jsx', 'src/accueil-demo.js', 'src/AccueilFilm.jsx'];
-        const sansCommentaires = (x) => (x || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-        SRC_PAGE.forEach((f) => {
-          const c = sansCommentaires(lire(f));
-          if (/rien ne part sans ton clic|rien n['’]est envoyé à ta place/i.test(c)) faux.push(`« rien n’est envoyé à ta place » dans ${f}`);
-          if (/(deux|2) minutes/i.test(c)) faux.push(`« deux minutes » dans ${f}`);
-        });
-        dit(faux.length === 0, 'aucune promesse fausse (rien ne part sans ton clic, deux minutes, publier sur Leboncoin) — ni affichée, ni écrite dans la page', faux.join(', '));
+        dit(!/ne vend (rien|aucune donnée)/i.test(t) || /ne vend aucune donnée/i.test(conf), '« ne vend rien » s’appuie sur la politique publiée');
         const auto = await pg.evaluate(() => { const c = document.querySelector('[data-confiance]'); return c ? c.querySelectorAll('[data-automatisme]').length : -1; });
-        dit(auto === 2, 'la confiance nomme les DEUX automatismes, éteints tant qu’on ne les allume pas', `${auto}`);
-        // 20. Vestiaire seulement dans la FAQ ; détourage absent tant qu'il n'est pas ouvert à tous.
+        dit(auto === 2 && /favori/i.test(t) && /republi/i.test(t), 'la confiance nomme les automatismes éteints, et dit que favoris et republication ne partent que lancés', `${auto} automatisme(s)`);
         const v = await pg.evaluate(() => { const tout = (document.body.innerText.match(/Vestiaire/g) || []).length; const faq = ((document.querySelector('[data-faq]') || {}).innerText || '').match(/Vestiaire/g) || []; return { tout, faq: faq.length }; });
-        dit(v.tout === v.faq, '« Vestiaire » n’apparaît que dans la FAQ (pas encore branché)', JSON.stringify(v));
-        if (reglages.DETOURAGE_POUR_TOUS === 'false') dit(!/Photoroom|détour/i.test(t), 'DETOURAGE_POUR_TOUS = false → ni « Photoroom » ni « détourage » sur la page');
-        // Aucune adresse email dans les fichiers de la page.
+        dit(v.tout === v.faq, '« Vestiaire » n’apparaît que dans les questions (pas encore branché)', JSON.stringify(v));
+        if (reglages.DETOURAGE_POUR_TOUS === 'false') dit(!/Photoroom|détour/i.test(t), 'DETOURAGE_POUR_TOUS = false → ni « Photoroom » ni « détourage »');
+        const faux = [];
+        if (/rien n['’]est envoyé à ta place|(deux|2) minutes|tout automatique/i.test(t)) faux.push('promesse fausse');
+        if (/répond(re)? (aux|à tes) (questions|messages) (des acheteurs )?(tout seul|automatiquement)/i.test(t)) faux.push('réponse automatique (n’existe plus)');
+        if (/Depop|Poshmark|Mercari|dollars?|international/i.test(t)) faux.push('international (refusé, §3)');
+        dit(faux.length === 0, 'aucune promesse fausse ni refusée (réponse auto, international)', faux.join(', '));
         const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/;
-        const sources = ['src/Accueil.jsx', 'src/accueil-carte.jsx', 'src/accueil-scenes.jsx', 'src/accueil-demo.js', 'src/accueil-reglages.js', 'src/AccueilFilm.jsx'];
-        const avecEmail = sources.filter((f) => EMAIL.test((lire(f) || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')));
-        dit(avecEmail.length === 0, 'aucune adresse email écrite dans les fichiers de la page (même dans la démo)', avecEmail.join(', '));
+        const avecEmail = ['src/Accueil.jsx', 'src/accueil-reglages.js'].filter((f) => EMAIL.test(sansCommentaires(lire(f))));
+        dit(avecEmail.length === 0, 'aucune adresse e-mail écrite dans les fichiers de la page', avecEmail.join(', '));
+        await ctx.close();
+      });
+    }
+
+    if (veut('reduit')) {
+      console.log('\n── « RÉDUIRE LES ANIMATIONS » : RIEN NE BOUGE, TOUT EST LÀ');
+      await essaie('réduit', async () => {
+        const { ctx, pg } = await page(nav, { ...ORDI, reduit: true });
+        const r = await pg.evaluate(() => {
+          const anim = document.getAnimations ? document.getAnimations().filter((a) => a.playState === 'running').length : 0;
+          const caches = [...document.querySelectorAll('[data-accueil] h1, [data-accueil] h2, [data-accueil] p')].filter((e) => Number(getComputedStyle(e).opacity) < 0.99).length;
+          return { anim, caches };
+        });
+        dit(r.anim === 0 && r.caches === 0, 'aucune animation en cours, aucun texte à moitié transparent', JSON.stringify(r));
         await ctx.close();
       });
     }
@@ -621,7 +375,7 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
       for (const [cta, attendu, q] of [['inscription', /Créer ton compte/, 'inscription'], ['connexion', /Se connecter/, 'connexion']]) {
         await essaie(`bouton ${cta}`, async () => {
           const { ctx, pg } = await page(nav, {});
-          await pg.click(`[data-accueil] .acc-hero [data-cta="${cta}"]`, { timeout: 8000 });
+          await pg.click(`[data-accueil] [data-section="hero"] [data-cta="${cta}"]`, { timeout: 8000 });
           await pg.waitForFunction((re) => new RegExp(re).test(document.body.innerText), attendu.source, { timeout: 15000 }).catch(() => {});
           const t = await pg.evaluate(() => document.body.innerText);
           dit(attendu.test(t) && !(await pg.evaluate(() => !!document.querySelector('[data-accueil]'))), `« ${cta} » ouvre le formulaire « ${String(attendu).replace(/[/\\]/g, '')} »`, t.slice(0, 120));
@@ -634,7 +388,7 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
       }
       await essaie('barre · se connecter', async () => {
         const { ctx, pg } = await page(nav, TEL);
-        await pg.click('.acc-nav [data-cta-nav="connexion"]', { timeout: 8000 });
+        await pg.click('.av-nav [data-cta-nav="connexion"]', { timeout: 8000 });
         await pg.waitForFunction(() => /[?&]connexion/.test(location.search), null, { timeout: 8000 }).catch(() => {});
         dit(/[?&]connexion/.test(pg.url()), '« Se connecter » de la barre ouvre la connexion (téléphone)', pg.url());
         await ctx.close();
@@ -677,7 +431,7 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
         const kE = entree ? gz(entree) / 1024 : Infinity, kS = sc ? gz(sc) / 1024 : Infinity, kF = fi ? gz(fi) / 1024 : Infinity;
         console.log(`     entrée ${entree} ${kE.toFixed(1)} Ko gzip · scènes ${kS.toFixed(1)} Ko · film ${kF.toFixed(1)} Ko (avant la refonte : entrée 19,05 Ko, mesurée sur e6bda5c)`);
         dit(kE <= 26, 'le fichier d’entrée (celui que nomme dist/index.html) pèse ≤ 26 Ko compressés', `${kE.toFixed(1)} Ko`);
-        dit(kS <= 20, 'les écrans du bas sont un morceau à part de ≤ 20 Ko compressés', `${sc || 'absent'} ${kS.toFixed(1)} Ko`);
+        dit(!sc || kS <= 20, 'les écrans dessinés de l’ancienne page ne sont plus un morceau que la page charge (le film les embarque)', `${sc || 'aucun morceau séparé'}`);
         dit(kF <= 25, 'le film est un morceau à part de ≤ 25 Ko compressés', `${fi || 'absent'} ${kF.toFixed(1)} Ko`);
       });
     }

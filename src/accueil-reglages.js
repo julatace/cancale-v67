@@ -26,3 +26,9 @@ export const VESTIAIRE_BRANCHE = false;
 // depuis le 27 octobre — 12,99 € avant, 9,99 € avant le 11 octobre). Le banc
 // compare les deux : la page ne peut pas dire un autre prix.
 export const PRIX_MOIS = '16,99';
+
+// (8 nov.) La durée de l'essai gratuit : celle que donne le serveur
+// (api/compte.js `trial_period_days`, api/_lib/relances-essai.js
+// `DUREE_ESSAI_JOURS`) et que disent les CGV (« essai gratuit de 7 jours »).
+// Le banc compare les trois : la page ne peut pas promettre une autre durée.
+export const ESSAI_JOURS = '7';

@@ -54,7 +54,10 @@ import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis,
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { passageRelances } from './_lib/relances-essai.js';
+import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
+// (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
+import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
+import { envoyerSmtp } from './_lib/smtp.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
@@ -710,10 +713,35 @@ async function lireTransporteursDuVendeur() {
   } catch (_) { return { fait: false, reason: 'erreur' }; }
   finally { clearTimeout(minuteur); arret.abort(); }   // l'arrêt, dès la réponse (le filet ou le passage)
 }
+// ── LE BILAN DU MOIS PAR E-MAIL (8 nov., api/_lib/bilan-mois.js) ─────────────
+// Du 1er au 7 du mois, pour le mois écoulé, seulement si le vendeur l'a ACTIVÉ
+// (`bilan_mois_choix`, écrit par le serveur seul). Les lectures sont celles du
+// bilan de la semaine (projetées, paginées) + la publication du bénéfice. Le
+// canal : le serveur SMTP des e-mails de l'essai (RELANCES_SMTP_*). La part du
+// jour (`COMPTEUR_BILAN_MOIS`) est posée par le handler, partagée par les lots.
+let COMPTEUR_BILAN_MOIS = { reste: 0 };
+async function bilanDuMoisVendeur(maintenant = Date.now()) {
+  const owner = proprietaireCourant();
+  if (!owner) return null;
+  const cfg = configurationRelances();
+  return bilanMoisVendeur({
+    owner, maintenant, compteur: COMPTEUR_BILAN_MOIS, config: cfg, service: process.env.SUPABASE_SERVICE_KEY || '',
+    lireChoix: () => getRow(ID_CHOIX_BILAN_MOIS), lireEnvois: () => getRow(ID_ENVOIS_BILAN_MOIS),
+    ecrireEnvois: (data) => ecrireDedup(ID_ENVOIS_BILAN_MOIS, data),
+    lireDonnees: lireDonneesBilan,
+    lirePub: async () => { const m = await getRowProjete('main', ['vrm_benefice_jours']); return m === undefined ? undefined : (m && m.vrm_benefice_jours) || null; },
+    adresse: () => adresseDuCompte(owner),
+    envoyer: (m) => envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
+      de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', ...m }),
+  });
+}
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
+  // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
+  let bilanMois = null;
+  try { bilanMois = await bilanDuMoisVendeur(); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1138,6 +1166,10 @@ export default async function handler(req, res) {
     // envoi configuré elle ne fait rien (et le dit dans la réponse).
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
+    // pour tout VRM (Brevo gratuit, `VRM_EMAILS_PAR_JOUR`), moins les e-mails de
+    // l'essai déjà partis, 150 au plus (api/_lib/bilan-mois.js `partBilan`).
+    COMPTEUR_BILAN_MOIS = { reste: !soir && !reveil ? partBilan({ dejaEnvoyes: relances && relances.envoyes }) : 0 };
     // (6 nov., filet 4) La veille des plantages.
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
