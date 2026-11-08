@@ -251,7 +251,7 @@ function rendreAuth(e) {
     // Connecté dans la carte : on NOMME le compte (c'est ce qui permet de voir
     // qu'on s'est trompé), et le geste suivant est d'ouvrir VRM.
     poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
-      <div class="muted" style="margin-top:4px">L’extension est connectée : tes données partent quand tu ouvres Vinted, Leboncoin ou Vestiaire.</div>
+      <div class="muted" style="margin-top:4px"${e.renouvellement ? ' data-renouvellement' : ''}>${e.renouvellement ? 'Connectée — ta session se renouvelle, un instant.' : 'L’extension est connectée : tes données partent quand tu ouvres Vinted, Leboncoin ou Vestiaire.'}</div>
       ${(() => { let n = false; try { n = sessionStorage.getItem('vrmOAuthNeuf') === '1'; } catch (_) {} return n ? '<div class="err" data-compte-neuf>Ce compte n’était relié à aucun compte VRM : un compte VRM neuf vient d’être créé. Si tu as déjà un compte VRM, clique « Se déconnecter » et connecte-toi avec son email et son mot de passe.</div>' : ''; })()}
       <div id="transpBox" hidden></div>
       <button id="vrmBtn">Ouvrir VRM</button>
@@ -461,6 +461,17 @@ function rendreTranspPermis(t) {
 function chargerAuth(rester) {
   chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authEtat' }, (r) => {
     const e = r || {};
+    // ⚠️ 5.329 (« ça se déconnecte à chaque fois ») : un renouvellement de la
+    //    session qui prend plus de 2 s (téléphone, réseau lent, service worker qui
+    //    se réveille) rendait `incertain` — et la fenêtre affichait « Session
+    //    expirée » + le mot de passe, alors que rien n'était perdu. Pas su n'est
+    //    pas « déconnecté » : on reste connecté, et on relit dans 4 s.
+    if (!e.connecte && e.incertain && !e.mort && (e.email || e.user_id)) {
+      document.body.classList.remove('decide');
+      rendreAuth(Object.assign({}, e, { connecte: true, renouvellement: true }));
+      setTimeout(() => chargerAuth(true), 4000);
+      return;
+    }
     if (!e.connecte) { document.body.classList.remove('decide'); rendreAuth(e); return; }
     lirePermisTransp((t) => {
       if (!CARTE && !rester && !globalThis.__vrmOrionCompat && !PERMIS_MANQUE(t)) { ouvrirVRM(); return; }

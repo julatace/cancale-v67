@@ -510,6 +510,7 @@ sans la fonction.
 | `appareil` | `publierAppareil` | **5.327.0** (8 nov.) | chaque navigateur publie `ext_appareil_{id}` (nom, version, envois réussis/refusés, comptes lus) : Paramètres → « Tout va bien ? » et l'alerte « compte pas relu » (`api/_lib/garde-capture.js`) |
 | `secoursenvoi` | `commandesSecours` | **5.327.0** (8 nov.) | 3 échecs réseau/5xx de suite vers vrm.center ⇒ voie directe bornée (< 256 Ko, fusion par n°) ; trop lourd ⇒ rien écrit, dit sur la carte |
 | `connexioncarte` | `sessionDepuis` | **5.328.0** (8 nov.) | la fenêtre et la carte du logo commencent par « Me connecter » (email + mot de passe VRM), sans ouvrir VRM |
+| `cartesansonglet` | `prendreVerrouRenouv` | **5.329.0** (8 nov.) | la carte du logo porte elle-même e-mail + mot de passe (shadow root fermée, aucun onglet, plus d'iframe) ; un seul renouvellement de session pour toute l'extension |
 
 ---
 
