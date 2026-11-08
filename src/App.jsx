@@ -44092,7 +44092,7 @@ function AcctTag({ acc, name, pastille = true }) {
   // couleur ne sert ici qu'à distinguer les comptes entre eux. Le point suffit
   // pour ça ; le texte redevient neutre.
   const col = acctColor(acc?.vinted_user_id);
-  return <span style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
+  return <span className="vrm-acct-tag" style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
     {pastille && <span style={{width:6,height:6,borderRadius:12,background:col,flexShrink:0}}/>}<span className="vrm-sensible" data-stream-type="compte">{name}</span>
   </span>;
 }
