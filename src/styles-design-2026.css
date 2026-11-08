@@ -544,3 +544,43 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-app-shell .vrm-main .vrm-boite-vide-lecture p { font-size: var(--d-t-15) !important; color: var(--d-gris) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-boite-jour-titre { font-size: var(--d-t-13) !important; font-weight: 600 !important; color: var(--d-gris) !important; letter-spacing: 0 !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-boite-ligne :is(time, .vrm-boite-quand) { font-variant-numeric: tabular-nums; }
+
+/* ══ 11. COMPTA (8 nov., passage 2) ════════════════════════════════════════
+   Tant que le statut n'est pas choisi, rien d'autre ne se calcule : la question
+   passe EN PREMIER, juste sous le titre, avec un point ambre (un geste à faire).
+   Ses quatre réponses ne sont plus quatre cartes cerclées dans une carte : au
+   téléphone une liste de Réglages (une rangée par statut, un chevron), à
+   l'ordinateur quatre cases grises côte à côte. Rien n'est retiré : l'ordre
+   seul change, et redevient l'ordinaire dès que le statut est choisi. */
+:root:root body .vrm-app-shell .vrm-main .vrm-finance-page:has([data-statut-carte="question"]) > * { order: 2; }
+:root:root body .vrm-app-shell .vrm-main .vrm-finance-page:has([data-statut-carte="question"]) > .vrm-screen-head { order: 0; }
+:root:root body .vrm-app-shell .vrm-main .vrm-finance-page:has([data-statut-carte="question"]) > section[data-compta-q="declarer"] { order: 1; }
+:root:root body .vrm-app-shell .vrm-main [data-statut-carte="question"] > .vrm-titre-compta { display: flex; align-items: center; gap: var(--d-e-2); font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-17); }
+:root:root body .vrm-app-shell .vrm-main [data-statut-carte="question"] > .vrm-titre-compta::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre); }
+:root:root body .vrm-app-shell .vrm-main section[data-compta-q="declarer"] > .vrm-surface { border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; background: var(--d-carte) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-statut-option {
+  border: 0 !important; box-shadow: none !important; text-align: left; position: relative;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-statut-option .vrm-statut-t { font-size: var(--d-t-15) !important; font-weight: 600 !important; color: var(--d-encre) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-statut-option .vrm-statut-s { font-size: var(--d-t-13) !important; color: var(--d-gris) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-statut-option .vrm-statut-e { font-size: var(--d-t-13) !important; color: var(--d-gris) !important; line-height: var(--d-il-ligne); }
+@media (max-width: 1023px) {
+  :root:root body .vrm-app-shell .vrm-main .vrm-statut-grille { gap: 0 !important; grid-template-columns: minmax(0, 1fr) !important; margin: 0 calc(-1 * var(--d-e-4)); }
+  :root:root body .vrm-app-shell .vrm-main .vrm-statut-option { background: transparent !important; border-radius: 0 !important; padding: var(--d-e-3) 40px var(--d-e-3) var(--d-e-4) !important; min-height: 64px; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-statut-option + .vrm-statut-option { border-top: .5px solid var(--d-filet) !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-statut-option::after {
+    content: ''; position: absolute; right: 18px; top: 50%; width: 7px; height: 7px; margin-top: -4px;
+    border-right: 2px solid var(--d-gris); border-top: 2px solid var(--d-gris); transform: rotate(45deg); opacity: .6;
+  }
+}
+@media (min-width: 1024px) {
+  :root:root body .vrm-app-shell .vrm-main .vrm-statut-option { background: var(--d-case) !important; border-radius: var(--d-r-case) !important; padding: var(--d-e-3) var(--d-e-4) !important; }
+  @media (hover: hover) and (pointer: fine) {
+    :root:root body .vrm-app-shell .vrm-main .vrm-statut-option:hover { background: var(--d-remplir-fort) !important; }
+  }
+}
+/* Les rubriques repliées (Vendu et reçu, Bilan du mois…) : un groupe à rangées. */
+:root:root body .vrm-app-shell .vrm-main .vrm-compta-replis { border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-compta-replis > details + details { border-top: .5px solid var(--d-filet) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-compta-carte:not(.vrm-fu-carte-sombre) { border: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main [data-compta-pas-calcule] { border: 0 !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; border-radius: var(--d-r-carte) !important; }
