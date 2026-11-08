@@ -172,7 +172,11 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         await rech.click(); await pg.keyboard.press('7');
         const v = await rech.inputValue();
         dit(v === '7', 'un chiffre tapé dans la recherche y reste (c’est elle qui cherche un N°)', v);
-        await rech.fill(''); await pg.keyboard.press('Escape');
+        await rech.fill('');
+        // (7 nov.) Échap remet l'adresse de l'app (« / ») par une navigation à elle : on attend
+        // qu'elle soit faite avant d'ouvrir Colis (sinon le goto suivant est annulé, ERR_ABORTED).
+        const navApp = pg.waitForEvent('framenavigated', { timeout: 3000 }).catch(() => {});
+        await pg.keyboard.press('Escape'); await navApp;
       });
       console.log('\n── Colis, 1512 px');
       await allerA(pg, 'cat_bord', '[data-bord-card][data-tx-colis="501"]');
