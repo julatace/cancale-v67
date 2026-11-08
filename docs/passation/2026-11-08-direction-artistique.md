@@ -49,9 +49,13 @@ CSS contradictoires.
 ## Vérifications
 
 `npm run build`, `audit-violet`, `audit-icones`, `audit-boutons`, `audit-variables`,
-`audit-tdz` : verts. Bancs : `iphone-reprise` 139/139 ; `chargement` (Ma journée, Ventes,
-Colis) et bancs Colis/Ventes : résultats et comparaison à `origin/main` dans le rapport de session
-(les bancs à fixtures réelles `fx/` ne tournent pas dans ce conteneur).
+`audit-tdz` : verts. Bancs (base inventée, un à la fois) : `chargement` (Ma journée, Ventes,
+Colis ; 4 combinaisons) 45 verts · `iphone-reprise` 139 · `ventes-e2` vert (il a attrapé l'état
+d'une vente posé à droite de la note : remis sur SA ligne) · `ventes-une-phrase` · `ventes-compte`
+55 · `colis-envoi` 118 · `colis-retirer-propre` 129. Rouges identiques sur `origin/main` (a49ebbc4),
+donc pas de cette branche : `colis-colonnes` 2 (« dernier jour » en ambre), `ventes-colis-premium` 4,
+`colis-tous-sites` 12 (HTTP 503 de son serveur), `colis-fiables` 58. Texte rendu (`innerText`)
+identique avant/après sur les 12 captures. `colis.cjs` exige `fx/` (absent ici).
 
 ## Phase 2 proposée (après validation de Julien)
 
