@@ -145,7 +145,7 @@ export const PREUVES_JOURNAL = {
   ebay_retraits_auto: 'Noté dans le registre des retraits eBay',
   ebay_agent_journal: 'Noté dans le journal des actions eBay',
   bordereaux: 'Le bordereau est rangé dans ta base',
-  relais: 'Demandé depuis ton téléphone, résultat écrit par l’extension',
+  relais: 'Résultat écrit par l’extension dans la commande',
 };
 // Ce qu'aucune ligne de la base ne note — dit tel quel à l'écran.
 export const NON_JOURNALISE = [

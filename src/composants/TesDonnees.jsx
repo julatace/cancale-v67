@@ -15,14 +15,14 @@ import '../tes-donnees.css';
 export default function TesDonnees({ onJournal, onExporter, onFermer, cloisonne = true }) {
   return (
     <div className="vrm-tes-donnees" data-tes-donnees="">
-      <p className="vrm-td-intro">Ce que VRM lit, où il le range, et ce que l’extension fait en ton nom. Rien d’autre.</p>
+      <p className="vrm-td-intro">Tout ce que VRM fait de tes données, en clair. Chaque phrase de cette page est vérifiée dans le code de VRM.</p>
 
-      <GroupeIos titre="Ce que VRM lit" pied={CE_QUE_VRM_NE_LIT_PAS} data-td-groupe="lit">
+      <GroupeIos titre="Ce qu’il lit" pied={CE_QUE_VRM_NE_LIT_PAS} data-td-groupe="lit">
         {CE_QUE_VRM_LIT.map((x) => <RangeeIos key={x.id} titre={x.titre} detail={x.detail} data-td-lit={x.id}/>)}
       </GroupeIos>
 
       {GESTES.map((g) => (
-        <GroupeIos key={g.id} titre={'L’extension · ' + g.titre.charAt(0).toLowerCase() + g.titre.slice(1)} pied={g.pied} data-td-groupe={g.id}>
+        <GroupeIos key={g.id} titre={g.titre} pied={g.pied} data-td-groupe={g.id}>
           {g.lignes.map((l) => <RangeeIos key={l.id} titre={l.texte} data-td-geste={g.id + ':' + l.id}/>)}
         </GroupeIos>
       ))}

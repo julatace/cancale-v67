@@ -51,11 +51,13 @@ export const CE_QUE_VRM_LIT = [
   { id: 'emails', titre: 'Tes e-mails', detail: 'Seulement ceux que tu fais suivre à VRM : ventes, bordereaux, codes de retrait, suivis de colis.',
     preuve: [['api/email-inbound.js', 'export default']] },
 ];
-export const CE_QUE_VRM_NE_LIT_PAS = 'L’extension n’a accès qu’aux sites nommés ci-dessus. Elle ne lit ni les autres sites, ni ton historique de navigation.';
+// Dit d'après SITES_EXTENSION : la liste affichée est celle que l'audit compare au manifeste.
+const enListe = (l) => (l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1]);
+export const CE_QUE_VRM_NE_LIT_PAS = `L’extension n’a accès qu’à ${enListe(SITES_EXTENSION.map((s) => s.nom))}. Elle ne lit ni les autres sites, ni ton historique de navigation.`;
 
 // ── Ce que l'extension fait, et quand ───────────────────────────────────────
 export const GESTES = [
-  { id: 'seule', titre: 'Toute seule', lignes: [
+  { id: 'seule', titre: 'Ce que l’extension fait seule', lignes: [
     { id: 'lire', texte: 'Lire tes pages de Vinted, Leboncoin et Vestiaire quand tu les ouvres.', preuve: [[EXT, 'async function visiteVinted']] },
     { id: 'bordereaux', texte: 'Récupérer le PDF des bordereaux de tes ventes.', preuve: [[EXT, 'async function recupererLabel']] },
   ] },
@@ -72,8 +74,8 @@ export const GESTES = [
     { id: 'supprimer-lbc', texte: `Supprimer une annonce Leboncoin, après confirmation, ${PLAFOND_SUPPRESSIONS_LBC} par heure au plus.`, preuve: [[EXT, 'async function supprimeLbcDepuisApp']] },
     { id: 'repondre-autres', texte: 'Envoyer un message sur Leboncoin ou Vestiaire.', preuve: [[EXT, 'async function repondreLeboncoin'], [EXT, 'async function repondreVestiaire']] },
   ] },
-  { id: 'jamais', titre: 'Jamais', lignes: [
-    { id: 'supprimer-vinted', texte: 'Supprimer une annonce Vinted en dehors de « Republier ».', preuve: [[EXT, 'const EXEC_PERMIS = [']] },
+  { id: 'jamais', titre: 'Ce qu’elle ne fait jamais', lignes: [
+    { id: 'supprimer-vinted', texte: 'Supprimer une annonce Vinted en dehors de «\u00a0Republier\u00a0».', preuve: [[EXT, 'const EXEC_PERMIS = [']] },
     { id: 'autre-compte', texte: 'Agir sur un autre compte que celui ouvert dans ton onglet.', preuve: [[EXT, 'async function gardeStricte']] },
     { id: 'plafond', texte: `Dépasser ${PLAFOND_ACTIONS_HEURE} actions par heure sur un compte.`, preuve: [[EXT, 'const ACTIONS_MAX_HEURE =']] },
     { id: 'frein', texte: 'Insister quand Vinted demande de ralentir : elle s’arrête.', preuve: [[EXT, 'poserPauseVinted']] },

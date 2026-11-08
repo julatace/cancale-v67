@@ -223,6 +223,8 @@ async function verifier(R, { silencieux = false } = {}) {
     const motifs = man ? [...(man.host_permissions || []), ...(man.content_scripts || []).flatMap((c) => c.matches || []), ...(man.optional_host_permissions || [])] : [];
     const hote = (m) => { const x = /^https?:\/\/([^/]+)\//.exec(m); return x ? x[1].replace(/^\*\./, '') : m; };
     const inconnus = [...new Set(motifs.map(hote))].filter((h) => !TD.SITES_EXTENSION.some((s) => s.motif.test(h)));
+    const permsInterdites = man ? (man.permissions || []).concat(man.optional_permissions || []).filter((x) => ['history', 'webRequest', 'webRequestBlocking', 'debugger', 'browsingData', 'topSites', 'bookmarks', '<all_urls>'].includes(x)) : ['?'];
+    dit(man && !permsInterdites.length && /ni ton historique de navigation/.test(TD.CE_QUE_VRM_NE_LIT_PAS || ''), 'C6b « elle ne lit pas ton historique » : aucune permission historique, requêtes, signets', permsInterdites);
     dit(man && motifs.length > 0 && !inconnus.length && !motifs.some((m) => /<all_urls>|^\*:|^https?:\/\/\*\//.test(m)), 'C6 chaque site que l’extension peut ouvrir est nommé sur la page (aucun « tous les sites »)', inconnus);
     dit(vercel && JSON.stringify(vercel.regions) === '["dub1"]' && TD.STOCKAGE.some((s) => /Dublin/.test(s.detail)), 'C7 « le serveur à Dublin » : vercel.json → regions ["dub1"]', vercel && vercel.regions);
     const sql = lire('supabase/migrations/001-multi-utilisateurs.sql') || '';
