@@ -57,7 +57,7 @@ async function rendre(nav, etat, { url = 'https://www.vinted.fr/items/1', deuxFo
   await pg.route('**/*', (r) => {
     const u = metaVersData(r.request().url());
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
-    if (/popup\.html/.test(u)) return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><body style="background:#07090D;color:#fff">connexion</body>' });
+    if (/popup\.html/.test(u)) return r.fulfill({ status: 200, contentType: 'text/html', body: etat.__cadreMuet ? '<!doctype html><body>muet</body>' : '<!doctype html><body style="background:transparent">connexion<script>parent.postMessage({__vrmCarte:"prete"},"*");parent.postMessage({__vrmCarte:"hauteur",h:388},"*");</script></body>' });
     return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff;font-family:sans-serif"><h1 style="padding:20px">Une page du site</h1><iframe id="sous" src="/sous" style="width:300px;height:120px"></iframe></body></html>' });
   });
   await pg.goto(url);
@@ -147,18 +147,77 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     dit(l.carteVisible && /Pas connecté/i.test(l.carte), 'au survol, la carte dit « pas connecté »', l.carte.replace(/\n/g, ' · ').slice(0, 160));
     await cliquer(pg);
     l = await lire(pg);
-    // 11 octobre (Julien : « quand j'appuie sur se connecter ça doit envoyer
-    // directement dans l'application VRM ») : le logo OUVRE VRM à chaque fois ;
-    // pas connecté, VRM s'ouvre avec l'identifiant de l'extension et la connecte.
-    dit(l.envoyes.includes('lierAvecVRM') && !l.iframe, 'pas connecté : le clic OUVRE VRM (qui connecte l’extension) — rien à taper dans le site', JSON.stringify({ envoyes: l.envoyes, iframe: l.iframe }));
-    dit(l.champsPage === 0, 'et AUCUN champ (mot de passe compris) dans le DOM du site', 'champs : ' + l.champsPage);
+    // 5.328 (8 nov., Julien sur Orion : « mets directement l'endroit de
+    // connexion avec le mot de passe ») : pas connecté, la carte s'ouvre AVEC la
+    // connexion dedans (iframe de l'extension) — plus aucun détour par VRM.
+    dit(!l.envoyes.includes('lierAvecVRM') && /popup\.html\?mode=carte$/.test(l.iframe || '') && l.carteVisible, 'pas connecté : le clic ouvre la carte AVEC la connexion dedans — VRM ne s’ouvre pas', JSON.stringify({ envoyes: l.envoyes, iframe: l.iframe }));
+    dit(l.champsPage === 0, 'et AUCUN champ (mot de passe compris) dans le DOM du site : il est dans l’iframe de l’extension', 'champs : ' + l.champsPage);
+    dit(!/rien à taper|VRM s’ouvre et connecte/.test(l.carte), 'la carte ne promet plus « VRM s’ouvre… rien à taper »', l.carte.replace(/\n/g, ' · ').slice(0, 200));
+    dit(/connecte-toi ci-dessous/.test(l.carte), '« Pas connecté — connecte-toi ci-dessous »', l.carte.slice(0, 120));
+    const hIframe = await pg.evaluate(() => Math.round(document.getElementById('vrm-badge').shadowRoot.querySelector('.connexion iframe').getBoundingClientRect().height));
+    dit(hIframe === 388, 'le cadre prend la hauteur que la connexion lui donne (un seul défilement)', 'hauteur ' + hIframe);
+    await pg.mouse.move(200, 200); await pg.waitForTimeout(400);
+    l = await lire(pg);
+    dit(l.carteVisible, 'la souris qui sort ne referme pas une carte qui porte le formulaire', '');
+    await ctx.close();
+  });
+  await essaie('déconnecté, au doigt (Orion iPhone)', async () => {
+    for (const scheme of ['light', 'dark']) {
+      const { ctx, pg } = await rendre(nav, ETATS.deconnecte, { scheme, mobile: { largeur: 390 } });
+      await pg.tap('#vrm-badge'); await pg.waitForTimeout(400);
+      const l = await lire(pg);
+      dit(/popup\.html\?mode=carte$/.test(l.iframe || '') && l.carteVisible && !l.envoyes.includes('lierAvecVRM'), `${scheme} : un toucher du logo montre la connexion dans la carte`, JSON.stringify({ iframe: l.iframe, envoyes: l.envoyes }));
+      await pg.screenshot({ path: path.join(SORTIE, 'badge-connexion-doigt-' + scheme + '.png') });
+      await ctx.close();
+    }
+  });
+  await essaie('cadre muet', async () => {
+    const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.deconnecte, { __cadreMuet: true }));
+    await cliquer(pg); await pg.waitForTimeout(6600);
+    const l = await lire(pg);
+    const sec = await pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-secours-formulaire]'));
+    dit(sec && !l.iframe && /ne s’affiche pas/.test(l.carte), 'un cadre qui ne se montre pas en 6 s : la carte le DIT et propose « Se connecter avec VRM »', JSON.stringify({ sec, iframe: l.iframe }));
+    await ctx.close();
+  });
+  await essaie('connecté depuis la carte', async () => {
+    const e = JSON.parse(JSON.stringify(ETATS.deconnecte)); e.site.choix = 'oui';   // (sinon la question du compte Vinted passe devant, à raison)
+    const { ctx, pg } = await rendre(nav, e);
+    await cliquer(pg);
+    // La session arrive (le service worker l'a rangée) : l'état suivant est connecté.
+    await pg.evaluate(() => {
+      const ancien = window.chrome.runtime.sendMessage;
+      window.chrome.runtime.sendMessage = (m, cb) => { if (m.action === 'etat') { setTimeout(() => cb(Object.assign({}, window.__etatSuivant)), 0); return; } return ancien(m, cb); };
+    });
+    await pg.evaluate((s) => { window.__etatSuivant = s; }, Object.assign({}, e, { vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true, depuis: Date.now() }, flux: { koAt: Date.now() - 60000, koStatut: 'sans_session' } }));
+    await pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await pg.waitForTimeout(400);
+    const l = await lire(pg);
+    dit(l.carteVisible && /C’est fait : l’extension est connectée à sophie@exemple\.fr/.test(l.carte) && !l.iframe, 'connecté : le formulaire part, la carte reste ouverte et NOMME le compte', l.carte.replace(/\n/g, ' · ').slice(0, 200));
+    dit(!/connecte-toi|Reconnecte-toi/i.test(l.carte) && /avant ta connexion/.test(l.carte) && !l.point, '« Tes données » : un refus d’avant la connexion ne dit plus « connecte-toi », et rien ne s’allume', l.carte.replace(/\n/g, ' · ').slice(0, 260));
+    await pg.screenshot({ path: path.join(SORTIE, 'badge-connecte-depuis-carte.png') });
+    await ctx.close();
+  });
+  await essaie('pas connecté : en attente, jamais « refusé »', async () => {
+    const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.deconnecte, { flux: { okAt: Date.now() - 3600000, koAt: Date.now() - 30000, koStatut: 'sans_session', refus: [{ at: Date.now() - 30000, statut: 'sans_session', famille: 'harvest_profile', octets: 900 }, { at: Date.now() - 20000, statut: '503', famille: 'harvest_listings', octets: 2000 }] } }));
+    await survoler(pg);
+    const l = await lire(pg);
+    const att = await pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { attente: !!r.querySelector('[data-flux-attente]'), sansSession: r.querySelectorAll('[data-refus-statut="sans_session"]').length, alerteFlux: !!r.querySelector('[data-refus-cause]') }; });
+    dit(att.attente && !att.alerteFlux && !/refusé/.test(l.carte.split('Tes données')[1] || ''), '« Tes données » : en attente (gris), jamais « refusé »', JSON.stringify(att));
+    dit(att.sansSession === 0, 'les derniers refus ne listent jamais un « pas de session »', JSON.stringify(att));
+    await ctx.close();
+  });
+  await essaie('refus après la connexion', async () => {
+    const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.connecte, { vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true, depuis: Date.now() - 3600000 }, flux: { koAt: Date.now() - 60000, koStatut: '401' } }));
+    await survoler(pg);
+    const l = await lire(pg);
+    dit(/a refusé ta session/.test(l.carte) && l.point, 'autre sens : un refus APRÈS la connexion reste ambre, avec sa raison', l.carte.replace(/\n/g, ' · ').slice(0, 220));
     await ctx.close();
   });
   await essaie('déconnecté, service worker d’avant', async () => {
     const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.deconnecte, { __lierMuet: true }));
     await cliquer(pg); await pg.waitForTimeout(200);
     const l = await lire(pg);
-    dit(/popup\.html\?mode=carte$/.test(l.iframe || '') && l.champsPage === 0, 'en secours (un service worker qui ne connaît pas la liaison) : la connexion s’ouvre dans un iframe de l’extension, jamais dans le site', JSON.stringify({ iframe: l.iframe, champs: l.champsPage }));
+    dit(/popup\.html\?mode=carte$/.test(l.iframe || '') && l.champsPage === 0, 'service worker d’avant : la connexion est aussi dans l’iframe de l’extension, jamais dans le site', JSON.stringify({ iframe: l.iframe, champs: l.champsPage }));
     await pg.screenshot({ path: path.join(SORTIE, 'badge-connexion.png') });
     await ctx.close();
   });
@@ -194,7 +253,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     l = await lire(pg);
     dit(/sophie@exemple\.fr/.test(l.carte), 'la carte nomme le compte VRM utilisé', l.carte.slice(0, 120));
     dit(/angeled92/.test(l.carte), 'et le compte Vinted connecté', l.carte.slice(0, 160));
-    dit(/Envoyées à VRM il y a 3 min/.test(l.carte), 'et dit quand les données sont parties pour la dernière fois', l.carte.replace(/\n/g, ' · '));
+    dit(/Tes données sont à jour · il y a 3 min/.test(l.carte), 'et dit quand les données sont parties pour la dernière fois', l.carte.replace(/\n/g, ' · '));
     await pg.screenshot({ path: path.join(SORTIE, 'badge-connecte.png') });
     await cliquer(pg);
     l = await lire(pg);
@@ -221,7 +280,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     const l = await lire(pg);
     dit(l.point, 'la pastille s’allume : les données ne passent plus');
     dit(/refusé il y a 2 min/i.test(l.carte), 'la carte dit que le dernier envoi a été refusé, et quand', l.carte.replace(/\n/g, ' · '));
-    dit(!/Envoyées à VRM/.test(l.carte), 'et ne dit PAS « envoyées » par-dessus (le refus est plus récent)');
+    dit(!/données sont à jour/.test(l.carte), 'et ne dit PAS « envoyées » par-dessus (le refus est plus récent)');
     dit(/Sophie B\./.test(l.carte), 'elle nomme le compte Leboncoin');
     await ctx.close();
   });
@@ -389,7 +448,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await survoler(pg);
     l = await lire(pg);
     dit(/ignoré/i.test(l.carte) && /Capter ce compte/.test(l.carte), 'au survol : « ignoré (ton choix) » et le moyen de revenir dessus', l.carte.replace(/\n/g, ' · ').slice(0, 240));
-    dit(!/Envoyées à VRM/.test(l.carte) && !l.point, 'ni « envoyées », ni pastille : un CHOIX n’est pas une panne', l.carte.replace(/\n/g, ' · ').slice(0, 200));
+    dit(!/données sont à jour/.test(l.carte) && !l.point, 'ni « envoyées », ni pastille : un CHOIX n’est pas une panne', l.carte.replace(/\n/g, ' · ').slice(0, 200));
     await pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-capter]').click());
     await pg.waitForTimeout(150);
     l = await lire(pg);
@@ -413,10 +472,11 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await d.ctx.close();
   });
   await essaie('graphisme', async () => {
-    for (const [scheme, fond, accent] of [['dark', 'rgb(16, 20, 27)', 'rgb(61, 123, 255)'], ['light', 'rgb(255, 255, 255)', 'rgb(36, 88, 230)']]) {
+    // 5.328 : verre (fond translucide) clair et sombre.
+    for (const [scheme, fond, accent] of [['dark', 'rgba(28, 28, 30, 0.82)', 'rgb(10, 132, 255)'], ['light', 'rgba(255, 255, 255, 0.82)', 'rgb(0, 113, 227)']]) {
       const { ctx, pg } = await rendre(nav, AC(), { scheme });
       const l = await lire(pg);
-      dit(l.fondQ === fond && l.accentQ === accent, `${scheme} : la carte suit le système (VRM Noir, un seul bleu)`, JSON.stringify({ fond: l.fondQ, accent: l.accentQ }));
+      dit(l.fondQ === fond && l.accentQ === accent, `${scheme} : la carte suit le système (verre, jetons de l’app, un seul bleu)`, JSON.stringify({ fond: l.fondQ, accent: l.accentQ }));
       if (scheme === 'light') await pg.screenshot({ path: path.join(SORTIE, 'badge-question-clair.png') });
       await ctx.close();
     }

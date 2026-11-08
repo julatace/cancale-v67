@@ -264,7 +264,7 @@ function rendreAuth(e) {
     return;
   }
   const expiree = e && e.expiree;
-  poserHtml(box, `<div class="who"><span class="dot warn"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
+  poserHtml(box, `<div class="who deco"><span class="dot warn"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
     <div class="muted" style="margin-top:6px">${quelCompte}</div>
     <div id="mdpForm">
       <label class="lab" for="mail">Email de ton compte VRM</label>

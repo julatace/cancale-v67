@@ -1011,6 +1011,16 @@ let _statutDernierRefus = null;
 // datés, que la carte montre en repli. Jamais le corps ni un identifiant.
 let _familleDernierRefus = '';
 let _octetsDernierRefus = 0;
+// ⚠️ 5.328 (8 nov., Julien : « il ne doit pas y avoir d'envoi si l'extension
+//    n'est pas connectée »). Sans session VRM (aucune, morte, ou renouvellement
+//    raté une fois), RIEN ne part — c'était déjà vrai au réseau (aucun `fetch`
+//    sans jeton) — et désormais RIEN n'est noté comme un REFUS : ni
+//    `_statutDernierRefus`, ni `vrmFlux.refus`, ni `ecriture_ratee_*_sans_session`.
+//    La carte dit « en attente : connecte l'extension » (`vrmFlux.attenteAt`).
+//    `sessionAbsente` est l'instant de la dernière tentative sans session, lu
+//    (et effacé) par `noterFlux` juste après.
+let _sansSessionAt = 0;
+function sessionAbsente() { _sansSessionAt = Date.now(); return false; }
 async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
@@ -1065,6 +1075,8 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
     }
     statut = String(res.status || 'inconnu');
   } catch (e) { statut = (e && e.statut) || 'reseau'; }
+  // 5.328 : pas connecté ⇒ rien n'est parti, ce n'est pas un refus.
+  if (statut === 'sans_session') return sessionAbsente();
   // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
   //    depuis la chaîne du tampon — attendre `noterDiag` l'y bloquerait.
   try { noterDiag(`ecriture_ratee_${familleEcriture(table, list)}_${statut}`); } catch (_) {}
@@ -1813,6 +1825,8 @@ async function appelCommandesServeur(envoi, famille) {
       break;
     }
   } catch (e) { statut = (e && e.statut) || 'reseau'; }
+  // 5.328 : pas connecté ⇒ rien n'est parti, ce n'est pas un refus.
+  if (statut === 'sans_session') { sessionAbsente(); return null; }
   try { noterDiag(`ecriture_ratee_${famille}_${statut}`); } catch (_) {}
   _statutDernierRefus = statut; _familleDernierRefus = famille; _octetsDernierRefus = octets;
   return null;
@@ -12331,7 +12345,11 @@ async function noterFlux(plateforme, ok) {
   try {
     const cur = (await chrome.storage.local.get('vrmFlux')).vrmFlux || {};
     const p = cur[plateforme] || {};
-    if (ok) { p.okAt = Date.now(); p.koStatut = null; }
+    const attente = !ok && _sansSessionAt && Date.now() - _sansSessionAt < 60000;
+    if (!ok) _sansSessionAt = 0;
+    if (ok) { p.okAt = Date.now(); p.koStatut = null; delete p.attenteAt; }
+    // 5.328 : sans session, l'envoi ATTEND (rien n'est parti) — pas un refus.
+    else if (attente) p.attenteAt = Date.now();
     else {
       p.koAt = Date.now(); p.koStatut = _statutDernierRefus;
       // 5.325 : les 5 derniers refus, datés (code, famille, taille du corps).

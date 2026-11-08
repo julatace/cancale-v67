@@ -51,26 +51,28 @@
   const ombre = hote.attachShadow({ mode: 'closed' });
   ombre.innerHTML = `
 <style>
-  /* « VRM Noir » (§7) : UN seul accent bleu, rare ; le clair et le sombre
-     suivent le système ; rayons 5 / 8 / 10 / 12 ; une seule forme de bouton. */
+  /* 5.328 — les jetons de l’app (--d-*, DESIGN.md) : style Apple, police
+     système, UN accent bleu rare (#0071E3 / #0A84FF), ambre = un geste, jamais
+     violet ; verre clair et sombre qui suivent le système ; rayons 12 / 14. */
   :host { all: initial;
-    --fond: #07090D; --carte: #10141B; --bord: #1E2530; --filet: #1A202A; --texte: #E8ECF2; --doux: #8A93A3; --pale: #6B7485;
-    --accent: #3D7BFF; --ambre: #F5A524; --survol: #1A202A; --verre: rgba(16,20,27,.88);
-    --ombre: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.36); }
+    --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --filet: rgba(84,84,88,.45); --texte: #F5F5F7; --doux: #98989D; --pale: #8E8E93;
+    --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); --verre: rgba(28,28,30,.82);
+    --ombre: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6); }
   @media (prefers-color-scheme: light) {
-    :host { --carte: #FFFFFF; --bord: #DCE1EA; --filet: #E8ECF2; --texte: #10151B; --doux: #5B6577; --pale: #7A8494;
-      --accent: #2458E6; --ambre: #A15C00; --survol: #EEF1F6; --verre: rgba(255,255,255,.9);
-      --ombre: 0 1px 2px rgba(16,21,27,.08), 0 16px 40px rgba(16,21,27,.14); }
+    :host { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
+      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.82);
+      --ombre: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14); }
   }
-  * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; }
-  .btn { position: relative; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(61,123,255,.38); border-radius: 12px;
-    background: #07090D; cursor: pointer; display: block;
-    box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.28); transition: transform .12s ease, box-shadow .12s ease; }
+  * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .btn { position: relative; width: 44px; height: 44px; padding: 0; border: .5px solid rgba(255,255,255,.14); border-radius: 12px;
+    background: #000; cursor: pointer; display: block;
+    box-shadow: 0 6px 16px rgba(0,0,0,.18), 0 16px 36px rgba(0,0,0,.22); transition: transform .15s cubic-bezier(.23,1,.32,1), box-shadow .15s cubic-bezier(.23,1,.32,1); }
+  .btn:active { transform: scale(.94); }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.34); }
   .btn:focus-visible, .b:focus-visible, .fermer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .btn img { width: 100%; height: 100%; border-radius: 10px; display: block; }
   .btn .txt { color: #E8ECF2; font-weight: 800; font-size: 12px; letter-spacing: .04em; line-height: 42px; text-align: center; display: block; }
-  .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: var(--ambre); border: 2px solid #07090D; display: none; }
+  .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: var(--ambre); border: 2px solid #000; display: none; }
   .pt.on { display: block; }
   /* 5.328 : verre (clair et sombre), une colonne ; la connexion y est posée. */
   .carte, .question { position: absolute; right: 0; bottom: 54px; width: min(320px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto; background: var(--verre); color: var(--texte); border: 1px solid var(--bord);
@@ -78,10 +80,10 @@
     border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: var(--ombre); display: none; }
   .carte.on, .question.on { display: block; }
   .tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-  .tete b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+  .tete b { font-size: 17px; font-weight: 600; letter-spacing: -.012em; }
   .ver { font-size: 11px; color: var(--pale); }
   .ligne { padding: 8px 0; border-top: 1px solid var(--filet); }
-  .lib { font-size: 11px; color: var(--doux); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .lib { font-size: 12px; color: var(--doux); font-weight: 500; }
   .val { margin-top: 2px; word-break: break-word; }
   .val.alerte { color: var(--ambre); }
   .val.gris { color: var(--doux); }
@@ -91,9 +93,11 @@
   .refus li { margin: 2px 0; word-break: break-word; }
   .pied { margin-top: 8px; font-size: 12px; color: var(--doux); }
   .pied b { color: var(--texte); font-weight: 600; }
-  .b { display: block; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 8px;
-    background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; line-height: 1.2; cursor: pointer; text-align: center; }
-  .b.sec { background: transparent; color: var(--texte); border-color: var(--bord); }
+  .b { display: block; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 12px;
+    background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer; text-align: center;
+    transition: transform .15s cubic-bezier(.23,1,.32,1); }
+  .b:active:not(:disabled) { transform: scale(.98); }
+  .b.sec { background: var(--remplir); color: var(--texte); border-color: transparent; }
   .b.sec:hover { background: var(--survol); }
   .b:disabled { opacity: .6; cursor: default; }
   .q { font-size: 14px; font-weight: 600; margin: 2px 0 4px; }
@@ -198,11 +202,11 @@
   const aFaire = (e) => {
     if (!e) return false;
     const v = e.vrm;
-    if (v && v.connecte === false) return true;                               // pas connecté, ou session expirée
+    if (v && v.connecte === false) return true;                               // pas connecté, ou session expirée (le geste : se connecter)
     if (e.bascule) return true;                                               // une autre session VRM a été adoptée
     if (e.site && e.site.choix === 'non' && e.plateforme === 'vinted') return false;   // un CHOIX n'est pas une panne
     const f = e.flux;
-    if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
+    if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
     if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
     return false;
   };
@@ -243,7 +247,8 @@
   // qui échoue en boucle. Jamais un identifiant (la famille n'en porte pas).
   const tailleLisible = (n) => { const o = Number(n) || 0; if (!o) return ''; return o >= 1e6 ? `${(o / 1e6).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(o / 1000))} Ko`; };
   function historiqueRefus(f) {
-    const h = f && Array.isArray(f.refus) ? f.refus.slice(-5).reverse() : [];
+    // 5.328 : « pas de session » n'est pas un refus (rien n'est parti) — jamais listé.
+    const h = f && Array.isArray(f.refus) ? f.refus.filter((r) => r && r.statut !== 'sans_session').slice(-5).reverse() : [];
     if (!h.length) return '';
     const heure = (t) => { try { return new Date(Number(t)).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
     const lignes = h.map((r) => `<li data-refus-statut="${esc(r.statut == null ? 'inconnu' : r.statut)}">${esc(heure(r.at))} · ${esc(causeRefus(r.statut))}${r.famille ? ' · ' + esc(r.famille) : ''}${r.octets ? ' · ' + esc(tailleLisible(r.octets)) : ''}</li>`).join('');
@@ -315,11 +320,16 @@
     if (e.capte && ignore) flux = '<div class="val gris">Rien n’est capté pour ce compte — ton choix.</div>';
     else if (e.capte) {
       const f = e.flux || {};
-      if (f.koAt && (!f.okAt || f.koAt > f.okAt) && refusAvantConnexion(f, v)) {
+      // 5.328 (Julien : « il ne doit pas y avoir d'envoi si l'extension n'est
+      // pas connectée ») : pas connecté ⇒ rien ne part, et la carte le dit
+      // calmement — jamais « refusé » pour un envoi qui n'a pas eu lieu.
+      if (v && v.connecte === false) {
+        flux = '<div class="val gris" data-flux-attente>En attente : connecte l’extension pour envoyer tes données.</div>';
+      } else if (f.koAt && (!f.okAt || f.koAt > f.okAt) && (f.koStatut === 'sans_session' || refusAvantConnexion(f, v))) {
         flux = `<div class="val gris" data-refus-avant>Dernier envoi refusé ${esc(depuis(f.koAt))}, avant ta connexion — les prochains partent avec ta session.</div>${historiqueRefus(f)}`;
       } else if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
         flux = `<div class="val alerte" data-refus-cause="${esc(String(f.koStatut == null ? 'inconnu' : f.koStatut))}">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>${historiqueRefus(f)}`;
-      } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val">Envoyées à VRM ${esc(depuis(f.okAt))}</div>`;
+      } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val" data-flux-ok>Tes données sont à jour · ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
       flux += ligneSecours(f);
     }
