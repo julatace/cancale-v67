@@ -220,7 +220,9 @@ const charger = async (texte, nom) => {
   // (5 nov., chantier E2) Sur Ventes · Vinted la carte passe SOUS la carte du mois, dans l'écran
   // (Comptabilite, `dansPlateforme`, le `liveStats` de la coque) : le même ordre que « Tous ».
   // Ce contrôle juge qu'elle est montée sur les deux écrans, avec la règle de la coque — plus sa ligne.
-  dit(/dansPlateforme && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStats && liveStats\.aVenir\} plateforme="Vinted"\/>/.test(A0) && /site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStatsVus && liveStatsVus\.aVenir\}\/>/.test(A0), 'Ventes (Vinted, et tous les sites) monte la carte « À venir » sous la carte du mois');
+  // (8 nov.) `reserve` (6 nov., banc chargement : la carte garde sa place pendant la lecture) est
+  // une présentation, pas une règle : il est admis ; le `A=` de la coque reste exigé.
+  dit(/dansPlateforme && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStats && liveStats\.aVenir\} plateforme="Vinted"\/>/.test(A0) && /site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStatsVus && liveStatsVus\.aVenir\}(?: reserve)?\/>/.test(A0), 'Ventes (Vinted, et tous les sites) monte la carte « À venir » sous la carte du mois');
   dit(!/Argent en attente \(estimation\)/.test(A0), 'plus d’« estimation » sur les statuts de la liste dans Ventes');
   dit(/const attV = aVenirPour\(liveStats && liveStats\.aVenir, \{ plateforme: 'Vinted' \}\);/.test(A0), 'le résumé Vinted lit la part Vinted de la règle');
   dit(/const aV = aVenirPour\(liveStatsVus\.aVenir\);\s*if \(aV\.valeur != null && !aV\.partiel\) base0\.enAttente/.test(A0), 'le widget prend la règle, seulement complète');
