@@ -213,7 +213,10 @@ const shot = async (pg, nom) => { if (SHOTS) await pg.screenshot({ path: path.jo
 
 // ── Le widget, EXÉCUTÉ (§4.10) sur les mêmes lignes.
 async function widget() {
-  process.env.VAPID_PRIVATE_KEY = 'banc'; delete process.env.SUPABASE_SERVICE_KEY;
+  process.env.VAPID_PRIVATE_KEY = 'banc';
+  // (8 nov.) Une clé de service FICTIVE (jamais la vraie : fetch est simulé) : depuis le 7 nov., sans clé
+  // de service le widget répond 503 « configuration incomplète » (api/_lib/cle-service.js), comme il le doit.
+  process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
   const vrai = global.fetch, vraiNow = Date.now;
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
