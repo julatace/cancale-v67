@@ -8,13 +8,14 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 import { resumeColisSites } from './_lib/colis-sites.js';
 import { numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
+import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
 // La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
 // (6 nov.) Les SMS de Mondial Relay (POST ?mode=sms, jeton `vrm_sms_token`) : api/_lib/sms-mondialrelay.js.
 import { routeSms } from './_lib/sms-mondialrelay.js';
-import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
+import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
@@ -742,13 +743,18 @@ export default async function handler(req, res) {
     const shipDone = (m.vinted_ship_done && typeof m.vinted_ship_done === 'object') ? m.vinted_ship_done : {};
     const bordsShipped = (m.vinted_bords_shipped && typeof m.vinted_bords_shipped === 'object') ? m.vinted_bords_shipped : {};
     const ventesMasquees = new Set();   // (29 oct.) une vente ne se masque plus
-    const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !ventesMasquees.has(t);
-    // (8 nov.) + parti d'après le transporteur : le n° du bordereau de CETTE
-    // transaction pris en charge (api/_lib/depart-colis.js, la règle de Colis).
+    // (8 nov., « à envoyer » prouvé) LA RÈGLE DE COLIS (api/_lib/depart-vente.js) : Colis
+    // fait, expédié à la main, traité depuis le panneau, e-mail du transporteur pour le n°
+    // EXACT du bordereau de CETTE transaction, prise en charge lue (`depart_*`) — n° ambigu
+    // ⇒ rien. Avant, le widget ne lisait ni l'e-mail ni le panneau : un colis déposé dont
+    // Vinted n'était pas relu restait « à expédier » sur l'écran d'accueil.
     const bKey0 = (b) => String(b.transaction || b.suivi || b.numero || '');
     const cachees0 = (m.vinted_bords_hidden && typeof m.vinted_bords_hidden === 'object') ? m.vinted_bords_hidden : {};
-    const partisTransp = txVintedParties(bordsParTransaction(bords, (b) => !!cachees0[bKey0(b)]), departs);
-    const shipTxns = new Set((txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter(pasPartie).filter((t) => !partisTransp.has(t)));
+    const bordsTx0 = bordsParTransaction(bords, (b) => !!cachees0[bKey0(b)]);
+    const txsVinted = (txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter((t) => !ventesMasquees.has(t));
+    const preuves = await lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x)));
+    const partisVinted = ventesPartiesParPreuve({ txs: txsVinted, bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants });
+    const shipTxns = new Set(txsVinted.filter((t) => !partisVinted.has(t)));
     const shipTotal = shipTxns.size;
     const pickupVinted = txBuy
       ? txBuy.filter(t => !pickupDone[String(t)]).length

@@ -238,6 +238,8 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/depart-colis.js';
+import {ventesPartiesParPreuve} from '../api/_lib/depart-vente.js';
+import {publierDepartsVinted,raisonDepartPubliee} from './departVente.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
@@ -8152,9 +8154,15 @@ function etapeVente(o, { poste = () => false, expediee = null } = {}) {
   // filtre « En transit » le montre — mais son étiquette disait encore
   // « À expédier », sous l'intitulé « En transit » (vu au banc
   // `statuts-colis.cjs`, 4 octobre). Vinted le confirmera au premier scan.
-  if (aExpedier(o)) return poste(o)
-    ? { label: 'Posté', color: C.blue || C.accent, step: 2, aide: "Tu l'as marqué posté : Vinted confirmera l'envoi au premier passage chez le transporteur." }
-    : { label: 'À expédier', color: C.warn, step: 1 };
+  // (8 nov.) Et la vente PARTIE d'après une autre preuve sûre, par identité (e-mail du
+  // transporteur pour le n° de SON bordereau, prise en charge lue, expédié à la main,
+  // panneau) : la règle de Colis (api/_lib/depart-vente.js), publiée par Colis.
+  if (aExpedier(o)) {
+    if (poste(o)) return { label: 'Posté', color: C.blue || C.accent, step: 2, aide: "Tu l'as marqué posté : Vinted confirmera l'envoi au premier passage chez le transporteur." };
+    const rd = raisonDepartPubliee(o.transaction_id);
+    if (rd) return { label: rd.type === 'colis-fait' ? 'Posté' : 'Envoyée', color: C.blue || C.accent, step: 2, depart: rd.type, aide: `${rd.phrase}. Vinted ne l'a pas encore relu : il confirmera l'envoi à ta prochaine visite.` };
+    return { label: 'À expédier', color: C.warn, step: 1 };
+  }
   if (isAtRelayStatus(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
   if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
   if (/transit|achemin|exp[ée]di[ée]|en\s+route/i.test(s) || tus === 'waiting') return { label: 'En transit', color: C.blue || C.accent, step: 2 };
@@ -17133,7 +17141,7 @@ function rechercheParNumero(q, numData, comptes) {
     numEbayLigne: numLigneEbay,
     numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
     numLbc: (v) => numeroLbcIdentite(v, nd.lbcItems || null, liensLbc),
-    aPoster: (o) => aExpedier(o) && !shipDone[String(o.transaction_id)],
+    aPoster: (o) => aExpedier(o) && !shipDone[String(o.transaction_id)] && !raisonDepartPubliee(o.transaction_id),
     // Posté = le colis est parti (transit, relais, livré, finalisé) — la
     // même étiquette que la carte de la vente (`etapeVente`, §11).
     expediee: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).step >= 2,
@@ -47217,8 +47225,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [emailBords, bordsHidden, vcLoc0.departsCle, sales.items]);
   const bordShipped = (b) => {
-    if (b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) return true; // colis déjà dans le réseau transporteur
-    if (b && b.transaction != null && partisTransp.has(String(b.transaction))) return true; // (8 nov.) pris en charge, lu chez le transporteur
+    // (8 nov., « à envoyer » prouvé) Par IDENTITÉ seulement : la preuve d'e-mail ou du
+    // transporteur pour le n° EXACT du bordereau de CETTE transaction, n° ambigu ⇒ rien
+    // (api/_lib/depart-vente.js — la règle du widget et des rappels, §11).
+    if (b && b.transaction != null) { const rv = partisVinted.get(String(b.transaction)); if (rv && rv.type !== 'colis-fait') return true; }
+    if (b && b.transaction == null && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) return true; // bordereau sans vente : diagnostic seulement
     const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null;
     if (!o) return false;                              // vente inconnue : on ne conclut pas
     // ⚠️ LA BONNE QUESTION EST « CETTE VENTE ATTEND-ELLE ENCORE MON ENVOI ? »,
@@ -47267,6 +47278,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // statut Vinted rattrape (la vente n'est alors plus « à expédier »).
   const [shipDone, setShipDone] = useStateCle('vinted_ship_done', () => load('vinted_ship_done', {}));
   const isShipDone = (o) => !!(o && shipDone[String(o.transaction_id)]);
+  // (8 nov.) « CETTE VENTE ATTEND-ELLE ENCORE MON ENVOI ? » — UNE règle
+  // (api/_lib/depart-vente.js), la même que le widget, les rappels et le bilan :
+  // Colis fait, expédié à la main, traité depuis le panneau, e-mail du transporteur
+  // pour le n° EXACT de son bordereau, prise en charge lue (`depart_*`). Map tx →
+  // raison ; publiée pour Ventes et la loupe (src/departVente.js).
+  const partisVinted = useMemo(() => {
+    const m = ventesPartiesParPreuve({
+      bordsParTx: bordsParTransaction(emailBords, isBordHidden), shipDone, bordsShipped, panelBordsDone,
+      lignesEmail: Array.isArray(tracking) ? tracking : null, departs: vcLoc0.departs,
+      ventesMs: Object.fromEntries((sales.items || []).filter((o) => o && o.transaction_id != null && tsCommande(o)).map((o) => [String(o.transaction_id), tsCommande(o)])),
+      entrants: Array.isArray(transp) ? new Set(transp.map((t) => t && t.suivi).filter(Boolean)) : null,
+    });
+    publierDepartsVinted(m);
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp]);
+  // Parti par UNE preuve sûre (Colis fait compris) : ce que chaque liste « à envoyer » de l'écran écarte.
+  const estParti = (o) => isShipDone(o) || !!(o && o.transaction_id != null && partisVinted.has(String(o.transaction_id)));
   const toggleShipDone = (o) => { const k = o && o.transaction_id!=null ? String(o.transaction_id) : null; if(!k) return; setShipDone(prev=>{ const u={...prev}; if(u[k]) delete u[k]; else u[k]=Date.now(); save('vinted_ship_done',u); return u; }); };
   // « ✓ Colis fait » : LE geste (la vente ET son bordereau). Le bouton de la
   // carte et le mode emballage appellent cette fonction — une seule écriture.
@@ -48443,8 +48472,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (6 nov.) Une vente vue par e-mail n'est ni « à expédier » ni « en transit » : son
       // état n'est pas encore lu chez Vinted (Colis ne la compte pas non plus).
       if (o._venteEmail && (vFilter === 'aexpedier' || vFilter === 'transit')) return false;
-      if (vFilter === 'aexpedier') return aExpedier(o) && !isShipDone(o);
-      if (vFilter === 'transit') return (st === 'pending' || revient) && !(aExpedier(o) && !isShipDone(o));
+      if (vFilter === 'aexpedier') return aExpedier(o) && !estParti(o);
+      if (vFilter === 'transit') return (st === 'pending' || revient) && !(aExpedier(o) && !estParti(o));
       if (vFilter === 'encours') return st === 'pending';
       if (vFilter === 'finalisees') return st === 'completed';
       if (vFilter === 'annulees') return st === 'cancelled' && !revient;
@@ -52253,7 +52282,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, shipDone, bordsParTxn, tracking, bordsShipped, panelBordsDone, partisTransp]);
+  }, [sales.items, hiddenSales, hiddenAccts, shipDone, bordsParTxn, tracking, bordsShipped, panelBordsDone, partisTransp, partisVinted]);
   // ── « COCHÉ POSTÉ » MAIS JAMAIS VU PARTIR — UN PROPRIÉTAIRE (§11) ─────────
   // La règle vit dans `posteSansDepart` ; la liste se calcule ICI, une fois, et
   // Colis comme Ma journée la LISENT. La capture qui a lu le statut de la vente
@@ -52267,13 +52296,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const b = bordsParTxn[k] || null;
       const lim = limiteExpedition(o, b);
       const cap = o._acc ? _harvestSeen[`${o._acc.vinted_user_id}_orders_sold`] : null;
-      const vu = !!(b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) || partisTransp.has(k);
+      // (8 nov.) Vu par le transporteur = la preuve d'e-mail ou de prise en charge de la règle
+      // unique (api/_lib/depart-vente.js), par le n° EXACT de son bordereau, n° ambigu ⇒ non.
+      const rv = partisVinted.get(k);
+      const vu = !!(rv && (rv.type === 'email' || rv.type === 'transporteur'));
       const r = posteSansDepart({ o, cocheLe: shipDone[k], captureAt: cap, joursLimite: lim.daysLeft, vuParTransporteur: vu });
       if (r) out.push({ o, ...r });
     }
     out.sort((a, b) => (b.limiteDepassee ? 1 : 0) - (a.limiteDepassee ? 1 : 0) || b.heures - a.heures);
     return out;
-  }, [sales.items, hiddenSales, shipDone, bordsParTxn, shippedSuivis, partisTransp]);
+  }, [sales.items, hiddenSales, shipDone, bordsParTxn, shippedSuivis, partisTransp, partisVinted]);
   // ── « COLIS À POSTER » EST PUBLIÉ, LA CLOCHE LE CONSOMME (§11) ────────────
   // Même motif que `vrm_colis_retirer` : l'écran qui a toutes les sources
   // publie, le centre de notifications lit. Il recalculait de son côté (sans
@@ -54610,7 +54642,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         for (const o of sales.items) {
           const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
           if (!tx || hiddenSales.has(tx) || !aExpedier(o) || isShipDone(o)) continue;
-          const dp = partisTransp.get(tx); if (!dp) continue;
+          // (8 nov., « à envoyer » prouvé) + l'e-mail du transporteur pour le n° de SON bordereau
+          // (api/_lib/depart-vente.js) : la même règle que la sortie de « À envoyer ».
+          const rv = partisVinted.get(tx);
+          const dp = rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null; if (!dp) continue;
           const b = bordsParTxn[tx] || null;
           if (b && isBordShippedManual(b)) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
@@ -56629,7 +56664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (!o || o.transaction_id == null || isHidden(o)) continue;
             const stO = classifyOrderStatus(o.status);
             if (stO === 'cancelled') continue;
-            if (aExpedier(o) && !isShipDone(o)) continue;
+            if (aExpedier(o) && !estParti(o)) continue;
             const p = preuvesFriseDe(o); const f = p.etapes ? friseVenteFusion(p.etapes) : null;
             if (!f) continue;
             const fait = Object.fromEntries(f.map((e) => [e.cle, e.fait]));
@@ -56823,7 +56858,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
+        <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !estParti(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
@@ -56875,7 +56910,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const deposeIci = !!(deposeVente.attente && deposeVente.attente.cle === txL);
             // (6 nov.) Une vente vue par e-mail, pas encore relue sur Vinted : aucun geste d'envoi
             // ici (ni « Déposé », ni bordereau) tant que Vinted n'a pas rendu son état.
-            const peutDeposer = !o._venteEmail && !hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null;
+            const peutDeposer = !o._venteEmail && !hidden && st!=='cancelled' && aExpedier(o) && !estParti(o) && o.transaction_id!=null;
             const libDepose = num ? `N°${num}` : (o.title || '');
             const gesteCout = coutManque ? <CoutAchatVente surLigne propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date }); }}/> : null;
@@ -56935,7 +56970,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 if (out === 'suspendue') return { t: `Rien n'est tranché : le N°${num} est conservé.` };
                 return arch ? { k: 'renvoi', t: `Si la paire t'est renvoyée, elle prendra un numéro neuf (le N°${num} est un ancien numéro).` } : { t: `Si la paire t'est renvoyée, republie-la avec le N°${num}.` };
               })();
-              const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id != null;
+              const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !estParti(o) && o.transaction_id != null;
               // (2 nov.) Le transporteur LU de la vente (n° de SON bordereau) : à côté du bouton
               // bordereau tant qu'il y a un colis à envoyer, sinon une ligne des détails (dit une fois).
               const trRecap = transporteurVente(bordE);
@@ -57042,7 +57077,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
-                </> : gesteRemise} basSeul={!peutDeposer && !!gesteRemise} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'&&!annChez?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                </> : gesteRemise} basSeul={!peutDeposer && !!gesteRemise} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !estParti(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'&&!annChez?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
@@ -60787,7 +60822,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // S'il n'y en a qu'UNE, on la pré-associe : bouton « Tamponner N°X » en
           // 1 tap (auto number + titre + fichier capté). Sinon on invite à cliquer
           // 📄 sur la bonne vente.
-          const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && aExpedier(o) && !isShipDone(o));
+          const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && aExpedier(o) && !estParti(o));
           const one = pending.length===1 ? pending[0] : null;
           const e = one ? effEntry(one) : null; const num = e?.numero || '';
           return (
@@ -61509,7 +61544,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span>{nParT[nomT(x)]} colis</span>
                         </div>
                       )}
-                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site} data-depart-lu={x.depart ? x.depart.carrier : undefined}
+                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site} data-depart-lu={x.depart ? (x.depart.carrier || x.depart.type) : undefined} data-depart-preuve={x.depart ? (x.depart.type || 'transporteur') : undefined}
                         {...(x.type === 'coche' && x.np ? { 'data-tx': tx, 'data-limite': x.np.limiteDepassee ? 'depassee' : 'ok' } : {})} {...(x.type === 'coche' ? { 'data-postes-pas-partis': x.np ? '1' : undefined, 'data-postes-recents': x.np ? undefined : '1' } : {})}
                         style={{padding:'14px',border:`1px solid ${so.ambre ? C.warn + '66' : C.border}`,background:C.card,borderRadius:12}}>
                         <div style={{display:'flex',gap:12,alignItems:'center'}}>
@@ -70339,7 +70374,7 @@ function ComptesARelierColis({ comptes }) {
   const { liste } = useComptesARelier(comptes);
   const { ventes } = useVentesCoque();
   if (!Array.isArray(liste) || !liste.length || !Array.isArray(ventes)) return null;
-  const parCompte = liste.map((c) => ({ c, n: ventes.filter((o) => o && o._acc && String(o._acc.vinted_user_id) === c.uid && aExpedier(o)).length })).filter((x) => x.n > 0);
+  const parCompte = liste.map((c) => ({ c, n: ventes.filter((o) => o && o._acc && String(o._acc.vinted_user_id) === c.uid && aExpedier(o) && !raisonDepartPubliee(o.transaction_id)).length })).filter((x) => x.n > 0);
   if (!parCompte.length) return null;
   return (
     <div className="vrm-colis-arelier" data-colis-a-relier={parCompte.length} role="note">
@@ -73581,7 +73616,7 @@ function AppCoeur() {
           // Repli seulement (la ligne publiée par Ma journée passe devant, plus
           // bas) — mais avec la MÊME règle qu'elle : `aExpedier`, hors ventes
           // masquées à la main, hors colis cochés « posté ».
-          toShipCount += sold.my_orders.filter(o=>aExpedier(o) && !shipDoneN[String(o.transaction_id)] && !ventesMasqueesN.has(String(o.transaction_id))).length;
+          toShipCount += sold.my_orders.filter(o=>aExpedier(o) && !shipDoneN[String(o.transaction_id)] && !raisonDepartPubliee(o.transaction_id) && !ventesMasqueesN.has(String(o.transaction_id))).length;
         }
         // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
         // (≥30 j → baisser le prix, action GRATUITE) et celles SANS numéro.
