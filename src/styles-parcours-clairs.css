@@ -76,3 +76,9 @@
 /* Les fils eBay sont aussi rendus en portail, hors de .vrm-main. */
 :root:root body .vrm-chat-panel [data-q-aller]:not(#vrm-touche),
 :root:root body .vrm-app-shell [data-ebay-vue]:not(#vrm-touche) { min-width:44px !important; min-height:44px !important; }
+/* Bureau compact : une fiche masquée ne doit pas garder sa colonne vide. */
+@media(min-width:1024px) and (max-width:1439px) {
+  :root:root body .vrm-message-workspace:not(#vrm-bureau) { grid-template-columns:clamp(240px,26vw,320px) minmax(0,1fr) !important; }
+  :root:root body .vrm-message-workspace>.vrm-msg-fiche { display:none !important; }
+  :root:root body .vrm-message-workspace .vrm-chat-panel .vrm-chat-paire { display:flex !important; }
+}
