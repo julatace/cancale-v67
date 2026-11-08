@@ -60,4 +60,10 @@ html .vrm-app-shell .vrm-phrase-ecran { margin: 4px 0 0; font-size: 15px; line-h
 html .vrm-app-shell .vrm-tache .vrm-tache-tete { flex-direction: column; align-items: flex-start; gap: 0; }
 html .vrm-app-shell .vrm-phrase-reglages { margin: -8px 0 16px; }
 html .vrm-app-shell .vrm-day-greeting .vrm-phrase-ecran { flex-basis: 100%; margin-top: 2px; }
+/* (8 nov., clarté) Ma journée : la phrase est dans la tête sombre — gris clair sur le bleu nuit,
+   comme le bonjour ; sur ordinateur, dans la colonne du titre. */
+html .vrm-app-shell .vrm-fu-tete .vrm-phrase-ecran.vrm-fu-phrase-tete { color: var(--fu-sur-sombre-2, rgba(255,255,255,.72)); margin: 4px 0 10px !important; }
+@media (min-width: 1024px) { html .vrm-app-shell .vrm-fu-tete > .vrm-fu-phrase-tete { grid-column: 1; } }
+/* Une phrase n'est jamais coupée en « … » : elle passe à la ligne, et ne s'étire pas au-delà d'une lecture. */
+html .vrm-app-shell .vrm-phrase-ecran { white-space: normal; max-width: 60ch; }
 /* (3 nov.) Le grand titre ne se tait plus au téléphone : c'est la barre du haut qui ne le redit pas. */

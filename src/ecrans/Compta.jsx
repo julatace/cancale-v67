@@ -3874,7 +3874,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   return (
     <div className="vrm-finance-page vrm-fu-ecran" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* (5 nov., chantier F, revue 2.27) Plus de surtitre « Novembre 2026 » au-dessus du titre : la carte sombre dit déjà sa période. */}
-      <ScreenHead icon="euro" title={L.compta} desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
+      <ScreenHead icon="euro" title={L.compta} phrase="compta" desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
