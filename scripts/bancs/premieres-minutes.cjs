@@ -115,8 +115,9 @@ const guide = (pg) => pg.evaluate(() => {
     carteDansCarte: g.querySelectorAll('.vrm-card').length };
 });
 const verif = (pg) => pg.evaluate(() => {
-  const v = document.querySelector('[data-verif-installation]');
-  if (!v) return null;
+  const tous = [...document.querySelectorAll('[data-verif-installation]')];
+  const v = tous.find((x) => x.getBoundingClientRect().height > 0);
+  if (!v) return tous.length ? { cache: tous.length } : null;
   return { afaire: v.getAttribute('data-verif-afaire'), passu: v.getAttribute('data-verif-passu'), ok: v.getAttribute('data-verif-ok'),
     lignes: Object.fromEntries([...v.querySelectorAll('[data-verif]')].map((e) => [e.getAttribute('data-verif'), { etat: e.getAttribute('data-etat'), geste: (e.querySelector('[data-verif-geste]') || {}).getAttribute ? e.querySelector('[data-verif-geste]').getAttribute('data-verif-geste') : '' }])) };
 });
@@ -203,7 +204,9 @@ async function installe(nav, W, theme) {
   dit(!(await o.pg.$('[data-guide-numerotation]')), `${T} I1 aucune question de numérotation`);
   await o.pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
   await o.pg.waitForSelector('[data-reglage-verifier], [data-sous-ouvrir="verifier"], [data-verif-installation]', { timeout: 15000 }).catch(() => {});
-  if (!(await o.pg.$('[data-verif-installation]'))) { const b = await o.pg.$('[data-sous-ouvrir="verifier"]'); if (b) { await b.click().catch(() => {}); } }
+  await o.pg.waitForTimeout(800);
+  const vu = await verif(o.pg);
+  if (!vu || vu.cache) { const ok = await o.pg.evaluate(() => { const b = [...document.querySelectorAll('[data-sous-ouvrir="verifier"]')].find((x) => x.getBoundingClientRect().height > 0); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); return true; } return false; }); if (!ok) dit(false, `${T} I1 la rangée « Vérifier mon installation » est dans Paramètres`); }
   await attendre(o.pg, async () => { const v = await verif(o.pg); return v && v.lignes.relecture && v.lignes.relecture.etat !== 'encours' && v.lignes.emails.etat !== 'encours'; }, 8000);
   const v = await verif(o.pg);
   dit(v && v.lignes.comptes && v.lignes.comptes.etat === 'ok' && v.lignes.emails && v.lignes.emails.etat === 'ok' && v.lignes.relecture && v.lignes.relecture.etat === 'ok', `${T} I1 Paramètres → « Vérifier mon installation » : comptes, boîte e-mail et relecture lus OK`, JSON.stringify(v));

@@ -109,8 +109,8 @@
 /* « Vérifier mon installation » : une case dans la carte du guide, ou seule dans Paramètres. */
 .vrm-verif { box-sizing: border-box; margin: 4px 0 12px; padding: 4px 14px; border-radius: var(--d-r-case, 14px); background: var(--d-case, #F2F2F7); color: var(--d-encre, #1D1D1F); }
 .vrm-verif-cadre { display: grid; gap: 10px; justify-items: start; }
-.vrm-verif-cadre .vrm-verif { width: 100%; margin: 0; background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, 0 4px 18px -6px rgba(0,0,0,.08)); padding: 4px 16px; }
-.vrm-verif-seule { background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, 0 4px 18px -6px rgba(0,0,0,.08)); }
+/* Dans Paramètres, le panneau est déjà une carte : pas de carte dans la carte. */
+.vrm-verif-cadre .vrm-verif { width: 100%; margin: 0; padding: 0; background: transparent; box-shadow: none; }
 .vrm-verif-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
 .vrm-verif-titre { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.008em; }
 .vrm-verif-liste { list-style: none; margin: 0; padding: 0; }
