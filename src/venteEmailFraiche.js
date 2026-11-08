@@ -157,3 +157,28 @@ export function avecVentesEmail(ventes, fraiches) {
 // de `motsNavigateur()` (« dans Orion », « dans ce Chrome »…) — jamais un nom de
 // navigateur écrit en dur.
 export const gesteVenteEmail = (dans) => gesteRelireVentes(dans);
+
+// (8 nov., « restes ventes ») UNE PHRASE PAR GROUPE (CLAUDE.md §7). Capture de
+// Julien : chaque ligne « Vue par e-mail » d'un même compte répétait la même
+// phrase (« Vendue — vue par e-mail, pas encore relue sur Vinted · ventes de ce
+// compte relues le … » et le geste). Elle dépend du COMPTE (sa date de lecture,
+// son geste) : dès que DEUX lignes affichées du même compte la portent, elle se
+// dit une fois, en tête de la liste, pour ce compte ; la ligne garde ce qui lui
+// est propre (son état, son bordereau). Une seule ligne ⇒ la phrase reste sur elle.
+// `lignes` : les ventes AFFICHÉES. Rend Map uid → { uid, acc, lu, txs }.
+export const MIN_LIGNES_EN_TETE = 2;
+export function groupesVentesEmailEnTete(lignes) {
+  const m = new Map();
+  for (const o of (Array.isArray(lignes) ? lignes : [])) {
+    if (!o || !o._venteEmail || o.transaction_id == null) continue;
+    const uid = String((o._acc && o._acc.vinted_user_id) || '');
+    if (!uid) continue;
+    const g = m.get(uid) || { uid, acc: o._acc, lu: o._lectureVentes, txs: [] };
+    g.txs.push(String(o.transaction_id));
+    m.set(uid, g);
+  }
+  for (const [k, g] of [...m]) if (g.txs.length < MIN_LIGNES_EN_TETE) m.delete(k);
+  return m;
+}
+// La phrase d'en-tête : le statut de la ligne, au pluriel (même source).
+export const statutVentesEmail = (n) => (n > 1 ? `${n} ventes vues par e-mail, pas encore relues sur Vinted` : STATUT_VENTE_EMAIL);
