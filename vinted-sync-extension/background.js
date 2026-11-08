@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.325.0';
+const CODE_VERSION = '5.326.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1536,6 +1536,18 @@ async function inboxFusionnee(rowId, neuf) {
 const FENETRE_CMD = 'vrmFenetreCommandes';          // { [rowId]: { [empreinte]: ms } } (§4.9)
 const FENETRE_CMD_VALIDITE_MS = 60 * 60 * 1000;
 const FENETRE_CMD_MAX = 8;
+// BEGIN COMMANDES PARTAGEES
+// ══ LES VENTES ET LES ACHATS SE FUSIONNENT PAR N° DE TRANSACTION (5.323) ═════
+// Récit : `docs/passation/2026-11-06-extension-5323.md`. Une lecture PARTIELLE
+// des commandes (les pages récentes) se fusionne dans la liste rangée, par
+// IDENTITÉ (`transaction_id`, §5 — jamais un titre) : une transaction relue
+// remplace sa copie (l'état le plus frais), une transaction hors de la fenêtre
+// reste telle quelle (loi 2), une neuve s'ajoute (en tête si la lecture part de
+// la page 1). Une ligne sans `transaction_id` n'est ni ajoutée ni rapprochée.
+// 5.326 (8 nov.) : CE TEXTE est la seule définition. Il est recopié tel quel
+// dans `background.js` (bloc COMMANDES PARTAGEES) et importé par le serveur
+// (`api/_lib/commandes-leger.js`) : l'extension et le serveur fusionnent avec
+// la MÊME règle, au caractère près (`node scripts/sync-commandes.cjs --verifier`).
 const cleTxCommande = (o) => { const t = o && o.transaction_id; return t == null || String(t).trim() === '' ? null : String(t); };
 // La lecture part-elle du HAUT de la liste ? Les trois lecteurs partent de la
 // page 1 et concatènent ; une page profonde SEULE (capture passive d'une page 3)
@@ -1568,6 +1580,25 @@ function fusionnerCommandes(avant, neuf) {
   const pagination = (haut || !(avant && avant.pagination)) ? ((neuf && neuf.pagination) || (avant && avant.pagination) || null) : avant.pagination;
   return Object.assign({}, avant && typeof avant === 'object' ? avant : {}, neuf, { pagination, my_orders });
 }
+// L'EMPREINTE D'UNE COMMANDE (5.326) : deux copies de la même commande (celle
+// que l'extension vient de lire, celle rangée en base) ont la même empreinte si
+// et seulement si leur CONTENU est le même. La base (jsonb) range les clés dans
+// son propre ordre : on trie les clés à chaque niveau avant de hacher. Deux
+// hachages de 32 bits (FNV-1a et djb2) : une collision sur la même transaction
+// est hors de portée. Elle ne sert qu'à dire « déjà rangée telle quelle » — une
+// empreinte inconnue fait ENVOYER la commande, jamais la deviner.
+function canonCommande(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
+  if (Array.isArray(v)) return '[' + v.map(canonCommande).join(',') + ']';
+  return '{' + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ':' + canonCommande(v[k])).join(',') + '}';
+}
+function empreinteCommande(o) {
+  const t = canonCommande(o);
+  let a = 0x811c9dc5, b = 5381;
+  for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); a ^= c; a = Math.imul(a, 0x01000193) >>> 0; b = (Math.imul(b, 33) + c) >>> 0; }
+  return a.toString(36) + b.toString(36);
+}
+// END COMMANDES PARTAGEES
 // Empreinte d'une fenêtre lue (FNV-1a sur le texte allégé) — elle ne sort jamais du navigateur.
 function empreinteFenetre(liste) {
   const t = JSON.stringify(liste || []);
@@ -1610,6 +1641,113 @@ async function commandesARanger(rowId, type, payload) {
   if (!f) { noterDiag(`ignore_commandes_sans_identite_${type}`); return 'forme'; }
   noterDiag(`fusion_${type}`);
   return { payload: f, emp };
+}
+
+// ══ LES COMMANDES S'ENVOIENT LÉGÈRES (5.326, 8 nov.) ═════════════════════════
+// Son iPhone (5.322) : « Dernier envoi refusé — la base n'a pas répondu, ça
+// réessaie tout seul », en boucle, et les ventes de shop_cancale (~2 160) plus
+// relues depuis le 6 nov. Fusionner (5.323) voulait dire RELIRE la ligne
+// entière (≈ 0,9 Mo pour 2 000 ventes) puis la RÉÉCRIRE en entier (autant)
+// pour y ranger 320 ventes : un `POST` de près d'un mégaoctet depuis un
+// téléphone, que la suspension du service worker sur iOS coupe en route.
+// ⇒ L'extension n'envoie plus que la FENÊTRE en abrégé (« n° : empreinte » par
+//   commande, ≈ 25 octets), les `COMMANDES_TETE` commandes du haut en entier,
+//   puis, sur demande, celles que la base n'a pas à l'identique (par lots de
+//   `COMMANDES_LOT`). C'est `vrm.center` qui relit la ligne et la fusionne, avec
+//   LA MÊME règle (bloc COMMANDES PARTAGEES ci-dessus, `api/_lib/commandes-leger.js`) ;
+//   la ligne garde sa forme : aucun lecteur ne change.
+// · « relues le … » n'avance que quand TOUTE la fenêtre est rangée (`complet`) ;
+// · un refus, une coupure, la base qui ne répond pas ⇒ `null` : RIEN n'est
+//   compté comme rangé, la carte le dit (code, famille, taille — 5.325) ;
+// · la route absente (un `vrm.center` d'avant) ⇒ 'absent' : la voie d'avant
+//   (relire + réécrire), pour ne rien perdre pendant le déploiement ;
+// · une lecture COMPLÈTE et petite (≤ `COMMANDES_DIRECT_MAX`) ⇒ 'direct' : elle
+//   s'écrit telle quelle, comme avant (≤ ~70 Ko, rien à fusionner).
+// Aucune requête Vinted de plus, rien de plus dans le budget de lecture ni dans
+// le plafond d'actions : seul le chemin vers la base change.
+const COMMANDES_API = 'https://vrm.center/api/compte?mode=commandes';
+const COMMANDES_TETE = 100;
+const COMMANDES_LOT = 200;
+const COMMANDES_TOURS_MAX = 12;
+const COMMANDES_DIRECT_MAX = 150;
+const RE_TX_LEGER = /^[0-9A-Za-z_-]{1,40}$/;
+// Un envoi vers la route. Rend { j, octets } (réponse `ok`), 'absent' (route
+// inconnue de ce `vrm.center`), ou `null` (refus, coupure, session : rien rangé,
+// et le refus est noté comme ceux de `supabaseUpsert`, pour la carte).
+async function appelCommandesServeur(envoi, famille) {
+  let statut = 'reseau', octets = 0;
+  try {
+    for (let essai = 0; essai < 2; essai++) {
+      const s = await authToken();
+      if (!(s && s.access_token && s.user_id)) { statut = 'sans_session'; break; }
+      const corps = JSON.stringify(envoi);
+      octets = corps.length;
+      const r = await fetch(COMMANDES_API, { method: 'POST', headers: { Authorization: `Bearer ${s.access_token}`, 'Content-Type': 'application/json' }, body: corps, ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : {}) });
+      let j = null; try { j = await r.json(); } catch (_) { j = null; }
+      if (r.ok && j && j.ok === true) { try { await effacerReculBase(); } catch (_) {} return { j, octets }; }
+      if (r.status === 404) return 'absent';
+      statut = String(r.status || 'inconnu');
+      // Un 401 : la session a pu vieillir — renouvelée UNE fois, puis rejoué
+      // (rien n'a été écrit : la route refuse avant de lire).
+      if (r.status === 401 && essai === 0) { const s2 = await renouvelerUneFois(); if (s2 && s2.access_token) continue; }
+      break;
+    }
+  } catch (e) { statut = (e && e.statut) || 'reseau'; }
+  try { noterDiag(`ecriture_ratee_${famille}_${statut}`); } catch (_) {}
+  _statutDernierRefus = statut; _familleDernierRefus = famille; _octetsDernierRefus = octets;
+  return null;
+}
+// Rend : 'ecrit' (fenêtre entière rangée) · 'partiel' (une partie rangée, la
+// suite au prochain passage) · 'inchange' · 'forme' · `null` (rien rangé) ·
+// 'absent' / 'direct' (la voie d'avant : `commandesARanger` + écriture entière).
+async function commandesParServeur(uid, type, payload, domain) {
+  const rowId = `harvest_${uid}_${type}`;
+  const lus = payload && Array.isArray(payload.my_orders) ? payload.my_orders : [];
+  const total = Number(payload && payload.pagination && payload.pagination.total_entries);
+  const complet = isFinite(total) && total > 0 && lus.length >= total;
+  if (complet && lus.length <= COMMANDES_DIRECT_MAX) return 'direct';
+  const emp = empreinteFenetre(lus);
+  if (!complet && await fenetreDejaRangee(rowId, emp)) { noterDiag(`fenetre_inchangee_${type}`); return 'inchange'; }
+  const vus = new Set(), entrees = [];
+  for (const o of lus) { const k = cleTxCommande(o); if (!k || vus.has(k)) continue; vus.add(k); entrees.push([k, empreinteCommande(o), o]); }
+  if (!entrees.length) { noterDiag(`ignore_commandes_sans_identite_${type}`); return 'forme'; }
+  if (entrees.some((e) => !RE_TX_LEGER.test(e[0]))) return 'absent';   // un n° hors forme : la voie d'avant
+  const ae = ((resumeCommandes(type, { my_orders: lus }) || {}).txns) || [];
+  let exclues = null;
+  if (type === 'orders_sold') { try { const x = await transactionsQuiNeSExpedientPlus(uid); if (x) exclues = [...x]; } catch (_) {} }
+  const base = { type, uid: String(uid), domain: domain || 'www.vinted.fr', luA: Date.now(), complet,
+    pagination: (payload && payload.pagination) || null, fenetre: entrees.map((e) => e[0] + ':' + e[1]).join(','), ae, exclues };
+  if (payload && payload.order_details_enabled !== undefined) base.order_details_enabled = payload.order_details_enabled;
+  const parTx = new Map(entrees.map((e) => [e[0], e[2]]));
+  const famille = `harvest_${type}`;
+  let aEnvoyer = entrees.slice(0, COMMANDES_TETE).map((e) => e[2]);
+  let ecritUneFois = false;
+  for (let tour = 0; tour < COMMANDES_TOURS_MAX; tour++) {
+    const r = await appelCommandesServeur(Object.assign({}, base, { commandes: aEnvoyer }), famille);
+    if (r === 'absent') return ecritUneFois ? 'partiel' : 'absent';
+    if (!r) return ecritUneFois ? 'partiel' : null;
+    if (r.j.ecrit) ecritUneFois = true;
+    if (r.j.ecrit && r.j.complet) { await noterFenetreRangee(rowId, emp); noterDiag(`envoi_leger_${type}`); return 'ecrit'; }
+    const manq = (Array.isArray(r.j.manquants) ? r.j.manquants : []).map(String).filter((k) => parTx.has(k));
+    if (!manq.length) break;
+    aEnvoyer = manq.slice(0, COMMANDES_LOT).map((k) => parTx.get(k));
+  }
+  // Tours épuisés (ou réponse sans suite) : ce qui est rangé l'est, la date ne bouge pas.
+  _statutDernierRefus = 'incomplet'; _familleDernierRefus = famille; _octetsDernierRefus = 0;
+  noterDiag(`envoi_leger_incomplet_${type}`);
+  return ecritUneFois ? 'partiel' : null;
+}
+// Ce qui suit un envoi léger, sur les deux voies (passive, active) — les mêmes
+// gestes que l'écriture directe : diagnostic, carte du logo, l'app qui relit.
+// Rend ce que `storeHarvestRow` rend : 'ecrit' seulement si TOUTE la fenêtre est
+// rangée ; une partie rangée n'est pas « rafraîchi » (la garde est relâchée,
+// la suite part au prochain passage).
+async function apresCommandesServeur(uid, type, lg, passif) {
+  const ok = lg === 'ecrit';
+  if (passif) noterDiag(`${ok ? 'ecrit' : 'ecriture_ratee'}_${type}`);
+  if (lg !== null) notifierApp({ type: 'maj', quoi: type === 'orders_sold' ? 'ventes' : 'achats', uid: String(uid) });
+  await noterFlux('vinted', ok);
+  return ok ? 'ecrit' : 'ecriture-ratee';
 }
 
 // Les pages d'un même fil se réunissent par identité de message.
@@ -2317,6 +2455,11 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     //    les pages concaténées d'`inject.js`). Faire défiler « Mes ventes » charge
     //    page 2, 3, 4… : chacune relirait et réécrirait toute la liste (≈ 1,3 Mo) ;
     //    elles gardent la règle d'avant (la lecture concaténée les couvre).
+    // 5.326 : envoyée LÉGÈRE (`commandesParServeur`) — la fusion se fait chez vrm.center.
+    const lg = await commandesParServeur(uid, type, parsed, domain);
+    if (lg === 'inchange' || lg === 'forme') return;
+    if (lg === 'ecrit' || lg === 'partiel' || lg === null) { await apresCommandesServeur(uid, type, lg, true); return; }
+    // 'absent' (route pas encore déployée) ou 'direct' (complète et petite) : la voie d'avant.
     const c = await commandesARanger(rowId, type, parsed);
     if (c === null || c === 'forme' || c === 'inchange') return;   // pas su / forme inconnue (dits) · déjà rangée
     parsed = c.payload;
@@ -7195,6 +7338,12 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   } else if ((type === 'orders_sold' || type === 'orders_purchased') && ((payload && payload.my_orders) || []).length) {
     // 5.323 : les commandes se FUSIONNENT par n° de transaction (`commandesARanger`) —
     // une fenêtre de 320 ou 1 000 n'est plus jetée devant une liste de 2 000.
+    // 5.326 : envoyée LÉGÈRE (`commandesParServeur`) — la fusion se fait chez vrm.center.
+    const lg = await commandesParServeur(uid, type, payload, domain || 'www.vinted.fr');
+    if (lg === 'inchange') return 'inchange';
+    if (lg === 'forme') return 'forme-inconnue';
+    if (lg === 'ecrit' || lg === 'partiel' || lg === null) return apresCommandesServeur(uid, type, lg, false);
+    // 'absent' (route pas encore déployée) ou 'direct' (complète et petite) : la voie d'avant.
     const c = await commandesARanger(`harvest_${uid}_${type}`, type, payload);
     if (c === null) return 'lecture-ratee';        // la base n'a pas répondu : rien écrit
     if (c === 'forme') return 'forme-inconnue';    // aucune identité lue : rien écrit (dit) — PAS « lu »
