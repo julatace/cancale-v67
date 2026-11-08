@@ -32,6 +32,11 @@ const auTel = () => { try { return window.matchMedia('(max-width: 767px)').match
 // de coupe (le dernier mot entier qui tient), vérifiée dans la page.
 const file = new Map();          // élément → ses gestes
 const vivantes = new Map();      // élément → ses gestes (pour le retour des polices)
+// (8 nov., écrans gardés) Ce que chaque ligne a posé la dernière fois (texte, lignes,
+// largeur). Un écran gardé qui revient (src/ecransGardes.jsx) relance ses effets de mise
+// en page : une ligne au même texte, à la même largeur, n'a rien à refaire — la
+// re-poser obligeait à refaire toute la mise en page de l'écran (~1 s au téléphone).
+const deja = new WeakMap();
 let prevu = false;
 // La largeur d'un texte mesurée sur un canevas : aucune mise en page de la page.
 let _ctx;
@@ -55,6 +60,7 @@ const vider = () => {
   for (const j of aCouper) j.proposer();                             // 3. coupe calculée, sans mise en page
   const aReprendre = aCouper.filter((j) => !j.tient());              // 4. une vérification
   for (const j of aReprendre) j.couper();                            //    (rare) la recherche dans la page
+  for (const j of items) if (j.el.isConnected && j.w >= 0) deja.set(j.el, { t: j.t, l: j.l, w: j.w });
 };
 const planifier = (j) => {
   file.set(j.el, j);
@@ -84,7 +90,7 @@ export function UneLigne({ texte, className = '', lignesTel = 1, ...rest }) {
     const tient = () => (el.getAttribute('data-lignes') !== '1' ? el.scrollHeight <= el.clientHeight + 1 : el.scrollWidth <= el.clientWidth + 1);
     const j = {};
     Object.assign(j, {
-      el, w: -1, tient,
+      el, w: -1, tient, t, l: lignesTel,
       poser: () => {
         el.setAttribute('data-lignes', String(lignesTel > 1 && auTel() ? lignesTel : 1));
         el.textContent = t;
@@ -129,7 +135,10 @@ export function UneLigne({ texte, className = '', lignesTel = 1, ...rest }) {
       },
     });
     vivantes.set(el, j);
-    planifier(j);
+    const prec = deja.get(el);
+    let aJour = false;
+    if (prec && prec.t === t && prec.l === lignesTel) { const w = el.clientWidth; if (Math.abs(w - prec.w) < 1) { j.w = w; aJour = true; } }
+    if (!aJour) planifier(j);
     attendrePolices();
     let ro = null;
     if (typeof ResizeObserver !== 'undefined') {

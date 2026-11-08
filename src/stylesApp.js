@@ -70,3 +70,5 @@ import './styles-barre-iphone.css';
 // (6 nov., finition) Lisible pour tous : texte en grand de l'appareil (src/grandTexte.js), cibles de 44 px, contrastes (ses règles portent leur propre poids).
 import './styles-lisible.css';
 import './styles-composants.css';
+// (8 nov.) Les écrans gardés (src/ecransGardes.jsx) et le passage d'un onglet à l'autre (fondu, pastille de la barre).
+import './styles-ecrans-gardes.css';
