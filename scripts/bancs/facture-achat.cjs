@@ -374,7 +374,7 @@ const chip = (pg, tx) => pg.evaluate((tx) => {
 
       await essaie('L. menu', async () => {
         const carte = pg.locator('[data-achat-tx="99990000111"]');
-        await carte.locator('button[title="Actions rapides"]').first().click();
+        await carte.locator('button.vrm-buy-more').first().click();
         await pg.waitForTimeout(300);
         const items = await carte.locator('[role="menuitem"]').allInnerTexts();
         dit(items.some((t) => /^\s*Reçu d'achat\s*$/.test(t)) && !items.some((t) => /[Ff]acture|\(Vinted\)/.test(t)), 'L. le menu ⋯ dit le MÊME nom que la ligne (« Reçu d’achat »)', JSON.stringify(items));

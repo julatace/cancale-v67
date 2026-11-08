@@ -224,6 +224,11 @@ button.vrm-set-ligne { transition: background-color .12s ease; }
 }
 @media (max-width: 767px) {
   .vrm-set-tete > .vrm-settings-status { max-width: 46%; }
+  /* (8 nov., clarté) « Paramètres » ne se coupe plus en « Paramèt / res » sur un petit
+     iPhone : le titre garde sa ligne, l'état d'enregistrement passe dessous s'il le faut. */
+  .vrm-set-tete { flex-wrap: wrap; row-gap: 2px; }
+  .vrm-set-tete > .vrm-set-h1 { flex: 0 0 auto; }
+  .vrm-set-tete > .vrm-settings-status { max-width: 100%; }
 }
 .vrm-set .vrm-set-recherche { margin: 0 0 20px; }
 /* (5 nov., chantier H — fusion-app F6) Le TEXTE bleu de Paramètres et de Comptes liés
@@ -242,3 +247,7 @@ button.vrm-set-ligne { transition: background-color .12s ease; }
    segmenté pose `margin: 0`). */
 :root .vrm-set .vrm-set-onglets.vrm-seg:not(#vrm-seg) { margin: 0 0 20px; }
 .vrm-set-rien { padding: 8px 16px 0; }
+/* (8 nov., clarté) Sur un iPhone SE, « Abonnement » ne se coupe plus dans les trois onglets. */
+@media (max-width: 360px) {
+  :root:root body .vrm-app-shell .vrm-set-onglets.vrm-seg > .vrm-seg-btn:not(#vrm-seg):not(#vrm-seg-se) { font-size: 13px !important; padding-left: 4px !important; padding-right: 4px !important; letter-spacing: -.01em; }
+}

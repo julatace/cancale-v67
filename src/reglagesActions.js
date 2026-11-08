@@ -3,7 +3,7 @@ export function actionsReglages({comptes=[],emails=null,preuves=null}) {
   const actions=[];
   if(emails) {
     const sans=comptes.filter(c=>!String(emails[String(c.vinted_user_id)]||'').trim());
-    if(sans.length) actions.push({id:'adresses',titre:`${sans.length} compte${sans.length>1?'s':''} sans adresse associée`,texte:'',geste:'Associer',cible:'comptes'});
+    if(sans.length) actions.push({id:'adresses',titre:`${sans.length} compte${sans.length>1?'s':''} sans adresse e-mail associée`,texte:'',geste:'Associer une adresse',cible:'comptes'});
   }
   if(preuves?.cloisonnee && preuves?.adresses) {
     const attente=Object.entries(preuves.adresses).filter(([,p])=>p && ['envoyee','expiree'].includes(p.etat));

@@ -1652,7 +1652,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
     { id:'comptes', titre:'Mes comptes', items:[
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est relu, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
+      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:'Comptes eBay', desc:'Connecter eBay à VRM et choisir les comptes reliés.', el:ebayCompte },
     ]},
@@ -1881,7 +1881,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={`Rechercher dans ${titreRetour}`} label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder="Rechercher un réglage" label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
           return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>Aucun réglage pour « {rechercheReglage.trim()} ». Essaie « e-mail », « numéro » ou « impression ».</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>Effacer la recherche</Bouton></div>;

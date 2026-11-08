@@ -536,7 +536,7 @@ function etapeVenteVc(v, depart = null) {
   // (8 nov.) Encore « à expédier » chez Vestiaire (pas relu), mais le n° de suivi
   // EXACT est pris en charge chez le transporteur : partie, la raison dite.
   if (v && v.aExpedier === true && depart) return { etape: 'en-route', label: `Envoyée — ${depart.phrase}`, rang: 1, departLu: depart };
-  if (v && v.aExpedier === true) return { etape: 'a-expedier', label: 'À expédier', rang: 0 };
+  if (v && v.aExpedier === true) return { etape: 'a-expedier', label: 'À envoyer', rang: 0 };
   const brut = String((v && v.etat) || '').trim();
   const f = brut ? VC_VENTE_ETAPES.find(([, re]) => re.test(brut)) : null;
   if (f) { const rang = { 'en-route': 1, controle: 1, livree: 2, terminee: 3, versee: 3 }[f[0]]; return { etape: f[0], label: f[2], rang: rang == null ? null : rang }; }
@@ -579,7 +579,7 @@ function beneficeVc(v, fait) {
 const etatLigneVc = (v, fait) => {
   if (vcVenteAnnulee(v)) return { etat: 'Annulée', ton: 'annule' };
   if (v.aExpedier && fait) return { etat: 'Colis fait', ton: '' };
-  if (v.aExpedier) return { etat: 'À expédier', ton: 'action' };
+  if (v.aExpedier) return { etat: 'À envoyer', ton: 'action' };
   return { etat: v.label || '', ton: '' };
 };
 // ⟦← App.jsx #12⟧
@@ -609,7 +609,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
     const etapes = etapesVc;
     const ici = etapes ? (etapes.find((x) => x.ici) || {}).cle : null;
     const phrase = vcVenteAnnulee(v) ? { gras: 'Annulée.', suite: 'L’article ne part pas : il reste chez toi.' }
-      : v.aExpedier && !fait ? { gras: 'À expédier.', suite: v.bordereau ? 'Imprime le bordereau (titre et N° tamponnés), puis dépose le colis.' : 'Le bordereau se prend sur Vestiaire, puis dépose le colis.' }
+      : v.aExpedier && !fait ? { gras: 'À envoyer.', suite: v.bordereau ? 'Imprime le bordereau (titre et N° tamponnés), puis dépose le colis.' : 'Le bordereau se prend sur Vestiaire, puis dépose le colis.' }
       : v.aExpedier && fait ? { gras: 'Colis fait.', suite: 'Vestiaire confirmera l’envoi au premier passage chez le transporteur.' }
       : mot === 'controle' ? { gras: 'Contrôle par Vestiaire.', suite: 'Vestiaire vérifie l’article avant de l’envoyer à l’acheteur.' }
       : ici === 'argent' ? { gras: 'Terminée.', suite: 'Vestiaire a versé l’argent.' }

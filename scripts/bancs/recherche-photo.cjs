@@ -202,7 +202,7 @@ const ouvrirDepuisLoupe = async (pg, tel) => {
         const { ctx, pg, errs, req, photosRoute } = await rendre(b, { tel, images });
         // A. L'appareil photo : dans le Stock, et dans la loupe.
         const stock = await pg.$('[data-stock-recherche-photo]');
-        dit(!!stock, `${T} A. le Stock porte « Par photo »`);
+        dit(!!stock, `${T} A. le Stock porte « Trouver par photo »`);
         await ouvrirDepuisLoupe(pg, tel);
         let f = await etatFeuille(pg);
         dit(!!f && f.etat === 'attente', `${T} A. l'appareil photo de la loupe ouvre « Chercher par photo »`, f && f.etat);
@@ -277,7 +277,7 @@ const ouvrirDepuisLoupe = async (pg, tel) => {
         await toucher(pg, tel, '[data-stock-recherche-photo]');
         await pg.waitForSelector('[data-recherche-photo]', { timeout: 15000 }).catch(() => {});
         f = await etatFeuille(pg);
-        dit(!!f && f.etat === 'attente', `${T} A. « Par photo » du Stock ouvre la même feuille`, f && f.etat);
+        dit(!!f && f.etat === 'attente', `${T} A. « Trouver par photo » du Stock ouvre la même feuille`, f && f.etat);
         // F. Après le rechargement, l'index est relu de l'APPAREIL : aucune photo relue.
         await photographier(pg, q13, 'encore.jpg');
         f = await etatFeuille(pg);

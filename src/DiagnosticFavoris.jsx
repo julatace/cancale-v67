@@ -28,7 +28,7 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
     <p>Le rapport ci-dessous réunit la dernière vérification sur Vinted et la structure des données captées. Après « Vérifier un favori », copie ce rapport pour transmettre aussi le résultat de l’ouverture.</p>
     <p>Ce contrôle technique ne déclenche aucune action sur Vinted. Il contient les noms et types des champs ainsi que des statuts techniques, sans pseudo, message, lien ou identifiant personnel.</p>
     {!uid&&<p>Choisis le compte Vinted à vérifier dans le sélecteur de compte.</p>}
-    <button type="button" disabled={!uid||!owner||etat.occupe} onClick={verifier}>{etat.occupe?'Vérification…':'Vérifier la capture des notifications'}</button>
+    <button type="button" disabled={!uid||!owner||etat.occupe} onClick={verifier}>{etat.occupe?'Vérification…':'Vérifier que l’extension lit tes notifications'}</button>
     {etat.erreur&&<p role="alert">{etat.erreur}</p>}
     {etat.rapport&&<>
       <p role="status">{etat.rapport.reception==='aucune_capture'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis réessaie.':'Capture reçue. Sa structure est disponible ci-dessous pour l’assistance technique.'}</p>

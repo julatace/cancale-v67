@@ -98,7 +98,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
 
  await p.getByRole('button',{name:'Fermer',exact:true}).click();
  await p.getByText('Assistance technique · favoris',{exact:true}).click();
- await p.getByRole('button',{name:'Vérifier la capture des notifications',exact:true}).click();
+ await p.getByRole('button',{name:'Vérifier que l’extension lit tes notifications',exact:true}).click();
  await p.getByRole('button',{name:'Copier le diagnostic',exact:true}).click();
  const assistance=await p.evaluate(()=>JSON.parse(window.controleCopie));
  check(assistance.verification.extension==='5.221.0'&&assistance.verification.code==='notifications_non_affichees','le diagnostic détaillé reprend le contrôle de la vraie ouverture du composant parent');
