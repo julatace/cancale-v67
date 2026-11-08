@@ -150,7 +150,14 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
       animer(g.y, 0, 300, EASE_FEUILLE);
     }
   };
-  const poignee = { onPointerDown: debut, onPointerMove: bouge, onPointerUp: fin, onPointerCancel: fin, onLostPointerCapture: fin };
+  // Une interruption du navigateur n'est pas un lâcher volontaire du doigt.
+  const annulerGeste = (e) => {
+    const g=refGeste.current;if(!g||g.id!==e.pointerId)return;
+    refGeste.current=null;
+    refFeuille.current?.setAttribute('data-feuille-geste','revient');
+    animer(g.y,0,300,EASE_FEUILLE);
+  };
+  const poignee = { onPointerDown: debut, onPointerMove: bouge, onPointerUp: fin, onPointerCancel: annulerGeste, onLostPointerCapture: annulerGeste };
 
   const cls = `vrm-fs${lumineuse ? ' vrm-fs-lumineuse' : ''}${className ? ' ' + className : ''}`;
   const contenu = (
