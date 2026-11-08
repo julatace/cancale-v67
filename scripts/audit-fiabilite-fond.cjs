@@ -94,8 +94,11 @@ function espionPosts(f) {
     const r2 = await f.ctx.supabaseUpsert('vinted_accounts', [{ vinted_user_id: '111', login: 'a' }], 'vinted_user_id');
     dit(r1 === false && r2 === false, 'sans session : l\'écriture rend « pas écrit »', `r=${r1},${r2}`);
     dit(posts.length === 0, 'sans session : aucune requête vers la base (elle serait refusée en 400)', `${posts.length} POST : ${posts.map((p) => p.url.replace(/^.*rest\/v1\//, '')).join(' | ')}`);
-    dit(f.j.diags.some((d) => /^ecriture_ratee_harvest_profile_sans_session$/.test(d)) && f.j.diags.some((d) => /^ecriture_ratee_vinted_accounts_sans_session$/.test(d)),
-      'le diagnostic dit la CAUSE (`…_sans_session`), pas un code HTTP', f.j.diags.filter((d) => /^ecriture_ratee/.test(d)).join(','));
+    // (8 nov., 5.328, décision de Julien : « il ne doit pas y avoir d'envoi si l'extension n'est
+    // pas connectée ») Sans session, ce n'est PAS un refus : aucun `ecriture_ratee_*` n'est noté
+    // (ni sans_session, ni un code HTTP) — l'état « en attente » est porté ailleurs (sessionAbsente).
+    dit(!f.j.diags.some((d) => /^ecriture_ratee_/.test(d)),
+      'sans session : aucun « écriture ratée » noté (pas connecté n\u2019est pas un refus)', f.j.diags.filter((d) => /^ecriture_ratee/.test(d)).join(','));
 
     // b) l'autre sens : avec une session, l'écriture part, avec owner, son jeton, la bonne cible.
     const g = faireFond({ src: SRC });
