@@ -309,6 +309,7 @@ import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
@@ -4594,6 +4595,8 @@ const viderCacheLignes = () => { _rowCache.clear(); try { viderLecturesMemo(); }
 // boucle qui guette un changement) garde `fetch`.
 const _memoLectures = new Map();       // clé -> { at, promesse }
 const viderLecturesMemo = () => _memoLectures.clear();
+const viderMemoPourEcriture = (url, methode, init, base) => fonctionVidage(_memoLectures, url, methode, init, base);
+const viderMemoLignes = (ids) => viderLignesMemo(_memoLectures, ids, SUPABASE_URL);
 const _cloner = (v) => { try { return typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)); } catch (_) { return JSON.parse(JSON.stringify(v)); } };
 const fetchMemo = (url, init = {}) => {
   const m = String((init && init.method) || 'GET').toUpperCase();
@@ -4627,16 +4630,29 @@ try {
         // DÉPART et au RETOUR (une lecture partie pendant l'écriture ne garde pas
         // l'état d'avant).
         if (m !== 'GET' && m !== 'HEAD' && (/\/rest\/v1\//.test(u) || /^(\/|https?:\/\/[^/]*vrm\.center\/)api\//.test(u))) {
-          viderLecturesMemo();
+          // (8 nov., démarrage) Une écriture de LIGNES NOMMÉES de notre base (upsert
+          // dont le corps porte les `id`, PATCH/DELETE `id=eq.`/`in.`) ne vide que
+          // les lectures qui PEUVENT porter ces lignes — la règle de
+          // `lecturesPartagees` (src/memoEcritures.js). Mesuré : la publication de
+          // `widget_stats` puis de `lbc_a_retirer` au démarrage vidait tout, et les
+          // transactions (2 pages, ~95 Ko), Vestiaire, les réserves de N° repartaient
+          // sur le réseau. Tout ce qui n'est pas sûr (route `/api/`, `main`, corps
+          // illisible, `Request`) vide tout, comme avant.
+          const vider = viderMemoPourEcriture(u, m, init, SUPABASE_URL);
+          vider();
           const p = _fetchBrut(input, init);
-          p.then(viderLecturesMemo, viderLecturesMemo);
+          p.then(vider, vider);
           return p;
         }
       } catch (_) {}
       return _fetchBrut(input, init);
     };
     window.addEventListener('vrm:ext', viderLecturesMemo);
-    window.addEventListener('vrm:nuage-relu', viderLecturesMemo);
+    // (8 nov.) Une relecture du nuage change des clés de la ligne `main` : seules les
+    // lectures qui peuvent porter `main` sont périmées (au premier chargement, toutes
+    // les clés « changent » et la mémoire entière partait — les transactions étaient
+    // relues 3 s après l'ouverture).
+    window.addEventListener('vrm:nuage-relu', () => viderMemoLignes(['main']));
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') viderLecturesMemo(); });
   }
 } catch (_) {}
@@ -6466,7 +6482,7 @@ const fetchVersementsVinted = async () => {
     // la transaction 450 ne date pas — par SON n° de transaction seulement
     // (src/versementReleve.js). Relevé illisible : les dates 450 restent, rien n'est deviné.
     let releve = null;
-    try { releve = versementsDuReleve(await lireTout('id=like.harvest_%25_releve_%25&select=id,l:data->lignes')); } catch (_) { releve = null; }
+    try { releve = versementsDuReleve(await lireTout('id=like.harvest_%25_releve_%25&select=id,l:data->lignes', { memo: true })); } catch (_) { releve = null; }   // (8 nov.) mémorisée comme les transactions
     return completerVersementsParReleve(map, releve);
   } catch (_) { return null; }
 };
@@ -23621,6 +23637,7 @@ function relireTransporteursSiVieux({ force = false } = {}) {
       if (Array.isArray(j.departs) && j.departs.some((x) => x && x.prisEnCharge)) chargerDeparts(true);
       if (change) {
         try { if (window.__vrmLecturesPartagees) window.__vrmLecturesPartagees.invalider(); } catch (_) {}
+        try { viderLecturesMemo(); } catch (_) {}   // (8 nov.) la mémoire des lectures de montage aussi
         try { window.dispatchEvent(new Event('vrm:transp-maj')); } catch (_) {}
       }
       return { fait: true, change };
