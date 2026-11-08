@@ -50329,7 +50329,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const etapes = horsParcours ? null : friseVente({
       vendue: { lu: true, t: o.date || null },
       bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
-      deposee: { lu: posteMain || bougeLu, t: posteMain ? shipDone[txL] : null },
+      // (8 nov.) + parti par une preuve sûre de la règle unique (api/_lib/depart-vente.js) : déposée, datée.
+      deposee: { lu: posteMain || bougeLu || partisVinted.has(txL), t: posteMain ? shipDone[txL] : ((partisVinted.get(txL) || {}).at || null) },
       livree: { lu: livreeLue, t: null },
       argent: { lu: finalisee, t: versement },
     });
@@ -56668,6 +56669,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const p = preuvesFriseDe(o); const f = p.etapes ? friseVenteFusion(p.etapes) : null;
             if (!f) continue;
             const fait = Object.fromEntries(f.map((e) => [e.cle, e.fait]));
+            // (8 nov.) Partie par une preuve sûre (e-mail de dépôt de SON n°, transporteur…) : en route.
+            if (aExpedier(o) && estParti(o) && !fait.livree) { enRoute += 1; continue; }
             if (fait.postee && !fait.livree) enRoute += 1;
             else if (fait.livree && !fait.payee) aVenir += 1;
           }
