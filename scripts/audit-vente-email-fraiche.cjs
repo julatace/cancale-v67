@@ -148,7 +148,10 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
   dit(/ventesFaites\(\{ vinted: ventesCoqueEmail,/.test(S) && /ventesFaites\(\{ vinted: ventesVendu \|\| ventes,/.test(S), 'F8 VENDU de la coque et « Vendu et reçu » aussi', '');
   dit(!/ventesDeclarables\(\{[^}]*vinted: (ventesListe|ventesCoqueEmail|ventesVendu)/.test(S) && !/aVenirCoque\(\{ vinted: ventesCoqueEmail/.test(S), 'F8 le CA déclaré et l\'argent à venir ne reçoivent jamais la liste fusionnée', '');
   dit(/publierVentesCoque\(ventesCoque, ventesKO\)/.test(S), 'F8 la coque publie la liste Vinted SEULE (numéros, colis, annulations la lisent)', '');
-  dit(/const peutDeposer = !o\._venteEmail &&/.test(S) && /if \(o\._venteEmail && \(vFilter === 'aexpedier' \|\| vFilter === 'transit'\)\) return false;/.test(S), 'F8 une vente e-mail n\'a aucun geste d\'envoi et n\'est ni « à expédier » ni « en transit »', '');
+  // (8 nov., bordereau des e-mails) Sans son bordereau, une vente e-mail n'a aucun geste d'envoi ; AVEC le
+  // bordereau du MÊME n° de transaction, elle est le colis de Colis (`estColisEmail`, src/bordereauVenteEmail.js) :
+  // « à expédier » et « Imprimer » — jamais « Déposé » ni « en transit » (audit-bordereau-des-email).
+  dit(/const peutDeposer = !o\._venteEmail &&/.test(S) && /if \(o\._venteEmail && vFilter === 'aexpedier'\) return estColisEmail\(o\);/.test(S) && /if \(o\._venteEmail && vFilter === 'transit'\) return false;/.test(S), 'F8 une vente e-mail n\'a aucun geste d\'envoi (« à expédier » seulement avec SON bordereau) et n\'est jamais « en transit »', '');
   const modSrc = sansCommentaires(fs.existsSync(path.join(R, 'src', 'venteEmailFraiche.js')) ? fs.readFileSync(path.join(R, 'src', 'venteEmailFraiche.js'), 'utf8') : '');
   dit(modSrc.length > 0 && !/numero|bord/i.test(modSrc), 'F8 la règle ne lit aucun N° (ni d\'un bordereau, ni du titre) : le N° passe par l\'identité', '');
   dit(/select=id,type:meta->>type,tx:meta->>transaction/.test(modSrc) && !/select=data/.test(modSrc), 'F8 lecture projetée (`meta->>`), jamais `select=data`', '');

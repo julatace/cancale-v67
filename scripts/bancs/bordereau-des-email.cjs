@@ -22,6 +22,7 @@
 //      N° vide) et la mention sans N°.
 //   B3 MA JOURNÉE — la tuile « à envoyer » dit 2.
 //   N1 le N° écrit sort : carte et bouton disent 12.
+//   I1 imprimé sans N° puis un N° 44 posé sur la transaction : la carte le redit, avec 44.
 //   A1 annulée : aucune carte, rien à imprimer pour ce n° ; 1 à imprimer.
 //  Réglages : `BANC_PORT` (défaut 9716), `LARGEURS=390,1512`, `SHOTS=<dossier>`,
 //  `BANC_DIST` (un autre dist/, pour juger la base). Un banc ne meurt pas : il rapporte.
@@ -58,7 +59,10 @@ const jeu = (variante) => {
   if (variante === 'A') v1.data.payload.my_orders.push({ transaction_id: Number(TX), title: TITRE, price: { amount: '72.00', currency_code: 'EUR' }, status: 'Commande annulée', transaction_user_status: 'failed', date: iso(0.05), photo: null });
   l.find((x) => x.id === 'harvest_111_listings').data.capturedAt = iso(0.0007);
   // Les fiches : une 30 et une 12 au MÊME titre (vendues, plus en ligne) — le titre seul ne dit pas laquelle.
-  const fiches = l.find((x) => x.id === 'main').data.vinted_annonce_numeros;
+  const main = l.find((x) => x.id === 'main').data;
+  const fiches = main.vinted_annonce_numeros;
+  // I : déjà imprimé SANS N° ; depuis, un N° 44 est posé à la main sur la transaction.
+  if (variante === 'I') { main.vrm_bords_sans_num = { [TX]: iso(0.02) }; main.vinted_sale_overrides = { [TX]: { numero: '44' } }; }
   fiches['59030'] = { numero: '30', title: TITRE };
   fiches['59012'] = { numero: '12', title: TITRE };
   l.push({ id: 'email_sale_b1', data: { type: 'vente', designation: TITRE, prix: '72.00', pseudo: 'acheteur_x', account: 'vendeuse_a', uid: '111', transaction: TX, receivedAt: iso(0.05) } });
@@ -167,6 +171,15 @@ async function un(nav, W) {
     const r = await lireColis(o.pg);
     dit(!!r.carte && r.carte.num === '12' && !r.carte.sansNum, 'N1', `${T} Colis : le N° écrit dans le titre (« n12 ») est tamponné`, JSON.stringify(r.carte));
     await capture(o.pg, `bde-colis-N-${W}`);
+    await ferme(o); }
+  // I · imprimé sans N°, un N° sûr apparu depuis
+  { const o = await ouvrirSur(nav, { W, variante: 'I', tab: 'cat_bord' });
+    await ongletEnvoyer(o.pg);
+    const r = await lireColis(o.pg);
+    const sn = await o.pg.evaluate((tx) => { const e = document.querySelector(`[data-bord-card][data-tx-colis="${tx}"] [data-imprime-sans-num]`); return e ? { v: e.getAttribute('data-imprime-sans-num'), t: e.innerText, vis: e.getBoundingClientRect().height > 0 } : null; }, TX);
+    dit(!!r.carte && r.carte.num === '44' && !!sn && sn.v === 'avec' && sn.vis && /44/.test(sn.t), 'I1', `${T} Colis : « imprimé sans N° » redit, avec le N° sûr apparu depuis (44)`, JSON.stringify({ c: r.carte, sn }));
+    await o.pg.locator(`[data-bord-card][data-tx-colis="${TX}"]`).first().scrollIntoViewIfNeeded().catch(() => {});
+    await attendre(300); await capture(o.pg, `bde-colis-I-${W}`);
     await ferme(o); }
   // A · la liste relue dit la vente annulée
   { const o = await ouvrirSur(nav, { W, variante: 'A', tab: 'cat_bord' });

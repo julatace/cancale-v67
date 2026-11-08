@@ -33005,6 +33005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // le chargement. Ce sont des corrections de compta (sale_overrides), notes,
     // états de bordereau/retour, achats hors-Vinted : les plus coûteux à perdre.
     setBordsPrinted(n => vide(n) ? load('vinted_bords_printed', {}) : n);
+    setBordsSansNum(n => vide(n) ? load(CLE_IMPRIMES_SANS_NUM, {}) : n);
     setBordLinks(n => vide(n) ? load('vinted_bord_links', {}) : n);
     setBordsHidden(n => vide(n) ? load('vinted_bords_hidden', {}) : n);
     setBordsShipped(n => vide(n) ? load('vinted_bords_shipped', {}) : n);
