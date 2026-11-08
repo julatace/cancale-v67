@@ -26724,7 +26724,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
   // (7 nov., vitesse) COLIS EN DEUX TEMPS : dessiner 70 cartes d'un coup gelait l'écran
   // 1 à 2 s au toucher (revue du 7 nov., 4 400 éléments). Les 24 plus pressées sont
   // dessinées tout de suite ; toutes les autres arrivent juste après, en tâche
@@ -42310,7 +42310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
       {/* (30 oct.) Les vérifications passent SOUS la liste, comme sur Ventes : avant, on ne voyait
           aucune annonce au premier écran. Rien n'est retiré, tout reste replié. */}
-      {curSub==='messages' && <section data-verifications-messages="" style={{marginTop:16}}><SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} onFavoris={uid=>{setCompteSel(String(uid));setZoneMessages('favoris');}} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
+      {curSub==='messages' && <section data-verifications-messages="" style={{marginTop:16}}><SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} onFavoris={uid=>{if(typeof setCompteSel==='function')setCompteSel(String(uid));setZoneMessages('favoris');}} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
@@ -50807,7 +50807,7 @@ function AppCoeur() {
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {/* (5 nov., chantier E2) « Retirer mon argent » et « À venir » passent SOUS la carte du mois,
               dans l'écran Ventes (Comptabilite) : le même ordre que « Tous » (la carte, puis l'argent). */}
-          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
+          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} setCompteSel={setCompteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
         </section>); };
   const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
