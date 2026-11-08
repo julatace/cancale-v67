@@ -106,7 +106,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
       const h = Array.isArray(p.refus) ? p.refus : [];
       dit(p.koStatut === '503' && h.length === 5, 'R1 · sept refus 503 : le code est gardé, et les 5 DERNIERS seulement', JSON.stringify({ ko: p.koStatut, n: h.length }));
       dit(h.every((r) => r.statut === '503' && r.famille === 'harvest_orders_sold' && r.octets > 60000 && Number(r.at) > 0), 'R1 · chacun daté, avec sa famille (sans identifiant) et la taille de l’envoi', JSON.stringify(h[0]));
-      dit(!JSON.stringify(h).includes('111'), 'R1 · aucun identifiant de compte dans l’historique', JSON.stringify(h[0]));
+      dit(!/harvest_111|"111"/.test(JSON.stringify(h)), 'R1 · aucun identifiant de compte dans l’historique', JSON.stringify(h[0]));
       await f.ctx.noterFlux('vinted', true);
       const p2 = (f.store.vrmFlux || {}).vinted || {};
       dit(Array.isArray(p2.refus) && p2.refus.length === 5 && p2.okAt >= p2.koAt, 'R2 · un envoi réussi ensuite n’efface pas l’historique', JSON.stringify({ n: p2.refus && p2.refus.length }));
