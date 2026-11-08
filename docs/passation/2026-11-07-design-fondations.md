@@ -93,7 +93,15 @@ Aussi : `apres2/` (390 et 1512, clair et sombre : journée, À envoyer, Envoyés
 
 ## Vérifications
 
-Voir la section « Bancs et audits » du rapport de fin (même contenu) ; le banc `colis-envoi` a été
+Bancs (machine chargée, un à la fois) : `chargement` vert · `colis-colonnes` vert · `colis-envoi`
+118 verts · `iphone-reprise` 139 OK · `fluidite` vert · `journee-mieux` 202 ✅ / 12 ❌ — les MÊMES 12
+sur origin/main (J « nombre écrit deux fois » ×10, B titres 320 px et 1280 px) · `verif_dark` 2 ❌,
+les mêmes sur origin/main · `tous-boutons` coupé par le délai de 1 500 s (machine chargée ; 1–2
+« défauts » par écran, déjà comptés avant) · `onglets-b` n'existe pas dans `scripts/bancs/`.
+Audits : 340 verts ; rouges = ceux déjà rouges sur main (argent-a-venir, export-donnees,
+journee-coherence, photos-vinted, politique-hotes, registres, chemin-json connu) ; `audit-violet`,
+`audit-icones`, `audit-boutons`, `audit-rouge-doublon`, `audit-fusion` verts. Détecteur
+`impeccable detect` : trois avis (couleur / rayons hors DESIGN.md) corrigés. Le banc `colis-envoi` a été
 adapté pour juger la règle nouvelle : rien de fait ⇒ pas de frise (ou aucun mot à l'encre), une
 carte imprimée garde la sienne, et aucune frise posée sans étape faite (la règle ne peut pas
 passer en retirant toutes les frises).
