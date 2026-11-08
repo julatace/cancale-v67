@@ -361,6 +361,13 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   content: ''; position: absolute; top: 0; left: 84px; right: 0; height: .5px; background: var(--d-filet); pointer-events: none; z-index: 1;
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { width: 56px !important; height: 56px !important; background: var(--d-case) !important; }
+/* (8 nov., Julien : « la photo est mal cadrée ») La case est CARRÉE, la photo
+   portrait : elle remplissait sa largeur et se faisait couper par le haut (le
+   cadre de 56 × 56 tombait sur le haut de l'image). Elle remplit maintenant la
+   case, centrée — comme la vignette d'une annonce. */
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { display: block !important; overflow: hidden !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty > :is(div, span) { width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty img { width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; object-fit: cover !important; object-position: 50% 50% !important; display: block; }
 :root:root body .vrm-app-shell .vrm-main .vrm-fu-vente-nom { letter-spacing: var(--d-ap-15); }
 :root:root body .vrm-app-shell .vrm-main .vrm-fu-vente-prix { font-weight: 600; }
 :root:root body .vrm-app-shell .vrm-main :is(.vrm-fu-vente-l2 .vrm-fu-site, .vrm-fu-vente-l2 .vrm-fu-vente-compte, .vrm-fu-vente-taille) { font-size: var(--d-t-13); color: var(--d-gris); }
