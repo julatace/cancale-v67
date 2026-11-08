@@ -21,7 +21,7 @@ import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { nomPlateforme } from './plateformes.js';
 import { ageLecture } from './comptesLies.js';
-import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, phraseRefus, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
+import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
 import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS } from './App.jsx';
 import './styles-tout-va-bien.css';
 
@@ -135,7 +135,7 @@ function LigneAppareil({ a, maintenant, ouvert, onOuvrir }) {
       <div className="vrm-tvb-texte">
         <span className="vrm-tvb-titre">{a.nom}</span>
         <span className="vrm-tvb-detail"><span className="vrm-tvb-ligne">Extension {v || '?'} · {vu}</span>
-          {refus ? <span className="vrm-tvb-ligne" data-tvb-refus="">Dernier envoi refusé ({nomPlateforme(refus.p)}) {quandRelu(refus.r.at)} — {phraseRefus(refus.r)}</span> : null}
+          {refus ? <span className="vrm-tvb-ligne" data-tvb-refus="">Dernier envoi {nomPlateforme(refus.p)} refusé {quandRelu(refus.r.at)}</span> : null}
           {secours ? <span className="vrm-tvb-ligne" data-tvb-secours={secours.etat}>{secours.etat === 'trop_lourd' ? 'vrm.center muet et liste trop lourde pour la voie directe : rien envoyé' : 'vrm.center muet : ventes envoyées par la voie directe'}</span> : null}
         </span>
         {ev === 'ancienne' && ouvert ? (
@@ -199,7 +199,8 @@ export function ToutVaBien({ onComptes }) {
               <span className="vrm-tvb-detail"><span className="vrm-tvb-ligne">Extension {versionCourte(ancien.code || ancien.ver)} · a écrit {ageLecture(ancien.at, maintenant) || 'il y a un moment'}</span></span>
               {ouvert === 'inconnu' ? (
                 <div className="vrm-tvb-maj">
-                  <ol><li>Sur un ordinateur : {gestesMiseAJour({ paquet: 'chromium' }, EXT_ATTENDUE).gestes.join(' ')}</li><li>Sur l’iPhone (Orion) : {gestesMiseAJour({ paquet: 'orion' }, EXT_ATTENDUE).gestes.join(' ')}</li></ol>
+                  <p className="vrm-tvb-maj-titre">Sur un ordinateur</p><ol>{gestesMiseAJour({ paquet: 'chromium' }, EXT_ATTENDUE).gestes.map((g, i) => <li key={i}>{g}</li>)}</ol>
+                  <p className="vrm-tvb-maj-titre">Sur l’iPhone, dans Orion</p><ol>{gestesMiseAJour({ paquet: 'orion' }, EXT_ATTENDUE).gestes.map((g, i) => <li key={i}>{g}</li>)}</ol>
                   <div className="vrm-tvb-liens"><a className="vrm-b vrm-b-primaire vrm-tvb-lien" href={LIENS_PAQUET.chromium} download>VRM-extension.zip</a><a className="vrm-b vrm-b-secondaire vrm-tvb-lien" href={LIENS_PAQUET.orion} download>VRM-Orion.xpi</a></div>
                 </div>
               ) : null}
@@ -233,7 +234,8 @@ export function AlerteCapture({ onVoir }) {
       <Pastille ton="geste"/>
       <div className="vrm-tvb-alerte-texte">
         <b><span className="vrm-sensible">{p.nom}</span> ({nomPlateforme(p.plateforme)}) n’arrive plus dans VRM{visibles.length > 1 ? ` · et ${visibles.length - 1} autre${visibles.length > 2 ? 's' : ''}` : ''}</b>
-        <span>Pas relu depuis {String(p.age || 'plus de 12 h').replace(/^il y a /, '')} — {p.cause}{p.appareil ? ` (${p.appareil.nom})` : ''}. {p.geste.charAt(0).toUpperCase() + p.geste.slice(1)}.</span>
+        <span>Pas relu depuis {String(p.age || 'plus de 12 h').replace(/^il y a /, '')} — {p.refus ? `${p.cause.split(' · ')[0]}` : p.cause}{p.appareil ? ` (${p.appareil.nom})` : ''}.</span>
+        <span className="vrm-tvb-alerte-geste">{p.geste.charAt(0).toUpperCase() + p.geste.slice(1)}.</span>
       </div>
       <div className="vrm-tvb-alerte-gestes">
         <button type="button" className="vrm-lien-action" data-alerte-voir="" onClick={voir}>Voir</button>

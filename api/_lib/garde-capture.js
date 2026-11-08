@@ -149,7 +149,7 @@ export function tailleLisible(o) {
 }
 export function causeRefus(statut) {
   const s = statut == null ? '' : String(statut);
-  if (s === 'reseau') return 'réseau coupé : le navigateur a interrompu l’envoi';
+  if (s === 'reseau') return 'réseau coupé pendant l’envoi';
   if (s === 'sans_session') return 'l’extension n’est pas connectée à ton compte VRM';
   if (s === '401') return 'la base a refusé la session de l’extension';
   if (s === '403') return 'la base refuse ce compte';
@@ -182,8 +182,7 @@ export function gestePanne({ plateforme, preuve, refus, appareil, attendue }) {
   const s = refus ? String(refus.statut == null ? '' : refus.statut) : '';
   if (s === 'sans_session' || s === '401') return `reconnecte l’extension${sur} : touche le logo VRM, puis « Se connecter avec VRM »`;
   if (s === '403') return 'vérifie que ton abonnement VRM est actif (Paramètres → Mon abonnement)';
-  if (preuve === 'vu' && !refus) return `recharge l’onglet ${onglet}${sur} ; si ça revient, Paramètres → Aide → Signaler un problème`;
-  return `recharge l’onglet ${onglet}${sur} : l’extension réessaie à chaque visite ; si ça revient, Paramètres → Aide → Signaler un problème`;
+  return `recharge l’onglet ${onglet}${sur} ; si ça revient, signale-le (Paramètres → Aide)`;
 }
 
 // ── LES PANNES ──────────────────────────────────────────────────────────────
@@ -243,7 +242,7 @@ export function textePannes(liste) {
   if (!l.length) return null;
   if (l.length === 1) {
     const p = l[0];
-    return { title: `⚠️ ${NOM_SITE[p.plateforme] || ''} · ${p.nom} n’arrive plus dans VRM`.replace(' ·  ', ' '),
+    return { title: `⚠️ ${p.nom} (${NOM_SITE[p.plateforme] || 'compte'}) n’arrive plus dans VRM`,
       body: `Pas relu depuis ${String(p.age || 'plus de 12 h').replace(/^il y a /, '')} — ${p.cause}${p.appareil ? ` (${p.appareil.nom})` : ''}. Geste : ${p.geste}.` };
   }
   const noms = l.slice(0, 4).map((p) => p.nom);
