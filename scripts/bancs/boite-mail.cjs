@@ -159,6 +159,16 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
         const ins = await inspecter(pg, nom);
         dit(!ins.mots.length && !ins.deborde && !ins.hors.length, `${nom} : liste — aucun undefined/NaN/null, rien ne dépasse`, JSON.stringify(ins));
         dit(!ins.petits.length, `${nom} : liste — chaque cible au doigt fait 44 px`, JSON.stringify(ins.petits));
+        // Une vue combinant compte et rubrique doit pouvoir revenir à tous les mails.
+        const adresseTest=await pg.locator('[data-boite-adresse] option').evaluateAll(es=>es.map(e=>e.value).find(Boolean));
+        if(adresseTest){
+          await Promise.all([pg.waitForResponse(r=>{const q=new URL(r.url()).searchParams;return q.get('mode')==='journal'&&q.get('adresse')===adresseTest;}),pg.locator('[data-boite-adresse]').selectOption(adresseTest)]);
+          await Promise.all([pg.waitForResponse(r=>{const q=new URL(r.url()).searchParams;return q.get('mode')==='journal'&&q.get('adresse')===adresseTest&&q.get('boite')==='ventes';}),pg.locator('[data-boite-rubrique="ventes"]').click()]);
+          dit(await pg.locator('[data-boite-vue-filtree]').isVisible(),`${nom} : les filtres combinés sont signalés`);
+          await pg.screenshot({path:path.join(CAPT,`filtres-${nom}.png`)});
+          await Promise.all([pg.waitForResponse(r=>{const q=new URL(r.url()).searchParams;return q.get('mode')==='journal'&&!['adresse','boite','etat','nonlus','cherche'].some(k=>q.has(k));}),pg.getByRole('button',{name:'Réinitialiser les filtres',exact:true}).click()]);
+          dit(await pg.locator('[data-boite-adresse]').inputValue()===''&&await pg.locator('[data-boite-vue-filtree]').count()===0,`${nom} : réinitialiser retire le compte et la rubrique, sans requête filtrée`);
+        }else dit(false,`${nom} : fixture multi-comptes disponible pour vérifier les filtres`);
         // La liste ENTIÈRE : la suite se charge au défilement (ou « Voir plus » sur l'arbre d'avant).
         const tA = Date.now();
         for (let i = 0; i < 80; i++) {
