@@ -239,7 +239,11 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 @media (prefers-reduced-motion: no-preference) {
   @keyframes vrm-entree-ligne { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .vrm-main :is(.vrm-toutes-liste > .vrm-toutes-ligne, .vrm-buy-list > .vrm-buy-row, .vrm-eb-ina-liste > .vrm-eb-ina-ligne, .vrm-ann-grid.vrm-fiches > .vrm-ann-card, .vrm-ios-carte > .vrm-ios-rangee):nth-child(-n+10) {
-    animation: vrm-entree-ligne 220ms var(--vrm-ease-sortie) both;
+    /* ⚠️ (8 nov.) `backwards`, JAMAIS `both`/`forwards` : une animation de transform
+       gardée après sa fin laisse un transform (identité) sur la ligne, donc un contexte
+       d'empilement par ligne — la ligne SUIVANTE passait par-dessus le menu ⋯ ouvert
+       de la précédente (Achats : « Reçu d'achat » intouchable, banc recu-achat). */
+    animation: vrm-entree-ligne 220ms var(--vrm-ease-sortie) backwards;
   }
   .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(2) { animation-delay: 30ms; }
   .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(3) { animation-delay: 60ms; }
