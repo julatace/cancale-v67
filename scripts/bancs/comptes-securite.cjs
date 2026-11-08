@@ -168,6 +168,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           { at: t(30), type: 'ebay_retrait', site: 'ebay', compte: 'principal', cle: { sku: 'VRM-12' }, resultat: 'ok' },
         ] }) }));
         await pg.goto(`http://localhost:${NV.PORT}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' }); await attendre(1800);
+        await pg.click('[data-onglets-reglages] [data-vue="compte"]').catch(() => {}); await attendre(400);   // (8 nov.) `?vue=compte` n'est lu qu'au premier chargement
         await pg.click('[data-sous-ouvrir="journal-vrm"]').catch(() => {});
         await pg.waitForSelector('[data-journal-ligne]', { timeout: 8000 }).catch(() => {});
         const L = await pg.evaluate(() => [...document.querySelectorAll('[data-journal-ligne]')].map((l) => ({ type: l.getAttribute('data-journal-ligne'), res: l.getAttribute('data-journal-resultat'), txt: l.innerText.replace(/\s+/g, ' ') })));
