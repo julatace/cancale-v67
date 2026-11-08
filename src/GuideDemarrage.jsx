@@ -63,8 +63,8 @@ function DessinNumerotation({ cle }) {
       <rect x="20" y="14" width="44" height="5" rx="2.5" className="g-ligne-fort" />
       <rect x="20" y="24" width="56" height="4" rx="2" className="g-ligne" />
       <rect x="20" y="31" width="40" height="4" rx="2" className="g-ligne" />
-      <rect x="20" y="38" width="30" height="7" rx="3.5" className="g-accent-doux" />
-      <text x="35" y="43.6" textAnchor="middle" className="g-accent-texte">N° 123</text>
+      <rect x="20" y="37" width="36" height="10" rx="5" className="g-accent-doux" />
+      <text x="38" y="44.6" textAnchor="middle" className="g-accent-texte">N° 123</text>
     </svg>
   );
 }

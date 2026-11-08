@@ -119,7 +119,7 @@ export function etatGuide(preuves = {}, { plusTard = null, maintenant = Date.now
 // ── LE CHOIX DE LA NUMÉROTATION ───────────────────────────────────────────────
 export const CHOIX_NUMEROTATION = [
   { cle: 'vrm', titre: 'VRM numérote mes paires', texte: 'Chaque nouvelle annonce reçoit un numéro à écrire sur sa boîte.' },
-  { cle: 'moi', titre: 'Je numérote moi-même', texte: 'Tu termines ta description par « N° 123 » : VRM lit le tien.' },
+  { cle: 'moi', titre: 'Je numérote moi-même', texte: 'Tu termines ta description par «\u00a0N°\u00a0123\u00a0»\u00a0: VRM lit le tien.' },
 ];
 // Posée seulement si : le réglage n'a jamais été choisi (ni `depuis` ni `choisi`)
 // ET on a LU qu'aucune paire ne porte de N° (`nNum === 0`). Pas su ⇒ on ne demande pas.

@@ -70,7 +70,7 @@
 .vrm-guide .g-plein { fill: color-mix(in srgb, var(--g-gris) 55%, transparent); }
 .vrm-guide .g-accent { fill: var(--g-accent); }
 .vrm-guide .g-accent-doux { fill: color-mix(in srgb, var(--g-accent) 14%, transparent); }
-.vrm-guide .g-accent-texte { fill: var(--g-accent-texte); font: 700 6.4px/1 -apple-system, BlinkMacSystemFont, sans-serif; }
+.vrm-guide .g-accent-texte { fill: var(--g-accent-texte); font: 700 7.4px/1 -apple-system, BlinkMacSystemFont, sans-serif; }
 .vrm-guide .g-num { fill: var(--g-encre); }
 .vrm-guide .g-num-texte { fill: var(--g-carte); font: 700 7.5px/1 -apple-system, BlinkMacSystemFont, sans-serif; }
 .vrm-guide .g-point { fill: var(--g-accent); }
@@ -90,7 +90,7 @@
 .vrm-guide-choix-carte:active { transform: scale(.97); }
 @media (hover: hover) { .vrm-guide-choix-carte:hover { box-shadow: 0 0 0 1.5px var(--g-accent); } }
 .vrm-guide-choix-carte:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 2px; }
-.vrm-guide-choix-dessin { width: 72px; height: auto; margin-bottom: 4px; }
+.vrm-guide-choix-dessin { width: 84px; height: auto; margin-bottom: 4px; }
 .vrm-guide-choix-titre { font-size: 15px; font-weight: 600; line-height: 1.3; }
 .vrm-guide-choix-texte { font-size: 13px; line-height: 1.4; color: var(--g-gris); }
 .vrm-guide-question-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-top: 8px; font-size: 13px; color: var(--g-gris); }
@@ -127,6 +127,11 @@
 .vrm-verif-rangee[data-etat="action"] .vrm-verif-etat { color: var(--d-encre, #1D1D1F); font-weight: 600; }
 .vrm-verif-detail { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--d-gris, #6E6E73); }
 .vrm-verif-geste { margin-top: 8px; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
+/* Dans la case grise, le geste se pose en blanc (un remplissage gris sur gris ne se voit pas). */
+.vrm-verif .vrm-b.vrm-verif-geste,
+.vrm-app-shell .vrm-main .vrm-verif .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-carte, #fff) !important; color: var(--d-accent-texte, #0066CC) !important; box-shadow: 0 .5px 1px rgba(0,0,0,.06); }
+.vrm-verif-cadre .vrm-b.vrm-verif-geste,
+.vrm-app-shell .vrm-main .vrm-verif-cadre .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-remplir, rgba(118,118,128,.12)) !important; box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .vrm-guide-ouverte, .vrm-guide .g-onde { animation: none !important; }
