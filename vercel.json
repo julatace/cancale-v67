@@ -40,6 +40,10 @@
       "destination": "/etat.html"
     },
     {
+      "source": "/statut",
+      "destination": "/statut.html"
+    },
+    {
       "source": "/api/stripe-webhook",
       "destination": "/api/compte?mode=webhook"
     },

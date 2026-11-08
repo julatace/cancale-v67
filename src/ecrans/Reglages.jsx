@@ -55,6 +55,7 @@ import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 // ⟦← App.jsx #13⟧
+import TesDonnees from '../composants/TesDonnees.jsx';
 import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
 // ⟦← App.jsx #14⟧
 import { DISCORD_ERREURS } from "../communaute/discordErreurs.js";
@@ -1739,11 +1740,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'conseils-revoir', type:'action', ic:'sync', lib:'Revoir les conseils', desc:'Ceux que tu as passés ou masqués pourront revenir.', onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? 'Les conseils pourront revenir.' : 'Pas pu enregistrer — réessaie.')); }, data:{ 'data-reglage-conseils-revoir':'' } },
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
+      // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
+      { id:'statut', type:'nav', ic:'pulse', lib:'État de VRM', desc:'La base, les e-mails et les notifications fonctionnent-ils ?', onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
+      <details data-aide-statut=""><summary>VRM semble en panne</summary><p>La page d’état dit, minute par minute, si la base, la réception des e-mails et les notifications fonctionnent, et les incidents connus. Si tout y fonctionne, le souci vient sans doute de cet appareil : recharge la page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
       <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un e-mail absent d’un e-mail à vérifier.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
       <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
@@ -1790,11 +1794,16 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
     ], pied:'Vide ce navigateur ; tes données restent dans ton compte.' },
     { id:'donnees', titre:'Tes données', items:[
+      // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
+      { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
+        el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
       AUTH.user && { id:'fermer', type:'panneau', ic:'trash', lib:'Fermer mon compte', el:<FermerCompte/> },
     ]},
   ] : [
     { id:'donnees', titre:'Tes données', items:[
+      { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
+        el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees}/> },
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
     ]},
   ];
@@ -2341,7 +2350,9 @@ function JournalVrm() {
               <div key={i} className="vrm-sec-ligne" data-journal-ligne={e.type} data-journal-resultat={e.resultat}>
                 <div className="vrm-sec-corps">
                   <span className="vrm-sec-titre">{L.titre}{L.article ? <> · {L.article}</> : null}</span>
-                  <span className="vrm-sec-sous">{e.at ? new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}{L.compte ? ` · ${L.compte}` : ''}</span>
+                  <span className="vrm-sec-sous">{e.at ? new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}{L.compte ? ` · ${L.compte}` : ''}{e.via === 'telephone' ? ' · depuis ton téléphone' : ''}</span>
+                  {/* (8 nov., confiance) La PREUVE de la ligne : ce qui, dans sa base, note ce geste. */}
+                  <span className="vrm-sec-sous vrm-sec-preuve" data-journal-preuve={L.preuve ? 'oui' : 'pas-su'}>{L.preuve || 'D’où vient cette ligne : pas su'}</span>
                 </div>
                 <span className={'vrm-sec-etat' + (L.aVerifier ? ' is-verifier' : '')}>{L.resultat}</span>
               </div>
@@ -2351,7 +2362,7 @@ function JournalVrm() {
       ))}
       {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
       <div className="vrm-sec-trous" data-journal-trous="">
-        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone' }[x] || x)).join(', ')}.</p> : null}
         {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
       </div>
     </div>

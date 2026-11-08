@@ -1,0 +1,4 @@
+{
+  "lisezmoi": "Incidents de vrm.center/statut, posés à la main. Un incident : { \"debut\": \"2026-11-08T14:05:00+01:00\", \"fin\": null ou une date, \"titre\": \"Réception des e-mails ralentie\", \"texte\": \"Ce qui se passe et ce qu'il faut faire, en une ou deux phrases.\", \"touche\": [\"base\" | \"emails\" | \"notifications\" | \"extension\" | \"autre\"] }. JAMAIS un pseudo, une adresse, un numéro de commande ou de suivi, un nom : la page est publique (scripts/audit-confiance.cjs refuse le fichier, et la page retire le texte).",
+  "incidents": []
+}
