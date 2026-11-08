@@ -1688,7 +1688,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'abonnement-ouvrir', type:'nav', ic:'wallet', lib:'Mon abonnement', desc:'Ton offre, ta carte, tes factures, et l’arrêt si tu veux.', onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Comment s’écrivent les numéros de tes prochaines paires.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:`Comment s’écrivent les numéros de tes prochain${profilV.vend === 'sneakers' ? 'es paires' : 's articles'}.`, val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
@@ -2759,6 +2759,7 @@ function DiscordCompte() {
 
 function EquipeSetting() {
   const uid = (AUTH.user && AUTH.user.id) || '';
+  const proprio = useEstProprietaire();
   const [lu, setLu] = React.useState(undefined);
   const [email, setEmail] = React.useState('');
   const [occupe, setOccupe] = React.useState('');
@@ -2781,7 +2782,20 @@ function EquipeSetting() {
       Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <button type="button" onClick={relire} className="vrm-b vrm-b-secondaire" style={{ marginLeft: 6 }}>Réessayer</button>
     </div>
   );
-  if (lu.nonInstalle) return <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
+  // (8 nov.) Tant que la 016 n'est pas appliquée : la phrase (la même que l'écran de
+  // l'équipe), CE QUE l'aide verra une fois le mode activé, et qui fait le geste —
+  // jamais un bouton « Inviter » qui ne mènerait nulle part (CLAUDE.md §5, 016).
+  if (lu.nonInstalle) return (
+    <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+      <div>{EQUIPE_NON_INSTALLE_TXT}</div>
+      <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
+        {proprio
+          ? <>Il s’active quand la mise à jour <b style={{ color: C.text }}>016</b> de la base est appliquée (Supabase) : rien d’autre à préparer, l’invitation marchera aussitôt.</>
+          : <>Rien à faire de ton côté : dès qu’il est activé, tu inviteras ici la personne qui t’aide, par son e-mail.</>}
+      </div>
+      <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
+    </div>
+  );
   const vivants = lu.equipe.filter((x) => x.statut !== 'revoquee');
   const inviter = async () => {
     const e = email.trim();

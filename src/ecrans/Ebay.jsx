@@ -1259,7 +1259,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               paires.length === 0 ? (
                 <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté n'est encore chargé sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes articles — avec leurs photos — apparaîtront ici.</div>
               ) : (<>
-                <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder="Chercher : n°, marque, pointure…" style={{ ...inp, marginBottom: 10 }} />
+                <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder={vendActuel() === 'sneakers' ? 'Chercher : n°, marque, pointure…' : 'Chercher : n°, titre, marque, taille…'} style={{ ...inp, marginBottom: 10 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
                   {listePaires.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px' }}>Aucun article ne correspond.</div>}
                   {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 12, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Un article porte deux N° (même photo sur deux fiches) : il n\'est proposé qu\'une fois.' : `${nJumellesMasquees} articles portent deux N° (même photo sur deux fiches) : chacun n'est proposé qu'une fois.`}</div>}
@@ -1270,7 +1270,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.accentTexte }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
-                        <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
+                        <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `${vendActuel() === 'sneakers' ? 'Pointure' : 'Taille'} ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
                           const jm = jumelles.get(String(p.id));
                           return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même article que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>

@@ -121,6 +121,9 @@ export const CHOIX_NUMEROTATION = [
   { cle: 'vrm', titre: 'VRM numérote mes paires', texte: 'Chaque nouvelle annonce reçoit un numéro à écrire sur sa boîte.' },
   { cle: 'moi', titre: 'Je numérote moi-même', texte: 'Tu termines ta description par «\u00a0N°\u00a0123\u00a0»\u00a0: VRM lit le tien.' },
 ];
+// (8 nov.) Hors sneakers (src/profilVendeur.js) : « mes articles », « sa boîte ou son étiquette ».
+export const choixNumerotation = (vend = 'sneakers') => vend === 'sneakers' ? CHOIX_NUMEROTATION
+  : CHOIX_NUMEROTATION.map((c) => c.cle === 'vrm' ? { ...c, titre: 'VRM numérote mes articles', texte: 'Chaque nouvelle annonce reçoit un numéro à écrire sur sa boîte ou son étiquette.' } : c);
 // Posée seulement si : le réglage n'a jamais été choisi (ni `depuis` ni `choisi`)
 // ET on a LU qu'aucune paire ne porte de N° (`nNum === 0`). Pas su ⇒ on ne demande pas.
 export function numerotationAChoisir(brut, nNum) {

@@ -257,7 +257,7 @@ import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExempl
 import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
 import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
-import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
+import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, choixNumerotation, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
 import { PHRASES_ECRAN } from "./phrasesEcran.js";
 import { AIDE_ECRANS } from "./aideEcrans.js";
 // ⟦→ ecrans/Reglages.jsx #12⟧
@@ -17907,7 +17907,7 @@ function GuideDemarrageCarte({ onNav, comptes, plein = false, etape }) {
       detail={<PremiersPas onNav={onNav} dansGuide/>}
       gestes={{ emails: { libelle: 'Relier ma boîte', onClick: () => ouvrirEmailsRelier() } }}
       onPlusTard={reporter}
-      numerotation={demanderNum ? <ChoixNumerotation choix={CHOIX_NUMEROTATION} onChoisir={choisirNum} onPlusTard={() => reporter('numerotation')}/> : null}
+      numerotation={demanderNum ? <ChoixNumerotation choix={choixNumerotation(vendActuel())} mot={motsArticle(vendActuel()).noms} onChoisir={choisirNum} onPlusTard={() => reporter('numerotation')}/> : null}
       verification={verifOuverte ? <VerifierInstallationApp comptes={comptes} onNav={onNav} onFermer={() => setVerifOuverte(false)}/> : null}
       onOuvrirVerification={verifOuverte ? null : () => setVerifOuverte(true)}
       onExemple={sansCompte ? () => entrerModeExemple() : null}
@@ -23601,6 +23601,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
 // « Pas su » (plan pas relu, liste des paires présentes jamais publiée) ⇒
 // aucune proposition, et c'est dit. Aucun numéro n'est jamais modifié.
 function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
+  const motsA = useMotsArticle();   // (8 nov.) « paire » / « article » (src/profilVendeur.js)
   const [q, setQ] = useState('');
   const [placer, setPlacer] = useState(null);   // N° en cours de placement « autre case »
   const [flash, setFlash] = useState(null);     // { itemId, key } — la case qu'on vient de remplir
@@ -23675,7 +23676,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
       {/* Le résumé, en texte neutre : des chiffres, pas des alertes. */}
       <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }} data-rgt-resume="">
         {sur
-          ? <><b style={{ color: C.text }}>{aRanger.length}</b> paire{aRanger.length > 1 ? 's' : ''} à ranger · <b style={{ color: C.text }}>{casesLibres}</b> case{casesLibres > 1 ? 's' : ''} libre{casesLibres > 1 ? 's' : ''} sur {totalCases}{aLiberer.length ? <> · <b style={{ color: C.text }}>{aLiberer.length}</b> à libérer</> : null}</>
+          ? <><b style={{ color: C.text }}>{aRanger.length}</b> {aRanger.length > 1 ? motsA.noms : motsA.nom} à ranger · <b style={{ color: C.text }}>{casesLibres}</b> case{casesLibres > 1 ? 's' : ''} libre{casesLibres > 1 ? 's' : ''} sur {totalCases}{aLiberer.length ? <> · <b style={{ color: C.text }}>{aLiberer.length}</b> à libérer</> : null}</>
           : <>{totalCases} case{totalCases > 1 ? 's' : ''} dans {meubles.length} meuble{meubles.length > 1 ? 's' : ''}</>}
       </div>
       {raisonPasSu && <div data-rgt-passu="" style={{ ...carte, padding: '11px 13px', fontSize: 13, color: C.text, lineHeight: 1.5, boxShadow: 'none', background: C.bg }}>{raisonPasSu}</div>}
@@ -23852,6 +23853,7 @@ const comptesStockEcartes = () => {
 };
 
 function StockPhotos() {
+  const motsA = useMotsArticle();   // (8 nov.) « paire » / « article »
   const [pairsLost, setPairsLost] = useStateCle('vinted_pairs_lost', () => load('vinted_pairs_lost', {}));
   const [max, setMax] = React.useState(60);
   const [q, setQ] = React.useState('');
@@ -23880,7 +23882,7 @@ function StockPhotos() {
   if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté</Card>;
   return (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accentTexte }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
+      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} {fiches.length > 1 ? motsA.noms : motsA.nom} en stock{nVendus > 0 ? <> · <b style={{ color: C.accentTexte }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher un article" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 12, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
     </div>
     {nVendus > 0 && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Qui clignote = vendu · <b style={{ color: C.text }}>Sortie du stock</b> <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et l’article reste en stock.</Pourquoi></div>}
@@ -51892,7 +51894,7 @@ function AppCoeur() {
       {/* (6 nov.) L'ACCOMPAGNEMENT (src/Conseils.jsx) : une bulle au plus, jamais pendant
           Bienvenue ni la visite (ni pour une personne neuve qui ne l'a pas encore vue). */}
       <GardeEcran nom="conseils"><Conseils ecran={tab} lire={lireLigneAccompagnement} ecrire={ecrireLigneAccompagnement} z={8500}
-        contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi }}
+        contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi, vend: PROFIL_VENDEUR.vend || vendActuel() }}
         onEchec={(m)=>toast(m)}
         onAction={(a)=>{ if(String(a).startsWith('reglages:')){ DEMANDE_REGLAGE_SOUS.id=String(a).slice(9); if(tab==='settings'){ try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } else setTab('settings'); } }}/></GardeEcran>
       {/* Les chiffres que la COQUE publie pour les conseils (la même règle que leurs bandeaux). */}

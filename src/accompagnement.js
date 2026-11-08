@@ -113,9 +113,10 @@ export const CONSEILS = [
     cle: 'dorment', chiffre: 'annonces.dorment',
     quand: (v) => fini(v) && v >= 1,
     cibles: ['[data-vue-relancer]'],
-    titre: (v) => (v > 1 ? 'Des paires dorment' : 'Une paire dort'),
-    texte: (v) => `En ligne depuis plus de 30 jours : ${v > 1 ? 'regarde-les' : 'regarde-la'}, tu choisis quoi faire.`,
-    geste: 'Voir les paires',
+    // (8 nov.) « paire » pour un vendeur de sneakers, « article » sinon (`contexte.vend`, src/profilVendeur.js).
+    titre: (v, ctx) => (ctx && ctx.vend !== 'sneakers' ? (v > 1 ? 'Des articles dorment' : 'Un article dort') : (v > 1 ? 'Des paires dorment' : 'Une paire dort')),
+    texte: (v, ctx) => `En ligne depuis plus de 30 jours : ${v > 1 ? 'regarde-les' : (ctx && ctx.vend !== 'sneakers' ? 'regarde-le' : 'regarde-la')}, tu choisis quoi faire.`,
+    geste: (v, ctx) => (ctx && ctx.vend !== 'sneakers' ? 'Voir les articles' : 'Voir les paires'),
   },
   {
     cle: 'prix-mini', chiffre: 'annonces.prixMini',
@@ -230,8 +231,8 @@ export function choisirConseil({ ecran = '', chiffres = {}, memoire, contexte = 
     if (!conseilLibre(c, memoire, maintenant)) continue;
     let cible = null;
     if (typeof cibleVisible === 'function') { cible = cibleVisible(c.cibles); if (!cible) continue; }
-    const dire = (x) => (typeof x === 'function' ? x(v) : x);
-    return { cle: c.cle, titre: dire(c.titre), texte: dire(c.texte), geste: c.geste, action: c.action || null, cibles: c.cibles, valeur: v, uneFois: !!c.uneFois, ...(cible ? { cible } : {}) };
+    const dire = (x) => (typeof x === 'function' ? x(v, contexte) : x);
+    return { cle: c.cle, titre: dire(c.titre), texte: dire(c.texte), geste: dire(c.geste), action: c.action || null, cibles: c.cibles, valeur: v, uneFois: !!c.uneFois, ...(cible ? { cible } : {}) };
   }
   return null;
 }

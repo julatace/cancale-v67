@@ -69,10 +69,10 @@ function DessinNumerotation({ cle }) {
   );
 }
 
-export function ChoixNumerotation({ choix, onChoisir, onPlusTard }) {
+export function ChoixNumerotation({ choix, onChoisir, onPlusTard, mot = 'paires' }) {
   return (
     <div className="vrm-guide-question" data-guide-numerotation="" role="group" aria-labelledby="vrm-guide-question-titre">
-      <p id="vrm-guide-question-titre" className="vrm-guide-question-titre">Qui écrit le numéro de tes paires&nbsp;?</p>
+      <p id="vrm-guide-question-titre" className="vrm-guide-question-titre">Qui écrit le numéro de tes {mot}&nbsp;?</p>
       <div className="vrm-guide-choix">
         {choix.map((c) => (
           <button key={c.cle} type="button" className="vrm-guide-choix-carte" data-guide-numerotation-choix={c.cle} onClick={() => onChoisir && onChoisir(c.cle)}>
