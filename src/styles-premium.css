@@ -357,6 +357,8 @@
   font: 700 12px/16px var(--vrm-police) !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums !important; margin-right: 6px !important; vertical-align: 1px !important;
 }
 .vrm-main[data-ecran="cat_bord"] .vrm-colis-carte .vrm-acct-tag { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; }
+/* Les lignes sous le titre : 2 px d'écart, pas 6 (titre, compte, limite se lisent comme un bloc). */
+.vrm-main[data-ecran="cat_bord"] .vrm-colis-carte > :first-child > div:nth-child(2) > div + div { margin-top: 2px !important; }
 /* La date limite : la phrase à l'ENCRE (13/500) et un point ambre devant quand il
    est pressé (DESIGN.md « un POINT, pas une phrase entière en ambre ») ; sinon grise. */
 .vrm-main[data-ecran="cat_bord"] .vrm-colis-carte [data-colis-dates] { font: 400 var(--p-t-note)/1.4 var(--vrm-police) !important; color: var(--p-gris) !important; display: block !important; margin-top: 2px !important; }
