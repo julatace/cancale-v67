@@ -670,3 +670,31 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-app-shell .vrm-main [data-stock-recherche] > div:focus-within { box-shadow: 0 0 0 2px var(--d-accent) !important; }
 :root:root body .vrm-app-shell .vrm-main section.vrm-sx { border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte) !important; background: var(--d-carte) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-sx-titre { font-size: var(--d-t-17) !important; font-weight: 600 !important; }
+
+/* ══ 16. EBAY, LEBONCOIN, VESTIAIRE, VINTED (8 nov., passage 2) ════════════
+   · Vestiaire : ses cartes avaient perdu leur marge (3 px : le texte touchait le
+     bord) ; elles retrouvent celle d'une carte, posées sans cadre. « Depuis ton
+     ordinateur » était une phrase ambre : ce n'est pas un geste à faire ici,
+     c'est une note — grise. « Publier sur Vestiaire » prend toute la largeur.
+     Les paires à mettre en vente : un filet après la vignette, la vignette en
+     rayon de case.
+   · L'écran d'un site pas encore relié ou pas encore lu (« Aucun compte eBay
+     relié », « Tes ventes Leboncoin ne sont pas encore lues ») : un état vide
+     posé (ombre, sans cadre), titre 17/600, la phrase grise, le geste dessous. */
+:root:root body .vrm-app-shell .vrm-main [data-tache-vestiaire] > .vrm-surface {
+  padding: var(--d-e-4) !important; border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important;
+}
+:root:root body .vrm-app-shell .vrm-main [data-tache-vestiaire] > .vrm-surface > div:first-child { font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-17); }
+:root:root body .vrm-app-shell .vrm-main [data-vc-raison] { color: var(--d-gris) !important; font-size: var(--d-t-13) !important; font-weight: 500 !important; }
+:root:root body .vrm-app-shell .vrm-main [data-vc-annonces] { color: var(--d-gris) !important; font-size: var(--d-t-15) !important; line-height: var(--d-il-texte) !important; }
+:root:root body .vrm-app-shell .vrm-main [data-vc-annonces] b { color: var(--d-encre) !important; font-weight: 600 !important; }
+:root:root body .vrm-app-shell .vrm-main [data-vc-paire] { border-top-color: var(--d-filet) !important; border-top-width: .5px !important; }
+:root:root body .vrm-app-shell .vrm-main [data-vc-paire] > span:first-child { border-radius: 10px !important; overflow: hidden; }
+:root:root body .vrm-app-shell .vrm-main .vrm-pa-entree { width: auto !important; margin-inline: 0 !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-pa-entree > button { width: 100% !important; border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; min-height: 60px; padding: var(--d-e-3) var(--d-e-4) !important; }
+/* L'état d'un site pas relié / pas lu */
+:root:root body .vrm-app-shell .vrm-main .vrm-onglet-manque {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; padding: var(--d-e-5) !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-onglet-manque > div:first-child { font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-17); color: var(--d-encre) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-onglet-manque > [data-onglet-geste] { font-size: var(--d-t-15) !important; color: var(--d-gris) !important; line-height: var(--d-il-texte) !important; margin-top: var(--d-e-1); }
