@@ -495,6 +495,7 @@ const COURT = { codes: 'Codes' };
 
 // ── LA BOÎTE ─────────────────────────────────────────────────────────────────
 function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete = null, ecrireLus, photoDe }) {
+  const aideRechercheId=React.useId();
   const [rubrique, setRubrique] = useState('');
   const [adresse, setAdresse] = useState('');
   const [aVerif, setAVerif] = useState(false);
@@ -628,8 +629,9 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
           <label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
             <span className="vrm-boite-sr">Chercher un e-mail</span>
             <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-            <input type="search" value={saisie} onChange={(ev) => { setSaisie(ev.target.value); setOuvert(''); }} placeholder="Article, code, n° de suivi…" aria-label="Chercher un e-mail" data-boite-cherche-champ="" enterKeyHint="search" autoComplete="off"/>
+            <input type="search" value={saisie} onChange={(ev) => { setSaisie(ev.target.value); setOuvert(''); }} placeholder="Article, code, n° de suivi…" aria-label="Chercher un e-mail" data-boite-cherche-champ="" aria-describedby={saisie.trim().length===1?aideRechercheId:undefined} enterKeyHint="search" autoComplete="off"/>
           </label>
+          {saisie.trim().length===1&&<p id={aideRechercheId} className="vrm-boite-aide-recherche" data-boite-aide-recherche="">Saisis au moins 2 caractères pour rechercher.</p>}
           <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label="Trier les e-mails">
             <button type="button" aria-pressed={!rubrique && !nonLus && !aVerif} data-boite-rubrique="tout" onClick={(ev) => { setNonLus(false); setAVerif(false); choisir('', ev.currentTarget); }}>
               <span>Tout</span>{!filtre && c && parR && !c.plus ? <span className="vrm-boite-n" data-boite-n={c.sur}>{c.sur}</span> : null}

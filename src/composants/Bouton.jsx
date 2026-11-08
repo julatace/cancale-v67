@@ -22,17 +22,18 @@ const iconeParDefaut = (nom, taille) => <IconeComposant nom={nom} taille={taille
 
 export const VARIANTES_BOUTON = Object.freeze(['primaire', 'secondaire', 'discret', 'danger']);
 
-export function BoutonBase({ variante = 'secondaire', taille, icone, plein = false, occupe = false, className = '', children, type = 'button', href, rendreIcone = iconeParDefaut, ...rest }) {
+export function BoutonBase({ variante = 'secondaire', taille, icone, plein = false, occupe = false, disabled = false, className = '', children, type = 'button', href, rendreIcone = iconeParDefaut, ...rest }) {
   const v = VARIANTES_BOUTON.includes(variante) ? variante : 'secondaire';
   const cls = `vrm-b vrm-b-${v}${taille === 'petit' ? ' vrm-b-petit' : ''}${plein ? ' vrm-b-plein' : ''}${!children && icone ? ' vrm-b-icone' : ''}${className ? ' ' + className : ''}`;
   const ic = icone ? rendreIcone(icone, taille === 'petit' ? 16 : 18) : null;
   const contenu = <>{occupe?<svg className="vrm-b-indicateur" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="7" opacity=".25"/><path d="M10 3a7 7 0 0 1 7 7" strokeLinecap="round"/></svg>:ic || null}{children}</>;
+  const bloque=occupe||disabled;
   const occ = occupe ? { 'aria-busy': 'true', disabled: true } : {};
-  if (href) return <a href={occupe ? undefined : href} className={cls} {...rest} {...(occupe ? { role: 'link', tabIndex: -1, 'aria-busy': 'true', 'aria-disabled': 'true', onClick: e => e.preventDefault(), onAuxClick: e => e.preventDefault() } : {})}>{contenu}</a>;
+  if (href) return <a href={bloque ? undefined : href} className={cls} {...rest} {...(bloque ? { role: 'link', tabIndex: -1, 'aria-busy': occupe ? 'true' : undefined, 'aria-disabled': 'true', onClick: e => e.preventDefault(), onAuxClick: e => e.preventDefault() } : {})}>{contenu}</a>;
   // Type écrit en clair (audit-commandes) : « submit » seulement quand on le
   // demande, sinon « button » — jamais un envoi de formulaire par défaut.
-  if (type === 'submit') return <button type="submit" className={cls} {...rest} {...occ}>{contenu}</button>;
-  return <button type="button" className={cls} {...rest} {...occ}>{contenu}</button>;
+  if (type === 'submit') return <button type="submit" disabled={disabled} className={cls} {...rest} {...occ}>{contenu}</button>;
+  return <button type="button" disabled={disabled} className={cls} {...rest} {...occ}>{contenu}</button>;
 }
 
 // UN contrôle segmenté pour toute l'app (revue du 16 oct.). Le dessin vit dans
@@ -52,7 +53,7 @@ export function SegmenteBase({ label, options, value, onChange, plein = false, d
           {...(o.titre ? { title: o.titre, ...(o.l ? {} : { 'aria-label': o.titre }) } : {})} {...(o.data || {})}>
           {o.icone ? rendreIcone(o.icone, 15) : null}
           {o.l}
-          {o.n ? <span className="vrm-seg-n"> {o.n}</span> : null}
+          {o.n===0||o.n ? <span className="vrm-seg-n"> {o.n}</span> : null}
         </button>
       ))}
     </div>
