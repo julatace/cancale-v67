@@ -14,7 +14,7 @@ const NOM = /^[a-z][a-z0-9_-]{0,39}$/;
 // La famille d'une requête, ou `null` (rien d'autre ne se note).
 export function familleRequete(u, origine = '') {
   let url;
-  try { url = new URL(String(u || ''), origine || 'https://vrm.center'); } catch (_) { return null; }
+  try { url = new URL(String(u || ''), origine || (typeof location !== 'undefined' ? location.origin : 'http://localhost')); } catch (_) { return null; }
   const p = url.pathname;
   let m;
   if ((m = /^\/rest\/v1\/rpc\/([^/]+)/.exec(p))) return NOM.test(m[1]) ? 'base:rpc:' + m[1] : 'base:rpc';

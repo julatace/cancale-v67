@@ -78,8 +78,8 @@ export const AIDE_ECRANS = {
   ] },
   settings: { article: 'extension', questions: [
     ['Comment installer l’extension ?', 'Télécharge-la et dézippe-la. Dans chrome://extensions, allume « Mode développeur », puis « Charger l’extension non empaquetée » et choisis le dossier.'],
-    ['Comment relier ma boîte e-mail ?', 'Dans Réglages, partie E-mails : VRM te donne ton adresse et la règle à copier dans Gmail, iCloud ou Outlook.'],
-    ['Comment résilier ?', 'Dans Réglages, onglet Abonnement : « Résilier ». Tu gardes VRM jusqu’à la fin du mois payé, et tes données restent intactes.'],
+    ['Comment relier ma boîte e-mail ?', 'Dans Réglages, partie « Mes e-mails » : VRM te donne ton adresse et la règle à copier dans Gmail, iCloud ou Outlook.'],
+    ['Comment résilier ?', 'Dans Réglages, « Mon abonnement » : « Résilier ». Tu gardes VRM jusqu’à la fin du mois payé, et tes données restent intactes.'],
   ] },
   communaute: { article: 'signaler', questions: [
     ['Qui voit ma position ?', 'Les revendeurs de la carte voient une position ARRONDIE, jamais ton adresse ni ton e-mail. Tu peux quitter la carte à tout moment.'],

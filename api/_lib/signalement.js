@@ -100,7 +100,7 @@ export const versionApp = (v) => { const s = String(v == null ? '' : v).trim(); 
 const versionExt = (v) => (/^\d{1,3}\.\d{1,4}\.\d{1,4}$/.test(String(v || '')) ? String(v) : null);
 const entier = (v) => (Number.isInteger(Number(v)) && Number(v) > 0 && Number(v) < 20000 ? Number(v) : null);
 const dateIso = (v) => { const t = Date.parse(String(v || '')); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
-const borne = (v, max) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(max, Math.round(Number(v)))) : null);
+const borne = (v, max) => (v != null && v !== '' && typeof v !== 'boolean' && Number.isFinite(Number(v)) ? Math.max(0, Math.min(max, Math.round(Number(v)))) : null);
 const ecranDeGarde = (v) => { const s = String(v || ''); return ecranValide(s) || ecranValide(s.split(':')[0]); };
 // La capture schématique : des rectangles [x, y, l, h, sorte] dans le cadre de
 // l'écran — que des NOMBRES ; tout autre forme est jetée.
@@ -136,6 +136,15 @@ const lecturesValides = (l) => (Array.isArray(l) ? l : []).slice(-LECTURES_MAX).
   ms: borne(x.ms, 600000),
   at: dateIso(x.at),
 }));
+// (8 nov.) Ce qui a la FORME d'un pseudo dans le message tapé : un mot avec un
+// « _ » ou un point intérieur (marie_dupont, julie.b), ou des lettres suivies de
+// deux chiffres ou plus (julatace3535, lea75). Un pseudo que l'écran ne connaît
+// pas (aucun jeton du mode stream) ne part pas non plus. Seulement le TEXTE tapé :
+// un message d'erreur garde ses noms de code (nettoyés par ailleurs).
+export const masquerPseudos = (t) => String(t == null ? '' : t)
+  .replace(/(^|[^\p{L}\p{N}_{])(?=[\p{L}\p{N}]*[_.][\p{L}\p{N}])[\p{L}\p{N}]+(?:[_.][\p{L}\p{N}]+)+(?![\p{L}\p{N}_])/gu, (m, a) => { const mot = m.slice(a.length); return /^\S+\.(fr|com|net|org|center|io)$/i.test(mot) || !/\p{L}{2,}/u.test(mot) ? m : a + '{pseudo}'; })
+  .replace(/(^|[^\p{L}\p{N}_{])\p{L}{2,}\d{2,}(?![\p{L}\p{N}_])/gu, '$1{pseudo}');
+
 // LE signalement, tel qu'il part ET tel qu'il est rangé. `null` si le texte
 // manque (un signalement vide ne dit rien). Seuls ces champs existent.
 // `opts.masque(texte)` (l'app seulement) : cache en plus ce que l'écran sait
@@ -144,7 +153,7 @@ const lecturesValides = (l) => (Array.isArray(l) ? l : []).slice(-LECTURES_MAX).
 export function normaliserSignalement(c, opts = {}) {
   if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
   const m2 = typeof opts.masque === 'function' ? (t) => { try { return String(opts.masque(t)); } catch (_) { return t; } } : (t) => t;
-  const texte = court(m2(String(c.texte == null ? '' : c.texte)), TEXTE_MAX).trim();
+  const texte = masquerPseudos(court(m2(String(c.texte == null ? '' : c.texte)), TEXTE_MAX)).trim();
   if (texte.length < TEXTE_MIN) return null;
   const l = entier(c.ecranTaille && c.ecranTaille.largeur), h = entier(c.ecranTaille && c.ecranTaille.hauteur);
   const plantages = (Array.isArray(c.plantages) ? c.plantages : []).slice(-PLANTAGES_MAX).filter((p) => p && typeof p === 'object').map((p) => ({
@@ -190,7 +199,7 @@ export function lignesApercu(s) {
     ['Connexion', s.enLigne === true ? 'en ligne' : s.enLigne === false ? 'hors connexion' : '—'],
     ['Capture de l’écran', s.plan ? `schéma, ${s.plan.b.length} blocs, sans texte` : 'pas prise'],
     ['État de l’écran', s.etatEcran ? `${s.etatEcran.boutons} boutons · ${s.etatEcran.champs} champs${s.etatEcran.gardeFou ? ' · écran tombé' : ''}${s.etatEcran.squelettes ? ' · en chargement' : ''}` : '—'],
-    ['Lectures récentes', s.lectures.length ? `${s.lectures.length}${(() => { const n = s.lectures.filter((x) => !(x.s >= 200 && x.s < 400)).length; return n ? `, dont ${n} en échec` : ', toutes réussies'; })()}` : 'aucune notée'],
+    ['Requêtes récentes', s.lectures.length ? `${s.lectures.length}${(() => { const n = s.lectures.filter((x) => !(x.s >= 200 && x.s < 400)).length; return n ? `, dont ${n} en échec` : ', toutes réussies'; })()}` : 'aucune notée'],
     ['Erreurs de cet appareil', s.plantages.length ? `${s.plantages.length}` : 'aucune notée'],
   ];
   return L;

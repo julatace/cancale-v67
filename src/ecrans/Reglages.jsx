@@ -1740,6 +1740,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'conseils-revoir', type:'action', ic:'sync', lib:'Revoir les conseils', desc:'Ceux que tu as passés ou masqués pourront revenir.', onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? 'Les conseils pourront revenir.' : 'Pas pu enregistrer — réessaie.')); }, data:{ 'data-reglage-conseils-revoir':'' } },
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
+      // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
+      { id:'centre-aide', type:'action', ic:'info', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
