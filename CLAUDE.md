@@ -509,6 +509,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · Démarrage léger** : 14 écrans sortis d'App.jsx vers `src/ecrans/*.jsx`, chargés à la demande (`scripts/decouper-app.cjs`, découpe mécanique ; balises `// ⟦→ ecrans/X.jsx #k⟧` à ne pas effacer) ; morceau App 1 223 → 808 Ko gz ; feuilles de l'app dans `src/stylesApp.js` (index.css 668 → 18 Ko, cascade identique) ; App préchargé par `public/demarrage-app.js` ; audits : `scripts/_source-app.cjs` (`brancher()`) recolle le texte d'origine. `docs/passation/2026-11-08-demarrage-leger.md`. Geste : aucun.
 - **8 nov. · Colis vendus partis d'après le transporteur** : vente « à envoyer » (Vestiaire, Vinted) dont le n° EXACT est pris en charge chez Chronopost/Vinted Go ⇒ « Envoyés » avec la raison, partout (Colis, Ma journée, cloche, widget, rappels) ; lignes à part `depart_*` (jamais `transp_`, jamais « à retirer ») ; Mondial Relay/Colissimo pas lus. `docs/passation/2026-11-08-colis-sortants.md`. Geste : aucun.
 - **8 nov. · Retraits : le suivi lu sort un colis en le disant** : un e-mail rangé « vinted »/« autre » se lit par la forme du n° (`carrierLuDeLigne`) ; deux `transp_` pour un n° ⇒ la lue (`indexTranspParSuivi`, app = serveur = cron) ; une lecture après 30 j ; Colis → À retirer « Sortis de « à retirer » » (« Mondial Relay : retiré le 5 nov. », 3 j, hors compte) et « pourquoi pas lu » + geste (`src/retraitSuivi.js`) ; widget : jamais un n° de ses bordereaux. `docs/passation/2026-11-08-retraits-suivi.md`. Geste : aucun.
 
@@ -548,10 +549,6 @@ sans la fonction.
 - **6 nov. · Accompagnement (v36)** : visite à 4 bulles ; conseils = 1 bulle non modale sur le VRAI bouton (halo, Plus tard, Ne plus montrer), 2/jour, 1/écran, 3 j de repos, sur un chiffre publié par l'écran (`<ChiffreConseil>`, pas su ⇒ rien), « vu » écrit d'abord dans `vrm_accompagnement` (rev) ; `src/accompagnement.js`, `audit-conseils`. `docs/passation/2026-11-06-accompagnement.md`. Geste : aucun.
 
 - **6 nov. · Facture Pro (v36)** : bouton « Envoyer la facture » sur la LIGNE de la vente seulement si l'acheteur est PROUVÉ (même n° de transaction Vinted + e-mail Pro, heure −2/+15 min, montant ; sinon la raison, `src/facturePro/rattachement.js`, relue par le serveur) ; envoi PAR VRM (From « … via VRM », Reply-To et Cc au vendeur, 50/jour) ; « Ma facture » avec aperçu en direct. `docs/passation/2026-11-06-facture-pro.md`. Geste : remplir Ma facture, poser `RELANCES_SMTP_*`.
-
-- **6 nov. · Onglets D (Annonces, Compta, Statistiques, Paramètres)** : sa base recalculée = l'app (25 mois de CA, 49 en ligne, 19 vendues) ; une vente « à dater » vendue ET lue finalisée la même année compte dans le CA de l'ANNÉE, jamais d'un mois (`src/aDaterAnnee.js` ; seuils, revenus, DAC7, « CA de l'année » de Ventes) ; « Déclarer » en 3 étapes avec « ? » ; Annonces « Prochain geste » ; Paramètres par intention, une phrase par réglage. `docs/passation/2026-11-06-onglets-d.md`. Geste : Compta → Déclarer octobre.
-
-- **6 nov. · Finitions (v36)** : « Plus tard » revient après 7 j (et relu au nuage) ; N° d'archive remis en vente ⇒ « à écrire sur tes cartons » ; Actions à deux comptes dit « Prix mini : possible » ; Colis une voix de fraîcheur ; `data-aller-chercher` ; « — » de Compta au jeton ; une paire en ligne deux fois = ambre seul, plus le rouge ; banc transporteurs à la forme du 3 nov. + ambre sombre, phrase « code postal », « transporteur pas encore connu ». `docs/passation/2026-11-06-finitions.md`. Geste : aucun.
 
 
 
@@ -610,6 +607,7 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 
 ```
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
+src/ecrans/*.jsx                écrans découpés d'App.jsx, chargés à la demande (scripts/decouper-app.cjs ; audits : scripts/_source-app.cjs)
 vinted-sync-extension/          background.js · inject.js · content.js · bridge.js · lbc*.js · vc*.js
 api/                            12 fonctions : email-inbound · push · widget · ship-reminders · ai · ebay · compte · relais …
 api/_lib/                       règles partagées serveur (copies refabriquées des règles de l'app)
