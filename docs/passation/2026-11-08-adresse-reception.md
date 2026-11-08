@@ -94,11 +94,16 @@ réception. Sans `DOMAINE_RECEPTION`, aucune ligne de code neuve ne s'exécute �
   index d'un autre réécrit · remplacée pas marquée · quarantaine ratée acquittée · lien hors
   Google rendu.
 - Banc `scripts/bancs/adresse-reception.cjs` (390 tactile / 1512, clair/sombre, refus, pas
-  ouverte, pas su), captures regardées.
+  ouverte, pas su) : 70 ✅ · 0 ❌, captures regardées. La première capture montrait les cartes
+  coupées au bord droit au téléphone (une cellule de grille élargie par le schéma) : le
+  contrôle « rien ne déborde » jugeait la feuille, pas l'écran — il est durci (il échoue
+  sur le CSS d'avant : 4 ❌) et le CSS corrigé (`minmax(0,1fr)`, domaine sur sa ligne).
 - Verts : `npm run build`, `audit-fonctions-api`, `audit-preuve-adresse`, `audit-email-cle`,
   `audit-secrets`, `audit-politique-hotes`, `audit-jeton-index`, `audit-vendeur-neutre`,
-  `audit-email-rattacher`, `audit-proprietaire-email`, `audit-cle-service`, et les 40 audits
-  qui nomment `email-inbound`.
+  `audit-email-rattacher`, `audit-proprietaire-email`, `audit-cle-service`, `audit-violet`,
+  `audit-rouge-doublon`, `audit-composants`, `audit-icones`, `audit-coherence`, et les 40
+  audits qui nomment `email-inbound`. `audit-politique-hotes` : les 4 liens « Ouvrir Gmail /
+  iCloud / Outlook / Yahoo » ajoutés à sa liste fermée (liens ouverts d'un clic).
 
 ## Reste / limites
 - Quiconque connaît l'adresse peut y écrire (c'est le principe : l'adresse est la preuve).
