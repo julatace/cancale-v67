@@ -1375,7 +1375,7 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
           {!on ? <p className="vrm-notif-apercu-coupee">Coupée : rien de cette famille ne sonne.</p> : null}
           {ap.exemples.map((e, i) => (
             <div key={i} className="vrm-notif-bulle" data-apercu-notif={i} data-apercu-exemple={e.exemple?'1':undefined}>
-              <div className="vrm-notif-bulle-tete"><img src="/vrm-icon-v4-192.png" alt="" width="18" height="18"/><span>VRM</span><span className="vrm-notif-bulle-quand">maintenant</span></div>
+              <div className="vrm-notif-bulle-tete"><img src="/vrm-icon-v5-192.png" alt="" width="18" height="18"/><span>VRM</span><span className="vrm-notif-bulle-quand">maintenant</span></div>
               <b className="vrm-notif-bulle-titre">{e.title}</b>
               <span className="vrm-notif-bulle-corps">{e.body}</span>
               <span className="vrm-notif-bulle-mene" data-apercu-mene="">Toucher ouvre : {e.mene}</span>

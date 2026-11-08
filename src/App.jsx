@@ -11948,7 +11948,7 @@ function pushNotif(title, body, vers){
   try{
     if(typeof Notification!=='undefined' && Notification.permission==='granted'){
       // (5 nov.) En mode stream, la notification affichée suit la même règle que l'écran.
-      const n=new Notification(textePourStream(title), { body: textePourStream(body), icon:'/vrm-icon-v4-192.png', badge:'/vrm-icon-v4-192.png' });
+      const n=new Notification(textePourStream(title), { body: textePourStream(body), icon:'/vrm-icon-v5-192.png', badge:'/vrm-icon-v5-192.png' });
       if(vers) n.onclick=()=>{ try{ window.focus(); }catch(_){} try{ window.dispatchEvent(new CustomEvent('vrm:aller',{detail:vers})); }catch(_){} try{ n.close(); }catch(_){} };
       return true;
     }
@@ -13441,7 +13441,7 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
 let _logoSeq = 0;
 // Identité officielle : logo VRM angulaire choisi par Julien (piste 02).
 function VrmLogo({ size = 40, style, anim = false }) {
-  return <img src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-brand-asset vrm-logo-anim' : 'vrm-logo vrm-brand-asset'}
+  return <img src="/vrm-logo-v5-192.png" srcSet="/vrm-logo-v5-96.png 96w, /vrm-logo-v5-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-brand-asset vrm-logo-anim' : 'vrm-logo vrm-brand-asset'}
     style={{ width: size, height: size, borderRadius: 0, objectFit: 'contain', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
@@ -15769,7 +15769,7 @@ function AuthScreen() {
         <div className="vrm-cx-etiquettes" aria-hidden="true"><span>Colis prêt</span><span>Bordereau imprimé</span><span>Vendu sur Vinted</span><span>Retirée de Leboncoin</span></div>
         <div className="vrm-cx-haut">
           <a href="/" className="vrm-cx-logo" aria-label="VRM — page d'accueil">
-            <img src="/vrm-logo-v4-192.png" alt="" width="36" height="36"/><b>VRM</b>
+            <img src="/vrm-logo-v5-192.png" alt="" width="36" height="36"/><b>VRM</b>
           </a>
           {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
               pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
@@ -26568,7 +26568,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
 //   L'ancienne palette violait 3 fois (bleu≈accent, rouge≈danger, ambre≈warn).
 //   Ces 6 teintes (6 nov., v36-visuel-2 : plus aucun violet ni indigo, §3 — audit-violet.cjs) sont toutes loin des couleurs réservées (des deux thèmes) et
 //   distinctes entre elles — vérifié par `audit-couleurs-comptes.cjs`.
-const ACCT_COLORS = ['#27ae60','#00b8a9','#9acd32','#17a9c9','#5f7f9b','#8e8e93'];
+const ACCT_COLORS = ['#4F8A68','#3A8C8C','#8C8A4A','#5F7F9B','#9A846C','#7C7C82'];   // (8 nov., « beauté ») sauge · sarcelle · olive · ardoise · grège · graphite : calmes, distinctes, aucune ne crie
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 // ── « RETOURS EN COURS » (Colis, 21 octobre) ─────────────────────────────────
 // Rend la sortie de `retoursEnCours` (src/retoursStock.js) — aucune règle ici.
@@ -47481,7 +47481,7 @@ function AbonnementRequis({ info }) {
   return (
     <div data-abonnement-requis="" style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
-        <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 12, display: 'block' }}/>
+        <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v5-192.png" srcSet="/vrm-logo-v5-96.png 96w, /vrm-logo-v5-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 12, display: 'block' }}/>
         <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
         <div style={{ fontSize: 15, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined} data-paiement-ferme={paiementFerme ? '' : undefined}>
           {impaye
@@ -47631,7 +47631,7 @@ const boiteEquipe = () => ({ maxWidth: 760, margin: '0 auto' });
 function TeteEquipe({ titre, sous, onPropre }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-      <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="44px" alt="VRM" width="36" height="36" style={{ borderRadius: 12, display: 'block' }}/>
+      <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v5-192.png" srcSet="/vrm-logo-v5-96.png 96w, /vrm-logo-v5-192.png 192w" sizes="44px" alt="VRM" width="36" height="36" style={{ borderRadius: 12, display: 'block' }}/>
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: -0.3 }}>{titre}</div>
         {sous && <div style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{sous}</div>}
