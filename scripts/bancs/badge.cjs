@@ -192,8 +192,8 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await pg.waitForTimeout(400);
     const l = await lire(pg);
-    dit(l.carteVisible && /C’est fait : l’extension est connectée à sophie@exemple\.fr/.test(l.carte) && !l.iframe, 'connecté : le formulaire part, la carte reste ouverte et NOMME le compte', l.carte.replace(/\n/g, ' · ').slice(0, 200));
-    dit(!/connecte-toi|Reconnecte-toi/i.test(l.carte) && /avant ta connexion/.test(l.carte) && !l.point, '« Tes données » : un refus d’avant la connexion ne dit plus « connecte-toi », et rien ne s’allume', l.carte.replace(/\n/g, ' · ').slice(0, 260));
+    dit(l.carteVisible && /sophie@exemple\.fr/.test(l.carte) && /C’est fait/.test(l.carte) && !l.iframe, 'connecté : le formulaire part, la carte reste ouverte et NOMME le compte', l.carte.replace(/\n/g, ' · ').slice(0, 200));
+    dit(!/connecte-toi|Reconnecte-toi|refusé/i.test(l.carte) && /prochains envois partent/.test(l.carte) && !l.point, '« Tes données » : un refus d’avant la connexion ne dit plus « connecte-toi », et rien ne s’allume', l.carte.replace(/\n/g, ' · ').slice(0, 260));
     await pg.screenshot({ path: path.join(SORTIE, 'badge-connecte-depuis-carte.png') });
     await ctx.close();
   });
@@ -473,7 +473,7 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
   });
   await essaie('graphisme', async () => {
     // 5.328 : verre (fond translucide) clair et sombre.
-    for (const [scheme, fond, accent] of [['dark', 'rgba(28, 28, 30, 0.82)', 'rgb(10, 132, 255)'], ['light', 'rgba(255, 255, 255, 0.82)', 'rgb(0, 113, 227)']]) {
+    for (const [scheme, fond, accent] of [['dark', 'rgba(28, 28, 30, 0.92)', 'rgb(10, 132, 255)'], ['light', 'rgba(255, 255, 255, 0.88)', 'rgb(0, 113, 227)']]) {
       const { ctx, pg } = await rendre(nav, AC(), { scheme });
       const l = await lire(pg);
       dit(l.fondQ === fond && l.accentQ === accent, `${scheme} : la carte suit le système (verre, jetons de l’app, un seul bleu)`, JSON.stringify({ fond: l.fondQ, accent: l.accentQ }));

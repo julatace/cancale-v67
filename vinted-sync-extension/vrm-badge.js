@@ -56,11 +56,11 @@
      violet ; verre clair et sombre qui suivent le système ; rayons 12 / 14. */
   :host { all: initial;
     --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --filet: rgba(84,84,88,.45); --texte: #F5F5F7; --doux: #98989D; --pale: #8E8E93;
-    --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); --verre: rgba(28,28,30,.82);
+    --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); --verre: rgba(28,28,30,.92);
     --ombre: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6); }
   @media (prefers-color-scheme: light) {
     :host { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
-      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.82);
+      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.88);
       --ombre: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14); }
   }
   * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -300,7 +300,7 @@
     else if (v.connecte) compteVrm = `<div class="val">${esc(v.email || 'connecté')}</div>`;
     else if (v.expiree) compteVrm = `<div class="val alerte">Session expirée${v.email ? ' (' + esc(v.email) + ')' : ''} — reconnecte-toi ci-dessous</div>`;
     else compteVrm = '<div class="val alerte">Pas connecté — connecte-toi ci-dessous</div>';
-    if (v && v.connecte && justeConnecte) compteVrm += `<div class="val" data-juste-connecte>C’est fait : l’extension est connectée${v.email ? ' à <b>' + esc(v.email) + '</b>' : ''}.</div>`;
+    if (v && v.connecte && justeConnecte) compteVrm += '<div class="val gris" data-juste-connecte>C’est fait : l’extension est connectée.</div>';
 
     const nomSite = NOM_SITE[e.plateforme] || 'ce site';
     let compteSite;
@@ -326,7 +326,7 @@
       if (v && v.connecte === false) {
         flux = '<div class="val gris" data-flux-attente>En attente : connecte l’extension pour envoyer tes données.</div>';
       } else if (f.koAt && (!f.okAt || f.koAt > f.okAt) && (f.koStatut === 'sans_session' || refusAvantConnexion(f, v))) {
-        flux = `<div class="val gris" data-refus-avant>Dernier envoi refusé ${esc(depuis(f.koAt))}, avant ta connexion — les prochains partent avec ta session.</div>${historiqueRefus(f)}`;
+        flux = `<div class="val gris" data-refus-avant>Connecté : les prochains envois partent avec ta session.</div>${historiqueRefus(f)}`;
       } else if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
         flux = `<div class="val alerte" data-refus-cause="${esc(String(f.koStatut == null ? 'inconnu' : f.koStatut))}">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>${historiqueRefus(f)}`;
       } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val" data-flux-ok>Tes données sont à jour · ${esc(depuis(f.okAt))}</div>`;

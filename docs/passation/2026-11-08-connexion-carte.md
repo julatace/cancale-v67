@@ -75,7 +75,7 @@ connexion dedans (iframe de l'extension posé sous l'état, gardé d'un rendu à
 le cadre via `__vrmCarte` — « prete » et « hauteur », rien d'autre ne sort du cadre) ; plus de
 « VRM s'ouvre… rien à taper » ; « Pas connecté — connecte-toi ci-dessous » ; un formulaire ouvert ne se
 ferme pas au survol ; cadre pas affiché en 6 s ⇒ la carte le dit et propose « Se connecter avec VRM ».
-Connecté depuis la carte ⇒ elle reste ouverte : « C'est fait : l'extension est connectée à <email> ».
+Connecté depuis la carte ⇒ elle reste ouverte, nomme le compte et dit « C’est fait : l’extension est connectée. » ; un refus d’avant la connexion devient « Connecté : les prochains envois partent avec ta session. »
 Tout est à jour ⇒ « Tes données sont à jour · il y a 2 min ».
 
 **5. Pas d'envoi, pas de « refus », sans connexion** (`supabaseUpsert`, `appelCommandesServeur`,
