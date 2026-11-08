@@ -28,7 +28,7 @@ export function BoutonBase({ variante = 'secondaire', taille, icone, plein = fal
   const ic = icone ? rendreIcone(icone, taille === 'petit' ? 16 : 18) : null;
   const contenu = <>{occupe?<svg className="vrm-b-indicateur" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="7" opacity=".25"/><path d="M10 3a7 7 0 0 1 7 7" strokeLinecap="round"/></svg>:ic || null}{children}</>;
   const occ = occupe ? { 'aria-busy': 'true', disabled: true } : {};
-  if (href) return <a href={href} className={cls} {...rest} {...(occupe ? { 'aria-busy': 'true', 'aria-disabled': 'true' } : {})}>{contenu}</a>;
+  if (href) return <a href={occupe ? undefined : href} className={cls} {...rest} {...(occupe ? { role: 'link', tabIndex: -1, 'aria-busy': 'true', 'aria-disabled': 'true', onClick: e => e.preventDefault(), onAuxClick: e => e.preventDefault() } : {})}>{contenu}</a>;
   // Type écrit en clair (audit-commandes) : « submit » seulement quand on le
   // demande, sinon « button » — jamais un envoi de formulaire par défaut.
   if (type === 'submit') return <button type="submit" className={cls} {...rest} {...occ}>{contenu}</button>;
