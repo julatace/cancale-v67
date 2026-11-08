@@ -228,7 +228,8 @@ async function charger() {
   dit(/registrePointsConnus\(\[[\s\S]{0,300}tracking[\s\S]{0,300}colisRelais[\s\S]{0,300}lieuTransporteurRepare/.test(A), 'H2 le registre lit tous les e-mails, les conversations et les lectures chez le transporteur', '');
   dit(/memePoint\(lpA, lqA\) && completudeLieu\(lqA\) > completudeLieu\(lpA\)/.test(A), 'H3 deux lignes du même n° : l’adresse complète du même point gagne', '');
   dit(/const sansVille = new Set\(pointsSansVille\(vueTout\)\)/.test(C) && /vChoisie\.points\.includes\(p\.cle\) \|\| sansVille\.has\(p\.cle\)/.test(C), 'H4 une ville choisie ne cache NI « Lieu à confirmer » NI un point sans ville', '');
-  dit(/export const villesDesPoints = \(vue\) => villesDesPointsRegle\(vue, optionsVille\(\)\)/.test(C) && /villesDesPoints\(parPoint\)/.test(A), 'H5 la carte sombre et le sélecteur : la MÊME règle, les mêmes sources', '');
+  // (8 nov.) Le sélecteur est `selecteurVilles` (villes avec colis + « Autres ») : la carte sombre lit le même.
+  dit(/export const selecteurVilles = \(vue\) => selecteurVillesRegle\(vue, optionsVille\(\)\)/.test(C) && /const villes = selecteurVilles\(vueTout\)/.test(C) && /selecteurVilles\(parPoint\)/.test(A), 'H5 la carte sombre et le sélecteur : la MÊME règle, les mêmes sources', '');
 
   console.log(`\n${ok} ✅ · ${ko} ❌${MUT ? ' (mutation ' + MUT + ')' : ''}`);
   process.exit(ko ? 1 : 0);

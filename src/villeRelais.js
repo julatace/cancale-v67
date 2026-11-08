@@ -115,12 +115,23 @@ export function villeDuPoint(p, { communes = null, villeCarte = null } = {}) {
 // Rend [{ cle, nom, n, points: [cle de point], cps }] (≥ 2 villes, sinon []).
 // `n` = les colis COMPTÉS (`!horsCompte`) des points de cette ville — le même
 // nombre que la carte sombre et que la section de la ville.
+// (8 nov., Julien : « adapter les villes en fonction des points relais où sont les colis ») L'URGENCE
+// d'un point : le nombre de jours avant la limite la plus proche de ses colis COMPTÉS (lue, sinon ce qui
+// reste de la garde de son transporteur — `triPoint`, posé par `pointsARetirer`), sinon 99.
+export const urgencePoint = (p) => { const t = p && Number.isFinite(p.triPoint) ? p.triPoint : (p && Number.isFinite(p.prochaineLimite) ? p.prochaineLimite : null); return t == null ? 99 : t; };
+const compteDuPoint = (p) => (p.arrives || []).filter((c) => !c.horsCompte).length;
 export function villesDesPoints(vue, opts = {}) {
+  const l = villesAvecColis(vue, opts);
+  return l.length >= 2 ? l : [];
+}
+// Toutes les villes où un colis ATTEND vraiment (≥ 1 colis compté), même une seule.
+// Triées par URGENCE (la limite la plus proche d'abord), puis par nombre, puis par nom.
+export function villesAvecColis(vue, opts = {}) {
   const lus = [];
   for (const p of ((vue && vue.points) || [])) {
     const v = villeDuPoint(p, opts);
     if (!v) continue;
-    lus.push({ p, v, n: (p.arrives || []).filter((c) => !c.horsCompte).length });
+    lus.push({ p, v, n: compteDuPoint(p) });
   }
   // Deux villes du même nom dans deux départements : deux boutons. Une ville
   // lue SANS code postal rejoint son homonyme seulement s'il n'y en a qu'un.
@@ -130,14 +141,26 @@ export function villesDesPoints(vue, opts = {}) {
   for (const x of lus) {
     const ds = depts.get(x.v.cle);
     const cle = ds.size > 1 ? `${x.v.cle}|${x.v.dept || '?'}` : x.v.cle;
-    const g = m.get(cle) || { cle, n: 0, points: [], noms: [], cps: [], dept: ds.size > 1 ? (x.v.dept || '') : '' };
+    const g = m.get(cle) || { cle, n: 0, points: [], noms: [], cps: [], dept: ds.size > 1 ? (x.v.dept || '') : '', urgence: 99 };
     g.n += x.n; g.points.push(x.p.cle); g.noms.push(x.v.nom); if (x.v.cp && !g.cps.includes(x.v.cp)) g.cps.push(x.v.cp);
+    if (x.n > 0) g.urgence = Math.min(g.urgence, urgencePoint(x.p));
     m.set(cle, g);
   }
   const l = [...m.values()].map((g) => {
     const nom = g.cle.startsWith('cp:') ? g.cle.slice(3) : joliNomVille(g.noms);
-    return { cle: g.cle, nom: g.dept ? `${nom} (${g.dept})` : (ds2(g) ? `${nom} (?)` : nom), n: g.n, points: g.points, cps: g.cps };
-  }).filter((x) => x.n > 0).sort((a, b) => b.n - a.n || a.nom.localeCompare(b.nom, 'fr'));
+    return { cle: g.cle, nom: g.dept ? `${nom} (${g.dept})` : (ds2(g) ? `${nom} (?)` : nom), n: g.n, points: g.points, cps: g.cps, urgence: g.urgence };
+  // Une ville sans nom lisible, ou sans colis compté (que des « à vérifier », que des colis en route) : pas de bouton.
+  }).filter((x) => x.n > 0 && String(x.nom || '').trim()).sort((a, b) => a.urgence - b.urgence || b.n - a.n || a.nom.localeCompare(b.nom, 'fr'));
+  return l;
+}
+// LE SÉLECTEUR DE « À RETIRER » : les villes avec colis, puis « Autres » — les points CONNUS dont la
+// ville n'est pas lue, où un colis compté attend (jamais le point « pas encore connu », qui reste sous
+// « Lieu à confirmer » quel que soit le choix). Rend [] quand il n'y a pas au moins deux choix.
+export const CLE_AUTRES = '__autres';
+export function selecteurVilles(vue, opts = {}) {
+  const l = villesAvecColis(vue, opts);
+  const autres = ((vue && vue.points) || []).filter((p) => !p.inconnu && !villeDuPoint(p, opts) && compteDuPoint(p) > 0);
+  if (autres.length) l.push({ cle: CLE_AUTRES, nom: 'Autres', n: autres.reduce((t, p) => t + compteDuPoint(p), 0), points: autres.map((p) => p.cle), cps: [], urgence: Math.min(...autres.map(urgencePoint)), autres: true });
   return l.length >= 2 ? l : [];
 }
 const ds2 = (g) => g.cle.endsWith('|?');

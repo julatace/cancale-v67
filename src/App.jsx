@@ -355,7 +355,8 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur, lieuTransporteurRepare } from "./relaisColis.js";
 import { registrePointsConnus, completerParPointConnu, lieuLePlusComplet, memePoint, completudeLieu, cleTransporteurLieu } from "./villeRelais.js";
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
-import CarteRelaisColis, { ColonneRetirer, villesDesPoints } from "./CarteRelais.jsx";
+import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais.jsx";
+import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
@@ -42528,6 +42529,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (jl === 1) return { t: 'jusqu’à demain', ambre: true, code: 'demain' };
             const d = new Date(String(lim).slice(0, 10) + 'T12:00:00');
             return Number.isFinite(d.getTime()) ? { t: `jusqu’au ${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`, code: 'date' } : null; };
+          // (8 nov., Julien : « une barre d'évolution avec le délai pour retirer ») LES DATES DE LA BARRE, des MÊMES
+          // sources que le détail (`arriveeRetrait`) : l'arrivée LUE, la limite LUE (ou « vers le » du transporteur,
+          // ou la garde de SON transporteur — dites « estimée »). Pas d'arrivée ⇒ pas de barre (src/delaiRetrait.js).
+          const delaiColisRetrait = (x) => { if (x.horsCompte) return null; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
+            const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
+            const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
+            if (!arr || !Number.isFinite(arr.ms)) return null;
+            const lim = t ? t.limite : (ev && ev.limite), limAt = t ? t.limiteAt : (ev && ev.limiteAt), vers = t ? t.limiteVers : (ev && ev.limiteVers);
+            if (lim || limAt) return delaiRetrait({ arriveeMs: arr.ms, limite: lim || null, limiteAt: limAt || null }, Date.now());
+            if (vers) return delaiRetrait({ arriveeMs: arr.ms, limite: String(vers).slice(0, 10), estimee: true }, Date.now());
+            const est = limiteEstimee({ arriveeMs: arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' });
+            return est ? delaiRetrait({ arriveeMs: arr.ms, limite: est.jour, estimee: true }, Date.now()) : null; };
           const statutAVerifier = (x) => { const r = String(x.raisonVerif || '') + ' ' + String(x.raisonCode || '');
             // (6 nov.) Deux sources datées qui se contredisent (api/_lib/etat-colis.js) : ni « incident » ni « retour ».
             if (/rien ne l[’']explique/i.test(r)) return 'Contradiction';
@@ -42606,7 +42619,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!baseKO && onglet === 'retirer' ? (() => {
               // Une ville choisie : les nombres de SA sélection (les lignes de ses points, les mêmes listes) ;
               // « Toutes » : ceux de Ma journée (`vrm_colis_retirer`) et de `pickupUnion`.
-              const vs = villesDesPoints(parPoint); const vc = vs.find((v) => v.cle === villeRetrait);
+              const vs = selecteurVilles(parPoint); const vc = vs.find((v) => v.cle === villeRetrait);
               if (vc) { const pts = parPoint.points.filter((p) => vc.points.includes(p.cle)); const rows = pts.flatMap((p) => p.arrives); const cpt = rows.filter((c) => !c.horsCompte);
                 const nD = cpt.filter((c) => c.jours != null && c.jours <= 1).length, nC = cpt.filter((c) => c.code || c.qr).length, nV = rows.filter((c) => c.horsCompte).length;
                 return <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre={vc.nom} data-fu-colis-retirer={String(cpt.length)} data-fu-ville={vc.cle} valeur={<>{cpt.length} colis</>} sous="à retirer"
@@ -42716,7 +42729,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <p className="vrm-colis-note" data-pickup-sans-compte={n}>{n>1?`${n} colis sont arrivés`:'1 colis est arrivé'} sur une adresse e-mail reliée à aucun de tes comptes Vinted : ils sont ci-dessous. Relie l’adresse pour qu’ils comptent.{' '}
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
-                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
+                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
                       fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
