@@ -10,12 +10,18 @@
 //  Et : le logo, c'est CELUI de l'app — jamais l'ancien bouton orange.
 //
 //  ⚠️ Ce que cette carte ne fait PAS, exprès :
-//  - aucun formulaire dans la page. Le mot de passe se tape dans un iframe de
-//    l'EXTENSION (popup.html?mode=carte) : les scripts du site ne peuvent ni lire
-//    le champ ni écouter le clavier. Dans le DOM de vinted.fr, ils le pouvaient.
-//    5.328 (Julien, 8 nov., iPhone Orion : « mets directement l'endroit de
-//    connexion avec le mot de passe, le Google, Discord ») : cet iframe est
-//    posé DANS la carte dès qu'on n'est pas connecté — plus de détour par VRM.
+//  - aucun onglet, aucune redirection pour se connecter. 5.329 (Julien, 8 nov.,
+//    22 h, iPhone Orion : « je veux avoir les outils de connexion directement
+//    là, et que ça n'ouvre AUCUN autre onglet ») : la 5.328 posait un iframe de
+//    l'extension (popup.html?mode=carte) ; Orion ne l'affichait pas, et au bout
+//    de 6 s la carte proposait « Se connecter avec VRM », qui OUVRAIT VRM.
+//    Le formulaire (e-mail + mot de passe VRM) est maintenant DESSINÉ ICI, dans
+//    la shadow root FERMÉE de la carte : la page ne peut ni lire les champs
+//    (`hote.shadowRoot` vaut null pour elle) ni les retrouver dans son DOM ; les
+//    événements du clavier et de saisie sont arrêtés à la frontière de la carte
+//    (`bouclier`) ; le mot de passe part UNE fois au service worker
+//    (`authLogin`), jamais gardé, jamais dans une adresse, jamais `postMessage`.
+//    « Se connecter avec VRM » n'existe plus dans la carte.
 //  - aucune lecture de données, aucune requête vers le site : l'état vient du
 //    service worker (session VRM, cookie du site, ce que les écritures ont noté).
 //  - aucune couleur quand tout va bien (§7). L'ambre ne s'allume que s'il y a
@@ -57,10 +63,12 @@
   :host { all: initial;
     --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --filet: rgba(84,84,88,.45); --texte: #F5F5F7; --doux: #98989D; --pale: #8E8E93;
     --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); --verre: rgba(28,28,30,.92);
+    --champ: rgba(118,118,128,.24); --anneau: rgba(10,132,255,.35);
     --ombre: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6); }
   @media (prefers-color-scheme: light) {
     :host { --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --filet: rgba(60,60,67,.14); --texte: #1D1D1F; --doux: #6E6E73; --pale: #8E8E93;
       --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); --verre: rgba(255,255,255,.88);
+      --champ: #FFFFFF; --anneau: rgba(0,113,227,.25);
       --ombre: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14); }
   }
   * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -103,12 +111,26 @@
   .q { font-size: 14px; font-weight: 600; margin: 2px 0 4px; }
   .q b { font-weight: 700; }
   .err { margin-top: 8px; font-size: 12px; color: var(--ambre); }
-  /* 5.328 : la connexion (iframe de l'extension) est DANS la carte, sous l'état ;
-     sa hauteur suit le formulaire (le cadre la donne) : un seul défilement. */
-  .connexion { margin: 4px -14px -12px; border-top: 1px solid var(--filet); }
+  /* 5.329 : le formulaire est DANS la carte (shadow root fermée), sous l'état. */
+  .connexion { margin: 4px -14px -12px; border-top: 1px solid var(--filet); padding: 12px 14px 14px; }
   .connexion[hidden] { display: none; }
-  .connexion iframe { width: 100%; height: 470px; border: 0; display: block; background: transparent; }
-  .connexion .secours { padding: 10px 14px 12px; }
+  .cx .lab { display: block; font-size: 12px; color: var(--doux); font-weight: 500; margin: 10px 0 4px; }
+  .cx .lab:first-child { margin-top: 0; }
+  .cx input { display: block; width: 100%; min-height: 44px; padding: 0 12px; margin: 0; border-radius: 10px; border: 1px solid var(--bord);
+    background: var(--champ); color: var(--texte); font-size: 16px; line-height: 1.2; outline: none; -webkit-appearance: none; appearance: none; }
+  .cx input::placeholder { color: var(--pale); }
+  .cx input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--anneau); }
+  .cx .aide { font-size: 12px; color: var(--doux); margin-top: 8px; }
+  .cx .b { margin-top: 12px; }
+  .cx .b + .b { margin-top: 8px; }
+  .cx .oubli { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-size: 13px; text-decoration: none; }
+  .cx .ou { display: flex; align-items: center; gap: 10px; color: var(--pale); font-size: 12px; margin: 12px 0 0; }
+  .cx .ou::before, .cx .ou::after { content: ''; flex: 1; height: 1px; background: var(--filet); }
+  .cx .fourn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .cx .etat { margin-top: 8px; font-size: 12px; color: var(--doux); }
+  .cx .err { margin-top: 10px; }
+  .cx [hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) { .b, .btn { transition: none; } }
   .fermer { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent;
     color: var(--doux); font-size: 18px; cursor: pointer; line-height: 44px; padding: 0; }
   .fermer:hover { background: var(--survol); color: var(--texte); }
@@ -142,7 +164,7 @@
   // ce compte » qui permet de revenir sur un « Non ») n'était joignable qu'à la
   // souris. On mesure l'ENTRÉE du geste (`pointerType`), jamais « c'est un
   // téléphone » : au doigt, toucher le logo OUVRE la carte, qui porte le geste
-  // du logo dans un bouton (« Ouvrir VRM » / « Se connecter avec VRM »).
+  // du logo dans un bouton (« Ouvrir VRM »), ou le formulaire de connexion.
   let dernierPointeur = '';
   let doigt = false;    // la carte est ouverte au doigt : elle porte son bouton et sa croix
   const sansSurvol = () => { try { return matchMedia('(hover: none)').matches; } catch (_) { return false; } };
@@ -381,14 +403,15 @@
     }
 
     // 5.328 : pas connecté ⇒ le formulaire est juste en dessous, rien à dire de plus.
-    const formulaire = !!(v && v.connecte === false) || (!v && formulaireDemande);
+    const formulaire = !!(v && v.connecte === false) || (!v && formulaireDemande) || changerCompte;
     const pied = (doigt || !(v && v.connecte)) ? '' : 'Clique sur le logo pour <b>ouvrir VRM</b>.';
     // Julien, 27 oct. : « je veux pouvoir me connecter à mon compte VRM depuis
     // Vestiaire et Leboncoin aussi ». Les gestes sont dans la carte sur TOUS
     // les sites et à la souris comme au doigt ; « Changer de compte VRM » ouvre
     // VRM, qui relie l'extension au compte connecté DANS l'app (la session est
     // celle du navigateur : elle vaut pour Vinted, Leboncoin et Vestiaire).
-    const gesteDoigt = v && v.connecte
+    const gesteDoigt = v && v.connecte && changerCompte ? ''
+      : v && v.connecte
       ? `<div class="gestes">${doigt ? '<button class="b" data-ouvrir-vrm>Ouvrir VRM</button>' : ''}<button class="b sec" data-changer-vrm>Changer de compte VRM</button></div>`
       : formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`;
     carte.classList.toggle('doigt', doigt || formulaire);
@@ -404,7 +427,8 @@
       ${pied ? `<div class="pied">${pied}</div>` : ''}
       ${gesteDoigt}`);
     const changer = carte.querySelector('[data-changer-vrm]');
-    if (changer) changer.addEventListener('click', () => { carte.classList.remove('on'); lierVRM(); });
+    // 5.329 : changer de compte se fait ICI (le formulaire), jamais en ouvrant VRM.
+    if (changer) changer.addEventListener('click', () => { changerCompte = true; formulaireDemande = true; doigt = true; rendre(); focaliser(); });
     const ouvrir = carte.querySelector('[data-ouvrir-vrm]');
     if (ouvrir) ouvrir.addEventListener('click', () => { carte.classList.remove('on'); actionLogo(); });
     const fermerC = carte.querySelector('[data-fermer-carte]');
@@ -466,53 +490,155 @@
     const r = await demander();
     if (r === undefined) { hote.remove(); return; }
     pasSu = r === null;
-    const avant = !!(etat && etat.vrm && etat.vrm.connecte === false) || !!iframe;
+    const avant = !!(etat && etat.vrm && etat.vrm.connecte === false) || (!!formulaireEl && !changerCompte);
     if (r) etat = r;
     // 5.328 : connecté depuis la carte ⇒ elle reste ouverte et NOMME le compte.
     if (avant && etat && etat.vrm && etat.vrm.connecte) { justeConnecte = true; formulaireDemande = false; }
     rendre();
   }
 
-  // ── La connexion : un iframe de l'EXTENSION, jamais un champ dans la page ──
-  // 5.328 : posé DANS la carte (sous l'état) tant qu'on n'est pas connecté, gardé
-  // d'un rendu à l'autre (ce qui est tapé ne se perd pas quand l'état change).
-  // Le cadre dit qu'il est prêt et sa hauteur (`__vrmCarte`, rien d'autre — ni
-  // e-mail ni mot de passe ne sortent du cadre). Pas prêt en 6 s (navigateur qui
-  // refuse le cadre) ⇒ le dire, et « Se connecter avec VRM » en dernier recours.
-  let iframe = null, cadrePret = false, cadreTimer = null, formulaireDemande = false, justeConnecte = false;
+  // ── LA CONNEXION, DESSINÉE DANS LA CARTE (5.329) ─────────────────────────
+  // Julien, 8 nov., 22 h (iPhone, Orion, 5.328) : « je veux avoir les outils de
+  // connexion directement là, et que ça n'ouvre AUCUN autre onglet ».
+  // ⚠️ Pourquoi plus d'iframe : la 5.328 posait `popup.html?mode=carte` (une page
+  //    de l'extension) dans la carte et attendait qu'il dise « prête » ; sur
+  //    Orion il ne l'a jamais dit (page d'extension dans une page web, et
+  //    `ev.source === iframe.contentWindow` entre deux mondes : rien de garanti
+  //    par le moteur d'Orion), et au bout de 6 s la carte proposait « Se
+  //    connecter avec VRM », qui ouvrait VRM dans un onglet.
+  // ⇒ Les champs vivent dans la shadow root FERMÉE de la carte (la page reçoit
+  //    `null` pour `hote.shadowRoot` et ne voit aucun <input> dans son DOM),
+  //    `autocomplete="off"` et des noms à nous (pas mélangés avec les
+  //    identifiants Vinted). Les événements du clavier, de saisie, de
+  //    composition et du presse-papiers sont ARRÊTÉS à la frontière de la carte
+  //    (`bouclier`, sur l'hôte et sur `window` en capture) : les écouteurs de la
+  //    page posés après nous n'entendent rien. ⚠️ Limite dite : un écouteur que
+  //    la page a posé sur `window` en capture AVANT nous entend toujours la
+  //    touche (`key`) — la valeur du champ, elle, ne lui est jamais lisible.
+  // ⇒ Le mot de passe part UNE fois au service worker (`authLogin`, depuis la
+  //    carte : `from: 'vrm-badge'`), n'est jamais rangé ni dans une adresse ni
+  //    `postMessage` ; le champ est vidé dès la réponse. Aucun onglet ouvert.
+  // ⇒ Google / Discord : seulement si le service worker dit qu'il peut ouvrir
+  //    une PETITE FENÊTRE qui se ferme seule au retour (`oauthFenetre`, Chrome,
+  //    Edge, Firefox sur ordinateur). Orion (iPhone) n'a pas de fenêtre : les
+  //    boutons n'y sont pas montrés — le mot de passe suffit.
+  let formulaireEl = null, formulaireDemande = false, justeConnecte = false, changerCompte = false, envoiEnVol = false, fournisseurs = null, fournisseursDemandes = false;
+  const EVTS_BOUCLIER = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'textInput', 'compositionstart', 'compositionupdate', 'compositionend', 'paste', 'copy', 'cut'];
+  const vientDeLaCarte = (ev) => { try { const p = ev.composedPath(); return p[0] === hote || p.includes(hote); } catch (_) { return ev.target === hote; } };
+  const bouclier = (ev) => { if (formulaireEl && vientDeLaCarte(ev)) ev.stopImmediatePropagation(); };
+  for (const t of EVTS_BOUCLIER) {
+    try { window.addEventListener(t, bouclier, true); } catch (_) {}
+    try { hote.addEventListener(t, (ev) => { if (formulaireEl) ev.stopPropagation(); }, false); } catch (_) {}
+  }
+  const LOGO_FOURN = {
+    google: '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg>',
+    discord: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true" focusable="false"><path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/></svg>',
+  };
+  const NOM_FOURN = { google: 'Google', discord: 'Discord' };
+  const champ = (id) => (formulaireEl ? formulaireEl.querySelector('#' + id) : null);
+  function focaliser() { setTimeout(() => { try { const m = champ('vrm-cx-mail'); const p = champ('vrm-cx-mdp'); (m && !m.value ? m : p || m).focus({ preventScroll: true }); } catch (_) {} }, 30); }
+  function direErreur(t) {
+    const e = champ('vrm-cx-err'); if (!e) return;
+    e.textContent = t || ''; e.hidden = !t;
+  }
+  function direEtat(t) { const e = champ('vrm-cx-etat'); if (!e) return; e.textContent = t || ''; e.hidden = !t; }
   function poserFormulaire(montrer) {
     if (!montrer) {
       connexion.hidden = true;
-      clearTimeout(cadreTimer);
-      if (iframe) { iframe.remove(); iframe = null; }
+      if (formulaireEl) { try { const p = champ('vrm-cx-mdp'); if (p) p.value = ''; } catch (_) {} }
+      formulaireEl = null; envoiEnVol = false;
       if (connexion.childNodes.length) connexion.replaceChildren();
       return;
     }
     connexion.hidden = false;
-    if (iframe || connexion.querySelector('.secours')) return;
-    iframe = document.createElement('iframe');
-    iframe.title = 'Connexion à VRM';
-    cadrePret = false;
-    try { iframe.src = chrome.runtime.getURL('popup.html') + '?mode=carte'; } catch (_) { iframe = null; secoursFormulaire(); return; }
-    connexion.appendChild(iframe);
-    clearTimeout(cadreTimer);
-    cadreTimer = setTimeout(() => { if (!cadrePret) secoursFormulaire(); }, 6000);
+    if (formulaireEl) { rendreFournisseurs(); majAnnuler(); return; }
+    const mailConnu = etat && etat.vrm && etat.vrm.expiree && etat.vrm.email ? etat.vrm.email : '';
+    poserHtml(connexion, `<form class="cx" data-connexion-carte novalidate autocomplete="off">
+      <label class="lab" for="vrm-cx-mail">E-mail de ton compte VRM</label>
+      <input id="vrm-cx-mail" name="vrm-carte-identifiant" type="email" inputmode="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="prenom@exemple.fr" value="${esc(mailConnu)}" data-1p-ignore data-lpignore="true">
+      <label class="lab" for="vrm-cx-mdp">Mot de passe VRM</label>
+      <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" data-1p-ignore data-lpignore="true">
+      <div class="aide">Ceux de vrm.center — pas ceux de Vinted.</div>
+      <button type="submit" class="b" data-me-connecter>Me connecter</button>
+      <button type="button" class="b sec" data-annuler-changer hidden>Annuler</button>
+      <div class="err" id="vrm-cx-err" role="alert" hidden></div>
+      <div class="etat" id="vrm-cx-etat" role="status" hidden></div>
+      <div data-fournisseurs-carte hidden></div>
+      <a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>Mot de passe oublié ?</a>
+    </form>`);
+    formulaireEl = connexion.querySelector('form');
+    formulaireEl.addEventListener('submit', (ev) => { ev.preventDefault(); ev.stopPropagation(); seConnecter(); });
+    formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { changerCompte = false; formulaireDemande = false; rendre(); });
+    rendreFournisseurs(); majAnnuler();
   }
-  function secoursFormulaire() {
-    if (iframe) { iframe.remove(); iframe = null; }
-    poserHtml(connexion, `<div class="secours" data-secours-formulaire><div class="val gris">Le formulaire de connexion ne s’affiche pas dans cette page. Touche l’icône VRM du navigateur pour t’y connecter avec ton e-mail et ton mot de passe — ou :</div><button class="b sec" data-lier-secours>Se connecter avec VRM</button></div>`);
-    const b = connexion.querySelector('[data-lier-secours]');
-    if (b) b.addEventListener('click', lierVRM);
+  function majAnnuler() { const b = formulaireEl && formulaireEl.querySelector('[data-annuler-changer]'); if (b) b.hidden = !changerCompte; }
+  function seConnecter() {
+    if (envoiEnVol || !formulaireEl) return;
+    const m = champ('vrm-cx-mail'), p = champ('vrm-cx-mdp'), b = formulaireEl.querySelector('[data-me-connecter]');
+    const email = String((m && m.value) || '').trim(), password = String((p && p.value) || '');
+    if (!email || !password) { direErreur(!email && !password ? 'Tape l’e-mail et le mot de passe de ton compte VRM.' : !email ? 'Tape l’e-mail de ton compte VRM.' : 'Tape ton mot de passe VRM.'); try { (!email ? m : p).focus(); } catch (_) {} return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur('Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    envoiEnVol = true; direErreur(''); direEtat('');
+    if (b) { b.disabled = true; b.textContent = 'Connexion…'; }
+    let fini = false;
+    const finir = (r, muet) => {
+      if (fini) return; fini = true; clearTimeout(attente); envoiEnVol = false;
+      if (b) { b.disabled = false; b.textContent = 'Me connecter'; }
+      try { if (p) p.value = ''; } catch (_) {}
+      if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; rafraichir(); return; }
+      if (muet) { direErreur('L’extension n’a pas répondu. Réessaie dans un instant.'); return; }
+      if (r && r.captcha) { direErreur('VRM demande une vérification anti-robot que la carte ne sait pas afficher. Touche l’icône VRM dans les réglages de l’extension pour te connecter.'); return; }
+      direErreur((r && r.error) || 'Connexion refusée.');
+      try { if (p) p.focus(); } catch (_) {}
+    };
+    // iOS peut suspendre le service worker en route : jamais un bouton figé.
+    const attente = setTimeout(() => finir(null, true), 20000);
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'authLogin', email, password }, (r) => {
+        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
+        finir(err ? null : r, !!err || r === undefined);
+      });
+    } catch (_) { finir(null, true); }
   }
-  window.addEventListener('message', (ev) => {
-    if (!iframe || ev.source !== iframe.contentWindow) return;
-    const d = ev.data;
-    if (!d || typeof d !== 'object') return;
-    if (d.__vrmCarte === 'prete') { cadrePret = true; clearTimeout(cadreTimer); }
-    if (d.__vrmCarte === 'hauteur') { const h = Math.round(Number(d.h) || 0); if (h >= 120) iframe.style.height = Math.min(h, 720) + 'px'; }
-  }, false);
+  // Google / Discord : seulement une petite fenêtre qui se ferme seule (jamais
+  // un onglet), et seulement pour un fournisseur que Supabase dit activé.
+  function rendreFournisseurs() {
+    const box = formulaireEl && formulaireEl.querySelector('[data-fournisseurs-carte]');
+    if (!box) return;
+    const peut = !!(etat && etat.oauthFenetre === true);
+    if (!peut) { box.hidden = true; box.setAttribute('data-fournisseurs', 'sans-fenetre'); return; }
+    if (!fournisseursDemandes) {
+      fournisseursDemandes = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'fournisseursConnexion' }, (r) => {
+          let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
+          fournisseurs = !err && r && r.ok === true ? r : null;
+          rendreFournisseurs();
+        });
+      } catch (_) { fournisseurs = null; }
+      return;
+    }
+    const actifs = fournisseurs ? ['google', 'discord'].filter((f) => fournisseurs[f] === true) : [];
+    box.setAttribute('data-fournisseurs', actifs.join(',') || 'aucun');
+    if (!actifs.length) { box.hidden = true; return; }
+    if (box.querySelector('[data-fournisseur]')) { box.hidden = false; return; }
+    poserHtml(box, `<div class="ou"><span>ou</span></div>` + actifs.map((f) => `<button type="button" class="b sec fourn" data-fournisseur="${f}">${LOGO_FOURN[f]}<span>Continuer avec ${NOM_FOURN[f]}</span></button>`).join(''));
+    box.querySelectorAll('[data-fournisseur]').forEach((el) => el.addEventListener('click', () => connexionFournisseur(el.getAttribute('data-fournisseur'))));
+    box.hidden = false;
+  }
+  function connexionFournisseur(f) {
+    if (!NOM_FOURN[f]) return;
+    direErreur(''); direEtat(`Une petite fenêtre ${NOM_FOURN[f]} s’ouvre. Connecte-toi : elle se ferme toute seule.`);
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'oauthDepart', fournisseur: f, fenetre: true }, (r) => {
+        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
+        if (err || !r) { direEtat(''); direErreur('L’extension n’a pas répondu. Connecte-toi avec ton e-mail et ton mot de passe VRM.'); return; }
+        if (!r.ok) { direEtat(''); direErreur(r.message || 'La connexion n’a pas pu démarrer.'); }
+      });
+    } catch (_) { direEtat(''); direErreur('La connexion n’a pas pu démarrer.'); }
+  }
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
-  function fermerCarte() { doigt = false; justeConnecte = false; carte.classList.remove('on'); }
+  function fermerCarte() { doigt = false; justeConnecte = false; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
   btn.addEventListener('click', async () => {
     // Au doigt : toucher le logo ouvre (ou referme) la carte — c'est elle qui
@@ -536,23 +662,11 @@
     }
     // ⚠️ 8 nov. (5.328, Julien sur Orion : « "Se connecter" change de page VRM
     //    et ça ne se connecte pas ») : pas connecté, le logo ouvre la carte AVEC
-    //    le formulaire (e-mail + mot de passe VRM, puis Google / Discord, puis
-    //    « Se connecter avec VRM » en dernier recours). Plus de détour par VRM.
+    //    le formulaire (e-mail + mot de passe VRM, dessiné dans la carte en
+    //    5.329 ; Google / Discord seulement en petite fenêtre). Aucun onglet.
     //    (11 octobre, retiré : le logo ouvrait VRM, qui adressait sa session.)
     ouvrirConnexion();
   }
-  function lierVRM() {
-    let repondu = false;
-    const secours = setTimeout(() => { if (!repondu) ouvrirConnexion(); }, 2500);
-    try {
-      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'lierAvecVRM' }, (r) => {
-        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
-        repondu = true; clearTimeout(secours);
-        if (err || !r || !r.ok) ouvrirConnexion();
-      });
-    } catch (_) { repondu = true; clearTimeout(secours); ouvrirConnexion(); }
-  }
-
   // Le type d'entrée du DERNIER geste (souris, doigt, stylet) : c'est lui qui
   // décide, pas la taille de l'écran (un portable tactile garde sa souris).
   hote.addEventListener('pointerdown', (e) => { dernierPointeur = String(e.pointerType || ''); }, true);
@@ -586,6 +700,9 @@
   try {
     chrome.storage.onChanged.addListener((ch, zone) => {
       if (zone !== 'local') return;
+      // 5.329 : Google / Discord dans la petite fenêtre — un refus est dit dans la carte.
+      const o = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
+      if (o && o.etat === 'erreur' && formulaireEl) { direEtat(''); direErreur(o.message || 'La connexion n’a pas abouti.'); }
       if (ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
     });
   } catch (_) {}

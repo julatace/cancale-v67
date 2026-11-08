@@ -510,11 +510,13 @@ sans la fonction.
 | `appareil` | `publierAppareil` | **5.327.0** (8 nov.) | chaque navigateur publie `ext_appareil_{id}` (nom, version, envois réussis/refusés, comptes lus) : Paramètres → « Tout va bien ? » et l'alerte « compte pas relu » (`api/_lib/garde-capture.js`) |
 | `secoursenvoi` | `commandesSecours` | **5.327.0** (8 nov.) | 3 échecs réseau/5xx de suite vers vrm.center ⇒ voie directe bornée (< 256 Ko, fusion par n°) ; trop lourd ⇒ rien écrit, dit sur la carte |
 | `connexioncarte` | `sessionDepuis` | **5.328.0** (8 nov.) | la fenêtre et la carte du logo commencent par « Me connecter » (email + mot de passe VRM), sans ouvrir VRM |
+| `cartesansonglet` | `prendreVerrouRenouv` | **5.329.0** (8 nov.) | la carte du logo porte elle-même e-mail + mot de passe (shadow root fermée, aucun onglet, plus d'iframe) ; un seul renouvellement de session pour toute l'extension |
 
 ---
 
 ## 9. État actuel et décisions récentes
 - **8 nov. · Fermetures involontaires** : une interruption de glissement ne ferme plus la feuille ; Échap de composition ne ferme plus un fil eBay. `docs/passation/2026-11-08-bugs-fermeture-fenetres.md`. Aucune extension à réinstaller.
+- **8 nov. (soir) · Extension 5.329 : connexion DANS la carte, sans iframe ni onglet** : e-mail + mot de passe dessinés dans la shadow root fermée du logo (l'iframe de la 5.328 ne s'affichait pas sur Orion ⇒ « Se connecter avec VRM » ouvrait VRM) ; Google/Discord seulement en petite fenêtre (pas sur Orion) ; « déconnecté » = renouvellement lent affiché « expirée », verrou de renouvellement partagé, rangement vérifié. `docs/passation/2026-11-08-connexion-carte-2.md`. Geste : installer la 5.329.
 - **8 nov. · Vendeurs différents** : Affichage Simple/Complet (`vrm_affichage`, auto = 1 compte et < 30 ventes/30 j, jamais Julien, pas su ⇒ Complet ; ne cache que des entrées, aucun total) ; « Je vends » (`vrm_je_vends`) : hors sneakers taille/marque facultatives, « article » ; « ordinateur » seulement si vrai (Orion) ; équipe : 016 dite. `src/profilVendeur.js`, `docs/passation/2026-11-08-vendeurs-differents.md`. Geste : 016.
 - **8 nov. · Accueil qui vend + bilan du mois par e-mail** : page publique refaite (promesse, journée en 4 moments, VRAIES captures en mode exemple `scripts/accueil-captures.cjs` + registre d'empreintes, prix et essai lus dans le code, FAQ, `/statut`) ; bilan du mois ÉTEINT par défaut (`api/_lib/bilan-mois.js`, règles de l'app, bénéfice recopié `benefice-regle.js`, 150/jour au plus) ; `docs/gestes-1000-vendeurs.md`. `docs/passation/2026-11-08-accueil-bilan.md`. Geste : `RELANCES_SMTP_*`, puis l'allumer dans Réglages → Notifications.
 - **8 nov. · Extension 5.328 : connexion DANS l'extension** : carte du logo et fenêtre commencent par email + mot de passe VRM, puis Google/Discord en PKCE dans l'extension (retour `vrm.center/extension-retour.html`), « par le site » en dernier ; Orion : liaison par le pont d'emblée ; sans session rien ne part ni n'est « refusé ». `docs/passation/2026-11-08-connexion-carte.md`. Geste : Supabase → Redirect URLs `https://vrm.center/extension-retour.html`.
@@ -538,8 +540,6 @@ sans la fonction.
 - **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
 
 
-- **8 nov. · Bordereau dès l'e-mail** : vente vue par e-mail + bordereau du MÊME n° de transaction ⇒ colis « prêt à imprimer » partout (Colis, lot, Ma journée, cloche, ligne Ventes « Imprimer ») ; N° du tampon par identité seule (posé, Relier, annonce/photo, « nXX » écrit dans le titre, réglage écrit), jamais le N° retrouvé par titre ; sinon « Sans N° : à écrire à la main », puis « Imprimé sans N° » (`src/bordereauVenteEmail.js`, `vrm_bords_sans_num`) ; widget serveur pas encore. `docs/passation/2026-11-08-bordereau-des-email.md`. Geste : aucun.
-- **8 nov. · Zéro audit rouge** : les 7 audits rouges depuis des jours sont verts — 1 vrai défaut corrigé (E-mails : la photo de la paire, une photo Vinted, passe par `PhotoVinted`), 5 contrôles mis à la règle actuelle (prop `reserve`, clé non numérique par construction, une phrase par réglage, chaque carte « À faire » comptée, liens partis dans `src/ecrans/`), `pdfjs-dist` absent du conteneur dit en clair. `docs/passation/2026-11-08-zero-audit-rouge.md`. Geste : aucun.
 
 
 

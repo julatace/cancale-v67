@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.328.0';
+const CODE_VERSION = '5.329.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -133,6 +133,25 @@ function normaliserSession(sess) {
   if (typeof s.expires_at === 'number' && s.expires_at > 0 && s.expires_at < 1e11) s.expires_at = s.expires_at * 1000;
   return s;
 }
+// ⚠️ 5.329 (« ça se déconnecte à chaque fois ») : le rangement de la session
+//    était `try { set } catch {}` — un rangement raté (stockage plein, refusé,
+//    service worker coupé) ne se voyait pas : la session vivait en mémoire, et
+//    au réveil suivant l'extension relisait l'ANCIENNE (ou rien) ⇒ jeton de
+//    renouvellement déjà consommé ⇒ session morte ⇒ « Pas connecté ». On RELIT
+//    ce qu'on vient d'écrire ; raté ⇒ on réessaie une fois, puis on le note
+//    (`session_non_rangee`) — jamais en silence.
+async function rangerSession(s) {
+  for (let essai = 0; essai < 2; essai++) {
+    try {
+      if (s) await chrome.storage.local.set({ [SESSION_STORE]: s });
+      else await chrome.storage.local.remove(SESSION_STORE);
+      const relu = (await chrome.storage.local.get(SESSION_STORE))[SESSION_STORE];
+      if (s ? (relu && relu.refresh_token === s.refresh_token && relu.access_token === s.access_token) : !relu) return true;
+    } catch (_) {}
+  }
+  Promise.resolve().then(() => noterDiag(s ? 'session_non_rangee' : 'session_non_effacee')).catch(() => {});
+  return false;
+}
 async function saveSession(sess) {
   let s = normaliserSession(sess);
   let avant = null;
@@ -145,10 +164,7 @@ async function saveSession(sess) {
     try { _memoVisite.clear(); } catch (_) {}
     try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit','vrmLbcARetirer']); } catch (_) {}
   }
-  try {
-    if (s) await chrome.storage.local.set({ [SESSION_STORE]: s });
-    else await chrome.storage.local.remove(SESSION_STORE);
-  } catch (_) {}
+  await rangerSession(s);
   // Une session VIVANTE et NEUVE (autre jeton de renouvellement) lève la pause
   // des renouvellements : la pause portait sur l'ancien jeton. La même session
   // renvoyée, elle, ne lève rien (sinon chaque « ready » relancerait un essai).
@@ -204,11 +220,21 @@ try {
     // Le clic n'arrive ici que si le popup est vide, donc si une session
     // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
     const e = await authEtat().catch(() => ({ connecte: true }));
-    if (!e.connecte) {
+    // 5.329 : « pas su, renouvellement en cours » n'est PAS « déconnecté ».
+    if (!e.connecte && !e.incertain) {
       majIcone(false);
       try { await chrome.action.openPopup(); return; } catch (_) {}
     }
     ouvrirVRMDepuis(tab && tab.url);
+  });
+} catch (_) {}
+// 5.329 : la session rangée par un AUTRE contexte (ou un réveil d'avant) remplace
+// la copie en mémoire — sinon ce réveil renouvellerait un jeton déjà consommé.
+try {
+  chrome.storage.onChanged.addListener((ch, zone) => {
+    if (zone !== 'local' || !ch || !ch[SESSION_STORE]) return;
+    const n = ch[SESSION_STORE].newValue;
+    VRM_SESSION = n ? normaliserSession(n) : null;
   });
 } catch (_) {}
 // Au réveil du service worker : l'icône suit la session enregistrée.
@@ -291,6 +317,66 @@ async function renouvelerSession({ force = false } = {}) {
   // ne changera rien au refus — c'est une autre cause (et une rafale évitée).
   if (force && rv.okAt && maintenant - Number(rv.okAt) < 60000 && s.access_token && s.expires_at > maintenant) return s;
   const jeton = s.refresh_token;
+  // ⚠️ 5.329 : UN SEUL RENOUVELLEMENT POUR TOUTE L'EXTENSION, pas seulement pour
+  //    ce réveil du service worker. `_refreshEnVol` vit en mémoire : un service
+  //    worker relancé (Chrome le coupe à 30 s, iOS gèle Orion) ou un second
+  //    contexte de l'extension ne la voit pas, et repartait avec le MÊME jeton.
+  //    Le verrou est dans `chrome.storage.local` (§4.9) : empreinte du jeton,
+  //    heure, 12 s au plus. Pris par un autre ⇒ on attend que la session
+  //    rangée change (le nouveau jeton), sans rien envoyer.
+  const pris = await prendreVerrouRenouv(jeton);
+  if (pris !== true) return pris;
+  try { return await renouvelerAvecVerrou(s, jeton, rv, force); }
+  finally { await rendreVerrouRenouv(jeton); }
+}
+const VERROU_RENOUV = 'vrmRenouvVerrou';
+const VERROU_RENOUV_MS = 12000;
+let _idContexteRenouv = '';
+function empreinteJeton(j) { let h = 2166136261; const t = String(j || ''); for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36) + ':' + t.length; }
+// `true` = à nous d'envoyer · une session = un autre l'a renouvelée · `null` = rien de neuf.
+async function prendreVerrouRenouv(jeton) {
+  if (!_idContexteRenouv) { try { _idContexteRenouv = nonceAleatoire(); } catch (_) { _idContexteRenouv = String(Math.random()); } }
+  const emp = empreinteJeton(jeton);
+  let v = null; try { v = (await chrome.storage.local.get(VERROU_RENOUV))[VERROU_RENOUV] || null; } catch (_) { v = null; }
+  const vivant = v && v.emp === emp && v.par !== _idContexteRenouv && Date.now() - Number(v.at || 0) < VERROU_RENOUV_MS && Date.now() >= Number(v.at || 0) - 1000;
+  if (!vivant) {
+    try { await chrome.storage.local.set({ [VERROU_RENOUV]: { emp, at: Date.now(), par: _idContexteRenouv } }); } catch (_) {}
+    // Deux qui écrivent en même temps : celui dont l'écriture est restée gagne.
+    let relu = null; try { relu = (await chrome.storage.local.get(VERROU_RENOUV))[VERROU_RENOUV] || null; } catch (_) { relu = null; }
+    if (!relu || relu.par === _idContexteRenouv) return true;
+  }
+  Promise.resolve().then(() => noterDiag('session_renouv_attend_verrou')).catch(() => {});
+  const fin = Date.now() + VERROU_RENOUV_MS;
+  while (Date.now() < fin) {
+    await new Promise((ok) => setTimeout(ok, 250));
+    let cur = null; try { cur = (await chrome.storage.local.get(SESSION_STORE))[SESSION_STORE] || null; } catch (_) { cur = null; }
+    if (!cur || cur.refresh_token !== jeton) {
+      VRM_SESSION = cur;
+      return (cur && !cur.mort && cur.access_token && cur.expires_at > Date.now()) ? cur : null;
+    }
+    let w = null; try { w = (await chrome.storage.local.get(VERROU_RENOUV))[VERROU_RENOUV] || null; } catch (_) { w = null; }
+    if (!w || w.emp !== emp) break;               // l'autre a rendu le verrou sans rien changer : à nous
+  }
+  try { await chrome.storage.local.set({ [VERROU_RENOUV]: { emp, at: Date.now(), par: _idContexteRenouv } }); } catch (_) {}
+  return true;
+}
+async function rendreVerrouRenouv(jeton) {
+  try {
+    const v = (await chrome.storage.local.get(VERROU_RENOUV))[VERROU_RENOUV];
+    if (v && v.par === _idContexteRenouv && v.emp === empreinteJeton(jeton)) await chrome.storage.local.remove(VERROU_RENOUV);
+  } catch (_) {}
+}
+async function renouvelerAvecVerrou(s, jeton, rv, force) {
+  // La mémoire de CE réveil peut être en retard sur le stockage (un autre
+  // contexte, ou un réveil d'avant, a déjà rangé le jeton suivant) : le stockage
+  // fait foi — on n'envoie jamais un jeton qui n'est plus le nôtre.
+  try {
+    const range = (await chrome.storage.local.get(SESSION_STORE))[SESSION_STORE] || null;
+    if (range && range.refresh_token && range.refresh_token !== jeton) {
+      VRM_SESSION = range;
+      return (!range.mort && range.access_token && range.expires_at > Date.now() + 60000) ? range : (range.mort ? null : await renouvelerSession({ force }));
+    }
+  } catch (_) {}
   // ⚠️⚠️ UNE RÉPONSE PERDUE NE TUE PLUS LA SESSION (11 octobre). Le serveur a pu
   //    faire tourner le jeton et la réponse se perdre (veille, réseau qui
   //    change, délai dépassé) : le nouveau jeton n'est jamais arrivé. On rejoue
@@ -628,9 +714,22 @@ function b64url(octets) {
 }
 async function noterEtatOAuth(v) { try { await chrome.storage.local.set({ [OAUTH_ETAT]: Object.assign({ at: Date.now() }, v) }); } catch (_) {} }
 const NOM_FOURN = { google: 'Google', discord: 'Discord' };
-async function oauthDepart(fournisseur, ongletDepart) {
+// 5.329 (Julien, 8 nov. : « que ça n'ouvre AUCUN autre onglet ») : depuis la
+// carte du logo, Google / Discord ne s'ouvrent QUE dans une petite fenêtre
+// (`chrome.windows.create`, type popup) que `oauthRetour` referme. Un navigateur
+// sans fenêtres (Orion sur iPhone, Firefox pour Android) : la carte ne montre
+// pas ces boutons, et un appel quand même est refusé — jamais un onglet.
+function oauthFenetrePossible() {
+  try {
+    if (globalThis.__vrmOrionCompat) return false;
+    return !!(chrome.windows && typeof chrome.windows.create === 'function' && typeof chrome.tabs.remove === 'function');
+  } catch (_) { return false; }
+}
+async function oauthDepart(fournisseur, ongletDepart, opts) {
   const f = String(fournisseur || '');
   if (!FOURNISSEURS_CONNEXION.includes(f)) return { ok: false, code: 'fournisseur', message: 'Moyen de connexion inconnu.' };
+  const fenetre = !!(opts && opts.fenetre);
+  if (fenetre && !oauthFenetrePossible()) return { ok: false, code: 'fenetre', message: 'Ce navigateur ne sait pas ouvrir la petite fenêtre de connexion : connecte-toi avec ton e-mail et ton mot de passe VRM.' };
   const fo = await fournisseursConnexion();
   if (!fo || !fo.ok) return { ok: false, code: 'pas-su', message: 'Je n’ai pas pu vérifier les moyens de connexion de VRM (réseau ?). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.' };
   if (fo[f] !== true) return { ok: false, code: 'ferme', message: `La connexion avec ${NOM_FOURN[f]} n’est pas ouverte sur VRM. Connecte-toi avec ton email et ton mot de passe VRM.` };
@@ -644,6 +743,14 @@ async function oauthDepart(fournisseur, ongletDepart) {
   try { await chrome.storage.local.set({ [OAUTH_STORE]: { f, v, at: Date.now(), tab } }); } catch (_) { return { ok: false, code: 'stockage', message: 'Je n’ai pas pu préparer la connexion. Réessaie.' }; }
   await noterEtatOAuth({ etat: 'attente', f });
   const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${f}&redirect_to=${encodeURIComponent(RETOUR_OAUTH)}&code_challenge=${ch}&code_challenge_method=s256`;
+  if (fenetre) {
+    const w = await new Promise((res) => {
+      try { chrome.windows.create({ url, type: 'popup', width: 480, height: 680, focused: true }, (x) => { let e = null; try { e = chrome.runtime.lastError; } catch (_) {} res(e ? null : (x || {})); }); }
+      catch (_) { res(null); }
+    });
+    if (!w) { try { await chrome.storage.local.remove(OAUTH_STORE); } catch (_) {} await noterEtatOAuth({ etat: 'erreur', f, message: 'La petite fenêtre de connexion ne s’est pas ouverte : connecte-toi avec ton e-mail et ton mot de passe VRM.' }); return { ok: false, code: 'fenetre', message: 'La petite fenêtre de connexion ne s’est pas ouverte : connecte-toi avec ton e-mail et ton mot de passe VRM.' }; }
+    return { ok: true, fenetre: true };
+  }
   const ouvert = await new Promise((res) => {
     try { chrome.tabs.create({ url }, (t) => { let e = null; try { e = chrome.runtime.lastError; } catch (_) {} res(e ? null : (t || {})); }); }
     catch (_) { res(null); }
@@ -2888,6 +2995,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-popup' && msg.action === 'authEtat') {
       authEtat().then(sendResponse); return true;
     }
+    // 5.329 : le formulaire DESSINÉ dans la carte du logo (shadow root fermée de
+    // vrm-badge.js). Seulement depuis un onglet (un script de contenu de CETTE
+    // extension : `onMessage` n'entend qu'elle). Jamais d'onglet ouvert ensuite.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'authLogin') {
+      if (!sender || !sender.tab) { sendResponse({ ok: false, error: 'Connexion refusée.' }); return true; }
+      authLogin(msg.email, msg.password).then(sendResponse, () => sendResponse({ ok: false, error: 'Réseau indisponible — réessaie.' }));
+      return true;
+    }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogin') {
       // Depuis la CARTE (un iframe dans l'onglet du site) : c'est le service
       // worker qui ouvre VRM après la connexion. La carte se referme dès que la
@@ -2908,13 +3023,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     // 5.325 : les fournisseurs activés chez Supabase (Google, Discord) — la
     // fenêtre n'affiche un bouton que pour un `true` lu.
-    if (msg && msg.from === 'cancale-popup' && msg.action === 'fournisseursConnexion') {
+    if (msg && (msg.from === 'cancale-popup' || msg.from === 'vrm-badge') && msg.action === 'fournisseursConnexion') {
       fournisseursConnexion().then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
     // 5.328 : « Continuer avec Google / Discord » dans l'extension (sans VRM).
-    if (msg && msg.from === 'cancale-popup' && msg.action === 'oauthDepart') {
-      oauthDepart(msg.fournisseur, sender && sender.tab ? sender.tab : null).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', message: 'La connexion n’a pas pu démarrer. Réessaie.' }));
+    if (msg && (msg.from === 'cancale-popup' || msg.from === 'vrm-badge') && msg.action === 'oauthDepart') {
+      // 5.329 : la carte ne demande QU'UNE petite fenêtre (jamais un onglet).
+      oauthDepart(msg.fournisseur, sender && sender.tab ? sender.tab : null, { fenetre: msg.from === 'vrm-badge' }).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', message: 'La connexion n’a pas pu démarrer. Réessaie.' }));
       return true;
     }
     if (msg && msg.from === 'vrm-oauth-retour' && msg.action === 'oauthRetour') {
@@ -12589,7 +12705,7 @@ async function etatSite(url,tabId) {
   // (29 oct.) Les paires vendues ailleurs, encore en ligne ici : ce que VRM a
   // calculé et publié (`lbc_a_retirer`) — la carte le dit, sans rien recalculer.
   const aRetirer = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer };
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, oauthFenetre: oauthFenetrePossible() };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
