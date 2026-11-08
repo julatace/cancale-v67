@@ -612,7 +612,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 
 /* ══ 13. RÉGLAGES (8 nov., passage 2) ══════════════════════════════════════
    Réglages d'iOS, au trait près : le nom du groupe en note grise au-dessus de sa
-   carte, chaque rangée avec son icône dans une tuile (30 px, rayon 8, remplissage
+   carte, chaque rangée avec son icône dans une tuile (30 px, rayon 6, remplissage
    neutre : pas de couleur, §7), le nom en 17 régulier, sa phrase en 13 grise
    régulière (elle était en gras gris : deux voix pour une note), le filet qui
    commence au texte. « À terminer » : un point ambre devant son titre. */
@@ -632,7 +632,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   content: '' !important; position: absolute; top: 0; left: 58px !important; right: 0; height: .5px !important; background: var(--d-filet) !important; display: block !important;
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-set .vrm-set-ic {
-  width: 30px !important; height: 30px !important; border-radius: 8px !important; background: var(--d-remplir-fort) !important; color: var(--d-encre) !important; flex: none;
+  width: 30px !important; height: 30px !important; border-radius: var(--d-r-num) !important; background: var(--d-remplir-fort) !important; color: var(--d-encre) !important; flex: none;
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-set .vrm-set-lib > b { font-size: var(--d-t-17) !important; font-weight: 400 !important; letter-spacing: var(--d-ap-17) !important; color: var(--d-encre) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-set .vrm-set-desc { font-size: var(--d-t-13) !important; font-weight: 400 !important; color: var(--d-gris) !important; line-height: var(--d-il-ligne) !important; margin-top: 1px; }
@@ -650,7 +650,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-app-shell .vrm-main .vrm-ios-carte { border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-ios-groupe-titre { font-size: var(--d-t-13) !important; font-weight: 600 !important; color: var(--d-gris) !important; text-transform: none !important; letter-spacing: 0 !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-ios-detail { color: var(--d-gris) !important; font-weight: 400 !important; }
-:root:root body .vrm-app-shell .vrm-main .vrm-ios-icone { border-radius: 8px !important; background: var(--d-remplir-fort) !important; color: var(--d-encre) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-ios-icone { border-radius: var(--d-r-num) !important; background: var(--d-remplir-fort) !important; color: var(--d-encre) !important; }
 
 /* ══ 14. STOCK (8 nov., passage 2) ═════════════════════════════════════════
    Le résumé (« au moins 84 annonces actuelles ») collait au bord de sa carte :
@@ -689,7 +689,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-app-shell .vrm-main [data-vc-annonces] { color: var(--d-gris) !important; font-size: var(--d-t-15) !important; line-height: var(--d-il-texte) !important; }
 :root:root body .vrm-app-shell .vrm-main [data-vc-annonces] b { color: var(--d-encre) !important; font-weight: 600 !important; }
 :root:root body .vrm-app-shell .vrm-main [data-vc-paire] { border-top-color: var(--d-filet) !important; border-top-width: .5px !important; }
-:root:root body .vrm-app-shell .vrm-main [data-vc-paire] > span:first-child { border-radius: 10px !important; overflow: hidden; }
+:root:root body .vrm-app-shell .vrm-main [data-vc-paire] > span:first-child { border-radius: var(--d-r-num) !important; overflow: hidden; }
 :root:root body .vrm-app-shell .vrm-main .vrm-pa-entree { width: auto !important; margin-inline: 0 !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-pa-entree > button { width: 100% !important; border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important; min-height: 60px; padding: var(--d-e-3) var(--d-e-4) !important; }
 /* L'état d'un site pas relié / pas lu */

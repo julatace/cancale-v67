@@ -237,6 +237,24 @@ Une rangée blanche (rayon 20, ombre posée) : un point ambre si c'est pressé, 
 ### Carte de colis
 Vignette 60 px (badge du transporteur LU) · N° en pastille encre + nom de la paire (15/600, deux lignes) · note grise 13 (limite, attente) · bouton rond du bordereau à droite. **La frise** (quatre segments « Imprimé · Déposé · En route · Livré ») n'est posée que si une étape est FAITE ; trait franchi bleu, mot à l'encre seulement sur la dernière étape faite.
 
+### La rangée de liste (Ventes, Achats, Messages, la loupe — 8 nov.)
+UNE carte par liste (rayon 20, ombre posée), une rangée par élément : vignette 56 rayon 14 (44 ronde en Messages), titre 15/600 sur deux lignes au plus, une note grise 13 (site · compte · date), le montant 15/600 en chiffres alignés, aligné en haut à droite. Filet .5 px qui commence après la vignette (84 px du bord ; 72 en Messages, 64 dans la loupe). Survol à la souris seulement, fond `--d-case` à 60 %. À l'ordinateur la même rangée, en colonnes, DANS le groupe (jamais flottante sur le gris).
+
+### L'état d'une rangée
+Un mot gris 13/500 sur sa ligne, jamais une pastille cerclée répétée sur chaque rangée. Un geste à faire (« À envoyer ») : le mot à l'encre 600 et un point ambre de 7 px devant. Le compte s'écrit en mots dans la note (`.vrm-acct-tag` y perd son cadre).
+
+### La feuille groupée (tiroir d'une vente)
+Le fond gris `--d-fond`, chaque bloc (état, argent, détails) une carte blanche à 16 px des bords, des lignes de 44 px séparées par un filet ; le titre d'un bloc en note 13/600 grise ; les gestes du bas en cartes blanches (un remplissage gris sur le fond gris ne se voit pas).
+
+### Les bandes de chiffres (carte d'annonce)
+Plusieurs petites valeurs saisissables (achat, accepter dès, refuser sous, boost, marge) : UNE bande blanche (rayon 14) en 2 × 2, filets entre les valeurs, libellé 11 gris ; une valeur vide (`data-vide`, « — » à saisir) en gris, une valeur saisie à l'encre. Jamais un mur de tuiles.
+
+### Le champ de recherche
+Celui d'iOS : remplissage `--d-remplir`, rayon 12, sans cadre ; l'anneau bleu seulement au focus.
+
+### Réglages
+Le nom du groupe en note 13/600 grise au-dessus de sa carte ; l'icône dans une tuile neutre de 30 px (rayon 6, `--d-remplir-fort`, jamais colorée) ; le nom en 17 régulier ; sa phrase en 13 grise régulière ; filet à 58 px.
+
 ### La carte sombre (signature)
 Dégradé radial bleu nuit, rayon 24 ; surtitre 13/600 blanc à 70 %, grand chiffre 800, cases en voile `rgba(255,255,255,.1)` rayon 14. À garder (choix de Julien) ; l'affiner, ne jamais la retirer.
 
