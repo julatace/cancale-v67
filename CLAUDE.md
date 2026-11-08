@@ -511,6 +511,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · Zéro audit rouge** : les 7 audits rouges depuis des jours sont verts — 1 vrai défaut corrigé (E-mails : la photo de la paire, une photo Vinted, passe par `PhotoVinted`), 5 contrôles mis à la règle actuelle (prop `reserve`, clé non numérique par construction, une phrase par réglage, chaque carte « À faire » comptée, liens partis dans `src/ecrans/`), `pdfjs-dist` absent du conteneur dit en clair. `docs/passation/2026-11-08-zero-audit-rouge.md`. Geste : aucun.
 - **8 nov. · Ventes envoyées légères (5.326)** : la ligne `orders_sold` d'un gros compte (2 000 ventes ≈ 1 055 Ko) n'est plus relue ni réécrite depuis le téléphone (coupée sur iOS) : l'extension envoie la fenêtre abrégée + ce qui manque (61,5 Ko), `vrm.center` fusionne (même règle, `src/commandesFusion.js`) ; la ligne garde sa forme, aucun lecteur ne change. `docs/passation/2026-11-08-ventes-envoi-leger.md`. Geste : installer 5.326, ouvrir Mes commandes sur shop_cancale.
 - **8 nov. · Extension 5.325 : Google / Discord** : la fenêtre propose « Continuer avec Google / Discord » (fournisseur activé chez Supabase seulement, pas su ⇒ caché) ; VRM part chez le fournisseur puis adresse sa session à CETTE extension ; carte du logo : cause du refus dite + 5 derniers refus datés. `docs/passation/2026-11-08-extension-google-discord.md`. Geste : activer Discord chez Supabase ; installer la 5.325.
 - **8 nov. · Démarrage : moins de lectures** : −12 à −15 lectures et −200 Ko par ouverture (dressings et boîtes en `in.(…)` par famille, petites lignes `select=data` groupées — `src/lectureGroupee.js` ; transactions plus relues — `src/memoEcritures.js` ; suivis sans l'image du QR des colis retirés — `src/suivisSansQr.js`) ; Ventes −1,2 s, Ma journée/Colis limitées par le processeur ; instantané de 2e ouverture : plan seulement. `docs/passation/2026-11-08-demarrage-lectures.md`. Geste : aucun.
@@ -546,8 +547,6 @@ sans la fonction.
 - **6 nov. · Hors réseau + temps réels (v36)** : Colis rouvert sans réseau (par point relais, codes, QR, « En grand »), « Hors connexion — dernier état du … », « J'ai retiré »/« Colis fait » en file ; temps réels anonymes (`src/mesuresTerrain.js`, `compte?mode=mesures`, 1 lot/min), panneau propriétaire, veille +30 % au p75. `docs/passation/2026-11-06-hors-reseau.md`.
 
 - **6 nov. · « Annuler » partout (v36)** : geste interne instantané + pilule 5 s « Annuler » (`src/gesteAnnulable.js`, `PiluleAnnuler`, `gesteVrm`) sur 10 gestes ; refus ⇒ l'écran revient, « Pas enregistré — Réessayer » ; réseau ⇒ « pas encore envoyé » (file d'envoi) ; jamais sur un geste chez un tiers. `docs/passation/2026-11-06-annuler.md`. Geste : Colis → « J'ai retiré » → Annuler.
-
-- **6 nov. · Chargement** : écran de démarrage dans `index.html` (avant le JS, retiré par `src/demarrage.js`) ; chaque écran attend ses données essentielles derrière son squelette (`src/AttenteEcran.jsx`, `ESSENTIELS_ECRAN`, plafond 2,5 s) ; « lecture… », jamais « pas lu », pendant qu'une publication se prépare ; banc `chargement.cjs`. `docs/passation/2026-11-06-chargement.md`.
 
 
 
