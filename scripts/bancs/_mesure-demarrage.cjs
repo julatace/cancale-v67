@@ -15,7 +15,7 @@ const path = require('path'), fs = require('fs'), http = require('http'), zlib =
 const RACINE = path.join(__dirname, '..', '..');
 const { chromium } = require(path.join(RACINE, 'node_modules', 'playwright'));
 const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs'));
-const base = fabriquer({ volumeReel: true });
+const base = fabriquer({ volumeReel: true, qr: process.env.QR !== '0' });
 const DIST = process.argv[2] || path.join(RACINE, 'dist'), PORT = +(process.argv[3] || process.env.BANC_PORT || 9610);
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/json', '.json': 'application/json', '.woff2': 'font/woff2' };
 const srv = http.createServer((q, r) => {

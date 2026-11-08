@@ -310,7 +310,8 @@ import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
-import { creerLectureGroupee, idGroupable } from "./lectureGroupee.js";
+import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
+import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
@@ -4599,6 +4600,22 @@ const viderLecturesMemo = () => _memoLectures.clear();
 const viderMemoPourEcriture = (url, methode, init, base) => fonctionVidage(_memoLectures, url, methode, init, base);
 const viderMemoLignes = (ids) => viderLignesMemo(_memoLectures, ids, SUPABASE_URL);
 const _cloner = (v) => { try { return typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)); } catch (_) { return JSON.parse(JSON.stringify(v)); } };
+// (8 nov., démarrage) Les petites lignes `select=data` du montage, groupées par session.
+const _groupeLignesData = creerLectureGroupee(async (ids, auth) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=id,data`, { headers: { apikey: SUPABASE_KEY, Authorization: auth } });
+    if (!r.ok) return { ok: false, statut: r.status };
+    const j = await r.json();
+    return Array.isArray(j) ? { ok: true, rows: j } : { ok: false, statut: 0 };
+  } catch (_) { return { ok: false, statut: 0 }; }
+}, async (id, auth) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: { apikey: SUPABASE_KEY, Authorization: auth } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
+});
 const fetchMemo = (url, init = {}) => {
   const m = String((init && init.method) || 'GET').toUpperCase();
   if (m !== 'GET') return fetch(url, init);
@@ -4608,7 +4625,13 @@ const fetchMemo = (url, init = {}) => {
   let promesse;
   if (e && (Date.now() - e.at) < ROW_TTL_MS) promesse = e.promesse;
   else {
-    promesse = fetch(url, init).then(async (r) => {
+    // (8 nov., démarrage) Une petite ligne `id=eq.X&select=data` part avec les autres
+    // du même tour en `id=in.(…)` (src/lectureGroupee.js) : mêmes lignes, même « pas su ».
+    const idSeul = idLigneData(url, SUPABASE_URL, h);
+    promesse = idSeul ? _groupeLignesData.charger(idSeul, String(h.Authorization || h.authorization || '')).then((rows) => {
+      if (!Array.isArray(rows)) { _memoLectures.delete(cle); return { ok: false, status: 0, headers: new Headers() }; }
+      return { ok: true, status: 200, headers: new Headers(), v: rows.map((x) => ({ data: x ? x.data : null })) };
+    }) : fetch(url, init).then(async (r) => {
       if (!r || !r.ok) { _memoLectures.delete(cle); return { ok: false, status: r ? r.status : 0, headers: r ? r.headers : null }; }
       const texte = await r.text();
       let v; try { v = texte === '' ? null : JSON.parse(texte); } catch (_) { _memoLectures.delete(cle); return { ok: false, status: r.status, headers: r.headers }; }
@@ -5315,12 +5338,17 @@ const fetchEmailTrackingBrut = async () => {
   try {
     // (1er nov.) Toutes les pages : au-delà de 1 000 suivis, la fin de la liste
     // (les colis les plus récents) tombait en silence. Une page ratée = pas su.
-    const rows = await lireTout('id=like.email_track_*&select=id,data', { strict: true });
+    // (8 nov., démarrage) SANS l'image du QR des colis retirés (src/suivisSansQr.js) :
+    // `meta` + les champs longs par leur chemin, le QR des colis encore en jeu en
+    // parallèle. Une lecture ratée ⇒ null, comme avant.
+    const lireUne = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+    const rows = await lireSuivisSansQr({ lireTout: (q) => lireTout(q, { strict: true }), lire: lireUne, besoinQr: (d) => { const x = reclassifyTrack(d); return !!x && x.status !== 'delivered'; } });
     if (!Array.isArray(rows)) return null;       // pas su ≠ aucun suivi (voir fetchEmailBordereaux)
     // (23 oct.) + le n° de suivi écrit dans le SUJET après « # » (Vinted Go :
     // « Ton colis arrive aujourd'hui ! #… ») pour une ligne qui n'en porte pas —
     // une IDENTITÉ, jamais un statut changé (api/_lib/suivi-colis.js, §11).
-    const liste = rows.map(r => avecSuiviDuSujet(reclassifyTrack(r.data))).filter(Boolean)
+    // `_ligne` : l'id de la ligne, pour relire le QR d'un colis retiré à la vue en grand.
+    const liste = rows.map(r => { const t = avecSuiviDuSujet(reclassifyTrack(r.data)); if (t && t.qrOmis) t._ligne = r.id; return t; }).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
     // (2 nov., 23 h) Un colis au point relais dont le lieu rangé n'a pas d'adresse
     // (locker d'une autre ville) : relu dans le texte gardé de SON e-mail, même règle
@@ -45333,6 +45361,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ (5 nov.) UN VRAI QR SE MONTRE TOUJOURS, quel que soit le mode préféré du transporteur :
     // Mondial Relay (« au code ») a désormais un QR quand il vient de son compte. Code ET QR, ensemble.
     if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true, mode: 'qr' }); return; }
+    // (8 nov., démarrage) Un colis RETIRÉ ne fait plus lire l'image de son QR à chaque
+    // ouverture (src/suivisSansQr.js) : elle se relit ici, à la demande.
+    if (t.qrOmis && t._ligne) {
+      const q = await lireQrDeLigne(async (qq) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${qq}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } }, t._ligne);
+      if (q) { setQrView({ ...base, img: `data:${q.qrType || 'image/png'};base64,${q.qrB64}`, real: true, mode: 'qr' }); return; }
+    }
     if (qrImage(t)) { setQrView({ ...base, img: qrImage(t), real: true, hosted: true, mode: 'qr' }); return; }
     setQrView({ ...base, img: null, real: false });
   };

@@ -42,6 +42,7 @@ function fausseBase(lignes, mode = {}) {
     if (mode.lot === 'panne') return { ok: false, statut: 503 };
     if (mode.lot === 'reseau') throw new Error('réseau');
     if (mode.lot === 'illisible') return { ok: false, statut: 0 };
+    if (mode.lot === 'session') return { ok: false, statut: 401 };
     if (mode.lot === 'pascompris') return { ok: false, statut: 400 };
     if (mode.lot === 'vide') return { ok: true, rows: [] };
     if (mode.lot === 'sansid') return { ok: true, rows: ids.map((id) => ({ data: lignes[id] })) };
@@ -72,11 +73,17 @@ async function verifier(mod) {
   dit(r.every((x) => !Array.isArray(x) || x.every((l) => l.id === ['a', 'b', 'z', 'c'][r.indexOf(x)])), '1. aucune ligne d\'un autre id');
 
   // 2.
-  for (const m of ['panne', 'reseau', 'illisible']) {
+  for (const m of ['reseau', 'illisible', 'session']) {
     fb = fausseBase(L, { lot: m }); g = mod.creerLectureGroupee(fb.lireLot, fb.lireUne);
     r = await tous(['a', 'b'].map((id) => g.charger(id, 'S1')));
-    dit(r.every((x) => x === null) && fb.appels.seules.length === 0, `2. lecture groupée « ${m} » = null pour tous (pas su)`, r.map(String).join(','));
+    dit(r.every((x) => x === null) && fb.appels.seules.length === 0, `2. lecture groupée « ${m} » = null pour tous (pas su), sans relecture`, r.map(String).join(','));
   }
+  fb = fausseBase(L, { lot: 'panne' }); g = mod.creerLectureGroupee(fb.lireLot, fb.lireUne);
+  r = await tous(['a', 'b'].map((id) => g.charger(id, 'S1')));
+  dit(fb.appels.seules.length === 2 && donnees(r[0]) === 'A' && donnees(r[1]) === 'B', '2. lecture groupée 503 : chaque ligne relue seule (garde SA réponse)', r.map(donnees).join(','));
+  fb = fausseBase(L, { lot: 'panne', une: 'panne' }); g = mod.creerLectureGroupee(fb.lireLot, fb.lireUne);
+  r = await tous(['a', 'b'].map((id) => g.charger(id, 'S1')));
+  dit(r.every((x) => x === null), '2. 503 puis lectures seules ratées = null (jamais [])');
   // 3. 4. 5.
   for (const m of ['pascompris', 'sansid', 'intrus', 'double', 'vide']) {
     fb = fausseBase(L, { lot: m }); g = mod.creerLectureGroupee(fb.lireLot, fb.lireUne);
@@ -112,8 +119,24 @@ async function verifier(mod) {
 
   dit(mod.idGroupable('harvest_3150000000_listings') && !mod.idGroupable('a,b') && !mod.idGroupable('a)') && !mod.idGroupable('a b') && !mod.idGroupable('a%') && !mod.idGroupable('"a"'), 'un id avec , ) espace % " n\'est jamais mis dans in.(…)');
 
+  // 10. La forme « petite ligne » de fetchMemo, reconnue EXACTEMENT.
+  const B = 'https://b.test', A = { apikey: 'k', Authorization: 'Bearer x' };
+  const idl = mod.idLigneData;
+  dit(typeof idl === 'function' && idl(`${B}/rest/v1/app_data?id=eq.panel_colis_collected&select=data`, B, A) === 'panel_colis_collected' && idl(`${B}/rest/v1/app_data?select=data&id=eq.vinted_lbc_posted`, B, A) === 'vinted_lbc_posted', '10. `id=eq.X&select=data` (dans un ordre ou l\'autre) : groupable');
+  const refus = typeof idl === 'function' ? [
+    [`${B}/rest/v1/app_data?id=eq.x&select=data,updated_at`, A], [`${B}/rest/v1/app_data?id=eq.x&select=data&owner=eq.u`, A],
+    [`${B}/rest/v1/app_data?id=like.x_*&select=data`, A], [`${B}/rest/v1/app_data?id=eq.x&select=data`, { ...A, Range: '0-999' }],
+    [`${B}/rest/v1/app_data?id=eq.x&select=data`, { ...A, Prefer: 'count=exact' }], [`${B}/rest/v1/vinted_accounts?id=eq.x&select=data`, A],
+    [`https://autre.test/rest/v1/app_data?id=eq.x&select=data`, A], [`${B}/rest/v1/app_data?id=eq.a%2Cb&select=data`, A],
+    [`${B}/rest/v1/app_data?id=eq.x&select=data&order=id.asc`, A],
+  ].filter(([u, h]) => idl(u, B, h) !== null) : ['absente'];
+  dit(refus.length === 0, '10. toute autre forme (autre select, owner, like, Range, Prefer, autre table, autre base, virgule, order) : jamais groupée', refus.map((x) => x[0]).join(' · '));
+
   // Câblage.
   const app = fs.readFileSync(APP, 'utf8').replace(/\/\/[^\n]*/g, '');
+  const memo = /const fetchMemo = \(url, init = \{\}\) => \{[\s\S]*?\n\};/.exec(app);
+  dit(!!memo && /const idSeul = idLigneData\(url, SUPABASE_URL, h\);\s*promesse = idSeul \? _groupeLignesData\.charger\(idSeul, String\(h\.Authorization \|\| h\.authorization \|\| ''\)\)/.test(memo[0]) && /if \(!Array\.isArray\(rows\)\) \{ _memoLectures\.delete\(cle\); return \{ ok: false/.test(memo[0]), 'App.jsx : fetchMemo groupe les petites lignes ; pas su ⇒ ok:false, rien gardé');
+  dit(/app_data\?id=in\.\(\$\{ids\.join\(','\)\}\)&select=id,data`/.test(app), 'App.jsx : le lot des petites lignes porte l\'id (attribution)');
   const brut = /const fetchHarvestBrut = async[\s\S]{0,1200}/.exec(app);
   dit(!!brut && /const rows = await lireMoissonGroupee\(`harvest_\$\{uid\}_\$\{type\}`\);\s*if \(!Array\.isArray\(rows\)\) return null;/.test(brut[0]), 'App.jsx : fetchHarvestBrut lit par la lecture groupée ; pas su ⇒ null');
   dit(/app_data\?id=in\.\(\$\{ids\.join\(','\)\}\)&select=\$\{SEL_MOISSON\}/.test(app) && /app_data\?id=eq\.\$\{id\}&select=\$\{SEL_MOISSON\}/.test(app), 'App.jsx : lot `id=in.(…)` et lecture seule, tous deux projetés `SEL_MOISSON`');
@@ -133,9 +156,13 @@ async function verifier(mod) {
     ['un id pas demandé accepté', texte.replace("if (!id || !demandes.has(id) || parId.has(id)) { attribuable = false; break; }", "if (!id) { attribuable = false; break; }")],
     ['sessions mêlées', texte.replace('const k = String(cle);', "const k = '';")],
     ['lot sans limite', texte.replace('for (let i = 0; i < ids.length; i += maxLot) {', 'for (let i = 0; i < ids.length; i += ids.length) {')],
-    ['400 = pas su', texte.replace('if (st >= 400 && st < 500 && st !== 401', 'if (false && st >= 400 && st < 500 && st !== 401')],
+    ['400 = pas su', texte.replace("if (st >= 500 || (st >= 400 && st !== 401", "if (st >= 500 || (false && st >= 400 && st !== 401")],
+    ["5xx = pas su pour tous", texte.replace("if (st >= 500 || (st >= 400", "if (st < 500 && (st >= 400")],
+    ['401 relu ligne par ligne', texte.replace("st !== 401 && st !== 403", "st !== 403")],
     ['même tableau partagé', texte.replace('ok(row ? [row] : [])', 'ok(row ? (parId.__t = parId.__t || {}, parId.__t[id] = parId.__t[id] || [row]) : [])')],
     ['id avec virgule accepté', texte.replace('/^[A-Za-z0-9_.:-]+$/', '/^[^)]+$/')],
+    ['petite ligne : autre en-tête accepté', texte.replace("if (!/^(apikey|authorization)$/i.test(k)) return null;", "void k;")],
+    ['petite ligne : autre filtre accepté', texte.replace("    else return null;\n  }\n  return sel", "  }\n  return sel").replace('if (parts.length !== 2) return null;', '')],
   ];
   let verts = 0;
   for (const [nom, m] of mutations) {

@@ -48,7 +48,7 @@ const STATUTS_A = ['Commande finalisée', 'Colis déposé en bureau de Poste ou 
 //    · 5 ANCIENS comptes (plus dans `vinted_accounts`) qui gardent leurs lignes
 //      de commandes (~15 Ko vendues, ~20 Ko achetées).
 //    Sans l'option, la base est EXACTEMENT celle d'avant (les autres bancs).
-function fabriquer({ comptes = 7, volumeReel = false } = {}) {
+function fabriquer({ comptes = 7, volumeReel = false, qr = false } = {}) {
   graine = 42;
   const accounts = [], rows = [], detailsReels = [];
   const numeros = {};
@@ -120,6 +120,22 @@ function fabriquer({ comptes = 7, volumeReel = false } = {}) {
   }
   // Suivis de colis par email (~180, petits).
   for (let i = 0; i < 180; i++) rows.push({ id: `email_track_mondialrelay_${100000 + i}`, data: { carrier: 'mondialrelay', tracking: String(100000 + i), status: i % 3 ? 'transit' : 'livre', receivedAt: iso(i * J), _pad: pad(200) } });
+  // (8 nov., démarrage) `qr: true` : la VRAIE forme des suivis Chronopost — l'image
+  // du QR (`qrB64`, ~2,4 Ko de base64) gardée sur la ligne, colis retiré compris
+  // (api/email-inbound.js la garde d'un e-mail à l'autre), et la forme d'aujourd'hui
+  // (`suivi`, `status` available/delivered, code, lieu, `recuSur`).
+  if (qr) {
+    const image = (i) => Buffer.from(Array.from({ length: 1800 }, (_, k) => (i * 31 + k * 7) % 251)).toString('base64');
+    for (let i = 0; i < 60; i++) {
+      const enJeu = i < 8;
+      rows.push({ id: `email_track_chronopost_XW${400000000 + i}FR`, data: { type: 'suivi', carrier: 'chronopost', suivi: `XW${400000000 + i}FR`,
+        status: enJeu ? 'available' : 'delivered', statusLabel: enJeu ? 'Arrivé au point de retrait' : 'Livré / retiré',
+        subject: enJeu ? `Votre colis XW${400000000 + i}FR est disponible` : `Votre colis XW${400000000 + i}FR a été retiré`,
+        receivedAt: iso(i * J), emailAt: iso(i * J), arriveLe: iso(i * J + 3600000), code: String(100000 + i), code2: null, artTitle: `Paire ${i}`,
+        lieu: `Relais ${i}\n12 rue des Lilas\n35000 Rennes`, limite: iso(-(7 - i) * J), consigne: false,
+        qrB64: image(i), qrType: 'image/png', qrUrl: null, account: 'compte' + (i % 7), ...(i % 5 === 0 ? { recuSur: ['ventes@exemple.fr'] } : {}) } });
+    }
+  }
   rows.push({ id: 'email_journal', data: { entries: Array.from({ length: 80 }, (_, i) => ({ at: iso(i * 3600000), type: 'message', to: 'x@y.fr' })) } });
   if (!volumeReel) rows.push({ id: 'vinted_item_details', data: Object.fromEntries(Array.from({ length: 120 }, (_, i) => [String(7000000000 + i), { desc: pad(800), photos: ['https://images1.vinted.net/t/a/f800/1.jpeg'] }])) });
   else {
@@ -161,6 +177,14 @@ const lireChemin = (o, chemin) => {
   for (const s of segs) v = v == null ? undefined : v[s];
   return v;
 };
+function metaDe(row) {
+  const d = row && row.data;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+  const m = {};
+  for (const [k, v] of Object.entries(d)) if ((typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') && Buffer.byteLength(JSON.stringify(v)) <= 600) m[k] = v;
+  if (d.pdfB64) m._pdf = true;
+  return m;
+}
 function projette(row, select) {
   if (!select || select === '*') return row;
   const out = {};
@@ -171,6 +195,9 @@ function projette(row, select) {
     const alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id' || src === 'updated_at' || src === 'owner') { out[alias] = src === 'updated_at' ? (row.updated_at || null) : row[src]; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    // (8 nov.) La colonne `meta` ENTIÈRE, calculée comme `public.vrm_meta` (004) :
+    // les champs scalaires de premier niveau dont le texte JSON fait ≤ 600 octets.
+    if (src === 'meta') { out[alias] = metaDe(row); continue; }
     if (/^data(->|->>)/.test(src)) {
       const v = lireChemin(row.data, src.replace(/^data/, ''));
       out[alias] = v == null ? null : (/->>[^>]*$/.test(src) && typeof v === 'object' ? JSON.stringify(v) : (/->>[^>]*$/.test(src) ? String(v) : v));
@@ -192,11 +219,15 @@ function filtreId(expr) {
   return () => true;
 }
 function filtreOr(expr) {
-  // or=(id.like.a,id.like.b)
+  // or=(id.like.a,id.like.b) — et (8 nov.) or=(data->>x.is.null,data->>x.neq.v)
   const corps = expr.replace(/^\(|\)$/g, '');
-  const parts = corps.split(/,(?=id\.)/);
-  const fs = parts.map((p) => { const m = /^id\.(.*)$/.exec(p); return m ? filtreId(m[1]) : () => false; });
-  return (id) => fs.some((f) => f(id));
+  const parts = corps.split(/,(?=id\.|data->)/);
+  const fs = parts.map((p) => {
+    let m = /^id\.(.*)$/.exec(p); if (m) { const f = filtreId(m[1]); return (row) => f(row.id); }
+    m = /^(data(?:->>|->)[A-Za-z_]+)\.(.*)$/.exec(p); if (m) return filtreData(m[1], m[2]);
+    return () => false;
+  });
+  return (row) => fs.some((f) => f(row));
 }
 function filtreData(cle, expr) {
   const chemin = cle.replace(/^data/, '');
@@ -206,7 +237,7 @@ function filtreData(cle, expr) {
     if (expr === 'not.is.null') return v != null;
     let m;
     if ((m = /^eq\.(.*)$/.exec(expr))) return String(v) === m[1];
-    if ((m = /^neq\.(.*)$/.exec(expr))) return String(v) !== m[1];
+    if ((m = /^neq\.(.*)$/.exec(expr))) return v != null && String(v) !== m[1];   // SQL : NULL <> x n'est pas vrai
     if ((m = /^gte\.(.*)$/.exec(expr))) return v != null && String(v) >= m[1];
     if ((m = /^gt\.(.*)$/.exec(expr))) return v != null && String(v) > m[1];
     if ((m = /^lt\.(.*)$/.exec(expr))) return v != null && String(v) < m[1];
@@ -227,7 +258,7 @@ function repondre(url, rangeHeader, { rows, main, accounts }) {
   for (const [k, v] of params) {
     if (k === 'select') select = v;
     else if (k === 'id') { const f = filtreId(v); L = L.filter((r) => f(r.id)); }
-    else if (k === 'or') { const f = filtreOr(v); L = L.filter((r) => f(r.id)); }
+    else if (k === 'or') { const f = filtreOr(v); L = L.filter((r) => f(r)); }
     else if (k === 'and') { const corps = v.replace(/^\(|\)$/g, ''); for (const p of corps.split(/,(?=id\.)/)) { const m = /^id\.(.*)$/.exec(p); if (m) { const f = filtreId(m[1]); L = L.filter((r) => f(r.id)); } } }
     else if (/^data(->|->>)/.test(k)) { const f = filtreData(k, v); L = L.filter(f); }
     else if (k === 'limit') limit = Number(v);

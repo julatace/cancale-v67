@@ -15,7 +15,8 @@
 //   · une ligne d'un autre appelant donnée à quelqu'un : chaque ligne est rendue
 //     à l'appelant de SON `id` (égalité stricte, jamais un préfixe) ;
 //   · « pas su » pris pour « rien » (§4.1) : une lecture groupée RATÉE (réseau,
-//     5xx, JSON illisible) rend `null` à TOUS — jamais `[]` ;
+//     JSON illisible, session refusée) rend `null` à TOUS — jamais `[]` ; un
+//     5xx (peut-être dû à une seule ligne) fait relire chaque ligne seule ;
 //   · une réponse qu'on ne sait pas attribuer (une ligne sans `id`, un `id` qui
 //     n'était pas demandé, deux fois le même) ⇒ on ne devine pas : chaque ligne
 //     est relue SEULE (comme avant) ;
@@ -53,8 +54,12 @@ export function creerLectureGroupee(lireLot, lireUne, opts = {}) {
     try { r = await lireLot(ids, cle); } catch (_) { r = { ok: false, statut: 0 }; }
     if (!r || !r.ok) {
       const st = r ? Number(r.statut) || 0 : 0;
-      // Pas compris (400, 404, 405…) : relu ligne par ligne. Panne : « pas su » pour tous.
-      if (st >= 400 && st < 500 && st !== 401 && st !== 403 && st !== 408 && st !== 429) return seul(ids, attente, cle);
+      // Pas compris (400, 404, 405…) ou panne du serveur (5xx, peut-être due à UNE
+      // ligne) : relu ligne par ligne — chaque ligne garde SA réponse, comme avant.
+      // Réseau coupé, réponse illisible, session refusée (401/403), trop de
+      // requêtes (408/429) : « pas su » pour tous (relire ligne par ligne ne
+      // ferait qu'ajouter des requêtes vouées au même sort).
+      if (st >= 500 || (st >= 400 && st !== 401 && st !== 403 && st !== 408 && st !== 429)) return seul(ids, attente, cle);
       for (const id of ids) for (const ok of attente.get(id)) ok(null);
       return undefined;
     }
@@ -103,3 +108,30 @@ export function creerLectureGroupee(lireLot, lireUne, opts = {}) {
 // Un identifiant de ligne qu'on peut écrire tel quel dans `in.(…)` (pas de
 // virgule, parenthèse, guillemet, espace ni `%`) — sinon : la lecture seule.
 export const idGroupable = (id) => typeof id === 'string' && /^[A-Za-z0-9_.:-]+$/.test(id);
+
+// ── (8 nov.) LES PETITES LIGNES `select=data` DU MONTAGE ────────────────────
+// `fetchMemo` (App.jsx) lit au montage une dizaine de lignes de réglages et de
+// gestes (`panel_*`, dates des annonces, Leboncoin…) par `id=eq.X&select=data`,
+// chacune par son effet, dans la même milliseconde. Cette fonction reconnaît
+// EXACTEMENT cette forme — `app_data?id=eq.<id>&select=data` (dans un ordre ou
+// l'autre), sans autre filtre ni en-tête que la clé et la session — et rend l'id
+// (sinon `null` : la lecture part telle quelle). Une page (`Range`), un `Prefer`,
+// un `order`, un `owner=`… : jamais groupée.
+export function idLigneData(url, base, entetes) {
+  const prefixe = String(base || '').replace(/\/+$/, '') + '/rest/v1/app_data?';
+  const u = String(url || '');
+  if (!base || u.indexOf(prefixe) !== 0) return null;
+  const h = entetes || {};
+  if (typeof Headers !== 'undefined' && h instanceof Headers) return null;
+  if (Array.isArray(h) || typeof h !== 'object') return null;
+  for (const k of Object.keys(h)) if (!/^(apikey|authorization)$/i.test(k)) return null;
+  const parts = u.slice(prefixe.length).split('&');
+  if (parts.length !== 2) return null;
+  let id = null, sel = false;
+  for (const p of parts) {
+    if (p === 'select=data') sel = true;
+    else if (p.startsWith('id=eq.')) { let v; try { v = decodeURIComponent(p.slice(6)); } catch (_) { return null; } id = v; }
+    else return null;
+  }
+  return sel && idGroupable(id) ? id : null;
+}
