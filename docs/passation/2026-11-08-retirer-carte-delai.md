@@ -60,8 +60,15 @@ d'évolution avec le délai pour retirer. »
   réduit, Ma journée) : **108 verts** sur la branche. Données inventées (Cancale ×2 même limite,
   Vannes dernier jour + consigne Vinted Go demain 9 h, Brest sans limite ⇒ estimée, Saint-Malo sans
   arrivée, Quimper « à vérifier » seul, un relais au nom seul).
-- Le même banc sur `origin/main` (git archive) : voir le rapport de la session (rouges sur les
-  villes, la carte au téléphone, les barres). Mutations : voir plus bas.
+- Le même banc sur `origin/main` (archive, build) : **65 rouges / 40 verts** (Quimper et pas
+  d'« Autres », ordre par nombre, pas de carte au téléphone, aucune barre, fond en panne non tu).
+- Mutations (sur la branche, 390 clair) : ambre jamais posé ⇒ 2 rouges (Vannes dernier jour, Vinted Go
+  < 24 h) ; villes sans colis réadmises ⇒ 1 rouge (Quimper revient). Code remis, rebâti.
+- Bancs existants : `colis-retirer-propre` 129 verts (1 contrôle réécrit : sans limite lue, la barre
+  « estimée » remplace « aucune puce »), `colis-villes` 46 verts (+ « Autres · 1 » attendu),
+  `hors-reseau` vert, `chargement` (Colis, Ma journée) vert. `carte-stable` : 3 rouges **identiques
+  sur origin/main** (son crochet cherche `carte.once("load"`, que le build minifié renomme — à
+  réparer à part ; le nouveau banc utilise la forme générale).
 - Audits : `audit-tdz`, `audit-violet`, `audit-icones`, `audit-retraits-suivi`, `audit-statuts`,
   `audit-identite`, `audit-villes-colis` verts ; `audit-variables` : 1 rouge **identique sur main**
   (`setCompteSel`, Vérifications → Messages — pas de ce chantier).
