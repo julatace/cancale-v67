@@ -20,6 +20,9 @@ test('les résultats sont bornés et le dépassement est explicite',async()=>{co
 test('aucun historique n’invente une réussite ; les anciennes entrées restent une référence de date',async()=>{const r=await lire('A',base([]));assert.equal(r.dernierEmail,null);assert.equal(etatCollecteur(r.collecteur).etat,'inconnu');});
 test('arrêt, erreur, passage en cours et horodatage futur sont distingués',()=>{const now=Date.parse('2026-10-21T12:30:00Z');assert.equal(etatCollecteur({dernierSucces:'2026-10-21T12:00:00Z'},now).etat,'alerte');assert.match(etatCollecteur({dernierPassage:'2026-10-21T12:29:00Z',etat:'debut'},now).titre,/cours/);assert.equal(etatCollecteur({dernierPassage:'2026-10-21T12:29:00Z',etat:'erreur'},now).etat,'alerte');assert.equal(etatCollecteur({dernierSucces:'2026-10-21T12:29:00Z'},now).etat,'actif');assert.equal(etatCollecteur({dernierSucces:'2026-10-22T12:00:00Z'},now).etat,'inconnu');});
 test('la route refuse les visiteurs et filtre avec l’identité validée, pas un paramètre owner',async()=>{
+ // (8 nov.) Sans clé de service, la route répond 503 AVANT tout (charge 1 000, 7 nov.) :
+ // la règle jugée ici (visiteur refusé, filtre par l’identité) suppose une installation configurée.
+ const cleAvant=process.env.SUPABASE_SERVICE_KEY;process.env.SUPABASE_SERVICE_KEY=cleAvant||'eyJhbGciOiJIUzI1NiJ9.e30.cle-de-test';
  const initial=global.fetch;const lectures=[];
  global.fetch=async(url,opts={})=>{
   if(String(url).includes('/auth/v1/user'))return opts.headers.Authorization==='Bearer session-A'?Response.json({id:'A'}):new Response('{}',{status:401});
@@ -31,7 +34,7 @@ test('la route refuse les visiteurs et filtre avec l’identité validée, pas u
   const appeler=async(headers)=>{const r={setHeader(){},status(n){this.code=n;return this;},json(b){this.body=b;}};await route({method:'GET',query:{mode:'reception',owner:'B'},headers},r);return r;};
   assert.equal((await appeler({})).code,401);assert.equal(lectures.length,0);
   const r=await appeler({authorization:'Bearer session-A'});assert.equal(r.code,200);assert.equal(r.body.emails[0].subject,'Mail de A');assert.ok(lectures.every(u=>!u.includes('owner=eq.B')));
- }finally{global.fetch=initial;}
+ }finally{global.fetch=initial;if(cleAvant===undefined)delete process.env.SUPABASE_SERVICE_KEY;else process.env.SUPABASE_SERVICE_KEY=cleAvant;}
 });
 
 test('les adresses déclarées sans email ne sont jamais déclarées en panne',async()=>{const donnees=[...rows,{owner:'A',id:'vrm_email_owners',data:{adresses:{'perso@example.test':{owner:'A'}}}}];const r=await lire('A',base(donnees));assert.deepEqual(r.adresses,[{adresse:'perso@example.test',declaree:true,comptes:[],derniereReception:null,codeGmail:null}]);});

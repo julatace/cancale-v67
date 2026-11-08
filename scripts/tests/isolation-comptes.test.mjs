@@ -9,7 +9,7 @@ const auth=()=>({user:{id:A},session:{access_token:'token-a'}});
 test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étranger et réponse périmée',async()=>{
  const code=extraire(app,'const fetchVintedAccounts =','// Retire un compte de');
  for(const mode of ['bon','etranger','sans-owner','bascule']){
-  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),fetch:async(url)=>{
+  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),memoriserComptesLies:()=>{},CLE_SUPPRIMES:'k',localStorage:{setItem(){},getItem(){return null;}},fetch:async(url)=>{
    assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);
    if(url.includes('/vinted_accounts')){if(mode==='bascule')c.AUTH=authB();return Response.json([{owner:mode==='etranger'?B:mode==='sans-owner'?undefined:A,vinted_user_id:'42'}]);}return Response.json([]);
   }});vm.runInContext(code+';globalThis.lire=fetchVintedAccounts;',c);
@@ -18,7 +18,7 @@ test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étrang
  function authB(){return {user:{id:B},session:{access_token:'token-b'}};}
 });
 test('les sauvegardes différées du vendeur A ne sont pas écrites après une bascule vers B dans un autre onglet',()=>{
- const code=extraire(app,'let _saveTimers = {}','// localStorage est partagé entre les onglets');let travail,ecrit=0;
+ const code=extraire(app,'let _saveTimers = {}','// ── « ANNULER » PARTOUT');let travail,ecrit=0;
  const c=vm.createContext({AUTH:auth(),readSession:()=>({user:{id:B}}),setTimeout:fn=>(travail=fn,1),clearTimeout(){},localStorage:{setItem(){ecrit++;}},SYNC_KEYS:[],window:{dispatchEvent(){}},CustomEvent:class{},cloudPush(){throw Error('Interdit');}});
  vm.runInContext(code+';globalThis.sauver=save;',c);c.sauver('vinted_sales',[{id:'vente-a'}]);travail();assert.equal(ecrit,0);
 });
