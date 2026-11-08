@@ -13,6 +13,7 @@ import { contexteVendeur } from './_lib/owner.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { normaliserSuivi } from './_lib/etat-colis-email.js';
 import { passageTransporteurs, transpALire, appliquerReponseBrute, ENVOI_MAX, MAX_APP, BUDGET_APP_MS } from './_lib/transporteurs-lecture.js';
+import { corsExtension } from './_lib/cors-extension.js';
 
 // ── (24 oct.) LE STATUT DES COLIS CHEZ LEUR TRANSPORTEUR (api/_lib/transporteurs*.js)
 // Trois modes, sans 13e fonction (le plan Hobby en permet 12) :
@@ -131,6 +132,7 @@ function carrierFromTags(t) {
 }
 
 export default async function handler(req, res) {
+  if (corsExtension(req, res)) return;   // (8 nov.) Orion : préalable CORS des appels de l'extension
   const mode = String((req.query && req.query.mode) || '');
   if (mode === 'transp' || mode === 'transp-a-lire' || mode === 'transp-brut') { await transp(req, res, mode); return; }
   if (!(await vendeurExige(req, res))) return;
