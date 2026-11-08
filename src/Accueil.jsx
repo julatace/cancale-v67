@@ -289,9 +289,17 @@ export default function Accueil({ onEntrer }) {
   }, []);
 
   // Le moment de la journée au milieu de l'écran : le téléphone fixe le montre.
+  // Ses captures ne se demandent qu'à l'approche de la section (sinon le
+  // chargement paresseux du navigateur, qui anticipe de plusieurs écrans, les
+  // tirait toutes au premier affichage).
   const [actif, setActif] = React.useState(MOMENTS[0].id);
+  const [plateauPret, setPlateauPret] = React.useState(false);
   React.useEffect(() => {
-    let io = null;
+    let io = null, io2 = null;
+    try {
+      io2 = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setPlateauPret(true); io2.disconnect(); } }, { rootMargin: '0px 0px 25% 0px' });
+      const j = document.getElementById('journee'); if (j) io2.observe(j);
+    } catch (_) { setPlateauPret(true); }
     try {
       io = new IntersectionObserver((es) => {
         const vus = es.filter((e) => e.isIntersecting);
@@ -299,7 +307,7 @@ export default function Accueil({ onEntrer }) {
       }, { rootMargin: '-45% 0px -45% 0px' });
       document.querySelectorAll('[data-moment]').forEach((m) => io.observe(m));
     } catch (_) {}
-    return () => { try { io && io.disconnect(); } catch (_) {} };
+    return () => { try { io && io.disconnect(); } catch (_) {} try { io2 && io2.disconnect(); } catch (_) {} };
   }, []);
 
   // Apparition au défilement — seulement si le mouvement est permis ET qu'un
@@ -393,7 +401,7 @@ export default function Accueil({ onEntrer }) {
               <div className="av-plateau" aria-hidden="true">
                 <span className="av-tel">
                   <span className="av-pile" data-pile="">
-                    {MOMENTS.map((m) => <Capture key={m.id} nom={m.capture} alt="" actif={actif === m.id} paresseuse={m.id !== MOMENTS[0].id} />)}
+                    {MOMENTS.filter((m, i) => plateauPret || i === 0).map((m) => <Capture key={m.id} nom={m.capture} alt="" actif={actif === m.id} />)}
                   </span>
                 </span>
               </div>
@@ -417,7 +425,7 @@ export default function Accueil({ onEntrer }) {
             <div className="av-conf" data-confiance="" data-reveil="">
               <h2 className="av-h2">Tes comptes restent les tiens.</h2>
               <p>VRM agit sur le compte ouvert dans ton navigateur, une action à la fois, jamais plus de 50 par heure. Aucun mot de passe Vinted ne t’est demandé.</p>
-              <p>Rien ne part sans toi. Les automatismes — <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span>, <span data-automatisme="">accepter une offre Vinted au-dessus de ton prix mini</span> — restent éteints tant que tu ne les allumes pas, et aucune annonce n’est supprimée sans ta confirmation.</p>
+              <p>Rien ne part sans toi. Les automatismes — <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span>, <span data-automatisme="">accepter une offre Vinted au-dessus de ton prix mini</span> — restent éteints tant que tu ne les allumes pas, et aucune annonce n’est supprimée sans ta confirmation. Les messages aux favoris et la republication ne démarrent que si tu les lances.</p>
               <p>Tes données ne servent qu’à faire marcher ta boutique : VRM ne vend rien et ne fait pas de publicité.</p>
             </div>
             <div data-reveil="">

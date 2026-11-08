@@ -1,0 +1,62 @@
+{
+ "bureau-clair.webp": {
+  "sha256": "d4bb6b0da075cfadd0cc92629e48601c1b7f09570d083ab79ba4e2116419af11",
+  "ecran": "journee",
+  "largeur": 1440,
+  "modeExemple": true
+ },
+ "bureau-sombre.webp": {
+  "sha256": "0e56e1c0e246a5859dbdf8e6650d147e5fb0bf23fcb52bb8386c1ceca28a3f43",
+  "ecran": "journee",
+  "largeur": 1440,
+  "modeExemple": true
+ },
+ "compta-clair.webp": {
+  "sha256": "968a6998d32c17663a73b6d8a17edf033cad75466614af3a22b5714c020ad217",
+  "ecran": "compta",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "compta-sombre.webp": {
+  "sha256": "27e622bafd9c04a86db7bc9a97cb5fdeb36b1655aa5709eafc9c35efd400dec6",
+  "ecran": "compta",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "journee-clair.webp": {
+  "sha256": "739b8ceea04dc2b682f63ba66f175130529953112a4ab7bad318f46fb7c64294",
+  "ecran": "journee",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "journee-sombre.webp": {
+  "sha256": "9b48b54973aa4c834fd32235748644fc1f499e2b7f700b0490b2e41dafcf8a03",
+  "ecran": "journee",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "numeros-clair.webp": {
+  "sha256": "d1c5874f611c6dee77bd1e09c5e8ae6a2b655da68cb1da00b7e3439cd6b69a5e",
+  "ecran": "annonces",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "numeros-sombre.webp": {
+  "sha256": "1d1521aafd9a325db0b0939da3580a8d1a61f3c780a1aead7d236076f9b5879f",
+  "ecran": "annonces",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "retirer-clair.webp": {
+  "sha256": "1e855f422d8cbc8af3f3c7428b2ff25dcdfdfbff176815e4e57beb7ed3ab5d2a",
+  "ecran": "cat_bord",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "retirer-sombre.webp": {
+  "sha256": "0d0e13fe3b24137f9528dc8b31dd86bfea5e9d2317be289a07b879e6fb0276fe",
+  "ecran": "cat_bord",
+  "largeur": 390,
+  "modeExemple": true
+ }
+}

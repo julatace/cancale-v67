@@ -7,7 +7,7 @@
 //  Le mode exemple répond lui-même à la base et à `/api` ; ce script coupe en
 //  plus TOUT le réseau hors de localhost : aucune requête ne sort.
 //
-//  Sortie : public/accueil/{nom}-{clair|sombre}.webp (WebP, qualité 72), au
+//  Sortie : public/accueil/{nom}-{clair|sombre}.webp + captures.json (empreintes) (WebP, qualité 72), au
 //  double de la taille affichée (écran Retina), métadonnées retirées.
 //    npm run build && node scripts/accueil-captures.cjs
 //    SEUL=journee,colis  THEMES=clair  SORTIE=/tmp/x  (pour essayer)
@@ -19,6 +19,7 @@
 'use strict';
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
 const { execFileSync } = require('child_process');
+const crypto = require('crypto');
 const { chromium } = require(path.join(__dirname, '..', 'node_modules', 'playwright'));
 
 const RACINE = path.join(__dirname, '..');
@@ -32,7 +33,6 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 // Les écrans montrés par la page. `w` × `h` : la taille AFFICHÉE (CSS px).
 const ECRANS = [
   { nom: 'journee', tab: 'journee', w: 390, h: 844 },
-  { nom: 'colis', tab: 'cat_bord', w: 390, h: 844 },
   { nom: 'retirer', tab: 'cat_bord', w: 390, h: 844, gestes: [/^\s*À retirer/, /^\s*Code\s*$/], defile: 560 },
   { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844, defile: 620 },
   { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/Micro-entrepreneur/, /^\s*Par mois\s*$/] },
@@ -85,6 +85,14 @@ async function capturer(nav, e, theme) {
   const args = [png, ...(e.w > 600 ? ['-resize', '1600x'] : []), '-strip', '-quality', '72', '-define', 'webp:method=6', webp];
   execFileSync('convert', args);
   fs.unlinkSync(png);
+  // Le registre : chaque fichier servi par la page porte l'empreinte de ce que CE
+  // script a produit en mode exemple. Le banc (scripts/bancs/accueil.cjs) refuse
+  // une image de la page qui n'y est pas (une capture posée à la main, peut-être
+  // d'une vraie base, ne passerait pas).
+  const reg = path.join(SORTIE, 'captures.json');
+  let r = {}; try { r = JSON.parse(fs.readFileSync(reg, 'utf8')); } catch (_) { r = {}; }
+  r[`${e.nom}-${theme}.webp`] = { sha256: crypto.createHash('sha256').update(fs.readFileSync(webp)).digest('hex'), ecran: e.tab, largeur: e.w, modeExemple: true };
+  fs.writeFileSync(reg, JSON.stringify(Object.fromEntries(Object.entries(r).sort()), null, 1) + '\n');
   console.log(`${e.nom}-${theme}.webp`, Math.round(fs.statSync(webp).size / 1024) + ' Ko', erreurs.length ? 'erreurs : ' + erreurs.join(' | ') : '', sorties.length ? `(${sorties.length} requête(s) externe(s) coupée(s))` : '');
 }
 
