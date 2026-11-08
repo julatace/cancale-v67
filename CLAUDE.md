@@ -511,6 +511,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · À retirer : villes, carte, délai** : villes = seulement celles où un colis compté attend, triées par urgence, + « Autres » (`selecteurVilles`) ; carte AUSSI au téléphone (200 px, suit la ville, deux doigts, « Agrandir », hors réseau ⇒ rien) ; barre du délai arrivée lue → limite (lue, sinon « estimée »), ambre ≤ 24 h, jamais rouge, en tête du point si commune (`src/delaiRetrait.js`). `docs/passation/2026-11-08-retirer-carte-delai.md`. Geste : aucun.
 - **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
 
 
@@ -546,9 +547,7 @@ sans la fonction.
 
 - **6 nov. · Visuel (v36)** : une ligne d'explication au plus, le reste en feuille (`Pourquoi`, ⓘ collé au texte) ; Réglages eBay en rangées iOS (`src/composants/Ios.jsx`), `Notice` en rangée, plus de barres latérales, listes en groupes iOS. `docs/passation/2026-11-06-visuel.md`.
 
-- **6 nov. · Statut des colis** : règle d'état datée (`api/_lib/etat-colis.js` : fini prouvé gagne, une lecture plus vieille ne fait pas reculer, « en route » daté après l'arrivée ⇒ à vérifier) ; conversation des e-mails Vinted relus décodée dans le navigateur (À vérifier 34 → 2) ; date estimée par la garde. `docs/passation/2026-11-06-statut-colis.md`. Geste : aucun.
 
-- **6 nov. · Hors réseau + temps réels (v36)** : Colis rouvert sans réseau (par point relais, codes, QR, « En grand »), « Hors connexion — dernier état du … », « J'ai retiré »/« Colis fait » en file ; temps réels anonymes (`src/mesuresTerrain.js`, `compte?mode=mesures`, 1 lot/min), panneau propriétaire, veille +30 % au p75. `docs/passation/2026-11-06-hors-reseau.md`.
 
 
 
