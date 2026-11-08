@@ -264,7 +264,7 @@ async function controlesRendu(nav, nom, opt, S) {
     // Les liens : légaux, aide, état du service — tous servis.
     const liens = await pg.evaluate(() => [...new Set([...document.querySelectorAll('[data-accueil] a[href^="/"]')].map((a) => a.getAttribute('href')).filter((h) => !/^\/(\?|$)/.test(h) && !/^\/#/.test(h)))]);
     const manquants = liens.filter((h) => { const f = fichierDe(h); return !fs.existsSync(path.join(DIST, f)) || !fs.statSync(path.join(DIST, f)).isFile(); });
-    const veutLiens = ['/legal/cgv.html', '/legal/confidentialite.html', '/aide', '/etat'];
+    const veutLiens = ['/legal/cgv.html', '/legal/confidentialite.html', '/aide', '/statut'];
     dit(veutLiens.every((h) => liens.includes(h)) && manquants.length === 0, `${nom} : CGV, confidentialité, aide et état du service sont là, et les ${liens.length} liens mènent à une vraie page`, `manquants : ${manquants.join(', ') || '—'} · absents : ${veutLiens.filter((h) => !liens.includes(h)).join(', ') || '—'}`);
     let cst = ''; try { cst = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(lire('src/contact.js') || '') || [])[1] || '').trim(); } catch (_) { cst = ''; }
     const contact = await pg.evaluate(() => { const e = document.querySelector('[data-accueil] [data-contact]'); return e ? { texte: e.innerText, absent: e.hasAttribute('data-contact-absent'), href: e.getAttribute('href') || '' } : null; });

@@ -215,7 +215,7 @@ async function controler(lib, { taire = false } = {}) {
     const r = await M.bilanMoisVendeur(p);
     const m = j.envois[0] || {};
     dit(j.envois.length === 1 && r && r.issue === 'envoye', 'réglage allumé ⇒ UN e-mail', JSON.stringify(r));
-    dit(m.a === 'vendeur@exemple.invalid' && /octobre 2026/.test(m.sujet || '') && /\?tab=compta/.test(m.html || '') && /\?tab=compta/.test(m.texte || ''), 'à l’adresse DU COMPTE, sujet du mois, lien vers Compta', `${m.a} · ${m.sujet}`);
+    dit(m.a === 'vendeur@exemple.invalid' && /bilan d’octobre 2026/.test(m.sujet || '') && /\?tab=compta/.test(m.html || '') && /\?tab=compta/.test(m.texte || ''), 'à l’adresse DU COMPTE, sujet du mois, lien vers Compta', `${m.a} · ${m.sujet}`);
     dit(/^<https:\/\/vrm\.center\/api\/compte\?mode=bilan-mois&d=[0-9a-f-]{36}\.[A-Za-z0-9_-]{32}>$/.test((m.entetes || {})['List-Unsubscribe'] || '') && (m.entetes || {})['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'désinscription en un clic, par un lien signé', JSON.stringify(m.entetes));
     const { j: j2, p: p2 } = faux({ choix: { actif: true }, memo: j.memo });
     const r2 = await M.bilanMoisVendeur(p2);

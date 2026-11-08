@@ -120,6 +120,8 @@ export const euros = (x) => {
 };
 const liste = (xs, max = 3) => (xs.length <= max ? xs.join(', ') : `${xs.slice(0, max).join(', ')} et ${xs.length - max} autre${xs.length - max > 1 ? 's' : ''}`);
 
+// « d’octobre », « d’avril », « d’août », mais « de novembre ».
+export const deMois = (libelle) => (/^[aeiouyàâéèêîôû]/i.test(String(libelle)) ? 'd’' : 'de ') + libelle;
 export function texteBilanMois(b, { lien = '' } = {}) {
   // « Au moins 0 » ne se dit jamais (§5) : un total partiel nul s'écrit « — ».
   const val = (etat, x, f) => (etat === 'pas-su' || (etat === 'partiel' && !(Math.abs(Number(x)) > 0)) ? '—' : `${etat === 'partiel' ? 'au moins ' : ''}${f(x)}`);
@@ -135,13 +137,13 @@ export function texteBilanMois(b, { lien = '' } = {}) {
   const suite = [];
   if (manque.length) suite.push(`« Au moins » : il manque ${liste(manque)}. Le détail est dans Compta.`);
   suite.push('Les chiffres suivent les règles de l’app : vendu au jour de la vente, reçu au jour du versement, bénéfice sur les ventes dont tu as noté le prix d’achat.');
-  const titre = `Ton mois de ${b.libelle}`;
+  const titre = `Ton mois ${deMois(b.libelle)}`;
   const { texte, html } = gabaritEmail({
-    titre, paras: [`Le résumé de ${b.libelle}, compté par VRM sur tous tes comptes.`], chiffres, suite,
+    titre, paras: [`Le résumé ${deMois(b.libelle)}, compté par VRM sur tous tes comptes.`], chiffres, suite,
     bouton: { mot: 'Ouvrir la Compta', url: `${SITE}/?tab=compta` },
     pied: { texte: 'Tu reçois ce bilan parce que tu l’as activé dans VRM (Réglages → Notifications).', ...(lien ? { lien, motLien: 'ne plus recevoir ce bilan' } : {}) },
   });
-  return { sujet: `Ton bilan de ${b.libelle} — VRM`, texte, html };
+  return { sujet: `Ton bilan ${deMois(b.libelle)} — VRM`, texte, html };
 }
 
 // ── LE LIEN « NE PLUS RECEVOIR » (signé, comme celui de l'essai) ───────────

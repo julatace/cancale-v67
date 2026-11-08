@@ -474,7 +474,7 @@ export default function Accueil({ onEntrer }) {
               <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, et un seul marche aussi : chacun se met à jour quand tu l’ouvres sur ton ordinateur, et ses chiffres restent séparés.</p>
               <p><b>C’est seulement pour les baskets ?</b> Non. Vêtements, sacs, livres : le numéro de rangement, le bordereau et la compta marchent pour n’importe quel article.</p>
               {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> Pas encore compté : VRM apprend à lire Vestiaire, mais ses ventes n’entrent dans aucun total aujourd’hui.</p>}
-              <p><b>Une question qui n’est pas ici ?</b> <a href="/aide">L’aide</a> répond pas à pas ; <a href="/etat">l’état du service</a> dit si tout fonctionne en ce moment.</p>
+              <p><b>Une question qui n’est pas ici ?</b> <a href="/aide">L’aide</a> répond pas à pas ; <a href="/statut">l’état du service</a> dit si tout fonctionne en ce moment.</p>
             </div>
           </div>
         </section>
@@ -498,7 +498,7 @@ export default function Accueil({ onEntrer }) {
           </div>
           <nav aria-label="Informations">
             <a href="/aide">Aide</a>
-            <a href="/etat" data-statut="">État du service</a>
+            <a href="/statut" data-statut="">État du service</a>
             {LEGAL.map(([l, h]) => <a key={h} href={h}>{l}</a>)}
             {/* CONTACT — une seule source (src/contact.js) ; vide ⇒ on le DIT (§2.3). */}
             {contactEmail()
