@@ -96,5 +96,9 @@ Branche `claude/vendeurs-differents` (depuis `claude/amazing-lovelace-xd7obl`). 
   equipe-ecriture-membre, verif-annonce (`--prouve` 11/11 après mise à jour de la mutation
   `sans_marque`), guide-iphone, accompagnement, conseils, fonctions-api, icones,
   annonces-actions (F5 accepte `verifV`), et 23 autres qui lisent les mêmes textes.
-- `audit-benefice` est rouge AVANT ce chantier (« boutiqueOrion déjà déclaré » dans le texte
-  recollé de `_source-app.cjs`) : pas de mon fait, à corriger dans `_source-app.cjs`.
+- `audit-benefice` et `audit-frein-relais-vinted` étaient rouges AVANT ce chantier (le texte
+  recollé par `_source-app.cjs` déclarait deux fois `boutiqueOrion` puis `VerifierInstallationApp` :
+  deux imports de Réglages.jsx vivaient DANS un morceau recollé). Les deux imports sont passés
+  dans l'en-tête de `src/ecrans/Reglages.jsx` (hors morceaux) : les deux audits sont verts.
+- `audit-coque-parametres` reste rouge comme avant (icônes `pulse` ×2 et `info` ×2 dans
+  Réglages, pas de ce chantier) ; « Je vends » a pris `bag` pour ne pas ajouter de doublon.
