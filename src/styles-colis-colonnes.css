@@ -250,3 +250,22 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord
 /* La pastille N° (`Numero`, inline-flex) se LIT « N°\n31 » (innerText, copier-coller) : dans Colis elle est
    un bloc en ligne, son texte se lit « N°31 ». Le dessin ne change pas. (Signalé au chantier B.) */
 html body .vrm-main .vrm-colis-titre .vrm-num, html body .vrm-tournee .vrm-num, html body [data-colis-bordereau-frais] .vrm-num { display: inline-block; }
+
+/* (8 nov., Julien : « une barre d'évolution avec le délai pour retirer ») La barre du délai : fine, NEUTRE ;
+   AMBRE dans les dernières 24 h (un geste à faire, §7) ; jamais rouge. Spécificité haute : les feuilles de
+   l'app (visuel, design 2026) passent après celle-ci. */
+:root:root body .vrm-rpf-delai { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 6px; max-width: 320px; }
+:root:root body .vrm-rpf-delai.is-tete { max-width: none; margin: 0; }
+:root:root body .vrm-rpf-delai-piste { position: relative; flex: 1 1 auto; min-width: 48px; height: 4px; border-radius: 2px; overflow: hidden; background: var(--d-remplir, rgba(118,118,128,.12)); }
+:root:root body .vrm-rpf-delai-plein { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--d-gris, #6E6E73); }
+:root:root body .vrm-rpf-delai.is-ambre .vrm-rpf-delai-plein { background: var(--d-ambre, var(--vrm-warn, #B25000)); }
+:root:root body .vrm-rpf-delai-txt { flex: none; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--d-gris, #6E6E73); white-space: nowrap; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-rpf-delai-txt.is-ambre { color: var(--d-ambre, var(--vrm-warn, #B25000)); font-weight: 600; }
+:root:root body .vrm-rpf-delai-est { font-weight: 400; }
+:root:root body .vrm-rpf-tete-delai { padding: 0 14px 10px; }
+/* La carte en haut de la liste (téléphone compris) ; « Agrandir » posé dans son coin, 44 px au doigt. */
+:root:root body .vrm-rpf-carte[hidden] { display: none !important; }
+:root:root body .vrm-rpf-agrandir { position: absolute; top: 8px; right: 8px; z-index: 3; min-height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 22px; font: 600 13px/44px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+:root:root body .vrm-rpf-agrandir:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
+:root:root body .vrm-rpf-ligne-delai { padding: 0 0 12px calc(56px + 12px); margin-top: -4px; }
+:root:root body .vrm-rpf-ligne-delai .vrm-rpf-delai { margin-top: 0; }
