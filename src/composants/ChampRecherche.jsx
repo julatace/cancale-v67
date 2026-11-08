@@ -30,28 +30,32 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
   const [ecoute, setEcoute] = React.useState(false);
   const [refus, setRefus] = React.useState(MICRO_REFUSE.oui);
   const refRec = React.useRef(null);
+  const composition = React.useRef(false);
   const avecMicro = micro && voixDisponible() && !refus;
 
-  React.useEffect(() => () => { try { refRec.current && refRec.current.abort(); } catch (_) {} }, []);
+  const interrompre = () => { const rec=refRec.current;refRec.current=null;try{rec?.abort();}catch(_){}setEcoute(false); };
+  React.useEffect(() => () => { const rec=refRec.current;refRec.current=null;try{rec?.abort();}catch(_){} }, []);
 
   const dicter = () => {
-    if (ecoute) { try { refRec.current && refRec.current.stop(); } catch (_) {} return; }
+    if (refRec.current) { try { refRec.current && refRec.current.stop(); } catch (_) {} return; }
     try {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       const rec = new SR();
       rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
       rec.onresult = (e) => {
+        if(refRec.current!==rec)return;
         const t = e && e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript;
         if (!t) return;
         const texte = voix === 'brut' ? String(t).trim() : requeteDeLaVoix(t).requete;
         if (onChange) onChange(texte);
       };
-      rec.onerror = (e) => { setEcoute(false); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { MICRO_REFUSE.oui = true; setRefus(true); } };
-      rec.onend = () => { setEcoute(false); refRec.current = null; };
+      rec.onerror = (e) => { if(refRec.current!==rec)return;refRec.current=null;setEcoute(false); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { MICRO_REFUSE.oui = true; setRefus(true); } };
+      rec.onend = () => { if(refRec.current!==rec)return;setEcoute(false); refRec.current = null; };
       refRec.current = rec; setEcoute(true); rec.start();
     } catch (_) { setEcoute(false); refRec.current = null; }
   };
   const effacer = () => {
+    interrompre();
     if (onChange) onChange('');
     try { ref.current && ref.current.focus(); } catch (_) {}
   };
@@ -60,8 +64,9 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
     <div className={`vrm-champ-recherche${className ? ' ' + className : ''}`} data-champ-recherche="" data-champ-recherche-plein={valeur ? '1' : '0'} {...rest}>
       <span className="vrm-champ-recherche-loupe"><IconeComposant nom="search" taille={17}/></span>
       <input ref={ref} type="search" className="vrm-champ-recherche-saisie" value={valeur}
-        onChange={(e) => onChange && onChange(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && onValider) { e.preventDefault(); onValider(valeur); } if (e.key === 'Escape' && valeur) { e.preventDefault(); e.stopPropagation(); effacer(); } }}
+        onChange={(e) => { interrompre();onChange && onChange(e.target.value); }}
+        onCompositionStart={()=>{composition.current=true;interrompre();}} onCompositionEnd={()=>{composition.current=false;}}
+        onKeyDown={(e) => { if(composition.current||e.nativeEvent.isComposing||e.keyCode===229){if(e.key==='Enter'||e.key==='Escape')e.stopPropagation();return;} if (e.key === 'Enter' && onValider) { e.preventDefault(); onValider(valeur); } if (e.key === 'Escape' && (valeur||refRec.current)) { e.preventDefault(); e.stopPropagation(); effacer(); } }}
         placeholder={placeholder} aria-label={nom} autoFocus={autoFocus}
         autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search"/>
       {valeur ? (
@@ -71,7 +76,7 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
       ) : null}
       {avecMicro ? (
         <button type="button" className="vrm-champ-recherche-bouton vrm-champ-recherche-micro" data-champ-recherche-micro="" data-micro-ecoute={ecoute ? '1' : '0'}
-          aria-label="Dicter la recherche" aria-pressed={ecoute} title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : 'Dicter'} onClick={dicter}>
+          aria-label={ecoute?"Arrêter la dictée":"Dicter la recherche"} aria-pressed={ecoute} title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : 'Dicter'} onClick={dicter}>
           <IconeComposant nom="mic" taille={18}/>
         </button>
       ) : null}

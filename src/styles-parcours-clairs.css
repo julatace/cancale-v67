@@ -82,3 +82,13 @@
   :root:root body .vrm-message-workspace>.vrm-msg-fiche { display:none !important; }
   :root:root body .vrm-message-workspace .vrm-chat-panel .vrm-chat-paire { display:flex !important; }
 }
+/* Un repère de négociation, sans suggérer une acceptation automatique. */
+.vrm-offre-repere { margin:8px 0 0; color:var(--d-gris,#6e6e73); font-size:12px; line-height:1.4; }
+.vrm-offre-repere[data-offre-niveau="sous-minimum"] { color:var(--d-ambre,#b25000); }
+.vrm-b-indicateur { animation:vrm-action-attente .9s linear infinite; }
+@keyframes vrm-action-attente { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .vrm-b-indicateur { animation:none; } }
+:root:root body .vrm-b[aria-busy="true"] { opacity:1 !important; color:var(--d-gris,#6e6e73) !important; background:var(--d-remplir,rgba(118,118,128,.12)) !important; cursor:progress; }
+.vrm-boite-vue-filtree { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-block:4px; }
+.vrm-boite-vue-filtree>span { min-width:0; color:var(--d-gris,#6e6e73); font-size:12px; line-height:1.45; overflow-wrap:anywhere; }
+.vrm-boite-vue-filtree>button { flex:none; min-height:44px; font-size:12px; padding-inline:10px; }

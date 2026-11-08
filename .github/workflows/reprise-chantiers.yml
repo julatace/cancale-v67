@@ -61,4 +61,6 @@ jobs:
           node scripts/bancs/${{ matrix.banc }}.cjs
           if [ "${{ matrix.banc }}" = "parcours-quotidien" ]; then
             node scripts/tests/synchronisation-vinted-interface.cjs
+            node scripts/tests/actions-visuelles-interface.cjs
+            node scripts/tests/recherche-interactions.cjs
           fi
