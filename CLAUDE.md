@@ -509,10 +509,12 @@ sans la fonction.
 | `ventesleger` | `commandesParServeur` | **5.326.0** (8 nov.) | ventes/achats envoyés LÉGERS : la fenêtre en abrégé (n° : empreinte) + ce que la base n'a pas, fusionnés chez vrm.center (`api/_lib/commandes-leger.js`, même règle que l'extension) ; chaque envoi < 200 Ko ; route absente ⇒ voie d'avant |
 | `appareil` | `publierAppareil` | **5.327.0** (8 nov.) | chaque navigateur publie `ext_appareil_{id}` (nom, version, envois réussis/refusés, comptes lus) : Paramètres → « Tout va bien ? » et l'alerte « compte pas relu » (`api/_lib/garde-capture.js`) |
 | `secoursenvoi` | `commandesSecours` | **5.327.0** (8 nov.) | 3 échecs réseau/5xx de suite vers vrm.center ⇒ voie directe bornée (< 256 Ko, fusion par n°) ; trop lourd ⇒ rien écrit, dit sur la carte |
+| `connexioncarte` | `sessionDepuis` | **5.328.0** (8 nov.) | la fenêtre et la carte du logo commencent par « Me connecter » (email + mot de passe VRM), sans ouvrir VRM |
 
 ---
 
 ## 9. État actuel et décisions récentes
+- **8 nov. · Extension 5.328 : connexion DANS l'extension** : carte du logo et fenêtre commencent par email + mot de passe VRM, puis Google/Discord en PKCE dans l'extension (retour `vrm.center/extension-retour.html`), « par le site » en dernier ; Orion : liaison par le pont d'emblée ; sans session rien ne part ni n'est « refusé ». `docs/passation/2026-11-08-connexion-carte.md`. Geste : Supabase → Redirect URLs `https://vrm.center/extension-retour.html`.
 - **8 nov. · Aide et signalement** : « ? » après la phrase de chaque écran (3 questions, article, « Signaler ») ; signalement enrichi (capture SCHÉMATIQUE en nombres, 30 requêtes par famille, 50 erreurs, montants/pseudos masqués) ; centre d'aide `vrm.center/aide` (généré par `scripts/aide-generer.cjs`) ; alertes de plantage groupées (1/h) au propriétaire. `docs/passation/2026-11-08-aide-signalement.md`. Geste : ouvrir vrm.center/aide.
 
 - **8 nov. · Recherche et filtres** : réinitialisation des filtres cumulés de la boîte mail, dictée annulée sans retour tardif et composition de texte protégée. `docs/passation/2026-11-08-recherches-filtres.md`. Aucune mise à jour d’extension.
@@ -537,9 +539,7 @@ sans la fonction.
 - **8 nov. · Démarrage : moins de lectures** : −12 à −15 lectures et −200 Ko par ouverture (dressings et boîtes en `in.(…)` par famille, petites lignes `select=data` groupées — `src/lectureGroupee.js` ; transactions plus relues — `src/memoEcritures.js` ; suivis sans l'image du QR des colis retirés — `src/suivisSansQr.js`) ; Ventes −1,2 s, Ma journée/Colis limitées par le processeur ; instantané de 2e ouverture : plan seulement. `docs/passation/2026-11-08-demarrage-lectures.md`. Geste : aucun.
 - **8 nov. · Démarrage léger** : 14 écrans sortis d'App.jsx vers `src/ecrans/*.jsx`, chargés à la demande (`scripts/decouper-app.cjs`, découpe mécanique ; balises `// ⟦→ ecrans/X.jsx #k⟧` à ne pas effacer) ; morceau App 1 223 → 808 Ko gz ; feuilles de l'app dans `src/stylesApp.js` (index.css 668 → 18 Ko, cascade identique) ; App préchargé par `public/demarrage-app.js` ; audits : `scripts/_source-app.cjs` (`brancher()`) recolle le texte d'origine. `docs/passation/2026-11-08-demarrage-leger.md`. Geste : aucun.
 - **8 nov. · Colis vendus partis d'après le transporteur** : vente « à envoyer » (Vestiaire, Vinted) dont le n° EXACT est pris en charge chez Chronopost/Vinted Go ⇒ « Envoyés » avec la raison, partout (Colis, Ma journée, cloche, widget, rappels) ; lignes à part `depart_*` (jamais `transp_`, jamais « à retirer ») ; Mondial Relay/Colissimo pas lus. `docs/passation/2026-11-08-colis-sortants.md`. Geste : aucun.
-- **8 nov. · Retraits : le suivi lu sort un colis en le disant** : un e-mail rangé « vinted »/« autre » se lit par la forme du n° (`carrierLuDeLigne`) ; deux `transp_` pour un n° ⇒ la lue (`indexTranspParSuivi`, app = serveur = cron) ; une lecture après 30 j ; Colis → À retirer « Sortis de « à retirer » » (« Mondial Relay : retiré le 5 nov. », 3 j, hors compte) et « pourquoi pas lu » + geste (`src/retraitSuivi.js`) ; widget : jamais un n° de ses bordereaux. `docs/passation/2026-11-08-retraits-suivi.md`. Geste : aucun.
 
-- **8 nov. · Design 2026, passage 2** : `--d-*` appliqué à Ventes (groupe à rangées, état en mot + point ambre, tiroir groupé), Annonces (5 colonnes, bandes de chiffres), Achats, Messages, E-mails, Compta (statut d'abord), Stats, Stock, Réglages, plateformes, loupe ; DESIGN.md +6 composants. `docs/passation/2026-11-08-design-ecrans.md`. Geste : regarder Ventes et Annonces.
 
 
 
