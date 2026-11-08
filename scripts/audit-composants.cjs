@@ -241,9 +241,10 @@ function statiques(bavard) {
   dit(!/toFixed\(2\)\.replace\('\.',','\)\+' €'\);?\s*$/m.test(app.split('\n').filter((l) => /const (fmt|fmtE|fmtE0|prixTxt)\b/.test(l)).join('\n')), 'App.jsx : plus aucune écriture propre dans ces quatre définitions');
   dit(/function SheetShell\(props\) \{\n {2}return <SheetShellBase \{\.\.\.props\} FermeAuRetour=\{FermeAuRetour\}\/>;/.test(app), 'App.jsx : `SheetShell` relaie la feuille unique avec le vrai FermeAuRetour');
   dit(/function Bouton\(props\) \{\n {2}return <BoutonBase/.test(app) && /function Segmente\(props\) \{\n {2}return <SegmenteBase/.test(app), 'App.jsx : `Bouton` et `Segmente` relaient les composants partagés');
-  const main = lire('src/main.jsx');
+  // (8 nov., démarrage léger) les feuilles de l'app ont quitté main.jsx pour src/stylesApp.js (même ordre)
+  const main = lire('src/main.jsx') + '\n' + (require('fs').existsSync(require('path').join(__dirname, '..', 'src', 'stylesApp.js')) ? lire('src/stylesApp.js') : '');
   const imports = [...main.matchAll(/^import '\.\/([^']+\.css)';/gm)].map((m) => m[1]);
-  dit(imports.includes('styles-composants.css') && imports[imports.length - 1] === 'styles-composants.css', 'main.jsx : styles-composants.css chargé, en dernier');
+  dit(imports.includes('styles-composants.css') && imports[imports.length - 1] === 'styles-composants.css', 'main.jsx / stylesApp.js : styles-composants.css chargé, en dernier');
   const css = lire('src/styles-composants.css').replace(/\/\*[\s\S]*?\*\//g, '');
   const regle = (sel) => { const i = css.indexOf(sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
   const fs = regle('.vrm-fs');

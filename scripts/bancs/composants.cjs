@@ -64,7 +64,8 @@ const MUTATIONS = {
 
 async function construire(theme) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-composants-'));
-  const main = fs.readFileSync(path.join(RACINE, 'src', 'main.jsx'), 'utf8');
+  // (8 nov., démarrage léger) les feuilles de l'app ont quitté main.jsx pour src/stylesApp.js (même ordre)
+  const main = fs.readFileSync(path.join(RACINE, 'src', 'main.jsx'), 'utf8') + '\n' + (fs.existsSync(path.join(RACINE, 'src', 'stylesApp.js')) ? fs.readFileSync(path.join(RACINE, 'src', 'stylesApp.js'), 'utf8') : '');
   const css = [...main.matchAll(/^import\s+'\.\/([^']+\.css)';/gm)].map((m) => path.join(RACINE, 'src', m[1]));
   const src = (f) => JSON.stringify(path.join(RACINE, 'src', f));
   const sombre = theme === 'sombre';
