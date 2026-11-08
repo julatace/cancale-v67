@@ -662,6 +662,10 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
               <span className={lecture ? 'vrm-boite-tourne' : undefined}>{Ic.actualiser}</span>{lecture ? 'Lecture…' : 'Actualiser'}
             </button>}
           </div>}
+          {[rubrique,adresse,aVerif,nonLus,cherche].filter(Boolean).length>1&&<div className="vrm-boite-vue-filtree" data-boite-vue-filtree="" role="group" aria-label="Filtres actifs">
+            <span>{[rubrique&&motRubrique,adresse&&'Un compte',aVerif&&'À vérifier',nonLus&&'Non lus',cherche&&'Recherche'].filter(Boolean).join(' · ')}</span>
+            <button type="button" className="vrm-b vrm-b-secondaire" onClick={()=>{setRubrique('');setAdresse('');setAVerif(false);setNonLus(false);setSaisie('');setCherche('');setOuvert('');}}>Réinitialiser les filtres</button>
+          </div>}
           {phrase && <p className="vrm-boite-couverture" data-boite-sur={c ? c.sur : undefined} data-boite-sur-adresse={(c && c.adresse) || ''}>{phrase}</p>}
         </div>
         {pages === undefined && <Squelette/>}
