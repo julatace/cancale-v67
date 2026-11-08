@@ -698,3 +698,40 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-onglet-manque > div:first-child { font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-17); color: var(--d-encre) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-onglet-manque > [data-onglet-geste] { font-size: var(--d-t-15) !important; color: var(--d-gris) !important; line-height: var(--d-il-texte) !important; margin-top: var(--d-e-1); }
+
+/* ══ 15. LA COQUE (8 nov., passage 2) ══════════════════════════════════════
+   Ce qui entoure tous les écrans parle la même langue que leurs listes.
+   · La loupe : les résultats d'un groupe forment UNE carte à rangées (ils étaient
+     empilés en cartes cerclées) ; le N° y est la pastille à l'encre de partout
+     (il était un rond BLEU sur chaque ligne — le bleu reste l'action, §7).
+   · Le menu « Plus » : des tuiles posées (ombre, sans cadre), l'icône dans une
+     pastille neutre ; l'écran ouvert surligné par un fond, plus par un trait.
+   · Le toast : une capsule flottante (ombre « flottant », rayon pilule).
+   · La barre latérale de l'ordinateur : l'entrée active en carte blanche posée. */
+/* La loupe */
+:root:root body .vrm-app-shell .vrm-recherche-ligne {
+  position: relative; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: var(--d-carte) !important;
+  min-height: 60px !important; padding: 10px var(--d-e-4) !important; gap: var(--d-e-3) !important;
+}
+:root:root body .vrm-app-shell :not(.vrm-recherche-ligne) + .vrm-recherche-ligne { border-top-left-radius: var(--d-r-carte) !important; border-top-right-radius: var(--d-r-carte) !important; }
+:root:root body .vrm-app-shell .vrm-recherche-ligne:not(:has(+ .vrm-recherche-ligne)) { border-bottom-left-radius: var(--d-r-carte) !important; border-bottom-right-radius: var(--d-r-carte) !important; margin-bottom: var(--d-e-3) !important; }
+:root:root body .vrm-app-shell .vrm-recherche-ligne + .vrm-recherche-ligne::before {
+  content: ''; position: absolute; top: 0; left: 64px; right: 0; height: .5px; background: var(--d-filet); pointer-events: none;
+}
+:root:root body .vrm-app-shell .vrm-recherche-num {
+  background: var(--d-encre) !important; color: var(--d-carte) !important; border-radius: var(--d-r-num) !important; height: 22px !important; min-width: 22px !important;
+  font-size: var(--d-t-12) !important; font-variant-numeric: tabular-nums;
+}
+:root:root body .vrm-app-shell .vrm-recherche-ligne:active { background: var(--d-case) !important; }
+/* Le menu « Plus » */
+:root:root html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile, :root html body .vrm-app-shell .vrm-plus-tuile {
+  border: 0 !important; border-radius: var(--d-r-carte) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-carte) !important;
+}
+:root html body .vrm-app-shell .vrm-plus-tuile[aria-current="page"] { box-shadow: var(--d-ombre-carte), inset 0 0 0 2px var(--d-accent) !important; }
+:root html body .vrm-app-shell .vrm-plus-tuile .vrm-plus-ic { color: var(--d-encre) !important; }
+:root html body .vrm-app-shell .vrm-plus-groupe > :is(h2, h3, .vrm-plus-groupe-titre) { font-size: var(--d-t-13) !important; font-weight: 600 !important; color: var(--d-gris) !important; text-transform: none !important; letter-spacing: 0 !important; }
+/* Le toast */
+:root:root body .vrm-toast { border: 0 !important; border-radius: var(--d-r-pilule) !important; background: var(--d-carte) !important; box-shadow: var(--d-ombre-flottant) !important; padding-inline: var(--d-e-5) !important; }
+/* Les feuilles du bas : le rayon et l'ombre du système. */
+:root:root body .vrm-feuille-surface { border-radius: var(--d-r-sombre) var(--d-r-sombre) 0 0 !important; box-shadow: var(--d-ombre-flottant) !important; }
+@media (min-width: 768px) { :root:root body .vrm-feuille-surface { border-radius: var(--d-r-sombre) !important; } }

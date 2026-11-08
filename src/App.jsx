@@ -74013,7 +74013,7 @@ function AppCoeur() {
         const shipDoneGs = load('vinted_ship_done', {}) || {};
         const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
         const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
-        const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:12,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
+        const numBadge=(n)=> <span className="vrm-recherche-num" style={{flexShrink:0,minWidth:26,height:26,borderRadius:12,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20,display:'flex'}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         // Où mène une ligne : SON objet, par son identité (`destinationResultat`).
         const ouvrir = (r, type) => {
