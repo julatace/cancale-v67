@@ -146,8 +146,10 @@ passage 260–660 ms), même nœud, 0 lecture, 0 montage.
   par `b789fa48`), `journee-coherence` (1, E9 « Voir » ouvre le Stock sur le N°42),
   `journee-mieux` (25), `journee-premium` (1), `journee-photos` (3), `colis` (4),
   `colis-colonnes` (3), `colis-tous-sites` (12, widget 503), `ventes-colis-premium` (4) ;
-  `chargement` : 2 CLS sur Stock/garage (0,034 / 0,02 ; Stock n'est pas un écran gardé,
-  déjà vu passager sur main le 8 nov.).
+  `chargement` : 2 CLS sur Stock/garage au premier passage (0,034 / 0,02 ; Stock n'est pas
+  un écran gardé), **vert** au passage final (code final, `c58a55a7`), comme `ecrans-gardes`,
+  `iphone-reprise`, `fluidite`, `garde-ecrans`, `journee-chiffres`, `journee-widgets`,
+  `colis-envoi` ; `chiffres-coherents` (2) et `journee-coherence` (E9) rouges comme au départ.
 - Audits : `npm run build`, `audit-variables`, `audit-tdz`, `audit-identite`,
   `audit-statuts`, `audit-coherence` verts.
 - Captures regardées (390, clair et sombre) : la barre avec sa pastille sous Colis puis
