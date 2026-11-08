@@ -98,6 +98,9 @@ function faireCtx({ lignes = {}, ecriture = () => 201, cloisonne = false, sessio
         j.refresh++;
         return rep(200, JSON.stringify({ access_token: 'jeton-neuf', refresh_token: 'r2', expires_in: 3600, user: { id: 'vendeur-1' } }));
       }
+      // 5.326 : la route de l'envoi léger des commandes ABSENTE (un vrm.center d'avant) ⇒
+      // l'extension garde la voie d'avant — c'est elle que ce banc juge (audit-ventes-envoi-leger : l'autre).
+      if (/^https:\/\/vrm\.center\/api\//.test(u0)) return rep(404, '{"erreur":"mode inconnu"}');
       if ((opts.method || 'GET') === 'POST') {
         let rows = []; try { rows = JSON.parse(opts.body || '[]'); } catch (_) {}
         const ids = rows.map((r) => r.id);
