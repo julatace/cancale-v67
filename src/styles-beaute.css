@@ -203,3 +203,46 @@
   .vrm-tournee-comptoir .vrm-tournee-colis { flex-wrap: wrap; }
   .vrm-tournee-comptoir .vrm-tournee-quoi { flex: 1 1 0; min-width: 0; }
 }
+
+/* ══ 5. STATISTIQUES FAÇON SANTÉ (src/GraphiqueSemaines.jsx) ═══════════════
+   Une carte : le titre, la semaine touchée en grand (son montant, ses ventes,
+   l'écart à la semaine d'avant), douze barres d'UNE teinte (le bleu), bouts
+   arrondis de 4 px posés sur la ligne de base, 2 px d'air entre deux barres,
+   trois graduations discrètes à droite, une date sur trois dessous. La barre
+   choisie est pleine ; les autres un ton en dessous ; la semaine en cours est
+   hachurée-légère (elle n'est pas finie). Le tableau caché sert le lecteur d'écran. */
+.vrm-sr-seul { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.vrm-sante {
+  display: flex; flex-direction: column; gap: 0; padding: 18px 18px 14px; border-radius: var(--d-r-carte);
+  background: var(--d-carte); box-shadow: var(--d-ombre-carte); color: var(--d-encre); min-width: 0;
+}
+.vrm-sante-haut { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.vrm-sante-titre { margin: 0; font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: var(--d-ap-17) !important; line-height: 1.25; }
+.vrm-sante-periode { font-size: var(--d-t-13); color: var(--d-gris); font-weight: 500; }
+.vrm-sante-detail { display: flex; flex-direction: column; gap: 2px; margin: 12px 0 16px; min-height: 76px; }
+.vrm-sante-lib { font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); }
+.vrm-sante-chiffre { font-size: var(--d-t-34); font-weight: 800; letter-spacing: var(--d-ap-34); line-height: 1.08; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-sante-aumoins { font-size: var(--d-t-17); font-weight: 600; letter-spacing: 0; color: var(--d-gris); }
+.vrm-sante-sous { font-size: var(--d-t-13); color: var(--d-gris); line-height: 1.35; }
+.vrm-sante-plot { position: relative; height: 168px; padding-right: 44px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.vrm-sante-grille { position: absolute; inset: 0 0 0 0; pointer-events: none; }
+.vrm-sante-ligne { position: absolute; left: 0; right: 0; height: 0; border-top: .5px solid var(--d-filet); }
+.vrm-sante-ligne:first-child { border-top: 1px solid var(--d-filet); }
+.vrm-sante-ligne > span { position: absolute; right: 0; bottom: 2px; font-size: var(--d-t-11); color: var(--d-gris); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-sante-barres { position: absolute; inset: 0 44px 0 0; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: end; column-gap: 2px; }
+.vrm-sante-col {
+  position: relative; display: flex; align-items: flex-end; justify-content: center; height: 100%; min-width: 0; padding: 0 2px; margin: 0;
+  border: 0; background: transparent; cursor: pointer; border-radius: 6px; -webkit-tap-highlight-color: transparent;
+}
+.vrm-sante-col:focus-visible { outline: 2px solid var(--d-accent); outline-offset: 2px; }
+.vrm-sante-barre { display: block; width: 100%; max-width: 28px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--d-accent) 42%, var(--d-carte)); transition: background-color var(--d-m-court) var(--d-sortie); }
+.vrm-sante-col.is-choisi .vrm-sante-barre { background: var(--d-accent); }
+.vrm-sante-col.is-encours .vrm-sante-barre { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 2px, transparent 2px 6px); }
+.vrm-sante-col.is-choisi::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 0; border-left: 1px dashed color-mix(in srgb, var(--d-accent) 55%, transparent); z-index: -1; }
+.vrm-sante-axe { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 2px; margin: 6px 44px 0 0; font-size: var(--d-t-11); color: var(--d-gris); font-variant-numeric: tabular-nums; }
+.vrm-sante-axe > span { white-space: nowrap; text-align: left; overflow: visible; }
+.vrm-sante-note { margin: 10px 0 0; font-size: var(--d-t-13); color: var(--d-gris); }
+@media (hover: hover) and (pointer: fine) { .vrm-sante-col:hover .vrm-sante-barre { background: color-mix(in srgb, var(--d-accent) 70%, var(--d-carte)); } .vrm-sante-col.is-choisi:hover .vrm-sante-barre { background: var(--d-accent); } }
+@media (min-width: 1024px) { .vrm-sante { padding: 22px 24px 18px; } .vrm-sante-plot { height: 220px; } .vrm-sante-chiffre { font-size: var(--d-t-44); } }
+@media (prefers-reduced-motion: reduce) { .vrm-sante-barre { transition: none; } }
+@media (forced-colors: active) { .vrm-sante-barre { background: CanvasText !important; } .vrm-sante-col.is-choisi .vrm-sante-barre { background: Highlight !important; } }
