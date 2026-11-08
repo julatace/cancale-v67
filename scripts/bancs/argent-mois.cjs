@@ -24,6 +24,9 @@ const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4593;
 const SHOTS = process.env.SHOTS || '';
+// Les bornes du jeu doivent suivre le même lundi que le navigateur à Paris.
+// À 23 h UTC le dimanche, Paris est déjà lundi.
+process.env.TZ = 'Europe/Paris';
 const MAINT = new Date();
 const iso = (d) => new Date(d).toISOString();
 // La semaine passée (lundi → dimanche, heure de l'appareil = Paris au banc).
