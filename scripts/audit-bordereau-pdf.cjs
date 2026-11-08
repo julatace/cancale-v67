@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // BANC : la récupération du PDF INSISTE quand Vinted ne l'a pas encore produit,
 // et n'insiste PAS sur un refus dur. Exécute la VRAIE fonction du fichier.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('fs'), vm=require('vm'), path=require('path');
 // ⚠️ Chemin RELATIF au script : un chemin absolu relirait toujours le dépôt
 // courant, donc la preuve « ça échoue sur le code d'avant » serait truquée (§5.80).

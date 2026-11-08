@@ -17,6 +17,7 @@
 //      dans le plafond de 50/h par compte.
 // `--prouve` : réaffaiblit la règle (X sous le mini, au-dessus du prix, mini
 // inventé, sur une offre déjà au mini) — chaque mutation doit passer au rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const RAC = path.join(__dirname, '..');
 const SRC = path.join(RAC, 'src', 'messagesVolets.js');

@@ -19,6 +19,7 @@
 //      part (jamais une photo d'origine envoyée à la place en silence).
 //  §6.1 — `--prouve` : sur origin/main, `recreerVinted` n'existe pas.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { faireFond } = require('./_fond-vm.cjs');
 
 let ok = 0, ko = 0;

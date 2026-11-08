@@ -18,6 +18,7 @@
 //  comme « faux »), `--mutation=passu` (une panne lue comme « faux ») : chacune
 //  doit faire passer l'audit au ROUGE (§6.1).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const RACINE = path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';

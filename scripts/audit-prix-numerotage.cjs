@@ -20,6 +20,7 @@
 //      aucun effet n'écrit un prix ; UNE carte Ma journée (fusionnée).
 // --prouve : chaque mutation réaffaiblit une règle ⇒ l'audit DOIT rougir.
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');

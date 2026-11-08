@@ -8,6 +8,7 @@
 //  E. App.jsx (commentaires retirés) : la lecture projetée, la règle de `pickupUnion` nourrie
 //     par les lignes fusionnées, la vue en grand sans titre ni rouge, le QR toujours montré.
 // `--prouve` : chaque mutation du module (ou de l'app) doit rendre l'audit ROUGE.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
 const SRC = path.join(RACINE, 'src', 'retraitQr.js');

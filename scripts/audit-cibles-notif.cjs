@@ -17,6 +17,7 @@
 //      api/_lib/notif-apercus.js, que l'aperçu de Paramètres lit aussi).
 //   5. L'aperçu de chaque famille existe et nomme où le toucher mène.
 // Code d'avant (sans crochet, sans cible d'offre) ⇒ rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 let ko = 0;

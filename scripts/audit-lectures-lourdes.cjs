@@ -30,6 +30,7 @@
 //  `--prouve` remet chacun des défauts d'avant (une mutation par défaut) et exige du ROUGE.
 //  Lancer : node scripts/audit-lectures-lourdes.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 

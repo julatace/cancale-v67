@@ -86,7 +86,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const P = await import(path.join(SRC, 'plateformes.js'));
   const PA = await import(path.join(SRC, 'publierAilleurs.js'));
   const SA = await import(path.join(SRC, 'suggestionsAchat.js'));
-  const APP = sansCommentaires(fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8'));
+  const APP = sansCommentaires(require("./_source-app.cjs").sourceAppDe(path.join(SRC, 'App.jsx')));
 
   // ── A. Les plateformes ──
   dit(P.IDS_PLATEFORMES.join() === 'vinted,leboncoin,ebay,vestiaire', 'A1 quatre sites, l’ordre de Vinted', P.IDS_PLATEFORMES.join());

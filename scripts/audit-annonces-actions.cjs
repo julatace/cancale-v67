@@ -22,6 +22,7 @@
 //      démarre après « Choisir », table des liens AJOUTÉE à celle de l'extension,
 //      `vrm_repub_main` synchronisé).
 // `--prouve` : chaque règle réaffaiblie doit passer au rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const RAC = path.join(__dirname, '..');
 const SRC = path.join(RAC, 'src', 'annoncesActions.js');

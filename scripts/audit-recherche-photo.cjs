@@ -16,6 +16,7 @@
 //   E. une entrée sans empreinte (photo pas lue) n'est pas classée à zéro, elle
 //      n'est pas classée du tout (elle est comptée à part par la feuille).
 // AUDIT_MUTATION=titre | aveugle | lumiere : la règle réaffaiblie ⇒ l'audit doit rougir.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
 const MUT = process.env.AUDIT_MUTATION || '';

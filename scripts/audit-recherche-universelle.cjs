@@ -23,6 +23,7 @@
 //      la précédente ANNULÉE ; mode stream : pseudo et code en `vrm-sensible`,
 //      récents tus en stream ; une réponse e-mails illisible = « pas su » (null).
 //   node scripts/audit-recherche-universelle.cjs [--mutation=NOM | --prouve]
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');

@@ -8,6 +8,7 @@
 // tant qu'elle n'est pas captée (jamais « aucun avis »), avis illisible ignoré.
 // Vérifie aussi qu'AUCUN rappel d'évaluation n'est rendu par l'app (refusé le 11 oct.).
 // `--mutation=X` : passu-zero · moyenne-simple · vieille-gagne · liste-vide · note-brute
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const ICI = path.join(__dirname, '..');
 const mut = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);

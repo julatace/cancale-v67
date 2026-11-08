@@ -72,7 +72,7 @@ for (const [f, s] of sources) s.split('\n').forEach((l, i) => { if (/\bnew Funct
 dit(evals.length === 0, "aucun eval / new Function (script-src n'a pas 'unsafe-eval')", evals.slice(0, 5).join(' · '));
 
 // Les hôtes CONTACTÉS : fetch('https://…'), un <script> injecté, un cadre.
-const app = lire('src/App.jsx');
+const app = require("./_source-app.cjs").sourceApp();
 const supa = (/const SUPABASE_URL = "([^"]+)"/.exec(app) || [])[1];
 const cs = dir(complete, 'connect-src') || [];
 const permis = (liste, origine) => liste.some((t) => t === origine || (t.includes('*') && new RegExp('^' + t.replace(/[.]/g, '\\.').replace('\\.*', '.*').replace('*', '[^.]+') + '$').test(origine)) || (t === 'https:' && origine.startsWith('https:')));

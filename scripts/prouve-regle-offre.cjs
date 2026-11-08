@@ -18,6 +18,7 @@
 //  Et `audit-offres-auto.cjs` doit passer au rouge sur une route qui appelle
 //  `RespondToBestOffer` (c'est eBay qui accepte, jamais VRM).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const os = require('os');

@@ -15,6 +15,7 @@
 // l'app (src/App.jsx, extraites par Babel), la vraie route api/widget.
 // `--prouve` : réaffaiblit la règle de cinq façons, chacune doit rendre ROUGE.
 // Données inventées. §6.1 : lancé depuis un arbre d'avant, il est rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');

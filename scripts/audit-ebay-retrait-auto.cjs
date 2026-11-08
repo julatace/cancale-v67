@@ -26,6 +26,7 @@
 // contrôle doit passer au ROUGE. « La fonction n'existait pas avant » n'est pas
 // une preuve (§6.1) — la partie « preuve de vente » s'exécute aussi sur le code
 // d'avant, où la fonction existait déjà.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const R = path.join(__dirname, '..');
 const APP0 = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');

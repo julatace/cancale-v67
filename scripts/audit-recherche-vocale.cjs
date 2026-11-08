@@ -5,6 +5,7 @@
 // de la barre passe par `requeteDeLaVoix`, n'apparaît que si l'API existe et
 // disparaît si le micro est refusé).
 // `--prouve` : chaque règle réaffaiblie doit faire passer l'audit au rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = path.join(__dirname, '..');
 const SRC = path.join(R, 'src', 'rechercheVocale.js');

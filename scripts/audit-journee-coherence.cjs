@@ -20,6 +20,7 @@
 //  `--mutation` : chaque règle affaiblie une à une — l'audit DOIT rougir.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');

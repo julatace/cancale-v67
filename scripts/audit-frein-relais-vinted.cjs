@@ -6,6 +6,7 @@
 // Mutation : `node scripts/audit-frein-relais-vinted.cjs --muter` réaffaiblit les
 // règles et doit finir en rouge.
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), parser = require('@babel/parser');
 const RACINE = path.join(__dirname, '..');
 let src = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');

@@ -22,6 +22,7 @@
 // --mutation=… réaffaiblit la route dans une copie de `api/` : chacune DOIT rougir.
 //   dedup · plateforme (le site de la vente compté) · passu (lecture ratée = vide)
 //   titre (N° Vinted lu dans le TITRE) · retire (journal eBay ignoré) · frais (24 h ignorées)
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 const fs = require('fs');
 const os = require('os');

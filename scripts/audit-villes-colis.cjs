@@ -20,6 +20,7 @@
 //  Sur le code d'AVANT (`--racine <arbre>`), la règle vient de l'ancien
 //  `villeDuPoint` de CarteRelais.jsx. `--mutation <nom>` réaffaiblit la règle.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const argv = process.argv;
 const R = argv.includes('--racine') ? path.resolve(argv[argv.indexOf('--racine') + 1]) : path.join(__dirname, '..');

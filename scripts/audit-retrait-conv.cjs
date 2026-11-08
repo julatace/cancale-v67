@@ -12,6 +12,7 @@
 //     fil côté vendeur, un texte sans adresse ni code).
 // Et il vérifie que `codeRetrait` (src/App.jsx) accepte un code à lettre —
 // c'est la règle de §5.37 qui l'aurait rejeté.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');

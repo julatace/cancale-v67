@@ -21,6 +21,7 @@
 //      450 garde la main ; relevé illisible ⇒ les dates 450 restent.
 //  Données inventées. Usage : node scripts/audit-versement-releve.cjs [--src f]
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');

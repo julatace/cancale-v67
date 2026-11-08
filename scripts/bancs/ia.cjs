@@ -29,6 +29,7 @@
 // bouton posé au bord droit, débordait de <main> (overflow hidden) et ses
 // libellés étaient coupés (« Répartir un », « Inventaire p »…) à 1512 ET 390 px.
 // Le banc mesure que chaque outil tient dans la zone visible, aux deux tailles.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)

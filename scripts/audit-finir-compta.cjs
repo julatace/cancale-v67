@@ -15,7 +15,7 @@
 // chaque correctif : au moins un contrôle doit passer au ROUGE à chaque fois.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const RACINE = path.join(__dirname, '..');
-const APP0 = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+const APP0 = require("./_source-app.cjs").sourceAppDe(path.join(RACINE, 'src', 'App.jsx'));
 const MSG0 = fs.existsSync(path.join(RACINE, 'src', 'messagesNonLus.js')) ? fs.readFileSync(path.join(RACINE, 'src', 'messagesNonLus.js'), 'utf8') : '';
 
 function extraire(src, nom) {

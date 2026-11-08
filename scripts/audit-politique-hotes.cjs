@@ -19,6 +19,7 @@
 // Un couple inconnu ⇒ ROUGE : un nouvel hôte appelé par le navigateur se
 // déclare (politique + cette liste), il ne passe pas en silence.
 // `--prouve` réaffaiblit la politique ou le code : chaque mutation ⇒ ROUGE.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const R = path.join(__dirname, '..');
 const PROUVE = process.argv.includes('--prouve');

@@ -24,6 +24,7 @@
 //  `--prouve` réaffaiblit chaque règle et exige que l'audit tombe au rouge.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');

@@ -17,6 +17,7 @@
 //      pour « à retirer » ; CarteRelais range un point dans UNE section.
 //  `--prouve` : chaque règle affaiblie (copie mutée) doit rendre l'audit ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const RACINE = path.join(__dirname, '..');

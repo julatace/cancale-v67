@@ -34,6 +34,7 @@
 //  BANC_PORT (8750–8799, défaut 8750). SHOTS : le dossier des captures.
 //  `node scripts/bancs/composants.cjs` (esbuild, pas Vite).
 // ════════════════════════════════════════════════════════════════════════════
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
 const RACINE = process.env.RACINE || path.join(__dirname, '..', '..');
 const NM = [path.join(RACINE, 'node_modules'), path.join(__dirname, '..', '..', 'node_modules')].find((p) => fs.existsSync(path.join(p, 'esbuild')));

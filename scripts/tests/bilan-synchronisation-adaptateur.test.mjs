@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {retraitsVestiaire} from '../../api/_lib/vestiaire-regle.js';
 import {articlesVendusAilleurs} from '../../src/bilanSynchronisation.js';
+import { createRequire as creerRequireSourceApp } from 'node:module';
+creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const s=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
 const debut=s.indexOf('  const chargerRetraitsMulti = async () => {');
 const bloc=s.slice(debut,s.indexOf('\n  };',debut)+5);

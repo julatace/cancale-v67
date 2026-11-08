@@ -118,7 +118,7 @@ async function audit(M, bavard) {
 function statiques(bavard) {
   let ko = 0;
   const dit = (bon, quoi, det) => { if (!bon) ko++; if (bavard || !bon) console.log(`${bon ? '✅' : '❌'} ${quoi}${!bon && det ? ' — ' + String(det).slice(0, 300) : ''}`); };
-  const app = sansCommentaires(lire('src/App.jsx'));
+  const app = sansCommentaires(require("./_source-app.cjs").sourceApp());
   const bloc = (debut, fin) => { const a = app.indexOf(debut); if (a < 0) return ''; const b = app.indexOf(fin, a + debut.length); return app.slice(a, b < 0 ? a + 20000 : b); };
   const pied = bloc('className="vrm-ventes-controles"', '</section>');
   dit(pied.length > 0 && !/<VendusAilleurs\b/.test(pied) && !/<BilanSynchronisation\b/.test(pied), 'S1 le pied de Ventes : ni « Vendus ailleurs » ni le bilan des données', pied.slice(0, 200));

@@ -19,6 +19,7 @@
 // ⚠️ CE CONTRÔLE EXÉCUTE LA VRAIE FONCTION extraite d'`App.jsx` dans un `vm`
 //    (comme `audit-fusion.cjs`) : il juge ce qu'elle REND, pas comment elle est
 //    écrite. Une reformulation ne peut pas le rendre vert (§6.5).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');

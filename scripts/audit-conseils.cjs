@@ -22,6 +22,7 @@
 //     « vu » ; les bancs le coupent ; aucun sujet refusé par Julien (§3).
 // Données INVENTÉES. Usage : node scripts/audit-conseils.cjs
 //   (MODULE=<chemin> pour juger une copie mutée de la règle.)
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 const MODULE = process.env.MODULE || path.join(RACINE, 'src/accompagnement.js');

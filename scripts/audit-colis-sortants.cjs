@@ -17,6 +17,7 @@
 //  6. les comptes : Colis/Ma journée/cloche (app) et widget/rappels (serveur) lisent la
 //     MÊME règle (`colisVcAPoster` + `txVintedParties`).
 // Données INVENTÉES. Usage : node scripts/audit-colis-sortants.cjs (RACINE=<arbre> : l'arbre d'avant)
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs');
 const RACINE = process.env.RACINE || path.join(__dirname, '..');
 let ok = 0, ko = 0;

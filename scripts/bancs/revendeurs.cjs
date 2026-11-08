@@ -1,4 +1,5 @@
 // Mise en page mobile, données synthétiques, aucune requête distante.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

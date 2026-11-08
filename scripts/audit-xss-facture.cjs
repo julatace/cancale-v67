@@ -23,6 +23,7 @@
 //  `--mutation sanscsp` retire la politique de la fenêtre : le contrôle 3 doit
 //  repasser au rouge (preuve que c'est elle qui protège les factures rangées).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');

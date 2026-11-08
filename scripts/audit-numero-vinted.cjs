@@ -14,6 +14,7 @@
 //  Et la règle de l'app (`numerosReserves`) : mêmes clés que l'extension (§11).
 //  Aucune donnée réelle.  `--src chemin` : sur une autre copie (§6.1).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 let ko = 0, ok = 0;

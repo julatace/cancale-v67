@@ -24,6 +24,7 @@
 //   6. les photos d'une annonce supprimée ne sont plus demandées à Vinted.
 //  Usage : node scripts/audit-supprimees.cjs [--mutation nom]
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const { metaVersData } = require('./bancs/_meta.cjs');
 const { faireFond } = require('./_fond-vm.cjs');

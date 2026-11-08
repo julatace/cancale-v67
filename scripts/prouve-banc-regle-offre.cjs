@@ -14,6 +14,7 @@
 //  règle d'offre) doit sortir ROUGE lui aussi.
 //  Le banc écoute le port 4761 (ou $PORT) : lancer ce script SEUL.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs');
 const path = require('path');
 const os = require('os');

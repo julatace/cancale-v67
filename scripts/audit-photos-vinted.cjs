@@ -45,6 +45,7 @@
 //    · hors ligne mesuré ⇒ cause « horsligne », jamais « pas su ».
 // Un audit ne meurt pas, il rapporte (`essaie`) : sur le code d'avant
 // (c02ffcf), les fonctions absentes sont des contrôles ROUGES, pas une pile.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const args = process.argv.slice(2);
 const opt = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };

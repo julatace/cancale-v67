@@ -17,6 +17,7 @@
 //   C. la carte : deux gestes + « … » dans la rangée ; la case « prix d'achat »
 //      n'est plus ambre (styles-annonces-coherence.css l'emporte) ; un bandeau.
 // `--prouve` : chaque règle réaffaiblie doit passer au rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const RAC = path.join(__dirname, '..');
 const F = {

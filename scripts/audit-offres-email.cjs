@@ -1,5 +1,6 @@
 // 24 octobre : retrait explicite du bloc email dans Messages.
 // La capture email et les règles de rapprochement sont conservées.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');

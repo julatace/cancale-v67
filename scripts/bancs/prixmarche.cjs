@@ -6,6 +6,7 @@
 // La preuve ne repose PAS sur « la fonction n'existait pas avant » (leçon
 // estALui) : on recompute les groupes INDÉPENDAMMENT et on exige l'égalité, et
 // on montre que le filtre « >=2 ventes » écarte de vrais groupes (il porte).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('fs'), path=require('path');
 const FULL=fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8');
 // ⚠️ EXTRACTION PAR NOM, PAS PAR NUMÉRO DE LIGNE (§4.11 : les tranches par ligne

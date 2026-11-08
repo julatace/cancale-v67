@@ -22,7 +22,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { reLike } = require('./bancs/_base-ecritures.cjs');
-const APP0 = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP0 = require("./_source-app.cjs").sourceAppDe(path.join(__dirname, '..', 'src', 'App.jsx'));
 
 const extraire = (app, debut, fin = '\n};') => { const i = app.indexOf(debut); if (i < 0) throw new Error('introuvable : ' + debut); const j = app.indexOf(fin, i); return app.slice(i, j + fin.length); };
 const extraireFn = (app, debut) => { const i = app.indexOf(debut); if (i < 0) throw new Error('introuvable : ' + debut); const j = app.indexOf('\n}\n', i); return app.slice(i, j + 3); };

@@ -12,6 +12,7 @@
 // et affiche chaque désaccord.
 //
 // Lecture seule. Aucune écriture, aucun appel à Vinted.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs=require('fs'), vm=require('vm'), path=require('path');
 // ⚠️ §5.80 : chemins RELATIFS au script. Avec des chemins absolus, ce fichier
 // copié dans un arbre de preuve relisait le dépôt courant — et la preuve

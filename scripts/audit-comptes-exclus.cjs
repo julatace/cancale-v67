@@ -48,7 +48,7 @@ async function charger(mut) {
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   fs.writeFileSync(path.join(dir, 'api', 'package.json'), '{"type":"module"}');
   const imp = (f) => import('file://' + path.join(lib, f));
-  let app = lire('src/App.jsx');
+  let app = require("./_source-app.cjs").sourceApp();
   if (mut && mut.fichier === 'App.jsx') app = mut.fn(app);
   return { ex: await imp('comptes-exclus.js'), vr: await imp('ventes-regle.js'), bil: await imp('bilan-semaine.js'), eae: await imp('ebay-a-expedier.js'), vcr: await imp('vestiaire-regle.js'), app, dir };
 }
@@ -139,7 +139,7 @@ const MUTATIONS = [
     console.log('\n── Mutations (chacune doit rougir)');
     for (const mu of MUTATIONS) {
       let rouges = 0, appliquee = true;
-      const avant = mu.fichier === 'App.jsx' ? lire('src/App.jsx') : lire('api/_lib/' + mu.fichier);
+      const avant = mu.fichier === 'App.jsx' ? require("./_source-app.cjs").sourceApp() : lire('api/_lib/' + mu.fichier);
       if (mu.fn(avant) === avant) appliquee = false;
       const Mm = await charger(mu);
       try { await verifier(Mm, (c) => { if (!c) rouges++; }); } catch (_) { rouges++; }

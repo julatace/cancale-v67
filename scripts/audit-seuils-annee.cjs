@@ -6,6 +6,7 @@
 // Vérifie aussi que les seuils DAC7 sont ceux de l'app (SEUIL_VINTED_*).
 // `--mutation=X` réaffaiblit la règle dans une copie : le contrôle doit rougir.
 //   partiel-projete · un-mois · mois-en-cours · dac7-egal · dac7-ou · passu-zero · sous-partiel · seuil-depasse
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const ICI = path.join(__dirname, '..');
 const mut = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);

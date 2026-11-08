@@ -93,7 +93,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log(`${c ? 'âœ…' : 'â
 const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, String((e && e.message) || e).split('\n')[0]); } };
 const imp = async (f) => { try { return await import('file://' + path.join(R, f)); } catch (e) { return { __erreur: e.message }; } };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
-const APP = lire('src/App.jsx');
+const APP = require("./_source-app.cjs").sourceApp();
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 const APPc = sansCommentaires(APP);
 function extraire(src, nom) {

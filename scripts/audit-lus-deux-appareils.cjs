@@ -8,6 +8,7 @@
 // les deux appareils (lecture A, lecture B, écriture A, écriture B).
 // Mutation : `--muter` (écrire `next` tel quel, sans fusion) doit finir en rouge.
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), parser = require('@babel/parser');
 const R = path.join(__dirname, '..');
 let src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
