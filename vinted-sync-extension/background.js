@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.327.0';
+const CODE_VERSION = '5.328.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -352,6 +352,9 @@ async function renouvelerSession({ force = false } = {}) {
       expires_at: Date.now() + ((corps.expires_in || 3600) * 1000),
       user_id: (corps.user && corps.user.id) || s.user_id || subDuJwt(corps.access_token) || null,
       email: (corps.user && corps.user.email) || s.email || emailDuJwt(corps.access_token) || '',
+      // 5.328 : la date où CETTE session a été donnée (connexion, liaison) suit
+      // le renouvellement — la carte juge par elle un refus d'AVANT la connexion.
+      depuis: Number(s.depuis) || 0,
     };
     await saveSession(next);
     await ecrireRenouv({ okAt: Date.now() });
@@ -437,6 +440,7 @@ async function authLogin(email, password) {
       expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
       user_id: (j.user && j.user.id) || null,
       email: (j.user && j.user.email) || mail,
+      depuis: Date.now(),
     });
     // 22 oct. : l'onglet Vinted déjà ouvert est relu tout de suite (voir `visiteApresSession`).
     visiteApresSession('connexion');
@@ -462,12 +466,22 @@ async function authLogin(email, password) {
 function subDuJwt(token) {
   try { const p = jwtPayload(token); return (p && typeof p.sub === 'string') ? p.sub : ''; } catch (_) { return ''; }
 }
+// 5.328 (8 nov.) : la date où la session a été DONNÉE à l'extension (mot de
+// passe dans la carte, ou liaison par VRM). La carte du logo s'en sert pour ne
+// plus dire « connecte-toi » sur un refus d'envoi d'AVANT la connexion.
+// 0 = pas su (session donnée par une version d'avant) : rien n'est conclu.
+function sessionDepuis(x) {
+  const t = x ? Number(x.depuis) : 0;
+  return (isFinite(t) && t > 0 && t <= Date.now() + 60000) ? t : 0;
+}
 async function authEtatRapide(attenteMs = 1500, attenteCloisonneMs = 0) {
   const cloisonneP = cloisonneConnu(attenteCloisonneMs).catch(() => null);
   const s = await loadSession();
   const ident = (x) => ({
     email: (x && (x.email || emailDuJwt(x.access_token))) || '',
     user_id: (x && (x.user_id || subDuJwt(x.access_token))) || null,
+    // 5.328 : quand cette session a été donnée (0 = pas su, session d'avant).
+    depuis: sessionDepuis(x),
   });
   const rendre = async (connecte, expiree, x, extra) => Object.assign(
     { ok: true, connecte, expiree }, ident(x), { cloisonne: await cloisonneP }, extra || {});
@@ -581,6 +595,112 @@ async function fournisseursConnexion() {
     return Object.assign({ ok: true }, out);
   } catch (_) { return { ok: false }; }
 }
+// ══ 5.328 (8 nov.) : GOOGLE / DISCORD DANS L'EXTENSION, SANS PASSER PAR VRM ══
+// Julien : « Je ne veux pas avoir besoin d'aller sur le site pour connecter
+// l'extension. » Et sur Orion, la liaison par vrm.center ne revenait pas.
+// ⇒ L'extension fait ELLE-MÊME l'OAuth Supabase (PKCE s256), comme l'app :
+//   1. `oauthDepart` (fenêtre ou carte, sur SON clic) : vérificateur aléatoire
+//      gardé dans `chrome.storage.local` (10 min, une fois), onglet ouvert chez
+//      Supabase → Google/Discord ;
+//   2. Supabase revient sur `RETOUR_OAUTH` (https://vrm.center/extension-retour.html,
+//      une page FIXE sans l'app) avec `?code=` ; le script de contenu
+//      `oauth-retour.js` (document_start, vrm.center seulement) le remet ICI ;
+//   3. on échange le code avec NOTRE vérificateur (`grant_type=pkce`) : la
+//      session est à l'extension seule — aucune page, aucun jeton dans une
+//      adresse, aucun onglet VRM à utiliser. L'onglet de retour se ferme, on
+//      revient à l'onglet d'où l'on est parti.
+// Pourquoi pas `chrome.identity` : une autorisation de plus dans le manifeste
+// (fiches des boutiques à refaire) et rien ne dit qu'Orion l'a ; ce chemin-ci
+// n'utilise que ce qui existe déjà partout (onglets, script de contenu sur
+// vrm.center), Orion compris.
+// Adresse de retour pas autorisée chez Supabase ⇒ Supabase renvoie sur sa
+// « Site URL » (vrm.center/) avec le code : le même script la reprend, mais
+// SEULEMENT si un départ de l'extension est en cours et que la page n'a pas son
+// propre vérificateur (une connexion de l'app n'est jamais touchée).
+const RETOUR_OAUTH = APP_URL_VRM + '/extension-retour.html';
+const OAUTH_STORE = 'vrmOAuthDepart';     // { f, v, at, tab, ouvert }
+const OAUTH_ETAT = 'vrmOAuthEtat';        // { etat: 'attente'|'ok'|'erreur', f, at, email, message, neuf }
+const OAUTH_MS = 10 * 60000;
+function b64url(octets) {
+  let s = ''; const a = new Uint8Array(octets);
+  for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function noterEtatOAuth(v) { try { await chrome.storage.local.set({ [OAUTH_ETAT]: Object.assign({ at: Date.now() }, v) }); } catch (_) {} }
+const NOM_FOURN = { google: 'Google', discord: 'Discord' };
+async function oauthDepart(fournisseur, ongletDepart) {
+  const f = String(fournisseur || '');
+  if (!FOURNISSEURS_CONNEXION.includes(f)) return { ok: false, code: 'fournisseur', message: 'Moyen de connexion inconnu.' };
+  const fo = await fournisseursConnexion();
+  if (!fo || !fo.ok) return { ok: false, code: 'pas-su', message: 'Je n’ai pas pu vérifier les moyens de connexion de VRM (réseau ?). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.' };
+  if (fo[f] !== true) return { ok: false, code: 'ferme', message: `La connexion avec ${NOM_FOURN[f]} n’est pas ouverte sur VRM. Connecte-toi avec ton email et ton mot de passe VRM.` };
+  let v = '', ch = '';
+  try {
+    const a = new Uint8Array(48); crypto.getRandomValues(a);
+    v = b64url(a);
+    ch = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+  } catch (_) { return { ok: false, code: 'crypto', message: 'Ce navigateur ne sait pas préparer une connexion sécurisée. Connecte-toi avec ton email et ton mot de passe VRM.' }; }
+  const tab = ongletDepart && typeof ongletDepart.id === 'number' ? ongletDepart.id : null;
+  try { await chrome.storage.local.set({ [OAUTH_STORE]: { f, v, at: Date.now(), tab } }); } catch (_) { return { ok: false, code: 'stockage', message: 'Je n’ai pas pu préparer la connexion. Réessaie.' }; }
+  await noterEtatOAuth({ etat: 'attente', f });
+  const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${f}&redirect_to=${encodeURIComponent(RETOUR_OAUTH)}&code_challenge=${ch}&code_challenge_method=s256`;
+  const ouvert = await new Promise((res) => {
+    try { chrome.tabs.create({ url }, (t) => { let e = null; try { e = chrome.runtime.lastError; } catch (_) {} res(e ? null : (t || {})); }); }
+    catch (_) { res(null); }
+  });
+  if (!ouvert) return { ok: true, url, ouvrirIci: true };     // la fenêtre l'ouvre elle-même (window.open)
+  return { ok: true };
+}
+// Le code rendu par Supabase, remis par `oauth-retour.js`. `fixe` : la page de
+// retour de l'extension (sinon : la page d'accueil de VRM, repli de Supabase).
+async function oauthRetour(msg, sender) {
+  const src = (sender && sender.tab && sender.tab.url) || (sender && (sender.origin || sender.url)) || '';
+  if (!ORIGINE_APP.test(src)) return { ok: false, code: 'origine' };
+  let d = null; try { d = (await chrome.storage.local.get(OAUTH_STORE))[OAUTH_STORE] || null; } catch (_) { d = null; }
+  if (!d || !d.v || Date.now() - Number(d.at || 0) > OAUTH_MS || Date.now() < Number(d.at || 0)) {
+    return { ok: false, code: 'aucun', message: msg && msg.fixe ? 'Cette connexion n’est plus en cours (plus de 10 minutes ?). Recommence depuis le logo VRM.' : '' };
+  }
+  // Une fois : consommé avant l'échange (un second envoi du même code n'a rien).
+  try { await chrome.storage.local.remove(OAUTH_STORE); } catch (_) { return { ok: false, code: 'stockage' }; }
+  const nom = NOM_FOURN[d.f] || 'le fournisseur';
+  const fermer = () => {
+    try { if (sender && sender.tab && typeof sender.tab.id === 'number') chrome.tabs.remove(sender.tab.id, () => { void chrome.runtime.lastError; }); } catch (_) {}
+    try { if (typeof d.tab === 'number') chrome.tabs.update(d.tab, { active: true }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+  };
+  if (msg && msg.error) {
+    const t = String(msg.error_description || msg.error || '').slice(0, 160);
+    const message = /access_denied|denied|cancel/i.test(t) ? `Connexion avec ${nom} annulée : rien n’a changé.` : `${nom} a refusé la connexion (${t || 'sans raison'}). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    await noterEtatOAuth({ etat: 'erreur', f: d.f, message });
+    return { ok: false, code: 'refus', message };
+  }
+  const code = String((msg && msg.code) || '');
+  if (!/^[A-Za-z0-9._~-]{8,512}$/.test(code)) { await noterEtatOAuth({ etat: 'erreur', f: d.f, message: 'Réponse de connexion illisible. Recommence.' }); return { ok: false, code: 'code' }; }
+  let r = null, j = null;
+  try {
+    r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=pkce`, { method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ auth_code: code, code_verifier: d.v }), signal: AbortSignal.timeout(15000) });
+    j = await r.json().catch(() => null);
+  } catch (_) { r = null; }
+  if (!r || !r.ok || !j || typeof j.access_token !== 'string' || typeof j.refresh_token !== 'string' || !j.user || typeof j.user.id !== 'string') {
+    const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    await noterEtatOAuth({ etat: 'erreur', f: d.f, message });
+    return { ok: false, code: 'echange', message };
+  }
+  // Un compte que Supabase vient de CRÉER (aucun compte VRM relié à ce Google) :
+  // on le dit — même règle que l'app (`compteOAuthNeuf`).
+  let neuf = false;
+  try {
+    const cree = Date.parse(j.user.created_at || '');
+    const ids = Array.isArray(j.user.identities) ? j.user.identities : [];
+    neuf = isFinite(cree) && Date.now() - cree < 10 * 60000 && !ids.some((x) => x && x.provider === 'email');
+  } catch (_) { neuf = false; }
+  const email = String(j.user.email || emailDuJwt(j.access_token) || '');
+  await saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((Number(j.expires_in) || 3600) * 1000), user_id: j.user.id, email, depuis: Date.now() });
+  Promise.resolve().then(() => noterDiag('session_oauth_' + d.f)).catch(() => {});
+  await noterEtatOAuth({ etat: 'ok', f: d.f, email, neuf });
+  visiteApresSession('oauth');
+  fermer();
+  return { ok: true, email, neuf };
+}
 const UUID_VRM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function demanderLiaison(msg) {
   const pour = String((msg && msg.pour) || '');
@@ -630,7 +750,7 @@ async function recevoirSessionAdressee(msg) {
     }
   } catch (_) {}
   const email = String(sess.email || emailDuJwt(sess.access_token) || '');
-  await saveSession({ access_token: sess.access_token, refresh_token: sess.refresh_token, expires_at: sess.expires_at, user_id: uid, email });
+  await saveSession({ access_token: sess.access_token, refresh_token: sess.refresh_token, expires_at: sess.expires_at, user_id: uid, email, depuis: Date.now() });
   Promise.resolve().then(() => noterDiag('session_liee')).catch(() => {});
   notifierApp({ type: 'session', etat: 'liee', email });
   if (!dejaVivante) visiteApresSession('liaison');
@@ -891,6 +1011,16 @@ let _statutDernierRefus = null;
 // datés, que la carte montre en repli. Jamais le corps ni un identifiant.
 let _familleDernierRefus = '';
 let _octetsDernierRefus = 0;
+// ⚠️ 5.328 (8 nov., Julien : « il ne doit pas y avoir d'envoi si l'extension
+//    n'est pas connectée »). Sans session VRM (aucune, morte, ou renouvellement
+//    raté une fois), RIEN ne part — c'était déjà vrai au réseau (aucun `fetch`
+//    sans jeton) — et désormais RIEN n'est noté comme un REFUS : ni
+//    `_statutDernierRefus`, ni `vrmFlux.refus`, ni `ecriture_ratee_*_sans_session`.
+//    La carte dit « en attente : connecte l'extension » (`vrmFlux.attenteAt`).
+//    `sessionAbsente` est l'instant de la dernière tentative sans session, lu
+//    (et effacé) par `noterFlux` juste après.
+let _sansSessionAt = 0;
+function sessionAbsente() { _sansSessionAt = Date.now(); return false; }
 async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
@@ -945,6 +1075,8 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
     }
     statut = String(res.status || 'inconnu');
   } catch (e) { statut = (e && e.statut) || 'reseau'; }
+  // 5.328 : pas connecté ⇒ rien n'est parti, ce n'est pas un refus.
+  if (statut === 'sans_session') return sessionAbsente();
   // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
   //    depuis la chaîne du tampon — attendre `noterDiag` l'y bloquerait.
   try { noterDiag(`ecriture_ratee_${familleEcriture(table, list)}_${statut}`); } catch (_) {}
@@ -1693,6 +1825,8 @@ async function appelCommandesServeur(envoi, famille) {
       break;
     }
   } catch (e) { statut = (e && e.statut) || 'reseau'; }
+  // 5.328 : pas connecté ⇒ rien n'est parti, ce n'est pas un refus.
+  if (statut === 'sans_session') { sessionAbsente(); return null; }
   try { noterDiag(`ecriture_ratee_${famille}_${statut}`); } catch (_) {}
   _statutDernierRefus = statut; _familleDernierRefus = famille; _octetsDernierRefus = octets;
   return null;
@@ -2776,6 +2910,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // fenêtre n'affiche un bouton que pour un `true` lu.
     if (msg && msg.from === 'cancale-popup' && msg.action === 'fournisseursConnexion') {
       fournisseursConnexion().then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.328 : « Continuer avec Google / Discord » dans l'extension (sans VRM).
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'oauthDepart') {
+      oauthDepart(msg.fournisseur, sender && sender.tab ? sender.tab : null).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', message: 'La connexion n’a pas pu démarrer. Réessaie.' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-oauth-retour' && msg.action === 'oauthRetour') {
+      oauthRetour(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
     // La version du CODE qui tourne (la page de réparation la compare au
@@ -12202,7 +12345,11 @@ async function noterFlux(plateforme, ok) {
   try {
     const cur = (await chrome.storage.local.get('vrmFlux')).vrmFlux || {};
     const p = cur[plateforme] || {};
-    if (ok) { p.okAt = Date.now(); p.koStatut = null; }
+    const attente = !ok && _sansSessionAt && Date.now() - _sansSessionAt < 60000;
+    if (!ok) _sansSessionAt = 0;
+    if (ok) { p.okAt = Date.now(); p.koStatut = null; delete p.attenteAt; }
+    // 5.328 : sans session, l'envoi ATTEND (rien n'est parti) — pas un refus.
+    else if (attente) p.attenteAt = Date.now();
     else {
       p.koAt = Date.now(); p.koStatut = _statutDernierRefus;
       // 5.325 : les 5 derniers refus, datés (code, famille, taille du corps).

@@ -499,7 +499,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.327.0';
+const EXT_ATTENDUE = '5.328.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -926,7 +926,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
+const EXT_CAPACITES = { connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -8154,6 +8154,8 @@ if (typeof window !== 'undefined') {
       if (e.source !== window || !e.data || e.data.__vmr !== 'ready') return;
       const premier = !__vmrExtReady;
       __vmrExtReady = true;
+      // 5.328 : ce pont n'a pas de canal direct (Orion, Firefox) — voir `__vmrPontSeul`.
+      if (e.data.canal === 'pont' && ID_EXT.test(String(e.data.id || ''))) __vmrPontSeul.add(String(e.data.id));
       if (__vmrTour) __vmrTour.ponts.set(cleDuPont(e.data), e.data.version ? String(e.data.version) : '');
       else if (e.data.version && (!__vmrExtVersion || cmpVersion(String(e.data.version), __vmrExtVersion) > 0 || !__vmrPlusieurs)) __vmrExtVersion = String(e.data.version);
       __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
@@ -8790,13 +8792,30 @@ const canalExt = () => { try { const c = typeof window !== 'undefined' ? window.
 // L'identifiant d'une extension : 32 lettres a-p (Chrome, Edge, Opera, Brave),
 // ou celui que déclare le paquet Firefox (`vrm@vrm.center`, 5.188), ou un
 // identifiant Firefox entre accolades. Rien d'autre n'est accepté.
-const ID_EXT = /^(?:[a-p]{32}|[a-z0-9][a-z0-9._-]{0,63}@[a-z0-9][a-z0-9.-]{0,63}|\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\})$/i;
+// 5.328 (8 nov.) : aussi un identifiant UUID nu (Safari, et les navigateurs
+// WebKit qui en donnent un) — il ne sert qu'à ADRESSER le pont de la page, qui
+// ne relaie que pour le sien ; le canal direct reste réservé aux 32 lettres.
+const ID_EXT = /^(?:[a-p]{32}|[a-z0-9][a-z0-9._-]{0,63}@[a-z0-9][a-z0-9.-]{0,63}|\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+// ⚠️ 5.328 (8 nov., Julien sur Orion iPhone : « "Se connecter" change de page
+//    VRM et ça ne se connecte pas »). Lu dans le code : le paquet Orion n'a PAS
+//    `externally_connectable` (zip-extension.cjs le retire), mais la page peut
+//    quand même porter un `chrome.runtime.sendMessage` ; si l'identifiant a la
+//    forme Chrome (32 lettres), l'app prenait le canal direct, et un envoi qui ne
+//    répond JAMAIS (ni réponse, ni erreur — Orion, ticket 13767) finissait au
+//    délai de 5 s sans repasser par le pont (exprès : jamais deux envois sur un
+//    simple délai) ⇒ « absente », rien de connecté. Le pont d'une extension SANS
+//    canal direct le dit maintenant dans son « ready » (`canal: 'pont'`, 5.328) :
+//    pour CET identifiant, l'app passe d'emblée par le pont — un seul envoi,
+//    toujours adressé (bridge.js ne relaie que pour son identifiant), mêmes
+//    règles côté extension (origine, nonce de 2 min, une fois, compte annoncé).
+const __vmrPontSeul = new Set();
 // ⚠️ 5.188 — FIREFOX NE CONNAÎT PAS `externally_connectable` : la page n'a pas
 //    de `chrome.runtime`. Le message part alors par le pont de la page
 //    (`adresse`), et il reste ADRESSÉ : seul le pont de l'extension NOMMÉE le
 //    relaie, et le service worker applique les mêmes règles (origine, nonce,
 //    compte annoncé). Chrome garde son canal adressé, inchangé.
 function versExtension(id, msg, timeoutMs = 5000) {
+  if (__vmrPontSeul.has(String(id || '')) && __vmrExtReady) return vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs);
   const rt0 = canalExt();
   if ((!rt0 || !/^[a-p]{32}$/.test(String(id || ''))) && ID_EXT.test(String(id || '')) && __vmrExtReady) {
     return vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs);
@@ -8855,7 +8874,10 @@ let __lierRetourPerime = false;  // retour de Google après 10 min : le dire, av
 // VRM », que toutes les fenêtres depuis la 5.169 portent.
 function boutonLierExt() {
   let f = ''; try { f = String((AUTH.user && AUTH.user.app_metadata && AUTH.user.app_metadata.provider) || ''); } catch (_) { f = ''; }
-  return (FOURNISSEURS_LIER.includes(f) && extSait('lieroauth') === 'ok') ? `« Continuer avec ${f === 'google' ? 'Google' : 'Discord'} »` : '« Se connecter avec VRM »';
+  if (FOURNISSEURS_LIER.includes(f) && extSait('lieroauth') === 'ok') return `« Continuer avec ${f === 'google' ? 'Google' : 'Discord'} »`;
+  // 5.328 : la fenêtre (et la carte du logo) commence par l'e-mail et le mot de
+  // passe VRM — le chemin qui marche partout, Orion compris.
+  return extSait('connexioncarte') === 'ok' ? '« Me connecter » (ton e-mail et ton mot de passe VRM)' : '« Se connecter avec VRM »';
 }
 function garderLierPourRetourOAuth() {
   try {
@@ -15530,7 +15552,9 @@ function AuthScreen() {
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
   const [mode, setMode] = React.useState(() => (RECOVERY_PENDING || (AUTH_REDIRECT && AUTH_REDIRECT.recovery)) ? 'newpw'
-    : (/[?&]inscription(=|&|$)/.test(window.location.search || '') ? 'up' : 'in')); // in · up · reset · newpw
+    : (/[?&]inscription(=|&|$)/.test(window.location.search || '') ? 'up'
+    // 5.328 : « Mot de passe oublié ? » dans la carte de l'extension.
+    : /[?&]mot-de-passe-oublie(=|&|$)/.test(window.location.search || '') ? 'reset' : 'in')); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
   // Le prénom demandé à l'inscription : il sert au bonjour de l'accueil, rien
   // d'autre. Rangé dans le même réglage synchronisé que le champ de Réglages

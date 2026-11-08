@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM — outil du revendeur",
-  "version": "5.327.0",
+  "version": "5.328.0",
   "description": "Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
   "permissions": [
     "cookies",
@@ -82,6 +82,17 @@
         "bridge.js"
       ],
       "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://vrm.center/*",
+        "https://cancale-v67-ten.vercel.app/*"
+      ],
+      "js": [
+        "oauth-retour.js"
+      ],
+      "run_at": "document_start",
       "all_frames": false
     },
     {
