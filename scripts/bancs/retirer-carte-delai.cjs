@@ -96,7 +96,8 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream' });
   if (ext === '.js') {
     // Le seul crochet (celui de carte-stable.cjs) : la carte construite par l'app est GARDÉE pour la mesurer.
-    const s = fs.readFileSync(p, 'utf8').replace(/carte\.once\("load", /g, 'window.__vrmPose && window.__vrmPose(carte); carte.once("load", ');
+    // (le code servi est minifié : le nom de la variable change, d'où la forme générale `X.once("load",`).
+    const s = fs.readFileSync(p, 'utf8').replace(/([A-Za-z_$][\w$]*)\.once\("load", ?/g, '(window.__vrmPose && window.__vrmPose($1), $1).once("load",');
     return r.end(s);
   }
   fs.createReadStream(p).pipe(r);
@@ -196,11 +197,11 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
         const ordre = vil.filter((x) => x.v).map((x) => x.v);
         dit(ordre[0] === 'vannes' && ordre[1] === 'cancale' && ordre[ordre.length - 1] === '__autres', 'triées par urgence (Vannes au dernier jour, puis Cancale), « Autres » à la fin', ordre.join(','));
         // ── 2. La carte ──
-        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 5, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 6, null, { timeout: 15000 }).catch(() => {});
         await pg.waitForFunction(() => document.querySelector('[data-retirer-carte-etat="pret"]'), null, { timeout: 15000 }).catch(() => {});
         const c = await pg.evaluate(() => {
           const k = document.querySelector('.vrm-rpf-carte'); const v = document.querySelector('[data-retirer-villes]'); const s = document.querySelector('.vrm-rpf-section');
-          const m = (window.__vrmCartes || []).filter((x) => x.getContainer().isConnected).pop();
+          const m = (window.__vrmCartes || []).filter((x) => x.getContainer && x.getContainer().isConnected && x.getContainer().closest('.vrm-rpf-carte')).pop();
           const can = k && k.querySelector('.maplibregl-canvas');
           return { la: !!k, etat: (document.querySelector('[data-retirer-carte-etat]') || { getAttribute: () => '' }).getAttribute('data-retirer-carte-etat'), h: k ? Math.round(k.getBoundingClientRect().height) : 0, avantVilles: !!(k && v && k.getBoundingClientRect().bottom <= v.getBoundingClientRect().top + 1), avantListe: !!(k && s && k.getBoundingClientRect().bottom <= s.getBoundingClientRect().top), epingles: [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].map((e) => ({ cle: e.getAttribute('data-relais-epingle'), n: e.getAttribute('data-relais-n') })), coop: m && m.cooperativeGestures ? m.cooperativeGestures.isEnabled() : null, touch: can ? getComputedStyle(can).touchAction : '', cadre: (document.querySelector('.vrm-rpf-carte [data-relais-cadre]') || { getAttribute: () => '' }).getAttribute('data-relais-cadre') };
         });
@@ -208,7 +209,9 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
         dit(c.la && c.etat === 'pret', `la carte est affichée${tel ? ' AU TÉLÉPHONE' : ''} (fond prêt)`, JSON.stringify({ la: c.la, etat: c.etat }));
         dit(c.avantVilles && c.avantListe, 'la carte est en haut, avant les villes et la liste', JSON.stringify(c));
         dit(tel ? c.h >= 180 && c.h <= 230 : c.h >= 180 && c.h <= 260, `hauteur raisonnable (${c.h} px)`);
-        dit(c.epingles.length === 5, 'une épingle par point placé (Cancale, 2 × Vannes, Brest, Saint-Malo ; Quimper : « à vérifier », compté à part)', JSON.stringify(c.epingles));
+        dit(c.epingles.length === 6, 'une épingle par point placé (Cancale, 2 × Vannes, Brest, Saint-Malo, et Quimper « à vérifier » : visible, jamais caché)', JSON.stringify(c.epingles));
+        const sortes = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-sorte')])));
+        dit(sortes['tabackereon|29000'] === 'averifier' && Object.entries(sortes).filter(([k]) => k !== 'tabackereon|29000').every(([, v]) => v === 'aretirer'), 'l’épingle de Quimper est « à vérifier » (neutre), les autres « à retirer »', JSON.stringify(sortes));
         const epC = c.epingles.find((e) => /maisonduquai/i.test(e.cle));
         dit(!!epC && epC.n === '2', 'l’épingle de Cancale porte ses 2 colis', JSON.stringify(epC));
         if (tel) dit(c.coop === true && /pan-y/.test(c.touch), 'au doigt : un doigt fait défiler la page (gestes coopératifs, touch-action pan-y)', `${c.coop} · ${c.touch}`);
@@ -216,20 +219,22 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
         await pg.locator('[data-retirer-villes] [data-ville="vannes"]').first().click();
         await pg.waitForFunction(() => { const e = [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')]; return e.length === 2; }, null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
-        const cv = await pg.evaluate(() => ({ ep: [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].map((e) => e.getAttribute('data-relais-epingle')), cadre: (document.querySelector('.vrm-rpf-carte [data-relais-cadre]') || { getAttribute: () => '' }).getAttribute('data-relais-cadre'), centre: (() => { const m = (window.__vrmCartes || []).filter((x) => x.getContainer().isConnected).pop(); if (!m) return null; const z = m.getCenter(); return [z.lng, z.lat]; })() }));
+        const cv = await pg.evaluate(() => ({ ep: [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].map((e) => e.getAttribute('data-relais-epingle')), cadre: (document.querySelector('.vrm-rpf-carte [data-relais-cadre]') || { getAttribute: () => '' }).getAttribute('data-relais-cadre'), centre: (() => { const m = (window.__vrmCartes || []).filter((x) => x.getContainer && x.getContainer().isConnected && x.getContainer().closest('.vrm-rpf-carte')).pop(); if (!m) return null; const z = m.getCenter(); return [z.lng, z.lat]; })() }));
         const [w, s0, e0, n0] = String(cv.cadre).split(',').map(Number);
         dit(cv.ep.length === 2 && w >= -2.77 && e0 <= -2.75 && s0 >= 47.65 && n0 <= 47.66, 'Vannes choisie : la carte ne porte que les 2 points de Vannes, cadrée sur eux', JSON.stringify(cv));
         dit(!!cv.centre && Math.abs(cv.centre[0] + 2.7585) < 0.02 && Math.abs(cv.centre[1] - 47.6555) < 0.02, 'le centre de la carte est à Vannes', JSON.stringify(cv.centre));
         if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.locator('.vrm-rpf-carte').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `retirer-carte-vannes-${nom}.png`) }); }
         await pg.locator('[data-retirer-villes] [data-ville=""]').first().click();
-        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 5, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 6, null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
-        // Toucher une épingle amène son point.
-        const cleB = await pg.evaluate(() => { const e = [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].find((x) => /siam/i.test(x.getAttribute('data-relais-epingle'))); return e ? e.getAttribute('data-relais-epingle') : ''; });
+        // Toucher une épingle amène son point (le plus bas de la liste : Saint-Malo, sans date).
+        const TOP = (k) => pg.evaluate((k) => { const p = [...document.querySelectorAll('[data-relais-point]')].find((x) => x.getAttribute('data-relais-point') === k); if (!p) return null; const r = p.getBoundingClientRect(); return { top: Math.round(r.top), choisi: p.classList.contains('is-choisi') }; }, k);
+        const cleB = 'pressedusillon|35400';
+        const t0 = await TOP(cleB);
         await pg.evaluate((k) => { const e = [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].find((x) => x.getAttribute('data-relais-epingle') === k); if (e) e.click(); }, cleB);
-        await pg.waitForTimeout(1200);
-        const vu = await pg.evaluate((k) => { const p = [...document.querySelectorAll('[data-relais-point]')].find((x) => x.getAttribute('data-relais-point') === k); if (!p) return null; const r = p.getBoundingClientRect(); return { top: Math.round(r.top), choisi: p.classList.contains('is-choisi') }; }, cleB);
-        dit(!!vu && vu.top >= -2 && vu.top < vp.height / 2 && vu.choisi, 'toucher l’épingle de Brest amène son point en haut de l’écran', JSON.stringify(vu));
+        await pg.waitForTimeout(1500);
+        const vu = await TOP(cleB);
+        dit(!!t0 && !!vu && t0.top > vp.height * 0.6 && vu.top >= -2 && vu.top < vp.height * 0.7 && vu.top < t0.top - 300 && vu.choisi, 'toucher l’épingle de Saint-Malo amène son point (plus bas) à l’écran (en haut, ou la page au bout)', JSON.stringify({ t0, vu }));
         await pg.evaluate(() => window.scrollTo(0, 0));
         // ── 3. Les barres ──
         const barres = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf [data-rp-delai]')].map((d) => {
@@ -271,8 +276,11 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
         // Hors réseau : la carte part, la liste reste.
         await ctx.setOffline(true);
         await pg.waitForTimeout(800);
-        const hr = await pg.evaluate(() => ({ carte: document.querySelectorAll('.vrm-rpf-carte .maplibregl-map').length, codes: document.querySelectorAll('[data-code-retrait]').length }));
-        dit(hr.carte === 0 && hr.codes > 0, 'hors réseau : plus de carte, les colis et leurs codes restent', JSON.stringify(hr));
+        const nReq = requetes.length;
+        const hr = await pg.evaluate(() => ({ carte: document.querySelectorAll('.maplibregl-map').length, texte: (document.querySelector('.vrm-main') || document.body).innerText }));
+        const apres = requetes.slice(nReq).filter((u) => /openfreemap|api-adresse/.test(u));
+        dit(hr.carte === 0 && !apres.length && /100001/.test(hr.texte), 'hors réseau : plus de carte (ni fond ni Base Adresse), les colis et leurs codes restent', JSON.stringify({ carte: hr.carte, apres, code: /100001/.test(hr.texte) }));
+        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-hors-reseau-${nom}.png`) });
         await ctx.setOffline(false);
       });
       dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
@@ -299,11 +307,11 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
       const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, { reduit: true });
       await essaie('reduit', async () => {
         await allerRetirer(pg);
-        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 5, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 6, null, { timeout: 15000 }).catch(() => {});
         await pg.evaluate(() => window.scrollTo(0, 0));
-        const t = await pg.evaluate(async () => { const e = [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].find((x) => /siam/i.test(x.getAttribute('data-relais-epingle'))); if (!e) return null; const y0 = window.scrollY; e.click(); await new Promise((r) => requestAnimationFrame(() => r())); return { y0, y1: window.scrollY }; });
+        const t = await pg.evaluate(async () => { const k = 'pressedusillon|35400'; const top = () => { const p = [...document.querySelectorAll('[data-relais-point]')].find((x) => x.getAttribute('data-relais-point') === k); return p ? Math.round(p.getBoundingClientRect().top) : null; }; const e = [...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].find((x) => x.getAttribute('data-relais-epingle') === k); if (!e) return null; const y0 = top(); e.click(); await new Promise((r) => requestAnimationFrame(() => r())); return { y0, y1: top() }; });
         await pg.waitForTimeout(800);
-        const y2 = await pg.evaluate(() => window.scrollY);
+        const y2 = await pg.evaluate(() => { const p = [...document.querySelectorAll('[data-relais-point]')].find((x) => x.getAttribute('data-relais-point') === 'pressedusillon|35400'); return p ? Math.round(p.getBoundingClientRect().top) : null; });
         dit(!!t && t.y1 !== t.y0 && Math.abs(t.y1 - y2) <= 2, 'mouvement réduit : toucher une épingle saute au point sans défilement animé', JSON.stringify({ ...t, y2 }));
       });
       dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
@@ -314,8 +322,9 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
       const { ctx, pg, errs, requetes } = await ouvrir(b, { width: 390, height: 844 }, { tab: 'journee' });
       await essaie('journee', async () => {
         await pg.waitForTimeout(6000);
-        const ml = requetes.filter((u) => /maplibre|fondCarte|openfreemap|api-adresse/.test(u));
-        dit(!ml.length, 'maplibre (et le fond, et la Base Adresse) ne partent pas au démarrage de Ma journée', ml.join(' | '));
+        // (La Base Adresse « limit=1 » de Ma journée — la distance au point — est d'avant ce chantier : pas jugée ici.)
+        const ml = requetes.filter((u) => /maplibre|fondCarte|openfreemap/.test(u));
+        dit(!ml.length, 'maplibre (et son fond) ne partent pas au démarrage de Ma journée', ml.join(' | '));
       });
       dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
       await ctx.close();

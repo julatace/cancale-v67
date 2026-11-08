@@ -182,7 +182,7 @@ const jourFr = (s) => { const t = Date.parse(String(s || '') + 'T12:00:00'); ret
 // (8 nov.) `cooperatif` (au doigt) : un doigt fait défiler la PAGE, deux doigts déplacent la carte
 // (`cooperativeGestures` de MapLibre, phrase en français) — la carte ne prend jamais le défilement.
 const PHRASES_GESTES = { 'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + molette pour zoomer la carte', 'CooperativeGesturesHandler.MacHelpText': '⌘ + molette pour zoomer la carte', 'CooperativeGesturesHandler.MobileHelpText': 'Deux doigts pour déplacer la carte' };
-const margesCadre = (h) => (h < 240 ? { top: 40, bottom: 20, left: 28, right: 28 } : { top: 48, bottom: 64, left: 40, right: 40 });
+const margesCadre = (h) => (h < 240 ? { top: 42, bottom: 58, left: 28, right: 28 } : { top: 48, bottom: 64, left: 40, right: 40 });
 export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat, muet = false, cooperatif = false }) {
   const boite = React.useRef(null);
   const carteRef = React.useRef(null);
