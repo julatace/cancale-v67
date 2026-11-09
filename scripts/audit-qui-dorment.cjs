@@ -73,7 +73,9 @@ async function audit(src, bavard) {
   let ko = await audit(src, true);
   const code = APP.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
   const dit = (c, m) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m); };
-  dit(/annSort==='sleeping'\) \{\s*arr = articlesQuiDorment\(arr\.map\(it=>\(\{id:String\(it\.id\),it,age:listedAgeDays\(it\)\}\)\), seuilDort\)\.liste\.map\(x=>x\.it\);/.test(code),
+  // (9 nov., « vendre plus ») La même vue porte aussi « Favoris sans vente » (src/vendrePlus.js) :
+  // la branche « qui dorment » reste `articlesQuiDorment` au seuil choisi, sur la même base.
+  dit(/annSort==='sleeping'\) \{\s*arr = modeDort==='favoris'\s*\? favorisSansVente\(arr\.map\([^\n]*\n\s*: articlesQuiDorment\(arr\.map\(it=>\(\{id:String\(it\.id\),it,age:listedAgeDays\(it\)\}\)\), seuilDort\)\.liste\.map\(x=>x\.it\);/.test(code),
     'la vue « qui dorment » d’Annonces passe par `articlesQuiDorment` au seuil choisi, sur la base de la grille');
   dit(/const annBase = useMemo\(\(\) => \(listings\.items \|\| \[\]\)\.filter\(garderAnnonce\)/.test(code), 'la base est `listings.items` (la règle « en ligne ») filtrée comme la grille');
   // (5 nov.) Depuis le 4 nov. (0b293942, « Masquées ») la vue est une branche d'une

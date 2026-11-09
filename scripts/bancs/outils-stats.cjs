@@ -283,7 +283,9 @@ const captureEl=async(pg,sel,nom)=>{ if(!CAPT) return; fs.mkdirSync(CAPT,{recurs
         await pg.locator('[data-qd-choix="30"]').click(); await pg.waitForTimeout(300);
         await pg.locator('[data-qd-agir="700002"]').click(); await pg.waitForSelector('[data-qd-menu]',{timeout:5000}).catch(()=>{});
         const m=await pg.evaluate(()=>[...document.querySelectorAll('[data-qd-choix-geste]')].map(e=>({ k:e.getAttribute('data-qd-choix-geste'), off:e.getAttribute('aria-disabled')==='true', titre:e.title||'', h:e.getBoundingClientRect().height })));
-        dit(m.map(x=>x.k).join(',')==='prix,republier,lbc,ebay','« Agir » ⇒ Baisser le prix · Republier · Mettre sur Leboncoin · Mettre sur eBay',m.map(x=>x.k).join(','));
+        // (9 nov., « vendre plus ») + « Ouvrir sur Vinted », « Préparer sur Vestiaire » (src/vendrePlus.js, `gestesDormeuse`) ;
+        // 700002 a 0 favori lu ⇒ pas d'« offre aux favoris ».
+        dit(m.map(x=>x.k).join(',')==='republier,prix,vinted,lbc,ebay,vestiaire','« Agir » ⇒ Ajouter à Republier · Baisser le prix · Ouvrir sur Vinted · Leboncoin · eBay · Vestiaire',m.map(x=>x.k).join(','));
         dit(m.filter(x=>['prix','republier'].includes(x.k)).every(x=>x.off && /extension VRM/.test(x.titre)),'sans extension : Baisser le prix et Republier grisés, la raison dans le titre (rien ne part)',JSON.stringify(m.map(x=>[x.k,x.off])));
         dit(m.every(x=>x.h>=44),'chaque choix fait 44 px ou plus',JSON.stringify(m.map(x=>Math.round(x.h))));
         await captureEl(pg,'[data-qd-menu]',`dorment-agir-${suf}`);
