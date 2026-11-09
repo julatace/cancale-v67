@@ -16,7 +16,7 @@ import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { nomCompteVente } from '../plateformes.js';
 import { champsFacultatifs } from '../profilVendeur.js';
-import { AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel } from '../App.jsx';
+import { InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { preuvesFriseVc, preuvesFriseEbay } from "../friseSites.js";
@@ -284,11 +284,17 @@ function AnnoncesVestiaire() {
     if (!n) corps = <div data-vc-annonces="vide" style={style}>Aucune annonce sur Vestiaire à la dernière lecture ({ageCourtVc(d.capturedAt)}). Si tu viens d'en publier une, {geste} : la liste se met à jour toute seule.</div>;
     else corps = (
       <div data-vc-annonces="lu" data-vc-annonces-n={n} data-vc-annonces-vieille={vieille ? '1' : '0'}>
-        <div data-vc-annonces-fraicheur="" style={{ ...style, marginBottom: 10 }}>
+        {/* (9 nov., lot AI) UNE ligne courte (« au moins 3 annonces · lu il y a 7 j · à confirmer »),
+            ambre si la lecture est à refaire ; la phrase d'avant, entière, dans la pop-up. */}
+        <InfoPop nom="vc-fraicheur" titre="Tes annonces Vestiaire" ton={vieille || sansFiche ? 'ambre' : 'neutre'}
+          attrs={{ 'data-vc-annonces-fraicheur': '' }}
+          resume={<>{d.complet ? '' : 'au moins '}{n} annonce{n > 1 ? 's' : ''} · lu{n > 1 ? 'es' : 'e'} {ageCourtVc(d.capturedAt)}{vieille ? ' · à confirmer' : ''}{sansFiche ? ' · fiches à venir' : ''}</>}>
+          <p data-vc-annonces-fraicheur-detail="" style={{ margin: 0 }}>
           {n} annonce{n > 1 ? 's' : ''}{d.complet ? '' : d.total != null ? ` (au moins — Vestiaire en annonce ${d.total})` : ' (au moins)'}, lue{n > 1 ? 's' : ''} sur Vestiaire {ageCourtVc(d.capturedAt)}.
           {vieille ? <> <b style={{ color: C.warn }}>À confirmer</b> : la lecture a plus de 24 h — {geste} pour la remettre à jour (rien n'est retiré d'ici).</> : null}
           {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Paramètres → État des connexions, puis {geste}</>}.</> : null}
-        </div>
+          </p>
+        </InfoPop>
         {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
             (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
         <section className="vrm-lbc-catalog vrm-vc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
