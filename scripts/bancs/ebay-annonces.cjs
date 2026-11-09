@@ -224,6 +224,8 @@ async function ouvrir(b, vp, panne, opts = {}) {
   else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   if (opts.pont) await pg.addInitScript(PONT, Object.assign({}, opts.pont, { etatCode: opts.pont.etatCode !== undefined ? opts.pont.etatCode : codeEtat(opts.pont.version) }));
   if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
+  // (9 nov.) Vendeur déjà configuré : l'écran plein « Ma configuration » ne couvre pas la page.
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); } catch (_) {} });
   await pg.addInitScript(() => {
     window.__etatsAuto = [];
     setInterval(() => { const e = document.querySelector('[data-ebay-retrait-auto]'); const v = e && e.getAttribute('data-ebay-retrait-auto'); if (v && window.__etatsAuto[window.__etatsAuto.length - 1] !== v) window.__etatsAuto.push(v); }, 25);
@@ -320,7 +322,9 @@ async function versAnnoncesEbay(pg) {
 //    Mesuré : le bouton est immobile 300 ms après l'ouverture ; c'est l'attente
 //    du banc qui était trop courte (5 s), pas l'écran. On attend 20 s.
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
-const lire = (pg) => pg.evaluate(() => {
+// (9 nov.) La liste des ventes Vinted à relier vit dans une feuille : on l'ouvre avant de lire.
+const lire = async (pg) => { if (await pg.locator('[data-ebay-sans-preuve-voir]').count()) { await pg.locator('[data-ebay-sans-preuve-voir]').first().click({ timeout: 3000 }).catch(() => {}); await pg.waitForSelector('[data-ebay-sans-preuve-vente]', { timeout: 4000 }).catch(() => {}); } const r = await lire0(pg); if (await pg.locator('[data-ebay-sans-preuve-vente]').count()) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForSelector('[data-ebay-sans-preuve-vente]', { state: 'detached', timeout: 3000 }).catch(() => {}); } return r; };
+const lire0 = (pg) => pg.evaluate(() => {
   const a = (sel, at) => [...document.querySelectorAll(sel)].map((e) => e.getAttribute(at));
   const relie = {}; for (const e of document.querySelectorAll('[data-ebay-annonce]')) { const r = e.querySelector('[data-relie]'); relie[e.getAttribute('data-ebay-annonce')] = r ? r.getAttribute('data-relie') : null; }
   const txt = document.body.innerText;
@@ -341,8 +345,8 @@ const lire = (pg) => pg.evaluate(() => {
     pasReliee: (txt.match(/pas reliée/g) || []).length,
     sansPreuve: [...document.querySelectorAll('[data-ebay-ventes-sans-preuve]')].map((e) => ({ n: e.getAttribute('data-ebay-ventes-sans-preuve'), geste: e.getAttribute('data-ebay-sans-preuve-geste'), t: e.textContent,
       promesse: e.getAttribute('data-ebay-sans-preuve-promesse'), blocage: e.getAttribute('data-ebay-sans-preuve-blocage'),
-      captes: [...e.querySelectorAll('[data-ebay-sans-preuve-bord-capte]')].map((x) => x.getAttribute('data-ebay-sans-preuve-bord-capte')),
-      ventes: [...e.querySelectorAll('[data-ebay-sans-preuve-vente]')].map((v) => ({ tx: v.getAttribute('data-ebay-sans-preuve-vente'), t: v.textContent, liens: [...v.querySelectorAll('a[href]')].map((a) => a.href), bord: !!v.querySelector('[data-bouton-bord][data-tx="' + v.getAttribute('data-ebay-sans-preuve-vente') + '"]') })) })),
+      captes: [...document.querySelectorAll('[data-ebay-sans-preuve-bord-capte]')].map((x) => x.getAttribute('data-ebay-sans-preuve-bord-capte')),
+      ventes: [...document.querySelectorAll('[data-ebay-sans-preuve-vente]')].map((v) => ({ tx: v.getAttribute('data-ebay-sans-preuve-vente'), t: v.textContent, liens: [...v.querySelectorAll('a[href]')].map((a) => a.href), bord: !!v.querySelector('[data-bouton-bord][data-tx="' + v.getAttribute('data-ebay-sans-preuve-vente') + '"]') })) })),
     autoEtat: (document.querySelector('[data-ebay-retrait-etat]') || {}).textContent || null, // (6 nov.) l'état en un mot, à la casse d'iOS (« Éteint ») : le banc juge le MOT, pas les capitales
   };
 });

@@ -174,7 +174,7 @@ const ouvrir = async (b, taille, tab) => {
   // Le Stock 3D boucle sur requestAnimationFrame : sous l'horloge simulée la
   // capture n'aboutit jamais. Il garde l'heure réelle.
   if (tab !== 'garage') await pg.clock.install({ time: maintenant });
-  await pg.addInitScript(([d, s]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vinted_dark', JSON.stringify(d)); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } catch (_) {} }, [sombre, SESSION]);
+  await pg.addInitScript(([d, s]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vinted_dark', JSON.stringify(d)); localStorage.setItem('vrm_bascule_mineral_v1', '1'); /* (9 nov.) vendeur déjà configuré : « Ma configuration » ne couvre pas l'écran */ localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); } catch (_) {} }, [sombre, SESSION]);
   await pg.route(/^https?:\/\/[^/]*(vinted\.net|img\.test)\//i, (r) => { const m = /\/b(\d+)\/|\/e(\d+)\.jpg/.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1] || m[2]) : 0) }); });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net|img\.test)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user, ...SESSION.user }) }));
@@ -247,6 +247,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
       await essaie(`[${T}] annonces`, async () => {
         const { ctx, pg } = await ouvrir(b, taille, ECRAN_EBAY.annonces);
         await sec('annonces')(pg);
+        if (await pg.locator('[data-ebay-sans-preuve-voir]').count()) { await pg.locator('[data-ebay-sans-preuve-voir]').first().click({ timeout: 3000 }).catch(() => {}); await pg.waitForSelector('[data-ebay-sans-preuve-vente]', { timeout: 4000 }).catch(() => {}); } // (9 nov.) la liste vit dans une feuille
         const m = await pg.evaluate(() => {
           const top = (s) => { const e = document.querySelector(s); return e ? e.getBoundingClientRect().top : null; };
           const liens = [...document.querySelectorAll('[data-ebay-sans-preuve-vente] a[href]')].map((a) => { const s = getComputedStyle(a); return [Math.round(a.getBoundingClientRect().height), s.borderTopWidth, s.borderTopStyle, s.backgroundColor, s.color, s.fontSize].join('|'); });
@@ -255,6 +256,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
           const plus = carte ? !!carte.querySelector('button[aria-expanded]') : false;
           return { cta: top('[data-poster="ebay"]'), alerte: top('[data-ebay-retirer-vinted]'), liens, encadres, plus };
         });
+        if (await pg.locator('[data-ebay-sans-preuve-vente]').count()) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForSelector('[data-ebay-sans-preuve-vente]', { state: 'detached', timeout: 3000 }).catch(() => {}); }
         dit(m.cta != null && m.alerte != null && m.cta < m.alerte, `[${T}] Annonces : « Vendre une paire » avant les alertes`, m);
         dit(m.liens.length >= 2 && new Set(m.liens).size === 1, `[${T}] les liens « ouvrir sur Vinted » des ventes pas reliées ont UNE forme`, m.liens);
         dit(Array.isArray(m.encadres) && m.encadres.length <= 1, `[${T}] une carte n'empile pas deux boutons encadrés (un geste principal, le reste en lien)`, m.encadres);

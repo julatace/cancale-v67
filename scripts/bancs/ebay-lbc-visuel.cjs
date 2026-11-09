@@ -201,6 +201,7 @@ const capture = async (pg, nom, plein = true) => {
         await pg.waitForSelector('[data-ebay-annonce]', { timeout: 20000 });
         await pg.waitForTimeout(2500);
         await capture(pg, `ebay-annonces-${taille}`);
+        if (await pg.locator('[data-ebay-sans-preuve-voir]').count()) { await pg.locator('[data-ebay-sans-preuve-voir]').first().click({ timeout: 3000 }).catch(() => {}); await pg.waitForSelector('[data-ebay-sans-preuve-vente]', { timeout: 4000 }).catch(() => {}); } // (9 nov.) la liste vit dans une feuille
         const m = await pg.evaluate(() => {
           const cartes = [...document.querySelectorAll('[data-ebay-annonce]')];
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
@@ -220,6 +221,7 @@ const capture = async (pg, nom, plein = true) => {
             sansPreuveLiens: [...document.querySelectorAll('[data-ebay-sans-preuve-vente] a[href]')].map((a) => a.innerText.trim()),
           };
         });
+        if (await pg.locator('[data-ebay-sans-preuve-vente]').count()) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForSelector('[data-ebay-sans-preuve-vente]', { state: 'detached', timeout: 3000 }).catch(() => {}); }
         const maxH = tel ? 104 : 96;
         dit(m.hauteurs.length >= 1 && m.hauteurs.every((h) => h <= maxH), `${T} chaque carte fermée est basse (≤ ${maxH} px) : photo · titre · N° · prix · une ligne`, m.hauteurs);
         dit(m.gestes.every((g) => g.n.length <= (g.relie ? 0 : 1)), `${T} une carte : « Relier » seul quand le lien manque, aucun geste en plus sur une reliée (le reste est dans « … »)`, m.gestes);
