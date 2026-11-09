@@ -2,6 +2,7 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { periodeADater } from '../aDaterAnnee.js';
+import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
@@ -3879,6 +3880,28 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // « Documents et réglages » — les mêmes cartes, rendues à UN seul endroit.
   const profilF = useProfilFiscal();
   const exportDevant = !!profilF.exportEnAvant;
+  // (9 nov., lot B) ⌘K « Exporter pour mon comptable » : la carte est MONTRÉE (repli ouvert,
+  // défilée, « Préparer » au focus) — rien n'est lu ni exporté avant son clic.
+  React.useEffect(() => {
+    const montrer = () => {
+      if (!DEMANDE_COMMANDE.export || Date.now() - DEMANDE_COMMANDE.export > 30000) return;
+      if (!exportDevant) setAvance(true);
+      let essais = 0;
+      const viser = () => {
+        const c = document.querySelector('[data-export-comptable]');
+        if (!c) { if (++essais < 100) setTimeout(viser, 100); return; }
+        // Rangée dans « Documents et réglages » (replié) : le repli s'ouvre (son `onToggle` suit).
+        const d = c.closest('details'); if (d && !d.open && ++essais < 100) { d.open = true; setTimeout(viser, 60); return; }
+        DEMANDE_COMMANDE.export = 0;
+        try { c.scrollIntoView({ block: 'center' }); } catch (_) {}
+        const b = c.querySelector('[data-export-preparer]'); try { if (b) b.focus({ preventScroll: true }); } catch (_) {}
+      };
+      setTimeout(viser, 0);
+    };
+    montrer();
+    window.addEventListener('vrm:export-comptable', montrer);
+    return () => window.removeEventListener('vrm:export-comptable', montrer);
+  }, [exportDevant]);
 
   // (3 nov.) La photo du ticket : réduite dans le navigateur, puis le montant lu
   // DANS la page (gratuit, local) s'il est lisible et que le champ est vide.

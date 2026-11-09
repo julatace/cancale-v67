@@ -314,7 +314,7 @@ async function allerTache(pg, tache, site) {
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-lbc-delier="lbc2"]', { timeout: 15000 });
-        pg.once('dialog', (d) => d.accept());
+        // (9 nov., lot B) Plus de confirmation : délier part tout de suite (« Annuler » 5 s dans la pilule).
         await pg.click('[data-doublon="15"] [data-lbc-delier="lbc2"]');
         await pg.waitForTimeout(2500);
       } catch (e) { dit(false, '« Pas le bon article » se clique sur la ligne de la N°15', String(e.message).slice(0, 100)); }

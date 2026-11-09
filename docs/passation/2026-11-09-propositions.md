@@ -135,3 +135,9 @@ demandes du soir : « pas d'hésitation », « tout doit être parfait », rapid
 | 48 | **Mode relais** : au point relais, les codes de retrait en plein écran, luminosité maximale, un code (et son QR) par écran, glisser pour le suivant, « Retiré » sous chacun | plus rapide au comptoir, sans chercher dans les listes | petit |
 | 49 | **Historique d'un N°** : quand et pourquoi un N° a été posé, changé (doublon réglé, republication, à la main) — lecture seule dans la fiche paire | confiance : un N° écrit sur un carton ne change jamais sans trace | petit |
 | 50 | **Siri / Raccourcis : « Ajoute un achat dans VRM »** (lien profond qui ouvre la saisie d'achat pré-remplie, et « Où est le N°124 ? ») | saisir un achat à la volée sans ouvrir l'app | petit |
+
+### Décision de Julien sur la sixième série (9 nov., soir)
+« Fais tout » ⇒ **43 à 50 validées**. Lots : AC = 43 (« À trancher ») · AD = 46 + 48 (préparer
+mes colis pas à pas + mode relais) · AE = 44 (Colis et Ventes instantanés) · AF = 45 + 49 (même
+annonce sur deux comptes + historique d'un N°) · AG = 47 (ligne de fraîcheur unique) · AH = 50
+(Siri / Raccourcis).
