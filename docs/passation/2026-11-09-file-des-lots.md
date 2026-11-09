@@ -52,17 +52,17 @@ libère son numéro (le dire ici).
 | — | direction artistique 6 : refonte VISIBLE « Widgets » (« il n'y a pas un grand changement ») | PR #1082 | **en ligne** |
 | — | plus de balayage entre onglets ; vues Vinted à 0 = pas su | PR #1074 | **en ligne** |
 
-| AC | « À trancher » : un seul endroit pour tous les doutes, un geste par ligne | `claude/a-trancher` | en cours |
+| AC | « À trancher » : un seul endroit pour tous les doutes, un geste par ligne | PR #1084 | **en ligne** |
 | AD | « Préparer mes colis » pas à pas + mode relais (codes plein écran) | PR #1083 | **en ligne** |
-| AE | Colis et Ventes instantanés | `claude/colis-ventes-instantanes` | en cours |
-| AF | même annonce sur deux comptes Vinted + historique d'un N° | `claude/doublons-historique` | en cours |
+| AE | Colis et Ventes instantanés | PR #1084 | **en ligne** |
+| AF | même annonce sur deux comptes Vinted + historique d'un N° | PR #1084 | **en ligne** |
 | AG | ligne de fraîcheur unique | `claude/fraicheur-unique` | en cours |
 | AH | Siri / Raccourcis (ajouter un achat, où est le N°) | `claude/siri-raccourcis` | à lancer |
 
 | AI | textes d'explication ⇒ pop-ups ; bouton « Imprimer » en double ; carte du compte ⇒ Paramètres ; point du compte Vinted refait (demandes 1, 2, 13, 14 du 9 nov. 21 h) | `claude/popups-propre` | en cours |
-| AJ | ordre partout : plus récent en haut, tous comptes (3) | `claude/ordre-recent` | à lancer (priorité) |
-| AK | zéro « Transporteur inconnu » (tous les PDF), logos des transporteurs, carte des relais parfaite, suivi irréprochable (4, 5, 11) | `claude/transporteurs-parfaits` | à lancer (priorité) |
-| AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | à lancer |
+| AJ | ordre partout : plus récent en haut, tous comptes (3) | `claude/ordre-recent` | en cours |
+| AK | zéro « Transporteur inconnu » (tous les PDF), logos des transporteurs, carte des relais parfaite, suivi irréprochable (4, 5, 11) | `claude/transporteurs-parfaits` | en cours |
+| AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | en cours |
 | AM | Annonces « Toutes » en grille comme Vinted, propositions lisibles (15) | `claude/annonces-grille` | à lancer |
 | AN | photo en grand partout + Achats plus beaux + facture d'achat hors Vinted (9, 10, 16) | `claude/photos-achats` | à lancer |
 | AO | Compta reliée à Statistiques (8) | `claude/compta-stats` | à lancer |
