@@ -1092,3 +1092,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Lignes déplacées du §9 de CLAUDE.md (9 nov., taille)
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (direction artistique 4, suite)
 - **9 nov. · Ma journée v2** : la prochaine chose à faire EN TÊTE (dans la carte sombre, plus redite) ; la frise des 7 jours se TOUCHE (un jour ⇒ son vendu, ventes, versé, colis envoyés, pile des ventes en éventail ⇒ Ventes ; « Semaine du … » remplace la carte Semaine ; par défaut le dernier jour vendu, jamais un « 0 € » géant) ; « Ensuite » pour le reste ; articles supprimés de Vinted en UNE carte (menu par rangée, + « Remise en ligne », « Tous chez moi » confirmé) ; « + N ventes à dater » ; Ventes : transporteur de SON bordereau sur chaque vente, plus de 2e liste « À envoyer » (lien vers Colis). `docs/passation/2026-11-09-journee-v2.md`. Geste : regarder les planches.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (lot F, plancher-stock)
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **9 nov. · Vitesse du démarrage** : Tournée cachée plus calculée, achats des colis indexés, formats de date créés une fois, cache des ventes écrit hors de l'ouverture ; processeur −15 % à l'ouverture, Colis 1er passage 6,0 → 4,1 s ; « Ma journée < 3 s » PAS atteint (prête = montage + plafond 2,5 s, carte/notifs tardives). `docs/passation/2026-11-09-vitesse-demarrage.md`, banc `demarrage-vitesse`. Geste : aucun (décider du plafond).

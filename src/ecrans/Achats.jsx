@@ -4,6 +4,8 @@ import { prixAchatSaisi } from '../prixAuNumerotage.js';
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { pairesDuModele } from '../dejaEnStock.js';
+import { DejaEnStock } from '../DejaEnStock.jsx';
 import { Bouton, C, FermeAuRetour, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lirePdfLigne, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
 
@@ -301,7 +303,7 @@ const lirePhotosAchatsHors = async () => {
 };
 // ⟦← App.jsx #5⟧
 
-function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero }) {
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null }) {
   const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', photo: null, photoAvant: false });
   const [form, setForm] = useState(null);       // null = fermé ; sinon le brouillon
   const [editId, setEditId] = useState(null);
@@ -310,6 +312,15 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   const [photos, setPhotos] = useState(undefined); // undefined en cours · null pas su · objet lu
   const fichierRef = useRef(null);
   const liste = Array.isArray(achats) ? achats : [];
+  // (9 nov., lot F) « Tu as déjà N paires de ce modèle en stock » pendant la saisie : une
+  // RESSEMBLANCE dite (src/dejaEnStock.js), jamais une liaison — rien n'est écrit.
+  const titreForm = form ? form.title : '';
+  // Les annonces ne sont pas lues sur l'écran Achats : le formulaire ouvert les demande (lecture seule).
+  const formOuvert = !!form;
+  const stockAbsent = stock == null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (formOuvert && stockAbsent && chargerStock) chargerStock(); }, [formOuvert, stockAbsent]);
+  const dejaStock = useMemo(() => (titreForm.trim().length >= 3 && Array.isArray(stock) ? pairesDuModele({ cible: { titre: titreForm }, stock, marqueDe: extractBrand, modeleDe: extractModel, couleursDe: extractColors }) : null), [titreForm, stock]);
   const total = liste.reduce((s, b) => s + (prixAchatHorsNombre(b) || 0), 0);
   const avecPhoto = liste.some(b => b && b.photo);
   useEffect(() => {
@@ -391,6 +402,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
         <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
           {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
+          {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             {champ('Prix payé', <div style={{ position: 'relative' }}><input data-champ="prix" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" placeholder="0,00" autoComplete="off" style={{ ...inp, paddingRight: 30 }} /><span aria-hidden="true" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span></div>)}
             {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
