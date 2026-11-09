@@ -66,6 +66,10 @@ aucun seuil élargi, aucun `skip`. Deux sessions ont travaillé sur la branche (
 - **Fraîcheur des achats seuls** : la puce de Colis se calcule sur les lectures des VENTES
   (`liveStats.dataAge*`) ; un compte dont seuls les achats seraient vieux ne serait pas nommé.
   Sans effet tant que l'extension relit ventes et achats ensemble.
+- **`chargement` sur une machine chargée** : lancé en même temps que des audits, 1 rouge
+  (390 · 4G · Ventes, CLS 0,079 : la ligne « Vinted : lecture en cours… » qui part à la fin de
+  la lecture, contenu à 16,5 s) ; relancé SEUL après la fusion de `main` : tout vert. Un banc
+  de vitesse ne se juge que seul.
 
 ## Vérifications
 `npm run build` vert ; audits `variables`, `tdz`, `coherence`, `identite`, `statuts` relancés
