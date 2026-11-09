@@ -742,4 +742,104 @@
   .vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row { grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) var(--p-g-montant) 44px !important; padding-right: 10px !important; }
 }
 
+/* ══ 11. PHASE 3 (9 nov.) — les écrans restants, la même grammaire ══════════ */
+
+/* 11.1 STOCK — le résumé : le chiffre à sa taille (34/700 tabulaire), son mot en gris,
+   les faits en note 13 grise (les nombres à l'encre) ; les rangées de la liste suivent
+   la grammaire : vignette 44, titre 15/600 sur une ligne, note 13, geste à droite,
+   filet 0,5 qui commence après la vignette. */
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n { font: 700 var(--p-t-titre)/1.1 var(--vrm-police) !important; letter-spacing: var(--p-ap-titre) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n > span { font: 400 var(--p-t-texte)/1 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n > small { font: 400 var(--p-t-texte)/1.3 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--p-gris) !important; margin-left: 6px !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-l { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 6px !important; max-width: 72ch !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-l b { color: var(--p-encre) !important; font-weight: 600 !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-liste-ligne { gap: var(--p-g-gout) !important; padding: 10px 0 !important; min-height: 64px !important; border-top: 0 !important; position: relative !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-liste-ligne + .vrm-s2d-liste-ligne::before { content: "" !important; position: absolute !important; top: 0 !important; left: calc(var(--p-g-vignette) + var(--p-g-gout)) !important; right: 0 !important; height: .5px !important; background: var(--p-filet) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-vig { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; border-radius: var(--p-r-vignette) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-t { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-s { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-s b { color: var(--p-encre) !important; font-weight: 500 !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-gestes { flex: none !important; }
+
+/* 11.2 FAVORIS & OFFRES (Messages → Favoris reçus) — un seul bord gauche : le panneau
+   était centré dans une colonne de 760 px (212 px de marge à gauche à l'ordinateur)
+   alors que les onglets et la liste partent du bord. Les replis du bas (« Assistance
+   technique », « Comptes Vinted », « Données ») deviennent des rangées de groupe :
+   une ligne de 48 px, le texte 15/500, le chevron à droite — plus de carte à moitié
+   vide ni de texte coupé au bas d'une carte trop courte. */
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="messages"] .vrm-fa { margin-left: 0 !important; margin-right: auto !important; }
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync) {
+  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte) !important; box-shadow: var(--p-ombre) !important;
+  padding: 0 !important; margin: 8px 0 0 !important; min-height: 0 !important; height: auto !important; overflow: hidden !important;
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync) > summary {
+  display: flex !important; align-items: center !important; gap: 8px !important; min-height: 48px !important; padding: 0 var(--p-g-bord) !important; box-sizing: border-box !important;
+  font: 500 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: 0 !important; cursor: pointer !important;
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync)[open] > :not(summary) { padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync)[open] > :last-child { padding-bottom: 12px !important; }
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes) > summary::after { margin-left: auto !important; }
+
+/* 11.3 STATISTIQUES — les tuiles et les tableaux à la grammaire des chiffres :
+   un rôle = une taille ; libellé 13 gris, chiffre 24/700 tabulaire, note 12 grise ;
+   dans les tableaux, le nom 15 à l'encre à gauche, le nombre 15 tabulaire aligné à droite ;
+   le titre d'une carte 17/600 à gauche, sa précision grise à droite, sur la même ligne de
+   base. Au téléphone, la marge de page passe de 12 à 16 px (le bord de Ma journée,
+   Ventes, Colis). Aucune barre, aucune couleur de graphique ne change. */
+@media (max-width: 767px) {
+  .vrm-main:is([data-ecran="dashboard"],[data-ecran="compta"]) .vrm-finance-page { padding-left: var(--p-marge) !important; padding-right: var(--p-marge) !important; }
+  .vrm-main[data-ecran="dashboard"] .vrm-sv-tuile .vrm-sv-tuile-val { font-size: 20px !important; }
+}
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile { border-radius: var(--p-r-carte) !important; box-shadow: var(--p-ombre) !important; border: 0 !important; padding: 14px 16px !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-lib { font: 500 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; letter-spacing: 0 !important; text-transform: none !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-val { font: 700 24px/1.15 var(--vrm-police) !important; letter-spacing: -.016em !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; margin: 4px 0 2px !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-val[data-vide] { font-weight: 400 !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-sous { font: 400 var(--p-t-legende)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-carte-tete { display: flex !important; align-items: baseline !important; justify-content: space-between !important; gap: 12px !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-carte-titre { font: 600 17px/1.25 var(--vrm-police) !important; letter-spacing: -.012em !important; margin: 0 !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-carte-tete > .vrm-sv-note { flex: none !important; text-align: right !important; font: 400 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-nom { font: 500 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.004em !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-n { font: 400 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; text-align: right !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-chiffre { font-variant-numeric: tabular-nums !important; }
+
+/* 11.4 COMPTA — les replis (« Vendu et reçu », « Bilan du mois »…) sont les rangées d'un
+   groupe : 48 px partout (60 à l'ordinateur, 44 au téléphone : deux hauteurs pour la même
+   rangée), le titre 15/500 à l'encre, le chevron gris, le filet après le bord. Les
+   montants de Compta en chiffres tabulaires. Aucun montant ni règle ne change. */
+.vrm-main[data-ecran="compta"] .vrm-compta-replis { padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-repli > summary { min-height: 48px !important; padding: 0 !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-repli-titre { font: 500 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.004em !important; }
+.vrm-main[data-ecran="compta"] :is(.vrm-urssaf-val, .vrm-fu-prevision-montant, .vrm-compta-q-n, .vrm-display) { font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-question { border-radius: var(--p-r-carte) !important; }
+
+/* 11.5 RÉGLAGES (Paramètres) — la rangée de Réglages d'iOS : icône 30 rayon 8 centrée,
+   titre 15/500 à l'encre, phrase 13 grise sur deux lignes au plus, chevron gris ;
+   l'en-tête de groupe (« Mes comptes ») 13/500 gris en casse de phrase, collé à son groupe.
+   (Notifications, `claude/notifications`, n'est pas touché au-delà de la rangée commune.) */
+.vrm-main[data-ecran="settings"] .vrm-set-ligne { column-gap: var(--p-g-gout) !important; min-height: 56px !important; padding-top: 10px !important; padding-bottom: 10px !important; align-items: center !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-ic { width: 30px !important; height: 30px !important; border-radius: 8px !important; flex: none !important; align-self: center !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-lib > b { font: 500 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.004em !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-desc { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important;
+  display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; overflow: hidden !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-ligne > svg:last-child { color: var(--p-gris-2) !important; flex: none !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-titre { font: 500 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 20px 4px 8px !important; }
+
+/* 11.6 LA COQUE — la barre latérale : les en-têtes de groupe (« Vendre », « Gérer »,
+   « Argent ») en casse de phrase, 12/500 gris, sans espacement de lettres (les petites
+   capitales espacées criaient plus fort que les entrées qu'elles rangent) ; les compteurs
+   des entrées en chiffres tabulaires. */
+.vrm-app-shell .vrm-rail-section-label { text-transform: none !important; letter-spacing: 0 !important; font: 500 var(--p-t-legende)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-app-shell :is(.vrm-rail, .vrm-sidebar, nav) .vrm-nav-badge-n { font-variant-numeric: tabular-nums !important; }
+
+/* 11.7 MESSAGES au téléphone — la ligne « paire · N° · compte » : le modèle se coupe le
+   premier, le N° (l'identité de la paire) et le motif ne se coupent jamais, le compte se
+   coupe ensuite. (Le N° est désormais son propre élément, src/App.jsx.) */
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire { flex-wrap: nowrap !important; overflow: hidden !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-paire-t { flex: 0 1 auto !important; min-width: 2ch !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-paire-num { flex: none !important; white-space: nowrap !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-acc { flex: 0 2 auto !important; min-width: 3ch !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-etat { flex: none !important; white-space: nowrap !important; }
+
 } /* fin @layer vrm-premium */
