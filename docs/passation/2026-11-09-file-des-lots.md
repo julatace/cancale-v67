@@ -38,7 +38,7 @@ libère son numéro (le dire ici).
 | T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | à lancer |
 
 | U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
-| V | scanner au dépôt (Colis) ET au retrait (Achats) | `claude/scanner-colis-achats` | en cours |
+| V | scanner au dépôt (Colis) ET au retrait (Achats) | PR #1075 | **en ligne** |
 | W | inventaire de fin d'année | `claude/inventaire-annuel` | à lancer |
 | X | sélection multiple + filtres enregistrés + fiche à côté de la liste | `claude/lots-vues-panneau` | à lancer |
 | Y | corbeille 30 jours | `claude/corbeille` | à lancer |
