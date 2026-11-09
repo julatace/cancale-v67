@@ -61,9 +61,10 @@ const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) =
 // DE DÉBUT d'activité : avant le 1er juillet 2026, 50 % des cotisations (6,2 %) ;
 // à partir du 1er juillet 2026, 75 % (12,3 × 0,75 = 9,225 %). `acre` : false · true
 // ou 'avant' (l'ancienne réponse « Oui ») · 'apres'.
+// (9 nov.) `tauxMicroVente` est gardée (audit-plateformes-2nov l'exécute) : elle vaut
+// `tauxMicro({ activite: 'vente' })` de src/profilFiscal.js, qui compose aussi les
+// PRESTATIONS (audit-configuration-depart compare les deux).
 const TAUX_MICRO = { cotisations: 12.3, acre: 6.2, acre2026: 9.225, formation: 0.1, liberatoire: 1 };
-// (9 nov.) Gardée (audit-plateformes-2nov l'exécute) : elle vaut `tauxMicro({ activite: 'vente' })`
-// de src/profilFiscal.js, qui compose aussi les PRESTATIONS (audit-configuration-depart les compare).
 const tauxMicroVente = ({ liberatoire = false, acre = false } = {}) =>
   Math.round(((acre === 'apres' ? TAUX_MICRO.acre2026 : acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations) + TAUX_MICRO.formation + (liberatoire ? TAUX_MICRO.liberatoire : 0)) * 10) / 10;
 // ⟦← App.jsx #10⟧

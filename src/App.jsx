@@ -6871,20 +6871,6 @@ function useRegimeFiscal() {
   useEffect(() => { const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_regime') setR(regimeFiscal()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   return r;
 }
-// (9 nov.) LE PROFIL FISCAL (src/profilFiscal.js) : ce que son statut permet de montrer
-// et de calculer, pour Comptabilité, Ma journée, Statistiques et la configuration.
-// Trois états comme `useRegimeFiscal` ; suit les écritures des clés qu'il lit.
-const CLES_PROFIL_FISCAL = ['vinted_regime', 'vrm_micro_options', 'vinted_urssaf_freq', 'vinted_urssaf_taux', CLE_SOCIETE_TVA, CLE_CONFIGURATION];
-const profilFiscalLu = () => profilFiscal({
-  regime: regimeFiscal(), inconnu: (lireConfiguration(load(CLE_CONFIGURATION, null)) || {}).statut === 'inconnu',
-  options: load('vrm_micro_options', null), rythme: load('vinted_urssaf_freq', null), tauxBrut: load('vinted_urssaf_taux', null), tvaSociete: load(CLE_SOCIETE_TVA, null),
-});
-function useProfilFiscal() {
-  const [p, setP] = useState(() => isCloudReady() ? profilFiscalLu() : profilFiscal({ regime: undefined }));
-  useEffect(() => onCloudReady(() => setP(profilFiscalLu())), []);
-  useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || CLES_PROFIL_FISCAL.includes(k)) setP(profilFiscalLu()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
-  return p;
-}
 // À payer à l'URSSAF, arrondi UNE fois au centime (en centimes entiers), et le
 // net qui s'en DÉDUIT. Vu au banc le 5 octobre sur ses vraies données : CA
 // 157,00 €, « à payer 21,20 € », « net 135,81 € » — 157 × 13,5 % = 21,195,
@@ -47834,6 +47820,20 @@ function useProfilVendeur() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesProfil.add(maj); return () => { _ecoutesProfil.delete(maj); }; }, []);
   return PROFIL_VENDEUR.uid === (AUTH.user?.id || '') ? PROFIL_VENDEUR : { mode: 'complet', usage: {}, relies: {}, contexte: {}, plateformes: null };
+}
+// (9 nov.) LE PROFIL FISCAL (src/profilFiscal.js) : ce que son statut permet de montrer
+// et de calculer, pour Comptabilité, Ma journée, Statistiques et la configuration.
+// (Rangé hors du bloc de la règle URSSAF, que audit-urssaf exécute seul.) Trois états comme `useRegimeFiscal` ; suit les écritures des clés qu'il lit.
+const CLES_PROFIL_FISCAL = ['vinted_regime', 'vrm_micro_options', 'vinted_urssaf_freq', 'vinted_urssaf_taux', CLE_SOCIETE_TVA, CLE_CONFIGURATION];
+const profilFiscalLu = () => profilFiscal({
+  regime: regimeFiscal(), inconnu: (lireConfiguration(load(CLE_CONFIGURATION, null)) || {}).statut === 'inconnu',
+  options: load('vrm_micro_options', null), rythme: load('vinted_urssaf_freq', null), tauxBrut: load('vinted_urssaf_taux', null), tvaSociete: load(CLE_SOCIETE_TVA, null),
+});
+function useProfilFiscal() {
+  const [p, setP] = useState(() => isCloudReady() ? profilFiscalLu() : profilFiscal({ regime: undefined }));
+  useEffect(() => onCloudReady(() => setP(profilFiscalLu())), []);
+  useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || CLES_PROFIL_FISCAL.includes(k)) setP(profilFiscalLu()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  return p;
 }
 // Le propriétaire de l'installation, en TROIS états (true · false · null pas su).
 function proprioTri() {

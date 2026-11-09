@@ -1766,11 +1766,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // e-mails, Notifications, Mon abonnement, Sécurité et sauvegarde, Aide), et chaque ligne
     // dit en UNE phrase ce que fait le réglage. Les `id` et les attributs `data-*` ne bougent
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
-    // (9 nov.) « Ma configuration » EN TÊTE : la configuration de départ, plein écran, rejouable
-    // (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
-    { id:'ma-configuration', titre:'Ma configuration', items:[
-      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Ce que tu vends, tes plateformes, ton statut, ton numéro, l’affichage, les notifications.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
-    ]},
     { id:'comptes', titre:'Mes comptes', items:[
       // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
       { id:'toutvabien', type:'panneau', ic:'heart', lib:'Tout va bien ?', desc:'Chaque compte, sa dernière relecture et l’extension de chaque appareil.', data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
@@ -1831,6 +1826,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
+      // (9 nov.) « Ma configuration » EN TÊTE du groupe : la configuration de départ, plein écran,
+      // rejouable (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
+      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Tout en une fois : ce que tu vends, tes plateformes, ton statut, ton numéro, l’affichage, les notifications.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
       { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
       { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
