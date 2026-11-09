@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.331.0';
+const CODE_VERSION = '5.334.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1278,6 +1278,9 @@ let _octetsDernierRefus = 0;
 //    (et effacé) par `noterFlux` juste après.
 let _sansSessionAt = 0;
 function sessionAbsente() { _sansSessionAt = Date.now(); return false; }
+// Le dernier refus d'une écriture `vinted_accounts`, par compte : 'preuve' (029),
+// 'unicite' (023) ou ''. Lu (et effacé) par `captureDomain` juste après l'appel.
+const _refusComptes = new Map();
 async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
@@ -1331,6 +1334,19 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
       return true;
     }
     statut = String(res.status || 'inconnu');
+    // 5.332 (migration 029) : la base refuse de CRÉER un compte Vinted par son
+    // API (42501 `vrm_vinted_preuve`) ; la 023 refuse un compte déjà relié
+    // ailleurs (409). `captureDomain` passe alors par la route serveur qui
+    // vérifie le jeton chez Vinted. On lit le code (corps borné, jamais rangé).
+    if (table === 'vinted_accounts') {
+      let code = '';
+      try {
+        const t = String(await res.text()).slice(0, 600);
+        if (/vrm_vinted_preuve/.test(t)) code = 'preuve';
+        else if (res.status === 409 || /"23505"/.test(t)) code = 'unicite';
+      } catch (_) {}
+      for (const r of list) if (r && r.vinted_user_id != null) _refusComptes.set(String(r.vinted_user_id), code);
+    }
   } catch (e) { statut = (e && e.statut) || 'reseau'; }
   // 5.328 : pas connecté ⇒ rien n'est parti, ce n'est pas un refus.
   if (statut === 'sans_session') return sessionAbsente();
@@ -1568,10 +1584,76 @@ async function captureDomain(domain) {
   if (await compteDejaEcrit(uid, sig)) { noterDiag('compte_inchange'); return uid; }
   // 5.331 : jamais écrit depuis CE navigateur ⇒ première écriture de ce compte.
   const premiere = !(await compteDejaConnuIci(uid));
-  const ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  _refusComptes.delete(uid);
+  let ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  // 5.332 (migration 029) : un compte NEUF ne se crée plus par l'API de la base.
+  // Refus « preuve » (ou « unicité » de la 023) ⇒ la route serveur vérifie le
+  // jeton chez Vinted et range la ligne. Avant la 029, l'upsert passe : rien ne
+  // change et la route n'est jamais appelée.
+  const refus = _refusComptes.get(uid) || '';
+  _refusComptes.delete(uid);
+  if (ok === false && (refus === 'preuve' || refus === 'unicite')) ok = await lierCompteParServeur(row);
   if (ok !== false) await noterCompteEcrit(uid, sig);
   if (ok === true) signalerCompteRelie('vinted', uid, premiere);
   return uid;
+}
+
+// ══ RELIER UN COMPTE VINTED NEUF PAR LE SERVEUR (5.332, défaut #5) ═══════════
+// Décision de Julien (9 nov.) : un compte Vinted ne se relie qu'après PREUVE.
+// `POST vrm.center/api/vinted-connect { source:'extension', … }` avec la session
+// VRM : le serveur relit le jeton chez Vinted (`/api/v2/users/current`), vérifie
+// qu'aucun AUTRE compte VRM ne porte ce compte, puis range la ligne (clé de
+// service). Le corps ne porte QUE ce que l'extension rangeait déjà elle-même en
+// base (les jetons du cookie de l'onglet). Le serveur ne renouvelle jamais le
+// jeton (l'onglet resterait connecté avec un refresh_token consommé).
+//   · une seule tentative par compte et par délai (`vrmLiaisonServeur`, §4.9) :
+//     15 min après un « pas su », 1 h après un refus de Vinted, 24 h après un
+//     « déjà relié à un autre compte VRM » (dit dans le journal d'activité) ;
+//   · sans session VRM ⇒ aucun appel, rien noté comme refus (5.328).
+// Rend true (rangé) ou false.
+const LIAISON_URL = 'https://vrm.center/api/vinted-connect';
+const LIAISON_ATTENTE_MS = { deja_relie: 24 * 3600000, refuse: 3600000, abonnement: 3600000, identifiant: 24 * 3600000, jeton_expire: 5 * 60000 };
+const LIAISON_ATTENTE_DEFAUT_MS = 15 * 60000;
+async function lierCompteParServeur(row) {
+  const uid = String((row && row.vinted_user_id) || '');
+  if (!/^[0-9]{1,20}$/.test(uid) || !row.access_token) return false;
+  let memo = {};
+  try { memo = (await chrome.storage.local.get('vrmLiaisonServeur')).vrmLiaisonServeur || {}; } catch (_) { return false; }
+  const e = memo[uid];
+  if (e && Date.now() < Number(e.prochain || 0)) { noterDiag('liaison_serveur_attente'); return false; }
+  const s = await authToken();
+  if (!(s && s.access_token && s.user_id)) return sessionAbsente();
+  let status = 0, json = null;
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
+    const r = await fetch(LIAISON_URL, {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+      body: JSON.stringify({ source: 'extension', accessToken: row.access_token, refreshToken: row.refresh_token || '', anonId: row.anon_id || '', csrfToken: row.csrf_token || '', domain: row.domain || 'www.vinted.fr' }),
+    });
+    clearTimeout(t);
+    status = r.status;
+    try { json = await r.json(); } catch (_) { json = null; }
+  } catch (_) { status = 0; }
+  const ok = status === 200 && !!(json && json.ok === true && json.account && String(json.account.vinted_user_id) === uid);
+  try {
+    const m = (await chrome.storage.local.get('vrmLiaisonServeur')).vrmLiaisonServeur || {};
+    if (ok) delete m[uid];
+    else {
+      const raison = (json && typeof json.raison === 'string' && /^[a-z_]{1,30}$/.test(json.raison)) ? json.raison : (status ? `http_${status}` : 'reseau');
+      m[uid] = { at: Date.now(), prochain: Date.now() + (LIAISON_ATTENTE_MS[raison] || LIAISON_ATTENTE_DEFAUT_MS), raison };
+    }
+    await chrome.storage.local.set({ vrmLiaisonServeur: m });
+  } catch (_) {}
+  if (ok) {
+    noterDiag('liaison_serveur_ok');
+    logActivity(`✅ Compte Vinted ${(json.account && json.account.login) || uid} relié à VRM (vérifié chez Vinted)`);
+    return true;
+  }
+  const raison = json && json.raison;
+  noterDiag(`liaison_serveur_${raison || (status ? 'http_' + status : 'reseau')}`);
+  if (raison === 'deja_relie') logActivity(`⛔ Compte Vinted ${uid} : déjà relié à un autre compte VRM — contacte le support`);
+  return false;
 }
 
 const COMPTE_REECRIT_MS = 30 * 60 * 1000;
@@ -5229,6 +5311,122 @@ function photoUtile(it) {
   return null;
 }
 
+// ── 5.334 (9 nov.) LE N° ÉCRIT À LA FIN DE LA DESCRIPTION ─────────────────────
+// Julien : « la personne met son numéro d'étiquetage à la fin de sa description :
+// capte ce numéro ». Le dressing envoie la description entière, l'allègement la
+// jette (elle pèse) : on la LIT ici, au passage, et on ne garde que la lecture
+// (`numEcrit`, quelques octets — jamais le texte). La règle est celle de l'app
+// (src/numeroEcrit.js), recopiée TELLE QUELLE entre les marques par
+// `node scripts/audit-numero-etiquette.cjs --recopie` (jamais à la main).
+// Lire n'est pas décider : l'app seule décide (réglage, identité, « à vérifier »).
+const VRM_NUMERO_ECRIT = (() => {
+// <numero-ecrit-lecture> — COPIE de src/numeroEcrit.js (scripts/audit-numero-etiquette.cjs --recopie). Ne pas modifier ici.
+// (background.js : la description du dressing ; lbc.js : la description entière
+// d'une annonce Leboncoin) par `node scripts/audit-numero-etiquette.cjs --recopie`.
+// Ne pas la modifier dans l'extension : la modifier ICI, puis recopier.
+// La clé d'un numéro : la MÊME que `cleNum` de l'app et de l'extension
+// (majuscules, sans espace ni tiret, « 007 » = « 7 »). L'audit vérifie qu'elles
+// rendent la même chose.
+const cleNumero = (v) => {
+  let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, '');
+  if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+  return s;
+};
+const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
+
+// ── LA LECTURE D'UN TEXTE ─────────────────────────────────────────────────────
+// La marque devant le numéro. `ref` : « Réf » (plus strict, voir plus haut).
+const MARQUE = /(?:^|[^0-9A-Za-zÀ-ÿ])(N\s?[°º]|No\.?(?=\s?[:#]?\s?(?:VRM[-\s]?)?[A-Za-z]{0,3}\d)|R[ée]f\.?|#)/gi;
+// Après la marque : blancs, « : » éventuel, « VRM- » éventuel, puis le numéro.
+const CORPS = /^\s{0,2}:?\s{0,2}(VRM[-\s]?)?([A-Za-z]{1,3})?(\d{1,6})(?![0-9A-Za-z])/i;
+// Ce qui suit un nombre et en fait autre chose qu'un numéro de rangement.
+const SUITE_INTERDITE = /^\s?(?:[-/]\s?\d|[.,]\d|€|eur\b|euros?\b|%|cm\b|mm\b|kg\b|g\b|ans?\b|paires?\b|pi[eè]ces?\b|x\s?\d)/i;
+
+// Toutes les occurrences marquées d'un texte : [{ cle, brut, index }].
+// Une occurrence douteuse (référence de modèle, prix…) n'est PAS un numéro : elle
+// est simplement ignorée (rien lu vaut mieux qu'un faux, §5).
+function numerosMarques(texte) {
+  const t = String(texte == null ? '' : texte);
+  const out = [];
+  MARQUE.lastIndex = 0;
+  let m;
+  while ((m = MARQUE.exec(t))) {
+    const marque = m[1];
+    const debut = m.index + m[0].length;
+    const c = CORPS.exec(t.slice(debut));
+    if (!c) continue;
+    const vrm = !!c[1], lettres = c[2] || '', chiffres = c[3];
+    const suite = t.slice(debut + c[0].length);
+    if (SUITE_INTERDITE.test(suite)) continue;
+    const estRef = /^r/i.test(marque);
+    if (lettres) {
+      if (chiffres.length > 4) continue;                 // « B75806 » : une référence de modèle
+      if (estRef && !vrm && lettres.length > 1) continue; // « Réf DD1391 » : idem
+    } else if (chiffres.length > 5) continue;            // « Réf 315122 » : idem
+    const cle = cleNumero(lettres + chiffres);
+    if (!cle || !NUM_OK.test(cle) || cle === '0') continue;
+    out.push({ cle, brut: (marque + t.slice(debut, debut + c[0].length)).trim(), index: m.index });
+  }
+  return out;
+}
+
+const distinctes = (occ) => [...new Set(occ.map((o) => o.cle))];
+
+// La lettre seule que Republier pose tout en bas (« \n\nk ») n'est pas la fin
+// de SA description.
+const LETTRE_FIN = /\n\s*\n\s*[a-z]\s*$/i;
+
+// Lit UN texte. `zone` : 'description' (la fin seulement) · 'titre' (n'importe
+// où) · 'ref' (le champ entier). Rend :
+//   { etat: 'lu', cle, brut } · { etat: 'rien', raison } · { etat: 'ambigu', cles, raison }
+function lireNumeroTexte(texte, zone = 'description') {
+  const t = String(texte == null ? '' : texte);
+  if (!t.trim()) return { etat: 'rien', raison: 'vide' };
+  if (zone === 'ref') {
+    const v = t.trim();
+    // Le champ ENTIER est un numéro : nu, « VRM-… », ou marqué.
+    const nu = /^(?:VRM[-\s]?)?([A-Za-z]{1,3})?(\d{1,6})$/i.exec(v);
+    if (nu) {
+      if (nu[2].length > (nu[1] ? 4 : 5)) return { etat: 'rien', raison: 'pas un numéro de rangement' };
+      const cle = cleNumero((nu[1] || '') + nu[2]);
+      return cle && cle !== '0' && NUM_OK.test(cle) ? { etat: 'lu', cle, brut: v } : { etat: 'rien', raison: 'pas un numéro de rangement' };
+    }
+    const occ = numerosMarques(v);
+    if (occ.length && occ[0].index === 0 && v.slice(occ[0].brut.length).trim() === '') return { etat: 'lu', cle: occ[0].cle, brut: v };
+    return { etat: 'rien', raison: 'pas un numéro de rangement' };
+  }
+  const occ = numerosMarques(t);
+  if (!occ.length) return { etat: 'rien', raison: 'aucun N° écrit' };
+  const cles = distinctes(occ);
+  if (cles.length > 1) return { etat: 'ambigu', cles, raison: `deux numéros écrits (${cles.join(' et ')})` };
+  if (zone === 'titre') return { etat: 'lu', cle: cles[0], brut: occ[0].brut };
+  // Description : le N° doit être sur la DERNIÈRE ligne non vide.
+  const corps = t.replace(LETTRE_FIN, '').replace(/\s+$/, '');
+  const lignes = corps.split('\n');
+  let i = lignes.length - 1; while (i >= 0 && !lignes[i].trim()) i--;
+  const derniere = i >= 0 ? lignes[i] : '';
+  const surFin = numerosMarques(derniere);
+  if (!surFin.length) return { etat: 'rien', raison: 'un N° est écrit, mais pas à la fin', ailleurs: cles[0] };
+  return { etat: 'lu', cle: surFin[0].cle, brut: surFin[0].brut };
+}
+
+// Ce que l'extension range à la place du texte (§34 : jamais la description
+// elle-même) : la lecture, en quelques octets. `null` pour une forme inconnue.
+function compacterLecture(l) {
+  if (!l || typeof l !== 'object') return null;
+  if (l.etat === 'lu' && typeof l.cle === 'string' && NUM_OK.test(l.cle) && l.cle !== '0') return { etat: 'lu', cle: l.cle, brut: String(l.brut || '').slice(0, 24) };
+  if (l.etat === 'ambigu' && Array.isArray(l.cles)) { const cles = l.cles.filter((k) => typeof k === 'string' && NUM_OK.test(k)).slice(0, 4); return cles.length > 1 ? { etat: 'ambigu', cles, raison: `deux numéros écrits (${cles.join(' et ')})` } : null; }
+  if (l.etat === 'rien') return { etat: 'rien', raison: String(l.raison || 'aucun N° écrit').slice(0, 60), ...(typeof l.ailleurs === 'string' && NUM_OK.test(l.ailleurs) ? { ailleurs: l.ailleurs } : {}) };
+  return null;
+}
+// </numero-ecrit-lecture>
+return { lireNumeroTexte, compacterLecture };
+})();
+function lectureNumeroDescription(texte) {
+  if (typeof texte !== 'string' || !texte.trim()) return null;
+  try { return VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(texte.slice(0, 20000), 'description')); } catch (_) { return null; }
+}
+
 function articleMaigre(it) {
   const o = {};
   for (const c of CHAMPS_ARTICLE) if (it[c] !== undefined) o[c] = it[c];
@@ -5249,6 +5447,8 @@ function articleMaigre(it) {
   // Un entier coûte trois octets et rend le diagnostic possible. Le TEXTE, lui,
   // va au coffre (archiverLot) — c'est là qu'on le recopie pour republier.
   if (typeof it.description === 'string') o.descLen = it.description.trim().length;
+  // 5.334 : le N° écrit à la fin de la description (la lecture, jamais le texte).
+  { const ne = lectureNumeroDescription(it.description); if (ne) o.numEcrit = ne; }
   return o;
 }
 
@@ -12320,7 +12520,10 @@ async function gardeLecture(uid, acc, classe = 'photos') {
 //    offre, répondre). Et la règle n'était pas ancrée à droite :
 //    `https://vrm.center.autre-site.com` passait. Une seule liste, ici, pour
 //    tous les messages du pont, et `APP_URLS` en découle.
-const ORIGINES_APP = ['https://vrm.center', 'https://cancale-v67-ten.vercel.app'];
+// 5.332 (revue sécurité du 9 nov.) : `cancale-v67-ten.vercel.app` retiré — un
+//    sous-domaine Vercel redevient réservable par un tiers si le projet est
+//    renommé ou supprimé ; il ne doit plus pouvoir donner une session à l'extension.
+const ORIGINES_APP = ['https://vrm.center'];
 const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new URL(String(src || '')).origin); } catch (_) { return false; } } };
 // Ce que l'app peut faire passer par `exec`, et RIEN d'autre (§3 : jamais de
 // suppression, jamais de requête arbitraire).
@@ -19372,6 +19575,9 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
         if (refVRM || (ownerId && miens.has(ownerId)) || aMoiParSession) found.push({
           id: sid, subject: String(title), price,
           body: bodyTxt.slice(0, 400),
+          // 5.334 : la description ENTIÈRE est lue ici (on n'en range que 400
+          // caractères : sa fin, là où il écrit son N°, était perdue).
+          ...(bodyTxt.trim() ? { numEcrit: lectureNumeroDescription(bodyTxt) } : {}),
           ref: refVRM,
           url: node.url || '',
           images: photosAnnonceLbc(node),

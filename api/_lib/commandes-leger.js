@@ -117,11 +117,20 @@ export function appliquerEnvoi(avant, envoi, maintenant = Date.now()) {
   const ancien = avant && avant.resume && Array.isArray(avant.resume.txns) ? new Set(avant.resume.txns.map(String)) : null;
   const ex = e.type === 'orders_sold' && exclues ? new Set(exclues) : null;
   const txns = [];
+  // (9 nov., charge) La DATE de chaque vente à expédier, prise dans la même
+  // commande que le n° (`o.date`, ce que lit `limiteExpedition`) : le widget et
+  // les rappels datent leur limite estimée sans relire la liste entière (≈ 650 Ko
+  // par rafraîchissement du widget, mesuré au banc `scripts/charge/`). Une vente
+  // sans date lisible n'y est pas : le lecteur relit sa liste, comme avant.
+  const dates = {};
   for (const o of payload.my_orders) {
     const k = cleTxCommande(o);
     if (!k) continue;
     const oui = appliquees.has(k) ? aeS.has(k) : !!(ancien && ancien.has(k));
-    if (oui && !(ex && ex.has(k))) txns.push(k);
+    if (oui && !(ex && ex.has(k))) {
+      txns.push(k);
+      if (e.type === 'orders_sold' && o && typeof o.date === 'string' && Number.isFinite(Date.parse(o.date))) dates[k] = o.date;
+    }
   }
   const lu = Number(e.luA);
   const luA = Number.isFinite(lu) && lu <= maintenant && lu >= maintenant - LU_RECUL_MAX_MS ? lu : maintenant;
@@ -129,7 +138,7 @@ export function appliquerEnvoi(avant, envoi, maintenant = Date.now()) {
   const data = {
     type: e.type, uid: String(e.uid), domain: typeof e.domain === 'string' && /^[a-z0-9.-]{1,60}$/i.test(e.domain) ? e.domain : 'www.vinted.fr',
     capturedAt, payload, nItems: payload.my_orders.length,
-    resume: { n: payload.my_orders.length, txns, at: maintenant },
+    resume: { n: payload.my_orders.length, txns, at: maintenant, ...(e.type === 'orders_sold' ? { dates } : {}) },
     rev: (Number(avant && avant.rev) || 0) + 1,
     envoi: 'leger',
   };
