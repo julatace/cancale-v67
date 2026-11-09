@@ -53,3 +53,28 @@ Compta, d'où 4 limité aux emballages). Rien de la liste refusée du 11 octobre
 | 20 | **Fiche à partager** (Instagram, WhatsApp) : une page propre photos + taille + prix + lien vers l'annonce, sans N° ni prix d'achat, lien révocable | vendre aussi par les réseaux | moyen |
 | 21 | **Raccourcis clavier à l'ordinateur** (J journée, V ventes, C colis, I imprimer, ? l'aide des raccourcis) | les gros vendeurs travaillent à l'ordinateur | petit |
 | 22 | **VRM au lecteur d'écran** (VoiceOver) : chaque bouton nommé, ordre de lecture, contrastes vérifiés | accessibilité, et c'est la loi pour un service en ligne | moyen |
+
+### Décision de Julien sur la troisième série (9 nov., soir)
+« Tout sauf Ma liste de recherche » ⇒ **18 refusée** (ne pas reproposer). **15 (étapes
+d'atelier) doit vivre dans l'écran Organisation** (Réglages → Stock et rangement →
+Organisation ; retiré du menu le 29 oct.). Les autres (13, 14, 16, 17, 19, 20, 21, 22) : à faire.
+Lots : L = 13 + 17 + 19 · M = 14 + 20 · N = 15 (Organisation) · O = 16 (extension, version à
+réserver : 5.338) · P = 21 + 22.
+
+## Quatrième série — la facture des comptes Vinted Pro (à valider)
+
+Ce qui existe déjà (`docs/passation/2026-11-06-facture-pro.md`) : « Envoyer la facture » sur
+chaque vente Pro dont l'acheteur est PROUVÉ (n° de transaction + heure + montant), « Ma
+facture » avec aperçu et 14 mentions obligatoires, envoi par VRM (copie au vendeur), numérotation
+continue, avoir, TVA sur la marge (art. 297 A). Propositions pour aller plus loin :
+
+| # | proposition | pourquoi | effort |
+|---|---|---|---|
+| 23 | **Envoi automatique de la facture** dès que l'acheteur est prouvé (réglage éteint par défaut, qu'il allume ; plafond 50/jour gardé ; un échec le dit) | ne plus cliquer vente par vente ; la preuve reste la même | petit |
+| 24 | **« Factures à envoyer »** : une liste des ventes Pro sans facture (prouvées ⇒ « Tout envoyer », confirmé ; non prouvées ⇒ la raison) | ne pas en oublier une | petit |
+| 25 | **Avoir proposé quand une vente Pro est annulée ou retournée** (son clic) | une facture d'une vente annulée doit être annulée par un avoir | petit |
+| 26 | **Registre des factures** dans « Exporter pour mon comptable » (factures + avoirs, n°, date, HT/TVA/TTC, statut d'envoi) + toutes les factures d'une période en un zip | le comptable reçoit tout d'un coup | petit |
+| 27 | **Livre de police** (registre des objets mobiliers, obligatoire pour un revendeur professionnel d'occasion) tenu depuis les achats : date, description, prix, vendeur (pseudo + plateforme), n° de la paire ; export PDF | obligation légale des pros de l'occasion ; ce que la plateforme ne donne pas (pièce d'identité du vendeur) est dit « à compléter », jamais inventé | moyen |
+| 28 | **Factures Pro aussi pour Leboncoin, eBay et Vestiaire** (même règle de preuve : n° de commande de la plateforme) | un pro vend partout | moyen (forme des e-mails à mesurer) |
+| 29 | **Facture en anglais** quand l'acheteur est à l'étranger (mentions identiques, traduites une fois, sans IA) | ventes vers la Belgique/l'Italie via Vinted | petit |
+| 30 | **Contrôle du seuil de TVA** (85 000 € / 93 500 €) relié aux factures : « tu factures sans TVA, tu es à 71 % du seuil » | éviter de dépasser le seuil sans le savoir | petit |
