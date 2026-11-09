@@ -85,6 +85,9 @@ import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
 import PorteConfidentialite from './PorteConfidentialite.jsx';
+import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
+import { REQUETE_LITIGES, requetePseudos, litigesDeLignes, pseudosDeLignes } from './vintedDejaRelie.js';
+import { installerGardeHorsLigne, horsLigneActif, etatHorsLigne, noterAbonnement, effacerLaissezPasser } from './porteHorsLigne.js';
 // ⟦→ ecrans/Reglages.jsx #7⟧
 // (6 nov., vitesse 2) SuiviReceptionEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
 import './reception-emails.css';
@@ -1155,6 +1158,10 @@ installerFiltreSupprimes(SUPABASE_URL);
 // l'écran floute le reste) et AUCUNE écriture vers la base ne part — elle
 // reçoit un refus lisible (src/abonnement/etatAbonnement.js).
 installerGardeEcriture(SUPABASE_URL);
+// (9 nov.) Ouvert HORS LIGNE à froid (src/porteHorsLigne.js) : tant que la porte
+// n'a pas refait la vérification, aucune requête vers la base ou nos routes ne
+// part et aucun message n'est envoyé à l'extension (lecture seule de l'appareil).
+installerGardeHorsLigne(SUPABASE_URL);
 // (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
 // compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
 try { const c = codeParrainDe(window.location.search); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}
@@ -1213,6 +1220,8 @@ const writeSession = (s) => {
     try { window.__vrmLecturesPartagees?.invalider(); } catch (_) {}
   }
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
+  // (9 nov.) Plus de session (refusée, déconnectée) : plus de laissez-passer hors ligne.
+  if (!s) { try { effacerLaissezPasser(localStorage); } catch (_) {} }
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
   // quoi que ce soit ne soit relu ou repoussé (voir ensureLocalOwner).
@@ -18374,12 +18383,31 @@ function useNumerosGuide() {
 // Le pont n'est interrogé que pour la carte d'accueil (`plein`) : un compte relié
 // prouve déjà l'extension, Ma journée ne questionne pas l'extension pour rien.
 function GuidePont({ children }) { const { etape } = useEtapePont(); return children(etape); }
+// (9 nov.) « Ce compte Vinted est déjà relié à un autre compte VRM » : SA ligne
+// `vrm_vinted_litige_*` (notée par api/vinted-connect.js, jamais l'autre compte)
+// et le pseudo que SON navigateur a lu (src/vintedDejaRelie.js). `null` = pas su.
+async function lireLitigesVinted() {
+  if (!AUTH.user) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${REQUETE_LITIGES}${filtreInventaire()}`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const litiges = litigesDeLignes(await r.json());
+    if (!litiges) return null;
+    let pseudos = {};
+    const q = requetePseudos(litiges.map((l) => l.vid));
+    if (q) { try { const r2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}${filtreInventaire()}`, { headers: sbAuth(), cache: 'no-store' }); if (r2.ok) pseudos = pseudosDeLignes(await r2.json()); } catch (_) {} }
+    return { litiges, pseudos };
+  } catch (_) { return null; }
+}
+async function changerCompteVrm() {
+  if (await askConfirm({ title: 'Changer de compte VRM ?', desc: 'Tu seras déconnecté de ce compte sur cet appareil, puis tu pourras te connecter avec le compte VRM qui porte ce compte Vinted.', ok: 'Me déconnecter', cancel: 'Annuler' })) authSignOut();
+}
 function GuideDemarrageApp(props) {
   const profil = useProfilVendeur();
   if (exempleActif()) return null;
   const sansVinted = Array.isArray(profil.plateformes) && !profil.plateformes.includes('vinted');
   const aRelier = sansVinted ? profil.plateformes.filter(id => profil.relies[id] !== true) : [];
-  return <><ReprendreConfiguration/>{sansVinted
+  return <><ReprendreConfiguration/><AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>{sansVinted
     ? aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null
     : props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>}</>;
 }
@@ -48449,6 +48477,15 @@ function PorteAbonnement({ uid, children }) {
   const [info, setInfo] = React.useState(null);
   React.useEffect(() => {
     let mort = false;
+    // (9 nov.) Ouvert hors ligne à froid : le DERNIER état lu du serveur, gardé sur
+    // l'appareil (src/porteHorsLigne.js) — « sans abonnement » reste un aperçu ;
+    // rien n'est réécrit sur l'appareil depuis une supposition.
+    const hl = horsLigneActif() ? etatHorsLigne() : null;
+    if (hl && hl.uid === uid && hl.abo) {
+      publierAbonnement(hl.abo);
+      setBloque(hl.abo.acces === false && hl.abo.lecture !== true); setInfo(hl.abo);
+      return () => { mort = true; };
+    }
     lireAbonnement().then((x) => {
       if (mort || !x) return;           // pas su : on garde la décision d'avant
       // ⚠️ `acces` vient de la BASE (`vrm_acces`) — la règle qui ferme aussi
@@ -48456,6 +48493,7 @@ function PorteAbonnement({ uid, children }) {
       //    pas : s'il disait « entre » pendant que la base refuse, il ouvrirait
       //    une app vide (§11).
       publierAbonnement(x);
+      try { noterAbonnement(localStorage, uid, x); } catch (_) {}
       const b = x.acces === false && x.lecture !== true;
       setBloque(b); setInfo(x);
       try { b ? localStorage.setItem(cleAbo(uid), 'bloque') : localStorage.removeItem(cleAbo(uid)); } catch (_) {}
@@ -49240,7 +49278,7 @@ export default function App() {
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
-    ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
+    ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
     : coeur}<VisionneusePdf/><PlaceurTampon/></>;
 }
 
@@ -53386,4 +53424,5 @@ function AppCoeur() {
 }
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
 export { useProfilFiscal, profilFiscalLu };
+export { lireLitigesVinted, changerCompteVrm };
 export { ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
