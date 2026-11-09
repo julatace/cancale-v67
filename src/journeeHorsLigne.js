@@ -92,6 +92,9 @@ export function construirePhoto({ uid, at, envoyer = [], retirer = [], aVerifier
       titre: txt(e.titre), numero: txt(e.numero, 12), compte: txt(e.compte, 40), plateforme: e.plateforme === 'ebay' ? 'ebay' : 'vinted',
       // (6 nov., v36) La vente Vinted, pour « Colis fait » hors réseau (`vinted_ship_done`).
       ...(e.plateforme !== 'ebay' && txValide(e.tx) ? { tx: txValide(e.tx) } : {}),
+      // (9 nov.) Les lignes de bordereau de CETTE vente (son identité, jamais le titre) :
+      // hors connexion, le PDF déjà ouvert ici s'affiche (src/bordereauxHorsLigne.js).
+      ...(e.plateforme !== 'ebay' && Array.isArray(e.pdf) && e.pdf.length ? { pdf: e.pdf.map((r) => cleGeste(r)).filter((r) => /^(email_bord_|harvest_)[A-Za-z0-9_.-]+$/.test(r) && !/_label_latest$/.test(r)).slice(0, 2) } : {}),
       limite: Number.isFinite(e.jours) ? jourLocal(at, e.jours) : '',
       // (22 oct.) L'HEURE limite lue dans l'email (« avant 10 h ») et l'instant
       // exact, pour que la ligne hors ligne dise la même chose que Colis — et

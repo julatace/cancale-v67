@@ -9,6 +9,7 @@ import { resumeColisSites } from './_lib/colis-sites.js';
 import { numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
 import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
+import { avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
 import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
 // La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
 // du matin et du rappel du soir (§11, 22 octobre).
@@ -227,8 +228,15 @@ async function colisAutresSites(fait, m, departs = null) {
     });
   } catch (_) { return { leboncoin: null, vestiaire: null }; }
 }
+// (9 nov.) + ce qui a été RELU dans le texte de l'e-mail des anciens bordereaux
+// (transporteur, n° Mondial Relay — api/_lib/transporteur-anciens.js), seulement là
+// où le bordereau n'a rien. Ligne légère illisible ⇒ rien de fusionné (pas su).
 async function bordRows() {
-  return await fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`));
+  const [b, relus] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`)),
+    fetchPaginated(scoped(REQ_RELUS)).catch(() => null),
+  ]);
+  return avecRelus(b, relus);
 }
 // Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
 // source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.

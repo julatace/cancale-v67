@@ -49,14 +49,30 @@
 import { montantPropose } from './prixAchatPropose.js';
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-export const PERIODE_OK = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
+// (9 nov.) + le TRIMESTRE (« AAAA-T1 » … « AAAA-T4 ») pour « Exporter pour mon
+// comptable » : janvier-mars, avril-juin, juillet-septembre, octobre-décembre.
+export const PERIODE_OK = /^\d{4}(-(0[1-9]|1[0-2]|T[1-4]))?$/;
+const TRIM = /^(\d{4})-T([1-4])$/;
 export const libellePeriode = (p) => {
   const s = String(p || '');
   if (/^\d{4}$/.test(s)) return `année ${s}`;
+  const t = TRIM.exec(s);
+  if (t) return `${t[2] === '1' ? '1er' : t[2] + 'e'} trimestre ${t[1]}`;
   const [y, m] = s.split('-').map(Number);
   return y && m ? `${MOIS[m - 1]} ${y}` : s;
 };
-export const dansPeriode = (ym, periode) => !!ym && !!periode && (String(periode).length === 4 ? String(ym).slice(0, 4) === String(periode) : String(ym) === String(periode));
+// Les mois (AAAA-MM) d'une période, dans l'ordre.
+export const moisDePeriode = (periode) => {
+  const s = String(periode || '');
+  if (!PERIODE_OK.test(s)) return [];
+  const y = s.slice(0, 4);
+  const t = TRIM.exec(s);
+  const de = t ? (Number(t[2]) - 1) * 3 + 1 : (s.length === 4 ? 1 : Number(s.slice(5, 7)));
+  const a = t ? de + 2 : (s.length === 4 ? 12 : de);
+  const out = []; for (let m = de; m <= a; m++) out.push(`${y}-${String(m).padStart(2, '0')}`);
+  return out;
+};
+export const dansPeriode = (ym, periode) => !!ym && !!periode && moisDePeriode(periode).includes(String(ym));
 const ymLocal = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 export const jourFr = (t) => { const d = new Date(t); return t == null || isNaN(d) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
 const cts = (x) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 100));
@@ -69,6 +85,9 @@ const centimesTexte = (v) => {
 };
 // La référence d'une recette : l'identifiant de la vente sans son préfixe.
 const referenceDe = (id) => String(id || '').replace(/^(vinted|lbc|ebay|vestiaire):/, '');
+// La date d'une ligne de `ventesDeclarables` (App.jsx) : le VERSEMENT pour Vinted et
+// Vestiaire ; la vente (Leboncoin, versement pas capté) ; la commande payée (eBay).
+export const DATEE_AU_VERSEMENT = new Set(['Vinted', 'Vestiaire']);
 const triChrono = (a, b) => (a.ts == null ? Infinity : a.ts) - (b.ts == null ? Infinity : b.ts) || String(a.id).localeCompare(String(b.id));
 
 // ── LE LIVRE DES RECETTES ───────────────────────────────────────────────────
@@ -82,6 +101,11 @@ export function livreDesRecettes({ decl, periode, numDe = () => '', compteDe = (
     id: String(l.id), ts: l.ts == null ? null : l.ts, date: jourFr(l.ts), montant, plateforme: l.plateforme,
     reglement: `Versement ${l.plateforme}`, reference: referenceDe(l.id), num: String(numDe(String(l.id)) || ''),
     compte: String(compteDe(String(l.id)) || ''), titre: String(l.titre || ''), raison: raison || '',
+    // (9 nov.) Ce que la date de la ligne EST, selon la règle de `ventesDeclarables` :
+    // le versement (Vinted, Vestiaire) ; la vente (Leboncoin) ; la commande (eBay).
+    // La date de vente d'une ligne Vinted est celle de SA commande (`dateVente`).
+    tsVersement: DATEE_AU_VERSEMENT.has(l.plateforme) ? (l.ts == null ? null : l.ts) : null,
+    tsVente: DATEE_AU_VERSEMENT.has(l.plateforme) ? (Number.isFinite(Date.parse(l.dateVente || '')) ? Date.parse(l.dateVente) : null) : (l.ts == null ? null : l.ts),
   });
   const lignes = [], horsPeriode = [];
   for (const l of decl.lignes) {
@@ -150,6 +174,10 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const liees = tx ? (parTx.get(tx) || []) : [];
     const nums = liees.map((e) => String(e.numero == null ? '' : e.numero).trim()).filter(Boolean).sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
     let montant = null, source = '', raison = '';
+    // (9 nov.) Le COÛT SAISI par lui : les prix d'achat des fiches reliées à CET
+    // achat par SON clic (`buyFromId`), tous présents ; sinon null (« vide »).
+    const saisisC = liees.map((e) => (lienGros(e) ? null : centimesTexte(e.buyPrice)));
+    const saisi = liees.length && saisisC.every((c) => c != null) ? saisisC.reduce((t, c) => t + c, 0) / 100 : null;
     const m = montantPropose(o, tx ? ventilationDe(tx) : null);
     if (m && m.source === 'recu') { montant = m.centimes / 100; source = 'recu'; }
     else {
@@ -161,7 +189,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
       else raison = String((o.price && o.price.currency_code) || 'EUR').toUpperCase() !== 'EUR' ? 'autre devise' : 'prix pas lu';
     }
     const ts = Date.parse(o.date || '');
-    const l = { id, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Vinted', fournisseur: 'Vinted', montant, source, raison,
+    const l = { id, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Vinted', fournisseur: 'Vinted', montant, source, raison, saisi,
       reglement: 'Paiement Vinted', reference: tx, num: nums.join(' + '), compte: String(o.compte || ''), titre: String(o.title || '') };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) lignes.push(l);
@@ -180,7 +208,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const num = String(b.numero == null ? '' : b.numero).trim();
     const doublon = !!num && numsGros.has(cleNum(num));
     const l = { id: 'hors:' + hid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Hors plateforme',
-      fournisseur: rat || String((typeof sourceHors === 'function' ? sourceHors(b.source) : b.source) || ''), montant: p == null ? null : p, source: p == null ? '' : 'saisi',
+      fournisseur: rat || String((typeof sourceHors === 'function' ? sourceHors(b.source) : b.source) || ''), montant: p == null ? null : p, source: p == null ? '' : 'saisi', saisi: p == null ? null : p,
       raison: p == null ? 'prix pas saisi' : (doublon ? 'N° aussi dans un achat en gros : à vérifier' : ''), reglement: '', reference: '', num, compte: '', titre: String(b.title || ''),
       paires: '', frais: null, rattache: !!rat, aVerifier: doublon };
     if (l.ts == null) { sansDate.push(l); continue; }
@@ -195,7 +223,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const ts = /^\d{4}-\d{2}-\d{2}$/.test(String(a.date || '')) ? Date.parse(a.date + 'T12:00:00') : NaN;
     const reliees = (parGros.get(gid) || []).map((e) => String(e.numero == null ? '' : e.numero).trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, 'fr', { numeric: true }));
     const l = { id: 'gros:' + gid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Achat en gros', fournisseur: nom,
-      montant: (a.total + frais) / 100, source: 'saisi', raison: '', reglement: '', reference: '', num: reliees.join(' + '), compte: '',
+      montant: (a.total + frais) / 100, source: 'saisi', saisi: (a.total + frais) / 100, raison: '', reglement: '', reference: '', num: reliees.join(' + '), compte: '',
       titre: `En gros · ${a.paires} paire${a.paires > 1 ? 's' : ''}${reliees.length ? ` · ${reliees.length} reliée${reliees.length > 1 ? 's' : ''}` : ''}`,
       paires: String(a.paires), frais: frais ? frais / 100 : null, gros: true };
     if (l.ts == null) { sansDate.push(l); continue; }

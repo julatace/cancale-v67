@@ -149,3 +149,20 @@ export function ecritureProposition(p, { accNom = '', photoDe = null } = {}) {
     },
   };
 }
+
+// (9 nov.) Ce que la saisie en série DIT d'une proposition : « Payé sur Vinted :
+// 85,40 € » quand le reçu tombe juste (article + port + frais Vinted, chacun tel
+// que Vinted l'écrit) ; « Article seul sur Vinted : 80,00 € » sinon (le port et
+// les frais ne sont pas lus : ce n'est PAS ce qu'il a payé, et c'est dit). Les
+// gestes : « Garder » (SON tap écrit ce montant) et « Corriger » (le champ, vide :
+// il tape le sien). Rien n'est écrit par ce texte.
+export function texteProposition(p) {
+  if (!p || !Number.isSafeInteger(p.centimes)) return null;
+  const recu = p.source === 'recu';
+  return {
+    libelle: recu ? 'Payé sur Vinted' : 'Article seul sur Vinted',
+    montant: texteCentimes(p.centimes),
+    detail: recu ? (p.detail || '') : 'sans le port ni les frais Vinted (reçu pas lu)',
+    garder: 'Garder', corriger: 'Corriger',
+  };
+}

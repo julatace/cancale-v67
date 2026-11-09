@@ -299,7 +299,8 @@ if (require.main === module && !EXPLORE) (async () => {
         dit(/par rapport à septembre/.test(r.tuiles[0].sous), `${suf} : l'écart dit à quoi il se compare`, r.tuiles[0].sous);
         dit(!/médiane?|\bs\d\d\b|Délai médian/.test(r.vitTexte), `${suf} : ni « médiane » ni « s44 » en haut de l'écran`);
         const l = r.lignesCompte;
-        dit(r.meilleur === l[0].k && l[0].n > l[1].n, `${suf} : « quel compte vend le mieux » nomme celui qui a le plus de ventes`, `${r.meilleur} · ${JSON.stringify(l)}`);
+        // (9 nov., « vendre plus ») « vend le plus » ne se dit qu'à 5 ventes ou plus et sans égalité.
+        dit(l[0].n >= 5 && l[0].n > l[1].n ? r.meilleur === l[0].k : r.meilleur === null, `${suf} : « quel compte vend le mieux » nomme celui qui a le plus de ventes — seulement à 5 ventes ou plus`, `${r.meilleur} · ${JSON.stringify(l)}`);
         if (T.nom === '390') dit(r.topComptes != null && r.topBarres != null && r.topComptes < r.topBarres, '390 : au téléphone, le compte qui vend le mieux passe avant le graphique', `${r.topComptes} < ${r.topBarres}`);
         dit(r.replis.length === 2 && r.replis.every((x) => !x.ouvert) && !r.hero, `${suf} : le détail est rangé en 2 volets fermés, rien n'y est calculé`, JSON.stringify(r.replis));
         const eur = r.tuiles[0].eur; const montant = (Number(eur) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €';

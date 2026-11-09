@@ -148,7 +148,7 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
         if (!f) return;
         // (3 nov.) La fiche est devenue l'HISTOIRE complète (src/histoireArticle.js) : numérotage,
         // prix, offres, favoris et retour s'insèrent à leur place dans le cycle.
-        dit(f.ordre.join() === 'achat,numero,stock,annonces,prix,offres,favoris,vente,colis,argent,retour', `A ${T} l'histoire dans l'ordre : achat → numéro → stock → annonces → prix → offres → favoris → vente → colis → argent → retour`, f.ordre.join());
+        dit(f.ordre.join() === 'achat,numero,stock,annonces,prix,offres,favoris,vente,colis,argent,retour,benefice', `A ${T} l'histoire dans l'ordre : achat → numéro → stock → annonces → prix → offres → favoris → vente → colis → argent → retour → bénéfice (9 nov.)`, f.ordre.join());
         dit(f.achat === '5200' && f.etapes.achat.etat === 'fait' && /tom\.kicks/.test(f.etapes.achat.txt) && /n° de transaction/.test(f.etapes.achat.txt), `A ${T} l'achat : 52 €, le vendeur, relié par n° de transaction`, f.achat + ' ' + (f.etapes.achat || {}).txt);
         dit(f.etapes.stock.etat === 'fait' && /Meuble B/.test(f.etapes.stock.txt), `A ${T} rangée dans le Stock (par N°)`, (f.etapes.stock || {}).txt);
         dit(f.etapes.vente.etat === 'fait' && /Vendue sur Vinted/.test(f.etapes.vente.txt) && f.vente === '9500' && f.txs.join() === '9117', `A ${T} vendue sur Vinted 95 €, par SA transaction`, f.vente + ' ' + f.txs.join() + ' ' + (f.etapes.vente || {}).txt);

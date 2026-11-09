@@ -52,6 +52,9 @@
 .vrm-stats-vitrine .vrm-sv-ligne-compte:first-child { padding-top: 2px; }
 .vrm-stats-vitrine .vrm-sv-ligne-compte:last-of-type { border-bottom: 0; }
 .vrm-stats-vitrine .vrm-sv-ligne-compte .vrm-sv-chiffre { color: var(--vrm-muted); font-size: 11px; }
+/* (9 nov., « vendre plus ») Le brut d'un compte, sous son nombre de ventes : le nom garde sa place. */
+.vrm-stats-vitrine .vrm-sv-ligne-compte .vrm-sv-n { text-align: right; }
+.vrm-stats-vitrine .vrm-sv-brut-compte { display: block; font-size: 11px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-stats-vitrine .vrm-sv-ligne-taille { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 6px 0; }
 .vrm-stats-vitrine .vrm-sv-taille { font-size: 15px; font-weight: 600; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-stats-vitrine .vrm-sv-ligne-taille .vrm-sv-chiffre { color: var(--vrm-muted); }
