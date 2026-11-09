@@ -104,7 +104,16 @@ Rien au démarrage : tout est lu **à l'ouverture** de la loupe ou de la fiche.
   sans ⌘K, index sans les nouvelles sources, conversations lues entières). Sur
   `origin/main` (b3ec1b17) : rouge (« ne savent pas encore : reconnaitreRequete … »).
 - Banc `scripts/bancs/recherche-fiche.cjs` (base inventée, 390 tactile / 1512,
-  clair / sombre) : voir le résultat et les captures plus bas.
+  clair / sombre, filtres `data->>k=in.(…)` servis comme la base) : **tout vert**
+  sur la branche ; **80 rouges** sur origin/main (b3ec1b17) ; mutation « la fiche
+  prend le colis de la première vente lue » : **8 rouges** (N°211 reçoit le suivi
+  du N°227). Captures regardées (loupe vide, transaction ⇒ Ventes + Messages,
+  Vestiaire, 50 au même titre, fiche du N°227 et sa frise du colis, N°228).
+- `audit-recherche-universelle` : 65/65 au premier passage sur la branche ; sous
+  la charge de la machine (plusieurs agents), son plancher de temps « première
+  recherche < 300 ms » passe au rouge (633-832 ms) — sur origin/main le banc du même
+  nom avait 23 rouges de temps dans les mêmes conditions. Ses données n'ont ni
+  commandes ni conversations : rien de cette branche n'y entre.
 - Audits verts : identite, statuts, variables, tdz, icones, boutons, violet,
   coherence, recherche-universelle (65/65), recherche-unique, recherche-numero,
   cibles-notif, mode-stream, lectures-lourdes, flux-divers, annonces-outils,
