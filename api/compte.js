@@ -1,5 +1,5 @@
 import './_lib/sans-bruit.js';
-import {routeProfilAvatar,routeAvatarPublic,lignesPriveesProfil} from './_lib/profil-avatar.js';
+import {routeProfilAvatar,routeAvatarPublic} from './_lib/profil-avatar.js';
 import {configurationAuthPublique} from './_lib/auth-public.js';
 import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
@@ -44,9 +44,11 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 `harvest_{uid}_orders_*` — api/_lib/commandes-leger.js
 //   /api/compte?mode=mail-essai   (POST, session) « M'envoyer un e-mail d'essai » :
 //                                 à l'adresse de SON compte, 3/h — api/_lib/mail-essai.js
-//   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
-//                                 efface ses données, puis son compte (refusé au
-//                                 propriétaire de l'installation)
+//   /api/compte?mode=supprimer    (GET/POST, session) SUPPRIMER MON COMPTE : GET
+//                                 l'inventaire ; POST (« SUPPRIMER » + mot de passe
+//                                 ou connexion récente) résilie, efface, puis son
+//                                 compte (refusé au propriétaire de l'installation) ;
+//                                 `?mode=fermer` = la même fonction
 //
 // L'abonnement (Julien, 4 octobre) : 12,99 € par mois depuis le 11 octobre
 // (9,99 € avant — décision de Julien après l'étude des coûts), prélevé chaque
@@ -68,15 +70,18 @@ import { routePhotoroom } from './_lib/photoroom-cle.js';
 import { routeFacturePro } from './_lib/facture-pro.js';
 import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
-import { routeCommunaute, effacerCommunaute } from './_lib/communaute.js';
+import { routeEquipe } from './_lib/equipe.js';
+import { routeCommunaute } from './_lib/communaute.js';
 import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
 import { routeCommandes } from './_lib/commandes-leger.js';
-import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
+import { effacerCompte } from './_lib/effacer-compte.js';
+import { envoyerSmtp } from './_lib/smtp.js';
+import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
@@ -972,50 +977,7 @@ async function lireCorpsJson(req) {
   try { return JSON.parse(b.toString('utf8')); } catch (_) { return null; }
 }
 
-// Supprime au nom du SERVEUR (clé de service). Rend le nombre de lignes
-// effacées (`Content-Range: */N`), 0 si la table n'existe pas ici (404), ou
-// `null` si la base a refusé ou n'a pas répondu — jamais un succès supposé.
-async function effacer(chemin, SERVICE) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, {
-      method: 'DELETE',
-      headers: { ...sbCle(SERVICE), Prefer: 'count=exact,return=minimal' },
-    });
-    if (r.status === 404) return 0;
-    if (!r.ok) return null;
-    const m = /\/(\d+)\s*$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');
-    return m ? Number(m[1]) : 0;
-  } catch (_) { return null; }
-}
-
-// Le cache de photos détourées du vendeur (compartiment privé `detourage`,
-// dossier `{owner}/`). Rend le nombre de fichiers effacés, ou `null`.
-async function viderCacheDetourage(owner, SERVICE) {
-  let n = 0;
-  try {
-    for (let tour = 0; tour < 50; tour++) {
-      const l = await fetch(`${SUPABASE_URL}/storage/v1/object/list/detourage`, {
-        method: 'POST',
-        headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prefix: owner, limit: 100, offset: 0 }),
-      });
-      if (l.status === 404 || l.status === 400) return n;     // pas de compartiment ici
-      if (!l.ok) return null;
-      const items = await l.json();
-      if (!Array.isArray(items)) return null;
-      const noms = items.map((x) => x && x.name).filter((x) => typeof x === 'string' && x && !x.includes('/') && x !== '.emptyFolderPlaceholder');
-      if (!noms.length) return n;
-      const d = await fetch(`${SUPABASE_URL}/storage/v1/object/detourage`, {
-        method: 'DELETE',
-        headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prefixes: noms.map((x) => `${owner}/${x}`) }),
-      });
-      if (!d.ok) return null;
-      n += noms.length;
-    }
-    return null;                                              // trop long : on ne dit pas « fini »
-  } catch (_) { return null; }
-}
+// (9 nov.) `effacer` et `viderCacheDetourage` vivent dans api/_lib/effacer-compte.js.
 
 // Ferme TOUTES ses sessions (app, extension, autres appareils).
 async function fermerSessions(req) {
@@ -1027,7 +989,7 @@ async function fermerSessions(req) {
 
 const NON_TOUCHE = "Rien n'a été effacé.";
 const nb = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
-const PROPRIO_REFUS = "Ce compte est celui du propriétaire de VRM : le fermer effacerait toute la boutique. C'est désactivé exprès.";
+const PROPRIO_REFUS = "Ce compte est celui du propriétaire de VRM : le supprimer effacerait toute la boutique. C'est désactivé exprès.";
 
 
 // ── Discord déjà affiché sur un AUTRE compte VRM (30 octobre) ────────────────
@@ -1066,102 +1028,114 @@ async function discordDeja(req, res) {
   } catch (_) { return repondre(res, 200, { trouve: null }); }
 }
 
-async function fermerCompte(req, res) {
+// ── SUPPRIMER MON COMPTE (9 novembre, RGPD art. 17) ─────────────────────────
+// `?mode=supprimer` (et l'ancien `?mode=fermer`, même fonction, même exigence) :
+//   GET  ce qui SERA effacé et gardé (l'inventaire), sans rien toucher ;
+//   POST la suppression, sur confirmation FORTE vérifiée ici
+//        (api/_lib/suppression-compte.js : « SUPPRIMER » + mot de passe, ou
+//        connexion de moins de 10 minutes).
+// Les gardes, dans l'ordre (chacune refuse sans rien toucher) : session prouvée
+// par Supabase · identifiant UUID, jamais le neutre · clé de service · jamais le
+// propriétaire de l'installation (VRM_OWNER_UID, ce que dit `vrm_acces`, ET ce
+// que dit `vrm_reglages` — « pas su » ⇒ refus) · confirmation · inventaire
+// (une lecture ratée ⇒ rien) · l'abonnement arrêté chez Stripe (muet ⇒ rien).
+// L'effacement : `effacerCompte` (api/_lib/effacer-compte.js), la MÊME fonction
+// que le départ des clients partis.
+async function gardesSuppression(req, res) {
   const u = await utilisateurDe(req);
-  if (!u) return repondre(res, 401, { erreur: 'session', message: 'Connecte-toi à VRM pour fermer ton compte.' });
-  if (!UUID_RE.test(u.id)) return repondre(res, 400, { erreur: 'identite', message: NON_TOUCHE });
+  if (u === undefined) { repondre(res, 503, { erreur: 'session-pas-su', message: `Le service de connexion ne répond pas. ${NON_TOUCHE} Réessaie dans un instant.` }); return null; }
+  if (!u) { repondre(res, 401, { erreur: 'session', message: `Connecte-toi à VRM pour supprimer ton compte. ${NON_TOUCHE}` }); return null; }
+  if (!UUID_RE.test(u.id) || u.id === PROPRIETAIRE_NEUTRE) { repondre(res, 400, { erreur: 'identite', message: NON_TOUCHE }); return null; }
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-  if (!SERVICE) return repondre(res, 503, { erreur: 'non-configure', message: `La fermeture de compte n'est pas encore branchée sur le serveur. ${NON_TOUCHE}` });
-  if (process.env.VRM_OWNER_UID && process.env.VRM_OWNER_UID === u.id) return repondre(res, 403, { erreur: 'proprietaire', message: PROPRIO_REFUS });
+  if (!SERVICE) { repondre(res, 503, { erreur: 'non-configure', message: `La suppression de compte n'est pas encore branchée sur le serveur. ${NON_TOUCHE}` }); return null; }
+  const env = String(process.env.VRM_OWNER_UID || '').trim().toLowerCase();
+  if (env && env === u.id.toLowerCase()) { repondre(res, 403, { erreur: 'proprietaire', proprietaire: true, message: PROPRIO_REFUS }); return null; }
   const acc = await accesDe(req);
-  if (acc === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu vérifier ton compte. ${NON_TOUCHE} Réessaie dans un instant.` });
-  if (acc.proprietaire) return repondre(res, 403, { erreur: 'proprietaire', message: PROPRIO_REFUS });
+  if (acc === undefined) { repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu vérifier ton compte. ${NON_TOUCHE} Réessaie dans un instant.` }); return null; }
+  if (acc.proprietaire) { repondre(res, 403, { erreur: 'proprietaire', proprietaire: true, message: PROPRIO_REFUS }); return null; }
+  const proprio = await lireProprietaire({ url: SUPABASE_URL, service: SERVICE });
+  if (proprio === undefined) { repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu vérifier ton compte. ${NON_TOUCHE} Réessaie dans un instant.` }); return null; }
+  if (proprio && proprio === u.id.toLowerCase()) { repondre(res, 403, { erreur: 'proprietaire', proprietaire: true, message: PROPRIO_REFUS }); return null; }
+  return { u, SERVICE, proprio };
+}
+
+async function apercuSuppression(req, res) {
+  const g = await gardesSuppression(req, res);
+  if (!g) return;
+  const inv = await inventaire({ url: SUPABASE_URL, service: g.SERVICE, owner: g.u.id, proprio: g.proprio });
+  if (!inv) return repondre(res, 503, { erreur: 'inventaire', message: "Je n'ai pas pu compter tes données. Réessaie dans un instant." });
+  const ligne = await ligneDe(req);
+  return repondre(res, 200, { ok: true, proprietaire: false, nombres: inv,
+    abonnement: ligne === undefined ? null : { actif: !!(ligne && abonnementActif(ligne.statut)), resilie: !!(ligne && ligne.annule_fin_periode), fin: (ligne && ligne.fin_periode) || null },
+    fenetreMinutes: FENETRE_RECENTE_MS / 60000, mot: MOT_CONFIRMATION });
+}
+
+async function supprimerCompte(req, res) {
+  const g = await gardesSuppression(req, res);
+  if (!g) return;
+  const { u, SERVICE, proprio } = g;
   // La confirmation est vérifiée ICI, pas seulement à l'écran.
   const corps = await lireCorpsJson(req);
-  const tape = String((corps && corps.confirmation) || '').trim().toLowerCase();
-  const email = String(u.email || '').trim().toLowerCase();
-  if (!email || tape !== email) return repondre(res, 400, { erreur: 'confirmation', message: `Recopie exactement ton adresse email pour confirmer. ${NON_TOUCHE}` });
+  const conf = await verifierConfirmation({ corps, utilisateur: u, jeton: jetonDe(req),
+    verifier: (email, mdp) => verifierMotDePasse({ url: SUPABASE_URL, anon: ANON, email, motDePasse: mdp, id: u.id }) });
+  if (!conf.ok) return repondre(res, conf.code, { ok: false, erreur: conf.erreur, message: conf.message });
+  // L'inventaire : une lecture ratée ⇒ rien n'est effacé.
+  const inv = await inventaire({ url: SUPABASE_URL, service: SERVICE, owner: u.id, proprio });
+  if (!inv) return repondre(res, 503, { ok: false, erreur: 'inventaire', message: `Je n'ai pas pu compter tes données. ${NON_TOUCHE} Réessaie dans un instant.` });
 
-  // 1) L'abonnement, d'abord.
+  // 1) L'abonnement, d'abord : on n'efface jamais un compte encore prélevé.
   const ligne = await ligneDe(req);
-  if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu lire ton abonnement. ${NON_TOUCHE} Réessaie dans un instant.` });
-  const etapes = { abonnement: 'aucun' };
+  if (ligne === undefined) return repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: `Je n'ai pas pu lire ton abonnement. ${NON_TOUCHE} Réessaie dans un instant.` });
+  const etapes = { abonnement: 'aucun', confirmation: conf.par };
   if (ligne && ligne.abonnement_stripe && ligne.client_stripe && abonnementActif(ligne.statut)) {
     const STRIPE_MUET = `Je n'ai pas pu arrêter ton abonnement chez Stripe. ${NON_TOUCHE} Réessaie dans un instant.`;
-    if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: STRIPE_MUET });
+    if (!stripePret()) return repondre(res, 503, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
     const id = encodeURIComponent(ligne.abonnement_stripe);
     const lu = await stripeApi('GET', `subscriptions/${id}`);
-    if (!lu.ok || !lu.data) return repondre(res, 502, { erreur: 'stripe', message: STRIPE_MUET });
-    if (lu.data.customer !== ligne.client_stripe) return repondre(res, 403, { erreur: 'pas-a-toi', message: NON_TOUCHE });
+    if (!lu.ok || !lu.data) return repondre(res, 502, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
+    if (lu.data.customer !== ligne.client_stripe) return repondre(res, 403, { ok: false, erreur: 'pas-a-toi', message: NON_TOUCHE });
     if (abonnementActif(lu.data.status)) {
       const impaye = lu.data.status === 'past_due';
-      const r = impaye
-        ? await stripeApi('DELETE', `subscriptions/${id}`, null, `vrm-fer-${u.id}`)
-        : await stripeApi('POST', `subscriptions/${id}`, { cancel_at_period_end: 'true' }, `vrm-fer-${u.id}-${Math.floor(Date.now() / 60000)}`);
-      if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: STRIPE_MUET });
-      etapes.abonnement = impaye ? 'arrete' : 'resilie';
+      if (!impaye && lu.data.cancel_at_period_end) etapes.abonnement = 'deja-resilie';     // rejoué : rien à refaire
+      else {
+        const r = impaye
+          ? await stripeApi('DELETE', `subscriptions/${id}`, null, `vrm-fer-${u.id}`)
+          : await stripeApi('POST', `subscriptions/${id}`, { cancel_at_period_end: 'true' }, `vrm-fer-${u.id}-${Math.floor(Date.now() / 60000)}`);
+        if (!r.ok || !r.data) return repondre(res, 502, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
+        etapes.abonnement = impaye ? 'arrete' : 'resilie';
+      }
     } else etapes.abonnement = 'deja-fini';
   }
-
-  // 2) Ses sessions. 3) Ses données. 4) Ses photos. 5) Son compte de connexion.
-  //    Chaque étape n'a lieu que si la précédente a réussi : un échec laisse un
-  //    compte qu'il peut rouvrir pour relancer, jamais des données orphelines.
+  // 2) Ses sessions (l'extension ne pourra plus renouveler la sienne).
   etapes.sessions = (await fermerSessions(req)) ? 'fermees' : 'non-fermees';
-  const filtre = `owner=eq.${encodeURIComponent(u.id)}`;
-  // Les photos et preuves en attente vivent hors des lignes du navigateur.
-  // Si leur effacement échoue, le compte reste récupérable pour recommencer.
-  etapes.profilPrive=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=in.(${lignesPriveesProfil(u.id).join(',')})`,SERVICE);
-  if(etapes.profilPrive===null)return repondre(res,503,{ok:false,erreur:'profil-non-efface',message:'La photo de profil et les preuves de connexion n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
-  // (22 oct., revue) Ses preuves d'adresse de réception vivent AUSSI sous le
-  // propriétaire neutre : son identifiant et l'adresse (demande en attente,
-  // adresse prouvée, et son compteur de demandes — même préfixe). Elles
-  // partent AVANT ses données ; illisible ⇒ rien d'autre n'est effacé, et c'est dit.
-  etapes.preuvesAdresse=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=like.vrm_email_preuve_*&data->>owner=eq.${encodeURIComponent(u.id)}`,SERVICE);
-  if(etapes.preuvesAdresse===null)return repondre(res,503,{ok:false,erreur:'preuves-non-effacees',message:'Tes adresses de réception confirmées n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
-  etapes.favoris=await effacerFavorisDe(u.id);
-  if(etapes.favoris===null)return repondre(res,503,{ok:false,erreur:'favoris-non-effaces',message:'La file des messages aux favoris n’a pas pu être effacée. Ton compte est conservé pour réessayer.'});
-  etapes.donnees = await effacer(`app_data?${filtre}`, SERVICE);
-  etapes.comptesVinted = etapes.donnees === null ? null : await effacer(`vinted_accounts?${filtre}`, SERVICE);
-  etapes.compteurs = etapes.comptesVinted === null ? null : await effacer(`detourage_usage?${filtre}`, SERVICE);
-  // Son équipe (migration 016) : ses invitations comme vendeur ET comme membre.
-  // Base sans la 016 ⇒ 0 (rien à effacer) ; base muette ⇒ null (incomplet).
-  etapes.equipe = etapes.compteurs === null ? null : await effacerEquipe(u.id, SERVICE);
-  // Sa présence sur la carte de la communauté (migration 018) : présence,
-  // conversations, blocages, signalements. Base sans la 018 ⇒ 0.
-  etapes.communaute = etapes.equipe === null ? null : await effacerCommunaute(u.id, SERVICE);
-  etapes.photos = etapes.communaute === null ? null : await viderCacheDetourage(u.id, SERVICE);
-  let connexion = false;
-  if (etapes.photos !== null) {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { method: 'DELETE', headers: sbCle(SERVICE) });
-      connexion = r.ok;
-    } catch (_) { connexion = false; }
-  }
-  etapes.connexion = connexion ? 'supprimee' : 'conservee';
-
-  // Ce qui a été fait, ce qui ne l'a pas été — en clair.
-  const fait = [], pasFait = [];
-  if (etapes.abonnement === 'resilie') fait.push('abonnement résilié (aucun nouveau prélèvement)');
+  // 3) Tout le reste, compte de connexion en dernier.
+  const r = await effacerCompte({ url: SUPABASE_URL, service: SERVICE, owner: u.id, proprio, inv });
+  Object.assign(etapes, r.etapes);
+  const fait = [];
+  if (etapes.abonnement === 'resilie' || etapes.abonnement === 'deja-resilie') fait.push('abonnement résilié (aucun nouveau prélèvement)');
   if (etapes.abonnement === 'arrete') fait.push('abonnement arrêté');
-  if (etapes.preuvesAdresse > 0) fait.push('tes adresses de réception confirmées effacées');
-  if (etapes.donnees !== null) fait.push(`tes données effacées (${nb(etapes.donnees, 'élément', 'éléments')})`);
-  if (etapes.comptesVinted != null) fait.push(nb(etapes.comptesVinted, 'compte Vinted délié', 'comptes Vinted déliés'));
-  if (etapes.equipe != null && etapes.equipe > 0) fait.push(nb(etapes.equipe, 'invitation d’équipe effacée', 'invitations d’équipe effacées'));
-  if (etapes.communaute != null && etapes.communaute > 0) fait.push('ta présence sur la carte de la communauté effacée');
-  if (etapes.photos != null && etapes.photos > 0) fait.push(nb(etapes.photos, 'photo détourée effacée', 'photos détourées effacées'));
-  if (etapes.donnees === null) pasFait.push('tes données', 'tes comptes Vinted');
-  else if (etapes.comptesVinted === null) pasFait.push('tes comptes Vinted');
-  else if (etapes.compteurs === null) pasFait.push('tes compteurs de détourage');
-  else if (etapes.equipe === null) pasFait.push('ton équipe');
-  else if (etapes.communaute === null) pasFait.push('ta présence sur la carte de la communauté');
-  else if (etapes.photos === null) pasFait.push('tes photos détourées');
-  if (!connexion) pasFait.push('ton compte de connexion');
-  const ok = connexion && etapes.donnees !== null && etapes.comptesVinted !== null && etapes.compteurs !== null && etapes.equipe !== null && etapes.communaute !== null && etapes.photos !== null;
-  const message = ok
-    ? `Ton compte VRM est fermé : ${fait.join(', ')}.`
-    : `Fermeture INCOMPLÈTE. Fait : ${fait.length ? fait.join(', ') : 'rien'}. Pas encore effacé : ${pasFait.join(', ')}. Reconnecte-toi et relance « Fermer mon compte ».`;
-  if (!ok) console.warn('[fermer-compte] incomplet', JSON.stringify(etapes));
-  return repondre(res, ok ? 200 : 502, { ok, etapes, message });
+  fait.push(...r.fait);
+  // 4) Le journal minimal (sans contenu), puis l'e-mail — ni l'un ni l'autre ne
+  //    change l'issue (elle est dite à part).
+  etapes.journal = (await noterJournal({ url: SUPABASE_URL, service: SERVICE, owner: u.id, ok: r.ok, nombres: { ...inv, donneesEffacees: r.etapes.donnees } })) ? 'note' : 'non-note';
+  etapes.email = 'non-envoye';
+  if (r.ok && u.email && u.emailConfirme) {
+    const cfg = configurationRelances();
+    if (cfg.pret) {
+      try {
+        try { await lireMentions(); } catch (_) {}
+        const m = mailSuppression({ fait, contact: contactEmail() });
+        const v = await envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
+          de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: u.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } });
+        etapes.email = (v && v.issue) || 'incertain';
+      } catch (_) { etapes.email = 'incertain'; }
+    } else etapes.email = 'non-configure';
+  }
+  const message = r.ok
+    ? `Ton compte VRM est supprimé : ${fait.join(', ')}.`
+    : `Suppression INCOMPLÈTE. Fait : ${fait.length ? fait.join(', ') : 'rien'}. Pas encore effacé : ${r.pasFait.join(', ')}. Reconnecte-toi et relance « Supprimer mon compte ».`;
+  if (!r.ok) console.warn('[supprimer-compte] incomplet', JSON.stringify(etapes));
+  return repondre(res, r.ok ? 200 : 502, { ok: r.ok, etapes, message });
 }
 
 // La session est vérifiée avant toute lecture du CDN.
@@ -1469,7 +1443,9 @@ export default async function handler(req, res) {
   if (mode === 'discord') return m === 'GET' ? retourDiscord(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'discord-deja') return m === 'GET' ? discordDeja(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
-  if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  // (9 nov.) « Supprimer mon compte » : GET l'inventaire, POST la suppression ;
+  // l'ancien `fermer` mène à la MÊME fonction (même confirmation forte).
+  if (mode === 'supprimer' || mode === 'fermer') return m === 'POST' ? supprimerCompte(req, res) : (m === 'GET' && mode === 'supprimer') ? apercuSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
