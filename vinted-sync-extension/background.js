@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.331.0';
+const CODE_VERSION = '5.332.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -12402,7 +12402,10 @@ async function gardeLecture(uid, acc, classe = 'photos') {
 //    offre, répondre). Et la règle n'était pas ancrée à droite :
 //    `https://vrm.center.autre-site.com` passait. Une seule liste, ici, pour
 //    tous les messages du pont, et `APP_URLS` en découle.
-const ORIGINES_APP = ['https://vrm.center', 'https://cancale-v67-ten.vercel.app'];
+// 5.332 (revue sécurité du 9 nov.) : `cancale-v67-ten.vercel.app` retiré — un
+//    sous-domaine Vercel redevient réservable par un tiers si le projet est
+//    renommé ou supprimé ; il ne doit plus pouvoir donner une session à l'extension.
+const ORIGINES_APP = ['https://vrm.center'];
 const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new URL(String(src || '')).origin); } catch (_) { return false; } } };
 // Ce que l'app peut faire passer par `exec`, et RIEN d'autre (§3 : jamais de
 // suppression, jamais de requête arbitraire).

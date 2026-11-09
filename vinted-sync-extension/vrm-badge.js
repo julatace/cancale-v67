@@ -193,7 +193,7 @@
   .connexion { margin: 0; border-top: 0; padding: 0 0 2px; }`;
     ombre.appendChild(st);
     carte.classList.add('on');
-    try { new ResizeObserver(() => direAuSite({ __vrmCarte: 'hauteur', h: Math.ceil(hote.getBoundingClientRect().height) })).observe(hote); } catch (_) {}
+    try { new ResizeObserver(() => direAuSite({ __vrmCarte: 'hauteur', h: Math.ceil(hote.getBoundingClientRect().height) + 6 })).observe(hote); } catch (_) {}
   }
 
   // Le logo de l'app (le même qu'en haut de chaque écran de VRM). S'il ne
@@ -234,7 +234,7 @@
   const jugeable = /^\d+\.\d+\.\d+$/.test(versionManif) && auMoins(versionManif, '5.171.0');
   let reparationPosee = false;
   function reparer() {
-    if (reparationPosee) return;
+    if (reparationPosee || CADRE) return;
     reparationPosee = true;
     try {
       const f = document.createElement('iframe');
@@ -335,6 +335,7 @@
 
   function rendre() {
     rendreCarte();
+    if (CADRE) { if (!cadreDitPrete) { cadreDitPrete = true; direAuSite({ __vrmCarte: 'hauteur', h: Math.ceil(hote.getBoundingClientRect().height) + 6 }); direAuSite({ __vrmCarte: 'prete' }); } return; }
     rendreQuestion();
   }
   function rendreCarte() {
@@ -449,7 +450,7 @@
     }
 
     // 5.328 : pas connecté ⇒ le formulaire est juste en dessous, rien à dire de plus.
-    const formulaire = !!(v && v.connecte === false) || (!v && formulaireDemande) || changerCompte;
+    const formulaire = CADRE ? (!(v && v.connecte) || changerCompte) : (!!(v && v.connecte === false) || (!v && formulaireDemande) || changerCompte);
     const pied = (doigt || !(v && v.connecte)) ? '' : 'Clique sur le logo pour <b>ouvrir VRM</b>.';
     // Julien, 27 oct. : « je veux pouvoir me connecter à mon compte VRM depuis
     // Vestiaire et Leboncoin aussi ». Les gestes sont dans la carte sur TOUS
@@ -536,7 +537,7 @@
     const r = await demander();
     if (r === undefined) { hote.remove(); return; }
     pasSu = r === null;
-    const avant = !!(etat && etat.vrm && etat.vrm.connecte === false) || (!!formulaireEl && !changerCompte);
+    const avant = !!(etat && etat.vrm && etat.vrm.connecte === false) || ((!!formulaireEl || !!cadreEl) && !changerCompte);
     if (r) etat = r;
     // 5.328 : connecté depuis la carte ⇒ elle reste ouverte et NOMME le compte.
     if (avant && etat && etat.vrm && etat.vrm.connecte) { justeConnecte = true; formulaireDemande = false; }
@@ -577,6 +578,10 @@
   //    Edge, Firefox sur ordinateur). Orion (iPhone) n'a pas de fenêtre : les
   //    boutons n'y sont pas montrés — le mot de passe suffit.
   let formulaireEl = null, formulaireDemande = false, justeConnecte = false, changerCompte = false, envoiEnVol = false, fournisseurs = null, fournisseursDemandes = false;
+  // 5.332 : le cadre de « Changer de compte VRM » (la carte du site le demande par l'adresse).
+  if (CADRE) formulaireDemande = true;
+  if (CADRE && /[?&]changer=1(?:&|$)/.test(location.search)) changerCompte = true;
+  let cadreDitPrete = false;
   const EVTS_BOUCLIER = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'textInput', 'compositionstart', 'compositionupdate', 'compositionend', 'paste', 'copy', 'cut'];
   const vientDeLaCarte = (ev) => { try { const p = ev.composedPath(); return p[0] === hote || p.includes(hote); } catch (_) { return ev.target === hote; } };
   // ⚠️ 5.330 : arrêté sur `window` en capture, l'événement n'atteint plus NOS
@@ -628,7 +633,105 @@
     try { const p = champ('vrm-cx-mdp'); if (p) p.value = ''; } catch (_) {}
     try { const c = champ('vrm-cx-code'); if (c) c.value = ''; } catch (_) {}
   }
+  // ══ 5.332 : L'IFRAME DE L'EXTENSION (Chrome, Edge, Firefox) ══════════════
+  // Décision de Julien (9 nov., défaut #6 de la revue sécurité) : là où une page
+  // d'extension s'affiche dans un iframe, le formulaire y vit (`popup.html?
+  // mode=carte`, origine de l'extension) : la page du site n'entend AUCUNE
+  // touche, même avec un écouteur posé en capture avant nous. Orion est exclu
+  // d'office (paquet MV2, `__vrmOrionCompat` : l'iframe ne s'y affichait pas,
+  // 5.328). Ailleurs, le cadre doit dire « prête » DEPUIS l'origine de
+  // l'extension en 1,5 s ; sinon (cadre muet) : le formulaire dessiné dans la
+  // carte (shadow root fermée), comme avant — jamais un onglet. Le cadre reste
+  // CACHÉ tant qu'il n'a pas dit « prête », et se re-cache à chaque nouveau
+  // chargement : une page qui ferait naviguer l'iframe vers SA page (une fausse
+  // connexion) n'est jamais montrée — la carte retombe sur son formulaire.
+  const CADRE_DELAI_MS = 1500;
+  const ORIGINE_EXT = (() => { try { return new URL(chrome.runtime.getURL('popup.html')).origin; } catch (_) { return ''; } })();
+  let cadreH = 0, cadreEl = null, cadreChanger = false, cadreMuet = false, cadreMinuteur = null, cadreChargements = 0, cadrePret = false;
+  function cadreVoulu() {
+    if (CADRE || cadreMuet || !ORIGINE_EXT || ORIGINE_EXT === 'null') return false;
+    try {
+      if (globalThis.__vrmOrionCompat) return false;
+      const m = chrome.runtime.getManifest();
+      return !!(m && m.manifest_version === 3);
+    } catch (_) { return false; }
+  }
+  function retirerCadre() {
+    clearTimeout(cadreMinuteur);
+    if (cadreEl) { try { cadreEl.remove(); } catch (_) {} }
+    cadreEl = null; cadrePret = false; cadreChargements = 0; cadreH = 0;
+    connexion.removeAttribute('data-cadre');
+  }
+  function cadreRepli() {
+    // Muet, ou parti ailleurs : le formulaire de la carte, pour toute la page.
+    cadreMuet = true;
+    retirerCadre();
+    if (connexion.childNodes.length) connexion.replaceChildren();
+    connexion.setAttribute('data-cadre', 'repli');
+    poserFormulaire(true, true);
+    connexion.setAttribute('data-cadre', 'repli');
+  }
+  function attendrePrete() {
+    clearTimeout(cadreMinuteur);
+    cadrePret = false;
+    if (cadreEl) { cadreEl.style.visibility = 'hidden'; cadreEl.style.height = '0px'; }
+    connexion.setAttribute('data-cadre', 'attente');
+    const att = connexion.querySelector('[data-cadre-attente]'); if (att) att.hidden = false;
+    cadreMinuteur = setTimeout(() => { if (!cadrePret) cadreRepli(); }, CADRE_DELAI_MS);
+  }
+  function poserCadre() {
+    if (formulaireEl) { viderSecrets(); formulaireEl = null; }
+    if (cadreEl && cadreChanger === changerCompte) { connexion.hidden = false; return true; }
+    retirerCadre();
+    connexion.hidden = false;
+    cadreChanger = changerCompte;
+    const f = document.createElement('iframe');
+    f.src = chrome.runtime.getURL('popup.html') + '?mode=carte' + (changerCompte ? '&changer=1' : '');
+    f.title = 'Connexion à VRM';
+    f.setAttribute('data-cadre-connexion', '');
+    f.style.cssText = 'display:block;width:100%;height:0;border:0;margin:0;background:transparent;color-scheme:normal;visibility:hidden;';
+    poserHtml(connexion, `${erreurAuRetour ? `<div class="err" role="alert">${esc(erreurAuRetour)}</div>` : ''}<div class="etat" data-cadre-attente>Chargement de la connexion…</div>`);
+    erreurAuRetour = '';
+    connexion.appendChild(f);
+    cadreEl = f; cadreChargements = 0;
+    f.addEventListener('load', () => {
+      if (cadreEl !== f) return;
+      cadreChargements += 1;
+      // Un second chargement = le cadre a navigué (pas nous) : on recache et on
+      // exige un nouveau « prête » venu de l'extension.
+      if (cadreChargements > 1) attendrePrete();
+    });
+    attendrePrete();
+    return true;
+  }
+  try {
+    window.addEventListener('message', (ev) => {
+      if (!cadreEl || CADRE) return;
+      if (ev.origin !== ORIGINE_EXT || ev.source !== cadreEl.contentWindow) return;
+      const d = ev.data;
+      if (!d || typeof d !== 'object' || typeof d.__vrmCarte !== 'string') return;
+      if (d.__vrmCarte === 'prete') {
+        clearTimeout(cadreMinuteur); cadrePret = true;
+        const att = connexion.querySelector('[data-cadre-attente]'); if (att) att.hidden = true;
+        cadreEl.style.visibility = 'visible';
+        cadreEl.style.height = (cadreH || 220) + 'px';
+        connexion.setAttribute('data-cadre', 'pret');
+      } else if (d.__vrmCarte === 'hauteur') {
+        cadreH = Math.max(60, Math.min(640, Math.ceil(Number(d.h) || 0)));
+        if (cadrePret) cadreEl.style.height = cadreH + 'px';
+      } else if (d.__vrmCarte === 'annuler') {
+        changerCompte = false; formulaireDemande = false; rendre();
+      } else if (d.__vrmCarte === 'aller' && cadrePret) {
+        // Google / Discord sans petite fenêtre : CET onglet part (jamais un autre).
+        const u = String(d.url || '');
+        if (URL_AUTORISE.test(u)) { try { location.assign(u); } catch (_) {} }
+      }
+    });
+  } catch (_) {}
+
   function poserFormulaire(montrer, refaire) {
+    if (montrer && cadreVoulu() && poserCadre()) return;
+    if (!montrer) retirerCadre();
     if (!montrer) {
       connexion.hidden = true;
       if (formulaireEl) viderSecrets();
@@ -681,7 +784,7 @@
       ev.preventDefault(); ev.stopPropagation();
       if (modeCx === 'mdp') seConnecter(); else if (modeCx === 'saisie') validerCode(); else demanderCode();
     });
-    formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { changerCompte = false; formulaireDemande = false; modeCx = 'code'; rendre(); });
+    formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { if (CADRE) { direAuSite({ __vrmCarte: 'annuler' }); return; } changerCompte = false; formulaireDemande = false; modeCx = 'code'; rendre(); });
     const bascule = formulaireEl.querySelector('[data-basculer-mode]');
     if (bascule) bascule.addEventListener('click', () => { modeCx = modeCx === 'mdp' ? 'code' : 'mdp'; poserFormulaire(true, true); focaliser(); });
     if (modeCx === 'saisie') brancherCases();
@@ -864,6 +967,7 @@
       if (!r.ok) { direEtat(''); direErreur(r.message || 'La connexion n’a pas pu démarrer.'); return; }
       // Sans fenêtre : CET onglet navigue (jamais un onglet de plus, jamais window.open).
       if (r.memeOnglet && typeof r.url === 'string' && URL_AUTORISE.test(r.url) && r.url.split('?provider=')[1].startsWith(f + '&')) {
+        if (CADRE) { direAuSite({ __vrmCarte: 'aller', url: r.url }); return; }   // c'est l'onglet du site qui part, pas le cadre
         try { location.assign(r.url); } catch (_) { direEtat(''); direErreur('La connexion n’a pas pu démarrer.'); }
       }
     });
@@ -906,7 +1010,7 @@
   // au même geste.
   let minuteur = null;
   hote.addEventListener('pointerenter', (e) => {
-    if (e.pointerType && e.pointerType !== 'mouse') return;
+    if (CADRE || (e.pointerType && e.pointerType !== 'mouse')) return;
     if (question.classList.contains('on')) return;
     clearTimeout(minuteur);
     doigt = false;
@@ -914,14 +1018,14 @@
     carte.classList.add('on');
   });
   hote.addEventListener('pointerleave', (e) => {
-    if (e.pointerType && e.pointerType !== 'mouse') return;
+    if (CADRE || (e.pointerType && e.pointerType !== 'mouse')) return;
     if (doigt || !connexion.hidden) return;             // un formulaire ouvert ne se ferme pas au survol
     clearTimeout(minuteur); minuteur = setTimeout(() => carte.classList.remove('on'), 180);
   });
   // Au doigt, toucher ailleurs dans la page referme la carte (sans rien cliquer
   // à sa place : on n'empêche pas le geste du site).
   document.addEventListener('pointerdown', (e) => {
-    if (!carte.classList.contains('on')) return;
+    if (CADRE || !carte.classList.contains('on')) return;
     let dedans = false; try { dedans = e.composedPath().includes(hote); } catch (_) {}
     if (!dedans) fermerCarte();
   }, true);
@@ -939,6 +1043,6 @@
   } catch (_) {}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rafraichir(); });
 
-  (document.documentElement || document.body).appendChild(hote);
+  (CADRE ? (document.body || document.documentElement) : (document.documentElement || document.body)).appendChild(hote);
   rafraichir();
 })();
