@@ -18386,7 +18386,9 @@ function GuideDemarrageCarte({ onNav, comptes, plein = false, etape }) {
     vente: plein ? 'afaire' : preuveNombre(ventes) }, { plusTard });
   if (!plein && (guide.fini || masque || !guide.courante)) return null;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;
-  const demanderNum = numEcrit !== undefined && numerotationAChoisir(numEcrit, nNum) && !reporteeActive(plusTard, 'numerotation');
+  // (9 nov.) « Où est ton numéro ? » est une étape de Ma configuration : dès qu'elle existe
+  // (faite ou mise de côté), la question n'est plus posée une seconde fois dans le guide.
+  const demanderNum = numEcrit !== undefined && numerotationAChoisir(numEcrit, nNum) && !reporteeActive(plusTard, 'numerotation') && !lireConfiguration(load(CLE_CONFIGURATION, null));
   const choisirNum = (cle) => {
     const r = reglageDuChoix(cle);
     save(CLE_NUMERO_ECRIT, r); setNumEcrit(r);
