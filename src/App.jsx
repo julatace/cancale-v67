@@ -496,6 +496,10 @@ import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
+import {LignePlancher} from "./LignePlancher.jsx";
+import {DejaEnStock} from "./DejaEnStock.jsx";
+import {pairesDuModele} from "./dejaEnStock.js";
+import {plancherVente,offreFacePlancher} from "./plancherOffre.js";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
 import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // (6 nov., v36-visuel-2) les dessins des états vides
@@ -31971,6 +31975,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const annMasquees = useMemo(() => masqueesSurEtagere.filter(garderAnnonce),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [masqueesSurEtagere, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  // (9 nov., lot F) LES PAIRES PRÉSENTES pour « Tu as déjà N paires de ce modèle en
+  // stock » (src/dejaEnStock.js) : en ligne (`annBase`) + masquées sur l'étagère
+  // (`annMasquees`) — la même étagère que la grille. Une LECTURE : rien n'est écrit.
+  // « Depuis » = la date « Ajouté il y a… » relevée, sinon la date Vinted (`listedAgeDays`).
+  const stockPourModele = useMemo(() => {
+    const out = [];
+    for (const it of [...annBase, ...annMasquees]) {
+      if (!it || it.id == null) continue;
+      const d = listingDates[String(it.id)];
+      const ts = d && d.ts ? Number(d.ts) : (it.createdTs != null ? (it.createdTs < 1e12 ? it.createdTs * 1000 : it.createdTs) : null);
+      out.push({ id: String(it.id), num: String((numeros[String(it.id)] || {}).numero || ''), titre: it.title || '', marque: it.brand || '', taille: it.size || '', photo: it.photo || null, depuisMs: Number.isFinite(ts) ? ts : null });
+    }
+    return out;
+  }, [annBase, annMasquees, listingDates, numeros]);
   // (23 oct.) TOUTES les masquées numérotées, chacune avec son geste : celles
   // encore comptées sur l'étagère (« Elle n'est plus là ») et celles qu'il a
   // déclarées parties (« Elle est encore là » répare une erreur). Sans ce bloc,
@@ -34880,6 +34898,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       favoris: ann ? n(ann.favourites) : null, vues: ann ? n(ann.views) : null,
       mini: isFinite(mn) && mn > 0 ? mn : null };
   };
+  // (9 nov., lot F) LE PLANCHER d'une offre Vinted : la fiche de CETTE annonce (par
+  // identité, l'item_id, §5) → `plancherVente` (src/plancherOffre.js : la règle du
+  // bénéfice, prix d'achat SAISI + frais connus). Pas de fiche ⇒ « prix d'achat pas
+  // saisi » ; une paire dans une autre devise ⇒ null (rien comparé).
+  const plancherDeItem = (item, devise = 'EUR') => (item == null || (devise || 'EUR') !== 'EUR' ? null : plancherVente(numeros[String(item)] || null));
 
   // ── LEBONCOIN ET eBAY DANS LE BÉNÉFICE (19 oct.) — `ventesAutresBenefice`,
   // par IDENTITÉ seulement (SKU eBay, lien/référence Leboncoin). Les annonces
@@ -38199,6 +38222,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-cible={off?'offre':undefined} data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
+                      {off ? <LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} offre={off.prix} mini={isFinite(minF)&&minF>0?minF:null} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/> : null}
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>
                         {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le navigateur où l'extension est installée."}
                         {!sansExt && <>{' '}<a href={lienVinted} target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>Ouvrir sur Vinted</a></>}
@@ -38221,6 +38245,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         return (
                         <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contre!=null?String(contre):undefined}>
                           <ResumeOffre affiche={afficheCompare} offre={off.prix} mini={mini} fmt={fmtE} titre={pc?.titre||''} photo={pc?.photo?<PhotoVinted src={pc.photo} size={44}/>:null}/>
+                          {/* (9 nov., lot F) Le plancher : prix d'achat SAISI + frais connus — jamais un prix conseillé. */}
+                          <LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>
                           <div className="vrm-chat-offre-actions">
                             <button type="button" className="vrm-chat-btn" data-offre-geste="refuser" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('reject', off)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Refuser</button>
                             {contre!=null
@@ -42018,7 +42044,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
-          prochainNumero={nextNumero}
+          prochainNumero={nextNumero} stock={stockPourModele}
           onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
@@ -43528,7 +43554,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
-                          {messageFilter.startsWith('repondre')&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}
+                          {messageFilter.startsWith('repondre')&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}{offre && offreFacePlancher(offre.prix, plancherDeItem(offre.item, paire&&paire.devise))?.niveau==='sous' && <span className="vrm-msg-etat" data-offre-sous-plancher="" title="Sous ton prix d’achat et tes frais connus" style={{color:C.warn,borderColor:C.border}}>à perte</span>}
                           {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
                               marquée « Offre » avec son montant, à SA conversation — plus jamais un
                               code ni un montant nu. L'offre EN ATTENTE garde sa pastille d'accent. */}
@@ -45645,6 +45671,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        <Bouton variante="primaire" data-prix-propose={pp.centimes} data-prix-propose-par={pp.par} data-prix-garder="" onClick={()=>appliquerProposition('f:'+r.key, pp)}>{tp.garder}</Bouton>
                        <Bouton variante="secondaire" data-prix-corriger="" onClick={()=>{ const n=document.querySelector(`[data-fillbuy="${i}"]`); if(n) n.focus(); }}>{tp.corriger}</Bouton>
                      </div>
+                     {/* (9 nov., lot F) Au moment de confirmer CET achat : les AUTRES paires du même modèle
+                         déjà sur l'étagère — une information par ressemblance, rien n'est relié ni écrit. */}
+                     <DejaEnStock autres C={C} Photo={PhotoVinted} r={pairesDuModele({ cible: { titre: r.titre||'', marque: r.marque||'', taille: r.taille||'' }, stock: stockPourModele, sauf: r.key, marqueDe: extractBrand, modeleDe: extractModel, couleursDe: extractColors })}/>
                    </div>; })()}
                  {(()=>{ const cs=propositionFiche(r.key) ? null : fillBuySugg[r.key]; if(!cs||!cs.length) return null;
                    // (30 oct.) Seules les pistes sûres (« C'est ça ») restent en clair ; les
