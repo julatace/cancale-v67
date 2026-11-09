@@ -46640,7 +46640,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // de l'annonce : c'est LUI qui choisit et envoie.
           favoris: ()=>{ if (uidIt && typeof setCompteSel === 'function') setCompteSel(uidIt); demanderVue('favoris'); onNav && onNav('messages'); setTimeout(()=>setDortAgir(null), 400); },
         };
-        const choix = gestesDormeuse({ numero: a.numero, favoris: a.favoris, url: urlFiche, cap: (c)=>extSait(c), version: (c)=>EXT_CAPACITES[c] || '' })
+        // (9 nov.) Seulement les sites qu'il AFFICHE (« Mes plateformes ») : un site masqué ramenait sur Vinted, le clic ne menait nulle part.
+        const sitesAffiches = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
+        const choix = gestesDormeuse({ numero: a.numero, favoris: a.favoris, url: urlFiche, cap: (c)=>extSait(c), version: (c)=>EXT_CAPACITES[c] || '', sites: sitesAffiches })
           .map((g)=>({ ...g, go: aller[g.k] }));
         return (
           <SheetShell onClose={()=>setDortAgir(null)} maxWidth={420}>
@@ -49315,6 +49317,10 @@ function FiltreSites({ tache, site, sites, onSite }) {
   const p = useProfilVendeur();
   const ctx = { mode: p.mode, relies: p.relies, choisi: site, plateformes: p.plateformes };
   React.useEffect(() => { if (Array.isArray(p.plateformes) && site !== 'toutes' && !p.plateformes.includes(site) && p.plateformes.length) onSite(t.toutes ? 'toutes' : p.plateformes[0]); }, [site, p.plateformes?.join('|')]);
+  // (9 nov., zéro banc rouge) Ses plateformes PAS ENCORE SUES (le nuage pas lu) : aucune rangée.
+  // Avant, les quatre sites s'affichaient puis la rangée disparaissait (un seul site affiché) :
+  // la barre du haut passait de 82 à 60 px et tout l'écran remontait (banc chargement, Annonces).
+  if (!Array.isArray(p.plateformes)) return null;
   return <SelecteurSites id={tache} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={onSite}/>;
 }
 // (5 nov.) UN ONGLET SANS DONNÉE : ce qui manque et le geste (`ONGLET_SANS_DONNEE`,
@@ -52962,7 +52968,8 @@ function AppCoeur() {
           const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
             stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
             coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne, colisVente: ex ? ex.colisVente : undefined,
-            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [] }, {
+            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [],
+            sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null }, {
             etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
             venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
             montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
