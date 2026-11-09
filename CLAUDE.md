@@ -520,6 +520,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **9 nov. · Préparer mes colis + mode relais (lot AD)** : Colis → À envoyer pas à pas (ordre de la liste, paire par n° de transaction, « Colis fait » = `deposeScan`, reprise) ; mode relais = `vrm_colis_retirer` exactement, code géant fond blanc, Wake Lock, « Retiré » + Annuler, hors ligne. `docs/passation/2026-11-09-preparer-relais.md`. Geste : aucun.
 - **9 nov. · Retraits frais** : plus de « peut-être en double » — un témoin = un carton (compté avec, fini avec, ou à retirer) ; carte = ce que l'onglet compte ; statut relu /15 min (`?moment=colis`). `docs/passation/2026-11-09-retraits-frais.md`. Geste : `CRON_SECRET` GitHub.
 - **9 nov. · Lot B : « Annuler » 5 s + ⌘K qui agit** : gestes réversibles dans VRM (masquer un achat, marquer vendue, délier LBC/gros, relier un achat…) sans confirmation, pilule « Annuler » ; l'extérieur garde sa confirmation ; ⌘K propose des actions qui OUVRENT seulement. `docs/passation/2026-11-09-annuler-commandes.md`. Geste : aucun.
 - **9 nov. (soir) · DA4 suite** : focus piégé et rendu dans les feuilles, feuille refusée qui remonte (`bloque`), saisie gardée à la fermeture, confirmation `irreversible` en ambre (Leboncoin/eBay supprimer), messages au-dessus du clavier à durée lisible, zone `aria-live` toujours montée, Messages vide dessiné. `docs/passation/2026-11-09-direction-artistique-4.md` (Suite). Geste : aucun.
