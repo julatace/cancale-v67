@@ -2607,8 +2607,7 @@ function FermerCompte({ onExporter }) {
                   ? 'Compte ouvert avec Google ou Discord : laisse vide si tu t’es connecté il y a moins de 10 minutes ; sinon déconnecte-toi, reconnecte-toi, puis reviens ici.'
                   : 'Sans mot de passe (compte Google ou Discord) : une connexion de moins de 10 minutes suffit.'}
               </div>
-              <Bouton variante="primaire" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
-                style={{ marginTop: 12, ...(pareil ? { background: C.danger, borderColor: C.danger, color: C.onWarn } : {}) }}>
+              <Bouton variante="danger" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
                 {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
               </Bouton>
             </div>

@@ -43,11 +43,11 @@ const INVENTAIRE = { ok: true, proprietaire: false, nombres: { donnees: 128, fac
       const enBas = await pg.evaluate(() => { const g = [...document.querySelectorAll('[data-groupe-reglages]')]; return g.map((x) => x.getAttribute('data-groupe-reglages')); });
       dit(enBas[enBas.length - 1] === 'supprimer', `${tag} : « Supprimer mon compte » est le DERNIER groupe de Mon compte`, enBas);
       const couleur = await pg.evaluate((tel) => {
-        const e = tel ? document.querySelector('[data-sous-ouvrir="fermer"] b') : [...document.querySelectorAll('[data-fermer-compte] button[aria-expanded] span span')].find((x) => x.getClientRects().length);
+        const e = document.querySelector('[data-sous-ouvrir="fermer"] b') || [...document.querySelectorAll('[data-fermer-compte] button[aria-expanded] span span')].find((x) => x.getClientRects().length);
         return e ? getComputedStyle(e).color : null;
       }, tel);
       dit(!!couleur && !/rgb\(215, 0, 21\)|rgb\(255, 105, 97\)/.test(couleur), `${tag} : le libellé n’est pas le rouge des doublons (§7)`, couleur);
-      if (tel) { await pg.click('[data-sous-ouvrir="fermer"]', { timeout: 8000 }).catch((e) => dit(false, `${tag} : la ligne se touche`, e.message.split('\n')[0])); await attendre(500); }
+      { await pg.click('[data-sous-ouvrir="fermer"]', { timeout: 8000 }).catch((e) => dit(false, `${tag} : la ligne se touche`, e.message.split('\n')[0])); await attendre(500); }
       await pg.locator('[data-fermer-compte] button[aria-expanded]:visible').first().click({ timeout: 10000 }); await attendre(900);
       const r = await pg.evaluate(() => {
         const hote = [...document.querySelectorAll('[data-fermer-compte]')].find((e) => e.getClientRects().length);
