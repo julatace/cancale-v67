@@ -19,7 +19,7 @@ libère son numéro (le dire ici).
 | A | Ma journée instantanée + objectif du mois | PR #1074 | **en ligne** |
 | B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | PR #1080 | **en ligne** |
 | C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | à lancer |
-| D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | `claude/hors-ligne-relie` | en cours |
+| D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | PR #1081 | **en ligne** |
 | E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | **fini, à intégrer** (`2026-11-09-solo-plateformes.md`, migration 030) |
 | F | prix plancher sous chaque offre + « déjà N paires de ce modèle » | PR #1079 | **en ligne** |
 | G | jauge 50 actions/h + journal « ce que VRM a fait » (ext. 5.337) | `claude/jauge-journal` | à lancer |

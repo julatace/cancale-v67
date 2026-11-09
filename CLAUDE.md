@@ -520,6 +520,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **9 nov. · Hors ligne à froid + « déjà relié »** : sans réseau, VRM s'ouvre en LECTURE SEULE si CE compte et CETTE session ont été vérifiés sur l'appareil il y a < 7 j (`vrm_porte_ok_{uid}`, garde : aucune requête base/`/api/`, aucun message à l'extension ; refus serveur au retour ⇒ refermé, drapeau effacé ; sans abonnement ⇒ aperçu) ; le refus `vrm_vinted_litige_*` dit dans Comptes liés et Ma journée (pseudo, geste, jamais l'autre compte). `docs/passation/2026-11-09-hors-ligne-relie.md` (modèle de menace). Geste : aucun.
 - **9 nov. · Retraits frais** : plus de « peut-être en double » — un témoin = un carton (compté avec, fini avec, ou à retirer) ; carte = ce que l'onglet compte ; statut relu /15 min (`?moment=colis`). `docs/passation/2026-11-09-retraits-frais.md`. Geste : `CRON_SECRET` GitHub.
 - **9 nov. · Lot B : « Annuler » 5 s + ⌘K qui agit** : gestes réversibles dans VRM (masquer un achat, marquer vendue, délier LBC/gros, relier un achat…) sans confirmation, pilule « Annuler » ; l'extérieur garde sa confirmation ; ⌘K propose des actions qui OUVRENT seulement. `docs/passation/2026-11-09-annuler-commandes.md`. Geste : aucun.
 - **9 nov. (soir) · DA4 suite** : focus piégé et rendu dans les feuilles, feuille refusée qui remonte (`bloque`), saisie gardée à la fermeture, confirmation `irreversible` en ambre (Leboncoin/eBay supprimer), messages au-dessus du clavier à durée lisible, zone `aria-live` toujours montée, Messages vide dessiné. `docs/passation/2026-11-09-direction-artistique-4.md` (Suite). Geste : aucun.
@@ -538,7 +539,6 @@ sans la fonction.
 - **9 nov. · Offres Solo 16,99 € / Pro 19,99 €** : un compte vendeur Vinted en Solo (ventes des autres en aperçu, hors totaux) ; plan lu du prix Stripe ; migration 028. `docs/passation/2026-11-09-plans-solo-pro.md`. Geste : prix Pro Stripe + `STRIPE_PRIX_PRO`, 028.
 - **9 nov. · Sécurité** : revue (aucune fuite entre vendeurs ; `/api/ai` exige une session) puis liaison Vinted prouvée (029) et carte en iframe hors Orion (5.332). `docs/passation/2026-11-09-securite.md`, `-securite-2.md`. Geste : requêtes SQL de contrôle, 029 avant 023.
 - **9 nov. · RGPD** : « Supprimer mon compte », clients partis (e-mail 11 mois, suppression 12 mois), export de ses données ouvert sans abonnement (sa décision). `docs/passation/2026-11-09-rgpd-compte.md`. Geste : relire la politique.
-- **9 nov. · Vendre plus / Recherche ⌘K + fiche paire / Achats proposés + export comptable / Inventaire + hors ligne / Tableau du propriétaire / Fiabilité 5.331 / Charge + sauvegarde / Direction artistique 3** : une passation chacun (`docs/passation/2026-11-09-*.md`). Geste : aucun (sauf Vercel Pro vers ~70 vendeurs).
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

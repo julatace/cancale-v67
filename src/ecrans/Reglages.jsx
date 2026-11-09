@@ -1,6 +1,8 @@
 import { PlateformesSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
+import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
+import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
@@ -725,6 +727,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
   // serveur ne répond qu'un oui/non — jamais QUI le possède. « Pas su » (pas de
   // clé de service, lecture ratée, compte à soi, compte libre) ⇒ pas d'alerte.
   const [vintedPris, setVintedPris] = useState(false);
+  // (9 nov.) Le refus NOTÉ par le serveur (src/vintedDejaRelie.js) : une lecture,
+  // partagée avec la carte ; la ligne « en direct » ci-dessous se tait pour un
+  // compte que la carte dit déjà.
+  const [litigesLus, setLitigesLus] = useState(undefined);
+  useEffect(() => { let mort = false; lireLitigesVinted().then((x) => { if (!mort) setLitigesLus(x); }); return () => { mort = true; }; }, []);
+  const lireLitigesLus = React.useCallback(() => Promise.resolve(litigesLus), [litigesLus]);
   const prisRef = React.useRef('');
   useEffect(() => {
     let mort = false;
@@ -1051,7 +1059,8 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
       {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ Paramètres</Bouton>}
       <ScreenHead icon="link" title="Comptes liés"
         right={<Bouton icone="sync" className="vrm-b-petit" onClick={()=>{ refreshAccounts(); relireAutres(); }}>{loading ? '…' : 'Actualiser'}</Bouton>}/>
-      {vintedPris && <div className="vrm-cl-alerte" data-vinted-pris={vintedPris.uid}>{vintedPris.login || 'Ce compte Vinted'} est déjà relié à un autre compte VRM — ouvre Vinted sur un autre compte.</div>}
+      <AlerteDejaRelie lire={lireLitigesLus} comptes={accounts} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="comptes"/>
+      {vintedPris && !(litigesLus && litigesLus.litiges && litigesLus.litiges.some((l) => l.vid === String(vintedPris.uid))) && <div className="vrm-cl-alerte" data-vinted-pris={vintedPris.uid}>{vintedPris.login || 'Ce compte Vinted'} est déjà relié à un autre compte VRM — ouvre Vinted sur un autre compte.</div>}
       {nbExclus > 0 && (
         <div className="vrm-cl-alerte">
           <span>{nbExclus} compte{nbExclus>1?'s':''} Vinted masqué{nbExclus>1?'s':''}</span>
