@@ -146,7 +146,7 @@ const famillesInconnues = () => [...base.entries()].filter(([k]) => k.split('|')
     console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(res.code === 200, 'l’email est accepté', `HTTP ${res.code} ${JSON.stringify(res.corps).slice(0,200)}`);
     dit(pushes.length === 1, 'une notification part (catégorie activée par défaut)', `${pushes.length}`);
-    dit(/annulation/i.test(p.title || '') && /Paire de banc taille 42/.test(p.title || ''), 'le titre dit « annulation » et nomme l’article lu dans l’email', JSON.stringify(p.title));
+    dit(/annulation/i.test(p.title || '') && /Paire de banc taille 42/.test(`${p.title} ${p.body}`), 'le titre dit « annulation » ; la notification nomme l’article lu dans l’email (8 nov. : dans le corps, titre ≤ 40)', JSON.stringify(p.title));
     dit(/acheteur_banc/.test(p.body || '') && /trompé de taille/.test(p.body || '') && /accepte ou refuse/i.test(p.body || ''), 'le texte nomme l’acheteur, sa raison, et le geste', JSON.stringify(p.body));
     const fam = famillesInconnues().map((d) => d.famille);
     dit(fam.includes("demande d'annulation de l'acheteur"), 'l’email reste conservé, rangé dans sa famille', JSON.stringify(fam));
@@ -161,7 +161,7 @@ const famillesInconnues = () => [...base.entries()].filter(([k]) => k.split('|')
     const p = pushes[0] || {};
     console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(pushes.length === 1, 'une notification part', `${pushes.length}`);
-    dit(/À confirmer/i.test(p.title || '') && /Veste de banc/.test(p.title || ''), 'le titre nomme l’achat (lu dans le sujet)', JSON.stringify(p.title));
+    dit(/À confirmer/i.test(p.title || '') && /Veste de banc/.test(`${p.title} ${p.body}`), 'la notification nomme l’achat (lu dans le sujet ; 8 nov. : dans le corps, titre ≤ 40)', JSON.stringify(p.title));
     dit(/18 oct\. 11:25/.test(p.title || ''), 'le titre porte la date limite LUE dans l’email (3 nov. : « ⏳ À confirmer avant le … »)', JSON.stringify(p.title));
     const sansDate = Object.assign({}, emailLivre, { subject: 'Autre paire - Confirmation requise', text: emailLivre.text.replace(/Tu as jusqu’au .+? pour signaler un problème\./, '') });
     pushes.length = 0; await recoit(sansDate);
