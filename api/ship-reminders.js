@@ -21,6 +21,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
+import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme } from './_lib/notif-textes.js';
@@ -78,6 +79,9 @@ import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.j
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+// (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
+import { passageSondes } from './_lib/statut-sondes.js';
+import { pushConfigure } from './_lib/push.js';
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
 const RELANCES_JUSQUA_MS = 60000;
@@ -1110,6 +1114,23 @@ async function veilleDesLenteurs(maintenant = Date.now()) {
   }));
 }
 
+// ── (9 nov.) LES SONDES DE vrm.center/statut (api/_lib/statut-sondes.js) ─────
+// `?moment=sondes` (GitHub, toutes les 10 min : .github/workflows/sondes-statut.yml),
+// et aussi au cron du matin et du soir. Une vraie connexion SMTP (aucun message)
+// une fois par heure au plus. L'incident ouvert part au PROPRIÉTAIRE seul
+// (VRM_OWNER_UID ou le propriétaire rangé en base), dans SON contexte.
+// `_bancSondes.envoyer` : le banc compte les notifications sans service de push.
+export const _bancSondes = { envoyer: null };
+async function sondesStatut(maintenant = Date.now()) {
+  const proprietaire = (await proprietaireInstallation()) || '';
+  const cfg = configurationRelances();
+  return passageSondes({
+    maintenant, proprietaire, pushPret: pushConfigure(), configSmtp: cfg,
+    smtp: () => envoyerSmtp({ seulementConnexion: true, hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE, de: process.env.RELANCES_EXPEDITEUR, a: process.env.RELANCES_EXPEDITEUR }),
+    envoyer: (notif) => (_bancSondes.envoyer ? _bancSondes.envoyer(notif, proprietaire) : contexteVendeur.run({ owner: proprietaire }, () => sendPushToAll({ ...notif, cat: 'signalement' }))),
+  });
+}
+
 // ── LES LIGNES DU PROPRIÉTAIRE NEUTRE (le curseur du cron) ─────────────────
 // Trois états : objet · `null` (absente) · `undefined` (pas su).
 async function lireNeutre(id) {
@@ -1144,8 +1165,11 @@ export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
   res.setHeader?.('Cache-Control','no-store');
   if (!secret) { res.status(503).json({ok:false,error:'cron-non-configure'});return; }
-  const auth = req.headers?.authorization || '';
-  if (auth !== `Bearer ${secret}`) { res.status(401).json({error:'clé invalide'});return; }
+  const auth = String(req.headers?.authorization || '');
+  // (9 nov., revue sécurité) Comparée en temps constant, comme la clé du script
+  // Gmail (email-inbound) : une comparaison qui s'arrête au premier écart.
+  const empreinte = (t) => crypto.createHash('sha256').update(String(t)).digest();
+  if (!crypto.timingSafeEqual(empreinte(auth), empreinte(`Bearer ${secret}`))) { res.status(401).json({error:'clé invalide'});return; }
   // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
   if (repondreSansCleService(res)) return;
 
@@ -1153,6 +1177,14 @@ export default async function handler(req, res) {
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
   // (ni URSSAF, ni bilan, ni rappel du matin).
   const moment = String((req.query && req.query.moment) || '');
+  // (9 nov.) `?moment=sondes` : les sondes de /statut, RIEN d'autre (aucun vendeur).
+  // État pas lu ou pas écrit ⇒ 503 (le workflow GitHub échoue : GitHub prévient).
+  if (moment === 'sondes') {
+    let s = null;
+    try { s = await sondesStatut(); } catch (e) { s = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(s && s.fait ? 200 : 503).json({ ok: !!(s && s.fait), moment: 'sondes', sondes: s });
+    return;
+  }
   const soir = moment === 'soir';
   const reveil = moment === 'reveil';
   const debutCron = Date.now();
@@ -1178,6 +1210,9 @@ export default async function handler(req, res) {
     //    fait échouer ni les autres ni les rappels (elle est dite dans la réponse).
     // (5 nov.) Les e-mails de l'essai gratuit (api/_lib/relances-essai.js). Sans
     // envoi configuré elle ne fait rien (et le dit dans la réponse).
+    // (9 nov.) Les sondes de /statut, aussi au matin et au soir (si GitHub ne passe pas).
+    let sondes = null;
+    if (!reveil) { try { sondes = await sondesStatut(debutCron); } catch (e) { sondes = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
@@ -1227,7 +1262,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
