@@ -18007,11 +18007,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
         {/* (9 nov., lot AI — Julien : le point « pas ouf ») L'AVATAR du compte (son initiale) dans une
             pastille ronde ; l'état passe dans un petit badge posé sur son bord (le même point, la même
             couleur : encre = tu peux agir, ambre = un geste à faire, gris = lecture) — jamais de rouge (§7).
-            Sans compte Vinted lu : l'icône de l'état à la place de l'initiale. Même information, même menu. */}
+            Sans compte Vinted lu : un « V » (Vinted) à la place de l'initiale ; pendant la vérification, l'icône qui tourne. Même information, même menu. */}
         <span aria-hidden="true" className="vrm-etat-avatar" data-etat-avatar={st.niveau === 'ok' && loginVinted ? 'compte' : st.niveau}>
           {st.niveau === 'ok' && loginVinted
             ? <span className="vrm-etat-initiale vrm-sensible">{String(loginVinted).trim().charAt(0).toUpperCase()}</span>
-            : <Icon name={st.niveau === 'verif' ? 'sync' : 'eye'} size={13}/>}
+            : st.niveau === 'verif' ? <Icon name="sync" size={13}/> : <span className="vrm-etat-initiale" data-etat-v="">V</span>}
           <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 6, background: point, flexShrink: 0 }}/>
         </span>
         <span className={st.niveau === 'ok' && loginVinted ? 'vrm-etat-compte vrm-sensible' : undefined} style={st.niveau === 'ok' && loginVinted ? { maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}>{court && st.niveau === 'lecture' ? (code === 'absente' ? 'Extension' : 'Lecture') : court && st.niveau === 'ok' && !loginVinted ? (st.relais ? 'Via ton ordi' : 'Actions') : visible}</span>
@@ -18590,7 +18590,8 @@ function ReprendreConfiguration() {
   if (!aReprendre) return null;
   return <section className="vrm-choix-plateformes" data-reprendre-configuration={conf ? 'plustard' : 'jamais'} aria-label="Ma configuration">
     <h2 style={{fontSize:19,letterSpacing:-0.4,margin:'0 0 5px'}}>{conf ? 'Termine ta configuration' : 'Configure VRM'}</h2>
-    <p className="vrm-cp-note">Ce que tu vends, tes plateformes, ton statut, ton numéro : deux minutes, et VRM s’adapte à toi.</p>
+    {/* (9 nov., lot AI) Une ligne courte ; la phrase entière dans sa pop-up. */}
+    <InfoPop nom="configuration" titre={conf ? 'Termine ta configuration' : 'Configure VRM'} resume="Deux minutes, et VRM s’adapte à toi"><p className="vrm-cp-note">Ce que tu vends, tes plateformes, ton statut, ton numéro : deux minutes, et VRM s’adapte à toi.</p></InfoPop>
     <Bouton variante="primaire" data-configuration-ouvrir="" onClick={() => { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }}>{conf ? 'Reprendre' : 'Commencer'}</Bouton>
   </section>;
 }
@@ -18667,7 +18668,7 @@ function GuideDemarrageCarte({ onNav, comptes, plein = false, etape }) {
   return (
     // Où s'installe l'extension : dans CE navigateur, ou — appareil sans extension
     // (téléphone, sauf Orion et Firefox Android avec sa fiche) — sur l'ordinateur.
-    <GuideDemarrage guide={guide} nav={(sansSouris && !(mobileIci() === 'ios-orion' || (boutiqueIci().nav === 'firefox' && estAndroid() && boutiqueIci().lien))) ? 'sur ton ordinateur' : NAV.dansNu}
+    <GuideDemarrage Pop={InfoPop} guide={guide} nav={(sansSouris && !(mobileIci() === 'ios-orion' || (boutiqueIci().nav === 'firefox' && estAndroid() && boutiqueIci().lien))) ? 'sur ton ordinateur' : NAV.dansNu}
       onVerifier={()=>{setVerification(n=>n+1);sonderPonts();}}
       detail={<PremiersPas onNav={onNav} dansGuide/>}
       gestes={{ emails: { libelle: 'Relier ma boîte', onClick: () => ouvrirEmailsRelier() } }}
