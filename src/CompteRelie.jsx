@@ -92,6 +92,13 @@ async function modifierLigne(transformer, essais = 4) {
   return { etat: 'ko' };
 }
 
+// L'écran d'ouverture (#vrm-demarrage, index.html) couvre tout tant que l'app démarre :
+// la feuille attend qu'il soit parti (au plus 20 s), sinon elle paraîtrait DESSOUS.
+const demarrageParti = async (maxMs = 20000) => {
+  const t0 = Date.now();
+  while (typeof document !== 'undefined' && document.getElementById('vrm-demarrage') && Date.now() - t0 < maxMs) await new Promise((ok) => setTimeout(ok, 200));
+  return !(typeof document !== 'undefined' && document.getElementById('vrm-demarrage'));
+};
 const mouvementReduit = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; } };
 const labelsVinted = () => load('vinted_account_labels', {}) || {};
 
@@ -142,6 +149,8 @@ export function AccueilComptesRelies({ comptesVinted, pret, silence = false, onN
         //    paraître maintenant (ni visite, ni Bienvenue, ni autre feuille, toujours monté).
         if (!monte.current || silenceRef.current || feuilleRef.current) return;
         if (!aAccueillir(f.data, presents).length) return;
+        if (!(await demarrageParti())) return;
+        if (!monte.current || silenceRef.current || feuilleRef.current) return;
         let cles = [];
         const g = await modifierLigne((m) => { cles = aAccueillir(m, presents); return cles.length ? marquer(m, cles, 'accueilli', Date.now()) : null; });
         if (g.etat !== 'ok' || !cles.length) return;          // pas ÉCRIT ⇒ pas montré (sinon il revient)

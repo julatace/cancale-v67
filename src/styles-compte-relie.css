@@ -71,6 +71,8 @@
 .vrm-cr-switch span { position: relative; width: 51px; height: 31px; border-radius: var(--d-r-pilule); background: var(--d-remplir-fort); transition: background-color var(--d-m-moyen) var(--d-sortie); }
 .vrm-cr-switch span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: var(--d-r-pilule); background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .18); transition: transform var(--d-m-long) var(--d-tiroir); }
 .vrm-cr-switch input:checked + span { background: var(--d-encre); }
+/* Allumé : le bouton prend la couleur de la carte (blanc en clair, gris foncé en sombre — jamais blanc sur blanc). */
+.vrm-cr-switch input:checked + span::after { background: var(--d-carte); }
 .vrm-cr-switch input:checked + span::after { transform: translateX(20px); }
 .vrm-cr-switch input:focus-visible + span { outline: 2px solid var(--d-accent); outline-offset: 2px; }
 .vrm-cr-regle { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--d-t-13); line-height: var(--d-il-ligne); color: var(--d-gris); }

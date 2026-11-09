@@ -159,6 +159,12 @@ async function ouvrir(nav, { base, largeur = 390, sombre = false, reduit = false
 }
 const FEUILLE = '[data-compte-relie-feuille]';
 const attendreFeuille = (pg, ms = 25000) => pg.locator(FEUILLE).first().waitFor({ timeout: ms }).then(() => true).catch(() => false);
+// La feuille est-elle VRAIMENT au premier plan (rien ne la couvre : ni l'écran d'ouverture, ni une autre couche) ?
+const auPremierPlan = (pg) => pg.waitForFunction(() => {
+  const t = document.querySelector('[data-cr-titre]'); if (!t) return false;
+  const r = t.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return !!(e && e.closest('[data-compte-relie-feuille]'));
+}, null, { timeout: 8000 }).then(() => true).catch(() => false);
 const memoDe = (base) => ((base.app_data.lignes.find((r) => r.id === 'vrm_comptes_relies') || {}).data) || null;
 const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, `compte-relie-${nom}.png`) }).catch(() => {});
 const cibles44 = (pg) => pg.evaluate((sel) => [...document.querySelectorAll(`${sel} button, ${sel} a, ${sel} input`)].filter((e) => e.getClientRects().length && e.type !== 'checkbox').map((e) => e.getBoundingClientRect()).filter((r) => r.height < 43.5).length, FEUILLE);
@@ -173,6 +179,7 @@ async function scenarioA(nav, largeur, sombre) {
   const { ctx, pg, etat } = await ouvrir(nav, { base, largeur, sombre });
   try {
     dit(await attendreFeuille(pg), `${nom} : la feuille paraît`);
+    dit(await auPremierPlan(pg), `${nom} : au premier plan (rien ne la couvre)`);
     const f = pg.locator(FEUILLE).first();
     dit(/shop_neuf est relié à VRM/.test(await f.locator('[data-cr-titre]').innerText().catch(() => '')), `${nom} : « shop_neuf est relié à VRM »`);
     dit(await f.getAttribute('data-compte-relie-feuille') === '1' && (await f.locator('[data-cr-compte="vinted:111"]').count()) === 0, `${nom} : seul le compte neuf, jamais le compte déjà là`);
@@ -221,6 +228,7 @@ async function scenarioB(nav, largeur, sombre) {
   const { ctx, pg, etat } = await ouvrir(nav, { base, largeur, sombre });
   try {
     dit(await attendreFeuille(pg), `${nom} : la feuille paraît`);
+    dit(await auPremierPlan(pg), `${nom} : au premier plan (rien ne la couvre)`);
     await pg.waitForTimeout(1500);
     dit((await pg.locator(FEUILLE).count()) === 1 && await pg.locator(FEUILLE).first().getAttribute('data-compte-relie-feuille') === '2', `${nom} : UNE feuille pour les deux`);
     dit((await pg.locator('[data-cr-compte="vinted:222"]').count()) === 1 && (await pg.locator('[data-cr-compte="vinted:333"]').count()) === 1, `${nom} : chacun sa carte`);
@@ -240,6 +248,7 @@ async function scenarioC(nav, reduit) {
   const { ctx, pg, etat } = await ouvrir(nav, { base, largeur: 390, reduit });
   try {
     dit(await attendreFeuille(pg), `${nom} : la feuille paraît (le serveur l’avait vu le premier)`);
+    dit(await auPremierPlan(pg), `${nom} : au premier plan (rien ne la couvre)`);
     await pg.waitForTimeout(1500);
     const g = pg.locator('[data-cr-etape="ventes"] [data-cr-geste]');
     dit((await g.count()) === 1 && /Mes commandes/.test(await g.innerText()), `${nom} : rien ne vient ⇒ le geste est dit`);
