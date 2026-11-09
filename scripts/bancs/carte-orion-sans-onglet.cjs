@@ -318,7 +318,7 @@ const aucuneOuverture = (f, o, l) => f.ouvertures.tabs.length === 0 && f.ouvertu
       'au retour, oauth-retour.js remet le code à l’extension, qui l’échange avec SON vérificateur : session rangée', JSON.stringify({ passe, pkce: f.gt.j.pkce.length, session: !!f.store.vrmSession }));
     dit(pg.url() === depart, 'l’onglet est RAMENÉ sur la page Vinted d’origine (même adresse)', pg.url());
     const l = await lire(pg);
-    dit(l.carteVisible && /C’est fait — connecté à VRM : google@exemple\.fr/.test(l.carte) && !l.form, 'la carte s’ouvre d’elle-même : « C’est fait — connecté à VRM : google@exemple.fr »', resume(l));
+    dit(l.carteVisible && /Connecté à VRM : google@exemple\.fr/.test(l.carte) && /C’est fait/.test(l.carte) && (l.carte.match(/google@exemple\.fr/g) || []).length === 1 && !l.form, 'la carte s’ouvre d’elle-même : « Connecté à VRM : google@exemple.fr », adresse dite une fois', resume(l));
     dit(aucuneOuverture(f, o, l) && f.ouvertures.maj.length === 0 && f.ouvertures.fermes.length === 0, 'chrome.tabs.create / tabs.update / tabs.remove / window.open JAMAIS appelés : c’est le même onglet', JSON.stringify({ o: f.ouvertures, e: o.erreurs }));
     dit(!!verif && nullePart(f, o, verif) && !f.store.vrmOAuthDepart, 'le vérificateur PKCE n’est dans aucune adresse et ne sert qu’une fois', JSON.stringify({ verif: !!verif, reste: !!f.store.vrmOAuthDepart }));
     dit(!o.erreurs.length, 'aucune erreur dans les pages', o.erreurs[0]);

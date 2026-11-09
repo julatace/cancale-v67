@@ -341,7 +341,8 @@
     else if (v.connecte) compteVrm = `<div class="val">${esc(v.email || 'connecté')}</div>`;
     else if (v.expiree) compteVrm = `<div class="val alerte">Session expirée${v.email ? ' (' + esc(v.email) + ')' : ''} — reconnecte-toi ci-dessous</div>`;
     else compteVrm = '<div class="val alerte">Pas connecté — connecte-toi ci-dessous</div>';
-    if (v && v.connecte && justeConnecte) compteVrm += `<div class="val gris" data-juste-connecte>C’est fait — connecté à VRM${v.email ? ' : ' + esc(v.email) : ''}.</div>`;
+    // 5.330 : l'adresse dite UNE fois (« Connecté à VRM : x@y »), puis « C'est fait ».
+    if (v && v.connecte && justeConnecte) compteVrm = `<div class="val">Connecté à VRM${v.email ? ' : ' + esc(v.email) : ''}</div><div class="val gris" data-juste-connecte>C’est fait : l’extension est connectée.</div>`;
 
     const nomSite = NOM_SITE[e.plateforme] || 'ce site';
     let compteSite;
