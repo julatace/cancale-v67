@@ -58,7 +58,7 @@ const RAISON_URSSAF = {
   particulier: 'Particulier : rien à déclarer à l’URSSAF, VRM ne calcule aucune cotisation',
   societe: 'Société : cotisations et impôts ne se calculent pas sur le chiffre d’affaires, VRM ne les estime pas',
   marge: 'Régime de la marge : VRM ne calcule pas de cotisation URSSAF',
-  null: 'Statut pas encore choisi (Comptabilité → Ton statut) : URSSAF non calculée',
+  null: 'Statut pas encore choisi (la question est en haut de Comptabilité) : URSSAF non calculée',
 };
 export const raisonUrssaf = (regime) => (regime === 'micro' ? '' : (RAISON_URSSAF[regime] || RAISON_URSSAF.null));
 
