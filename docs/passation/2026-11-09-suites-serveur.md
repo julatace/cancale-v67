@@ -80,7 +80,9 @@ demandée ; l'app dit la carte « à confirmer » avec le geste.
 | `audit-double-vente-ailleurs` (27), `audit-lbc-restes`, `tests/lbc-attribution-historique` | verts, données servies avec la lecture complète | — | — |
 | `audit-plans-solo-pro` | 56 verts (câblage : la règle pure) | — | — |
 | variables, tdz, coherence, identite, statuts, fonctions-api (12), bilan-mois, lbc-a-retirer, comptes-exclus, compte-pas-relu, colis-ventes-email, urssaf, flux-divers, double-vente ; `npm run build` | verts | — | — |
-| `audit-donnees-ecrans` (1 rouge `_fmtJourSemaine`), `audit-dac7-comptes`, `audit-achats-export` (plantent) | rouges | **les mêmes sur le code d'avant** | pas de ce chantier |
+| `audit-registres` (64), `audit-dac7-comptes` (43), `audit-achats-export` (55) : leur chaîne de l'app lit `compteEcarteChoix` + `compteEcarteRegle` (dac7 et achats-export plantaient DÉJÀ sur le code d'avant : `compteEcarteChoix is not defined` depuis Solo/Pro) | verts | 2 plantaient | — |
+| 108 audits et bancs qui touchent ces fichiers, rejoués des deux côtés | aucun rouge nouveau | — | — |
+| rouges **identiques sur le code d'avant** (pas de ce chantier) : `audit-donnees-ecrans` (`_fmtJourSemaine`), `audit-journal-semaine` (journal en tête de Ma journée), `audit-pagination-ordre` (`api/_lib/pilotage.js:66` sans ordre), `audit-politique-hotes` (liens de `src/profilFiscal.js`), banc `suivi-colis` K, banc `transporteurs` F (« Reçus 1,7 k ») | rouges | les mêmes | — |
 
 ## Ce qui reste
 - Décider (Julien) : Leboncoin/eBay/Vestiaire dans Solo ? (alors : `excluAutre` + l'offre).
