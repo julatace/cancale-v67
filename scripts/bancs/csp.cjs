@@ -279,6 +279,16 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
     await pg.goto(`${ORIGINE}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
     // (22 oct., revue) Le QR Vinted Go (http dans sa base) part en https, et ne
     // fait signaler aucune violation (la tournée des écrans juge les violations).
+    // (9 nov.) Depuis la ligne par colis (4 nov.), le QR n'est dessiné qu'à l'ouverture de la
+    // ligne de son colis (Colis → À retirer) : le banc l'ouvre, comme Julien, puis attend la
+    // requête du QR (condition, jamais un délai fixe).
+    if (!VG.https && !VG.http) {
+      await pg.goto(`${ORIGINE}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
+      await pg.evaluate(() => { for (const d of document.querySelectorAll('[data-cc-colonne="retirer"] details')) d.open = true; for (const b of document.querySelectorAll('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir[aria-expanded="false"]')) b.click(); }).catch(() => {});
+      for (let i = 0; i < 40 && !VG.https && !VG.http; i++) await pg.waitForTimeout(200);
+      // retour à l'écran des achats : la suite (reçu, journal de l'écran) part de lui.
+      await pg.goto(`${ORIGINE}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
+    }
     dit(VG.https > 0 && VG.http === 0, 'le QR Vinted Go (http dans les emails) est demandé en https, jamais en http', `https ${VG.https} · http ${VG.http}`);
     // (22 oct., revue) Le journal dit QUEL écran a parlé : l'app retire `?tab=`
     // de l'adresse, l'écran se lit dans `history.state` (une violation de la
