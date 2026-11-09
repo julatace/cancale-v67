@@ -62,6 +62,9 @@ import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.j
 // (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
+// (9 nov., soir) Colis et Ventes tout de suite : la même règle d'instantané (src/instantaneEcran.js).
+import { ColisInstantane, VentesInstantanee } from './ColisVentesInstantanes.jsx';
+import { capturerColis, capturerVentes, ecrireInstantaneColis, ecrireInstantaneVentes, lireInstantaneColis, lireInstantaneVentes } from './colisVentesInstantanes.js';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -50031,25 +50034,27 @@ function NoteSatisfactionJournee() {
   if (!uid || !CLOISONNE) return null;
   return <NoteSatisfaction key={uid} compteCreeLe={AUTH.user?.created_at || ''} lireEtat={lireNoteSatisfaction} ecrireEtat={ecrireNoteSatisfaction} lireAbonnement={lireAbonnement}/>;
 }
-// (9 nov., Julien : « Ma journée affichée tout de suite ») L'INSTANTANÉ DE MA JOURNÉE est pris ICI,
-// dans l'écran vrai, et seulement quand TOUTES ses données essentielles sont là (`useAttenteComplete` :
-// jamais au plafond, jamais pendant une lecture — `capturerJournee` refuse une valeur « lecture… »).
-// Ce qui est rangé est ce que l'écran a RENDU (texte et `data-*`), rien n'est recalculé (§11). Repris
-// à chaque changement (1,5 s après le dernier), et quand la page est quittée ou cachée.
-function CaptureJournee({ uid }) {
+// (9 nov., Julien : « Ma journée affichée tout de suite », puis le soir « Colis et Ventes aussi »)
+// L'INSTANTANÉ D'UN ÉCRAN est pris ICI, dans l'écran vrai, et seulement quand TOUTES ses données
+// essentielles sont là (`useAttenteComplete` : jamais au plafond, jamais pendant une lecture — chaque
+// capture refuse une valeur « lecture… »). Ce qui est rangé est ce que l'écran a RENDU (texte et
+// `data-*`, sur liste blanche), rien n'est recalculé (§11). Repris à chaque changement (1,5 s après
+// le dernier), et quand la page est quittée ou cachée. UNE règle pour les trois écrans
+// (src/instantaneEcran.js) ; chaque écran dit où est sa racine et ce qu'il range.
+function CaptureInstantane({ uid, ecran, racine: trouver, capturer, ecrire }) {
   const complet = useAttenteComplete();
   React.useEffect(() => {
     if (!complet || !uid || typeof document === 'undefined') return undefined;
     let t = null, mort = false;
-    const racine = () => [...document.querySelectorAll('[data-attente-ecran="journee"][data-attente="pret"] .vrm-fu-journee')].find((e) => !e.closest('.vrm-ji') && !e.closest('.vrm-attente-cache')) || null;
+    const racine = () => { try { return trouver(); } catch (_) { return null; } };
     const prendre = () => {
       t = null; if (mort) return;
       const r = racine(); if (!r) return;
       // Sans abonnement, l'écran est un APERÇU flouté (src/abonnement/apercu.js) : rien n'est rangé, et ce
       // qui l'était part (un instantané ne rendra jamais lisible ce que l'aperçu floute).
       if (r.closest('[data-apercu]')) { effacerInstantanes(); return; }
-      const snap = capturerJournee(r, { uid, maintenant: Date.now(), largeur: window.innerWidth || 0 });
-      if (snap) ecrireInstantane(snap);
+      const snap = capturer(r, { uid, maintenant: Date.now(), largeur: window.innerWidth || 0 });
+      if (snap) ecrire(snap);
     };
     const bientot = (ms = 1500) => { if (t) clearTimeout(t); t = setTimeout(prendre, ms); };
     bientot(1200);
@@ -50058,8 +50063,20 @@ function CaptureJournee({ uid }) {
     const cache = () => { if (document.visibilityState === 'hidden') prendre(); };
     window.addEventListener('pagehide', prendre); document.addEventListener('visibilitychange', cache);
     return () => { mort = true; if (t) clearTimeout(t); try { if (obs) obs.disconnect(); } catch (_) {} window.removeEventListener('pagehide', prendre); document.removeEventListener('visibilitychange', cache); };
-  }, [complet, uid]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complet, uid, ecran]);
   return null;
+}
+// La racine de l'écran VRAI d'une attente prête (jamais l'instantané, jamais un écran caché).
+const racineEcranPret = (attente, sel) => [...document.querySelectorAll(`[data-attente-ecran="${attente}"][data-attente="pret"] ${sel}`)].find((e) => !e.closest('.vrm-ji') && !e.closest('.vrm-attente-cache')) || null;
+function CaptureJournee({ uid }) {
+  return <CaptureInstantane uid={uid} ecran="journee" racine={() => racineEcranPret('journee', '.vrm-fu-journee')} capturer={capturerJournee} ecrire={ecrireInstantane}/>;
+}
+function CaptureColis({ uid }) {
+  return <CaptureInstantane uid={uid} ecran="colis" racine={() => { const c = racineEcranPret('cat_bord', '[data-carte-stats="colis"]'); return c ? c.closest('.vrm-attente-pret') : null; }} capturer={capturerColis} ecrire={ecrireInstantaneColis}/>;
+}
+function CaptureVentes({ uid }) {
+  return <CaptureInstantane uid={uid} ecran="ventes" racine={() => racineEcranPret('ventes', 'section.vrm-tache[data-tache="ventes"]')} capturer={capturerVentes} ecrire={ecrireInstantaneVentes}/>;
 }
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
@@ -52735,14 +52752,25 @@ function AppCoeur() {
     // Les actions du jour (la cloche, « À faire » de Ma journée, les pastilles de la navigation).
     notifs: (notifsLus || baseKO || (accountsLoaded && !(vintedAccounts || []).length)) ? true : undefined,
   };
-  // (9 nov.) L'instantané de Ma journée de CE compte VRM sur CET appareil (src/journeeInstantanee.js) :
-  // relu à chaque arrivée sur Ma journée ; celui d'un autre uid n'est jamais rendu (`lireInstantane`).
-  // Base injoignable : aucun instantané (l'écran dit la panne, jamais des chiffres d'avant).
+  // (9 nov.) L'instantané de Ma journée, Colis, Ventes de CE compte VRM sur CET appareil
+  // (src/instantaneEcran.js, la règle commune) : relu à chaque arrivée sur l'écran ; celui d'un autre
+  // uid n'est jamais rendu. Base injoignable : aucun instantané (l'écran dit la panne, jamais des
+  // chiffres d'avant). Sans abonnement (aperçu flouté) : jamais d'instantané lisible.
+  // Colis : seulement sur sa vue d'ouverture (aucun site Leboncoin / autre demandé), et l'onglet rangé
+  // doit être celui que l'écran va montrer. Ventes : seulement sur « Tous ».
   const uidInstantane = (authState.user && authState.user.id) || '';
   const snapJournee = React.useMemo(() => (tab === 'journee' && uidInstantane ? lireInstantane(uidInstantane) : null), [tab, uidInstantane]);
-  // Sans abonnement (aperçu flouté) : jamais d'instantané lisible.
-  const instantaneJournee = tab === 'journee' && snapJournee && !baseKO && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })()
-    ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/> : null;
+  const vueColisOuverture = tab === 'cat_bord' && platSub !== 'leboncoin' && !(typeof platSub === 'string' && platSub.startsWith('site:'));
+  const snapColis = React.useMemo(() => (vueColisOuverture && uidInstantane ? lireInstantaneColis(uidInstantane) : null), [vueColisOuverture, uidInstantane]);
+  const vueVentesTous = tab === 'ventes' && siteDeTache('ventes', platSub) === 'toutes';
+  const snapVentes = React.useMemo(() => (vueVentesTous && uidInstantane ? lireInstantaneVentes(uidInstantane) : null), [vueVentesTous, uidInstantane]);
+  const instantanePermis = !baseKO && !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
+  const instantaneEcranIci = !instantanePermis ? null
+    : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
+    : vueColisOuverture && snapColis && (!ongletColis || ongletColis === snapColis.onglet) && (platSub !== 'retirer' || snapColis.onglet === 'retirer')
+      ? <ColisInstantane snap={snapColis} Icon={Icon} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
+    : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
+    : null;
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
   // session on affiche la porte d'entrée au lieu de l'app.
@@ -53501,8 +53529,10 @@ function AppCoeur() {
         {/* (8 nov.) Ma journée, Colis, Ventes, Annonces déjà vues restent montées, gelées et hors de
             la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
-        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneJournee}>
+        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
         {tab==='journee'&&uidInstantane&&<CaptureJournee uid={uidInstantane}/>}
+        {tab==='cat_bord'&&uidInstantane&&<CaptureColis uid={uidInstantane}/>}
+        {tab==='ventes'&&uidInstantane&&<CaptureVentes uid={uidInstantane}/>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
