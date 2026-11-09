@@ -104,7 +104,7 @@ export function CarteVerifEntreprise({ recherche, actuel, avecSiret = false, onE
             </div>
             <div className="vrm-ent-gestes">
               {l.cas === 'vide' ? <>
-                <button type="button" className="vrm-ent-b is-ok" data-ent-ok={l.champ} onClick={() => geste(l, 'ok')}>C’est bon</button>
+                <button type="button" className={`vrm-ent-b${vides.length > 1 ? "" : " is-ok"}`} data-ent-ok={l.champ} onClick={() => geste(l, 'ok')}>C’est bon</button>
                 <button type="button" className="vrm-ent-b" data-ent-modifier={l.champ} onClick={() => geste(l, 'modifier')}>Modifier</button>
               </> : <>
                 <button type="button" className="vrm-ent-b" data-ent-remplacer={l.champ} onClick={() => geste(l, 'remplacer')}>Remplacer</button>
@@ -117,7 +117,7 @@ export function CarteVerifEntreprise({ recherche, actuel, avecSiret = false, onE
       {vides.length > 1 ? <button type="button" className="vrm-ent-b is-ok vrm-ent-tout" data-ent-tout={vides.length} onClick={async () => {
         if (!(await ecrire(ecritureToutVide(vides)))) return;
         setDecide((x) => { const n = { ...x }; for (const l of vides) n[l.champ] = 'ok'; return n; });
-      }}>Tout est bon ({vides.length} champs vides)</button> : null}
+      }}>Tout est bon : remplir les {vides.length} champs</button> : null}
       {erreur ? <p className="vrm-ent-erreur" role="alert">{erreur}</p> : null}
       {p.notes.length ? <ul className="vrm-ent-notes">{p.notes.map((n) => <li key={n.cle} data-ent-note={n.cle}>{n.texte}</li>)}</ul> : null}
     </div>

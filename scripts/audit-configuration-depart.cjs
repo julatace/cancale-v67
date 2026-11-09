@@ -40,7 +40,7 @@ if (process.argv.includes('--prouve')) {
     ['profilFiscal.js', 'le rappel DAC7 sur des ventes incomplètes', "if (!p || p.etat !== 'lu' || p.verdict !== 'sous'", "if (!p || p.etat !== 'lu' || p.verdict === 'atteint'"],
     ['microEntreprise.js', 'les seuils des services = ceux de la vente', "services: { plafondVente: 83600, tvaBase: 37500, tvaMajore: 41250 },", "services: { plafondVente: 203100, tvaBase: 85000, tvaMajore: 93500 },"],
     ['configurationDepart.js', 'le statut pré-sélectionné sans réponse', "  let statut = null;", "  let statut = 'particulier';"],
-    ['configurationDepart.js', 'une étape réécrit ce qui n’a pas changé', "if (c.vends && c.vends !== i.vends)", "if (c.vends)"],
+    ['configurationDepart.js', 'une étape réécrit ce qui n’a pas changé', "if (cats.length && (cats.slice().sort().join() !== avant.slice().sort().join() || autre !== autreAvant))", "if (cats.length)"],
     ['configurationDepart.js', '« je ne sais pas » pose un statut', "if (regimeAvant !== null) out.push({ cle: CLE_REGIME, valeur: null });", "out.push({ cle: CLE_REGIME, valeur: 'particulier' });"],
     ['configurationDepart.js', 'un taux manuel remplacé', "  if (!tauxEstOfficiel(tauxBrut)) return null;\n", ""],
     ['configurationDepart.js', 'ouverte pour le propriétaire', "  if (proprietaire !== false) return false;\n", ""],
@@ -136,7 +136,7 @@ const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 
     numeroEcrit: { actif: true, depuis: '2026-11-07T00:00:00Z', ou: ['titre'] }, affichage: { choix: 'simple' },
     pushPrefs: { familles: { offres: false } },
   });
-  dit(deja.vends === 'sneakers' && deja.statut === 'micro-services' && deja.rythme === 'mensuel' && deja.liberatoire === 'non' && deja.acre === 'apres' && deja.numero === 'moi' && deja.numeroOu.join() === 'titre' && deja.affichage === 'simple', 'F4 un vendeur installé retrouve SES choix', deja);
+  dit(JSON.stringify(deja.vends) === '["sneakers"]' && deja.statut === 'micro-services' && deja.rythme === 'mensuel' && deja.liberatoire === 'non' && deja.acre === 'apres' && deja.numero === 'moi' && deja.numeroOu.join() === 'titre' && deja.affichage === 'simple', 'F4 un vendeur installé retrouve SES choix', deja);
   dit(deja.plateformes.join() === 'vinted,leboncoin,ebay' && deja.familles && deja.familles.offres === false && deja.familles.ventes === true, 'F4 plateformes choisies + compte relié ; familles lues par la règle du serveur', deja);
   dit(G.choixInitiaux({ regime: 'marge' }).statut === 'societe' && G.choixInitiaux({ regime: 'marge' }).tvaSociete === 'marge', 'F4 régime de la marge ⇒ société, TVA sur la marge');
   dit(G.choixInitiaux({ regime: null, configuration: { etat: 'plusTard', statut: 'inconnu' } }).statut === 'inconnu', 'F4 « je ne sais pas encore » reste pré-sélectionné');
@@ -150,7 +150,7 @@ const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 
   const i0 = G.choixInitiaux({});
   dit(G.ecrituresEtape('vends', { ...i0 }, i0, {}, AT).length === 0, 'F5 une étape sans réponse n’écrit rien');
   dit(G.ecrituresEtape('vends', deja, deja, {}, AT).length === 0 && G.ecrituresEtape('affichage', deja, deja, {}, AT).length === 0, 'F5 un choix inchangé ne réécrit rien');
-  const wv = G.ecrituresEtape('vends', { ...i0, vends: 'autre' }, i0, {}, AT);
+  const wv = G.ecrituresEtape('vends', { ...i0, vends: ['autre'] }, i0, {}, AT);
   dit(wv.length === 1 && wv[0].cle === 'vrm_je_vends' && wv[0].valeur.choix === 'autre', 'F5 « Autre chose » ⇒ vrm_je_vends', wv);
   const wp = G.ecrituresEtape('plateformes', { ...i0, plateformes: ['vinted'] }, i0, {}, AT);
   dit(wp.length === 1 && wp[0].cle === 'vrm_plateformes_affichees' && wp[0].valeur.sites.join() === 'vinted', 'F5 confirmer le défaut le RANGE (le choix est fait, la question ne revient pas)', wp);

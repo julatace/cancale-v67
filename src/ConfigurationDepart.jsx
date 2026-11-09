@@ -360,7 +360,7 @@ function SiretConfiguration({ entreprise, statut, poser }) {
     ? <div className="vrm-cfg-statut-propose" data-configuration-statut-propose={prop.statut}>
         <p>{prop.texte} Ton statut serait donc <b>Société</b>.</p>
         <div className="vrm-ent-gestes">
-          <button type="button" className="vrm-ent-b is-ok" data-ent-statut-ok="" onClick={() => { poser({ statut: prop.statut }); setStatutVu(recherche.ch); }}>C’est bon</button>
+          <button type="button" className="vrm-ent-b" data-ent-statut-ok="" onClick={() => { poser({ statut: prop.statut }); setStatutVu(recherche.ch); }}>C’est bon</button>
           <button type="button" className="vrm-ent-b" data-ent-statut-non="" onClick={() => setStatutVu(recherche.ch)}>Non</button>
         </div>
       </div>

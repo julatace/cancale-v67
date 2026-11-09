@@ -2,12 +2,12 @@
    Les jetons de l'écran qui l'accueille (configuration : --cfg-* ; app : --vrm-*),
    avec repli. Neutre ; l'accent seulement sur « C'est bon ». */
 .vrm-ent {
-  --ent-carte: var(--cfg-carte, var(--vrm-card, #fff));
-  --ent-fond: var(--cfg-fond, var(--vrm-bg, #F5F5F7));
-  --ent-encre: var(--cfg-encre, var(--vrm-ink, #1D1D1F));
-  --ent-gris: var(--cfg-gris, var(--vrm-muted, #6E6E73));
-  --ent-filet: var(--cfg-filet, var(--vrm-line, rgba(60,60,67,.18)));
-  --ent-accent: var(--cfg-accent, var(--vrm-accent, #0071E3));
+  --ent-carte: var(--cfg-carte, var(--d-carte, var(--vrm-surface, #fff)));
+  --ent-fond: var(--cfg-fond, var(--d-fond, var(--vrm-bg, #F5F5F7)));
+  --ent-encre: var(--cfg-encre, var(--d-encre, var(--vrm-ink, #1D1D1F)));
+  --ent-gris: var(--cfg-gris, var(--d-gris, var(--vrm-muted, #6E6E73)));
+  --ent-filet: var(--cfg-filet, var(--d-filet, var(--vrm-line, rgba(60,60,67,.18))));
+  --ent-accent: var(--cfg-accent, var(--d-accent, var(--vrm-accent, #0071E3)));
   box-sizing: border-box; min-width: 0; color: var(--ent-encre);
   border-radius: 14px; background: var(--ent-carte); box-shadow: inset 0 0 0 1px var(--ent-filet);
   padding: 12px 14px; font-size: 15px; line-height: 1.4; text-align: left;
@@ -42,7 +42,7 @@
 .vrm-ent-b {
   appearance: none; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 0; cursor: pointer;
   font: inherit; font-size: 15px; font-weight: 600; white-space: nowrap;
-  background: rgba(118,118,128,.12); color: var(--ent-encre);
+  background: var(--cfg-remplir, var(--d-remplir, rgba(118,118,128,.12))); color: var(--ent-encre);
 }
 .vrm-ent-b.is-ok { background: var(--ent-accent); color: #fff; }
 .vrm-ent-b:focus-visible { outline: 2px solid var(--ent-accent); outline-offset: 2px; }
