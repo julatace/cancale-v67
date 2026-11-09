@@ -17,7 +17,7 @@
   display: flex !important; align-items: center !important; gap: 12px !important;
   width: 100% !important; box-sizing: border-box !important; min-height: 68px !important;
   margin: 0 !important; padding: 12px 12px 12px 12px !important;
-  border: 0 !important; border-radius: 16px !important; box-shadow: none !important;
+  border: 0 !important; border-radius: 14px !important; box-shadow: none !important;
   background: rgba(255,255,255,.10) !important; color: #fff !important; text-align: left !important;
   font-family: var(--vrm-police) !important; cursor: pointer;
   transition: transform 140ms var(--p-sortie), background-color 140ms ease;
@@ -82,7 +82,7 @@
 .vrm-main[data-ecran="journee"] .vrm-fu-jour[data-auj] .vrm-jv2-jour > span { color: #fff; }
 .vrm-main[data-ecran="journee"] .vrm-fu-jour[data-choisi] .vrm-jv2-jour > b { background: #fff; color: #1D1D1F; box-shadow: none; font-weight: 700; }
 .vrm-main[data-ecran="journee"] .vrm-jv2-barre {
-  display: block; width: 4px; height: 14px; border-radius: 2px; background: rgba(255,255,255,.42);
+  display: block; width: 4px; height: 14px; border-radius: 999px; background: rgba(255,255,255,.42);
   transform-origin: 50% 100%; transform: scaleY(var(--h, 0)); transition: transform 320ms var(--p-sortie), background-color 160ms ease;
 }
 .vrm-main[data-ecran="journee"] .vrm-fu-jour[data-choisi] .vrm-jv2-barre { background: #fff; }
@@ -119,7 +119,7 @@
    (Julien, 9 nov. : « j'aimais bien la superposition des ventes »). Elle se touche ⇒ Ventes. */
 .vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton {
   flex: none; position: relative; width: 112px !important; height: 96px !important; min-height: 0 !important; margin: 0 -4px 0 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important;
-  cursor: pointer; border-radius: 16px; -webkit-tap-highlight-color: transparent; transition: transform 160ms var(--p-sortie);
+  cursor: pointer; border-radius: 14px; -webkit-tap-highlight-color: transparent; transition: transform 160ms var(--p-sortie);
 }
 .vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton:active { transform: scale(.95); }
 .vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
