@@ -32,6 +32,8 @@ export const PRIX_MOIS = '16,99';
 // paiement Pro reste fermé tant que son prix Stripe n'est pas posé
 // (`STRIPE_PRIX_PRO`) : la page dit « bientôt ».
 export const PRIX_PRO_MOIS = '19,99';
+// `true` le jour où le paiement Pro est ouvert (prix Stripe posé, `STRIPE_PRIX_PRO`) : la page cesse de dire « bientôt ».
+export const PRO_OUVERT = false;
 
 // (8 nov.) La durée de l'essai gratuit : celle que donne le serveur
 // (api/compte.js `trial_period_days`, api/_lib/relances-essai.js

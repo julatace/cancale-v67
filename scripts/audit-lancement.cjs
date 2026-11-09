@@ -155,9 +155,24 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
   //    comparerait Stripe à un prix qui n'est plus celui des CGV acceptées.
   await essaie('prix des CGV', async () => {
     const cgv = lire('public/legal/cgv.html') || '';
+    // (9 nov.) DEUX offres : Solo (le prix `PRIX_CGV`) et Pro (`PRIX_PRO_CGV`).
+    //    Chacune a UN prix, écrit pareil partout ; aucun troisième prix mensuel.
     const prixCgv = [...cgv.matchAll(/(\d+,\d{2}) € par mois/g)].map((m) => m[1]);
-    const uniques = [...new Set(prixCgv)];
-    dit(prixCgv.length >= 2 && uniques.length === 1, 'les CGV annoncent UN prix mensuel (encadré et article « Offres et prix »)', `${prixCgv.join(' · ') || 'aucun'}`);
+    const soloCgv = [...cgv.matchAll(/offre Solo\s*:\s*(\d+,\d{2}) € par mois|(\d+,\d{2}) € par mois \(offre Solo\)/g)].map((m) => m[1] || m[2]);
+    const proCgv = [...cgv.matchAll(/[Oo]ffre Pro\s*:\s*(\d+,\d{2}) € par mois|offre Pro à (\d+,\d{2}) € par mois/g)].map((m) => m[1] || m[2]);
+    const uniques = [...new Set(soloCgv)], uniquesPro = [...new Set(proCgv)];
+    dit(soloCgv.length >= 2 && uniques.length === 1 && proCgv.length >= 2 && uniquesPro.length === 1 && uniques[0] !== uniquesPro[0]
+      && prixCgv.every((x) => x === uniques[0] || x === uniquesPro[0]),
+      'les CGV annoncent UN prix par offre (Solo, Pro — encadré et article « Offres et prix »), aucun autre', `Solo ${soloCgv.join(' · ') || 'aucun'} · Pro ${proCgv.join(' · ') || 'aucun'} · tous ${prixCgv.join(' · ')}`);
+    {
+      const cptP = lire('api/compte.js') || '';
+      const pro = /PRIX_PRO_CGV\s*=\s*\{\s*centimes:\s*(\d+),\s*devise:\s*'(\w+)',\s*intervalle:\s*'(\w+)'/.exec(cptP);
+      const proC = uniquesPro.length === 1 ? Math.round(Number(uniquesPro[0].replace(',', '.')) * 100) : NaN;
+      dit(!!pro && Number(pro[1]) === proC && pro[2] === 'eur' && pro[3] === 'month', 'le serveur compare Stripe au prix Pro des CGV (PRIX_PRO_CGV)', pro ? `serveur ${pro[1]} c · CGV ${proC} c` : 'PRIX_PRO_CGV introuvable');
+      const regP = (lire('src/accueil-reglages.js') || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+      const pm = (/PRIX_PRO_MOIS\s*=\s*'(\d+,\d{2})'/.exec(regP) || [])[1];
+      dit(pm && pm === uniquesPro[0], 'l’app et la page d’accueil disent le prix Pro des CGV (PRIX_PRO_MOIS)', `PRIX_PRO_MOIS ${pm || '?'} · CGV ${uniquesPro.join('/')}`);
+    }
     const cgvCentimes = uniques.length === 1 ? Math.round(Number(uniques[0].replace(',', '.')) * 100) : NaN;
     const cpt = lire('api/compte.js') || '';
     const serveur = /PRIX_CGV\s*=\s*\{\s*centimes:\s*(\d+),\s*devise:\s*'(\w+)',\s*intervalle:\s*'(\w+)'/.exec(cpt);
@@ -174,7 +189,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     const prixMois = (/PRIX_MOIS\s*=\s*'(\d+,\d{2})'/.exec(reg) || [])[1];
     const acc = (lire('src/Accueil.jsx') || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     const litterauxAcc = [...acc.matchAll(/(\d+,\d{2}) €(?=\s*(?:par mois|\/\s*mois))|className="gros[^"]*">(\d+,\d{2}) €/g)].map((m) => m[1] || m[2]);
-    dit(prixMois && uniques.length === 1 && prixMois === uniques[0] && litterauxAcc.every((m) => m === uniques[0]),
+    dit(prixMois && uniques.length === 1 && prixMois === uniques[0] && litterauxAcc.every((m) => m === uniques[0] || m === uniquesPro[0]),
       'la page d’accueil dit le prix des CGV et aucun autre (PRIX_MOIS, aucun prix mensuel en clair qui le contredise)',
       `PRIX_MOIS ${prixMois || '?'} · CGV ${uniques.join('/')}${litterauxAcc.length ? ' · en clair ' + litterauxAcc.join(', ') : ''}`);
     const fb = /const prixLisible = \(p\) => [^\n]*: (PRIX_CGV_LISIBLE|'[^']*');/.exec(app);
