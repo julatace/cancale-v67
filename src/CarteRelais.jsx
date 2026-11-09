@@ -29,13 +29,12 @@
 //  sont sous « Point pas encore connu », avec la raison et le geste.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN } from './relaisColis.js';
+import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN, surLaCarte } from './relaisColis.js';
 import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, selecteurVilles as selecteurVillesRegle, CLE_AUTRES, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
 import './styles-colis-colonnes.css';
 import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.jsx';
 import { cleStatTransporteur } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
-import { explicationEnDouble } from './retraitPreuves.js';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -182,6 +181,14 @@ const jourFr = (s) => { const t = Date.parse(String(s || '') + 'T12:00:00'); ret
 // (8 nov.) `cooperatif` (au doigt) : un doigt fait défiler la PAGE, deux doigts déplacent la carte
 // (`cooperativeGestures` de MapLibre, phrase en français) — la carte ne prend jamais le défilement.
 const PHRASES_GESTES = { 'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + molette pour zoomer la carte', 'CooperativeGesturesHandler.MacHelpText': '⌘ + molette pour zoomer la carte', 'CooperativeGesturesHandler.MobileHelpText': 'Deux doigts pour déplacer la carte' };
+// (9 nov., Julien : capture iPhone, « Deux doigts pour déplacer la carte » écrit EN TRAVERS de la carte)
+// MapLibre pose ce voile à chaque glissement d'un doigt sur la carte — donc à chaque défilement de la
+// page qui passe dessus. Le voile est éteint (styles-colis-colonnes.css) ; à sa place, UN indice bref,
+// dans un coin, la première fois que la carte s'affiche au doigt pendant cette visite, qui s'efface seul.
+// La carte ne prend toujours pas le glissement d'un doigt (`cooperativeGestures`) : la page défile.
+export const INDICE_GESTES = 'Deux doigts pour déplacer la carte';
+export const INDICE_MS = 2500;
+let INDICE_MONTRE = false;
 const margesCadre = (h) => (h < 240 ? { top: 42, bottom: 58, left: 28, right: 28 } : { top: 48, bottom: 64, left: 40, right: 40 });
 export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat, muet = false, cooperatif = false }) {
   const boite = React.useRef(null);
@@ -243,6 +250,13 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cle, cooperatif]);
   React.useEffect(() => { marquerChoisi(elements.current, selection); }, [selection]);
+  const [indice, setIndice] = React.useState(false);
+  React.useEffect(() => {
+    if (!cooperatif || etat !== 'pret' || INDICE_MONTRE) return undefined;
+    INDICE_MONTRE = true; setIndice(true);
+    const t = setTimeout(() => setIndice(false), INDICE_MS);
+    return () => clearTimeout(t);
+  }, [cooperatif, etat]);
   // (8 nov.) « Agrandir » / « Réduire » : la boîte change de hauteur, la carte se recadre sur les mêmes points.
   const premiereHauteur = React.useRef(true);
   React.useEffect(() => {
@@ -260,6 +274,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
     <div style={{ position: 'relative' }}>
       <div ref={boite} data-relais-fond={etat} data-relais-cadre={points.length ? [Math.min(...points.map((p) => p.lon)), Math.min(...points.map((p) => p.lat)), Math.max(...points.map((p) => p.lon)), Math.max(...points.map((p) => p.lat))].map((v) => Number(v).toFixed(3)).join(',') : ''} className="vrm-relais-fond" aria-hidden={ko ? 'true' : undefined}
         style={{ width: '100%', height: hauteur, borderRadius: 10, overflow: 'hidden', background: '#eaeef2', ...(ko ? { position: 'absolute', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' } : null) }}/>
+      {indice && !ko ? <span className="vrm-relais-indice" data-carte-indice="" role="status">{INDICE_GESTES}</span> : null}
       {ko && !muet && <div data-relais-carte-ko="" style={{ fontSize: 12, color: 'var(--vrm-muted, #667)', padding: '8px 0' }}>La carte ne s’affiche pas ici pour l’instant — la liste ci-dessous reste juste.</div>}
       {selection ? <span className="vrm-sr">{selection}</span> : null}
     </div>
@@ -480,7 +495,11 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
   // hors réseau, pas de carte.
   const avecCarte = !!avecCarteVoulu && enLigne;
   const tousConnus = ((vueTout && vueTout.points) || []).filter((p) => !p.inconnu);
-  const reperes = useReperes(tousConnus, avecCarte && tousConnus.length > 0);
+  // (9 nov., Julien : « À retirer · 0 » et une carte à 18 points) LA CARTE NE MONTRE QUE CE QUE L'ONGLET
+  // COMPTE (`surLaCarte`, src/relaisColis.js) : un point dont tous les colis sont « à vérifier », « peut-être
+  // en double » ou « en route » n'y a pas d'épingle — ses colis restent dans leurs replis, jamais cachés.
+  const aEpingler = tousConnus.filter(surLaCarte);
+  const reperes = useReperes(aEpingler, avecCarte && aEpingler.length > 0);
   useCommunesCp(vueTout, true);
   const villes = selecteurVilles(vueTout);
   const vChoisie = villes.find((v) => v.cle === ville) || null;
@@ -494,7 +513,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
   const [etatFond, setEtatFond] = React.useState('charge');
   const racine = React.useRef(null);
   // La carte suit la ville choisie : SES points seuls (le cadrage se fait sur eux).
-  const surCarte = avecCarte ? connus.filter((p) => !vChoisie || vChoisie.points.includes(p.cle)).map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
+  const surCarte = avecCarte ? connus.filter(surLaCarte).filter((p) => !vChoisie || vChoisie.points.includes(p.cle)).map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
   const [grande, setGrande] = React.useState(false);
   const hauteurCarte = grande ? (ordi ? 420 : 380) : (ordi ? 220 : 200);
   const choisir = (cle) => {
@@ -599,9 +618,11 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
         </details>) : null}
       {parSection.double.length ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-double" data-rp-section="double" data-rp-section-n={parSection.double.length} data-retirer-en-double={parSection.double.length}>
-          <summary className="vrm-rpf-section-titre is-repli"><span>Peut-être en double<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
-          {/* (6 nov.) Pourquoi « peut-être en double » : une phrase, une fois (src/retraitPreuves.js). */}
-          <p className="vrm-rp-sous vrm-rpf-double-pourquoi" data-double-explication={parSection.double.length}>{explicationEnDouble(parSection.double.length)}</p>
+          {/* (9 nov., 17 h 24, Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION ») Plus de « peut-être » ni de paragraphe :
+              chaque moitié Vinted a UN état, sur SA ligne — « Compté avec le n°…1234 » (le colis du transporteur
+              arrivé au même point, compté une fois). Un témoin = un carton : une moitié sans témoin libre est à
+              retirer, comptée ; une moitié dont le témoin est fini est dans les sortis (api/_lib/achat-arrive-relais.js). */}
+          <summary className="vrm-rpf-section-titre is-repli"><span>Comptés avec un autre colis<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
           <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
         </details>) : null}
       {nRoute ? (
@@ -629,11 +650,11 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;
   // Au téléphone (pas de carte) : aucune adresse n'est cherchée pour la carte.
-  const reperes = useReperes(connus, avecCarte && connus.length > 0);
+  const reperes = useReperes(connus.filter(surLaCarte), avecCarte && connus.some(surLaCarte));
   const [choisi, setChoisi] = React.useState('');
   const [etatFond, setEtatFond] = React.useState('charge');
   const racine = React.useRef(null);
-  const surCarte = avecCarte ? connus.map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
+  const surCarte = avecCarte ? connus.filter(surLaCarte).map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
   const choisir = (cle) => {
     setChoisi(cle);
     const el = racine.current && [...racine.current.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === cle);

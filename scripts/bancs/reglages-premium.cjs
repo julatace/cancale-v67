@@ -45,6 +45,8 @@ const REGLAGES = {
   vrm_email_config: { startDate: '2026-07-10' },
 };
 
+const MAIN = { vrm_configuration: { etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 } };
+
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).slice(0, 200)); } };
@@ -71,6 +73,9 @@ async function ouvrir(nav, vp, vue) {
     if (/select=owner/.test(u)) return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     for (const k of Object.keys(REGLAGES)) if (u.includes('id=eq.' + k)) return j([{ data: REGLAGES[k] }]);
+    // (9 nov.) Camille est une vendeuse INSTALLÉE : sa configuration de départ est faite
+    // (« Ma configuration » plein écran ne s'ouvre qu'au tout premier lancement, 9 nov.).
+    if (/id=eq\.main(&|$)/.test(u)) return j([{ id: 'main', updated_at: new Date().toISOString(), data: MAIN }]);
     return j([]);
   });
   await pg.route('**/api/**', (r) => {
@@ -78,6 +83,12 @@ async function ouvrir(nav, vp, vue) {
     if (/mode=abonnement/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ABO) });
     if (/mode=factures/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FACTURES) });
     if (/mode=detourage/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, ready: true, autorise: true, n: 12, plafond: 100 }) });
+    // (9 nov.) Le bilan du mois par e-mail (8 nov.) dans la VRAIE forme de api/compte.js :
+    // GET ⇒ `actif` booléen (ou null pas su) ; POST ⇒ le choix écrit renvoyé.
+    if (/mode=bilan-mois/.test(u)) {
+      if (r.request().method() === 'POST') { let a = null; try { a = JSON.parse(r.request().postData() || '{}').actif; } catch (_) {} return r.fulfill({ status: typeof a === 'boolean' ? 200 : 400, contentType: 'application/json', body: JSON.stringify(typeof a === 'boolean' ? { ok: true, actif: a } : { ok: false, raison: 'corps' }) }); }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, configure: true, actif: false, envois: {} }) });
+    }
     if (/email-rattacher/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, emails: [], installation: null }) });
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"pret":true}' });
   });
@@ -127,9 +138,11 @@ async function interrupteurs(pg, T) {
     if (await s.isDisabled()) { dit(libre, `${T} interrupteur « ${nom} » (désactivé : réglage pas lu) rien ne le recouvre`); continue; }
     const avant = await s.getAttribute('aria-checked');
     await s.click({ timeout: 4000 });
-    await pg.waitForTimeout(450);
+    // (9 nov.) Pas un délai fixe (§6.5) : on attend que l'état change, 3 s au plus (sous charge,
+    // 450 ms ne suffisaient pas toujours à un réglage synchronisé, « Ce que le stream cache »).
     const s2 = pg.locator('.vrm-set [role="switch"]').nth(i);
-    const apres = await s2.getAttribute('aria-checked');
+    let apres = await s2.getAttribute('aria-checked');
+    for (let k = 0; k < 30 && apres === avant; k++) { await pg.waitForTimeout(100); apres = await s2.getAttribute('aria-checked'); }
     dit(libre && avant !== apres, `${T} interrupteur « ${nom} » : cliquable, et le clic change son état`, `${avant} → ${apres}${libre ? '' : ' · RECOUVERT'}`);
     await s2.click({ timeout: 4000 }).catch(() => {});
     await pg.waitForTimeout(350);
@@ -180,7 +193,9 @@ async function interrupteurs(pg, T) {
                 // (1er nov.) « Import des emails » n'agit que pour la boîte du PROPRIÉTAIRE de
                 // l'installation : chez un vendeur (ABO.proprietaire false) il n'est pas
                 // proposé ; s'il l'est, il vit à côté de la réception des emails.
-                importAvecEmails: !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="adresses"]') && (!document.querySelector('[data-sous-ouvrir="import"]') || !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="import"]')),
+                // (9 nov.) Depuis le 6 nov. « E-mails » a son groupe (« Mes e-mails ») : on juge
+                // que l'import est dans le MÊME groupe que la réception, quel que soit son nom.
+                importAvecEmails: (() => { const a = document.querySelector('[data-sous-ouvrir="adresses"]'); const g = a && a.closest('[data-groupe-reglages]'); const i = document.querySelector('[data-sous-ouvrir="import"]'); return !!g && (!i || g.contains(i)); })(),
                 importVendeur: !!document.querySelector('[data-sous-ouvrir="import"]'),
               };
             });

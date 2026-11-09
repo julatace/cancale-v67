@@ -152,6 +152,11 @@ async function preparer(b, vp, sombre, opts = {}) {
     }
     if (m !== 'GET') return rep([]);
     if (/id=like\.harvest_\*_suivi_\*/.test(u) && opts.suivisVinted === 'ko') return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
+    // (9 nov.) Depuis le 8 nov. les petites lignes partent groupées en `id=in.(…)`
+    // (src/lectureGroupee.js) : une ligne illisible fait échouer le LOT (5xx), puis la
+    // règle la relit seule (`id=eq.`) — qui échoue aussi. Avant, le lot répondait et la
+    // panne n'était jamais servie.
+    if (opts.relaisKo && /id=in\.\([^)]*\bpanel_colis_relais\b/.test(u)) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
     if (/id=eq\.panel_colis_relais/.test(u) && opts.relaisKo) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
     if (/select=owner/.test(u)) return rep([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return rep(ACCOUNTS);
