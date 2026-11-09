@@ -2901,7 +2901,7 @@ function AskTextSheet({ q, close }) {
   React.useEffect(() => { const t = setTimeout(() => { try { ref.current.focus(); ref.current.select(); } catch (_) {} }, 60); return () => clearTimeout(t); }, []);
   const { titre, corps } = sheetTexte(q, 'Saisir');
   return (
-    <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
+    <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION} className="vrm-confirmation">
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -2945,7 +2945,7 @@ function ConfirmHost() {
   // (3 nov.) VÉRIFIER AVANT DE PUBLIER (`src/verifAnnonce.js`) : une ligne par
   // problème + son geste ; « Corriger » ferme, « Publier quand même » continue.
   if (q.kind === 'verif') return createPortal(
-    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation">
       <div data-verif-sheet={q.site || ''} data-verif-n={(q.lignes || []).length}>
         <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{q.title}</div>
         <div className="vrm-verif-liste" style={{marginTop:12,display:'flex',flexDirection:'column',borderTop:`1px solid ${C.border}`}}>
@@ -2965,7 +2965,7 @@ function ConfirmHost() {
   if (q.kind === 'choix') {
     const { titre: tc, corps: cc } = sheetTexte(q, 'Choisis');
     return createPortal(
-      <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
+      <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION} className="vrm-confirmation">
         <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{tc}</div>
         {cc.length > 0 && <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{cc.join('\n')}</div>}
         {/* (1er nov.) Des choix en PHRASES (la case occupée du Stock) : une par ligne, jamais coupées dans une grille de 120 px. */}
@@ -2981,7 +2981,7 @@ function ConfirmHost() {
   // étaient écrits d'un bloc avec des retours à la ligne.
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
   return createPortal(
-    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation">
       {/* (29 oct.) Plus de rouge sur une confirmation (§7 : le rouge, c'est deux
           paires sous un même N°) : la conséquence est dite par le texte. */}
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
@@ -27250,11 +27250,11 @@ function Skeleton({ variant='row', count=6 }) {
 
 // État d'erreur de chargement, avec un bouton « Réessayer ».
 function LoadError({ onRetry }) {
-  return <div style={{textAlign:'center',padding:'28px 16px'}}>
+  return <div className="vrm-erreur-chargement" style={{textAlign:'center',padding:'28px 16px'}}>
     <div aria-hidden="true" style={{width:44,height:44,margin:'0 auto 10px',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:C.card2,color:C.muted}}><Icon name="cloudOff" size={20}/></div>
     <div style={{fontSize:15,fontWeight:500,color:C.text,marginBottom:4}}>Impossible de charger ces données</div>
     <div style={{marginBottom:12}}/>
-    <button type="button" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'0 22px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600}}>Réessayer</button>
+    <button type="button" className="vrm-erreur-chargement-bouton" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'0 22px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600}}>Réessayer</button>
   </div>;
 }
 
