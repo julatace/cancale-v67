@@ -105,3 +105,10 @@ retrait, pas les bordereaux). Rien de la liste refusée, ni prix venu des autres
 | 40 | Extension | **Sur vinted.fr, sur SES annonces** : « N°124 · acheté 60 € · en ligne depuis 23 j » discret sous chaque annonce (lecture seule) | l'info au bon endroit, sans changer d'onglet | moyen (ext.) |
 | 41 | Extension | **Pendant un ACHAT sur Vinted** : la calculette (13) et « tu as déjà 2 paires de ce modèle » (8) dans la page | décider au moment d'acheter | moyen (ext.) |
 | 42 | Messages | **Messages des quatre plateformes dans un seul fil par acheteur et par paire**, avec la plateforme marquée | ne plus aller chercher où il a écrit (si pas déjà le cas partout) | moyen |
+
+### Décision de Julien sur la cinquième série (9 nov., soir)
+« Vas-y, j'adore Colis, et fais pareil pour les achats, fais tout » ⇒ **31 à 42 validées**, et
+**33 étendu aux ACHATS** : au point relais, la caméra lit le code du colis (n° de suivi = son
+identité) ⇒ « retiré » coché sur CET achat (jamais par ressemblance ; code inconnu ⇒ dit, rien coché).
+Lots : U = 31 + 32 · V = 33 Colis + Achats (scanner) · W = 34 · X = 35 + 36 + 37 · Y = 38 ·
+Z = 39 · AA = 40 + 41 (extension, version réservée **5.339**) · AB = 42.

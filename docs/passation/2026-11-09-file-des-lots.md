@@ -6,7 +6,7 @@ branches `claude/<lot>` existent, intégrer celles qui sont finies (vrai merge, 
 passation générale), puis lancer les suivantes (≈ 5 agents en même temps au plus).
 
 Versions d'extension réservées : **5.336** = C (baisse de prix en série) · **5.337** = G
-(jauge + journal) · **5.338** = O (mode vacances). Un lot qui n'en a finalement pas besoin
+(jauge + journal) · **5.338** = O (mode vacances) · **5.339** = AA (infos sur vinted.fr). Un lot qui n'en a finalement pas besoin
 libère son numéro (le dire ici).
 
 | lot | contenu | branche | état |
@@ -36,5 +36,14 @@ libère son numéro (le dire ici).
 | R | livre de police | `claude/livre-police` | à lancer |
 | S | factures Pro Leboncoin/eBay/Vestiaire (forme à mesurer) | `claude/factures-autres` | à lancer |
 | T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | à lancer |
+
+| U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
+| V | scanner au dépôt (Colis) ET au retrait (Achats) | `claude/scanner-colis-achats` | à lancer |
+| W | inventaire de fin d'année | `claude/inventaire-annuel` | à lancer |
+| X | sélection multiple + filtres enregistrés + fiche à côté de la liste | `claude/lots-vues-panneau` | à lancer |
+| Y | corbeille 30 jours | `claude/corbeille` | à lancer |
+| Z | pastille sur l'icône (colis à envoyer) | `claude/pastille-icone` | à lancer |
+| AA | sur vinted.fr : infos sous SES annonces + calculette pendant un achat (ext. 5.339) | `claude/extension-infos` | à lancer |
+| AB | un seul fil par acheteur et par paire, toutes plateformes | `claude/fil-unique` | à lancer |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
