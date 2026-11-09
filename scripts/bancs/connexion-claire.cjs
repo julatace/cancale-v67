@@ -204,11 +204,20 @@ const { chromium } = require("playwright"),
       await p
         .getByRole("button", { name: "Envoyer le lien", exact: true })
         .click();
+      // (8 nov.) La phrase dit le geste ; « Renvoyer » attend 60 s sur le bouton,
+      // et plus aucune voie « colle le lien » sur cet écran.
       await p
         .getByRole("status")
-        .filter({ hasText: "Si un compte existe" })
+        .filter({ hasText: "On t’a envoyé un e-mail à client@exemple.test. Ouvre-le sur cet appareil." })
         .waitFor();
       assert.equal(recuperations, 1);
+      assert.match(
+        await p.locator("[data-auth-valider]").innerText(),
+        /^Renvoyer dans \d+ s$/,
+      );
+      assert.equal(await p.locator("[data-auth-valider]").isDisabled(), true);
+      assert.equal(await p.getByText(/colle le lien/i).count(), 0);
+      assert.equal(await p.locator('a[href="/recuperation.html"]').count(), 0);
       await p.getByRole("button", { name: "Retour", exact: true }).click();
       assert.equal(await p.getByRole("status").count(), 0);
       compteNonConfirme = true;

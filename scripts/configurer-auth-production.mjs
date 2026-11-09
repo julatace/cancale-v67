@@ -2,12 +2,14 @@
 // Ne jamais coller le jeton Supabase ni les identifiants SMTP dans un chat.
 import fs from 'node:fs';
 const projet='lgonxzrzjcqthjtbdpzo',origine='https://vrm.center';
-const contenu=fs.readFileSync(new URL('../supabase/templates/recovery.html',import.meta.url),'utf8');
-const confirmation=fs.readFileSync(new URL('../supabase/templates/confirmation.html',import.meta.url),'utf8');
-const changements={site_url:origine,mailer_subjects_confirmation:'VRM — Confirme ton adresse email',mailer_templates_confirmation_content:confirmation,mailer_subjects_recovery:'VRM — Réinitialiser ton mot de passe',mailer_templates_recovery_content:contenu,smtp_sender_name:'VRM'};
+// (8 nov.) Les six modèles et leurs sujets bilingues, fabriqués par
+// scripts/modeles-email.cjs (supabase/templates/sujets.json).
+const sujets=JSON.parse(fs.readFileSync(new URL('../supabase/templates/sujets.json',import.meta.url),'utf8'));
+const changements={site_url:origine,smtp_sender_name:'VRM'};
+for(const [id,{sujet}] of Object.entries(sujets)){changements[`mailer_subjects_${id}`]=sujet;changements[`mailer_templates_${id}_content`]=fs.readFileSync(new URL(`../supabase/templates/${id}.html`,import.meta.url),'utf8');}
 const appliquer=process.argv.includes('--appliquer');
 const token=process.env.SUPABASE_ACCESS_TOKEN;
-if(!appliquer){console.log('Aperçu : Site URL https://vrm.center, autorisation de retour sur VRM, objets et modèles de confirmation et réinitialisation VRM, nom d’expéditeur VRM. Aucun réglage modifié.');console.log('L’adresse d’expédition VRM nécessite un SMTP de domaine vérifié ; les paramètres existants seront conservés.');process.exit(0);}
+if(!appliquer){console.log('Aperçu : Site URL https://vrm.center, autorisation de retour sur VRM, objets et modèles des six e-mails de compte VRM (FR/EN), nom d’expéditeur VRM. Aucun réglage modifié.');console.log('L’adresse d’expédition VRM nécessite un SMTP de domaine vérifié ; les paramètres existants seront conservés.');process.exit(0);}
 if(!token){console.error('Accès administrateur indisponible. Fournir SUPABASE_ACCESS_TOKEN dans l’environnement local, jamais dans le chat. Aucun réglage modifié.');process.exit(1);}
 const endpoint=`https://api.supabase.com/v1/projects/${projet}/config/auth`;
 try{
