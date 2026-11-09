@@ -67,6 +67,8 @@ const lignes = () => [
   { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [] } } },
   ...PARTIS.filter((p) => p[2]).map(([tx, j, b]) => ({ id: 'email_bord_' + tx, data: { type: 'bordereau', transaction: String(tx), uid: '111', account: 'compte_a', filename: `Bordereau-Vinted-${tx}.pdf`, modele: TITRE, article: TITRE, receivedAt: ilYa(j - 0.1), pdfB64: PDF_B64, suivi: b.suivi, transporteur: b.transporteur, dateLimite: '', ...(b.transporteurPdf ? { transporteurPdf: b.transporteurPdf, pdfLu: b.pdfLu } : {}) } })),
   { id: 'vrm_bord_transporteurs', data: { v: 1, parTx: {}, vus: {}, pdf: { 7108: { t: 'chronopost' } }, pdfVus: {} } },
+  // (9 nov.) Une information reçue par SMS de VestiaireCo (sans identité) : DITE dans « À envoyer », jamais un colis.
+  { id: 'vrm_sms_infos', data: { v: 1, infos: { 'vc|prada|2026-11-12': { source: 'vestiaire', marque: 'Prada', jour: '2026-11-12', limite: '2026-11-12T23:59:59+01:00', premiere: ilYa(1), derniere: ilYa(1), n: 1, formes: ['vendu'] } } } },
   ...AENV.map(([tx, j, lim]) => ({ id: 'email_bord_' + tx, data: { type: 'bordereau', transaction: String(tx), uid: '111', account: 'compte_a', filename: `Bordereau-Vinted-${tx}.pdf`, modele: TITRE, article: TITRE, receivedAt: ilYa(j - 0.1), pdfB64: PDF_B64, suivi: '', transporteur: '', dateLimite: fmtLimite(lim) } })),
   // L'e-mail de Chronopost pour le MÊME n° que le bordereau de 7103 (forme `email_track_*`, scalaires).
   { id: 'email_track_chronopost_XA200000003FR', data: { type: 'suivi', carrier: 'chronopost', suivi: 'XA200000003FR', status: 'transit', label: 'En cours d’acheminement', subject: 'Votre colis XA200000003FR est en cours d’acheminement', receivedAt: ilYa(7), sens: 'sortant' } },
@@ -228,6 +230,9 @@ async function regle() {
         await pg.waitForTimeout(1200);
         const A = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card]')].map((x) => x.getAttribute('data-colis-ident')));
         dit(A.join() === 'v:7202,v:7201', 'A. « À envoyer » : la limite la plus proche d’abord (7202 demain, puis 7201)', A.join());
+        const IS = await pg.evaluate(() => { const e = document.querySelector('[data-infos-sms="vestiaire"]'); return e ? { n: e.getAttribute('data-infos-sms-n'), t: e.innerText } : null; });
+        dit(IS && IS.n === '1' && /Prada/.test(IS.t) && /12 nov/.test(IS.t) && !/peut-être «/.test(IS.t), 'I. « À envoyer » dit l’information SMS Vestiaire (marque, date limite), sans la relier à rien', JSON.stringify(IS));
+        dit(A.length === 2, 'I. l’information SMS n’est pas comptée comme un colis');
         await shot(pg, `envoyer-${k}`);
         await onglet(pg, 'envoyes');
         await pg.waitForFunction(() => document.querySelectorAll('[data-colis-envoye]').length >= 8, null, { timeout: 15000 }).catch(() => {});

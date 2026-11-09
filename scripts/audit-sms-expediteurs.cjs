@@ -121,7 +121,7 @@ async function suite(widgetDefault, { quiet = false } = {}) {
   const nLignes = base.lignes.size;
   r = await appel(S.mrRappel, { expediteur: 'MRELAY', date: '2026-11-10T08:00:00+01:00' });
   l = L('email_track_mondialrelay_81234560');
-  ok(r.code === 200 && base.lignes.size === nLignes && l.code === '712340' && l.lieu === "TABAC D'ICI" && l.arriveLe === '2026-11-09T09:00:00.000Z', 'M3 le rappel du MÊME colis : une seule entrée, code et lieu identiques, arrivée inchangée', JSON.stringify([base.lignes.size, nLignes, l.arriveLe]));
+  ok(r.code === 200 && base.lignes.size === nLignes && !!l && l.code === '712340' && l.lieu === "TABAC D'ICI" && l.arriveLe === '2026-11-09T09:00:00.000Z', 'M3 le rappel du MÊME colis : une seule entrée, code et lieu identiques, arrivée inchangée', JSON.stringify([base.lignes.size, nLignes, l.arriveLe]));
   r = await appel(S.mrRappelSeul, { expediteur: 'MRELAY' });
   l = L('email_track_mondialrelay_81234562');
   ok(l && l.status === 'available' && l.code === '712342' && l.lieu === 'LIBRAIRIE CENTRE' && !l.arriveLe, 'M4 un rappel reçu seul : à retirer, mais il ne date jamais l’arrivée', JSON.stringify(l));
@@ -130,16 +130,16 @@ async function suite(widgetDefault, { quiet = false } = {}) {
 
   // V. VESTIAIRECO
   r = await appel(S.vcVendu, { expediteur: 'VestiaireCo', date: '2026-11-09T14:20:00+01:00' });
-  let inf = L('vrm_sms_infos');
+  let inf = L('vrm_sms_infos') || { infos: {} };
   const cles = inf ? Object.keys(inf.infos || {}) : [];
   const e = inf && inf.infos[cles[0]];
-  ok(r.code === 200 && cles.length === 1 && e.source === 'vestiaire' && e.marque === 'Prada' && e.jour === '2026-11-16' && /^2026-11-16T23:59:59\+01:00$/.test(e.limite), 'V1 « Votre article Prada vient d’etre vendu … avant le lundi 16 novembre » ⇒ UNE information datée (année de la réception)', JSON.stringify(inf));
+  ok(r.code === 200 && cles.length === 1 && !!e && e.source === 'vestiaire' && e.marque === 'Prada' && e.jour === '2026-11-16' && /^2026-11-16T23:59:59\+01:00$/.test(e.limite), 'V1 « Votre article Prada vient d’etre vendu … avant le lundi 16 novembre » ⇒ UNE information datée (année de la réception)', JSON.stringify(inf));
   r = await appel(S.vcRappel, { expediteur: 'VestiaireCo', date: '2026-11-12T08:04:00+01:00' });
-  inf = L('vrm_sms_infos');
-  const e2 = inf.infos[cles[0]];
-  ok(Object.keys(inf.infos).length === 1 && e2.n === 2 && e2.formes.join() === 'vendu,rappel', 'V2 le rappel (même marque, même date) met à jour la MÊME information', JSON.stringify(inf.infos));
+  inf = L('vrm_sms_infos') || { infos: {} };
+  const e2 = inf.infos[cles[0]] || {};
+  ok(Object.keys(inf.infos).length === 1 && e2.n === 2 && (e2.formes || []).join() === 'vendu,rappel', 'V2 le rappel (même marque, même date) met à jour la MÊME information', JSON.stringify(inf.infos));
   r = await appel(S.vcAutre, { date: '2026-11-10T09:00:00+01:00' });
-  inf = L('vrm_sms_infos');
+  inf = L('vrm_sms_infos') || { infos: {} };
   ok(Object.keys(inf.infos).length === 2, 'V3 reconnu sans expéditeur (ses phrases) ; une autre marque/date ⇒ une autre information', JSON.stringify(Object.keys(inf.infos)));
   ok(![...base.lignes.keys()].some((k) => /\|vc_ventes$|\|vc_email_vente_/.test(k)) && !/annul/i.test(JSON.stringify(inf)), 'V4 rien rattaché à une vente Vestiaire ; « sinon la vente sera annulée » ne constate aucune annulation');
 
@@ -150,7 +150,7 @@ async function suite(widgetDefault, { quiet = false } = {}) {
   base.lignes.set('A|email_track_vinted_XX99', { type: 'suivi', carrier: 'vinted', suivi: '', code: 'K22222', status: 'available', limite: null, subject: 'Ton colis t’attend' });
   r = await appel(S.vgoConnu, { expediteur: 'VintedGo' });
   l = L('email_track_vinted_XX99');
-  ok(l.limite === '2026-11-19' && l.aussiSms === true && !L('email_track_vinted_code-K22222'), 'G2 le code est porté par un colis d’e-mail ⇒ CE colis reçoit la date limite, aucune ligne en double', JSON.stringify(l));
+  ok(!!l && l.limite === '2026-11-19' && l.aussiSms === true && !L('email_track_vinted_code-K22222'), 'G2 le code est porté par un colis d’e-mail ⇒ CE colis reçoit la date limite, aucune ligne en double', JSON.stringify(l));
   base.lignes.set('A|panel_colis_relais', { 4400001: { code: 'K33333', lieu: 'Relais X' } });
   r = await appel(S.vgoConv, { expediteur: 'VintedGo' });
   l = L('email_track_vinted_code-K33333');
@@ -160,9 +160,9 @@ async function suite(widgetDefault, { quiet = false } = {}) {
   r = await appel(S.pk1, { expediteur: 'Pickup' });
   r = await appel(S.pk1, { expediteur: 'Pickup' });
   r = await appel(S.pk2, { expediteur: 'Pickup' });
-  inf = L('vrm_sms_infos');
+  inf = L('vrm_sms_infos') || { infos: {} };
   const pk = Object.entries(inf.infos).filter(([k]) => k.startsWith('pickup|'));
-  ok(pk.length === 2 && pk.every(([, v]) => v.relais === 'TABAC DU PORT' && /^http:\/\/n\.pkup\.fr\//.test(v.pass)) && pk.find(([k]) => k === 'pickup|Ab3dEf9Gh')[1].n === 2, 'P1 une information par JETON de Pass (le même jeton ⇒ la même), même relais ⇒ rien deviné', JSON.stringify(pk));
+  ok(pk.length === 2 && pk.every(([, v]) => v.relais === 'TABAC DU PORT' && /^http:\/\/n\.pkup\.fr\//.test(v.pass)) && (pk.find(([k]) => k === 'pickup|Ab3dEf9Gh') || [0, {}])[1].n === 2, 'P1 une information par JETON de Pass (le même jeton ⇒ la même), même relais ⇒ rien deviné', JSON.stringify(pk));
   ok(![...base.lignes.keys()].some((k) => /email_track_.*pickup|email_track_.*TABAC/i.test(k)), 'P2 jamais un colis « à retirer » fabriqué sans identité');
 
   // C. CHRONOPOST
@@ -181,7 +181,7 @@ async function suite(widgetDefault, { quiet = false } = {}) {
   r = await appel(S.verifVgo, { expediteur: 'VintedGo' });
   ok(r.corps.range === false && !base.posts().slice(n2).some((x) => /612345/.test(x.corps)), 'X1 un code de vérification (même de Vinted Go) n’est jamais rangé');
   r = await appel(S.vcVendu, { k: JB, expediteur: 'VestiaireCo' });
-  ok(L('vrm_sms_infos', 'B') && Object.keys(L('vrm_sms_infos', 'B').infos).length === 1 && Object.keys(L('vrm_sms_infos').infos).length === 4, 'X2 le vendeur est celui du JETON (B), jamais le texte');
+  ok(L('vrm_sms_infos', 'B') && Object.keys(L('vrm_sms_infos', 'B').infos).length === 1 && Object.keys((L('vrm_sms_infos') || { infos: {} }).infos).length === 4, 'X2 le vendeur est celui du JETON (B), jamais le texte');
   base.pannes.lecture = (u) => /vrm_sms_infos/.test(u);
   const avant = JSON.stringify(L('vrm_sms_infos'));
   r = await appel(S.vcAutre.replace('Celine', 'Loewe'), { expediteur: 'VestiaireCo' });
@@ -224,6 +224,7 @@ async function suite(widgetDefault, { quiet = false } = {}) {
   fs.symlinkSync(path.join(R, 'src'), path.join(tmp, 'src'));
   let n = 0;
   for (const [fichier, nom, mut] of MUT) {
+    if (!fs.existsSync(path.join(LIBS, fichier))) { ko++; console.log(`❌ E mutation « ${nom} » : ${fichier} absent`); continue; }
     const src = fs.readFileSync(path.join(LIBS, fichier), 'utf8');
     const m = mut(src);
     if (m === src) { ko++; console.log(`❌ E mutation « ${nom} » : motif introuvable`); continue; }
