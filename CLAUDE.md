@@ -513,6 +513,7 @@ sans la fonction.
 | `cartesansonglet` | `prendreVerrouRenouv` | **5.329.0** (8 nov.) | la carte du logo porte elle-même e-mail + mot de passe (shadow root fermée, aucun onglet, plus d'iframe) ; un seul renouvellement de session pour toute l'extension |
 | `comptepush` | `signalerCompteRelie` | **5.331.0** (9 nov.) | « shop_x est relié à VRM » arrive tout de suite : après la 1re écriture d'un compte (Vinted, Leboncoin, Vestiaire), `POST /api/push {action:'comptes'}` avec la session, une fois par compte ; sans session rien ne part |
 | `cartecode` | `authCodeVerif` | **5.330.0** (9 nov.) | la carte du logo : « Me connecter avec un code » (e-mail, tout compte, jamais de compte créé), mot de passe replié, Google/Discord dans le MÊME onglet sur Orion (retour sur la page Vinted) |
+| `cartecadre` | `cadreVoulu` (vrm-badge.js) | **5.332.0** (9 nov.) | Chrome/Edge/Firefox : le formulaire de la carte dans un iframe de l'extension (`popup.html?mode=carte`, la page n'entend aucune touche) ; Orion ou cadre muet 1,5 s ⇒ la carte dessinée ; jamais d'onglet |
 
 ---
 
@@ -533,7 +534,6 @@ sans la fonction.
 - **8 nov. · Vendeurs différents** : Affichage Simple/Complet (`vrm_affichage`, auto = 1 compte et < 30 ventes/30 j, jamais Julien, pas su ⇒ Complet ; ne cache que des entrées, aucun total) ; « Je vends » (`vrm_je_vends`) : hors sneakers taille/marque facultatives, « article » ; « ordinateur » seulement si vrai (Orion) ; équipe : 016 dite. `src/profilVendeur.js`, `docs/passation/2026-11-08-vendeurs-differents.md`. Geste : 016.
 - **8 nov. · Accueil qui vend + bilan du mois par e-mail** : page publique refaite (promesse, journée en 4 moments, VRAIES captures en mode exemple `scripts/accueil-captures.cjs` + registre d'empreintes, prix et essai lus dans le code, FAQ, `/statut`) ; bilan du mois ÉTEINT par défaut (`api/_lib/bilan-mois.js`, règles de l'app, bénéfice recopié `benefice-regle.js`, 150/jour au plus) ; `docs/gestes-1000-vendeurs.md`. `docs/passation/2026-11-08-accueil-bilan.md`. Geste : `RELANCES_SMTP_*`, puis l'allumer dans Réglages → Notifications.
 - **8 nov. · Extension 5.328 : connexion DANS l'extension** : carte du logo et fenêtre commencent par email + mot de passe VRM, puis Google/Discord en PKCE dans l'extension (retour `vrm.center/extension-retour.html`), « par le site » en dernier ; Orion : liaison par le pont d'emblée ; sans session rien ne part ni n'est « refusé ». `docs/passation/2026-11-08-connexion-carte.md`. Geste : Supabase → Redirect URLs `https://vrm.center/extension-retour.html`.
-- **8 nov. · Adresse de réception unique (comme vtools)** : chaque vendeur a SA propre adresse `jeton@DOMAINE_RECEPTION` (24 car., ≈2^119) ; livré là ⇒ rangé chez lui AVANT toute autre règle (index neutre, jeton re-comparé, enveloppe `envelopeTo` fait foi) ; inconnue/remplacée/éteinte ⇒ quarantaine neutre non réclamable ; code Gmail affiché (Copier + lien Google) ; feuille « Ton adresse VRM » (E-mails → Relier ma boîte, Réglages → E-mails → Adresses). `docs/passation/2026-11-08-adresse-reception.md`. Geste : domaine dédié + Cloudflare catch-all → Worker + `DOMAINE_RECEPTION` sur Vercel.
 
 
 
