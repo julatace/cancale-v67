@@ -108,7 +108,7 @@ async function faux(url, opts = {}) {
     etat.deletes.push('auth:' + id);
     if (etat.pannes.has('auth')) return rep('<html>522</html>', 522);
     if (!base.utilisateurs.has(id)) return rep({ msg: 'User not found' }, 404);
-    base.utilisateurs.delete(id);
+    base.utilisateurs.delete(id); delete base.abonnements[id];   // la clé étrangère ON DELETE CASCADE (005)
     return rep({}, 200);
   }
   if (u.includes('/rest/v1/rpc/vrm_acces')) {
