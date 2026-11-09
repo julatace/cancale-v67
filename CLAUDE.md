@@ -520,6 +520,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **9 nov. · Pastille de l'icône (lot Z)** : l'icône de VRM (écran d'accueil, Dock) porte le nombre de colis à envoyer = le badge de Colis (`vrm_colis_aposter`, frais < 12 h) ; pas su ou 0 ⇒ effacée (`src/pastilleIcone.js`, banc `navigation-tache` Z, rouge par mutation). File des lots : `docs/passation/2026-11-09-file-des-lots.md`. Geste : aucun.
 - **9 nov. · Suites serveur** : l'offre Solo appliquée aussi par les bilans (semaine, mois), le repli e-mails du widget et le rappel des offres mini (`compteEcarteRegle`, recopiée d'App.jsx ; propriétaire = Pro ; pas su ⇒ rien bridé ; colis jamais bridés) ; double vente Leboncoin serveur seulement si vue en ligne < 24 h (`src/enLigneLbc.js`). `docs/passation/2026-11-09-suites-serveur.md`. Geste : aucun (028 pour que l'offre soit lue).
 - **9 nov. (soir) · PASSATION GÉNÉRALE** : état, décisions, ce qui reste, gestes de Julien, leçons d'intégration — `docs/passation/2026-11-09-passation-generale.md` (à lire en premier).
 - **9 nov. · Leboncoin clair (5.335)** : rattrapage après connexion, `X` = `lbc-account:X`, « Mes annonces » relue en entier, « à retirer » seulement si vue en ligne < 24 h, carte en 3 lignes. `docs/passation/2026-11-09-leboncoin-clair.md`. Geste : 5.335 + « Mes annonces » sur chaque compte.
