@@ -120,7 +120,11 @@ function cond(row, c) {
   return test(row, mm[1], mm[2]);
 }
 function projeter(row, select) {
-  if (!select || select === '*') return { id: row.id, owner: row.owner, data: row.data, meta: metaDe(row), updated_at: row.updated_at || null };
+  if (!select || select === '*') {
+    // `vinted_accounts`, `abonnements` : toutes leurs colonnes (pas de `data`).
+    if (!('data' in row)) return { ...row };
+    return { id: row.id, owner: row.owner, data: row.data, meta: metaDe(row), updated_at: row.updated_at || null };
+  }
   const out = {};
   for (const part of decouper(select)) {
     const p = part.trim(); if (!p) continue;
@@ -144,6 +148,7 @@ function creerBase({ vendeurs = 10, gabarit = null, cleService = 'cle-service-ba
   // Le gabarit d'un vendeur : `main` + les lignes. Le résumé « à expédier » que
   // pose l'extension (`data.resume`) est ajouté aux ventes (la forme réelle).
   const lignesGabarit = [...g.main, ...g.rows].map((r) => ({ id: r.id, data: r.data }));
+  if (typeof majGabarit === 'function') majGabarit(lignesGabarit);
   // Forme de `resumeCommandes` (vinted-sync-extension/background.js) : { n, txns, at }.
   for (const r of lignesGabarit) {
     const cmds = r.data && r.data.payload && Array.isArray(r.data.payload.my_orders) ? r.data.payload.my_orders : null;
@@ -156,7 +161,6 @@ function creerBase({ vendeurs = 10, gabarit = null, cleService = 'cle-service-ba
     }
     else if (/_orders_purchased$/.test(r.id)) r.data.resume = { n: cmds.length, at, txns: cmds.filter((o) => /disponible|point relais.*retir/i.test(String(o.status || ''))).map((o) => String(o.transaction_id)) };
   }
-  if (typeof majGabarit === 'function') majGabarit(lignesGabarit);
   const idsGabarit = new Map(lignesGabarit.map((r) => [r.id, r]));
   const owners = Array.from({ length: vendeurs }, (_, i) => uuidVendeur(i));
   const setOwners = new Set(owners);
