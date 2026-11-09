@@ -38,6 +38,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   dit(!ids('baisser').some((x) => /baisser-prix/.test(x)), 'A10 une action à N° n’apparaît jamais sans N°');
   const dest = M.ACTIONS_RECHERCHE.map((a) => M.destinationAction({ id: a.id, num: a.num ? '88' : null }));
   dit(dest.every((d) => d && Object.keys(d).every((k) => ['tab', 'colis', 'feuille', 'num', 'stock'].includes(k))), 'A11 chaque action a une destination (onglet / feuille), rien d’autre', JSON.stringify(dest));
+  dit(M.destinationAction({ id: 'colis-retirer' }).colis === 'retirer' && M.destinationAction({ id: 'colis-envoyer' }).colis === 'envoyer' && M.destinationAction({ id: 'export-comptable' }).tab === 'compta', 'A13 chaque action mène au BON onglet');
   dit(M.destinationAction({ id: 'baisser-prix', num: '88' }).feuille === 'prix' && M.destinationAction({ id: 'imprimer-jour' }).feuille === 'lot', 'A12 « baisser le prix » ouvre la feuille du prix ; « imprimer » la feuille « Tout imprimer »');
 
   // B. champsAvant
@@ -61,6 +62,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   dit(!/title:\s*'Masquer cet achat \?'/.test(A) && /gesteVrm\('Achat masqué'/.test(A), 'C2 masquer un achat : plus de confirmation, gesteVrm');
   dit(!/Marquer TOUS ces colis comme récupérés/.test(A) && /const markAllCollected = \(list\) => \{[\s\S]{0,600}gesteVrm\(/.test(A), 'C3 tout marquer retiré : plus de confirmation, gesteVrm');
   dit(!/Marquer cet article VENDU/.test(A) && !/Réafficher toutes les annonces marquées vendues \?/.test(A) && /const gesteVendues = [\s\S]{0,700}gesteVrm\(/.test(A), 'C4 marquer vendue / réafficher : gesteVrm');
+  dit(/type: 'ensemble', id, apres: !!oui, avant: !oui \}/.test(A), 'C4b l’annulation remet la valeur d’AVANT (l’inverse du geste), jamais la même');
   dit(!/window\.confirm\(`(Ce n'est pas la|Retirer le lien avec la) N°/.test(L) && /function gesteDelierLbc[\s\S]{0,900}gesteVrm\(/.test(L) && (L.match(/gesteDelierLbc\(/g) || []).length >= 3, 'C5 délier Leboncoin : plus de confirmation, gesteVrm (deux boutons)');
   dit(!/title: `Délier le N°\$\{e\.numero\} \?`/.test(A) && /délié[\s\S]{0,200}type: 'champs'[\s\S]{0,120}champsAvant\(e, patch\)/.test(A), 'C6 délier un achat en gros : gesteVrm, champs d’avant');
   dit(/gesteVrm\(`N°\$\{f\.numero\} relié`/.test(A), 'C7 relier un achat : la pilule « Annuler »');
