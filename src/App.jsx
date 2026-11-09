@@ -44433,17 +44433,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
             {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
-<<<<<<< HEAD
-            {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} /> : null}
+            {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} publier={publierATrancher} /> : null}
             {/* (9 nov., lot AD) « Préparer mes colis » : un colis à la fois, plein écran, dans l'ordre de cette liste. */}
             {/* Une rangée À ELLE (pas `.vrm-colis-outils`, rangée derrière « … ») : le geste du moment. */}
             {onglet === 'envoyer' && (nEnv || 0) > 0 ? (
               <div className="vrm-pas-a-pas-rangee" data-preparer-rangee="">
                 <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton>
               </div>) : null}
-=======
-            {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} publier={publierATrancher} /> : null}
->>>>>>> origin/claude/a-trancher
             {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
                 <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton>
