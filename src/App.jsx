@@ -64,6 +64,7 @@ import './notif-reglages.css';
 import './design/guide-iphone.css'; // (8 nov.) style de ./GuideIphone.jsx, gardé à sa place (son écran est chargé à la demande)
 import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à sa place (son écran est chargé à la demande)
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
+import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
@@ -7600,7 +7601,7 @@ const joursVenduRecu = (vendues, recues, n = 14, maintenant = Date.now()) => {
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(d0); d.setDate(d0.getDate() - i);
     const j = { cle: cleJourLocal(d.getTime()), jour: ['D', 'L', 'M', 'M', 'J', 'V', 'S'][d.getDay()], num: d.getDate(),
-      long: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }),
+      long: dateLocale(d, 'fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }),
       vendu: { n: 0, eur: 0 }, recu: recues ? { n: 0, eur: 0 } : null };
     J.push(j); par[j.cle] = j;
   }
@@ -34652,7 +34653,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Tendance sur 6 mois (CA finalisé + bénéfice net) pour le mini-graphique.
   const monthlyChart = useMemo(() => {
     const now = new Date(); const months = [];
-    for (let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ ym:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, benef:0 }); }
+    for (let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ ym:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:dateLocale(d,'fr-FR',{month:'short'}).replace('.',''), ca:0, benef:0 }); }
     const idx = {}; months.forEach((m,i)=>{ idx[m.ym]=i; });
     for (const o of (sales.items||[])){
       if (isHidden(o)) continue;
@@ -36170,7 +36171,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!showAnnual) return null;
     const regime = regimeFiscal();   // (27 oct.) statut de la personne (null : pas choisi ⇒ aucune cotisation estimée)
     const tvaRate = Number(load('vinted_tva',20))||20;
-    const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
+    const months = Array.from({length:12},(_,i)=>({ m:i, label:dateLocale(new Date(reportYear,i,1),'fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
     let nMasq=0, caMasq=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
@@ -37868,7 +37869,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // règle des comptes muets, src/relierCompte.js), dite une fois par jour — touchée, elle s'efface
   // jusqu'au lendemain (préférence de cet appareil ; E-mails et Comptes liés la redisent).
   const { liste: aRelierListe } = useComptesARelier(accounts, only === 'journee');
-  const jourRelier = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  const jourRelier = dateLocale(new Date(), 'fr-CA', { timeZone: 'Europe/Paris' });
   const [aRelierVus, setARelierVus] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_relier_vus') || '{}'); return v && v.j === new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) && Array.isArray(v.uids) ? v.uids : []; } catch (_) { return []; } });
   const comptesARelierJour = only === 'journee' && Array.isArray(aRelierListe) ? aRelierListe.filter((c) => !aRelierVus.includes(c.uid)) : [];
   const noterRelierVus = (uids) => { const n = [...new Set([...aRelierVus, ...uids])]; try { localStorage.setItem('vrm_journee_relier_vus', JSON.stringify({ j: jourRelier, uids: n })); } catch (_) {} setARelierVus(n); };
@@ -38357,7 +38358,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // REÇU = au mois du VERSEMENT (`recuDuMois`, la date des barres) — jamais
         // le mois de déclaration, qui peut être un autre (revue du 6 octobre).
         const recuMois = declarables ? recuDuMois(declarables.lignes, ymIci) : null;
-        const moisNom = new Date().toLocaleDateString('fr-FR',{month:'long'});
+        const moisNom = dateLocale(new Date(),'fr-FR',{month:'long'});
         // (26 octobre) Julien : « le chiffre d'affaires total ». Celui de l'ANNÉE,
         // toutes plateformes, sur les MÊMES lignes et le même mois que le CA déclaré
         // de Compta (`declarables`, `l.ym`) — jamais un second calcul (§11).
@@ -45344,7 +45345,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const avgs = s.pts.map(p=>p.avg); const mn=avgs.length?Math.min(...avgs):0, mx=avgs.length?Math.max(...avgs):1;
         const lo=Math.floor(mn/5)*5, hi=Math.max(lo+5, Math.ceil(mx/5)*5);
         const ys = v => padT + (1-(v-lo)/((hi-lo)||1))*(H-padT-padB);
-        const monLabel = ym => { const [Y,M]=ym.split('-').map(Number); return new Date(Y,M-1,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''); };
+        const monLabel = ym => { const [Y,M]=ym.split('-').map(Number); return dateLocale(new Date(Y,M-1,1),'fr-FR',{month:'short'}).replace('.',''); };
         return (
         <div onClick={()=>setShowBrandCurves(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowBrandCurves(false)}/>

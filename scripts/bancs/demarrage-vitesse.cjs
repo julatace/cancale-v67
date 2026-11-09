@@ -22,6 +22,7 @@
 //  (SEUIL_PRET_MS, SEUIL_LONGUES_MS, SEUIL_FORMATS). D1/D2 dépendent de la charge
 //  de la machine : un rouge sur D1/D2 seul ⇒ regarder la charge (`uptime`) et
 //  relancer. D3/D4 ne dépendent pas de la charge.
+//  PILES=1 : d'où viennent les formats de date (les appels les plus fréquents).
 //  Rien de réel : la base est inventée ; aucune écriture n'arrive nulle part.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
@@ -56,17 +57,20 @@ function sondes() {
   const setItem = Storage.prototype.setItem;
   Storage.prototype.setItem = function (k, v) { if (k === 'vrm_acct_cache' && this === window.sessionStorage) window.__cache.push([performance.now(), String(v).length]); return setItem.call(this, k, v); };
   const DTF = Intl.DateTimeFormat;
-  const Enrobe = function (...a) { window.__formats.push(performance.now()); return new.target ? Reflect.construct(DTF, a, new.target === Enrobe ? DTF : new.target) : DTF(...a); };
+  const pile = () => { if (!window.__pileFormats) return; try { const l = String(new Error().stack).split('\n').slice(3, 6).map((x) => x.trim().replace(/^at /, '').replace(/\(?https?:\/\/[^/]+\/assets\//, '(')).join(' < '); window.__piles[l] = (window.__piles[l] || 0) + 1; } catch (_) {} };
+  window.__piles = {};
+  const Enrobe = function (...a) { window.__formats.push(performance.now()); pile(); return new.target ? Reflect.construct(DTF, a, new.target === Enrobe ? DTF : new.target) : DTF(...a); };
   Enrobe.prototype = DTF.prototype; Enrobe.supportedLocalesOf = DTF.supportedLocalesOf.bind(DTF);
   try { Object.defineProperty(Intl, 'DateTimeFormat', { value: Enrobe, writable: true, configurable: true }); } catch (_) {}
   for (const nom of ['toLocaleDateString', 'toLocaleString', 'toLocaleTimeString']) {
     const f = Date.prototype[nom];
-    Date.prototype[nom] = function (...a) { if (a.length) window.__formats.push(performance.now()); return f.apply(this, a); };
+    Date.prototype[nom] = function (...a) { if (a.length) { window.__formats.push(performance.now()); pile(); } return f.apply(this, a); };
   }
 }
 
 async function passe(b, i) {
   const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  if (process.env.PILES) await ctx.addInitScript(() => { window.__pileFormats = true; });
   await ctx.addInitScript(sondes);
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
@@ -97,6 +101,7 @@ async function passe(b, i) {
     cacheAvant: window.__cache.filter((x) => tp == null || x[0] < tp).length,
     formatsAvant: window.__formats.filter((x) => tp == null || x < tp).length,
     journee: !!document.querySelector('.vrm-fu-journee'),
+    piles: window.__pileFormats ? Object.entries(window.__piles).sort((a, b) => b[1] - a[1]).slice(0, 12) : undefined,
   }), pret).catch(() => ({}));
   if (i === 0 && process.env.CAPTURE) await pg.screenshot({ path: process.env.CAPTURE });
   await ctx.close();
