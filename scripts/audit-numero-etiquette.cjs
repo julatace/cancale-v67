@@ -67,10 +67,22 @@ const MUTATIONS = {
 if (MUT) {
   const noms = MUT === 'toutes' ? Object.keys(MUTATIONS) : [MUT];
   let attrapees = 0;
+  // Le TÉMOIN : la même copie, sans mutation, doit être verte (sinon une mutation
+  // « attrapée » le serait pour une autre raison — un fichier manquant dans la copie).
+  noms.unshift('__temoin__'); MUTATIONS.__temoin__ = ['src/numeroEcrit.js', 'export', 'export'];
   for (const nom of noms) {
     const m = MUTATIONS[nom]; if (!m) { console.log(`❌ mutation inconnue : ${nom}`); process.exitCode = 1; continue; }
+    if (nom === '__temoin__') {
+      const t = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-net-'));
+      for (const f of [...fs.readdirSync(path.join(RACINE, 'src')).filter((x) => /\.js$/.test(x)).map((x) => 'src/' + x), 'src/App.jsx', 'vinted-sync-extension/background.js', 'vinted-sync-extension/manifest.json']) { fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true }); try { fs.copyFileSync(path.join(RACINE, f), path.join(t, f)); } catch (_) {} }
+      try { fs.cpSync(path.join(RACINE, 'src', 'ecrans'), path.join(t, 'src', 'ecrans'), { recursive: true }); } catch (_) {}
+      const r = spawnSync(process.execPath, [__filename, '--src', t], { encoding: 'utf8', timeout: 180000 });
+      const vert = r.status === 0; if (vert) attrapees++;
+      console.log(`${vert ? '✅' : '❌'} témoin sans mutation ⇒ ${vert ? 'vert' : 'ROUGE : la copie est incomplète, les mutations ne prouvent rien'}`);
+      fs.rmSync(t, { recursive: true, force: true }); continue;
+    }
     const t = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-net-'));
-    for (const f of ['src/numeroEcrit.js', 'src/remiseEnLigne.js', 'src/App.jsx', 'vinted-sync-extension/background.js']) { fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true }); try { fs.copyFileSync(path.join(RACINE, f), path.join(t, f)); } catch (_) {} }
+    for (const f of [...fs.readdirSync(path.join(RACINE, 'src')).filter((x) => /\.js$/.test(x)).map((x) => 'src/' + x), 'src/App.jsx', 'vinted-sync-extension/background.js', 'vinted-sync-extension/manifest.json']) { fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true }); try { fs.copyFileSync(path.join(RACINE, f), path.join(t, f)); } catch (_) {} }
     try { fs.cpSync(path.join(RACINE, 'src', 'ecrans'), path.join(t, 'src', 'ecrans'), { recursive: true }); } catch (_) {}
     const p = path.join(t, m[0]); const src = fs.readFileSync(p, 'utf8');
     if (!src.includes(m[1])) { console.log(`❌ mutation ${nom} : ancre introuvable dans ${m[0]}`); process.exitCode = 1; fs.rmSync(t, { recursive: true, force: true }); continue; }
@@ -149,7 +161,10 @@ const PIEGES = [
   const N = await imp('src/numeroEcrit.js');
   const APP = sansCommentaires(lire('src/App.jsx'));
   if (N) {
-    const { lireNumeroTexte: T, lireNumeroEcrit: E, lireReglageNumeroEcrit: R, basculerOu, compacterLecture, lectureRecue, decisionEcrite } = N;
+    // Absentes (code d'avant) : des remplaçants inertes — le banc rapporte, il ne meurt pas.
+    const inerte = (nom, v) => (typeof N[nom] === 'function' ? N[nom] : (dit(false, `src/numeroEcrit.js exporte \`${nom}\``), v));
+    const { lireNumeroTexte: T, lireNumeroEcrit: E, lireReglageNumeroEcrit: R, decisionEcrite } = N;
+    const basculerOu = inerte('basculerOu', () => ({ ou: [] })), compacterLecture = inerte('compacterLecture', () => null), lectureRecue = inerte('lectureRecue', () => undefined);
     console.log('— 1. La lecture : 50 descriptions piégées');
     dit(PIEGES.length === 50, '50 descriptions piégées');
     const rates = PIEGES.filter(([t, att]) => { const r = T(t, 'description'); return att === 'rien' ? r.etat !== 'rien' : att === 'ambigu' ? r.etat !== 'ambigu' : !(r.etat === 'lu' && r.cle === att); });
@@ -231,8 +246,8 @@ const PIEGES = [
     dit(s.length === 1 && s[0].nouvelle === 'n1' && s[0].options[0].numero === '12' && s[0].options[0].force === 'forte', 'photo identique ⇒ proposition « forte » du N°12', JSON.stringify(s));
     s = S(base({ nouvelles: [nv('n1')], supprimees: [old('a1', '12')] }));
     dit(s.length === 1 && s[0].options[0].force === 'simple', 'même marque + taille + modèle ⇒ proposition « simple »', JSON.stringify(s));
-    s = S(base({ nouvelles: [nv('n1')], supprimees: [old('a1', '12', { titre: 'Adidas Samba taille 42' })] }));
-    dit(s.length === 0, 'marque différente ⇒ rien', JSON.stringify(s));
+    s = S(base({ nouvelles: [nv('n1')], supprimees: [old('a1', '12', { titre: 'Adidas Dunk Low Panda taille 42' })] }));
+    dit(s.length === 0, 'marque différente (même modèle, même taille) ⇒ rien', JSON.stringify(s));
     s = S(base({ nouvelles: [nv('n1')], supprimees: [old('a1', '12', { titre: 'Nike Air Max 90 taille 42' })] }));
     dit(s.length === 0, 'deux modèles différents (Dunk / Air Max) ⇒ rien');
     s = S(base({ nouvelles: [nv('n1')], supprimees: [old('a1', '12', { titre: 'Nike Dunk Low Panda taille 44', taille: '44' })] }));
