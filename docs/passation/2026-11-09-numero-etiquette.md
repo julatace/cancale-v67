@@ -111,7 +111,7 @@ description Leboncoin de plus de 400 caractères était perdue ; la remise en li
   **Sur `origin/main` : 25 rouges** (`--src`). `--mutation=toutes` : **témoin vert,
   12/12 mutations attrapées** (ou, jamais zéro, forme reçue, copie, dressing, Leboncoin,
   marque, paire présente, archive, compte, avant la suppression, app sans `ou`).
-- Banc `scripts/bancs/numero-etiquette.cjs` (390 tactile et 1512, clair et sombre) :
+- Banc `scripts/bancs/numero-ou-remise.cjs` (390 tactile et 1512, clair et sombre) :
   **103/103** ; **sur un build d'`origin/main` : rouge** (voir le rapport). Captures
   regardées : les trois cases, l'essai « VRM lit N°125 », le bloc « 2 annonces remises en
   ligne ? » avec « Oui, N°7 / Non, une autre paire ».
