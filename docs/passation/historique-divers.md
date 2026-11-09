@@ -1041,3 +1041,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Lignes du §9 de CLAUDE.md déplacées telles quelles (9 nov.)
 ### Ligne déplacée telle quelle de CLAUDE.md §9 (9 nov., taille du dossier)
 - **8 nov. · Aide et signalement** : « ? » après la phrase de chaque écran (3 questions, article, « Signaler ») ; signalement enrichi (capture SCHÉMATIQUE en nombres, 30 requêtes par famille, 50 erreurs, montants/pseudos masqués) ; centre d'aide `vrm.center/aide` (généré par `scripts/aide-generer.cjs`) ; alertes de plantage groupées (1/h) au propriétaire. `docs/passation/2026-11-08-aide-signalement.md`. Geste : ouvrir vrm.center/aide.
+
+
+### Déplacé de CLAUDE.md §9 le 9 nov. (tel quel)
+- **8 nov. · Beauté** : Ma journée : `data-prochain` sur la 1re ligne + phrase du jour sans compte redit (`src/phraseJour.js`, la forme est à `claude/direction-artistique`) ; vignettes en fondu (`src/fonduPhotos.js`) ; « Colis fait » au glisser à droite (`src/GlisserColis.js`, pilule Annuler) ; tournée « 3 / 7 » lisible debout ; Statistiques façon Santé (`src/GraphiqueSemaines.jsx`) ; icônes v5 ; Apparence Clair/Sombre/Automatique/Le soir (`src/apparence.js` = `public/demarrage-theme.js`). `docs/passation/2026-11-08-beaute.md`. Geste : aucun.
