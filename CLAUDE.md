@@ -515,6 +515,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **9 nov. · Direction artistique 2 (à valider)** : une grammaire de rangée (vignette 44, N° à largeur fixe, titre 1 ligne, sous-ligne, colonnes fixes, montant à droite) sur Colis, Ventes, Ma journée, Annonces, Achats, Messages ; en-tête unique et barre de recherche pleine. `docs/passation/2026-11-08-direction-artistique-2.md`. Branche `claude/direction-artistique-2`. Geste : regarder les planches.
 - **8 nov. · Périodes et garde Orion** : une ancienne plage montre ses dates réelles ; focus rendu à la fermeture du calendrier ; garde ajusté strictement au retour OAuth commun 5.328, avec huit altérations refusées. `docs/passation/2026-11-08-periodes-et-garde-orion.md`. Aucune extension à réinstaller.
 - **8 nov. · Fermetures involontaires** : une interruption de glissement ne ferme plus la feuille ; Échap de composition ne ferme plus un fil eBay. `docs/passation/2026-11-08-bugs-fermeture-fenetres.md`. Aucune extension à réinstaller.
 - **8 nov. (soir) · Extension 5.329 : connexion DANS la carte, sans iframe ni onglet** : e-mail + mot de passe dessinés dans la shadow root fermée du logo (l'iframe de la 5.328 ne s'affichait pas sur Orion ⇒ « Se connecter avec VRM » ouvrait VRM) ; Google/Discord seulement en petite fenêtre (pas sur Orion) ; « déconnecté » = renouvellement lent affiché « expirée », verrou de renouvellement partagé, rangement vérifié. `docs/passation/2026-11-08-connexion-carte-2.md`. Geste : installer la 5.329.
