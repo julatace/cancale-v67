@@ -187,10 +187,10 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     dit(n.length === 1, 'UNE notification « double vente » part vers son téléphone', `${n.length}`);
     const p = n[0] || {};
     console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
-    dit(/N°230/.test(p.title || '') && /eBay/.test(p.title || ''), 'elle nomme le N° et la plateforme', JSON.stringify(p.title));
+    dit(/N°230/.test(p.title || '') && /eBay/.test(`${p.title} ${p.body}`), 'elle nomme le N° et la plateforme (8 nov. : « encore en ligne sur … » en tête du corps)', JSON.stringify(p.title));
     // (3 nov., Julien : aucun texte explicatif) le titre dit le fait et le geste
     // (« vendu sur Vinted · encore en ligne sur eBay »), le corps nomme l'article.
-    dit(/Nike Air Max 90/.test(p.body || '') && /vendu sur Vinted · encore en ligne sur eBay/.test(p.title || ''), 'elle nomme l’article, le site de la vente et celui où il reste en ligne', JSON.stringify(p.title + ' / ' + p.body));
+    dit(/Nike Air Max 90/.test(p.body || '') && /vendu sur Vinted$/.test(p.title || '') && /^Encore en ligne sur eBay · /.test(p.body || ''), 'elle nomme l’article, le site de la vente et celui où il reste en ligne', JSON.stringify(p.title + ' / ' + p.body));
     dit(p.url === '/?tab=annonces&site=ebay&cible=doublon&num=230&plat=ebay', 'elle ouvre Annonces · eBay, sur la ligne N°230 à retirer (31 oct.)', p.url);
     dit(dv('B').length === 0, 'le téléphone du vendeur B ne reçoit rien');
   });
@@ -205,7 +205,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
     const n = dv('A');
     dit(n.length === 1, 'UNE notification « double vente »', `${n.length}`);
-    dit(/N°231/.test((n[0] || {}).title || '') && /Leboncoin/.test((n[0] || {}).title || ''), 'elle nomme N°231 et Leboncoin', JSON.stringify((n[0] || {}).title));
+    dit(/N°231/.test((n[0] || {}).title || '') && /Leboncoin/.test(`${(n[0] || {}).title} ${(n[0] || {}).body}`), 'elle nomme N°231 et Leboncoin', JSON.stringify((n[0] || {}).title));
     dit((n[0] || {}).url === '/?tab=annonces&site=leboncoin&cible=doublon&num=231&plat=leboncoin', 'elle ouvre Annonces · Leboncoin, sur « à retirer » (31 oct.)', (n[0] || {}).url);
   });
 

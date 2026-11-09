@@ -116,7 +116,7 @@ const APP = ['src/App.jsx', 'src/CarteRelais.jsx'].map((f) => sansCommentaires(l
     // fait, le corps l'objet et le geste (docs/passation/2026-11-08-notifications.md).
     dit(v.title === 'Vendu · 10 €' && v.body === 'X · c · Prépare le colis, le bordereau suit par e-mail', 'texte « Vendu » : le fait (le prix), l’objet, le geste', JSON.stringify(v));
     const m = A.texteMessage({ paire: 'P', qui: 'q', compte: 'c', extrait: '' });
-    dit(m.title === 'Message de q' && m.body === 'P · sur c · Réponds dans Messages', 'texte « Message » : qui écrit, la paire, le geste', JSON.stringify(m));
+    dit(m.title === 'Message de q' && m.body === 'P · Nouveau message sur c · réponds dans Messages', 'texte « Message » : qui écrit, la paire, le geste', JSON.stringify(m));
   }
 
   // (revue du 5 nov.) Aucun aperçu rédigé à la main : chacun sort de la fabrique du vrai texte.

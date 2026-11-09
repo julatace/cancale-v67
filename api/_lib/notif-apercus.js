@@ -65,8 +65,8 @@ export const texteOffre = ({ montant = '', qui = '', article = '', compte = '', 
 });
 // Un message reçu (e-mail « Nouveau message »).
 export const texteMessage = ({ paire = '', qui = '', compte = '', extrait = '' } = {}) => ({
-  title: qui ? `Message de ${qui}` : (paire ? court(paire, 40) : 'Nouveau message'),
-  body: joindre(qui && paire ? court(paire, 60) : '', compte ? `sur ${compte}` : '', extrait ? `« ${extrait} »` : 'Réponds dans Messages'),
+  title: qui ? `Message de ${qui}` : (paire ? court(paire, 40) : 'Message Vinted'),
+  body: joindre(qui && paire ? court(paire, 60) : '', compte ? `Nouveau message sur ${compte}` : 'Nouveau message', extrait ? `« ${extrait} »` : 'réponds dans Messages'),
 });
 
 // Une annulation demandée (e-mail « … souhaiterait annuler l'achat … »).
