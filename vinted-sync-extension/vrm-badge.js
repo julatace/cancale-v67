@@ -34,7 +34,16 @@
 //    quelque chose à faire, et « pas su » reste gris — jamais un faux vert.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (window.top !== window) return;                 // une seule carte par onglet
+  // 5.332 (défaut #6, décision de Julien du 9 nov.) : sur Chrome / Edge /
+  // Firefox, le formulaire de connexion vit dans un IFRAME de l'extension
+  // (`popup.html?mode=carte`) — l'origine de l'extension, que la page du site ne
+  // peut ni lire ni écouter (ses écouteurs de clavier, même posés en capture
+  // AVANT nous, n'entendent rien). Cette page-là charge CE fichier en mode
+  // « cadre » (`__vrmCadre`, posé par popup.js — une variable que la page d'un
+  // site ne peut pas écrire dans le monde de l'extension) : le formulaire seul,
+  // sans logo ni état (la carte du site les montre).
+  const CADRE = (() => { try { return globalThis.__vrmCadre === true && window.top !== window; } catch (_) { return false; } })();
+  if (window.top !== window && !CADRE) return;       // une seule carte par onglet
   if (document.getElementById('vrm-badge')) return;  // déjà posée (SPA, double injection)
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
   if (!vivant()) return;
@@ -59,7 +68,7 @@
 
   const hote = document.createElement('div');
   hote.id = 'vrm-badge';
-  hote.style.cssText = 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483646;';
+  hote.style.cssText = CADRE ? 'all:initial;display:block;' : 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483646;';
   const ombre = hote.attachShadow({ mode: 'closed' });
   ombre.innerHTML = `
 <style>
@@ -169,6 +178,23 @@
   const contenu = carte.querySelector('.contenu');
   const connexion = carte.querySelector('.connexion');
   const question = ombre.querySelector('.question');
+
+  // ══ 5.332 : LE CADRE (dans l'iframe de l'extension) ══════════════════════
+  // Le formulaire seul, posé à plat dans la page de l'extension : ni logo, ni
+  // état, ni verre (le verre est celui de la carte du site, derrière). Il dit à
+  // la carte du site qu'il s'affiche (« prête ») et sa hauteur — rien d'autre
+  // ne sort d'ici (ni e-mail, ni code, ni mot de passe, ni état).
+  const direAuSite = (d) => { if (!CADRE) return; try { window.parent.postMessage(Object.assign({ __vrmCarte: '' }, d), '*'); } catch (_) {} };
+  if (CADRE) {
+    const st = document.createElement('style');
+    st.textContent = `.btn, .question, .contenu { display: none !important; }
+  .carte, .carte.on { position: static; display: block; width: auto; max-height: none; overflow: visible; background: transparent; border: 0;
+    box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; border-radius: 0; }
+  .connexion { margin: 0; border-top: 0; padding: 0 0 2px; }`;
+    ombre.appendChild(st);
+    carte.classList.add('on');
+    try { new ResizeObserver(() => direAuSite({ __vrmCarte: 'hauteur', h: Math.ceil(hote.getBoundingClientRect().height) })).observe(hote); } catch (_) {}
+  }
 
   // Le logo de l'app (le même qu'en haut de chaque écran de VRM). S'il ne
   // charge pas : « VRM » en texte, jamais une image cassée.
