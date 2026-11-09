@@ -59,7 +59,35 @@ function EtatArticle({ etat }) {
   );
 }
 
-export default function FichePaire({ owner = '', p, etat = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour }) {
+// (9 nov., lot AF) L'HISTOIRE DU N° (`historiqueNumero`, src/historiqueNumero.js) : LECTURE
+// SEULE — quand et pourquoi ce N° a été posé, changé, quitté, libéré. Chaque ligne vient
+// d'une trace qui existe ; ce qui n'en a pas est dit (« origine non enregistrée »), jamais
+// deviné. Aucun bouton : rien ici ne change un N°. Aucune couleur (§7).
+function HistoireNumero({ h }) {
+  return (
+    <section className="vrm-fp-histo-num" aria-label="L’histoire de ce N°" data-fiche-histo-num={h.cle} data-n={String(h.evenements.length)} data-origine-connue={h.origineConnue ? '1' : '0'}>
+      <h3 className="vrm-fp-etat-titre">L’histoire du N°</h3>
+      {h.evenements.length ? (
+        <ul className="vrm-fp-evs">
+          {h.evenements.map((ev, i) => (
+            <li key={i} className="vrm-fp-ev" data-histo-num-ev={ev.quoi} data-histo-num-source={ev.cle} data-histo-num-date={ev.at || ''} data-histo-num-id={ev.id || undefined}>
+              {ev.at ? <time dateTime={ev.at}>{dateCourte(ev.at)}</time> : <span className="vrm-fp-ev-sansdate">—</span>}
+              <span className="vrm-fp-ev-txt">{ev.texte}{ev.preuve ? <small data-fiche-preuve="">{ev.preuve}</small> : null}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {h.note ? <p className="vrm-fp-note" data-histo-num-note="">{h.note}</p> : null}
+    </section>
+  );
+}
+const dateCourte = (iso) => {
+  const t = Date.parse(iso || ''); if (!Number.isFinite(t)) return '—';
+  const d = new Date(t);
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+};
+
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -104,6 +132,7 @@ export default function FichePaire({ owner = '', p, etat = null, lecture = false
         </div>
       ) : null}
       <nav className="vrm-fp-raccourcis" aria-label="Rubriques de cet article">{p.etapes.map(e=><button key={e.cle} type="button" onClick={()=>document.getElementById(`vrm-fiche-etape-${e.cle}`)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>{e.titre}</button>)}</nav>
+      {histoNum ? <HistoireNumero h={histoNum}/> : null}
       <HistoriqueModifications owner={owner} numero={p.num}/>
       <ol className="vrm-fp-parcours">
         {p.etapes.map((e) => (

@@ -484,7 +484,8 @@ import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, 
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
-import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
+import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
+import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
@@ -2486,6 +2487,10 @@ const SYNC_KEYS = [
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed','vinted_retours_remis',
+  // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
+  // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
+  // lu par la fiche d'une paire (« L'histoire du N° »). Ne change jamais un N°.
+  'vrm_numeros_journal',
   'vrm_stock_sortis','vrm_stock_garder','vrm_stock_garde_hors_ligne','vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
@@ -3628,6 +3633,22 @@ const fusionALaSauvegarde = (k, v) => {
 // son issue avec elle (la valeur gardée porte les deux).
 const _saveQuand = {};
 const _rendreQuand = (k, ok, raison) => { const l = _saveQuand[k]; delete _saveQuand[k]; if (l) for (const f of l) { try { f(ok, raison); } catch (_) {} } };
+// (9 nov., lot AF) LE JOURNAL DES N° : chaque écriture des fiches (`vinted_annonce_numeros`)
+// qui change un N° y ajoute SA ligne (quand, quelle annonce, quel N°, l'ancien, pourquoi —
+// `evenementsNumeroFiches`, src/historiqueNumero.js), dans la MÊME sauvegarde : même ligne
+// `main`, même envoi (comparer-et-échanger sur `data.rev`, fusion des listes par élément).
+// Append-only : rien n'y est jamais retiré, aucun N° n'y est changé. Une sauvegarde du journal
+// déjà en attente est prolongée (sinon sa ligne se perdrait sous la suivante).
+let _journalNumAttente = null;
+function noterJournalNumeros(avant, apres) {
+  try {
+    const lignes = evenementsNumeroFiches(avant, apres, { cle: cleNum });
+    if (!lignes.length) return;
+    const base = (_saveTimers[CLE_JOURNAL_NUMEROS] && Array.isArray(_journalNumAttente)) ? _journalNumAttente : (load(CLE_JOURNAL_NUMEROS, []) || []);
+    _journalNumAttente = ajouterAuJournal(base, lignes);
+    save(CLE_JOURNAL_NUMEROS, _journalNumAttente);
+  } catch (_) {}
+}
 const save = (k,v,quand) => {
   if (SYNC_KEYS.includes(k)) { _settingsRevision++; try { window.dispatchEvent(new Event('vrm:reglage-attente')); } catch (_) {} }
   const owner = AUTH.user?.id;
@@ -3649,6 +3670,7 @@ const save = (k,v,quand) => {
     }
     delete _saveTimers[k];
     _rendreQuand(k, true);
+    if (k === 'vinted_annonce_numeros' && !r.conflit) noterJournalNumeros(_lireJson(avantTxt), r.v);
     // (2 nov.) LA FILE D'ENVOI (src/fileEnvoi.js) : le geste est noté avec la
     // base de sa fusion, et il y reste jusqu'à ce que le nuage l'ACCEPTE — l'app
     // fermée avant le retour du réseau, le chargement suivant le rejoue au lieu
@@ -30990,9 +31012,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return { uid, nom: accNameOf(a), ok: !ko.has(uid), lu: listings.lues ? listings.lues[uid] : null,
         enLigne: listings.items.filter((it) => String(it && it._acc && it._acc.vinted_user_id) === uid) };
     });
-    return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum });
+    // (9 nov., lot AF) `dateDe` : depuis quand chaque annonce est en ligne (la date que
+    // l'écran Annonces affiche, `dateMiseEnLigneMs`) — l'alerte la montre, null = pas lue.
+    // Coût : un passage par annonce, un index par clé photo (union-find) — jamais O(n²).
+    return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum, dateDe: (it) => dateMiseEnLigneMs(it, listingDates) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff]);
+  }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff, listingDates]);
   // (29 oct.) La lecture des annonces telle que la règle de l'offre la juge
   // (`annonceOffreEnVente`) : la MÊME que l'écran Annonces (§11) — en ligne, à
   // confirmer, masquées, brouillons, l'heure de la lecture qui fait foi par compte
@@ -42906,6 +42931,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const noms = {}; accounts.forEach(a => { noms[String(a.vinted_user_id)] = accNameOf(a); });
           return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} aConfirmer={annAConfirmer} numeros={numeros} activite={liveStats && liveStats.annActivite}/>;
         })()}
+        {/* (9 nov., lot AF) LA MÊME PAIRE EN LIGNE DEUX FOIS (`enLigneDeux`, src/enLigneDeuxFois.js) :
+            mêmes groupes que la carte de Ma journée (§11) — même PHOTO EXACTE ou `recreeDe`, lectures
+            de moins de 24 h, jamais le titre. AMBRE, avant la double vente ; le geste est le sien,
+            sur vinted.fr (VRM ne supprime rien, §3). */}
+        {enLigneDeux && enLigneDeux.vinted.length > 0 && <EnLigneDeuxFoisAlerte groupes={enLigneDeux.vinted} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted} Feuille={SheetShell}/>}
         {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
         {listings.error && <EtatPanne quoi="Tes annonces Vinted" data-ann-panne="" onReessayer={()=>loadListings(true)}/>}
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
@@ -53520,8 +53550,13 @@ function AppCoeur() {
           const etat = p ? etatArticle(p, { fiches: numeros, ids: (rn.annonces || []).map((a) => a.id),
             crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined,
             reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
+          // (9 nov., lot AF) L'HISTOIRE DU N° (src/historiqueNumero.js) : lecture seule, depuis les
+          // traces qui existent (fiches, ventes, marqueur 013, Stock, journal des N°) — jamais devinée.
+          const histoNum = p && rn && rn.cle ? historiqueNumero({ cle: rn.cle, fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {},
+            journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
+            estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = () => setFicheNum(null);
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}

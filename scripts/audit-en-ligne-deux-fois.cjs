@@ -242,7 +242,7 @@ if (arg.includes('--prouve')) {
     const comp = app.slice(app.indexOf('function Comptabilite('), app.indexOf('function Comptabilite(') + 700000);   // (9 nov., lot AC) fenêtre élargie : Comptabilite a grandi
     const dMemo = comp.indexOf('const enLigneDeux = useMemo(');
     const memo = dMemo >= 0 ? comp.slice(dMemo, comp.indexOf('}, [listings, numeros', dMemo)) : '';
-    dit(/enLigneDeuxFois\(\{ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum \}\)/.test(memo), 'Ma journée passe par la règle avec la VRAIE clé de photo et cleNum');
+    dit(/enLigneDeuxFois\(\{ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum(?: \}\)|, dateDe: )/.test(memo), 'Ma journée passe par la règle avec la VRAIE clé de photo et cleNum');
     dit(/enLigne: listings\.items\.filter\(/.test(memo) && !/aConfirmer|masquees/.test(memo), 'seulement les annonces EN LIGNE (jamais « à confirmer » ni masquées)');
     dit(/lu: listings\.lues \? listings\.lues\[uid\]/.test(memo) && /ok: !ko\.has\(uid\)/.test(memo), 'chaque compte porte l’heure de SA lecture et son échec');
     dit(/!acctOff\(a\.vinted_user_id\)/.test(memo), 'les comptes écartés n’entrent pas');
