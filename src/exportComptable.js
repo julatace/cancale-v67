@@ -139,7 +139,7 @@ export function couvertureExport(d) {
   if (!d.ligneLue) L.push('CA déclaré pas encore calculé : ouvre Ventes une fois');
   for (const m of [...(d.manqueVentes || []), ...(d.manqueAchats || [])]) L.push(`pas lu : ${m}`);
   if (d.raisonUrssaf) L.push(d.raisonUrssaf);
-  if (d.totalVentes != null && d.caDeclare != null && Math.round(d.totalVentes * 100) !== Math.round(d.caDeclare * 100)) L.push('Le total des ventes listées et le CA déclaré diffèrent : une vente notée « déclarée » dans un autre mois, ou une lecture plus récente de Ventes');
+  if (d.totalVentes != null && d.caDeclare != null && Math.round(d.totalVentes * 100) !== Math.round(d.caDeclare * 100)) L.push('Ventes listées et CA déclaré diffèrent (vente déclarée dans un autre mois, ou Ventes relu depuis)');
   return L;
 }
 
@@ -215,7 +215,7 @@ export async function pdfExportComptable(d, { PDFLib = null } = {}) {
     txt(m.mois + (m.declare ? ' · noté déclaré' : ''), xs.mois, y, { t: 9, max: 210 }); txt(String(m.n), xs.n, y, { t: 9, droite: true });
     txt(eurosTexte(m.ca), xs.ca, y, { t: 9, droite: true }); txt(d.regime === 'micro' ? eurosTexte(m.urssaf) : 'non calculée', xs.urs, y, { t: 9, droite: true, c: d.regime === 'micro' ? ENCRE : GRIS }); y -= 13;
   }
-  if (d.caParMois) { filet(y + 9); txt('Total', xs.mois, y - 2, { font: fb, t: 9 }); txt(d.caDeclare == null ? '—' : `${d.partielCa ? 'au moins ' : ''}${eurosTexte(d.caDeclare)}`, xs.ca, y - 2, { font: fb, t: 9, droite: true }); if (d.regime === 'micro') txt(d.urssaf == null ? '—' : eurosTexte(d.urssaf), xs.urs, y - 2, { font: fb, t: 9, droite: true }); y -= 20; }
+  if (d.caParMois) { filet(y + 9); txt('Total', xs.mois, y - 2, { font: fb, t: 9 }); txt(d.caDeclare == null ? '—' : `${d.partielCa ? 'au moins ' : ''}${eurosTexte(d.caDeclare)}`, xs.ca, y - 2, { font: fb, t: 9, droite: true }); if (d.regime === 'micro') txt(d.urssaf == null ? '—' : `${d.partielCa ? 'au moins ' : ''}${eurosTexte(d.urssaf)}`, xs.urs, y - 2, { font: fb, t: 9, droite: true }); y -= 20; }
   const cv = couvertureExport(d);
   if (cv.length) {
     y -= 6; txt('Ce qui manque', M, y, { font: fb, t: 11 }); y -= 15;
@@ -223,6 +223,7 @@ export async function pdfExportComptable(d, { PDFLib = null } = {}) {
   }
   y -= 8;
   txt('Ventes datées au jour où la plateforme a versé l’argent (Vinted, Vestiaire), de la vente (Leboncoin), de la commande payée (eBay).', M, y, { t: 7.5, c: GRIS }); y -= 10;
-  txt('Comptes écartés par le vendeur : hors de tous les totaux. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — VRM ne remplace pas un comptable.', M, y, { t: 7.5, c: GRIS });
+  txt('Comptes écartés par le vendeur : hors de tous les totaux.', M, y, { t: 7.5, c: GRIS }); y -= 10;
+  txt('Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — VRM ne remplace pas un comptable.', M, y, { t: 7.5, c: GRIS });
   return doc.save();
 }
