@@ -83,6 +83,7 @@ import { effacerCompte } from './_lib/effacer-compte.js';
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
+import { routePilotage } from './_lib/pilotage.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
 // (9 nov.) L'état rangé par les sondes automatiques (projection publique, api/_lib/statut-sondes.js).
@@ -1452,6 +1453,16 @@ export default async function handler(req, res) {
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
+  // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :
+  // jeton vérifié d'abord, propriétaire seul (403 sinon), clé de service après.
+  if (mode === 'pilotage') {
+    if (m !== 'GET') return repondre(res, 405, { erreur: 'GET seulement' });
+    const utilisateur = await vendeurExige(req, res);
+    if (!utilisateur) return;
+    res.setHeader('Cache-Control', 'no-store');
+    const r = await routePilotage({ utilisateur });
+    return repondre(res, r.code, r.corps);
+  }
   if (mode === 'mesures') return (m === 'GET' || m === 'POST') ? mesures(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

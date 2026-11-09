@@ -65,6 +65,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
+import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -1861,6 +1862,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
+      // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
+      // voit l'entrée, et la route refuse tout autre compte (403).
+      proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'pulse', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>VRM semble en panne</summary><p>La page d’état dit, minute par minute, si la base, la réception des e-mails et les notifications fonctionnent, et les incidents connus. Si tout y fonctionne, le souci vient sans doute de cet appareil : recharge la page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>

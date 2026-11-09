@@ -75,6 +75,7 @@ import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelectu
 import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_LENTEURS } from './_lib/veille-plantages.js';
 // (8 nov.) Les alertes de plantage restées en attente pendant l'heure de repos : dites ici.
 import { vidangerAlertesPlantages } from './_lib/alertes-plantages.js';
+import { noterPilotageDuJour } from './_lib/pilotage.js';
 // (6 nov.) La purge à 30 jours du HTML d'origine des e-mails (api/_lib/email-html.js).
 import { purgerHtml } from './_lib/email-html.js';
 // (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
@@ -1252,6 +1253,9 @@ export default async function handler(req, res) {
       const proprio = String(process.env.VRM_OWNER_UID).trim().toLowerCase();
       try { alertesPlantages = await vidangerAlertesPlantages({ proprio, maintenant: debutCron, pousser: (n) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(n)) }); } catch (e) { alertesPlantages = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     }
+    // (9 nov.) Un point par jour pour les courbes du tableau du propriétaire (api/_lib/pilotage.js).
+    let pilotage = null;
+    if (!soir && !reveil) { try { pilotage = await noterPilotageDuJour({ maintenant: debutCron }); } catch (e) { pilotage = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (6 nov.) Le HTML d'origine des e-mails (30 jours) : une purge ratée ne fait
     // échouer rien (elle est dite dans la réponse).
     let purgeHtml = null;
@@ -1289,7 +1293,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
