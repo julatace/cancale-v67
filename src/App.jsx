@@ -366,7 +366,7 @@ import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
-import { trouverParScan } from "./scanColis.js";
+import { trouverParScan, candidatsRetrait } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
@@ -37457,6 +37457,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  · Vinted : le n° du bordereau (`b.suivi`, e-mail du bordereau) — à envoyer, et déjà
   //    partis (« Déjà déposé ») ; · Vestiaire : `v.suivi` (à envoyer, et « Colis fait »).
   // Leboncoin et eBay n'ont aucun n° de suivi lu chez VRM : un scan ne les trouve pas.
+  // (9 nov., lot V) Chaque colis porte aussi LA PAIRE ATTENDUE, par identité seulement (n° de suivi
+  // ⇒ SA vente ⇒ son annonce ⇒ sa fiche, `effEntry`) : photo, N°, titre, taille, compte, acheteur.
+  // Un bordereau sans vente (`!o`) est trouvé mais dit « relié à aucune vente » (`sansVente`) : rien.
+  const pseudoCommande = (o) => (o && (o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login))) || '';
+  const paireDeVente = (o, b) => {
+    const e = o ? effEntry(o) : null;
+    return { sansVente: !o, photo: o ? (orderPhoto(o) || null) : null, taille: (e && e.taille ? String(e.taille) : '') || (o ? String(o.size_title || o.size || '') : ''),
+      compte: o && o._acc ? accName(o._acc) : '', personne: pseudoCommande(o) };
+  };
   const colisScannables = () => {
     const L = [];
     try {
@@ -37464,18 +37473,60 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const vus = new Set();
         for (const e of expeditions()) { const o = e.o, b = e.b; if (e.txn) vus.add(String(e.txn));
           L.push({ cle: 'v:' + (e.txn || e.key), site: 'vinted', suivis: b && b.suivi ? [b.suivi] : [], deja: o ? isShipDone(o) : (b ? isBordShippedManual(b) : false), o, b,
-            num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis' }); }
+            num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis', ...paireDeVente(o, b) }); }
         for (const o of (Array.isArray(sales.items) ? sales.items : [])) { const tx = String(o && o.transaction_id); if (!o || vus.has(tx) || aExpedier(o)) continue;
           const b = bordsParTxn[tx]; if (!b || !b.suivi) continue;
-          L.push({ cle: 'v:' + tx, site: 'vinted', suivis: [b.suivi], deja: true, o, b, num: numForBord(b) || (effEntry(o)?.numero || ''), titre: o.title || 'Colis' }); }
+          L.push({ cle: 'v:' + tx, site: 'vinted', suivis: [b.suivi], deja: true, o, b, num: numForBord(b) || (effEntry(o)?.numero || ''), titre: o.title || 'Colis', ...paireDeVente(o, b) }); }
       }
       if (voitSite('vestiaire')) { const cv = colisVestiaire(vcEtat) || {}; const faits = vcCarte('vrm_vc_colis_done') || {};
-        for (const v of [...(cv.faits || []), ...(cv.partis || [])]) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: true, v, num: v.num || '', titre: v.titre || 'Article Vestiaire' });
-        for (const v of (cv.aEnvoyer || [])) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: !!faits[v.id], v, num: v.num || '', titre: v.titre || 'Article Vestiaire' }); }
+        for (const v of [...(cv.faits || []), ...(cv.partis || [])]) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: true, v, num: v.num || '', titre: v.titre || 'Article Vestiaire', photo: v.photo || null, taille: v.taille || '' });
+        for (const v of (cv.aEnvoyer || [])) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: !!faits[v.id], v, num: v.num || '', titre: v.titre || 'Article Vestiaire', photo: v.photo || null, taille: v.taille || '' }); }
     } catch (_) {}
     return L;
   };
+  // ── (9 nov., lot V) SCANNER AU RETRAIT : LES ACHATS QU'UN SCAN PEUT DÉSIGNER ──────────────
+  // Les MÊMES listes que « À retirer » (`pickupUnion` : e-mails, Vinted, à vérifier, à confirmer —
+  // jamais « peut-être en double »), chacune avec SES identités : son n° de suivi, son code de
+  // retrait, et ceux de SA commande reliée par identité (`achatDuColis`, `cmdParColis`). Les colis
+  // déjà cochés « J'ai retiré » répondent « Déjà noté retiré » (un retiré reste retiré). Une commande
+  // déjà portée par un e-mail n'entre pas une seconde fois (un colis, une ligne). Le geste est
+  // celui des cartes (`retirerColis` : `markCollected` pour un e-mail, `markPickupDone` sinon).
+  const retraitsScannables = () => {
+    const L = []; const vus = new Set(), txCouverts = new Set();
+    const photoA = (o) => (o ? (orderPhoto(o) || (indexSuivisAchats[String(o.transaction_id)] || {}).photo || null) : null);
+    const fiche = (o, t) => ({ titre: (o && o.title) || (t && t.artTitle) || 'Colis à retirer', photo: photoA(o) || (t && t.photo) || null,
+      taille: o ? String(o.size_title || o.size || '') : '', compte: o && o._acc ? accName(o._acc) : '', personne: pseudoCommande(o), prix: o ? prixPayeAchat(o) : null, num: '' });
+    try {
+      const ajouterEmail = (t, deja) => {
+        const k = t ? colisKey(t) : ''; if (!k || vus.has('e:' + k)) return; vus.add('e:' + k);
+        const o = achatDuColis(t, buysBase, indexSuivisAchats) || (pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(k) : null) || null;
+        if (o && o.transaction_id != null) txCouverts.add(String(o.transaction_id));
+        const ids = [suiviDeLigne(t), codeRetrait(t.code), codeRetrait(t.code2), ...(o ? suivisAchat(o, indexSuivisAchats) : [])].filter(Boolean);
+        L.push({ cle: 'r:e:' + k, suivis: ids, deja: !!deja, t, o, ...fiche(o, t) });
+      };
+      for (const t of (pickupUnion.emailList || [])) ajouterEmail(t, false);
+      for (const x of (pickupUnion.aVerifier || [])) if (x && x.kind === 'email') ajouterEmail(x.t, false);
+      for (const t of (trackingRetrait || [])) if (t && collected.has(colisKey(t))) ajouterEmail(t, true);
+      const ajouterVinted = (o, deja) => {
+        if (!o || o.transaction_id == null) return; const tx = String(o.transaction_id);
+        if (txCouverts.has(tx) || vus.has('v:' + tx)) return; vus.add('v:' + tx);
+        const r = relaisDe(o);
+        const ids = [...suivisAchat(o, indexSuivisAchats), r ? codeRetrait(r.code) : ''].filter(Boolean);
+        L.push({ cle: 'r:v:' + tx, suivis: ids, deja: !!deja, o, ...fiche(o, null) });
+      };
+      for (const o of (pickupUnion.extra || [])) ajouterVinted(o, false);
+      for (const x of (pickupUnion.aVerifier || [])) if (x && x.kind !== 'email') ajouterVinted(x.o, false);
+      for (const o of (pickupUnion.aConfirmer || [])) ajouterVinted(o, false);
+      for (const o of (buysBase || [])) if (o && pickupDone[String(o.transaction_id)]) ajouterVinted(o, true);
+    } catch (_) {}
+    return L;
+  };
+  const trouverRetrait = (brut) => trouverParScan(brut, retraitsScannables(), { candidats: candidatsRetrait });
+  const retirerScan = (x) => { if (!x) return; if (x.t) markCollected(x.t); else if (x.o) markPickupDone(x.o); };
+  // false · 'envoi' (bordereau, Colis) · 'retrait' (achat, Colis → À retirer et Achats).
   const [scanOuvert, setScanOuvert] = useState(false);
+  const boutonScanRetrait = <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-achats-scanner="" aria-label="Scanner un colis à retirer"
+    title="Scanner le colis au point relais : VRM montre l’achat attendu" onClick={() => setScanOuvert('retrait')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>;
   // (5 nov.) « … » de Colis : un état React (aria-expanded vrai à chaque rendu) posé sur la racine
   // pour les règles de fusion.css ; il se range quand on quitte Colis.
   const [outilsColis, setOutilsColis] = useState(false);
@@ -40767,9 +40818,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='achats' && (<div className="vrm-achats" data-ecran-achats={modeRetraits?(retraitsOutils?'retraits-outils':'retraits'):'achats'}>
         {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
+        {/* (9 nov., lot V) « Scanner » au point relais : la caméra lit le colis ⇒ l'achat qui porte CE n°
+            de suivi ou CE code de retrait (src/scanColis.js), « J'ai retiré » sur SON toucher. */}
         {!dansPlateforme && (modeRetraits
-          ? <ScreenHead icon="qr" title="Colis à retirer" desc="Les colis à aller chercher : code de retrait, date limite, point relais."/>
-          : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé."/>)}
+          ? <ScreenHead icon="qr" title="Colis à retirer" desc="Les colis à aller chercher : code de retrait, date limite, point relais." right={boutonScanRetrait}/>
+          : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé." right={boutonScanRetrait}/>)}
+        {dansPlateforme && !baseKO && pickupUnion.total > 0 ? <div className="vrm-achats-scan" data-achats-scan="">{boutonScanRetrait}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
@@ -43786,7 +43840,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    le geste principal tant qu'un bordereau est prêt ; sinon il reste à sa place, grisé, et
                    dit pourquoi. « … » montre les outils de Colis (Emballer, Tout générer) à leur place. */
                 <div className="vrm-colis-barre" data-colis-barre="">
-                  <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label="Scanner un bordereau" title="Scanner le code-barres d’un bordereau : le colis passe en « déposé »" onClick={() => setScanOuvert(true)}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
+                  <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label={onglet === 'retirer' ? 'Scanner un colis à retirer' : 'Scanner un bordereau'} data-scan-mode-bouton={onglet === 'retirer' ? 'retrait' : 'envoi'} title={onglet === 'retirer' ? 'Scanner le colis au point relais : VRM montre l’achat attendu' : 'Scanner le code-barres d’un bordereau : VRM montre la paire qui doit être dedans'} onClick={() => setScanOuvert(onglet === 'retirer' ? 'retrait' : 'envoi')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
                   <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
                     title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
                     onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : 'Tout imprimer'}</Bouton>
@@ -44488,7 +44542,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           ) : null}
                           <div className="vrm-tournee-haut">
                             <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
-                            <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton>
+                            <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert('envoi')}>Scanner</Bouton>
                           </div>
                           {!groupesT.length ? <div className="vrm-colis-vide-envoi" data-tournee-fini=""><span className="vrm-colis-vide-titre">Tout est déposé</span><span className="vrm-colis-vide-sous">Plus aucun colis à déposer pour l’instant.</span></div> : null}
                           {groupesT.map((g) => {
@@ -44988,7 +45042,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
       </>)}
 
-      {curSub==='bordereaux' && scanOuvert ? <ScannerColis trouver={trouverScan} onDeposer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => setScanOuvert(false)} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
+      {(curSub==='bordereaux' || curSub==='achats') && scanOuvert === 'retrait' ? <ScannerColis mode="retrait" trouver={trouverRetrait} onConfirmer={retirerScan} onFermer={() => setScanOuvert(false)} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
+      {curSub==='bordereaux' && scanOuvert && scanOuvert !== 'retrait' ? <ScannerColis mode="envoi" trouver={trouverScan} onConfirmer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => setScanOuvert(false)} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
       {curSub==='bordereaux' && !scanOuvert && !tourneeDepot ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
