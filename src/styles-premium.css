@@ -715,6 +715,29 @@
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-price { align-self: first baseline !important; justify-self: end !important; font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; white-space: nowrap !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-act { align-self: center !important; justify-self: end !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-act .vrm-buy-more { width: 44px !important; height: 44px !important; min-width: 44px !important; color: var(--p-gris-2) !important; }
+/* 10.8 MESSAGES — la rangée de Mail : [avatar 44 rond] [nom · heure à droite /
+   paire et compte (méta, 1 ligne) / extrait (1 ligne)] ; un rôle = une taille. */
+.vrm-main[data-ecran="messages"] .vrm-inbox-row { column-gap: var(--p-g-gout) !important; padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-av { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; flex: none !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-l1 { align-items: baseline !important; gap: 8px !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-name { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-time { margin-left: auto !important; flex: none !important; font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-article { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; overflow: hidden !important; min-width: 0 !important; margin-top: 1px !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-l2 { align-items: center !important; gap: 8px !important; margin-top: 1px !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-extrait { font: 400 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row[data-nonlu] .vrm-msg-extrait { color: var(--p-encre) !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-dot { flex: none !important; width: 10px !important; height: 10px !important; margin-left: auto !important; }
+
+/* 10.7 LA COQUE : l'en-tête de CHAQUE écran (pas seulement les trois de la phase 1) —
+   grand titre 34/700, phrase grise 15, et plus de tuile d'icône devant le titre : un seul
+   bord gauche du titre à la dernière rangée, sur tous les écrans. */
+.vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1) {
+  font-size: var(--p-t-titre) !important; font-weight: var(--p-g-titre) !important; letter-spacing: var(--p-ap-titre) !important; line-height: 1.12 !important;
+}
+.vrm-main .vrm-screen-head .vrm-screen-repere { display: none !important; }
+.vrm-main .vrm-screen-head .vrm-screen-head-titre.a-repere { display: block !important; }
+.vrm-main .vrm-screen-head .vrm-phrase-ecran:not(.vrm-fu-phrase-tete) { font: 400 var(--p-t-texte)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 4px !important; }
+
 @media (min-width: 1024px) {
   .vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row { grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) var(--p-g-montant) 44px !important; padding-right: 10px !important; }
 }
