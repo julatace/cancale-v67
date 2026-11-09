@@ -761,4 +761,25 @@
 .vrm-main[data-ecran="garage"] .vrm-s2d-txt-s b { color: var(--p-encre) !important; font-weight: 500 !important; }
 .vrm-main[data-ecran="garage"] .vrm-s2d-gestes { flex: none !important; }
 
+/* 11.2 FAVORIS & OFFRES (Messages → Favoris reçus) — un seul bord gauche : le panneau
+   était centré dans une colonne de 760 px (212 px de marge à gauche à l'ordinateur)
+   alors que les onglets et la liste partent du bord. Les replis du bas (« Assistance
+   technique », « Comptes Vinted », « Données ») deviennent des rangées de groupe :
+   une ligne de 48 px, le texte 15/500, le chevron à droite — plus de carte à moitié
+   vide ni de texte coupé au bas d'une carte trop courte. */
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="messages"] .vrm-fa { margin-left: 0 !important; margin-right: auto !important; }
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync) {
+  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte) !important; box-shadow: var(--p-ombre) !important;
+  padding: 0 !important; margin: 8px 0 0 !important; min-height: 0 !important; height: auto !important; overflow: hidden !important;
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync) > summary {
+  display: flex !important; align-items: center !important; gap: 8px !important; min-height: 48px !important; padding: 0 var(--p-g-bord) !important; box-sizing: border-box !important;
+  font: 500 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: 0 !important; cursor: pointer !important;
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync)[open] > :not(summary) { padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync)[open] > :last-child { padding-bottom: 12px !important; }
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes) > summary::after { margin-left: auto !important; }
+
 } /* fin @layer vrm-premium */
