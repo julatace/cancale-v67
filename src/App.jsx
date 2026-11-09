@@ -39731,7 +39731,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <CarteStatsApp page="ventes" aide liveStats={liveStats} className="vrm-fu-ecran vrm-fu-ventes" ici="cat_ventes" onNav={onNav}
               sel={{ site: 'vinted', compte: compteCarte(selEff, accounts), periode: pf }}
-              clics={{ aposter: () => setVFilter((v) => v === 'aexpedier' ? 'all' : 'aexpedier') }}
+              /* (9 nov., Ma journée v2 — Julien : « "Colis à envoyer" et "Ventes", ça fait répéter deux fois la
+                 même chose ») Ventes = l'argent et l'histoire des ventes ; Colis = les gestes. La case « À envoyer »
+                 mène à Colis (son `aller` du catalogue), elle ne déplie plus ici une seconde liste « à envoyer ». */
               attrsDe={(x) => x.place.id === 'vendu' && (x.p === 'mois' || (pf && x.p === pf)) ? { 'data-fu-vendu-mois': x.valeur == null ? '' : String(Math.round(x.valeur * 100)), 'data-fu-partiel': x.partiel ? '1' : undefined, 'data-fu-pas-su': x.valeur == null ? '1' : undefined } : x.place.id === 'aposter' ? { 'data-n': x.valeur == null ? '' : String(x.valeur), 'aria-pressed': vFilter === 'aexpedier' } : null}
               locaux={{
                 enroute: { nom: 'Ventes en route', court: 'en route', type: 'n', valeur: pasSu ? null : enRoute, titre: 'Déposées, pas encore livrées', onClick: () => setVFilter((v) => v === 'transit' ? 'all' : 'transit'), attrs: { 'data-n': pasSu ? '' : String(enRoute), 'aria-pressed': vFilter === 'transit' } },
@@ -39764,9 +39766,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Les filtres défilent seuls, « Outils » reste à droite, à part. */}
         <div className="vrm-filtres-et-outils" style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,minWidth:0}}>
         <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2,flex:'1 1 auto',minWidth:0}}>
-          {[['all','Toutes'],['aexpedier',L.aEnvoyer],['transit',L.enRoute],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
+          {/* (9 nov., Ma journée v2) Plus de filtre « À envoyer » ici : la liste des colis à envoyer vit dans
+              Colis (un lien, au bout de la rangée), jamais redite en entier dans Ventes. Une vue enregistrée
+              qui le choisit filtre encore (rien n'est cassé) ; l'état « À envoyer » reste sur chaque vente. */}
+          {[['all','Toutes'],['transit',L.enRoute],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
             <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'background-color .15s ease, color .15s ease'}}>{label}</button>
           ))}
+          {onNav ? <button type="button" className="vrm-ventes-vers-colis" data-ventes-vers-colis="" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{L.aEnvoyer} : Colis ›</button> : null}
         </div>
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
@@ -48939,6 +48945,24 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // (8 nov.) Les départs prouvés chez le transporteur : la ligne d'une vente Vestiaire partie se redessine.
   const vcLocDep = useVcLocal();
   const voit = (s) => !sites || sites.has(s);
+  // (9 nov., Ma journée v2 — Julien : « il manque les transporteurs à côté de chaque vente ») LE
+  // TRANSPORTEUR D'UNE VENTE VINTED : par SON bordereau (le MÊME n° de transaction), la règle de Colis
+  // (`transporteurDeVente`, src/colisEnvoyes.js) — le transporteur nommé dans l'e-mail du bordereau, puis
+  // la forme propre de son n°. Jamais par titre ; rien lu ⇒ rien posé. Les bordereaux : ceux que Colis
+  // vient de lire (mémoire de l'écran), sinon la même lecture légère (métadonnées seules, jamais le PDF).
+  const [bordsT, setBordsT] = React.useState(() => souvenir('emailBords', AUTH.user?.id) || null);
+  React.useEffect(() => {
+    if (!voit('vinted') || bordsT) return undefined;
+    let vivant = true;
+    fetchEmailBordereaux().then((v) => { if (vivant && Array.isArray(v)) setBordsT(v); }).catch(() => {});
+    return () => { vivant = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sites && sites.has('vinted')]);
+  const bordTParTx = React.useMemo(() => {
+    const m = {};
+    for (const b of (bordsT || [])) { if (b && b.transaction && !m[String(b.transaction)]) m[String(b.transaction)] = b; }
+    return m;
+  }, [bordsT]);
   // (5 nov.) Le compte de CHAQUE vente, toutes plateformes (`nomCompteVente`).
   const annLbc = useAnnuaireLbc();
   const [vc, setVc] = React.useState(undefined);   // undefined en cours · null pas su · objet
@@ -48976,7 +49000,8 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         out.push({ cle: 'vinted:' + tx, site: 'vinted', id: tx, titre: o.title || '(sans titre)', t: ts(o.date),
           prix: euro(o.price && typeof o.price === 'object' ? o.price.amount : o.price), devise: (o.price && o.price.currency_code) || 'EUR',
           etat: etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label,
-          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || null });
+          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || null,
+          tr: bordTParTx[tx] ? transporteurDeVente({ bord: bordTParTx[tx] }) : null });
       }
     }
     if (voit('leboncoin') && lbcLu === true) {
@@ -49018,7 +49043,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
     return out.sort((a, z) => (z.t ?? -Infinity) - (a.t ?? -Infinity));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle]);
+  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx]);
   const [n, setN] = React.useState(60);
   const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).

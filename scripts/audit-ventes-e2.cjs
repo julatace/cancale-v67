@@ -40,7 +40,9 @@ const MUTATIONS = {
   fiab_zero: ['src/FiabiliteVentes.jsx', 'r.prixManquant>0&&pl(', 'r.prixManquant>=0&&pl('],
   fiab_titre: ['src/FiabiliteVentes.jsx', "r.calculables===0?`Bénéfice : aucune des ${pl(r.total,'vente')} n’est calculable`:", ''],
   pied_vendus: ['src/App.jsx', '  <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>\n', "  <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>\n  <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>\n"],
-  filtre_mot: ['src/App.jsx', "['aexpedier',L.aEnvoyer]", "['aexpedier','À expédier']"],
+  filtre_mot: ['src/App.jsx', "['pending',L.aEnvoyer]", "['pending','À expédier']"],
+  // (9 nov., Ma journée v2) La liste « à envoyer » revient dans Ventes · Vinted (une seconde liste) : rouge.
+  filtre_double: ['src/App.jsx', "{[['all','Toutes'],['transit',L.enRoute]", "{[['all','Toutes'],['aexpedier',L.aEnvoyer],['transit',L.enRoute]"],
   compteur: ['src/App.jsx', '            {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus=""', '            <CompteurListe affiches={n} total={lignes.length}/>{lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus=""'],
   annul_copie: ['src/App.jsx', 'const R = annulationsParCompte({ ventes: sales.items,', 'const R = ({ ventes: sales.items,'],
 };
@@ -124,9 +126,14 @@ function statiques(bavard) {
   dit(pied.length > 0 && !/<VendusAilleurs\b/.test(pied) && !/<BilanSynchronisation\b/.test(pied), 'S1 le pied de Ventes : ni « Vendus ailleurs » ni le bilan des données', pied.slice(0, 200));
   dit(!/Compte qui vend le mieux/.test(app) && /Quel compte vend le mieux/.test(app) && !/data-ventes-par-compte/.test(app), 'S2 « Compte qui vend le mieux » : une seule place, Statistiques');
   // Les DEUX rangées de filtres de Ventes : Vinted (dans l'écran) et `FiltresVentes` (Leboncoin, eBay).
-  const rangees = (app.match(/\[\['all','Toutes'\][\s\S]*?(?=\.map\(|\];)/g) || []).filter((f) => /'aexpedier'|'pending',/.test(f));
-  dit(rangees.length >= 2 && rangees.every((f) => /L\.aEnvoyer/.test(f) && !/À expédier|En transit|À poster/.test(f)) && rangees.some((f) => /L\.enRoute/.test(f)),
-    'S3 les filtres de Ventes (Vinted, Leboncoin, eBay) : « À envoyer », « En route » (src/libelles.js)', rangees.join(' ¦ ').slice(0, 300));
+  // (9 nov., Ma journée v2) Vinted : « En route » par les mots de libelles.js, et PLUS de filtre « À envoyer »
+  // (la liste vit dans Colis, un lien le dit) ; Leboncoin, eBay : « À envoyer » par les mots de libelles.js.
+  const rangees = (app.match(/\[\['all','Toutes'\][\s\S]*?(?=\.map\(|\];)/g) || []);
+  const rVinted = rangees.filter((f) => /'transit',/.test(f)), rAutres = rangees.filter((f) => /'pending',/.test(f));
+  dit(rVinted.length >= 1 && rVinted.every((f) => /L\.enRoute/.test(f) && !/'aexpedier'/.test(f) && !/À expédier|En transit|À poster/.test(f)) && /data-ventes-vers-colis=""[^>]*onClick=\{\(\)=>onNav\('cat_bord'\)\}/.test(app),
+    'S3 Ventes · Vinted : « En route » (src/libelles.js), aucun filtre « À envoyer » — un lien vers Colis', rVinted.join(' ¦ ').slice(0, 300));
+  dit(rAutres.length >= 1 && rAutres.every((f) => /L\.aEnvoyer/.test(f) && !/À expédier|En transit|À poster/.test(f)),
+    'S3 les filtres de Leboncoin et eBay : « À envoyer » (src/libelles.js)', rAutres.join(' ¦ ').slice(0, 300));
   dit(/etat=\{motEtatVente\(venteStage\(o\)\.label\)\}/.test(app), 'S3 l’état d’une ligne Vinted passe par `motEtatVente`');
   const toutes = bloc('function VentesToutes(', 'function AppCoeur(');
   dit(toutes.length > 0 && !/CompteurListe/.test(toutes) && !/résultats/.test(toutes), 'S4 « Tous » : plus de compteur « N sur N résultats »');
