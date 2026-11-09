@@ -17,8 +17,11 @@
 //       (mesuré : des centaines quand chaque appel refaisait le sien) ;
 //   D5  aucune erreur de page.
 //
-//  Les seuils viennent des mesures de la passation (2026-11-09-vitesse-demarrage.md),
-//  avec une marge pour un conteneur partagé ; ils se changent par l'environnement
+//  Les seuils viennent des mesures de la passation (2026-11-09-vitesse-demarrage.md) :
+//  après, sous une charge de 10 à 20, « prêt » 7,7–8,7 s et tâches longues 3,0–6,7 s ;
+//  avant, 469 à 546 formats et 2 écritures du cache avant « prêt » (D3/D4 rouges).
+//  ⚠️ « Prêt » = montage + plafond d'AttenteEcran (~2,5 s) tant que la carte et les
+//  notifications manquent : D1 garde contre un recul, il ne mesure pas un gain ; ils se changent par l'environnement
 //  (SEUIL_PRET_MS, SEUIL_LONGUES_MS, SEUIL_FORMATS). D1/D2 dépendent de la charge
 //  de la machine : un rouge sur D1/D2 seul ⇒ regarder la charge (`uptime`) et
 //  relancer. D3/D4 ne dépendent pas de la charge.
@@ -33,8 +36,8 @@ const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs')
 const base = fabriquer({ volumeReel: true, qr: true });
 const DIST = process.argv[2] || path.join(RACINE, 'dist'), PORT = +(process.argv[3] || process.env.BANC_PORT || 9641);
 const PASSES = +(process.env.PASSES || 3);
-const SEUIL_PRET_MS = +(process.env.SEUIL_PRET_MS || 6500);
-const SEUIL_LONGUES_MS = +(process.env.SEUIL_LONGUES_MS || 5500);
+const SEUIL_PRET_MS = +(process.env.SEUIL_PRET_MS || 9000);
+const SEUIL_LONGUES_MS = +(process.env.SEUIL_LONGUES_MS || 6500);
 const SEUIL_FORMATS = +(process.env.SEUIL_FORMATS || 60);
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/json', '.json': 'application/json', '.woff2': 'font/woff2' };
 const srv = http.createServer((q, r) => {
