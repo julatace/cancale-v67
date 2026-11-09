@@ -285,11 +285,14 @@ async function main() {
         await ouvrirEnLigne(pg);
         // En ligne : il ouvre le bordereau de la 70001 (Ventes → « Imprimer »), pas celui de la 70002.
         await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-bouton-bord="pdf"][data-tx="70001"]', { state: 'attached', timeout: 30000 }).catch(() => {});
-        const bouton = await pg.evaluate(() => { const b = document.querySelector('[data-bouton-bord="pdf"][data-tx="70001"]'); if (!b) return false; b.click(); return true; });
+        // La ligne de la vente s'ouvre (son tiroir porte le bouton), puis « Imprimer ».
+        await pg.waitForSelector('.vrm-ledger-sale-toggle', { timeout: 30000 }).catch(() => {});
+        await pg.locator('.vrm-ledger-sale-toggle', { hasText: 'Nike Air Max 1 banc' }).first().click({ timeout: 8000 }).catch(() => {});
+        await pg.waitForSelector('[data-bouton-bord="pdf"][data-tx="70001"]', { state: 'attached', timeout: 20000 }).catch(() => {});
+        const bouton = await pg.evaluate(() => { const b = document.querySelector('[data-bouton-bord="pdf"][data-tx="70001"]'); if (!b) return [...document.querySelectorAll('[data-bouton-bord]')].map((x) => x.getAttribute('data-bouton-bord') + ':' + x.getAttribute('data-tx')).join(',') || 'aucun bouton'; b.click(); return true; });
         let garde = [];
         for (let i = 0; i < 30 && !garde.length; i++) { await pg.waitForTimeout(400); garde = await pg.evaluate(async () => (await (await caches.open('vrm-hl-pdf')).keys()).map((r) => decodeURIComponent(new URL(r.url).pathname))).catch(() => []); }
-        dit(bouton && garde.length === 1 && garde[0] === `/hl-pdf/${UID_A}/email_bord_70001`, 'en ligne, le bordereau OUVERT est gardé sur l\'appareil, au nom de CE vendeur (et lui seul)', JSON.stringify({ bouton, garde }));
+        dit(bouton === true && garde.length === 1 && garde[0] === `/hl-pdf/${UID_A}/email_bord_70001`, 'en ligne, le bordereau OUVERT est gardé sur l\'appareil, au nom de CE vendeur (et lui seul)', JSON.stringify({ bouton, garde }));
         await pg.keyboard.press('Escape').catch(() => {});
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         let photo = null;
