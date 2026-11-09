@@ -77,6 +77,12 @@ Vinted qui ne sont plus sur Leboncoin ».
   jamais, partielle, prouvée, eBay), 9 mutations rouges.
 - `scripts/bancs/lbc-clair-carte.cjs` : la carte (vraie `resumeCarteLbc`) 390 tactile et
   1512, clair et sombre, 4 états.
+- `scripts/bancs/lbc-supprimer.cjs` (écran Leboncoin + Ma journée) : la N°15 vendue sur
+  eBay, seulement « publiée », passe dans la carte « à confirmer » (attendu mis à jour) ;
+  5 rouges restants **déjà rouges sur `origin/main`** (9 rouges là-bas : « 1 annonce à
+  retirer » au lieu de « 1 à retirer » dans Ma journée, « Voir » de Ma journée, onglets
+  rognés à 390) — pas de ce chantier.
+- `audit-coherence` : vert après le merge de `origin/main` (5.332 sécurité-2, 5.334 N°).
 - Audits extension-zip, paquets-boutiques, sans-session-envoi, coherence, identite,
   statuts, variables, tdz, les 25 `audit-*lbc*` et double-vente ; `npm run build`.
 
