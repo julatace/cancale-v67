@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ⚠️⚠️ LE BILAN DE LA SEMAINE — UNE RÈGLE, CELLE DE L'APP, ET DES TOTAUX QUI DISENT S'ILS SONT PARTIELS
 //
 // Julien, 5 octobre : un bilan de la semaine en notification (vendu, reçu,

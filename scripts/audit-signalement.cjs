@@ -32,6 +32,7 @@
 // `--prouve` : réaffaiblit le code, une mutation à la fois ⇒ ROUGE exigé.
 // Données inventées (le dépôt est public).
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs');
 const { spawnSync } = require('child_process');
@@ -275,8 +276,8 @@ const lignesSignalements = () => rows.filter((r) => /^signalement_/.test(r.id));
     const jn = rows.find((x) => x.owner === JULIEN && x.id === 'push_journal');
     const e = (jn && jn.data && jn.data.entrees) || [];
     const titres = e.filter((x) => x.cat === 'signalement').map((x) => x.titre);
-    dit(titres.length >= 6 && titres.filter((t) => t === '🛟 Problème signalé').length === 3, 'les 3 premiers de l’heure : une notification chacun', titres.slice(0, 6));
-    dit(titres.some((t) => /^🛟 4 problèmes signalés depuis une heure$/.test(t)) && titres.some((t) => /^🛟 6 problèmes signalés depuis une heure$/.test(t)), 'au-delà : regroupées, le titre dit combien', titres.slice(0, 8));
+    dit(titres.length >= 6 && titres.filter((t) => t === 'Problème signalé').length === 3 /* (8 nov.) sans emoji, api/_lib/notif-belle.js */, 'les 3 premiers de l’heure : une notification chacun', titres.slice(0, 6));
+    dit(titres.some((t) => /^4 problèmes signalés depuis une heure$/.test(t)) && titres.some((t) => /^6 problèmes signalés depuis une heure$/.test(t)), 'au-delà : regroupées, le titre dit combien', titres.slice(0, 8));
     const n = SIG.notifSignalement({ id: 'signalement_x', s: { texte: 'abc', ecran: 'ventes' }, n: 5 });
     dit(n.tag === 'vrm-signalements' && SIG.notifSignalement({ id: 'signalement_x', s: { texte: 'abc', ecran: '' }, n: 2 }).tag === 'signalement-signalement_x', 'regroupées = une seule notification qui se remplace (même étiquette)');
   });

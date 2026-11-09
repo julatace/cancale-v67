@@ -17,9 +17,11 @@ export const TYPES_CENTRE = [
   { id: 'doublevente', titre: 'Double vente' },
   { id: 'rappels', titre: 'Rappels' },
 ];
+import { embellir, GENRES } from '../api/_lib/notif-belle.js';
 // Ce que l'écran dit d'une notification qui n'a PAS sonné (rien pour « envoyée »).
 export const ETAT_CENTRE = {
   calme: 'Heures calmes',
+  discret: 'Sans sonnerie',
   'sans-appareil': 'Aucun appareil',
   serveur: 'Pas envoyée',
   echec: 'Pas reçue',
@@ -32,9 +34,13 @@ export function entreeSure(x) {
   const t = Date.parse(x.at || '');
   if (!Number.isFinite(t)) return null;
   const url = typeof x.url === 'string' && /^\/(\?[A-Za-z0-9_=&%.-]{0,600})?$/.test(x.url) ? x.url : '/';
+  // (8 nov.) Le MÊME texte que le téléphone (api/_lib/notif-belle.js) : les
+  // entrées rangées avant le 8 nov. perdent leurs emoji ici aussi.
+  const v = embellir({ title: String(x.titre || '').slice(0, 120), body: String(x.texte || '').slice(0, 240) }, x.cat);
   return {
     seq: x.seq, t, famille: typeof x.famille === 'string' ? x.famille : '',
-    titre: String(x.titre || '').slice(0, 120), texte: String(x.texte || '').slice(0, 240),
+    titre: v.title, texte: v.body,
+    genre: typeof x.genre === 'string' && GENRES.some((g) => g.id === x.genre) ? x.genre : null,
     url, etat: typeof x.etat === 'string' ? x.etat : 'envoyee',
   };
 }
@@ -100,3 +106,33 @@ export function parJour(entrees, maintenant = Date.now()) {
 export const heureCourte = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 // L'adresse à suivre au toucher : la partie `?…` d'un chemin de l'app, ou `null`.
 export const rechercheDe = (url) => (typeof url === 'string' && /^\/\?/.test(url) ? url.slice(1) : null);
+
+// (8 nov.) LE MÊME REGROUPEMENT QUE LE TÉLÉPHONE : dans un jour, les entrées d'un
+// même genre (« bordereau », « vente », « offre »…) deviennent UNE ligne
+// (« 3 bordereaux prêts à imprimer ») placée à la plus récente, dépliable.
+// Une seule entrée d'un genre reste une ligne simple.
+export function regrouperLignes(items) {
+  const parGenre = new Map();
+  for (const e of items || []) if (e && e.genre) parGenre.set(e.genre, [...(parGenre.get(e.genre) || []), e]);
+  const out = [], places = new Set();
+  for (const e of items || []) {
+    const l = e && e.genre ? parGenre.get(e.genre) : null;
+    if (l && l.length > 1) {
+      if (places.has(e.genre)) continue;
+      places.add(e.genre);
+      const g = GENRES.find((x) => x.id === e.genre);
+      out.push({ groupe: true, cle: 'g-' + e.genre + '-' + e.seq, genre: e.genre, titre: g ? g.titre(l.length) : `${l.length} notifications`, famille: e.famille, t: e.t, url: g ? g.url : '/', items: l });
+    } else out.push(e);
+  }
+  return out;
+}
+// L'heure dite comme un téléphone : « À l'instant », « Il y a 5 min », « Il y a 2 h »,
+// puis l'heure (le jour est dans l'intertitre).
+export function quandRelatif(t, maintenant = Date.now()) {
+  const d = maintenant - t;
+  if (!Number.isFinite(d) || d < 0) return heureCourte(t);
+  if (d < 60e3) return 'À l’instant';
+  if (d < 3600e3) return `Il y a ${Math.floor(d / 60e3)} min`;
+  if (d < 6 * 3600e3) return `Il y a ${Math.floor(d / 3600e3)} h`;
+  return heureCourte(t);
+}

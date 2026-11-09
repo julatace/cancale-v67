@@ -27,46 +27,53 @@ import { notificationUrssaf } from './rappel-urssaf.js';
 import { texteBilan } from './bilan-semaine.js';
 import { notificationDoubleVente } from './double-vente.js';
 import { texteComptesARelire } from './comptes-a-relire.js';
+import { texteCompteRelie } from '../../src/compteRelie.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
-// 💸 Une vente Vinted (e-mail « Ton article s'est vendu »).
+// (8 nov., Julien : « de belles notifications ») Chaque titre dit LE fait en
+// ≤ 40 caractères, sans emoji ; le corps dit l'objet, puis le geste et
+// l'échéance. La forme finale (coupe, séparateurs) : api/_lib/notif-belle.js.
+const euros = (x) => { const s = String(x == null ? '' : x).trim().replace('.', ','); return s ? `${s} €` : ''; };
+const joindre = (...xs) => xs.filter((x) => x && String(x).trim()).join(' · ');
+
+// Une vente Vinted (e-mail « Ton article s'est vendu »).
 // (6 nov.) `verification` : la vente « avec Vérification de l'article » (l'e-mail
 // ne donne pas de prix — il n'est jamais deviné) ; le colis part au centre de Vinted.
 export const texteVendu = ({ article = '', prix = '', compte = '', verification = false } = {}) => ({
-  title: '💸 Vendu !',
-  body: `${article || 'Article'}${prix ? ` — ${prix} €` : ''}${compte ? ` (${compte})` : ''}${verification ? ' — avec Vérification de l’article : envoi au centre de vérification de Vinted' : ''}`,
+  title: prix ? `Vendu · ${euros(prix)}` : 'Vendu',
+  body: joindre(article || 'Article', compte, verification ? 'avec Vérification de l’article : envoi au centre de vérification de Vinted' : 'Prépare le colis, le bordereau suit par e-mail'),
 });
-// 💰 L'argent d'une vente arrive (e-mail « Transaction finalisée »).
+// L'argent d'une vente arrive (e-mail « Transaction finalisée »).
 export const texteArgentRecu = ({ montant = '', article = '', compte = '' } = {}) => ({
-  title: '💰 Argent reçu',
-  body: `${montant ? montant + ' € viré sur ton compte Vinted' : 'Transaction finalisée'}${article ? ' — ' + String(article).slice(0, 50) : ''}${compte ? ` (${compte})` : ''}.`,
+  title: montant ? `${euros(montant)} reçus` : 'Argent reçu',
+  body: joindre(article ? String(article).slice(0, 50) : 'Transaction finalisée', compte, 'sur ton porte-monnaie Vinted'),
 });
 // Vendu sur Vestiaire (e-mail de vente Vestiaire). `montant` en euros (nombre).
 export const texteVenduVestiaire = ({ titre = '', montant = null, limite = '' } = {}) => ({
   title: 'Vendu sur Vestiaire',
-  body: `${titre || 'Ton article'}${Number.isFinite(montant) ? ` — tu reçois ${String(montant.toFixed(2)).replace('.', ',')} €` : ''}${limite ? ` — à envoyer avant le ${String(limite).slice(8, 10)}/${String(limite).slice(5, 7)}` : ''}.`,
+  body: joindre(titre || 'Ton article', Number.isFinite(montant) ? `tu reçois ${String(montant.toFixed(2)).replace('.', ',')} €` : '', limite ? `à envoyer avant le ${String(limite).slice(8, 10)}/${String(limite).slice(5, 7)}` : 'à envoyer'),
 });
-// 📦 Le bordereau d'une vente est arrivé (e-mail « Bordereau d'envoi »).
+// Le bordereau d'une vente est arrivé (e-mail « Bordereau d'envoi »).
 export const texteBordereau = ({ modele = '', numero = '', tamponne = false, dateLimite = '' } = {}) => ({
-  title: tamponne ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu',
-  body: `${modele || 'Article'}${numero ? ` — N°${numero}` : ''}${tamponne ? ' : déjà tamponné' : ''} — à expédier${dateLimite ? ` avant le ${dateLimite}` : ''}.`,
+  title: tamponne ? 'Bordereau prêt à imprimer' : 'Bordereau reçu',
+  body: joindre(modele || 'Article', numero ? `N°${numero}` : '', tamponne ? 'déjà tamponné' : '', dateLimite ? `à déposer avant le ${dateLimite}` : 'à déposer'),
 });
-// 💰 Une offre reçue (e-mail « Nouvelle offre »). `conseil` : la phrase du copilote, déjà formée.
+// Une offre reçue (e-mail « Nouvelle offre »). `conseil` : la phrase du copilote, déjà formée.
 export const texteOffre = ({ montant = '', qui = '', article = '', compte = '', conseil = '' } = {}) => ({
-  title: `💰 Offre ${montant ? montant + ' €' : ''}${qui ? ' de ' + qui : ''}`,
-  body: `${article ? `« ${String(article).trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${compte ? ` (${compte})` : ''}${conseil || ''}`,
+  title: montant ? `Offre de ${euros(montant)}` : 'Nouvelle offre',
+  body: joindre(article ? `« ${String(article).trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre', qui, compte) + (conseil ? conseil : ' — accepte, refuse ou contre-propose.'),
 });
-// 💬 Un message reçu (e-mail « Nouveau message »).
+// Un message reçu (e-mail « Nouveau message »).
 export const texteMessage = ({ paire = '', qui = '', compte = '', extrait = '' } = {}) => ({
-  title: `💬 ${paire ? court(paire, 70) : (qui || 'Message Vinted')}`,
-  body: `${qui && paire ? `${qui} · ` : ''}Nouveau message${compte ? ` sur ${compte}` : ''}${extrait ? ` : « ${extrait} »` : ' — ouvre Vinted pour répondre.'}`,
+  title: qui ? `Message de ${qui}` : (paire ? court(paire, 40) : 'Message Vinted'),
+  body: joindre(qui && paire ? court(paire, 60) : '', compte ? `Nouveau message sur ${compte}` : 'Nouveau message', extrait ? `« ${extrait} »` : 'réponds dans Messages'),
 });
 
-// ⚠️ Une annulation demandée (e-mail « … souhaiterait annuler l'achat … »).
+// Une annulation demandée (e-mail « … souhaiterait annuler l'achat … »).
 export const texteAnnulation = ({ qui = '', article = '', raison = '', compte = '' } = {}) => ({
-  title: `⚠️ Annulation demandée${article ? ` — ${court(article, 60)}` : ''}`,
-  body: `${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''}${compte ? ` sur ${compte}` : ''} — accepte ou refuse dans la conversation Vinted.`,
+  title: 'Annulation demandée',
+  body: `${joindre(article ? court(article, 60) : '', compte)}${article || compte ? ' · ' : ''}${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''} — accepte ou refuse dans la conversation Vinted.`,
 });
 // Le rappel du cron « offres au-dessus de ton prix mini » (api/ship-reminders.js).
 export const texteOffresMini = (n) => ({
@@ -84,7 +91,7 @@ export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDema
   if (aVerifier) parts.push(`${aVerifier} à vérifier sur Vinted (date estimée passée)`);
   if (demain) parts.push(`${demain} avec la date limite demain${H ? (demain === 1 ? ` à ${H}` : `, la première à ${H}`) : ''}`);
   return {
-    title: retard ? `⏰ Demain : ${N}` : `📮 Demain : ${N}`,
+    title: `Demain : ${N}`,
     body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? `Les ventes ${(Array.isArray(manque) && manque.length ? manque : ['eBay']).join(' et ')} n'ont pas pu être relues : il peut y en avoir plus. ` : ''}Prépare-les ce soir.`,
   };
 }
@@ -150,6 +157,13 @@ export const APERCUS_NOTIF = {
       ...(URSSAF && URSSAF.envoyer ? [{ ...deux(URSSAF), mene: 'Comptabilité · ta déclaration' }] : []),
       { ...deux(BILAN), mene: 'Ma journée' },
       { ...texteComptesARelire([{ nom: EX.compte, age: 'il y a 2 j' }]), mene: 'Paramètres · Comptes liés' },
+    ],
+  },
+  // (8 nov.) Un compte relié pour la première fois (src/compteRelie.js, le vrai texte).
+  comptes: {
+    quoi: 'Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois.',
+    exemples: [
+      { ...texteCompteRelie([{ plateforme: 'vinted', id: '123', nom: EX.compte }]), mene: 'Paramètres · Comptes liés' },
     ],
   },
 };

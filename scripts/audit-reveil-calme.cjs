@@ -11,6 +11,7 @@
 // Données inventées (le dépôt est public). Mutation : `--muter` (le mémo du jour
 // ignoré) doit finir en rouge.
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const R = path.join(__dirname, '..');
 const MUTER = process.argv.includes('--muter');
@@ -48,7 +49,7 @@ const hhmm = (t) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris',
     dit(resumeReveil({ prefs, journal, lu: {}, dejaJour: null, maintenant: t0 - 2 * H }).raison === 'pas-l-heure', 'pendant les heures calmes : rien');
     dit(resumeReveil({ prefs, journal, lu: {}, dejaJour: null, maintenant: t0 + 4 * H }).raison === 'pas-l-heure', 'plus de 3 h après la fin : rien');
     dit(resumeReveil({ prefs, journal, lu: null, dejaJour: null, maintenant: t0 }).raison === 'pas-su', 'ce qu\'il a lu illisible : rien (pas su)');
-    dit(resumeReveil({ prefs: {}, journal, lu: {}, dejaJour: null, maintenant: t0 }).raison === 'calme-eteint', 'heures calmes éteintes : rien');
+    dit(resumeReveil({ prefs: { calme: { actif: false } }, journal, lu: {}, dejaJour: null, maintenant: t0 }).raison === 'calme-eteint', 'heures calmes coupées à la main : rien (8 nov. : allumées par défaut)');
     dit(resumeReveil({ prefs, journal, lu: { luJusqua: 9 }, dejaJour: null, maintenant: t0 }).raison === 'rien', 'tout déjà lu : rien');
   }
 

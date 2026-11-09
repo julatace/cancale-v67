@@ -1,0 +1,17 @@
+.vrm-choix-plateformes { padding: 20px; border: 1px solid var(--vrm-line); border-radius: 18px; background: var(--vrm-surface); color: var(--vrm-ink); margin-bottom: 18px; }
+.vrm-cp-tete h2 { font-size: 19px; letter-spacing: -.4px; margin: 0 0 5px; }
+.vrm-cp-tete p,.vrm-cp-note { color: var(--vrm-muted); font-size: 13px; line-height: 1.55; margin: 0 0 16px; }
+.vrm-cp-grille { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-bottom: 14px; }
+.vrm-cp-grille button { display: flex; align-items: center; gap: 12px; text-align: left; min-height: 70px; padding: 12px; color: var(--vrm-ink); background: var(--vrm-bg); border: 1px solid var(--vrm-line); border-radius: 12px; cursor: pointer; }
+.vrm-cp-grille button[aria-pressed=true] { border-color: var(--vrm-accent); background: color-mix(in srgb,var(--vrm-accent) 6%,var(--vrm-surface)); }
+.vrm-cp-grille button:disabled { cursor: default; }
+.vrm-cp-grille button:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 3px; }
+.vrm-cp-grille img { width: 30px; height: 25px; object-fit: contain; }
+.vrm-cp-grille b { display: block; font-size: 14px; font-weight: 600; }
+.vrm-cp-grille small { display: block; font-size: 12px; color: var(--vrm-muted); margin-top: 3px; }
+.vrm-cp-coche { margin-left: auto; color: var(--vrm-accent); }
+@media(max-width:420px) { .vrm-choix-plateformes { padding: 14px; }.vrm-cp-grille button { gap: 8px; padding: 9px; }.vrm-cp-grille img { width: 23px; } }
+.vrm-cp-logo { display: block; width: 30px; height: 25px; flex-shrink: 0; background: currentColor; mask: var(--vrm-cp-logo) center/contain no-repeat; -webkit-mask: var(--vrm-cp-logo) center/contain no-repeat; }
+.vrm-choix-plateformes[data-choix-plateformes=reglages] { border: 0; padding: 0; border-radius: 0; margin-bottom: 0; }
+.vrm-cp-grille button[aria-pressed=true]:disabled { opacity: 1; color: var(--vrm-ink); border-color: var(--vrm-line); background: color-mix(in srgb,var(--vrm-accent) 4%,var(--vrm-surface)); }
+@media(max-width:420px) { .vrm-cp-logo { width: 23px; } }

@@ -1,0 +1,38 @@
+{
+  "confirmation": {
+    "onglet": "Confirm signup",
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Confirm your VRM email address{{ else }}Confirme ton adresse e-mail VRM{{ end }}",
+    "sujetFr": "Confirme ton adresse e-mail VRM",
+    "sujetEn": "Confirm your VRM email address"
+  },
+  "invite": {
+    "onglet": "Invite user",
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}You’re invited to VRM{{ else }}On t’invite sur VRM{{ end }}",
+    "sujetFr": "On t’invite sur VRM",
+    "sujetEn": "You’re invited to VRM"
+  },
+  "magic_link": {
+    "onglet": "Magic Link",
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Your VRM code{{ else }}Ton code VRM{{ end }}",
+    "sujetFr": "Ton code VRM",
+    "sujetEn": "Your VRM code"
+  },
+  "email_change": {
+    "onglet": "Change Email Address",
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Confirm your new VRM email address{{ else }}Confirme ta nouvelle adresse VRM{{ end }}",
+    "sujetFr": "Confirme ta nouvelle adresse VRM",
+    "sujetEn": "Confirm your new VRM email address"
+  },
+  "recovery": {
+    "onglet": "Reset Password",
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Choose a new VRM password{{ else }}Choisis un nouveau mot de passe VRM{{ end }}",
+    "sujetFr": "Choisis un nouveau mot de passe VRM",
+    "sujetEn": "Choose a new VRM password"
+  },
+  "reauthentication": {
+    "onglet": "Reauthentication",
+    "sujet": "{{- $en := eq (printf \"%v\" .Data.langue) \"en\" -}}{{ if $en }}Your VRM confirmation code{{ else }}Ton code de confirmation VRM{{ end }}",
+    "sujetFr": "Ton code de confirmation VRM",
+    "sujetEn": "Your VRM confirmation code"
+  }
+}

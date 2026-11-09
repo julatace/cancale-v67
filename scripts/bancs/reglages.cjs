@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : UN RÉGLAGE QU'ON N'A PAS PU LIRE NE SE FAIT PAS ÉCRASER
 //        node scripts/bancs/reglages.cjs

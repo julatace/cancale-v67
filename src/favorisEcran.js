@@ -211,10 +211,10 @@ export function groupesFavoris({lignes=[],statut=()=>null,journal=[],vendue=()=>
 
 // L'en-tête d'un groupe : un titre, une phrase (une fois), un geste (ambre).
 export function enteteGroupe(g){
-  if(g.code==='a_verifier')return {titre:'À vérifier sur Vinted',phrase:'Vinted n’a pas répondu clairement : le message est peut-être parti.',geste:'Regarde la conversation sur Vinted, puis dis-le à VRM.',ton:'geste'};
+  if(g.code==='a_verifier')return {titre:'À vérifier sur Vinted',phrase:'Vinted n’a pas répondu clairement : le message est peut-être parti.',geste:'Vérifie la conversation avant de relancer pour éviter un doublon, puis indique le résultat à VRM.',ton:'geste'};
   if(g.code==='a_envoyer')return {titre:'À envoyer',phrase:'',geste:'',ton:'neutre'};
   if(g.code==='en_cours')return {titre:'En cours d’envoi',phrase:'Ils partent un par un, depuis l’onglet vinted.fr de ce compte.',geste:'',ton:'neutre'};
-  if(g.code==='envoye')return {titre:'Envoyés',phrase:'',geste:'',ton:'neutre'};
+  if(g.code==='envoye')return {titre:'Envoyés',phrase:'Envoi confirmé : ces favoris ne sont pas à relancer.',geste:'',ton:'neutre'};
   const r=RAISONS_ECRAN[g.raison]||RAISONS_ECRAN.interrompu;
   return {titre:'Pas envoyé',phrase:r.texte.charAt(0).toUpperCase()+r.texte.slice(1)+'.',geste:r.geste||'',ton:r.geste?'geste':'neutre'};
 }

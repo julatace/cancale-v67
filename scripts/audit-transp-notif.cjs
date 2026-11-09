@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // scripts/audit-transp-notif.cjs
 // ─────────────────────────────────────────────────────────────────────────────
 // (29 oct.) LE STATUT LU CHEZ LE TRANSPORTEUR : CE QUI SONNE, LA CONCURRENCE,

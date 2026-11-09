@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.329.0';
+const CODE_VERSION = '5.331.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -520,18 +520,130 @@ async function authLogin(email, password) {
       else if (/rate limit|too many/i.test(brut)) msg = 'Trop de tentatives. Réessaie dans quelques minutes.';
       return { ok: false, error: msg };
     }
-    await saveSession({
-      access_token: j.access_token,
-      refresh_token: j.refresh_token,
-      expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
-      user_id: (j.user && j.user.id) || null,
-      email: (j.user && j.user.email) || mail,
-      depuis: Date.now(),
-    });
-    // 22 oct. : l'onglet Vinted déjà ouvert est relu tout de suite (voir `visiteApresSession`).
-    visiteApresSession('connexion');
-    return { ok: true, email: (j.user && j.user.email) || mail };
+    return await adopterSessionAuth(j, mail, 'connexion');
   } catch (e) { return { ok: false, error: 'Réseau indisponible — réessaie.' }; }
+}
+// La session rendue par Supabase (mot de passe OU code reçu par e-mail) : le
+// MÊME rangement (`saveSession` ⇒ `rangerSession`, relu et vérifié), la même
+// relecture de l'onglet Vinted ouvert. Un seul chemin, pas deux copies.
+async function adopterSessionAuth(j, mail, raison) {
+  await saveSession({
+    access_token: j.access_token,
+    refresh_token: j.refresh_token,
+    expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
+    user_id: (j.user && j.user.id) || null,
+    email: (j.user && j.user.email) || mail,
+    depuis: Date.now(),
+  });
+  // 22 oct. : l'onglet Vinted déjà ouvert est relu tout de suite (voir `visiteApresSession`).
+  visiteApresSession(raison || 'connexion');
+  return { ok: true, email: (j.user && j.user.email) || mail };
+}
+
+// ══ 5.330 (8 nov.) : SE CONNECTER AVEC UN CODE REÇU PAR E-MAIL ══════════════
+// Julien : « il n'y a pas la connexion Discord et Google, parce que certains ont
+// créé leur compte comme ça » — ces comptes n'ont PAS de mot de passe, et sur
+// Orion (iPhone) la carte n'a pas de petite fenêtre. Un code à usage unique
+// envoyé à l'e-mail du compte marche pour TOUS les comptes VRM (mot de passe,
+// Google, Discord : la même adresse), sans rien ouvrir.
+//   1. `authCodeDemande` : POST /auth/v1/otp, `create_user:false` — on ne crée
+//      JAMAIS de compte depuis la carte (adresse inconnue ⇒ on le dit) ;
+//   2. `authCodeVerif`  : POST /auth/v1/verify, type `email`, le code tapé ⇒ la
+//      session, rangée par `adopterSessionAuth` (le chemin du mot de passe).
+// ⚠️ Le CODE n'est jamais rangé ni mis dans une adresse : il part une fois chez
+//    Supabase. On ne garde que l'e-mail et l'heure de l'envoi (`vrmCodeEnvoi`),
+//    pour que la carte reprenne à la saisie si iOS a rechargé la page pendant
+//    qu'il lisait ses e-mails, et pour le délai de renvoi (60 s).
+// ⚠️ Le modèle d'e-mail Supabase « Magic Link » doit contenir `{{ .Token }}` :
+//    sans lui, l'e-mail ne porte qu'un lien et aucun code (passation 5.330).
+// Longueur du code : 6 chiffres par défaut chez Supabase, réglable de 6 à 10 ;
+// on accepte 6 à 10 (la carte ne le devine pas).
+const CODE_STORE = 'vrmCodeEnvoi';          // { email, at } — jamais le code
+const CODE_RENVOI_MS = 60000;
+const CODE_REPRISE_MS = 15 * 60000;         // la carte reprend la saisie pendant 15 min
+const CODE_VIE_MS = 60 * 60000;             // durée de vie d'un code chez Supabase (par défaut 1 h)
+const MAIL_FORME = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+async function lireEnvoiCode() {
+  try { const c = (await chrome.storage.local.get(CODE_STORE))[CODE_STORE]; return c && typeof c.email === 'string' && Number(c.at) > 0 ? c : null; } catch (_) { return null; }
+}
+function secondesDuMessage(t) { const m = /(\d+)\s*(?:seconds?|secondes?|s\b)/i.exec(String(t || '')); return m ? Math.min(3600, Number(m[1])) : 0; }
+async function authCodeDemande(email) {
+  const mail = String(email || '').trim().toLowerCase();
+  if (!mail) return { ok: false, error: 'Tape l’e-mail de ton compte VRM.' };
+  if (!MAIL_FORME.test(mail)) return { ok: false, error: 'Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).' };
+  const avant = await lireEnvoiCode();
+  if (avant && avant.email === mail && Date.now() - Number(avant.at) < CODE_RENVOI_MS && Date.now() >= Number(avant.at)) {
+    const s = Math.ceil((CODE_RENVOI_MS - (Date.now() - Number(avant.at))) / 1000);
+    return { ok: false, attendre: s, error: `Un code vient de partir à cette adresse : attends ${s} s avant d’en demander un autre.` };
+  }
+  let res = null, j = null, brut = '';
+  try {
+    res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: mail, create_user: false }),
+      signal: AbortSignal.timeout(15000),
+    });
+    brut = await res.text().catch(() => '');
+    try { j = JSON.parse(brut || '{}'); } catch (_) { j = {}; }
+  } catch (_) { return { ok: false, error: 'Réseau indisponible — réessaie.' }; }
+  if (!res.ok) {
+    const quoi = String((j && (j.error_code || j.code || '')) || '');
+    const texte = String((j && (j.msg || j.error_description || j.message || j.error)) || brut || '');
+    if (estRefusCaptcha(j, brut)) return { ok: false, captcha: true, error: 'VRM demande une vérification anti-robot que la carte ne sait pas afficher. Touche l’icône VRM dans les réglages de l’extension pour te connecter.' };
+    if (res.status === 429 || /rate.?limit|too many|only request this/i.test(quoi + ' ' + texte)) {
+      const s = secondesDuMessage(texte);
+      return { ok: false, attendre: s || 60, error: s ? `Trop de demandes de code : réessaie dans ${s} s.` : 'Trop de demandes de code pour l’instant : réessaie dans quelques minutes.' };
+    }
+    if (/otp_disabled|signups? not allowed|user not found|not.?found/i.test(quoi + ' ' + texte) || res.status === 422) {
+      return { ok: false, inconnu: true, error: 'Aucun compte VRM avec cet e-mail. Vérifie l’adresse (celle de ton compte vrm.center), ou crée ton compte sur vrm.center.' };
+    }
+    return { ok: false, error: `VRM n’a pas pu envoyer le code (erreur ${res.status}). Réessaie dans un instant.` };
+  }
+  const at = Date.now();
+  try { await chrome.storage.local.set({ [CODE_STORE]: { email: mail, at } }); } catch (_) {}
+  Promise.resolve().then(() => noterDiag('code_demande')).catch(() => {});
+  return { ok: true, email: mail, at, renvoiDans: Math.ceil(CODE_RENVOI_MS / 1000) };
+}
+async function authCodeVerif(email, code) {
+  const mail = String(email || '').trim().toLowerCase();
+  const c = String(code || '').replace(/\s+/g, '');
+  if (!MAIL_FORME.test(mail)) return { ok: false, error: 'Redonne l’e-mail de ton compte VRM, puis demande un code.' };
+  if (!/^\d{6,10}$/.test(c)) return { ok: false, error: 'Tape les 6 chiffres du code reçu par e-mail.' };
+  const envoi = await lireEnvoiCode();
+  let res = null, j = null, brut = '';
+  try {
+    res = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'email', email: mail, token: c }),
+      signal: AbortSignal.timeout(15000),
+    });
+    brut = await res.text().catch(() => '');
+    try { j = JSON.parse(brut || '{}'); } catch (_) { j = {}; }
+  } catch (_) { return { ok: false, error: 'Réseau indisponible — réessaie.' }; }
+  if (!res.ok || !j || typeof j.access_token !== 'string' || typeof j.refresh_token !== 'string') {
+    const quoi = String((j && (j.error_code || j.code || '')) || '');
+    const texte = String((j && (j.msg || j.error_description || j.message || j.error)) || brut || '');
+    if (res.status === 429 || /rate.?limit|too many/i.test(quoi + ' ' + texte)) return { ok: false, error: 'Trop d’essais : attends quelques minutes, puis demande un nouveau code.' };
+    if (estRefusCaptcha(j, brut)) return { ok: false, captcha: true, error: 'VRM demande une vérification anti-robot que la carte ne sait pas afficher.' };
+    // GoTrue ne distingue pas « faux » et « expiré » (`otp_expired` pour les deux) :
+    // on ne connaît que l'âge de NOTRE envoi.
+    const vieux = envoi && envoi.email === mail && Date.now() - Number(envoi.at) > CODE_VIE_MS;
+    if (vieux) return { ok: false, expire: true, error: 'Ce code a expiré : demande un nouveau code.' };
+    if (res.ok || /otp_expired|invalid|expired/i.test(quoi + ' ' + texte) || res.status === 403 || res.status === 400) {
+      return { ok: false, faux: true, error: 'Ce code n’est pas le bon (ou il a expiré). Vérifie les chiffres du DERNIER e-mail reçu, ou demande un nouveau code.' };
+    }
+    return { ok: false, error: `VRM n’a pas validé le code (erreur ${res.status}). Réessaie.` };
+  }
+  try { await chrome.storage.local.remove(CODE_STORE); } catch (_) {}
+  Promise.resolve().then(() => noterDiag('session_code')).catch(() => {});
+  return adopterSessionAuth(j, mail, 'code');
+}
+async function authCodeEtat() {
+  const e = await lireEnvoiCode();
+  if (!e || Date.now() < Number(e.at) || Date.now() - Number(e.at) > CODE_REPRISE_MS) return { ok: true, enCours: false };
+  return { ok: true, enCours: true, email: e.email, at: Number(e.at), renvoiDans: Math.max(0, Math.ceil((CODE_RENVOI_MS - (Date.now() - Number(e.at))) / 1000)) };
 }
 
 // État de la session, pour l'afficher SANS mentir : connecté ou non, sous quelle
@@ -725,10 +837,34 @@ function oauthFenetrePossible() {
     return !!(chrome.windows && typeof chrome.windows.create === 'function' && typeof chrome.tabs.remove === 'function');
   } catch (_) { return false; }
 }
+// La page où l'onglet revient après Google / Discord dans le même onglet : une
+// page https d'un site où la carte est posée, rien d'autre (jamais une adresse
+// venue d'un message, ni vrm.center, ni Supabase).
+const HOTES_RETOUR_OAUTH = /^(?:[a-z0-9-]+\.)*(?:vinted\.(?:fr|com|it|de)|leboncoin\.fr|ebay\.fr|vestiairecollective\.com)$/i;
+function retourOAuthPermis(url) {
+  try {
+    const u = new URL(String(url || ''));
+    if (u.protocol !== 'https:' || !HOTES_RETOUR_OAUTH.test(u.hostname) || u.username || u.password) return '';
+    const s = u.href;
+    return s.length <= 2048 ? s : (u.origin + u.pathname).slice(0, 2048);
+  } catch (_) { return ''; }
+}
 async function oauthDepart(fournisseur, ongletDepart, opts) {
   const f = String(fournisseur || '');
   if (!FOURNISSEURS_CONNEXION.includes(f)) return { ok: false, code: 'fournisseur', message: 'Moyen de connexion inconnu.' };
-  const fenetre = !!(opts && opts.fenetre);
+  // 5.330 : la carte du logo sans petite fenêtre (Orion sur iPhone) ⇒ le MÊME
+  // onglet part chez Google / Discord et y revient (`memeOnglet`). Jamais un
+  // onglet de plus, jamais `window.open`. La page d'où l'on part est gardée
+  // (`retour`, lue sur l'onglet qui écrit — jamais sur le message) et seule une
+  // page d'un site que la carte connaît peut l'être.
+  const carte = !!(opts && opts.carte);
+  const memeOnglet = carte && !oauthFenetrePossible();
+  const fenetre = carte ? !memeOnglet : !!(opts && opts.fenetre);
+  let retour = '';
+  if (memeOnglet) {
+    retour = retourOAuthPermis(ongletDepart && ongletDepart.url);
+    if (!retour || !ongletDepart || typeof ongletDepart.id !== 'number') return { ok: false, code: 'onglet', message: 'Je ne retrouve pas la page d’où tu pars : recharge-la, puis recommence.' };
+  }
   if (fenetre && !oauthFenetrePossible()) return { ok: false, code: 'fenetre', message: 'Ce navigateur ne sait pas ouvrir la petite fenêtre de connexion : connecte-toi avec ton e-mail et ton mot de passe VRM.' };
   const fo = await fournisseursConnexion();
   if (!fo || !fo.ok) return { ok: false, code: 'pas-su', message: 'Je n’ai pas pu vérifier les moyens de connexion de VRM (réseau ?). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.' };
@@ -740,9 +876,15 @@ async function oauthDepart(fournisseur, ongletDepart, opts) {
     ch = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
   } catch (_) { return { ok: false, code: 'crypto', message: 'Ce navigateur ne sait pas préparer une connexion sécurisée. Connecte-toi avec ton email et ton mot de passe VRM.' }; }
   const tab = ongletDepart && typeof ongletDepart.id === 'number' ? ongletDepart.id : null;
-  try { await chrome.storage.local.set({ [OAUTH_STORE]: { f, v, at: Date.now(), tab } }); } catch (_) { return { ok: false, code: 'stockage', message: 'Je n’ai pas pu préparer la connexion. Réessaie.' }; }
-  await noterEtatOAuth({ etat: 'attente', f });
+  const depart = memeOnglet ? { f, v, at: Date.now(), tab, memeOnglet: true, retour } : { f, v, at: Date.now(), tab };
+  try { await chrome.storage.local.set({ [OAUTH_STORE]: depart }); } catch (_) { return { ok: false, code: 'stockage', message: 'Je n’ai pas pu préparer la connexion. Réessaie.' }; }
+  // Relu : sans le vérificateur rangé, le retour ne vaudrait rien — on ne part pas.
+  try { const relu = (await chrome.storage.local.get(OAUTH_STORE))[OAUTH_STORE]; if (!relu || relu.v !== v) throw 0; } catch (_) { return { ok: false, code: 'stockage', message: 'Je n’ai pas pu préparer la connexion. Réessaie.' }; }
+  await noterEtatOAuth(memeOnglet ? { etat: 'attente', f, memeOnglet: true, tab } : { etat: 'attente', f });
   const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${f}&redirect_to=${encodeURIComponent(RETOUR_OAUTH)}&code_challenge=${ch}&code_challenge_method=s256`;
+  // L'onglet de la carte navigue LUI-MÊME vers cette adresse (location.assign) :
+  // elle ne porte que le défi PKCE, jamais le vérificateur ni un jeton.
+  if (memeOnglet) return { ok: true, memeOnglet: true, url };
   if (fenetre) {
     const w = await new Promise((res) => {
       try { chrome.windows.create({ url, type: 'popup', width: 480, height: 680, focused: true }, (x) => { let e = null; try { e = chrome.runtime.lastError; } catch (_) {} res(e ? null : (x || {})); }); }
@@ -770,18 +912,26 @@ async function oauthRetour(msg, sender) {
   // Une fois : consommé avant l'échange (un second envoi du même code n'a rien).
   try { await chrome.storage.local.remove(OAUTH_STORE); } catch (_) { return { ok: false, code: 'stockage' }; }
   const nom = NOM_FOURN[d.f] || 'le fournisseur';
+  // 5.330 : parti du MÊME onglet (Orion) ⇒ on ne ferme rien : l'onglet revient
+  // sur la page d'où il est parti (`retour`, rendu à oauth-retour.js), où la
+  // carte s'ouvre et dit le résultat (`vrmOAuthEtat`, `memeOnglet`).
+  const meme = !!(d.memeOnglet && retourOAuthPermis(d.retour));
+  const retour = meme ? retourOAuthPermis(d.retour) : '';
+  const enPlus = meme ? { memeOnglet: true, tab: typeof d.tab === 'number' ? d.tab : null } : {};
+  const rendre = (x) => (meme ? Object.assign(x, { retour }) : x);
   const fermer = () => {
+    if (meme) return;
     try { if (sender && sender.tab && typeof sender.tab.id === 'number') chrome.tabs.remove(sender.tab.id, () => { void chrome.runtime.lastError; }); } catch (_) {}
     try { if (typeof d.tab === 'number') chrome.tabs.update(d.tab, { active: true }, () => { void chrome.runtime.lastError; }); } catch (_) {}
   };
   if (msg && msg.error) {
     const t = String(msg.error_description || msg.error || '').slice(0, 160);
     const message = /access_denied|denied|cancel/i.test(t) ? `Connexion avec ${nom} annulée : rien n’a changé.` : `${nom} a refusé la connexion (${t || 'sans raison'}). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.`;
-    await noterEtatOAuth({ etat: 'erreur', f: d.f, message });
-    return { ok: false, code: 'refus', message };
+    await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
+    return rendre({ ok: false, code: 'refus', message });
   }
   const code = String((msg && msg.code) || '');
-  if (!/^[A-Za-z0-9._~-]{8,512}$/.test(code)) { await noterEtatOAuth({ etat: 'erreur', f: d.f, message: 'Réponse de connexion illisible. Recommence.' }); return { ok: false, code: 'code' }; }
+  if (!/^[A-Za-z0-9._~-]{8,512}$/.test(code)) { await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message: 'Réponse de connexion illisible. Recommence.' }, enPlus)); return rendre({ ok: false, code: 'code', message: 'Réponse de connexion illisible. Recommence.' }); }
   let r = null, j = null;
   try {
     r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=pkce`, { method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ auth_code: code, code_verifier: d.v }), signal: AbortSignal.timeout(15000) });
@@ -789,8 +939,8 @@ async function oauthRetour(msg, sender) {
   } catch (_) { r = null; }
   if (!r || !r.ok || !j || typeof j.access_token !== 'string' || typeof j.refresh_token !== 'string' || !j.user || typeof j.user.id !== 'string') {
     const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
-    await noterEtatOAuth({ etat: 'erreur', f: d.f, message });
-    return { ok: false, code: 'echange', message };
+    await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
+    return rendre({ ok: false, code: 'echange', message });
   }
   // Un compte que Supabase vient de CRÉER (aucun compte VRM relié à ce Google) :
   // on le dit — même règle que l'app (`compteOAuthNeuf`).
@@ -803,10 +953,10 @@ async function oauthRetour(msg, sender) {
   const email = String(j.user.email || emailDuJwt(j.access_token) || '');
   await saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((Number(j.expires_in) || 3600) * 1000), user_id: j.user.id, email, depuis: Date.now() });
   Promise.resolve().then(() => noterDiag('session_oauth_' + d.f)).catch(() => {});
-  await noterEtatOAuth({ etat: 'ok', f: d.f, email, neuf });
+  await noterEtatOAuth(Object.assign({ etat: 'ok', f: d.f, email, neuf }, enPlus));
   visiteApresSession('oauth');
   fermer();
-  return { ok: true, email, neuf };
+  return rendre({ ok: true, email, neuf });
 }
 const UUID_VRM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function demanderLiaison(msg) {
@@ -1416,8 +1566,11 @@ async function captureDomain(domain) {
   //    RÉUSSIE : un refus de la base fait réessayer à la requête suivante.
   const sig = empreinteCompte(row);
   if (await compteDejaEcrit(uid, sig)) { noterDiag('compte_inchange'); return uid; }
+  // 5.331 : jamais écrit depuis CE navigateur ⇒ première écriture de ce compte.
+  const premiere = !(await compteDejaConnuIci(uid));
   const ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
   if (ok !== false) await noterCompteEcrit(uid, sig);
+  if (ok === true) signalerCompteRelie('vinted', uid, premiere);
   return uid;
 }
 
@@ -1437,6 +1590,86 @@ async function compteDejaEcrit(uid, sig) {
     return !!(e && e.sig === sig && Date.now() - Number(e.at || 0) < COMPTE_REECRIT_MS);
   } catch (_) { return false; }                    // pas su : on écrit (comme avant)
 }
+// Une entrée (même ancienne) dans `vrmCompteEcrit` : ce Chrome a déjà écrit ce
+// compte. Pas su (stockage illisible) ⇒ « connu » : on ne signale rien sur un doute.
+async function compteDejaConnuIci(uid) {
+  try {
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    return !!m[String(uid)];
+  } catch (_) { return true; }
+}
+
+// ══ « shop_x EST RELIÉ À VRM » TOUT DE SUITE (5.331, 9 nov.) ══════════════════
+// L'extension écrit les comptes DIRECTEMENT en base (`vinted_accounts`,
+// `lbc_accounts`, `vc_session`) : sans app VRM ouverte, le serveur ne voyait un
+// compte neuf qu'au cron du matin ou du soir (passation 2026-11-08-compte-relie,
+// « Signal qui manque côté extension »). Après la PREMIÈRE écriture réussie d'un
+// compte, l'extension prévient `POST vrm.center/api/push { action:'comptes' }`
+// avec la session VRM : le corps ne dit RIEN (ni compte, ni nom) — la route relit
+// tout au nom du vendeur de la session et décide (point de départ, une fois par
+// compte, famille « Nouveau compte relié » — `api/_lib/compte-relie.js`).
+//   · une fois par compte : `vrmComptesSignales` ({ 'vinted:222': { at, fait } })
+//     dans `chrome.storage.local` (§4.9) ;
+//   · sans session VRM ⇒ AUCUN appel (le signal attend, 24 h au plus) ;
+//   · réseau, 5xx, 401, 429 ⇒ gardé, retenté à la prochaine écriture d'un compte ;
+//     un autre 4xx (refus jugé) ⇒ oublié ; 2xx ⇒ fait, plus jamais rappelé ;
+//   · un seul appel couvre tous les comptes en attente (la route relit tout).
+// eBay n'est pas ici : c'est la route eBay (OAuth) qui écrit `ebay_comptes`.
+const COMPTE_PUSH_URL = 'https://vrm.center/api/push';
+const COMPTE_PUSH_MAX_MS = 24 * 3600000;
+const RE_CLE_COMPTE_PUSH = /^(vinted|leboncoin|vestiaire):[\w:.-]{1,80}$/;
+let _chaineComptePush = Promise.resolve();
+function unComptePushALaFois(fn) {
+  const suite = _chaineComptePush.then(() => fn(), () => fn());
+  _chaineComptePush = suite.then(() => {}, () => {});
+  return suite;
+}
+// `premiere` : la ligne de CE compte n'existait pas avant cette écriture.
+// Rend une promesse (les audits l'attendent ; l'appelant n'a pas à le faire).
+function signalerCompteRelie(plateforme, id, premiere) {
+  return unComptePushALaFois(async () => {
+    try {
+      const cle = `${plateforme}:${String(id == null ? '' : id)}`;
+      if (!RE_CLE_COMPTE_PUSH.test(cle)) return 0;
+      const m = (await chrome.storage.local.get('vrmComptesSignales')).vrmComptesSignales || {};
+      if (premiere && !m[cle]) { m[cle] = { at: Date.now(), fait: false }; await chrome.storage.local.set({ vrmComptesSignales: m }); }
+    } catch (_) { return 0; }
+    return envoyerComptesSignalesUn();
+  });
+}
+function envoyerComptesSignales() { return unComptePushALaFois(envoyerComptesSignalesUn); }
+async function envoyerComptesSignalesUn() {
+  try {
+    const m = (await chrome.storage.local.get('vrmComptesSignales')).vrmComptesSignales || {};
+    const now = Date.now();
+    let change = false;
+    for (const k of Object.keys(m)) {
+      const e = m[k] || {};
+      if (!e.fait && now - Number(e.at || 0) > COMPTE_PUSH_MAX_MS) { delete m[k]; change = true; }
+    }
+    const enAttente = Object.keys(m).filter((k) => !(m[k] && m[k].fait));
+    // Mémo borné : les 200 derniers « faits » suffisent (un compte relié se signale une fois).
+    const faits = Object.keys(m).filter((k) => m[k] && m[k].fait).sort((a, b) => Number(m[b].at || 0) - Number(m[a].at || 0));
+    for (const k of faits.slice(200)) { delete m[k]; change = true; }
+    if (!enAttente.length) { if (change) await chrome.storage.local.set({ vrmComptesSignales: m }); return 0; }
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('compte_push_sans_session'); if (change) await chrome.storage.local.set({ vrmComptesSignales: m }); return 0; }
+    let status = 0;
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(COMPTE_PUSH_URL, { method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+        body: JSON.stringify({ action: 'comptes' }) });
+      clearTimeout(t); status = r.status;
+    } catch (_) { status = 0; }
+    const fini = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 429);
+    if (fini) { for (const k of enAttente) m[k] = { at: now, fait: true }; change = true; }
+    noterDiag(status >= 200 && status < 300 ? 'compte_push_envoye' : `compte_push_${fini ? 'refus' : 'ko'}_${status || 'reseau'}`);
+    if (change) await chrome.storage.local.set({ vrmComptesSignales: m });
+    return fini && status < 300 ? enAttente.length : 0;
+  } catch (_) { return 0; }
+}
+
 async function noterCompteEcrit(uid, sig) {
   try {
     const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
@@ -3003,6 +3236,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       authLogin(msg.email, msg.password).then(sendResponse, () => sendResponse({ ok: false, error: 'Réseau indisponible — réessaie.' }));
       return true;
     }
+    // 5.330 : « Me connecter avec un code » (e-mail) dans la carte du logo.
+    // Seulement depuis un onglet (un script de contenu de CETTE extension).
+    if (msg && msg.from === 'vrm-badge' && (msg.action === 'authCodeDemande' || msg.action === 'authCodeVerif' || msg.action === 'authCodeEtat')) {
+      if (!sender || !sender.tab) { sendResponse({ ok: false, error: 'Connexion refusée.' }); return true; }
+      const p = msg.action === 'authCodeDemande' ? authCodeDemande(msg.email)
+        : msg.action === 'authCodeVerif' ? authCodeVerif(msg.email, msg.code) : authCodeEtat();
+      p.then(sendResponse, () => sendResponse({ ok: false, error: 'Réseau indisponible — réessaie.' }));
+      return true;
+    }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogin') {
       // Depuis la CARTE (un iframe dans l'onglet du site) : c'est le service
       // worker qui ouvre VRM après la connexion. La carte se referme dès que la
@@ -3030,7 +3272,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 5.328 : « Continuer avec Google / Discord » dans l'extension (sans VRM).
     if (msg && (msg.from === 'cancale-popup' || msg.from === 'vrm-badge') && msg.action === 'oauthDepart') {
       // 5.329 : la carte ne demande QU'UNE petite fenêtre (jamais un onglet).
-      oauthDepart(msg.fournisseur, sender && sender.tab ? sender.tab : null, { fenetre: msg.from === 'vrm-badge' }).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', message: 'La connexion n’a pas pu démarrer. Réessaie.' }));
+      // 5.330 : sans petite fenêtre (Orion), le MÊME onglet (jamais un onglet de plus).
+      oauthDepart(msg.fournisseur, sender && sender.tab ? sender.tab : null, { carte: msg.from === 'vrm-badge' }).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', message: 'La connexion n’a pas pu démarrer. Réessaie.' }));
       return true;
     }
     if (msg && msg.from === 'vrm-oauth-retour' && msg.action === 'oauthRetour') {
@@ -9413,6 +9656,8 @@ async function visiteVinted() {
     // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
     await envoyerNotifsRetrait();
+    // 5.331 : un « compte relié » resté en attente (réseau, session absente) repart ici.
+    await envoyerComptesSignales();
     await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -12705,7 +12950,19 @@ async function etatSite(url,tabId) {
   // (29 oct.) Les paires vendues ailleurs, encore en ligne ici : ce que VRM a
   // calculé et publié (`lbc_a_retirer`) — la carte le dit, sans rien recalculer.
   const aRetirer = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, oauthFenetre: oauthFenetrePossible() };
+  const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
+}
+// 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
+// s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
+// et seulement pour l'onglet qui était parti.
+async function oauthRevenuPour(tabId) {
+  let o = null; try { o = (await chrome.storage.local.get(OAUTH_ETAT))[OAUTH_ETAT] || null; } catch (_) { return null; }
+  if (!o || !o.memeOnglet || o.vu || (o.etat !== 'ok' && o.etat !== 'erreur')) return null;
+  if (!(Date.now() - Number(o.at || 0) < 5 * 60000) || Date.now() < Number(o.at || 0)) return null;
+  if (typeof o.tab === 'number' && typeof tabId === 'number' && o.tab !== tabId) return null;
+  try { await chrome.storage.local.set({ [OAUTH_ETAT]: Object.assign({}, o, { vu: true }) }); } catch (_) { return null; }
+  return o.etat === 'ok' ? { etat: 'ok', email: String(o.email || ''), f: o.f, neuf: !!o.neuf } : { etat: 'erreur', message: String(o.message || ''), f: o.f };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
@@ -16546,8 +16803,11 @@ async function noterSessionVcMaintenant(id, tabId, forme, source) {
   const comptes = Object.assign({}, cur.comptes || {});
   comptes[String(id)] = new Date(now).toISOString();
   const data = { id: String(id), at: new Date(now).toISOString(), source: source === 'stream' ? 'stream' : 'users/me', forme: (Array.isArray(forme) ? forme : []).slice(0, 80).map(String), comptes: Object.fromEntries(Object.entries(comptes).slice(-10)) };
+  // 5.331 : un compte Vestiaire jamais rangé dans `vc_session` = sa première écriture.
+  const premiereVc = !(cur.comptes && cur.comptes[String(id)]) && String(cur.id || '') !== String(id);
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_session', data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true) signalerCompteRelie('vestiaire', String(id), premiereVc);
   return ok === true;
 }
 const _vcFilChaines = new Map();
@@ -18092,8 +18352,14 @@ async function storeLbcAccountUneFois(acc,owner) {
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
+    // 5.331 : ce compte (sous l'une ou l'autre de ses deux clés) n'était pas rangé
+    // avant, et il vient d'une source « moi » (jamais la fiche d'autrui).
+    const _nuLbc = idCompteLbc(acc.id);
+    const _premiereLbc = !prev[String(acc.id)] && !prev[_nuLbc] && !prev['lbc-account:' + _nuLbc]
+      && (acc.session === true || !!(acc.source && !LBC_URL_AUTRUI.test(String(acc.source))));
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id',owner);
     await noterFlux('leboncoin', _okFlux === true);
+    if (_okFlux === true) signalerCompteRelie('leboncoin', _nuLbc, _premiereLbc);
     if(_okFlux===true&&(await loadSession())?.user_id===owner){
     try {
       if (acc.courant === true && acc.source && !LBC_URL_AUTRUI.test(String(acc.source))) {

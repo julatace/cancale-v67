@@ -20,6 +20,7 @@
 //  Lancer : node scripts/audit-cron-lots.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver } = require('./_mutations-audit.cjs');

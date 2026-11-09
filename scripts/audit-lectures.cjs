@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ⚠️ CONTRÔLE PERMANENT — CE QU'UNE LECTURE A LE DROIT DE RAPATRIER.
 //
 // Demande de Julien, 15 septembre : « améliore la rapidité de la capture de

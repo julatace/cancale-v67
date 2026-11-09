@@ -26,6 +26,7 @@
 // `--prouve` : réaffaiblit le code, une mutation à la fois ⇒ ROUGE exigé.
 // Données inventées (le dépôt est public).
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path'), fs = require('fs');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');
@@ -255,7 +256,7 @@ const SECRETS = {
     const types = ligne ? Object.values(ligne.data.types) : [];
     dit(types.length === 2 && types.find((t) => t.n === 20) && types.find((t) => t.garde === 1), 'additionnés par type : 20 fois la même erreur, un écran tombé', types.map((t) => ({ n: t.n, g: t.garde, ap: t.appareils.length })));
     const r4 = await MT.recevoirMesures({ corps: lot([{ ...evA[0], n: 2 }]), verifierJeton, pousser, maintenant: T0 + 61 * 60e3 });
-    dit(r4.code === 200 && envois.length === 2 && /2 soucis/.test(envois[1].n.body) && envois[1].proprio === JULIEN && envois[1].n.tag === 'vrm-alerte-plantages', 'une heure après : UNE notification groupée, qui dit tout ce qui attendait', envois[1] && envois[1].n.body);
+    dit(r4.code === 200 && envois.length === 2 && /2 soucis/.test(envois[1].n.title + ' ' + envois[1].n.body) /* (8 nov.) le fait est dans le titre */ && envois[1].proprio === JULIEN && envois[1].n.tag === 'vrm-alerte-plantages', 'une heure après : UNE notification groupée, qui dit tout ce qui attendait', envois[1] && envois[1].n.body);
     dit(!/87,50|perso\.julien|aaaa/.test(JSON.stringify(envois)), 'la notification ne porte aucune donnée');
     panne = true;
     const avant = JSON.stringify(rows);

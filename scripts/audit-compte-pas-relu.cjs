@@ -25,6 +25,7 @@
 // exige que l'audit devienne ROUGE (puis remet les fichiers à l'identique).
 // Données INVENTÉES. Aucune donnée réelle, aucun réseau.
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path'), fs = require('fs');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');
@@ -141,7 +142,7 @@ const iso = (ms) => new Date(ms).toISOString();
     const t1 = L.texteComptesARelire([l.find((x) => x.uid === '101')]);
     dit(t1 && /vieux_compte/.test(t1.title + t1.body) && /vinted\.fr/.test(t1.body) && /navigateur où est l’extension VRM/.test(t1.body) && /il y a 30 h/.test(t1.body), 'A17 un compte : son nom, l’âge de sa lecture, le geste (vinted.fr, le navigateur où est l’extension)', t1 && (t1.title + ' / ' + t1.body));
     const t2 = L.texteComptesARelire(l);
-    dit(t2 && /^🔄 4 comptes/.test(t2.title) && ['rallume', 'vieux_compte', 'enligne_seul', 'n° 110'].every((n) => t2.body.includes(n)), 'A18 plusieurs comptes : le nombre, et chacun nommé', t2 && (t2.title + ' / ' + t2.body));
+    dit(t2 && /^4 comptes/.test(t2.title) && ['rallume', 'vieux_compte', 'enligne_seul', 'n° 110'].every((n) => t2.body.includes(n)), 'A18 plusieurs comptes : le nombre, et chacun nommé', t2 && (t2.title + ' / ' + t2.body));
     const six = Array.from({ length: 6 }, (_, i) => ({ uid: String(300 + i), nom: 'c' + i, lu: 0, age: 'il y a 2 j' }));
     const t3 = L.texteComptesARelire(six);
     dit(t3 && /et 2 autres/.test(t3.body) && !/c4|c5/.test(t3.body), 'A19 au-delà de quatre, le reste est compté', t3 && t3.body);
@@ -153,7 +154,7 @@ const iso = (ms) => new Date(ms).toISOString();
     dit(d(l, undefined) === false, 'A24 mémo illisible ⇒ rien (pas su)');
     dit(d([], null) === false && d(null, null) === false, 'A25 aucun compte à relire, ou pas su ⇒ rien');
     const T = await import('file://' + path.join(R, 'api', '_lib', 'notif-textes.js'));
-    dit(T.familleDe(L.CAT_RELECTURE) === 'rappels' && T.FAMILLES.length === 7, 'A26 la catégorie est rangée dans la famille « Rappels » des sept familles', T.familleDe(L.CAT_RELECTURE));
+    dit(T.familleDe(L.CAT_RELECTURE) === 'rappels' && T.FAMILLES.length === 8, 'A26 la catégorie est rangée dans la famille « Rappels » des huit familles', T.familleDe(L.CAT_RELECTURE));
     dit(T.decisionNotif({ familles: { rappels: false } }, L.CAT_RELECTURE) === false && T.decisionNotif({ familles: { compta: false } }, L.CAT_RELECTURE) === false && T.decisionNotif({}, L.CAT_RELECTURE) === true, 'A27 elle suit le choix du type « Rappels » (et l’ancien « Compta » hérité), allumée par défaut');
     const A = await import('file://' + path.join(R, 'api', '_lib', 'notif-apercus.js'));
     const ap = A.apercuFamille('rappels');
@@ -238,7 +239,7 @@ const iso = (ms) => new Date(ms).toISOString();
     dit(/2 comptes/.test(p.title || '') && /boutique_banc/.test(p.body || '') && /atelier_banc/.test(p.body || '') && !/frais_banc/.test(p.body || ''), 'B2 elle nomme les deux comptes, pas le compte frais', p.body);
     dit(/vinted\.fr/.test(p.body || '') && /navigateur où est l’extension VRM/.test(p.body || ''), 'B3 elle dit le geste : ouvrir vinted.fr sur ce compte, dans le navigateur où est l’extension', p.body);
     dit(p.url && /^\/\?tab=vintedaccounts/.test(p.url), 'B4 le toucher mène à Paramètres → Comptes liés', p.url);
-    const iMemo = journal.findIndex((x) => x.startsWith('memo:')), iPush = journal.findIndex((x) => x.startsWith('push:🔄'));
+    const iMemo = journal.findIndex((x) => x.startsWith('memo:')), iPush = journal.findIndex((x) => /^push:.*pas relus?$/.test(x)); // (8 nov.) titres sans emoji
     dit(iMemo >= 0 && iPush > iMemo && journal[iMemo].includes(`"jour":"${jour}"`), 'B5 le mémo du jour (Paris) est écrit AVANT l’envoi', journal.join(' | '));
     const b = res.corps && res.corps.bilans && res.corps.bilans[0];
     dit(b && b.relecture && b.relecture.relecture === 'envoyé' && b.relecture.n === 2 && !/boutique_banc|atelier_banc/.test(JSON.stringify(b.relecture)), 'B6 la réponse du cron dit « envoyé » et un nombre, aucun pseudo', JSON.stringify(b && b.relecture));

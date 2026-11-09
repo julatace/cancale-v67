@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // audit-colis-sortants.cjs — UN COLIS VENDU PRIS EN CHARGE CHEZ LE TRANSPORTEUR EST PARTI (8 nov. 2026)
 //
 // Julien (8 nov.) : « J'ai une commande qui est marquée comme non envoyée car je n'ai pas

@@ -1,3 +1,4 @@
+import { PlateformesSetting } from '../App.jsx';
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { HistoriqueModifications } from '../OutilsParcours.jsx';
@@ -46,6 +47,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // ⟦← App.jsx #4⟧
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
+import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
 // ⟦← App.jsx #5⟧
 import GuideIphone, { useGuideIphone } from '../GuideIphone.jsx';
 // (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
@@ -63,6 +65,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
+import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -1050,6 +1053,11 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             : <div className="vrm-cl-vide" data-comptes-vide="vinted"><a className="vrm-b vrm-b-discret vrm-cl-bouton" href={URL_SITE_COMPTE.vinted} target="_blank" rel="noreferrer">Ouvrir Vinted</a></div>)
           : accounts.map(carteVinted)}/>
       <ComptesAutresSites lu={autres} relire={relireAutres}/>
+      {/* (8 nov.) L'accueil d'un compte relié (src/CompteRelie.jsx), rattrapable ici : la feuille revient
+          avec les derniers comptes reliés, leur première lecture et leurs choix. */}
+      <div className="vrm-cl-revoir" style={{display:'flex',justifyContent:'center'}}>
+        <Bouton variante="discret" icone="link" data-comptes-relies-revoir="" onClick={()=>{ try{ window.dispatchEvent(new Event('vrm:comptes-relies-revoir')); }catch(_){} }}>Revoir l’accueil des comptes reliés</Bouton>
+      </div>
 
       {/* ── MODALE : SUPPRIMER LES DONNÉES D'UN COMPTE (ciblé, récupérable) ──── */}
       {delCible && (()=>{ const acc = delCible;
@@ -1158,7 +1166,9 @@ async function sourcesExportDonnees() {
   };
 }
 async function exporterMesDonnees() {
-  if (lectureSeuleActive()) { toast(EXPORT_FERME); return; }
+  // (9 nov., Julien) Sans abonnement, l'export de SES données reste ouvert (RGPD, portabilité,
+  // art. 20) : il ne sert pas à utiliser VRM, seulement à repartir avec ses données. La
+  // « Sauvegarde complète » (restaurer VRM) reste, elle, fermée sans abonnement.
   try {
     const src = await sourcesExportDonnees();
     const zip = zipStocke(fichiersExport(feuillesExport(src)));
@@ -1260,6 +1270,32 @@ function BilanMoisSetting() {
   );
 }
 
+// (8 nov.) « M'envoyer un e-mail d'essai » : pour voir un VRAI e-mail de VRM dans sa
+// boîte. Sur SON clic, à l'adresse de SON compte (le serveur la lit, jamais l'écran),
+// 3 par heure (api/_lib/mail-essai.js). L'issue est dite telle quelle : envoyé ·
+// peut-être parti · rien n'est parti (et pourquoi).
+function MailEssaiSetting() {
+  const [etat, setEtat] = useState(null);   // null · 'envoi' · { ok, texte }
+  const envoyer = async () => {
+    if (etat === 'envoi') return; setEtat('envoi');
+    try {
+      const x = await fetch('/api/compte?mode=mail-essai', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await x.json().catch(() => null);
+      if (j && j.ok) setEtat({ ok: 'envoye', texte: `Envoyé à ${j.a}. Regarde ta boîte de réception dans une minute.` });
+      else setEtat({ ok: j && j.issue === 'incertain' ? 'incertain' : 'refuse', texte: (j && j.message) || 'Rien n’est parti : le serveur n’a pas répondu. Réessaie dans un instant.' });
+    } catch (_) { setEtat({ ok: 'refuse', texte: 'Rien n’est parti : pas de réseau. Réessaie quand tu as du réseau.' }); }
+  };
+  return (
+    <div data-mail-essai={etat && etat !== 'envoi' ? etat.ok : etat === 'envoi' ? 'envoi' : 'pret'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-ligne">
+        <span className="vrm-np-lib">Voir un e-mail de VRM<small>Un e-mail d’essai, à l’adresse de ton compte. Trois par heure au plus.</small></span>
+        <Bouton variante="secondaire" className="vrm-b-petit" disabled={etat === 'envoi'} onClick={envoyer}>{etat === 'envoi' ? 'Envoi…' : 'M’envoyer un e-mail d’essai'}</Bouton>
+      </div>
+      {etat && etat !== 'envoi' ? <div className="vrm-np-relance" role="status" style={{paddingTop:6}}>{etat.texte}</div> : null}
+    </div>
+  );
+}
+
 // (3 nov., 5 nov.) Sept types, un interrupteur chacun (api/_lib/notif-textes.js, la
 // règle que le serveur applique avant d'envoyer). Les anciennes catégories
 // fines restent lues comme réglage d'avant tant qu'une famille n'est pas posée.
@@ -1318,7 +1354,8 @@ function PushPrefsSetting({ comptes, onMuets }) {
   const bascule = (c) => ecrirePrefs({ ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } }, `« ${c.titre} »`);
   const calme = reglageCalme(prefs || {});
   const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
-  const regroupe = !!(prefs && prefs.regrouper === true);
+  // (8 nov.) Allumé par défaut (api/_lib/notif-textes.js, `regrouper`) : seul un `false` posé l'éteint.
+  const regroupe = !(prefs && prefs.regrouper === false);
   const n = prefs ? PUSH_FAMILLES.filter(actif).length : 0;
   return (
     <>
@@ -1358,7 +1395,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
         d'envoyer (api/_lib/notif-textes.js) — pas un filtre d'affichage. */}
     <div data-np-reglages="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
       <div className="vrm-np-ligne" data-np-calme={calme.actif?'on':'off'} style={{borderTop:0}}>
-        <span className="vrm-np-lib">Heures calmes<small>Rien ne sonne ; tout reste dans la cloche de VRM.</small></span>
+        <span className="vrm-np-lib">Heures calmes<small>Rien ne sonne la nuit, sauf la double vente et ce qui expire avant 10 h. Au réveil, une seule notification dit ce qui est arrivé.</small></span>
         <Interrupteur on={calme.actif} onClick={()=>poserCalme({ actif: !calme.actif })} disabled={!prefs||busy} label={`Heures calmes : ${calme.actif?'activées':'désactivées'}`}/>
       </div>
       {calme.actif && (
@@ -1374,8 +1411,8 @@ function PushPrefsSetting({ comptes, onMuets }) {
         </div>
       )}
       <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
-        <span className="vrm-np-lib">Regrouper par type<small>Une notification par type sur le téléphone, avec le nombre d’autres.</small></span>
-        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper par type : ${regroupe?'activé':'désactivé'}`}/>
+        <span className="vrm-np-lib">Regrouper<small>« 3 bordereaux prêts à imprimer » au lieu de trois notifications.</small></span>
+        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper : ${regroupe?'activé':'désactivé'}`}/>
       </div>
       <div className="vrm-np-ligne">
         <Bouton variante="secondaire" data-np-voir-centre="" onClick={()=>{ try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }}>Voir les notifications envoyées</Bouton>
@@ -1395,8 +1432,8 @@ const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
   { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
+  { id: 'comptes', titre: 'Comptes', ids: ['comptes'] },
 ];
-const ICONE_FAMILLE_NOTIF = { ventes: 'cash', doublevente: 'alert', rappels: 'clock', poster: 'box', arrives: 'pin', offres: 'tag', messages: 'chat' };
 function groupesFamillesNotif(familles) {
   const vus = new Set();
   const out = GROUPES_NOTIF.map(g => { const f = g.ids.map(id => familles.find(x => x.id === id)).filter(Boolean); f.forEach(x => vus.add(x.id)); return { ...g, familles: f }; }).filter(g => g.familles.length);
@@ -1424,14 +1461,14 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
         </button>
         {vue ? <div className="vrm-notif-apercu" id={idAp} data-apercu-famille={c.id} data-apercu-coupee={on?undefined:'1'}>
           {!on ? <p className="vrm-notif-apercu-coupee">Coupée : rien de cette famille ne sonne.</p> : null}
-          {ap.exemples.map((e, i) => (
+          {ap.exemples.map((e, i) => { const v = embellirNotif(e); return (
             <div key={i} className="vrm-notif-bulle" data-apercu-notif={i} data-apercu-exemple={e.exemple?'1':undefined}>
               <div className="vrm-notif-bulle-tete"><img src="/vrm-icon-v5-192.png" alt="" width="18" height="18"/><span>VRM</span><span className="vrm-notif-bulle-quand">maintenant</span></div>
-              <b className="vrm-notif-bulle-titre">{e.title}</b>
-              <span className="vrm-notif-bulle-corps">{e.body}</span>
+              <b className="vrm-notif-bulle-titre">{v.title}</b>
+              <span className="vrm-notif-bulle-corps">{v.body}</span>
               <span className="vrm-notif-bulle-mene" data-apercu-mene="">Toucher ouvre : {e.mene}</span>
             </div>
-          ))}
+          ); })}
           <p className="vrm-notif-apercu-note">Exemples inventés ; les vraies portent ton article, ton compte et ton code.</p>
         </div> : null}
       </> : null}
@@ -1631,7 +1668,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const corps = (<>
       {it.ic && <IconeReglage name={it.ic}/>}
       <span className="vrm-set-lib">
-        <b style={{color:C.text}}>{it.lib}</b>
+        <b style={{color: it.ton === 'danger' ? C.danger : C.text}}>{it.lib}</b>
         {/* (6 nov., onglets D) « Chaque réglage dit en une phrase ce qu'il fait » (demande du 6 nov.,
             qui remplace la critique #1.4 du 3 nov.) : la phrase revient, UNE ligne grise, courte ;
             une alerte (un élément) garde sa couleur. */}
@@ -1680,7 +1717,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── TES DONNÉES ET LES CONDITIONS
   const donnees = (
     <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
-      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Fermer ton compte</b> : « Fermer mon compte »</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
+      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Supprimer ton compte</b> : « Supprimer mon compte », tout en bas</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
         {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accentTexte,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
@@ -1735,7 +1772,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
-        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/></> },
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
@@ -1778,8 +1815,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
+      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
-      { id:'affichage-mode', type:'panneau', nu:true, ic:'grid', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
+      { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
       { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:'Je vends', desc:'Sneakers, ou autre chose : les mots et les vérifications suivent.', val: profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre', data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : 'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
@@ -1824,6 +1862,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
+      // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
+      // voit l'entrée, et la route refuse tout autre compte (403).
+      proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'pulse', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>VRM semble en panne</summary><p>La page d’état dit, minute par minute, si la base, la réception des e-mails et les notifications fonctionnent, et les incidents connus. Si tout y fonctionne, le souci vient sans doute de cet appareil : recharge la page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
@@ -1877,7 +1918,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
-      AUTH.user && { id:'fermer', type:'panneau', ic:'trash', lib:'Fermer mon compte', el:<FermerCompte/> },
+    ]},
+    // (9 nov., RGPD) « Supprimer mon compte » : TOUT EN BAS de Mon compte, seul, discret
+    // (le libellé dans la couleur `danger` du thème — le rouge est réservé aux doublons, §7).
+    AUTH.user && { id:'supprimer', titre:null, items:[
+      { id:'fermer', type:'panneau', ic:'trash', lib:'Supprimer mon compte', ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
     ]},
   ] : [
     { id:'donnees', titre:'Tes données', items:[
@@ -2057,21 +2102,6 @@ const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', unc
 // on ne fait pas confiance à une seula moitié).
 const lienFacture = (u) => (typeof u === 'string' && /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//.test(u) ? u : null);
 
-// ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────
-// La politique de confidentialité promet l'effacement ; il fallait écrire à une
-// adresse qui n'existe pas encore. Le serveur fait le travail
-// (api/compte.js?mode=fermer) et rend ce qui a été fait ET ce qui ne l'a pas
-// été : l'écran l'affiche tel quel — jamais « compte fermé » sur un échec.
-// Trois états de réponse : `{ ok:true }` fermé · `{ ok:false, message }` dit
-// par le serveur · pas de réponse = PAS SU (on ne prétend ni l'un ni l'autre).
-async function fermerMonCompte(confirmation) {
-  try {
-    const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation }) });
-    const j = await r.json().catch(() => null);
-    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
-    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
-  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
-}
 // ── DOUBLE VÉRIFICATION — le panneau de Réglages → Mon compte → Connexion ──
 // Trois états pour la lecture des facteurs : `undefined` en cours · `null` pas
 // su (GoTrue injoignable : on le dit, « Réessayer ») · l'objet lu.
@@ -2448,81 +2478,144 @@ function JournalVrm() {
     </div>
   );
 }
-function FermerCompte() {
+// ── SUPPRIMER MON COMPTE (9 novembre, RGPD ; « Fermer mon compte » du 5 oct.) ──
+// Tout en bas de Mon compte. L'écran EXPLIQUE (ce qui part, ce qui reste et
+// pourquoi — les nombres viennent du serveur, `GET ?mode=supprimer`), propose
+// d'abord l'export, puis demande la confirmation FORTE : « SUPPRIMER » tapé, et
+// le mot de passe (un compte Google/Discord sans mot de passe : une connexion de
+// moins de 10 minutes). C'est le SERVEUR qui juge les deux
+// (api/_lib/suppression-compte.js) ; l'écran n'affiche que ce qu'il répond —
+// jamais « supprimé » sur un échec. `data-fermer-*` gardés (bancs).
+// Trois états de lecture : `undefined` en cours · `null` pas su · l'objet lu.
+async function supprimerMonCompte({ confirmation, motDePasse }) {
+  try {
+    const r = await fetch('/api/compte?mode=supprimer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation, motDePasse }) });
+    const j = await r.json().catch(() => null);
+    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
+    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la suppression a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
+  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la suppression a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
+}
+async function lireInventaireSuppression() {
+  try {
+    const r = await fetch('/api/compte?mode=supprimer', { headers: { ...enTeteSession() }, cache: 'no-store' });
+    const j = await r.json().catch(() => null);
+    if (j && j.proprietaire === true) return { proprietaire: true };
+    if (r.ok && j && j.ok && j.nombres) return j;
+    return null;
+  } catch (_) { return null; }
+}
+const MOT_SUPPRIMER = 'SUPPRIMER';
+// Le compte a-t-il un mot de passe ? (identités de Supabase) — `null` pas dit.
+const aMotDePasse = () => {
+  const u = AUTH.user || {};
+  const p = Array.isArray(u.identities) ? u.identities.map((i) => i && i.provider) : (u.app_metadata && Array.isArray(u.app_metadata.providers) ? u.app_metadata.providers : null);
+  return p ? p.includes('email') : null;
+};
+function FermerCompte({ onExporter }) {
   const [ouvert, setOuvert] = React.useState(false);
-  // `undefined` en cours · `null` pas su · l'objet du serveur (`proprietaire`).
   const [info, setInfo] = React.useState(undefined);
   const [tape, setTape] = React.useState('');
+  const [mdp, setMdp] = React.useState('');
   const [occupe, setOccupe] = React.useState(false);
   const [fin, setFin] = React.useState(null);
   // (9 octobre) Ses RÈGLES D'OFFRE eBay restent posées chez eBay après la
-  // fermeture : eBay continuera d'accepter. Compté sur tous ses comptes eBay ;
-  // `undefined` en cours · `null` pas su · { oui, peutEtre } (`compterReglesEbay`).
+  // suppression : eBay continuera d'accepter (`compterReglesEbay`).
   const [reglesEbayN, setReglesEbayN] = React.useState(undefined);
+  const [essai, setEssai] = React.useState(0);
   React.useEffect(() => {
-    if (!ouvert || info !== undefined) return;
-    let mort = false;
-    lireAbonnement().then((x) => { if (!mort) setInfo(x); });
+    if (!ouvert) return;
+    let mort = false; setInfo(undefined);
+    lireInventaireSuppression().then((x) => { if (!mort) setInfo(x); });
     compterReglesEbay().then((n) => { if (!mort) setReglesEbayN(n); }).catch(() => { if (!mort) setReglesEbayN(null); });
     return () => { mort = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ouvert]);
-  const email = String((AUTH.user && AUTH.user.email) || '');
-  const pareil = !!email && tape.trim().toLowerCase() === email.trim().toLowerCase();
+  }, [ouvert, essai]);
+  const pareil = tape.trim() === MOT_SUPPRIMER;
+  const avecMdp = aMotDePasse();
   const valider = async () => {
     if (!pareil || occupe) return;
     setOccupe(true);
-    const r = await fermerMonCompte(tape.trim());
-    setOccupe(false);
+    const r = await supprimerMonCompte({ confirmation: tape.trim(), motDePasse: mdp });
+    setOccupe(false); setMdp('');
     setFin(r);
-    // Fermé : on efface aussi ce navigateur, puis retour à l'accueil public.
-    if (r.ok) setTimeout(() => { try { authSignOut(); } catch (_) {} location.assign('/'); }, 4000);
+    if (r.ok) setTimeout(() => { try { authSignOut(); } catch (_) {} location.assign('/'); }, 6000);
   };
-  const txt = { fontSize: 12, color: C.muted, lineHeight: 1.55 };
+  const txt = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
+  const champ = { width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 16, minHeight: 44, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' };
+  const titreBloc = { display: 'block', fontSize: 13, fontWeight: 600, color: C.text, marginTop: 14 };
+  const n = info && info.nombres;
+  const nb = (x, un, plusieurs) => `${x} ${x > 1 ? plusieurs : un}`;
   return (
-    <div data-fermer-compte="" style={{ padding: '13px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 }}>
+    <div data-fermer-compte="" data-supprimer-compte="" style={{ padding: '13px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 }}>
       <button type="button" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert}
-        style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+        style={{ display: 'flex', width: '100%', minHeight: 44, alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text }}>Fermer mon compte</span>
-          <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 2 }}>Efface tes données et ton compte VRM, définitivement.</span>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.danger }}>Supprimer mon compte</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Efface ton compte VRM et tes données, définitivement.</span>
         </span>
-        <span style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
+        <span aria-hidden="true" style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
       </button>
       {ouvert && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
           {fin ? (
-            <div data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
+            <div role="status" data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
               {fin.message}
-              {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l'extension VRM de ton navigateur. Retour à l'accueil dans un instant…</div>}
+              {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l’extension VRM de ton navigateur. Retour à l’accueil dans un instant…</div>}
+              {!fin.ok && <div style={{ marginTop: 10 }}><Bouton variante="secondaire" onClick={() => setFin(null)}>Revenir</Bouton></div>}
             </div>
           ) : info === undefined ? (
-            <div style={txt}>Vérification de ton compte…</div>
+            <div style={txt}>Je compte ce qui serait supprimé…</div>
           ) : info === null ? (
-            <div data-fermer-etat="pas-su" style={txt}>Compte pas vérifié : rien n'est proposé. Rouvre cet écran dans un instant.</div>
+            <div data-fermer-etat="pas-su" style={txt}>
+              Je n’ai pas pu compter tes données : rien n’est proposé tant que ce n’est pas su.
+              <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={() => setEssai((x) => x + 1)}>Réessayer</Bouton></div>
+            </div>
           ) : info.proprietaire ? (
             <div data-fermer-etat="proprietaire" style={txt}>
-              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Fermer ce compte effacerait toute la boutique : désactivé ici, exprès.
+              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Supprimer ce compte effacerait toute la boutique : désactivé ici, exprès.
             </div>
           ) : (
             <div data-fermer-etat="possible">
-              <div style={txt}>
-                Seront effacés : <b style={{ color: C.text }}>tes données VRM</b> (ventes, annonces captées, numéros, compta, réglages), <b style={{ color: C.text }}>tes comptes Vinted liés</b> et <b style={{ color: C.text }}>ton compte de connexion</b>.
-                {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
-                {' '}C'est <b style={{ color: C.text }}>définitif</b> : fais d'abord une « Sauvegarde complète » (Réglages), puis retire l'extension VRM de ton navigateur.
-              </div>
+              <span style={{ ...titreBloc, marginTop: 0 }}>1. D’abord, garde une copie</span>
+              <div style={txt}>Un fichier sur ton appareil : ventes, achats, stock, compta, factures.</div>
+              {onExporter && <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={onExporter} data-supprimer-exporter="">Exporter mes données</Bouton></div>}
+
+              <span style={titreBloc}>2. Ce qui sera supprimé</span>
+              <ul data-supprimer-liste="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
+                <li>Tes données VRM : ventes, annonces captées, numéros, compta, réglages, notifications ({nb(Math.max(0, n.donnees - n.facturesPro), 'élément', 'éléments')}).</li>
+                <li>{n.comptesVinted ? `Tes comptes Vinted liés (${n.comptesVinted}) et leurs connexions.` : 'Tes connexions aux sites de revente.'}</li>
+                <li>Tes adresses de réception et adresses VRM, tes photos, ton équipe, ta présence sur la carte{n.signalements ? `, tes signalements (${n.signalements})` : ''}.</li>
+                <li>Ton compte de connexion, en dernier.</li>
+                {info.abonnement && info.abonnement.actif && <li data-supprimer-abonnement="">Ton abonnement est résilié d’abord : aucun nouveau prélèvement.</li>}
+              </ul>
+
+              <span style={titreBloc}>3. Ce qui est gardé, et pourquoi</span>
+              <ul data-supprimer-garde="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
+                {n.facturesPro > 0 && <li data-supprimer-factures={n.facturesPro}>{nb(n.facturesPro, 'facture Pro émise', 'factures Pro émises')} : gardée{n.facturesPro > 1 ? 's' : ''} 10 ans, sans accès, parce que la loi l’exige (art. L123-22 du Code de commerce), puis effacée{n.facturesPro > 1 ? 's' : ''}. Exporte-les : c’est à toi de les conserver aussi.</li>}
+                <li>Les factures de ton abonnement VRM, chez Stripe (même obligation de 10 ans).</li>
+                <li>Une ligne sans contenu — la date et des nombres, ni ton e-mail ni ton identifiant — qui prouve que la suppression a été faite ; effacée au bout de 3 ans.</li>
+              </ul>
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
-              {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la fermeture, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
-              <label style={{ display: 'block', ...txt, marginTop: 10 }}>
-                Pour confirmer, recopie ton adresse : <b style={{ color: C.text }}>{email}</b>
-                <input type="email" autoComplete="off" autoCapitalize="none" value={tape} onChange={(e) => setTape(e.target.value)} placeholder={email}
-                  data-fermer-confirmation=""
-                  style={{ width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+              {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la suppression, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
+
+              <span style={titreBloc}>4. Confirme que c’est toi</span>
+              <label style={{ display: 'block', ...txt, marginTop: 4 }}>
+                Tape <b style={{ color: C.text }}>{MOT_SUPPRIMER}</b> en majuscules
+                <input type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={tape} onChange={(e) => setTape(e.target.value)}
+                  data-fermer-confirmation="" aria-label={`Tape ${MOT_SUPPRIMER} pour confirmer`} style={champ}/>
               </label>
-              <button type="button" className="vrm-b vrm-b-primaire" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
-                style={{ marginTop: 10 }}>
-                {occupe ? 'Fermeture en cours…' : 'Fermer définitivement mon compte'}
-              </button>
+              <label style={{ display: 'block', ...txt, marginTop: 10 }}>
+                Ton mot de passe VRM{avecMdp === false ? ' (ton compte n’en a pas)' : ''}
+                <input type="password" autoComplete="current-password" value={mdp} onChange={(e) => setMdp(e.target.value)}
+                  data-supprimer-mdp="" style={champ}/>
+              </label>
+              <div style={{ ...txt, fontSize: 12, marginTop: 6 }}>
+                {avecMdp === false
+                  ? 'Compte ouvert avec Google ou Discord : laisse vide si tu t’es connecté il y a moins de 10 minutes ; sinon déconnecte-toi, reconnecte-toi, puis reviens ici.'
+                  : 'Sans mot de passe (compte Google ou Discord) : une connexion de moins de 10 minutes suffit.'}
+              </div>
+              <Bouton variante="danger" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
+                {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
+              </Bouton>
             </div>
           )}
         </div>
@@ -3069,7 +3162,7 @@ function AffichageSetting() {
         options={[['auto', 'Automatique'], ['simple', 'Simple'], ['complet', 'Complet']].map(([v, l]) => ({ v, l, data: { 'data-affichage-choix': v } }))}/>
       <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{r.choix === 'auto' ? phraseAffichageAuto(p) : r.choix === 'simple' ? 'Simple, choisi par toi.' : 'Complet, choisi par toi.'}</div>
       <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
-        En simple, le menu ne montre pas ce qui ne sert pas encore : Stock (sans meuble), Republier (jamais lancé), les sites jamais reliés. Ma journée garde tous les gestes dus. <Pourquoi label="Rien n’est perdu ?">Aucun écran n’est supprimé et aucun chiffre ne change : chaque total compte toujours tout. Dès que tu ranges un meuble, relies Leboncoin ou republies, l’entrée revient d’elle-même. « Complet » remet tout, tout de suite.</Pourquoi>
+        En simple, le menu ne montre pas ce qui ne sert pas encore : Stock (sans meuble), Republier (jamais lancé), les fonctions jamais utilisées. Ma journée garde tous les gestes dus. <Pourquoi label="Rien n’est perdu ?">Aucun écran n’est supprimé et aucun chiffre ne change : chaque total compte toujours tout. Dès que tu ranges un meuble, relies Leboncoin ou republies, l’entrée revient d’elle-même. « Complet » remet les fonctions ; les plateformes se choisissent dans « Mes plateformes ».</Pourquoi>
       </div>
     </div>
   );

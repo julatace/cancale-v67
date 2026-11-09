@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // (8 nov.) La photo de l'article lue dans l'e-mail de vente Vinted s'affiche sur la
 // ligne « Vue par e-mail » tant que la liste Vinted n'a pas la vente.
 //  · le serveur (`photoVenteEmail`) prend la PREMIÈRE image d'annonce Vinted

@@ -140,7 +140,11 @@ export default async function handler(req, res) {
   const lat = req.query && req.query.lat, lon = req.query && req.query.lon;
   try {
     // Depuis la position : on retrouve d'abord le nom de la ville.
-    if (!city && lat && lon) { city = (await cityFromLatLon(lat, lon)) || ''; }
+    // (9 nov., revue sécurité) lat/lon partaient TELS QUELS dans l'adresse de
+    // Nominatim (« 1&q=… » y ajoutait des paramètres) : des nombres, ou rien.
+    const coord = (v, max) => { const t = String(v == null ? '' : v).trim(); const n = Number(t); return /^-?\d{1,3}(\.\d{1,10})?$/.test(t) && Math.abs(n) <= max ? String(n) : ''; };
+    const la = coord(lat, 90), lo = coord(lon, 180);
+    if (!city && la && lo) { city = (await cityFromLatLon(la, lo)) || ''; }
     if (!city) { res.status(200).json({ city: '', points: [], error: 'ville_introuvable' }); return; }
     const g = await geocodeCity(city);
     if (!g) { res.status(200).json({ city, points: [], error: 'ville_introuvable' }); return; }

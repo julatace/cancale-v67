@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « UNE OFFRE A PASSÉ TON PRIX MINI » → UNE NOTIFICATION (1 tap)
 //        node scripts/bancs/offres-mini-push.cjs

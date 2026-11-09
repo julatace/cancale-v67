@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : L'AGENT eBAY EST ARRÊTÉ — PLUS AUCUNE NOTIFICATION DU MATIN (5 nov.)
 //        node scripts/bancs/agent-ebay-push.cjs

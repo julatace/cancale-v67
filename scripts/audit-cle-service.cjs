@@ -16,6 +16,7 @@
 //  Lancer : node scripts/audit-cle-service.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path');
 const { spawnSync } = require('child_process');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');

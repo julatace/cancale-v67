@@ -17,6 +17,11 @@ require('./_porte-banc.cjs');
 //   C. un AUTRE vendeur a laissé une photo sur l'appareil (sa clé, et une clé
 //      au bon nom dont le contenu le nomme) → hors ligne : rien de lui n'est
 //      servi.
+//   E. (9 nov.) LE COMPTOIR SANS RÉSEAU : le bordereau DÉJÀ OUVERT en ligne (Ventes →
+//      « Imprimer ») se rouvre hors connexion (un vrai lien, le PDF de cet appareil,
+//      `%PDF`) ; un colis dont le bordereau n'a jamais été ouvert dit « pas gardé ici »
+//      (rien n'est téléchargé d'avance) ; la liste s'appelle « À déposer » ; « Déposé »
+//      est noté et part au retour (une fois : noté, annulé, renoté ⇒ UNE marque).
 //  Aucune fixture : tout est inventé (le banc vit dans le dépôt).
 //  Lancer : node scripts/bancs/hors-ligne.cjs   (BANC_PORT pour changer le port)
 // ════════════════════════════════════════════════════════════════════════════
@@ -27,7 +32,8 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 
-const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
+// BANC_DIST=<dist d'avant> : le même banc sur l'arbre d'avant (§6.1, il doit rougir).
+const DIST = process.env.BANC_DIST ? path.resolve(process.env.BANC_DIST) : path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4961;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.zip': 'application/zip', '.onnx': 'application/octet-stream' };
 
@@ -73,6 +79,15 @@ const ROWS_D = ROWS.concat([
     suivi: 'XW666000111FR', artTitle: '', receivedAt: iso(Date.now() - 3 * 864e5), limite: jour(-1) }),
 ]);
 
+// (9 nov.) E — deux ventes à déposer, chacune avec son bordereau par e-mail (un VRAI petit
+// PDF) ; seule la 70001 sera ouverte en ligne.
+const PDF_MINI = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 283 425]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n').toString('base64');
+const VENTE_2 = { ...VENTE, transaction_id: 70002, title: 'Adidas Samba banc' };
+const bord = (tx, titre) => ligne('email_bord_' + tx, { type: 'bordereau', transaction: String(tx), filename: 'bordereau-' + tx + '.pdf', pdfB64: PDF_MINI, modele: titre, article: titre,
+  account: COMPTE.login, uid: COMPTE.vinted_user_id, receivedAt: iso(Date.now() - 3600e3), dateLimite: jour(3), transporteur: 'Mondial Relay' });
+const ROWS_E = ROWS.map((r) => (r.id === `harvest_${COMPTE.vinted_user_id}_orders_sold` ? ligne(r.id, { capturedAt: iso(Date.now()), payload: { my_orders: [VENTE, VENTE_2] } }) : r))
+  .concat([bord(70001, VENTE.title), bord(70002, VENTE_2.title)]);
+
 const srv = http.createServer((q, r) => {
   let f = decodeURIComponent(q.url.split('?')[0]); if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(DIST, f);
@@ -82,7 +97,8 @@ const srv = http.createServer((q, r) => {
 
 let ko = 0;
 const dit = (bon, quoi, detail) => { if (!bon) ko++; console.log(`  ${bon ? '✅' : '❌'} ${quoi}${detail ? ' — ' + detail : ''}`); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 160)); } };
+// BANC_PHASES=E (ou A,E…) : seulement ces phases ; BANC_TAILLES=390 : une seule taille.
+const essaie = async (nom, f) => { if (process.env.BANC_PHASES && !process.env.BANC_PHASES.split(',').includes(nom.trim().split(' ').pop())) return; try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 160)); } };
 
 // Un faux Supabase / API / hôte du QR, posé sur le CONTEXTE (il voit aussi les
 // requêtes du service worker). `etat.hors` : tout échoue (comme hors ligne).
@@ -94,7 +110,7 @@ async function brancher(ctx, etat) {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
     if (etat.baseKO) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
     if (/select=owner/.test(u) && !/rpc/.test(u)) return json(route, []);
-    if (req.method() !== 'GET') return json(route, []);
+    if (req.method() !== 'GET') { (etat.ecrits = etat.ecrits || []).push({ m: req.method(), u: decodeURIComponent(u), corps: req.postData() || '' }); return json(route, []); }
     if (!String(h.authorization || '').includes(JETON)) return json(route, []);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json(route, [COMPTE]);
     if (/\/rest\/v1\/rpc\//.test(u)) return json(route, null);
@@ -125,7 +141,7 @@ async function main() {
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est pris — relance ce banc seul`) : e)); srv.listen(PORT, res); });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }].filter((v) => !process.env.BANC_TAILLES || process.env.BANC_TAILLES.split(',').includes(String(v.width)))) {
       const T = vp.width < 600 ? '📱 390' : '🖥️ 1512';
       const opts = { viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) };
 
@@ -166,7 +182,7 @@ async function main() {
             code: !!document.querySelector('[data-hl-code="4321"]') && !!document.querySelector('[data-hl-code="C49341"]'),
             qr: qrs.length ? qrs.map((q) => ({ etat: q.getAttribute('data-hl-qr'), w: q.naturalWidth || 0 })) : null,
             soir: document.querySelector('[data-hl-soir]') ? document.querySelector('[data-hl-soir]').getAttribute('data-hl-soir-n') : null,
-            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled && !b.hasAttribute('data-hl-file') && !b.hasAttribute('data-hl-en-grand-ouvrir')).map((b) => b.innerText) : ['(pas de vue)'],
+            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled && !b.hasAttribute('data-hl-file') && !b.hasAttribute('data-hl-en-grand-ouvrir') && !b.hasAttribute('data-hl-inventaire-ouvrir')).map((b) => b.innerText) : ['(pas de vue)'],
             gestes: v ? v.querySelectorAll('[data-hl-geste][data-hl-file]').length : 0,
             texte: document.body.innerText,
             mdp: !!document.querySelector('input[type="password"]'),
@@ -255,6 +271,73 @@ async function main() {
         dit(!/hors délai/i.test(r.texte), 'jamais « hors délai » sur un colis sans date limite (le mot n\'est plus écrit hors ligne)');
         await ctx.close();
       });
+
+      // ── E. (9 nov.) le bordereau déjà ouvert, « À déposer », « Déposé » en file ──
+      // E se joue en clair puis en sombre (le thème choisi : `vinted_dark`).
+      for (const sombre of [false, true]) {
+      console.log(`\n── ${T} · E. au comptoir sans réseau (${sombre ? 'sombre' : 'clair'}) : bordereau déjà ouvert, « Déposé » en file`);
+      await essaie(`${T} E`, async () => {
+        const ctx = await nav.newContext({ ...opts, colorScheme: sombre ? 'dark' : 'light' });
+        await ctx.addInitScript((d) => { try { localStorage.setItem('vinted_dark', JSON.stringify(d)); } catch (_) {} }, sombre);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
+        const etat = { hors: false, rows: ROWS_E };
+        await brancher(ctx, etat);
+        await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
+        const pg = await ctx.newPage();
+        const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
+        await ouvrirEnLigne(pg);
+        // En ligne : il ouvre le bordereau de la 70001 (Ventes → « Imprimer »), pas celui de la 70002.
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        // La ligne de la vente s'ouvre (son tiroir porte le bouton), puis « Imprimer ».
+        await pg.waitForSelector('.vrm-ledger-sale-toggle', { timeout: 30000 }).catch(() => {});
+        await pg.locator('.vrm-ledger-sale-toggle', { hasText: 'Nike Air Max 1 banc' }).first().click({ timeout: 8000 }).catch(() => {});
+        await pg.waitForSelector('[data-bouton-bord="pdf"][data-tx="70001"]', { state: 'attached', timeout: 20000 }).catch(() => {});
+        const bouton = await pg.evaluate(() => { const b = document.querySelector('[data-bouton-bord="pdf"][data-tx="70001"]'); if (!b) return [...document.querySelectorAll('[data-bouton-bord]')].map((x) => x.getAttribute('data-bouton-bord') + ':' + x.getAttribute('data-tx')).join(',') || 'aucun bouton'; b.click(); return true; });
+        let garde = [];
+        for (let i = 0; i < 30 && !garde.length; i++) { await pg.waitForTimeout(400); garde = await pg.evaluate(async () => (await (await caches.open('vrm-hl-pdf')).keys()).map((r) => decodeURIComponent(new URL(r.url).pathname))).catch(() => []); }
+        dit(bouton === true && garde.length === 1 && garde[0] === `/hl-pdf/${UID_A}/email_bord_70001`, 'en ligne, le bordereau OUVERT est gardé sur l\'appareil, au nom de CE vendeur (et lui seul)', JSON.stringify({ bouton, garde }));
+        await pg.keyboard.press('Escape').catch(() => {});
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        let photo = null;
+        for (let i = 0; i < 40; i++) { photo = await photoDe(pg, UID_A); if (photo && photo.nEnvoyer === 2 && photo.envoyer.every((e) => Array.isArray(e.pdf) && e.pdf.length)) break; await pg.waitForTimeout(500); }
+        dit(!!photo && photo.envoyer.map((e) => e.tx + ':' + (e.pdf || []).join('+')).sort().join(',') === '70001:email_bord_70001,70002:email_bord_70002', 'la photo relie chaque colis à SES lignes de bordereau (par sa transaction)', photo ? JSON.stringify(photo.envoyer.map((e) => [e.tx, e.pdf])) : 'aucune');
+        etat.hors = true; await ctx.setOffline(true);
+        await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+        await pg.waitForSelector('[data-hors-ligne="photo"]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForSelector('[data-hl-pdf="70001"]', { timeout: 8000 }).catch(() => {});
+        const r = await pg.evaluate(async () => {
+          const a = document.querySelector('[data-hl-pdf="70001"]');
+          let tete = '';
+          if (a) { try { const b = await (await fetch(a.href)).arrayBuffer(); tete = String.fromCharCode(...new Uint8Array(b).slice(0, 5)); } catch (e) { tete = 'KO ' + e.message; } }
+          const titres = [...document.querySelectorAll('[data-hors-ligne] div')].filter((d) => /^À déposer · \d/.test(d.innerText.trim()) && d.children.length === 0).map((d) => d.innerText.trim());
+          return { lien: !!a, href: a ? a.getAttribute('href').slice(0, 5) : '', tag: a ? a.tagName : '', tete, absent: !!document.querySelector('[data-hl-pdf-absent="70002"]'), lien2: !!document.querySelector('[data-hl-pdf="70002"]'), titres,
+            deposer: [...document.querySelectorAll('[data-hl-fait-btn]')].map((b) => b.innerText.trim()), ligne: (document.querySelector('[data-hors-ligne-ligne]') || {}).innerText || '' };
+        });
+        dit(r.lien && r.tag === 'A' && r.href === 'blob:' && r.tete === '%PDF-', 'hors connexion : « Bordereau » de la 70001 est un vrai lien vers le PDF gardé ici (%PDF)', JSON.stringify({ lien: r.lien, tag: r.tag, href: r.href, tete: r.tete }));
+        dit(r.absent && !r.lien2, 'la 70002 (bordereau jamais ouvert ici) : « pas gardé ici », aucun faux bouton', JSON.stringify({ absent: r.absent, lien2: r.lien2 }));
+        dit(r.titres.length === 1 && r.titres[0] === 'À déposer · 2' && r.deposer.length === 2 && r.deposer.every((x) => x === 'Déposé'), 'la liste dit « À déposer · 2 », chaque colis a « Déposé »', JSON.stringify({ t: r.titres, d: r.deposer }));
+        dit(/^Hors connexion — dernier état du \d{1,2} \S+ à \d{2}:\d{2}\./.test(r.ligne.trim()), 'le bandeau dit l\'heure du dernier état', r.ligne);
+        if (process.env.SHOT_HL) await pg.screenshot({ path: `${process.env.SHOT_HL}-${vp.width}-${sombre ? 'sombre' : 'clair'}-comptoir.png`, fullPage: true }).catch(() => {});
+        // « Déposé » : noté, annulé, renoté — UNE marque, qui part au retour du réseau.
+        const nAvant = (etat.ecrits || []).length;
+        const btn = '[data-hl-colis]:has-text("Nike Air Max 1 banc") [data-hl-fait-btn]';
+        await pg.locator(btn).click({ timeout: 5000 });
+        await pg.waitForTimeout(300);
+        await pg.locator('[data-hl-colis]:has-text("Nike Air Max 1 banc") [data-hl-annuler]').click({ timeout: 5000 });
+        await pg.waitForTimeout(300);
+        await pg.locator(btn).click({ timeout: 5000 });
+        await pg.waitForTimeout(600);
+        const note = await pg.evaluate(() => ({ fait: [...document.querySelectorAll('[data-hl-fait]')].map((x) => x.getAttribute('data-hl-fait')), ship: JSON.parse(localStorage.getItem('vinted_ship_done') || '{}'), attente: (document.querySelector('[data-file-envoi]') || { getAttribute: () => null }).getAttribute('data-file-envoi') }));
+        dit(note.fait.join() === 'attente' && Object.keys(note.ship).join() === '70001' && (etat.ecrits || []).length === nAvant, 'hors connexion : « Déposé » noté (en attente d\'envoi), UNE marque pour la 70001, rien parti', JSON.stringify({ ...note, envois: (etat.ecrits || []).length - nAvant }));
+        etat.hors = false; await ctx.setOffline(false);
+        let parti = null;
+        for (let i = 0; i < 40 && !parti; i++) { await pg.waitForTimeout(500); parti = (etat.ecrits || []).slice(nAvant).find((x) => /vinted_ship_done/.test(x.corps) && /70001/.test(x.corps)); }
+        let ship = null; try { const c = JSON.parse(parti ? parti.corps : 'null'); const rows = Array.isArray(c) ? c : [c]; for (const row of rows) { const d = row && (row.data || row); if (d && d.vinted_ship_done) ship = d.vinted_ship_done; } } catch (_) {}
+        dit(!!parti && ship && Object.keys(ship).join() === '70001', 'le réseau revient : la marque « Déposé » part, une fois, pour la seule 70001', parti ? JSON.stringify(ship) : 'rien envoyé');
+        dit(erreurs.length === 0, 'aucune erreur d\'app (E)', erreurs.join(' | '));
+        await ctx.close();
+      });
+      }
 
       // ── C. la photo d'un autre vendeur n'est jamais servie ────────────────
       console.log(`\n── ${T} · C. la photo d'un autre vendeur reste à lui`);

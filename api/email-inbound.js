@@ -55,6 +55,7 @@ import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from '
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
+import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -463,7 +464,7 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
   const htmlText = htmlToText(html);
   const attachNames = (attachments || []).map(a => a.filename || '').join(' ');
   const all = (subject + '\n' + body + '\n' + htmlText + '\n' + attachNames).replace(/\t/g, ' ').replace(/ {2,}/g, ' ');
-  const data = { article: '', modele: '', numero: '', taille: '', suivi: '', transaction: '', dateLimite: '' };
+  const data = { article: '', modele: '', numero: '', taille: '', suivi: '', transaction: '', dateLimite: '', transporteur: '' };
 
   let art = subject.match(/pour\s+(.+?)\s*$/i);
   if (!art) art = all.match(/Article\s*:?\s*([^\n]+?)\s*(?:Format|N[°ºo]?\s*de|\n)/i);
@@ -485,6 +486,12 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
   // Garde-fou : un vrai n° de suivi est en MAJUSCULES/chiffres — sinon c'est un
   // mot de phrase attrapé par erreur (ex. « suivi apparaissent »).
   if (suivi && /^[A-Z0-9]{8,}$/.test(suivi[1].trim())) data.suivi = suivi[1].trim();
+  // (9 nov.) Un n° Mondial Relay (8 chiffres) écrit après « N° de suivi » : la même
+  // identité (cet e-mail = CETTE transaction), que l'ancienne forme ne lisait pas.
+  if (!data.suivi) { const mr = suiviMondialRelayDuTexte(all); if (mr) data.suivi = mr; }
+  // (9 nov., Colis → Envoyés) Le transporteur NOMMÉ dans le texte de CET e-mail (sujet +
+  // corps, jamais les pièces) : un seul nom, sinon rien (api/_lib/transporteur-bordereau.js).
+  data.transporteur = transporteurDeTexteBordereau(subject + '\n' + body + '\n' + htmlText);
   const date = all.match(/avant\s*le\s*:?\s*(\d{2}\/\d{2}\/\d{4}[\s\dh:]*?)(?:\s*pour|\n|$)/i);
   if (date) data.dateLimite = date[1].trim().replace(/\s+/g, ' ');
 
@@ -2631,7 +2638,7 @@ export async function traiterEmail(req, res) {
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', compteSource: acc.source || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
+      try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }), ...(data.photo ? { photo: { url: data.photo, preuve: 'meme-email' } } : {}) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
       // Vente PRO (la mention de Vinted) avec l'e-mail de l'acheteur et sa
       // transaction : on garde le formulaire de retour pour la facture que le

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // (8 nov.) À quel compte Vinted appartient un e-mail (`compteDeLEmail`,
 // api/email-inbound.js). Julien : « je sélectionne le compte Shop, on me met des
 // ventes d'un autre compte ». Plusieurs comptes écrivent à la MÊME boîte : la

@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // Audit « abonnement propre » (8 nov.) — Julien : « des vendeurs vont payer,
 // fais tout ». Exécute le VRAI api/compte.js (faux Stripe, fausse base) et le
 // VRAI src/abonnement/etatAbonnement.js, et lit la migration 027 :
@@ -202,7 +203,9 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     dit(/x\.acces === false && x\.lecture !== true/.test(p) && /publierAbonnement\(x\)/.test(p), 'la porte ne ferme l’app QUE si la base ferme aussi la lecture ; elle publie l’état (garde, coque)');
     dit(/installerGardeEcriture\(SUPABASE_URL\)/.test(app) && /<BandeauAbonnement setTab=\{setTab\}\/>/.test(app) && /<ApercuSansAbonnement tab=\{tab\} setTab=\{setTab\}\/>/.test(app), '  la garde est posée ; la ligne de l’abonnement et l’aperçu flouté sont sur la coque');
     const reg = lire('src/ecrans/Reglages.jsx');
-    dit(/onExport=\{async\(\)=>\{ if\(lectureSeuleActive\(\)\)\{ toast\(EXPORT_FERME\); return; \}/.test(app) && /async function exporterMesDonnees\(\) \{\n  if \(lectureSeuleActive\(\)\) \{ toast\(EXPORT_FERME\); return; \}/.test(reg), '  sans abonnement, les DEUX exports sont fermés (sauvegarde complète, export des données)');
+    dit(/onExport=\{async\(\)=>\{ if\(lectureSeuleActive\(\)\)\{ toast\(EXPORT_FERME\); return; \}/.test(app), '  sans abonnement, la sauvegarde complète est fermée');
+    // (9 nov., Julien + RGPD art. 20) L'export de SES données reste ouvert sans abonnement.
+    dit(/async function exporterMesDonnees\(\) \{/.test(reg) && !/async function exporterMesDonnees\(\) \{[^}]*lectureSeuleActive/.test(reg), '  sans abonnement, « Exporter mes données » reste ouvert (portabilité)');
   });
 
   console.log('── 3. Le portail Stripe : SON client, et rien sans Stripe');

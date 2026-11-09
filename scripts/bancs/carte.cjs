@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // LES POINTS RELAIS DE L'ÉCRAN ACHATS, quand c'est le PREMIER écran ouvert.
 //
 // Ce banc est né pour « la carte des points relais » (Julien : « pour chaque
