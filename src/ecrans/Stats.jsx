@@ -1548,7 +1548,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
                     ))}
                     {rapidesC.peu.length > 0 && (
                       <div className="vrm-sv-note" data-sv-pas-conclu={rapidesC.peu.length}>
-                        {rapides.length ? 'Pas encore classés' : 'Rien de classé'} : {pl(rapidesC.peu.length, 'groupe')} à moins de {SEUIL_CONCLUSION} ventes datées ({rapidesC.peu.slice(0, 4).map((g) => `${g.k} ${g.nDelai}`).join(', ')}{rapidesC.peu.length > 4 ? '…' : ''}) — pas assez pour conclure.
+                        {rapides.length ? 'Pas encore classés' : 'Rien de classé'} : {pl(rapidesC.peu.length, 'groupe')} à moins de {SEUIL_CONCLUSION} ventes datées ({rapidesC.peu.slice(0, 4).map((g) => `${g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())} ${g.nDelai}`).join(', ')}{rapidesC.peu.length > 4 ? '…' : ''}) — pas assez pour conclure.
                       </div>
                     )}
                   </div>
