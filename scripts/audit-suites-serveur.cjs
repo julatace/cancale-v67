@@ -23,6 +23,15 @@ require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calm
 // La règle attendue n'est pas écrite ici : elle est celle de l'APP
 // (`compteEcarteRegle`, extraite d'App.jsx et exécutée avec api/_lib/plan-regle.js).
 //
+// (9 nov., soir) SOLO PAR PLATEFORME — cinq vendeurs de plus, chacun avec DEUX comptes
+// Leboncoin (L1 vendeur 60 € · L2 achat 600 €), DEUX comptes eBay (principal 70 € · clé
+// 700 €), DEUX comptes Vestiaire (v1 80 € · v2 800 €), et les deux comptes Vinted :
+//   S2 Solo, un compte vendeur par plateforme (11, L1, principal, v1) ⇒ 4 ventes · 250 €
+//   P2 Pro                                                           ⇒ 8 ventes · 2 850 €
+//   A2 Solo d'avant le 9 nov. (le webhook range `plan` null)         ⇒ 8 ventes · 2 850 €
+//   X2 `abonnements` illisible (pas su)                              ⇒ 8 ventes · 2 850 €
+//   N2 Solo, base SANS la 030 (`comptes_vendeurs` inconnue)          ⇒ Vinted bridé seul : 7 · 2 350 €
+//
 // --mutation=… réaffaiblit une copie temporaire d'`api/` (et `src/`) : le contrôle
 // DOIT sortir rouge. --prouve les joue toutes et exige que chacune soit rouge.
 // Aucune donnée réelle : tout est inventé ici, rien ne quitte la machine.
@@ -36,6 +45,11 @@ const MUTS = {
   statut: ['api/_lib/plan-vendeur.js', 'v = l && VIVANTS.has(String(l.statut || \'\')) ?', 'v = l ?'],
   widget: ['api/widget.js', '      if (venteHorsPlan(regle, s.uid)) continue;\n', ''],
   offres: ['api/ship-reminders.js', '    if (cpt && venteHorsPlan(regle, cpt[1])) continue;\n', ''],
+  // (9 nov., soir) Solo par plateforme
+  autres: ['api/_lib/bilan-semaine.js', 'excluAutreDe(e.exclusAutres, e.regle)', 'excluAutreDe(e.exclusAutres)'],
+  predicat: ['api/_lib/comptes-exclus.js', 'return bride && c !== SANS_COMPTE_VC && venteAutreHorsPlan(regle, plateforme, c);', 'return false;'],
+  colonne030: ['api/_lib/plan-vendeur.js', "comptesVendeurs: l.comptes_vendeurs }", '}'],
+  repli030: ['api/_lib/plan-vendeur.js', "if (!r.ok && r.status === 400) r = await lire('statut,plan,compte_vendeur');", ''],
 };
 const ARG = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
 if (process.argv.includes('--prouve')) {
@@ -70,6 +84,8 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, St
 // ── Faux Web Push : on capture ce qui partirait, rien ne part ───────────────
 const S = '5a000000-0000-4000-8000-000000000001', P = '5a000000-0000-4000-8000-000000000002', X = '5a000000-0000-4000-8000-000000000003';
 const C = '5a000000-0000-4000-8000-000000000004', O = '5a000000-0000-4000-8000-000000000005';
+const S2 = '5a000000-0000-4000-8000-000000000006', P2 = '5a000000-0000-4000-8000-000000000007', A2 = '5a000000-0000-4000-8000-000000000008';
+const X2 = '5a000000-0000-4000-8000-000000000009', N2 = '5a000000-0000-4000-8000-00000000000a';
 process.env.VRM_OWNER_UID = O;
 process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
@@ -88,13 +104,20 @@ const vraiNow = Date.now;
 
 // ── La fausse base (cloisonnée par owner), à la forme de PostgREST ───────────
 const VENDEURS = { S: S, P: P, X: X, C: C, O: O };
+const VENDEURS2 = { S2, P2, A2, X2, N2 };
+const AUTRES_CHOIX = { leboncoin: 'L1', ebay: 'principal', vestiaire: 'v1' };
 const ABOS = {
   [S]: { statut: 'active', plan: 'solo', compte_vendeur: '11' },
   [P]: { statut: 'active', plan: 'pro', compte_vendeur: null },
   [C]: { statut: 'canceled', plan: 'solo', compte_vendeur: '11' },
   [O]: { statut: 'active', plan: 'solo', compte_vendeur: '11' },
+  [S2]: { statut: 'active', plan: 'solo', compte_vendeur: '11', comptes_vendeurs: AUTRES_CHOIX },
+  [P2]: { statut: 'active', plan: 'pro', compte_vendeur: null, comptes_vendeurs: {} },
+  [A2]: { statut: 'active', plan: null, compte_vendeur: '11', comptes_vendeurs: AUTRES_CHOIX },
+  [N2]: { statut: 'active', plan: 'solo', compte_vendeur: '11', comptes_vendeurs: AUTRES_CHOIX },   // la 030 n'est pas passée : colonne inconnue
 };   // X : la lecture d'`abonnements` répond 400 (colonne `plan` inconnue : 028 pas passée)
-const lettre = (own) => Object.keys(VENDEURS).find((k) => VENDEURS[k] === own) || '?';
+const TOUS = { ...VENDEURS, ...VENDEURS2 };
+const lettre = (own) => Object.keys(TOUS).find((k) => TOUS[k] === own) || '?';
 let memos, lus;
 const vendeur = (own) => {
   const L = lettre(own);
@@ -115,7 +138,24 @@ const vendeur = (own) => {
     { id: 'email_sale_a' + L, data: { type: 'vente', prix: '40,00', uid: '11', account: 'vendeur', receivedAt: '2026-10-02T09:00:00.000Z' } },
     { id: 'email_sale_b' + L, data: { type: 'vente', prix: '500,00', uid: '12', account: 'achats', receivedAt: '2026-10-03T09:00:00.000Z' } },
     conv('11', 9011, 1), conv('12', 9012, 2),
+    ...(Object.values(VENDEURS2).includes(own) ? autresSites() : []),
     ...Object.entries(memos[own] || {}).map(([id, data]) => ({ id, data })),
+  ];
+};
+// (9 nov., soir) Deux comptes sur chaque autre plateforme, à la forme réelle des lignes.
+const autresSites = () => {
+  const d = new Date(DANS).toISOString();
+  const lbc = (tx, eur, compte) => ({ txId: tx, title: 'Paire ' + tx, isSeller: true, price: eur * 100, dateVente: d, stepStatus: 'done', account: compte });
+  const eb = (id, eur) => ({ orderId: id, orderPaymentStatus: 'PAID', creationDate: d, lineItems: [{ title: 'Paire ' + id }],
+    paymentSummary: { totalDueSeller: { value: String(eur + 5), currency: 'EUR' } }, totalMarketplaceFee: { value: '5', currency: 'EUR' } });
+  const vc = (eur, compte) => ({ titre: 'Paire vc', date: d, compte, etat: 'Vendu', montant: { valeur: eur, cle: 'payout', devise: 'EUR' } });
+  return [
+    { id: 'lbc_ventes', data: { ventes: { LT1: lbc('LT1', 60, 'lbc-account:L1'), LT2: lbc('LT2', 600, 'L2') } } },
+    { id: 'ebay_comptes', data: { comptes: [{ principal: true, pseudo: 'vend' }, { cle: '0123456789abcdef', pseudo: 'achete' }] } },
+    { id: 'ebay_orders', data: { orders: [eb('E1', 70)] } },
+    { id: 'ebay_orders_0123456789abcdef', data: { orders: [eb('E2', 700)] } },
+    { id: 'vc_ventes', data: { ventes: { V1: vc(80, 'v1'), V2: vc(800, 'v2') } } },
+    { id: 'vc_listings', data: { liens: {} } },
   ];
 };
 const rep = (o, status = 200) => new Response(typeof o === 'string' ? o : JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
@@ -155,17 +195,21 @@ global.fetch = async (url, opts = {}) => {
   const select = (/(?:^|&)select=([^&]+)/.exec(q) || [])[1] || '';
   if (table === 'abonnements') {
     // La vraie forme : `select=statut,plan,compte_vendeur` ; 028 absente ⇒ 400 (PGRST204/42703).
-    if (own === X) return rep({ code: '42703', message: 'column abonnements.plan does not exist' }, 400);
+    if (own === X || own === X2) return rep({ code: '42703', message: 'column abonnements.plan does not exist' }, 400);
+    // (9 nov., soir) N2 : la 030 n'est pas passée — demander `comptes_vendeurs` ⇒ 400.
+    if (own === N2 && /comptes_vendeurs/.test(select)) return rep({ code: '42703', message: 'column abonnements.comptes_vendeurs does not exist' }, 400);
     const l = ABOS[own];
     return rep(l ? [projette({ owner: own, ...l }, select)] : []);
   }
   if (table === 'app_data' && /select=owner&limit=1/.test(q)) return rep([{ owner: S }]);
-  if (table === 'app_data' && /id=eq\.main/.test(q) && !own) return rep(Object.values(VENDEURS).map((o) => projette({ owner: o, id: 'main', data: vendeur(o)[0].data }, select)));
+  if (table === 'app_data' && /id=eq\.main/.test(q) && !own) return rep(Object.values(TOUS).map((o) => projette({ owner: o, id: 'main', data: vendeur(o)[0].data }, select)));
   if (!own) return rep([]);
   if (table === 'vinted_accounts') return rep([{ vinted_user_id: 11, login: 'vendeur' }, { vinted_user_id: 12, login: 'achats' }].map((c) => projette(c, select)));
   if (table !== 'app_data') return rep([]);
-  if (!Object.values(VENDEURS).includes(own)) return rep([]);
-  return rep(vendeur(own).filter((l) => filtreId(l.id, q)).map((l) => projette({ ...l, owner: own }, select)));
+  if (!Object.values(TOUS).includes(own)) return rep([]);
+  // Une ligne par id (la dernière posée gagne : les autres plateformes des vendeurs « 2 »).
+  const parId = new Map(); for (const l of vendeur(own)) parId.set(l.id, l);
+  return rep([...parId.values()].filter((l) => filtreId(l.id, q)).map((l) => projette({ ...l, owner: own }, select)));
 };
 const res = () => ({ code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } });
 const euros = (x) => `${Number(x).toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(Number(x)) ? 0 : 2, maximumFractionDigits: 2 })} €`.replace(/\s+/g, ' ');
@@ -305,6 +349,35 @@ async function regleApp() {
       dit(n.length === 1 && oids.length === attenduN && (attenduN === 2 || (oids.includes(`${L}1`) && !oids.includes(`${L}2`))),
         `${L} — ${attenduN === 1 ? 'seule l’offre du compte vendeur (11) sonne ; celle du compte d’achat (12) se tait' : 'les deux offres sonnent'}`, `${n.length} notif · offres ${JSON.stringify(oids)}`);
     }
+  });
+
+  console.log('\n── 6. Solo par plateforme : deux comptes Leboncoin, deux eBay, deux Vestiaire (bilan de la semaine)');
+  await essaie('solo plateformes', async () => {
+    memos = {}; pushes.length = 0;
+    Date.now = () => LUNDI;
+    try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r); }
+    finally { Date.now = vraiNow; }
+    // Reçu (au versement) : Vinted et Leboncoin (date de vente) et eBay ; Vestiaire sans date de versement n'y est pas.
+    const ATT = { S2: [4, 250, 'Solo, un compte vendeur par plateforme', 170], P2: [8, 2850, 'Pro', 1970], A2: [8, 2850, 'Solo d’avant le 9 nov. (plan « pas su »)', 1970],
+      X2: [8, 2850, 'offre illisible (pas su)', 1970], N2: [7, 2350, 'Solo, base sans la 030 : Vinted bridé seul', 1470] };
+    for (const [L, [n, eur, nom, recu]] of Object.entries(ATT)) {
+      const b = pushes.filter((p) => /^bilan-/.test(p.tag || '') && p.endpoint.endsWith('/' + L + '1'));
+      const corps = String((b[0] && b[0].body) || '').replace(/\s+/g, ' ');
+      const vendu = `Vendu : ${n} vente${n > 1 ? 's' : ''} · ${euros(eur)}.`;
+      dit(b.length === 1 && corps.startsWith(vendu + ' '), `${L} — ${nom} : « ${vendu} »`, corps || `${b.length} bilan(s)`);
+      dit(corps.includes(` Reçu : ${euros(recu)}. `), `${L} — « Reçu : ${euros(recu)}. » (même règle, au versement)`);
+    }
+    // Le bilan du mois : les mêmes lectures, le même calcul.
+    for (const [L, o] of Object.entries(VENDEURS2)) {
+      const d = await owner.contexteVendeur.run({ owner: o }, () => banc.lireDonneesBilan());
+      const mois = { ym: '2026-09', debut: Date.parse('2026-08-31T22:00:00Z'), fin: Date.parse('2026-09-30T22:00:00Z') + 86400000 * 2, libelle: 'septembre 2026' };
+      const b = bilanMois.calculerBilanMois({ d, pub: null, mois, maintenant: LUNDI });
+      const v = (b && (b.vendu || (b.bilan && b.bilan.vendu))) || {};
+      const [n, eur] = ATT[L];
+      dit(v.n === n && Math.round(v.eur) === eur, `${L} — bilan du mois : ${n} vente(s) · ${euros(eur)}`, JSON.stringify({ n: v.n, eur: v.eur }));
+    }
+    const lAbo = lus.filter((u) => /\/rest\/v1\/abonnements\?.*comptes_vendeurs/.test(u));
+    dit(lAbo.length > 0 && lAbo.every((u) => /owner=eq\.[0-9a-f-]{36}/.test(u) && !/select=\*|select=data/.test(u)), 'le compte vendeur des autres plateformes est lu par vendeur, projeté (`comptes_vendeurs`) — jamais select=data', `${lAbo.length} lecture(s)`);
   });
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);

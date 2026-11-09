@@ -301,7 +301,8 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(avant7.ecran === 'ventes' && e7.ecran === 'ventes', `B7 ${qui} : un balayage parti du bord gauche est laissé au système (VRM ne change pas d'onglet)`, JSON.stringify({ avant: avant7.ecran, apres: e7.ecran }));
         await balayer(ctx, pg, 200, 40, y7 == null ? 420 : y7);
         const e7b = await ecran(pg);
-        dit(e7b.ecran === 'cat_bord', `B7 ${qui} : un balayage au milieu (hors d'une commande) change toujours d'onglet (Ventes → Colis)`, JSON.stringify({ y: y7, ...e7b }));
+        // (9 nov., décision de Julien) plus aucun changement d'onglet au doigt, même au milieu.
+        dit(e7b.ecran === 'ventes', `B7 ${qui} : un balayage au milieu ne change plus d'onglet (décision du 9 nov.)`, JSON.stringify({ y: y7, ...e7b }));
         // B8 · retoucher l'onglet courant
         await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]');
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 400; }); await pg.waitForTimeout(300);
