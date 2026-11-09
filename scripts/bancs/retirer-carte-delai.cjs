@@ -209,9 +209,14 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
         dit(c.la && c.etat === 'pret', `la carte est affichée${tel ? ' AU TÉLÉPHONE' : ''} (fond prêt)`, JSON.stringify({ la: c.la, etat: c.etat }));
         dit(c.avantVilles && c.avantListe, 'la carte est en haut, avant les villes et la liste', JSON.stringify(c));
         dit(tel ? c.h >= 180 && c.h <= 230 : c.h >= 180 && c.h <= 260, `hauteur raisonnable (${c.h} px)`);
-        dit(c.epingles.length === 6, 'une épingle par point placé (Cancale, 2 × Vannes, Brest, Saint-Malo, et Quimper « à vérifier » : visible, jamais caché)', JSON.stringify(c.epingles));
+        // (9 nov., retraits frais — Julien : « À retirer · 0 » sous une carte à 18 points) LA CARTE NE MONTRE QUE
+        // CE QUE L'ONGLET COMPTE : Quimper (un « à vérifier » seul) n'a plus d'épingle ; son colis reste VISIBLE
+        // sous « À vérifier » (contrôlé plus bas). Avant ce jour, ce banc exigeait l'épingle de Quimper.
+        dit(c.epingles.length === 5 && !c.epingles.some((e) => /tabackereon/.test(e.cle)), 'une épingle par point où un colis COMPTÉ attend (Cancale, 2 × Vannes, Brest, Saint-Malo) — Quimper « à vérifier » n’en a pas', JSON.stringify(c.epingles));
         const sortes = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-sorte')])));
-        dit(sortes['tabackereon|29000'] === 'averifier' && Object.entries(sortes).filter(([k]) => k !== 'tabackereon|29000').every(([, v]) => v === 'aretirer'), 'l’épingle de Quimper est « à vérifier » (neutre), les autres « à retirer »', JSON.stringify(sortes));
+        dit(Object.values(sortes).length === 5 && Object.values(sortes).every((v) => v === 'aretirer'), 'toutes les épingles sont « à retirer »', JSON.stringify(sortes));
+        const quimperVu = await pg.evaluate(() => [...document.querySelectorAll('[data-rp-section="verifier"] [data-cc-carte]')].some((l) => /93000006/.test(l.getAttribute('data-cc-carte') || '')));
+        dit(quimperVu, 'le colis de Quimper reste visible sous « À vérifier » (jamais caché)');
         const epC = c.epingles.find((e) => /maisonduquai/i.test(e.cle));
         dit(!!epC && epC.n === '2', 'l’épingle de Cancale porte ses 2 colis', JSON.stringify(epC));
         if (tel) dit(c.coop === true && /pan-y/.test(c.touch), 'au doigt : un doigt fait défiler la page (gestes coopératifs, touch-action pan-y)', `${c.coop} · ${c.touch}`);

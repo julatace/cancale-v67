@@ -520,6 +520,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **9 nov. · Retraits frais** : moitié Vinted d'un colis fini ⇒ « sans doute fini » (sortis), plus « en double » ; carte = ce que l'onglet compte ; statut relu /15 min (`?moment=colis`). `docs/passation/2026-11-09-retraits-frais.md`. Geste : `CRON_SECRET` GitHub.
 - **9 nov. · Direction artistique 4** : feuilles et ateliers (Republier) en portail à la forme unique (groupes blancs, croix ronde, pied plein), confirmations à deux gestes égaux, toasts en carte sans rouge, états vides centrés, « pas su » en carte au bouton gris, barre du bas pleine (styles-premium.css §12). `docs/passation/2026-11-09-direction-artistique-4.md`. Geste : regarder les planches.
 - **9 nov. · Pastille de l'icône (lot Z)** : l'icône de VRM (écran d'accueil, Dock) porte le nombre de colis à envoyer = le badge de Colis (`vrm_colis_aposter`, frais < 12 h) ; pas su ou 0 ⇒ effacée (`src/pastilleIcone.js`, banc `navigation-tache` Z, rouge par mutation). File des lots : `docs/passation/2026-11-09-file-des-lots.md`. Geste : aucun.
 - **9 nov. · Suites serveur** : l'offre Solo appliquée aussi par les bilans (semaine, mois), le repli e-mails du widget et le rappel des offres mini (`compteEcarteRegle`, recopiée d'App.jsx ; propriétaire = Pro ; pas su ⇒ rien bridé ; colis jamais bridés) ; double vente Leboncoin serveur seulement si vue en ligne < 24 h (`src/enLigneLbc.js`). `docs/passation/2026-11-09-suites-serveur.md`. Geste : aucun (028 pour que l'offre soit lue).
