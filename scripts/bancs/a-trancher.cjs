@@ -88,7 +88,8 @@ const projette = (row, sel) => {
 // Un contexte : la base servie, les semis rangés UNE fois (au premier chargement).
 async function contexte(b, vp, { theme = 'light', zero = false } = {}) {
   const ctx = await b.newContext({ viewport: vp, colorScheme: theme, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
-  const MAIN = { vinted_dark: theme === 'dark', vinted_account_emails: {} };
+  // L'annonce porte déjà son N° (posé à la main) : aucun écran n'a à la numéroter pendant le banc.
+  const MAIN = { vinted_dark: theme === 'dark', vinted_account_emails: {}, ...(zero ? {} : { vinted_annonce_numeros: { '800001': { numero: '7', title: 'Nike Dunk Low taille 42', auto: false, manuelAt: iso(MAINTENANT - 86400e3) } } }) };
   const ROWS = lignesBase(zero ? 60000 : 3 * 86400e3, zero);
   const semis = { uid: UID, s: Object.fromEntries(Object.entries(SEMIS).map(([k, n]) => [k, { n: zero ? 0 : n, at: MAINTENANT }])) };
   if (zero) semis.s['adresses-sans-compte'] = { n: 0, at: MAINTENANT };
