@@ -919,6 +919,10 @@
 [data-republier] .vrm-sel-liste .vrm-sel-ligne { border-color: var(--p-filet) !important; border-width: 0 0 .5px !important; }
 [data-republier] .vrm-sel-liste .vrm-sel-photo { width: 44px !important; height: 44px !important; border-radius: var(--p-r-vignette) !important; }
 [data-republier] input[type="checkbox"] { width: 22px !important; height: 22px !important; }
+/* Les choix (baisse de prix, temps entre deux articles) : 44 au doigt ET à la souris dans
+   une feuille ; une pilule au repos est un remplissage gris sans cadre, l'active à l'encre. */
+[data-republier] [data-republier-reductions] > button:not([aria-pressed="true"]) { background: var(--p-remplir) !important; border: 0 !important; box-shadow: none !important; color: var(--p-encre) !important; }
+[data-republier] [data-republier-esp] [role="radiogroup"] button, [data-republier] [data-republier-esp] [role="tablist"] button, [data-republier] [data-republier-esp] [data-republier-esp-choix] { min-height: 44px !important; }
 /* Un champ de l'atelier : la forme du champ de recherche d'iOS (remplissage, sans cadre, 44). */
 [data-republier] :is(input:not([type]), input[type="text"], input[inputmode], select) { min-height: 44px !important; border: 0 !important; background: var(--p-remplir) !important; border-radius: var(--p-r-ctrl) !important; font-size: var(--p-t-texte) !important; color: var(--p-encre) !important; }
 /* Le geste principal pas encore permis : un bouton gris qui SE VOIT (plus un texte

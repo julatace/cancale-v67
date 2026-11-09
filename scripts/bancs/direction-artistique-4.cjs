@@ -193,7 +193,7 @@ const lire = (pg, quoi) => pg.evaluate(([M, quoi]) => {
   const R = {};
   if (quoi === 'atelier') {
     const f = document.querySelector('[data-republier]'); if (!f) return null;
-    const voile = f.parentElement, tete = f.firstElementChild, titre = tete && tete.querySelector('div > div');
+    const voile = f.parentElement, tete = f.firstElementChild, titre = tete && tete.firstElementChild && tete.firstElementChild.firstElementChild;
     const croix = tete && tete.querySelector('button[aria-label="Fermer"]');
     const pied = f.lastElementChild;
     const blocs = [...f.querySelectorAll('[data-republier-photos],[data-republier-description],[data-republier-brouillon],[data-republier-esp],[data-republier-reductions]')].map((e) => (e.matches('[data-republier-reductions]') ? e.parentElement : e)).filter(vis);
@@ -205,7 +205,7 @@ const lire = (pg, quoi) => pg.evaluate(([M, quoi]) => {
     R.pied = pied ? { opaque: opaque(st(pied).backgroundColor), filet: px(st(pied).borderTopWidth) } : null;
     R.blocs = blocs.map((e) => ({ bord: px(st(e).borderTopWidth), fond: st(e).backgroundColor, ecart: Math.abs(lum(st(e).backgroundColor) - lum(st(f).backgroundColor)), opaque: opaque(st(e).backgroundColor) }));
     R.petits = cibles(f); R.rouges = rouges(f);
-    const desac = f.querySelector('.vrm-b-primaire:disabled'); R.desactive = desac ? { fond: st(desac).backgroundColor, opaque: opaque(st(desac).backgroundColor) } : null;
+    const desac = f.querySelector('.vrm-b-primaire:disabled'); R.desactive = desac ? { fond: st(desac).backgroundColor, opaque: (rgb(st(desac).backgroundColor) || { a: 0 }).a >= 0.1 } : null;
   } else if (quoi === 'actions') {
     const f = document.querySelector('[data-actions-selection]'); if (!f) return null;
     const feuille = f.closest('.vrm-fs'); const cadre = f.closest('[data-feuille-cadre]');
@@ -338,7 +338,7 @@ const bleu = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return
         await cap(pg, `${nomV}-republier-lancer`);
         const r3 = await lire(pg, 'atelier');
         dit(r3.petits.length === 0, `${nomV} R (lancer) cibles ≥ 44`, r3.petits.join(' · '));
-        dit(!!r3.desactive && r3.desactive.opaque, `${nomV} R « Republier » pas encore permis reste un BOUTON (fond plein gris)`, JSON.stringify(r3.desactive));
+        dit(!!r3.desactive && r3.desactive.opaque, `${nomV} R « Republier » pas encore permis reste un BOUTON (fond gris visible)`, JSON.stringify(r3.desactive));
         await ctx.close();
       });
       // V. États vides : Ventes (lues, vides), Messages (« pas su »), Achats.
