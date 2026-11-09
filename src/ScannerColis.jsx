@@ -102,7 +102,10 @@ const MOTS = {
 };
 const euros = (v) => (Number.isFinite(v) ? v.toFixed(2).replace('.', ',') + ' €' : '');
 
-export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null }) {
+// (9 nov., lot AD) `attendu` : la clé du colis que « Préparer mes colis » montre. Le scan dit alors
+// si le bordereau est le BON (la même identité : n° de suivi ⇒ SA vente) ; un bordereau d'un autre
+// colis est dit (« celui du N°… »), sans bouton — rien n'est coché sur la mauvaise vente.
+export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null, attendu = '' }) {
   const M = MOTS[mode] || MOTS.envoi;
   const video = React.useRef(null);
   const saisieRef = React.useRef(null);
@@ -110,7 +113,7 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
   const [res, setRes] = React.useState(null);                 // { etat, colis?, n, lu }
   const [scannes, setScannes] = React.useState([]);           // la série : [{ n, cle, etat, num, titre, fait }]
   const [saisie, setSaisie] = React.useState('');
-  const ref = React.useRef({}); ref.current.trouver = trouver; ref.current.confirmer = onConfirmer || onDeposer;
+  const ref = React.useRef({}); ref.current.trouver = trouver; ref.current.confirmer = onConfirmer || onDeposer; ref.current.attendu = attendu ? String(attendu) : '';
   const bip = React.useRef(null); if (!bip.current) bip.current = creerBip();
   const compte = React.useRef(0);
   const noter = React.useCallback((n, colis, etat, fait) => setScannes((L) => {
@@ -121,12 +124,14 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
     return [x, ...autres].slice(0, 40);
   }), []);
   const traiter = React.useCallback((brut) => {
-    const r = ref.current.trouver(brut) || { etat: 'inconnu' };
+    let r = ref.current.trouver(brut) || { etat: 'inconnu' };
+    const att = ref.current.attendu;
+    if (att && (r.etat === 'trouve' || r.etat === 'deja') && r.colis && !Array.isArray(r.colis) && String(r.colis.cle) !== att) r = { etat: 'autre', colis: r.colis };
     compte.current += 1; const n = compte.current;
     const bon = r.etat === 'trouve';
     vibrer(bon ? 40 : [30, 60, 30]); bip.current(bon);
     setRes({ etat: r.etat, colis: r.colis || null, n, lu: String(brut) });
-    noter(n, r.colis || null, r.etat, r.etat === 'deja');
+    noter(n, r.colis || null, r.etat === 'autre' ? 'inconnu' : r.etat, r.etat === 'deja');
   }, [noter]);
   React.useEffect(() => {
     let vivant = true, flux = null, minuterie = null;
@@ -181,9 +186,10 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
   };
   const montrePaire = !!(c && res && (res.etat === 'trouve' || res.etat === 'fait' || res.etat === 'deja'));
   const nAmbigu = res && Array.isArray(res.colis) ? res.colis.length : 2;
-  const message = !res ? '' : res.etat === 'ambigu' ? M.ambigu(nAmbigu) : res.etat === 'sansVente' ? M.sansVente : M.inconnu;
+  const autre = res && res.etat === 'autre' && res.colis && !Array.isArray(res.colis) ? res.colis : null;
+  const message = !res ? '' : autre ? `Pas ce colis : ce bordereau est celui ${autre.num ? `du N°${autre.num}` : 'd’une autre vente'}${autre.titre ? ` (${autre.titre})` : ''}.` : res.etat === 'ambigu' ? M.ambigu(nAmbigu) : res.etat === 'sansVente' ? M.sansVente : M.inconnu;
   return createPortal(
-    <div className={'vrm-scan' + (montrePaire ? ' a-paire' : '')} role="dialog" aria-modal="true" aria-label={M.titre} data-scan-sheet="" data-scan-mode={mode} data-scan-camera={camera} style={{ zIndex }}>
+    <div className={'vrm-scan' + (montrePaire ? ' a-paire' : '')} role="dialog" aria-modal="true" aria-label={M.titre} data-scan-sheet="" data-scan-mode={mode} data-scan-attendu={attendu || undefined} data-scan-camera={camera} style={{ zIndex }}>
       {children}
       <div className="vrm-scan-tete">
         <h2>{M.titre}</h2>
@@ -200,7 +206,7 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
           <div className="vrm-scan-paire" data-scan-paire={String(c.cle)} data-scan-paire-num={c.num || ''}>
             <div className="vrm-scan-photo">{c.photo ? <img src={c.photo} alt="" referrerPolicy="no-referrer" decoding="async"/> : <span aria-hidden="true"/>}</div>
             <div className="vrm-scan-infos">
-              <span className={'vrm-scan-kicker is-' + res.etat}>{res.etat === 'deja' ? M.deja : res.etat === 'fait' ? M.fait + ' ✓' : M.tete}</span>
+              <span className={'vrm-scan-kicker is-' + res.etat} data-scan-bon={attendu ? '1' : undefined}>{res.etat === 'deja' ? M.deja : res.etat === 'fait' ? M.fait + ' ✓' : attendu ? 'C’est le bon bordereau' : M.tete}</span>
               <span className="vrm-scan-ligne1">{c.num ? <b className="vrm-scan-num" data-scan-num={c.num}>N°{c.num}</b> : null}<span className="vrm-scan-titre" data-scan-titre="">{c.titre}</span></span>
               <span className="vrm-scan-sous">
                 {c.taille ? <span data-scan-taille={c.taille}>{/^\d/.test(String(c.taille)) ? `Taille ${c.taille}` : c.taille}</span> : null}
