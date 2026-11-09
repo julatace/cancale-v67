@@ -1,0 +1,112 @@
+/* ── PRÉPARER MES COLIS (pas à pas) et MODE RELAIS (9 nov., lot AD) ───────────
+   Préparer reprend la feuille du mode emballage (.vrm-emb*, styles-emballage.css :
+   portail plein écran, barre ronde, pied collant, boutons de 56 px) ; ici ce qui
+   lui est propre : la grande photo, le N° en pastille, la ligne du bordereau.
+   Le mode relais est un écran de COMPTOIR : blanc plein, encre noire, grand
+   contraste MÊME en mode sombre (jetons forcés, pas de --vrm-*). Couleur rare
+   (§7) : aucune couleur d'accent ; ambre pour une limite proche, rouge seulement
+   pour deux paires sous un N°. Cibles au doigt ≥ 44 px. */
+
+.vrm-prep-feuille { z-index: 9000; }
+.vrm-prep-barre { height: 4px; border-radius: 999px; background: var(--vrm-line, #E5E5EA); overflow: hidden; margin: 0 0 6px; }
+.vrm-prep-barre > span { display: block; height: 100%; background: var(--vrm-ink, #1D1D1F); border-radius: inherit; }
+.vrm-prep-faits { color: var(--vrm-muted, #6E6E73); }
+.vrm-prep { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.vrm-prep-photo {
+  position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 46vh; border-radius: 18px; overflow: hidden;
+  background: var(--vrm-card2, #F2F2F7); display: flex; align-items: center; justify-content: center;
+}
+.vrm-prep-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-prep-photo-vide { font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-prep-verif {
+  display: flex; flex-direction: column; gap: 6px; padding: 20px; text-align: center; max-width: 360px;
+  color: var(--vrm-warn, #B25000); font-size: 15px; line-height: 1.4;
+}
+.vrm-prep-verif b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+.vrm-prep-verif span { color: var(--vrm-ink, #1D1D1F); }
+.vrm-prep-num {
+  position: absolute; left: 12px; top: 12px; min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px;
+  border-radius: 999px; background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F);
+  font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 4px 14px rgba(0, 0, 0, .10);
+}
+.vrm-prep-num.is-double { color: var(--vrm-doublon, var(--vrm-danger, #B42318)); }
+.vrm-prep-num.is-a-verifier { color: var(--vrm-warn, #B25000); }
+.vrm-prep-num.is-sans { color: var(--vrm-muted, #6E6E73); font-family: var(--vrm-police, system-ui, sans-serif) !important; font-size: 15px; }
+.vrm-prep-titre { margin: 4px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.vrm-prep-puces { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-prep-puces > span + span::before { content: "·"; margin-right: 6px; }
+.vrm-prep-limite { margin: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-prep-limite.is-ambre { color: var(--vrm-warn, #B25000); }
+.vrm-prep-bord { display: flex; flex-direction: column; gap: 8px; background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 14px 16px; }
+.vrm-prep-bord-lib { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-prep-bord-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-prep-bord-gestes .vrm-emb-b { flex: 1 1 140px; min-height: 48px; font-size: 15px; }
+.vrm-prep-bord-note { font-size: 15px; color: var(--vrm-muted, #6E6E73); line-height: 1.4; }
+.vrm-prep-fait { margin: 0; font-size: 17px; font-weight: 700; }
+.vrm-prep-fleche { flex: 0 0 56px; font-size: 26px; padding: 0; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-prep-photo { max-height: 420px; }
+}
+
+/* ── MODE RELAIS ─────────────────────────────────────────────────────────── */
+.vrm-relais {
+  position: fixed; inset: 0; z-index: 9000; overflow-y: auto; overscroll-behavior: contain;
+  background: #FFFFFF !important; color: #000000 !important; color-scheme: light;
+  font-family: var(--vrm-police, system-ui, -apple-system, sans-serif);
+}
+.vrm-relais-cadre {
+  box-sizing: border-box; width: 100%; max-width: 640px; min-height: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+.vrm-relais-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; }
+.vrm-relais-rond, .vrm-relais-rond-vide { flex: none; width: 48px; height: 48px; border-radius: 999px; }
+.vrm-relais .vrm-relais-rond:not(#vrm-r-a):not(#vrm-r-b) {
+  margin: 0 !important; border-radius: 999px !important; min-width: 48px !important; min-height: 48px !important;
+  border: 2px solid #000000 !important; background: #FFFFFF !important; color: #000000 !important; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.vrm-relais-titre { flex: 1; text-align: center; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-relais-sous { font-weight: 500; color: #3A3A3C; }
+.vrm-relais-lum { margin: 0 0 8px; text-align: center; font-size: 13px; color: #3A3A3C; line-height: 1.4; }
+.vrm-relais-points { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+.vrm-relais-point {
+  flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #000000; background: #FFFFFF; color: #000000;
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; max-width: 80vw; overflow: hidden; text-overflow: ellipsis;
+}
+.vrm-relais-point.is-choisi { background: #000000; color: #FFFFFF; }
+.vrm-relais-carte { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; touch-action: pan-y; user-select: none; -webkit-user-select: none; min-width: 0; }
+.vrm-relais-lieu { margin: 6px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; overflow-wrap: anywhere; }
+.vrm-relais-adresse { margin: 0; font-size: 15px; color: #3A3A3C; overflow-wrap: anywhere; }
+.vrm-relais-codes { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; margin: 8px 0; }
+.vrm-relais-code-bloc { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; }
+.vrm-relais-code-lib { font-size: 15px; font-weight: 600; color: #3A3A3C; }
+.vrm-relais-code {
+  font-family: var(--vrm-police-mono, ui-monospace, "SF Mono", Menlo, monospace) !important; font-weight: 700;
+  font-size: clamp(56px, 17vw, 120px); line-height: 1; letter-spacing: .06em; color: #000000; font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere; word-break: break-all; max-width: 100%;
+}
+.vrm-relais-qr { width: min(78vw, 340px); height: auto; aspect-ratio: 1 / 1; image-rendering: pixelated; background: #FFFFFF; padding: 8px; box-sizing: border-box; }
+.vrm-relais-sans { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; }
+.vrm-relais-suivi { margin: 0; font-size: 15px; color: #3A3A3C; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-relais-achat { display: flex; align-items: center; gap: 12px; max-width: 100%; min-width: 0; }
+.vrm-relais-photo { flex: none; width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
+.vrm-relais-achat-titre { font-size: 17px; font-weight: 600; text-align: left; overflow-wrap: anywhere; min-width: 0; }
+.vrm-relais-geste { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; margin-top: 6px; min-height: 56px; }
+.vrm-relais-fait { font-size: 20px; font-weight: 800; }
+.vrm-relais-note { margin: 0; font-size: 15px; color: #3A3A3C; line-height: 1.4; }
+.vrm-relais-b {
+  min-height: 56px; min-width: 56px; border-radius: 14px; padding: 0 20px; cursor: pointer; font: inherit; font-size: 17px; font-weight: 700;
+  border: 2px solid #000000; background: #FFFFFF; color: #000000;
+}
+.vrm-relais-b-plein { background: #000000; color: #FFFFFF; flex: 1 1 auto; max-width: 420px; }
+.vrm-relais-b:disabled { opacity: .3; cursor: default; }
+.vrm-relais-b:focus-visible, .vrm-relais-point:focus-visible, .vrm-relais-rond:focus-visible { outline: 3px solid #0071E3; outline-offset: 2px; }
+.vrm-relais-fleche { font-size: 30px; padding: 0; width: 64px; }
+.vrm-relais-pied { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 0; background: #FFFFFF; }
+.vrm-relais-points-pos { flex: 1; display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.vrm-relais-points-pos i { width: 8px; height: 8px; border-radius: 999px; border: 1.5px solid #000000; box-sizing: border-box; }
+.vrm-relais-points-pos i.is-fait { background: #8E8E93; border-color: #8E8E93; }
+.vrm-relais-points-pos i.is-ici { background: #000000; border-color: #000000; transform: scale(1.25); }
+.vrm-relais-vide { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
+.vrm-relais-grand { margin: 0; font-size: 22px; font-weight: 800; }
