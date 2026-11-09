@@ -148,7 +148,7 @@ export function TableauProprietaire({ entetes, fetcher = (typeof fetch === 'func
   return (
     <div data-pilotage="lu" data-pilotage-at={d.at}>
       {tete}
-      <p style={{ ...S.muet, marginTop: 2 }}>Lu le {dateHeure(d.at)} · <button type="button" className="vrm-lien-action" onClick={lire} style={{ minHeight: 44 }}>Relire</button></p>
+      <p style={{ ...S.muet, marginTop: 2 }}>Lu le {dateHeure(d.at)} · <button type="button" data-pilotage-relire="" onClick={lire} style={{ minHeight: 44, padding: '0 4px', background: 'none', border: 0, color: 'var(--vrm-accent)', fontSize: 13, cursor: 'pointer' }}>Relire</button></p>
 
       <h3 style={S.titre}>Vendeurs</h3>
       <div style={S.grille}>
@@ -161,7 +161,7 @@ export function TableauProprietaire({ entetes, fetcher = (typeof fetch === 'func
       <div style={S.grille}>
         <Tuile cle="essais" lib="Essais en cours" valeur={es ? nombre(es.enCours) : null} sous={es ? `${nombre(es.finis)} fini${es.finis > 1 ? 's' : ''} · ${nombre(es.convertis)} devenu${es.convertis > 1 ? 's' : ''} abonné${es.convertis > 1 ? 's' : ''}` : pasSu(R, 'essais')}/>
         <Tuile cle="abonnes" lib="Abonnés" valeur={ab ? nombre(ab.total) : null} alerte={!!(ab && ab.impayes)}
-          sous={ab ? [ab.impayes ? `${ab.impayes} impayé${ab.impayes > 1 ? 's' : ''}` : '', ab.resiliationsProgrammees ? `${ab.resiliationsProgrammees} partira${ab.resiliationsProgrammees > 1 ? 'ont' : ''} en fin de période` : ''].filter(Boolean).join(' · ') || 'aucun impayé' : pasSu(R, 'abonnes')}/>
+          sous={ab ? [ab.impayes ? `${ab.impayes} impayé${ab.impayes > 1 ? 's' : ''}` : '', ab.resiliationsProgrammees ? `${ab.resiliationsProgrammees} ${ab.resiliationsProgrammees > 1 ? 'partiront' : 'partira'} en fin de période` : ''].filter(Boolean).join(' · ') || 'aucun impayé' : pasSu(R, 'abonnes')}/>
         <Tuile cle="revenus" lib="Revenus mensuels récurrents" valeur={revValeur} sous={revSous}/>
         <Tuile cle="desabonnements" lib="Désabonnements ce mois" valeur={des ? nombre(des.n) : null} sous={des ? (des.source === 'stripe' ? 'lus chez Stripe' : 'lus dans VRM') : pasSu(R, 'desabonnements')}/>
       </div>
