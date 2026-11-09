@@ -136,6 +136,13 @@ async function ouvrirAnnonces(pg) {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-carte-annonce]').first().waitFor({ state: 'attached', timeout: 20000 }).catch(() => {});
   for (let i = 0; i < 30; i++) { if ((await pg.locator('[data-carte-annonce]').count()) >= 6) break; await pg.waitForTimeout(250); }
+  // (9 nov.) Depuis l'attente d'écran (6 nov., src/AttenteEcran.jsx), les cartes sont MONTÉES
+  // invisibles (`visibility:hidden`) avant que l'écran s'ouvre : « attachées » ne veut plus dire
+  // « montrées ». On attend que l'écran de démarrage soit parti et que l'écran soit OUVERT.
+  for (let i = 0; i < 80; i++) {
+    const pret = await pg.evaluate(() => { const e = document.querySelector('[data-attente-ecran="cat_annonces"]'); return !document.getElementById('vrm-demarrage') && !!e && /pret|plafond/.test(e.getAttribute('data-attente') || ''); }).catch(() => false);
+    if (pret) break; await pg.waitForTimeout(250);
+  }
   await pg.waitForTimeout(600);
 }
 async function vueSelection(pg) {
@@ -189,8 +196,18 @@ async function vueSelection(pg) {
           dit(selVis && selVis.droite <= Math.min(selVis.vw, selVis.cDroite) + 0.5 && selVis.gauche >= selVis.cGauche - 0.5, `B ${T} « Sélectionner » entièrement visible`, JSON.stringify(selVis));
 
           // ── P : le prix d'achat ──
-          const achats = await pg.evaluate(() => [...document.querySelectorAll('[data-ann-achats]')].map((x) => x.getAttribute('data-ann-achats') + '|' + x.innerText.replace(/\s+/g, ' ')));
-          dit(achats.length === 1 && achats[0].startsWith('2/6|') && /2\/6/.test(achats[0]) && /Compléter/.test(achats[0]), `P ${T} UN bandeau « Prix d'achat · ${'2/6'} → Compléter »`, JSON.stringify(achats));
+          // (9 nov.) Depuis « le prochain geste en tête » (6 nov., src/prochainGesteAnnonces.js) :
+          // « Prix d'achat N/M » se dit UNE fois — dans la ligne du geste quand c'est lui
+          // (`data-ann-prochain-geste="prix"`), sinon dans le bandeau `data-ann-achats`. On compte
+          // les deux endroits : exactement un, qui dit 2/6 et porte « Compléter ».
+          const achats = await pg.evaluate(() => [...document.querySelectorAll('[data-ann-achats], [data-ann-prochain-geste="prix"]')].filter((x) => x.getBoundingClientRect().height > 0).map((x) => (x.getAttribute('data-ann-achats') || 'geste') + '|' + x.innerText.replace(/\s+/g, ' ')));
+          dit(achats.length === 1 && /(^|\D)2\/6(\D|$)/.test(achats[0]) && /Compléter/.test(achats[0]) && (achats[0].startsWith('2/6|') || achats[0].startsWith('geste|')), `P ${T} UN bandeau « Prix d'achat · ${'2/6'} → Compléter »`, JSON.stringify(achats));
+          if (achats.length === 1) {
+            await clic(pg, achats[0].startsWith('geste|') ? '[data-ann-prochain-geste="prix"] [data-ann-prochain-geste-bouton]' : '[data-ann-achats-completer]');
+            const saisie = await pg.waitForSelector('[data-fillbuy-feuille]', { timeout: 4000 }).then(() => true).catch(() => false);
+            dit(saisie, `P ${T} « Compléter » ouvre la saisie des prix d'achat`);
+            if (saisie) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(350); if (await pg.$('[data-fillbuy-feuille]')) await pg.$eval('[data-fillbuy-feuille]', (x) => x.click()).catch(() => {}); await pg.waitForTimeout(250); }
+          }
           const caseAchat = await pg.evaluate(({ AMBRES }) => [...document.querySelectorAll('[data-carte-annonce] [data-fiche-achat="inconnu"]')].map((c) => { const cs = getComputedStyle(c); const lab = c.querySelector('.vrm-fiche-etat-haut > span'); return { bord: cs.borderTopColor, lab: lab ? getComputedStyle(lab).color : '', vis: c.getBoundingClientRect().height > 0 }; }).filter((x) => x.vis).filter((x) => AMBRES.some((a) => x.bord.startsWith(a.slice(0, -1)) || x.lab.startsWith(a.slice(0, -1)))), { AMBRES });
           dit(caseAchat.length === 0, `P ${T} la case « prix d'achat » de la carte est grise (ni bord ni libellé ambre)`, JSON.stringify(caseAchat.slice(0, 2)));
 
