@@ -17,7 +17,7 @@ libère son numéro (le dire ici).
 | — | zéro banc rouge (suite) | `claude/zero-banc-rouge` | en cours |
 | — | direction artistique 5 : colonne de gauche refaite + boutons (demande de Julien) | PR #1073 | **en ligne** |
 | A | Ma journée instantanée + objectif du mois | PR #1074 | **en ligne** |
-| B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | `claude/annuler-commandes` | en cours |
+| B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | PR #1080 | **en ligne** |
 | C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | à lancer |
 | D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | `claude/hors-ligne-relie` | en cours |
 | E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | **fini, à intégrer** (`2026-11-09-solo-plateformes.md`, migration 030) |
@@ -51,5 +51,12 @@ libère son numéro (le dire ici).
 | — | colis à retirer : relecture fréquente, retirés jamais montrés, carte = onglet (plainte de Julien) | PR #1079 | **en ligne** |
 | — | direction artistique 6 : refonte VISIBLE « Widgets » (« il n'y a pas un grand changement ») | `claude/direction-artistique-6` | en cours |
 | — | plus de balayage entre onglets ; vues Vinted à 0 = pas su | PR #1074 | **en ligne** |
+
+| AC | « À trancher » : un seul endroit pour tous les doutes, un geste par ligne | `claude/a-trancher` | en cours |
+| AD | « Préparer mes colis » pas à pas + mode relais (codes plein écran) | `claude/preparer-relais` | en cours |
+| AE | Colis et Ventes instantanés | `claude/colis-ventes-instantanes` | à lancer |
+| AF | même annonce sur deux comptes Vinted + historique d'un N° | `claude/doublons-historique` | à lancer |
+| AG | ligne de fraîcheur unique | `claude/fraicheur-unique` | à lancer |
+| AH | Siri / Raccourcis (ajouter un achat, où est le N°) | `claude/siri-raccourcis` | à lancer |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
