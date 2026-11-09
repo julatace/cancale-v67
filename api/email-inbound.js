@@ -55,6 +55,7 @@ import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from '
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
+import { transporteurDeTexteBordereau } from './_lib/transporteur-bordereau.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -463,7 +464,7 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
   const htmlText = htmlToText(html);
   const attachNames = (attachments || []).map(a => a.filename || '').join(' ');
   const all = (subject + '\n' + body + '\n' + htmlText + '\n' + attachNames).replace(/\t/g, ' ').replace(/ {2,}/g, ' ');
-  const data = { article: '', modele: '', numero: '', taille: '', suivi: '', transaction: '', dateLimite: '' };
+  const data = { article: '', modele: '', numero: '', taille: '', suivi: '', transaction: '', dateLimite: '', transporteur: '' };
 
   let art = subject.match(/pour\s+(.+?)\s*$/i);
   if (!art) art = all.match(/Article\s*:?\s*([^\n]+?)\s*(?:Format|N[°ºo]?\s*de|\n)/i);
@@ -485,6 +486,12 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
   // Garde-fou : un vrai n° de suivi est en MAJUSCULES/chiffres — sinon c'est un
   // mot de phrase attrapé par erreur (ex. « suivi apparaissent »).
   if (suivi && /^[A-Z0-9]{8,}$/.test(suivi[1].trim())) data.suivi = suivi[1].trim();
+  // (9 nov.) Un n° Mondial Relay (8 chiffres) écrit après « N° de suivi » : la même
+  // identité (cet e-mail = CETTE transaction), que l'ancienne forme ne lisait pas.
+  if (!data.suivi) { const mr = all.match(/N[°ºo]?\s*de\s*suivi\s*:?\s*(\d{8})(?!\d)/i); if (mr) data.suivi = mr[1]; }
+  // (9 nov., Colis → Envoyés) Le transporteur NOMMÉ dans le texte de CET e-mail (sujet +
+  // corps, jamais les pièces) : un seul nom, sinon rien (api/_lib/transporteur-bordereau.js).
+  data.transporteur = transporteurDeTexteBordereau(subject + '\n' + body + '\n' + htmlText);
   const date = all.match(/avant\s*le\s*:?\s*(\d{2}\/\d{2}\/\d{4}[\s\dh:]*?)(?:\s*pour|\n|$)/i);
   if (date) data.dateLimite = date[1].trim().replace(/\s+/g, ' ');
 
