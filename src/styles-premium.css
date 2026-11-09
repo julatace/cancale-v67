@@ -833,4 +833,13 @@
 .vrm-app-shell .vrm-rail-section-label { text-transform: none !important; letter-spacing: 0 !important; font: 500 var(--p-t-legende)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; }
 .vrm-app-shell :is(.vrm-rail, .vrm-sidebar, nav) .vrm-nav-badge-n { font-variant-numeric: tabular-nums !important; }
 
+/* 11.7 MESSAGES au téléphone — la ligne « paire · N° · compte » : le modèle se coupe le
+   premier, le N° (l'identité de la paire) et le motif ne se coupent jamais, le compte se
+   coupe ensuite. (Le N° est désormais son propre élément, src/App.jsx.) */
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire { flex-wrap: nowrap !important; overflow: hidden !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-paire-t { flex: 0 1 auto !important; min-width: 2ch !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-paire-num { flex: none !important; white-space: nowrap !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-acc { flex: 0 2 auto !important; min-width: 3ch !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-etat { flex: none !important; white-space: nowrap !important; }
+
 } /* fin @layer vrm-premium */
