@@ -96,6 +96,9 @@ const lancer = (S, C, extra = {}) => new Promise((fin) => {
   // V6 : lecture seule
   vrai(S.compteurs.ecritures === 0 && C3.compteurs.ecritures === 0 && C4.compteurs.ecritures === 0 && C.compteurs.ecritures === 1 /* le DELETE du banc */, `V6 aucune écriture n'est arrivée aux bases (${ecritures()} dont 1 posée par le banc lui-même)`);
 
+  const tous = [r2.out, r3.out, r4.out].join('\n');
+  vrai(!/vendeur_\d|Nike|Adidas|samba|cle-service|c4a6-4e00/.test(tous), 'V7 les écarts non plus : ni pseudo, ni titre, ni clé, ni identifiant complet', tous);
+
   // V8 : même base des deux côtés
   const r8 = await lancer(S, S);
   vrai(r8.code === 2 && /même base/.test(r8.out), 'V8 SOURCE = COPIE ⇒ refusé', r8.out);
