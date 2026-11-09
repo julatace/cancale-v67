@@ -2763,7 +2763,7 @@ function MonAbonnement() {
         onChoisirSolo={e && e.plan === 'pro' && !e.proprietaire ? () => changerOffre('solo') : null}/>}
       {e && e.plan === 'solo' && (
         <GroupeIos titre="Le compte qui vend sur chaque plateforme" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Tes autres comptes restent des comptes d’achat. Changement possible une fois tous les 30 jours.'}>
-          <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Pas encore choisi</span>}
+          <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Vinted · Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Vinted · Pas encore choisi</span>}
             detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
             onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
           {/* (9 nov., Solo par plateforme) Un compte vendeur PAR plateforme : une rangée chacune, dès
