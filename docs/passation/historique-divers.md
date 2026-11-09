@@ -994,3 +994,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée le 8 nov., chantier vitesse-calcul-partage (telle quelle)
 - **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
 - **8 nov. · À retirer : villes, carte, délai** : villes = seulement celles où un colis compté attend, triées par urgence, + « Autres » (`selecteurVilles`) ; carte AUSSI au téléphone (200 px, suit la ville, deux doigts, « Agrandir », hors réseau ⇒ rien) ; barre du délai arrivée lue → limite (lue, sinon « estimée »), ambre ≤ 24 h, jamais rouge, en tête du point si commune (`src/delaiRetrait.js`). `docs/passation/2026-11-08-retirer-carte-delai.md`. Geste : aucun.
+
+## Déplacé de CLAUDE.md §9 le 8 nov. (place pour « Nouveau compte relié »)
+
+- **8 nov. · Écrans gardés, onglets en fondu** : Ma journée, Colis, Ventes déjà vues (pas Annonces : plus lente rattachée) restent montées, GELÉES (Suspense : ni rendu, ni effet, ni publication, ni lecture) et détachées ; réutilisées au seul toucher de la barre, remontées si une donnée a changé (`src/ecransGardes.jsx`) ; fondu Web Animations + pastille qui glisse (`src/passageOnglet.js`) ; plus de classe sur `<main>` ni de View Transitions (recalcul de style de toute la page, mesuré). `docs/passation/2026-11-08-vitesse-calcul-partage.md`, banc `ecrans-gardes`. Geste : aucun.
