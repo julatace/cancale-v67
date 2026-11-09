@@ -105,3 +105,10 @@ retrait, pas les bordereaux). Rien de la liste refusée, ni prix venu des autres
 | 40 | Extension | **Sur vinted.fr, sur SES annonces** : « N°124 · acheté 60 € · en ligne depuis 23 j » discret sous chaque annonce (lecture seule) | l'info au bon endroit, sans changer d'onglet | moyen (ext.) |
 | 41 | Extension | **Pendant un ACHAT sur Vinted** : la calculette (13) et « tu as déjà 2 paires de ce modèle » (8) dans la page | décider au moment d'acheter | moyen (ext.) |
 | 42 | Messages | **Messages des quatre plateformes dans un seul fil par acheteur et par paire**, avec la plateforme marquée | ne plus aller chercher où il a écrit (si pas déjà le cas partout) | moyen |
+
+### Ajout de Julien au lot V (9 nov., soir)
+« Quand on scanne le bordereau, l'app peut dire la paire qu'il doit y avoir dedans. » ⇒ au scan
+d'un bordereau (Colis), VRM affiche en grand **la paire attendue dans ce colis** : photo, N°,
+titre, taille — retrouvée par l'IDENTITÉ (n° de suivi ⇒ vente ⇒ annonce ⇒ fiche, §5), jamais par
+ressemblance. Deux paires possibles ou aucune ⇒ dit, rien deviné (« mieux vaut un blanc qu'un faux »).
+Utile AVANT de fermer le carton (vérifier qu'on met la bonne paire) et au dépôt.

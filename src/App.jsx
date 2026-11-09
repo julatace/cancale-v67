@@ -421,6 +421,7 @@ import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACH
 import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
+import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche } from "./design/carteChiffres.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
@@ -50534,6 +50535,9 @@ function AppCoeur() {
   useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && (e.detail.k==='vrm_colis_aposter'||e.detail.k==='vrm_colis_retirer'))) return; setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); };
     window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>{ setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); });
     return ()=>{ window.removeEventListener('vrm:colis',f); window.removeEventListener('vrm:save',f); if(typeof stop==='function') stop(); }; },[]);
+  // (9 nov., lot Z) La pastille de l'icône de VRM = le badge de Colis (src/pastilleIcone.js) ; effacée en partant.
+  useEffect(()=>{ poserPastilleIcone(colisBadge); },[colisBadge]);
+  useEffect(()=>()=>{ poserPastilleIcone(null); },[]);
   // (17 oct., 5 nov.) LE MODE STREAM CACHE PARTOUT (src/modeStream.js) : on lui donne
   // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
   // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui
