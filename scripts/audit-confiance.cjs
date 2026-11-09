@@ -232,11 +232,11 @@ async function verifier(R, { silencieux = false } = {}) {
     dit(/alter table public\.app_data\s+enable row level security/i.test(sql) && /using \(owner = auth\.uid\(\)\)/.test(sql), 'C8 « ta base ne rend tes lignes qu’à ta session » : RLS sur owner = auth.uid()');
     const td = lire('src/composants/TesDonnees.jsx') || '';
     const regl = lire('src/ecrans/Reglages.jsx') || '';
-    dit(/onExporter=\{exporterMesDonnees\}/.test(regl) && /onFermer=\{AUTH\.user \? \(\)=>ouvrirSous\('fermer'\)/.test(regl) && /\{ id:'fermer', type:'panneau'[^\n]*<FermerCompte\/>/.test(regl) && /onJournal=\{AUTH\.user \? \(\)=>ouvrirSous\('journal-vrm'\)/.test(regl),
-      'C9 « Exporter » = l’export existant ; « Fermer mon compte » ouvre la fermeture existante (confirmation par l’adresse) ; « Ce que l’extension a fait » ouvre le journal');
+    dit(/onExporter=\{exporterMesDonnees\}/.test(regl) && /onFermer=\{AUTH\.user \? \(\)=>ouvrirSous\('fermer'\)/.test(regl) && /\{ id:'fermer', type:'panneau'[^\n]*<FermerCompte onExporter=\{exporterMesDonnees\}\/>/.test(regl) && /onJournal=\{AUTH\.user \? \(\)=>ouvrirSous\('journal-vrm'\)/.test(regl),
+      'C9 « Exporter » = l’export existant ; « Supprimer mon compte » ouvre la suppression (export proposé d’abord) ; « Ce que l’extension a fait » ouvre le journal');
     dit(/href="\/statut"/.test(td) && /window\.open\('\/statut'/.test(regl) && /data-aide-statut/.test(regl), 'C10 /statut joignable depuis « Tes données », l’Aide et « Résoudre un problème »');
-    const fermer = (/function FermerCompte\(\) \{[\s\S]*?\n\}\n/.exec(regl) || [''])[0];
-    dit(/const pareil = !!email && tape\.trim\(\)\.toLowerCase\(\) === email\.trim\(\)\.toLowerCase\(\)/.test(fermer) && /disabled=\{!pareil \|\| occupe\}/.test(fermer) && /info\.proprietaire/.test(fermer), 'C11 fermer le compte : recopier son adresse, bouton éteint sinon ; jamais pour le propriétaire de l’installation');
+    const fermer = (/function FermerCompte\(\{ onExporter \}\) \{[\s\S]*?\n\}\n/.exec(regl) || [''])[0];
+    dit(/const pareil = tape\.trim\(\) === MOT_SUPPRIMER/.test(fermer) && /disabled=\{!pareil \|\| occupe\}/.test(fermer) && /info\.proprietaire/.test(fermer) && /type="password"/.test(fermer), 'C11 supprimer le compte : taper « SUPPRIMER » (+ mot de passe, jugé par le serveur), bouton éteint sinon ; jamais pour le propriétaire de l’installation');
   }
   return res;
 }
