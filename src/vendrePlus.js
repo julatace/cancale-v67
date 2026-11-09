@@ -74,7 +74,12 @@ export const favorisSansVente = (annonces, seuil = 5) => {
 // `cap(nom)` → 'ok' | 'retard' | 'absente' (`extSait`) ; `version(nom)` → la
 // version minimale. Un geste bloqué dit pourquoi (§2.7), jamais en silence.
 // Aucun geste ne porte de prix : aucun montant n'est proposé (refusé le 11 oct.).
-export const gestesDormeuse = ({ numero = '', favoris = null, url = '', cap = () => 'ok', version = () => '' } = {}) => {
+// (9 nov., zéro banc rouge) `sites` : les plateformes AFFICHÉES du vendeur
+// (`plateformesAffichees`, « Mes plateformes », 8 nov.) ; `null` = pas su ⇒ tout
+// est proposé. Un site qu'il n'affiche pas n'est pas proposé : l'écran de ce site
+// ramène aussitôt sur un site affiché (FiltreSites), le clic ne menait nulle part.
+const SITE_DU_GESTE = { lbc: 'leboncoin', ebay: 'ebay', vestiaire: 'vestiaire' };
+export const gestesDormeuse = ({ numero = '', favoris = null, url = '', cap = () => 'ok', version = () => '', sites = null } = {}) => {
   const ext = (c) => (cap(c) === 'ok' ? '' : `Demande l’extension VRM ${version(c) || 'à jour'} ou plus récente.`);
   const f = compteurLu(favoris);
   const g = [
@@ -86,7 +91,7 @@ export const gestesDormeuse = ({ numero = '', favoris = null, url = '', cap = ()
     { k: 'vestiaire', t: 'Préparer sur Vestiaire', sous: '', bloque: numero ? '' : 'Mets un N° à cet article d’abord.' },
   ];
   if (f != null && f > 0) g.push({ k: 'favoris', t: 'Envoyer une offre aux favoris', sous: `${f} favori${f > 1 ? 's' : ''} sur cette annonce`, bloque: ext('favoris') });
-  return g;
+  return Array.isArray(sites) ? g.filter((x) => !SITE_DU_GESTE[x.k] || sites.includes(SITE_DU_GESTE[x.k])) : g;
 };
 
 // ── CE QUI PART VITE : CLASSER SANS CONCLURE TROP VITE ─────────────────────
