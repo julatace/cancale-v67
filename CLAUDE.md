@@ -516,6 +516,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **9 nov. · Contrôle quotidien de la prod en navigateur** : 7 h 10 Paris, Chromium iPhone + ordinateur en lecture seule (accueil, /statut, /aide, lien de récupération expiré, mode exemple sans base, /api/sante, zip, manifeste, en-têtes) ; rouge ⇒ rejoué après 5 min, puis UNE issue tenue à jour, fermée au vert ; captures en artefact. `docs/passation/2026-11-09-controle-prod.md`. Geste : facultatif (compte de démo, réglage des e-mails GitHub).
 - **8 nov. (nuit) · Beaux e-mails** : un gabarit commun `api/_lib/mail-gabarit.js` (logo, préentête, 520, sombre toléré, UN bouton bleu, « Gérer mes e-mails » sur les facultatifs, éditeur seulement si rempli) pour essai j1/j3/j6, bilan du mois (couverture « sur N ventes de M », jamais « au moins 0 »), preuve d'adresse, facture Pro, essai de boîte ; « M’envoyer un e-mail d’essai » (Réglages → Notifications, 3/h) ; `audit-mails-envoyes` (+ `--mutations`), `scripts/mails-apercus.cjs`. `docs/passation/2026-11-08-mails-envoyes.md`. Geste : s'envoyer l'e-mail d'essai.
 - **8 nov. · Nouveau compte relié** : feuille « shop_x est relié à VRM » une fois par compte (identité, ligne `vrm_comptes_relies`, point de départ posé par l'app ⇒ jamais pour les comptes déjà là), première lecture cochée sur preuve (annonces/ventes/achats/porte-monnaie, nombre lu ou « En cours », geste après 3 min), nom court · totaux · règle des N° ; notification famille « Nouveau compte relié » (`api/_lib/compte-relie.js`, via `/api/push` + cron), rattrapable dans Comptes liés. `docs/passation/2026-11-08-compte-relie.md`. Geste : aucun.
 - **8 nov. · Notifications belles et utiles** : une forme pour tout ce qui sonne (`api/_lib/notif-belle.js` : sans emoji, titre ≤ 40 qui dit le fait, corps = geste + échéance, badge monochrome, actions, photo seulement prouvée) ; regroupement par genre et heures calmes 22 h → 8 h ALLUMÉS par défaut (sauf double vente et limite < 10 h) ; cloche regroupée pareil ; doublons locaux retirés. `docs/passation/2026-11-08-notifications.md`. Geste : aucun.
@@ -536,7 +537,6 @@ sans la fonction.
 - **8 nov. · Petits défauts des contrôles** : liens disabled bloqués, longs libellés contenus, boutons mobiles alignés, zéro explicite et seuil de recherche des mails expliqué. `docs/passation/2026-11-08-petits-defauts-controles.md`. Aucune extension à installer.
 - **8 nov. · Recherche et filtres** : réinitialisation des filtres cumulés de la boîte mail, dictée annulée sans retour tardif et composition de texte protégée. `docs/passation/2026-11-08-recherches-filtres.md`. Aucune mise à jour d’extension.
 
-- **8 nov. · Actions et offres** : repère au minimum saisi, liens occupés réellement bloqués, relecture sans double départ, indicateur lisible et mouvement réduit. `docs/passation/2026-11-08-actions-offres-finitions.md`. Aucune extension à réinstaller.
 
 
 

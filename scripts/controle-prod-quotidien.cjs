@@ -42,6 +42,7 @@
 // `SEUIL_RENDU_MS` (défaut 8000) : délai maximal pour que l'accueil soit rendu.
 // `RESULTAT=fichier.json` : le bilan, lu par le workflow pour l'issue GitHub.
 // `VRM_CHROMIUM_PATH` : un Chromium précis.
+// `PARTIES=P,X` : seulement ces parties (lettres ci-dessus ; défaut : toutes).
 // ═══════════════════════════════════════════════════════════════════════════
 'use strict';
 const fs = require('fs');
@@ -56,6 +57,7 @@ const RESULTAT = process.env.RESULTAT || '';
 const DEMO_EMAIL = process.env.PROD_DEMO_EMAIL || '';
 const DEMO_MDP = process.env.PROD_DEMO_MDP || '';
 const HOTE_BASE = 'supabase.co';
+const PARTIES = new Set(String(process.env.PARTIES || 'A,S,H,R,E,P,X,M,T,C').split(',').map((x) => x.trim().toUpperCase()));
 
 // ── Ce que le dépôt attend (lu dans la copie du dépôt, jamais recopié ici) ──
 const lireDepot = (rel) => { try { return fs.readFileSync(path.join(RACINE, rel), 'utf8'); } catch (_) { return ''; } };
@@ -155,7 +157,12 @@ const ecrituresParPage = {};
     pg.on('response', (r) => { const u = r.url(); if (u.startsWith(ORIGINE + '/') && /\/assets\//.test(u) && r.status() >= 400) s.assets.push(r.status() + ' ' + u.slice(ORIGINE.length)); });
     await ctx.route('**/*', (route) => {
       const q = route.request(), m = q.method(), u = q.url();
-      if (u.includes(HOTE_BASE)) s.base.push(m + ' ' + u.replace(/\?.*$/, '').slice(0, 120));
+      if (u.includes(HOTE_BASE)) {
+        s.base.push(m + ' ' + u.replace(/\?.*$/, '').slice(0, 120));
+        // Hors compte de démo, aucune page visitée ne doit toucher la base : même
+        // une lecture est comptée (et jugée) puis coupée, elle ne part jamais.
+        if (!permettre) return route.abort();
+      }
       if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return route.fallback();
       if (permettre && permettre(m, u)) return route.fallback();
       ecrituresBloquees++; ecrituresParPage[cle] = (ecrituresParPage[cle] || 0) + 1;
@@ -170,7 +177,8 @@ const ecrituresParPage = {};
       try { await pg.screenshot({ path: path.join(CAPTURES, nom + '.png'), timeout: 10000 }); } catch (_) {}
     }
   }
-  const propre = (T, s, { console: juger = true } = {}) => {
+  const propre = (T, s, { console: juger = true, base = true } = {}) => {
+    if (base) controle(`${T} : aucune requête vers la base`, !s.base.length, s.base.slice(0, 5).join(' ¦ '));
     controle(`${T} : aucune erreur JavaScript`, !s.erreurs.length, s.erreurs.join(' ¦ '));
     controle(`${T} : aucun fichier /assets/ en erreur`, !s.assets.length, s.assets.join(' ¦ '));
     if (juger) controle(`${T} : aucune erreur de console (hors bruit connu)`, !s.console.length, [...new Set(s.console)].slice(0, 5).join(' ¦ '));
@@ -181,7 +189,7 @@ const ecrituresParPage = {};
 
   for (const [appareil] of APPAREILS) {
     // ── A. Page d'accueil ────────────────────────────────────────────────────
-    {
+    if (PARTIES.has('A')) {
       const T = `[${appareil}] accueil`;
       const { ctx, pg, s } = await ouvrir(appareil, 'accueil');
       const t0 = Date.now();
@@ -209,7 +217,7 @@ const ecrituresParPage = {};
     }
 
     // ── S. /statut ───────────────────────────────────────────────────────────
-    {
+    if (PARTIES.has('S')) {
       const T = `[${appareil}] /statut`;
       const { ctx, pg, s } = await ouvrir(appareil, 'statut');
       const r = await aller(pg, T, ORIGINE + '/statut');
@@ -225,7 +233,7 @@ const ecrituresParPage = {};
     }
 
     // ── H. /aide ─────────────────────────────────────────────────────────────
-    {
+    if (PARTIES.has('H')) {
       const T = `[${appareil}] /aide`;
       const { ctx, pg, s } = await ouvrir(appareil, 'aide');
       const r = await aller(pg, T, ORIGINE + '/aide');
@@ -252,7 +260,7 @@ const ecrituresParPage = {};
       ['dièse', '/recuperation.html#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'],
       ['paramètre', '/recuperation.html?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'],
     ];
-    for (const [forme, chemin] of FORMES) {
+    for (const [forme, chemin] of PARTIES.has('R') ? FORMES : []) {
       const T = `[${appareil}] récupération, lien expiré (${forme})`;
       const { ctx, pg, s } = await ouvrir(appareil, 'recuperation');
       const r = await aller(pg, T, ORIGINE + chemin);
@@ -267,12 +275,12 @@ const ecrituresParPage = {};
         controle(`${T} : aucun appel à Supabase (aucun e-mail ne part)`, !s.base.length && !s.ecritures.length, [...s.base, ...s.ecritures].join(' ¦ '));
         if (forme === 'dièse') await capture(pg, `${appareil}-recuperation-expire`);
       }
-      propre(T, s);
+      propre(T, s, { base: false });
       await ctx.close();
     }
 
     // ── E. Mode exemple : Ma journée, Colis, Ventes, sans rien lire ni écrire ─
-    for (const [ecran, tab] of [['Ma journée', 'journee'], ['Colis', 'cat_bord'], ['Ventes', 'cat_ventes']]) {
+    for (const [ecran, tab] of PARTIES.has('E') ? [['Ma journée', 'journee'], ['Colis', 'cat_bord'], ['Ventes', 'cat_ventes']] : []) {
       const T = `[${appareil}] mode exemple, ${ecran}`;
       const { ctx, pg, s } = await ouvrir(appareil, 'exemple', { initScript: () => { try { sessionStorage.setItem('vrm_mode_exemple', '1'); } catch (_) {} } });
       const r = await aller(pg, T, ORIGINE + '/?tab=' + tab);
@@ -286,14 +294,14 @@ const ecrituresParPage = {};
         controle(`${T} : rien d’écrit (aucune requête d’écriture tentée vers l’extérieur)`, !s.ecritures.length, s.ecritures.slice(0, 5).join(' ¦ '));
         await capture(pg, `${appareil}-exemple-${tab}`);
       }
-      propre(T, s);
+      propre(T, s, { base: false });
       await ctx.close();
     }
   }
 
   // ── P. /api/sante ──────────────────────────────────────────────────────────
   const api = await pw.request.newContext();
-  try {
+  if (PARTIES.has('P')) try {
     const r = await api.get(ORIGINE + '/api/sante', { headers: { accept: 'application/json' }, timeout: 30000 });
     let j = null; try { j = await r.json(); } catch (_) {}
     controle('/api/sante : HTTP 200 et du JSON', r.status() === 200 && j && typeof j === 'object', `HTTP ${r.status()}`);
@@ -316,7 +324,7 @@ const ecrituresParPage = {};
   } catch (e) { controle('/api/sante : répond', false, String(e && e.message).split('\n')[0]); }
 
   // ── X. L'extension servie ──────────────────────────────────────────────────
-  try {
+  if (PARTIES.has('X')) try {
     const r = await api.get(ORIGINE + '/VRM-extension.zip', { timeout: 60000 });
     const buf = await r.body();
     const p = r.status() === 200 ? paquetExtension(buf) : null;
@@ -329,7 +337,7 @@ const ecrituresParPage = {};
   } catch (e) { controle('extension servie : répond', false, String(e && e.message).split('\n')[0]); }
 
   // ── M. Manifeste et icônes ─────────────────────────────────────────────────
-  try {
+  if (PARTIES.has('M')) try {
     const r = await api.get(ORIGINE + '/manifest.webmanifest', { timeout: 30000 });
     let m = null; try { m = JSON.parse(await r.text()); } catch (_) {}
     controle('manifeste : HTTP 200, nom, départ et icônes', r.status() === 200 && m && m.name && m.start_url && Array.isArray(m.icons) && m.icons.length > 0, `HTTP ${r.status()}`);
@@ -345,7 +353,7 @@ const ecrituresParPage = {};
   } catch (e) { controle('manifeste : répond', false, String(e && e.message).split('\n')[0]); }
 
   // ── T. En-têtes de sécurité ────────────────────────────────────────────────
-  try {
+  if (PARTIES.has('T')) try {
     const r = await api.get(ORIGINE + '/', { timeout: 30000 });
     const h = r.headers();
     if (!entetesAttendus || !Object.keys(entetesAttendus).length) controle('en-têtes de sécurité : lus dans vercel.json du dépôt', false, 'illisibles');
@@ -357,7 +365,8 @@ const ecrituresParPage = {};
   await api.dispose();
 
   // ── C. Compte de démo (seulement s'il existe) ──────────────────────────────
-  if (!DEMO_EMAIL || !DEMO_MDP) saute('connexion au compte de démo', 'secrets PROD_DEMO_EMAIL / PROD_DEMO_MDP absents : aucun compte n’est utilisé (et aucun n’est créé)');
+  if (!PARTIES.has('C')) { /* partie non demandée */ }
+  else if (!DEMO_EMAIL || !DEMO_MDP) saute('connexion au compte de démo', 'secrets PROD_DEMO_EMAIL / PROD_DEMO_MDP absents : aucun compte n’est utilisé (et aucun n’est créé)');
   else {
     const T = '[ordinateur] compte de démo, Ma journée';
     // Seule écriture permise : la connexion elle-même (elle ne crée rien).
@@ -383,6 +392,7 @@ const ecrituresParPage = {};
   }
 
   await nav.close();
+  if (!resultats.length) controle('au moins un contrôle a tourné', false, `PARTIES=${[...PARTIES].join(',')}`);
   const echecs = resultats.filter((r) => !r.ok);
   console.log(`\n${ecrituresBloquees} requête(s) d’écriture bloquée(s) avant de partir (${Object.entries(ecrituresParPage).map(([k, n]) => `${k} : ${n}`).join(', ') || 'aucune'}).`);
   if (RESULTAT) {
