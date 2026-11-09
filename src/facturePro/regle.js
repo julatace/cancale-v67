@@ -1,3 +1,4 @@
+import { gabaritMail } from '../../api/_lib/mail-gabarit.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  LA FACTURE PRO — la règle (2 novembre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -355,7 +356,6 @@ export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) 
 // (tout est échappé : aucune valeur n'écrit du HTML), avec en petit pourquoi VRM
 // l'envoie et à qui répondre. Jamais de lien de désinscription : c'est un e-mail
 // transactionnel (la facture d'un achat), pas une lettre d'information.
-const echapper = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
   const { sujet, corps } = messageEmail(cfg, contenu);
   const nom = contenu.vendeur.nom;
@@ -363,12 +363,17 @@ export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
     ? `Cette facture vous est envoyée par VRM pour le compte de ${nom}. Pour toute question, répondez simplement à cet e-mail : votre réponse arrive chez ${nom}.`
     : '';
   const texte = pied ? `${corps}\n\n—\n${pied}` : corps;
-  const paras = corps.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${echapper(p).replace(/\n/g, '<br>')}</p>`).join('');
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${echapper(sujet)}</title></head>`
-    + `<body style="margin:0;padding:24px 16px;background:#ffffff;color:#1d1d1f;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">`
-    + `<div style="max-width:520px;margin:0 auto">${paras}`
-    + `<p style="margin:0 0 14px;color:#6e6e73;font-size:14px">${echapper(`${contenu.type === 'avoir' ? 'Avoir' : 'Facture'} ${contenu.numero} en pièce jointe (PDF).`)}</p>`
-    + (pied ? `<p style="margin:24px 0 0;padding-top:12px;border-top:1px solid #e5e5ea;color:#6e6e73;font-size:12px">${echapper(pied)}</p>` : '')
-    + `</div></body></html>`;
+  // (8 nov.) Le HTML passe par le gabarit commun des e-mails (api/_lib/mail-gabarit.js) :
+  // le NOM du vendeur en tête (c'est SA facture, pas un e-mail de VRM), son texte
+  // échappé, la pièce jointe dite, aucun bouton. Le texte brut reste exactement le sien.
+  const doc = contenu.type === 'avoir' ? 'Avoir' : 'Facture';
+  const { html } = gabaritMail({
+    titre: `${doc} ${contenu.numero}`,
+    preentete: `${doc} ${contenu.numero} en pièce jointe (PDF).`,
+    paras: corps.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean),
+    apres: `${doc} ${contenu.numero} en pièce jointe (PDF).`,
+    pied: pied ? { texte: pied } : null,
+    marque: { nom },
+  });
   return { sujet, texte, html, nomExpediteur: via === 'vrm' ? `${nom} via VRM`.slice(0, 120) : nom };
 }

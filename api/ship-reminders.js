@@ -58,6 +58,7 @@ import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
 import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
 import { envoyerSmtp } from './_lib/smtp.js';
+import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
@@ -1170,6 +1171,8 @@ export default async function handler(req, res) {
     // pour tout VRM (Brevo gratuit, `VRM_EMAILS_PAR_JOUR`), moins les e-mails de
     // l'essai déjà partis, 150 au plus (api/_lib/bilan-mois.js `partBilan`).
     COMPTEUR_BILAN_MOIS = { reste: !soir && !reveil ? partBilan({ dejaEnvoyes: relances && relances.envoyes }) : 0 };
+    // (8 nov.) L'identité de l'éditeur au pied du bilan (public/legal/editeur.js), lue une fois.
+    if (COMPTEUR_BILAN_MOIS.reste > 0) { try { await lireMentions(); } catch (_) {} }
     // (6 nov., filet 4) La veille des plantages.
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }

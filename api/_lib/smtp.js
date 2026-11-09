@@ -67,6 +67,15 @@ export function enteteEncode(s) {
   return morceaux.join(`${CRLF} `);
 }
 const adresseNue = (a) => String(a || '').trim();
+// (8 nov.) Le NOM d'expéditeur (« Boutique X via VRM ») : un caractère spécial
+// (< > " , ; @ …) écrit tel quel casserait l'adresse — il part toujours encodé.
+export const nomEncode = (n) => {
+  const t = String(n == null ? '' : n).replace(/[\r\n]+/g, ' ');
+  if (/^[A-Za-z0-9 !#$%&'*+\-/=?^_`{|}~]*$/.test(t)) return t;
+  const b = Buffer.from(t, 'utf8'); const morceaux = []; let i = 0;
+  while (i < b.length) { let j = Math.min(b.length, i + 45); while (j < b.length && (b[j] & 0xc0) === 0x80) j--; morceaux.push(`=?UTF-8?B?${b.slice(i, j).toString('base64')}?=`); i = j; }
+  return morceaux.join(`${CRLF} `);
+};
 export const emailSur = (a) => /^[^\s@<>"',;()\[\]\\]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(adresseNue(a));
 const base64Lignes = (buf) => (Buffer.isBuffer(buf) ? buf : Buffer.from(buf)).toString('base64').replace(/.{1,76}/g, (x) => x + CRLF);
 const nomFichierSur = (n) => String(n || 'piece.pdf').replace(/[^\w.\-]/g, '_').slice(0, 120);
@@ -77,7 +86,7 @@ export function composerMessage({ de, nomDe, a, cc = [], replyTo = '', sujet, te
   const alt = `vrm-alt-${crypto.randomBytes(12).toString('hex')}`;
   const id = `<${crypto.randomBytes(16).toString('hex')}@${domaine || String(de).split('@')[1] || 'vrm.center'}>`;
   const h = [
-    `From: ${nomDe ? `${enteteEncode(nomDe)} ` : ''}<${adresseNue(de)}>`,
+    `From: ${nomDe ? `${nomEncode(nomDe)} ` : ''}<${adresseNue(de)}>`,
     `To: <${adresseNue(a)}>`,
     // (6 nov.) La facture envoyée par VRM : le vendeur en COPIE visible, et les
     // réponses de l'acheteur vont chez LUI (Reply-To), jamais chez VRM.

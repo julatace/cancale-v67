@@ -42,7 +42,8 @@
 import crypto from 'node:crypto';
 import { sbCle } from './cle.js';
 import { envoyerSmtp, emailSur, hoteValide } from './smtp.js';
-import { gabaritEmail } from './gabarit-email.js';
+import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
+import { lireMentions } from './mentions-legales.js';
 
 export const SITE = 'https://vrm.center';
 export const ID_ENVOIS = 'relances_essai';
@@ -121,7 +122,7 @@ export function etapeDuJour({ fin, maintenant = Date.now(), envois = {} }) {
 
 // ── LES TEXTES (sobres, sans donnée réelle) ─────────────────────────────────
 // (5 nov., soir, Julien : « ça doit être bcp plus clair ».) Chaque e-mail suit
-// la forme de api/_lib/gabarit-email.js : un titre qui dit ce que c'est, une ou
+// la forme de api/_lib/mail-gabarit.js : un titre qui dit ce que c'est, une ou
 // deux phrases sur ce qu'il faut faire, UN bouton (« Ouvrir VRM »), le pied en
 // petit (pourquoi ce message, comment ne plus le recevoir).
 const dateLongue = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long' });
@@ -136,10 +137,11 @@ export function texteRelance(etape, { fin, annule = false, relie = {}, lien = ''
   const finTxt = Number.isFinite(Date.parse(fin || '')) ? dateLongue(Date.parse(fin)) : '';
   const pied = { texte: 'Tu reçois ce message parce que ton essai gratuit de VRM est en cours.', ...(lien ? { lien, motLien: 'ne plus recevoir ces rappels' } : {}) };
   const bouton = { mot: 'Ouvrir VRM', url: SITE };
-  let sujet = '', titre = '', paras = [], liste = [], suite = [];
+  let sujet = '', titre = '', preentete = '', paras = [], liste = [], suite = [];
   if (etape === 'j1') {
-    sujet = 'Bienvenue sur VRM — ton premier geste';
+    sujet = 'Bienvenue sur VRM : ton premier geste';
     titre = 'Bienvenue sur VRM';
+    preentete = 'Installe l’extension, ouvre Vinted : VRM fait le reste.';
     paras = [
       `Ton essai gratuit a commencé${finTxt ? `. Il dure jusqu’au ${finTxt}` : ''}, sans engagement.`,
       'Ton premier geste : installe l’extension VRM, puis ouvre Vinted dans le même navigateur. VRM lit alors tes annonces et tes ventes, et donne un numéro de rangement à chaque article.',
@@ -147,7 +149,9 @@ export function texteRelance(etape, { fin, annule = false, relie = {}, lien = ''
   } else if (etape === 'j3') {
     const manquent = RELIER.filter((x) => relie[x.id] === false);
     const pasSu = RELIER.some((x) => relie[x.id] !== true && relie[x.id] !== false);
-    sujet = manquent.length ? 'VRM — ce qui n’est pas encore relié' : 'VRM — tout est relié';
+    // (8 nov.) Le sujet dit la même chose que le titre : « pas su » n'est jamais « tout est relié ».
+    sujet = manquent.length ? 'Ce qui n’est pas encore relié à VRM' : pasSu ? 'Où en est ton compte VRM' : 'Tout est relié à VRM';
+    preentete = manquent.length ? 'Quelques minutes pour que VRM suive tes ventes tout seul.' : '';
     titre = manquent.length ? (manquent.length === 1 ? 'Une chose n’est pas encore reliée' : `${manquent.length} choses ne sont pas encore reliées`) : pasSu ? 'Où en est ton compte VRM' : 'Tout est relié';
     if (manquent.length) {
       paras.push('Relie-les pour que VRM suive tes ventes et tes colis tout seul :');
@@ -160,13 +164,15 @@ export function texteRelance(etape, { fin, annule = false, relie = {}, lien = ''
   } else if (etape === 'j6') {
     sujet = 'Ton essai VRM se termine demain';
     titre = 'Ton essai se termine demain';
+    preentete = annule ? 'Ton accès se ferme demain. Tes données restent gardées.' : 'Rien à faire pour continuer.';
     paras = annule
       ? [`Tu as arrêté l’abonnement : ton accès à VRM se ferme demain${finTxt ? ` (${finTxt})` : ''}. Tes données restent gardées.`,
         'Pour continuer : Paramètres → Abonnement → « Reprendre mon abonnement ».']
       : [`Demain${finTxt ? ` (${finTxt})` : ''}, ton abonnement démarre au prix affiché à ton inscription. Rien à faire pour continuer.`,
         'Pour arrêter avant : Paramètres → Abonnement → « Résilier ».'];
   } else return null;
-  const { texte, html } = gabaritEmail({ titre, paras, liste, suite, bouton, pied });
+  // (8 nov.) E-mail FACULTATIF : « Gérer mes e-mails » au pied (Réglages → Notifications).
+  const { texte, html } = gabaritEmail({ titre, preentete, paras, liste, suite, bouton, pied, facultatif: true });
   return { sujet, texte, html };
 }
 
@@ -261,6 +267,9 @@ export async function ceQuiEstRelie(owner) {
 export async function passageRelances({ maintenant = Date.now(), env = process.env, envoyer = envoyerSmtp, jusqua = Infinity, horloge = Date.now } = {}) {
   const cfg = configurationRelances(env);
   if (!cfg.pret) return { pret: false, manque: cfg.manque, envoyes: 0 };
+  // (8 nov.) L'identité de l'éditeur pour le pied des e-mails (public/legal/editeur.js) ;
+  // illisible ⇒ le pied n'en dit rien (jamais une mention inventée).
+  try { await lireMentions(); } catch (_) {}
   const proprio = await proprietaires();
   if (!proprio) return { pret: true, envoyes: 0, arret: 'proprietaire pas su' };
   const essais = await listerEssais();

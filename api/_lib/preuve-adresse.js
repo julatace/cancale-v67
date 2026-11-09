@@ -46,7 +46,7 @@
 // désigne personne (conflit → quarantaine, la règle existante).
 import crypto from 'node:crypto';
 import { normAdresse, estAdresseCollectrice, PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
-import { gabaritEmail } from './gabarit-email.js';
+import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
 
 export const PREFIXE_PREUVE = 'vrm_email_preuve_';
 export const DUREE_LIEN_MS = 72 * 3600e3;
@@ -190,12 +190,14 @@ export function reserverEnvois(d, { n, maintenant = Date.now() }) {
 
 // L'email de confirmation (le serveur l'écrit, le script Gmail l'envoie tel quel).
 // (5 nov., soir, « ça doit être bcp plus clair ») La forme commune des e-mails de
-// VRM (api/_lib/gabarit-email.js) : un titre, ce qu'il faut faire, UN bouton,
+// VRM (api/_lib/mail-gabarit.js) : un titre, ce qu'il faut faire, UN bouton,
 // le « ce n'est pas toi ? » en petit.
 export function emailConfirmation(adresse, lien) {
-  const sujet = 'VRM — confirme ton adresse de réception';
+  // (8 nov.) Le sujet garde « confirme ton adresse » : email-inbound.js le reconnaît (un renvoi n'est pas une vente).
+  const sujet = 'Confirme ton adresse de réception VRM';
   const { texte, html } = gabaritEmail({
     titre: 'Confirme ton adresse',
+    preentete: 'Un clic pour que VRM range tes e-mails Vinted. Le lien marche 72 heures.',
     paras: [
       `L’adresse ${adresse} vient d’être ajoutée à un compte VRM, pour y recevoir les e-mails Vinted (ventes, bordereaux, colis).`,
       'Si c’est toi, confirme-la en étant connecté à VRM avec ce compte.',
