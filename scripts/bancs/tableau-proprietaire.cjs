@@ -217,6 +217,8 @@ async function vendeur(nav, W, theme) {
       const ok = await attendre(o.pg, async () => !!(await o.pg.$('[data-note-satisfaction="merci"]')), 6000);
       const l = (base.lignes.find((x) => x.id === 'vrm_satisfaction') || {}).data;
       dit(ok && l && l.reponse && l.reponse.note === 4 && l.reponse.mot === 'Ça me fait gagner une heure par jour', `${T} V2 4 + un mot ⇒ vrm_satisfaction écrit, « Merci »`, JSON.stringify(l));
+      // Le signe de vie part 4 s après le montage : on attend l'écriture elle-même.
+      await attendre(o.pg, async () => base.lignes.some((x) => x.id === 'vrm_vu'), 10000);
       const vu = (base.lignes.find((x) => x.id === 'vrm_vu') || {}).data;
       dit(vu && /^\d{4}-\d{2}-\d{2}$/.test(vu.jour) && Object.keys(vu).sort().join(',') === 'jour,v', `${T} V2 le signe de vie du jour ne porte que le jour`, JSON.stringify(vu));
     }
