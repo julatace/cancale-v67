@@ -63,7 +63,22 @@ du DOM.
 
 ## Bancs existants
 
-RESULTATS_BANCS
+Après un vrai merge de `origin/main` (PR #1074 à #1078 : retraits frais, scanner, plancher, Ma journée
+instantanée…), `npm run build`, un banc à la fois :
+
+| banc | résultat |
+|---|---|
+| `direction-artistique-6` | 184 verts |
+| `journee-premium` | 15 verts — d'abord ROUGE (« le premier geste entier au-dessus de la barre du bas », 844 px : 1re carte de « Ensuite » à 926 px avec le bento sur deux rangées). Corrigé par le DESSIN, pas par le banc : Ma journée au téléphone garde sa tête bord à bord et pose trois widgets sur une ligne (778 ≤ 784 px) |
+| `journee-instantanee` | 0 rouge (`BANC_PORT=4593` : le port par défaut était pris par une autre session) |
+| `beaute` | vert |
+| `journee-v2` | 0 rouge |
+| `ventes-colis-premium` | 32 verts |
+| `direction-artistique-4` | 168 OK |
+| `nav-v2` | 54 verts — **N8 mis à la règle changée** : « primaire = pilule pleine, secondaire = pilule grise » (consigne de Julien relayée par le coordinateur, 9 nov. soir) ; le rayon accepté est l'échelle fermée 6·12·14·20·24 **ou** une pilule (rayon ≥ moitié de la hauteur) |
+| `onglets-a` | 29 verts |
+| `journee-coherence` | rien à signaler — E4 (« la tête sombre se détache des cartes », la nuit) mesurait le bas du rectangle de la tête, qui contient maintenant les widgets : il mesure le bas du fond sombre PEINT (`::before`) ; la règle ne change pas (sans `::before`, la mesure d'avant). E6 (« Modifier ne chevauche rien ») a trouvé un vrai défaut (Modifier sur la courbe de Ventes au téléphone) : corrigé dans le CSS |
+| `iphone-reprise` | 139 verts |
 
 ## Planches (mode exemple, données inventées)
 

@@ -270,3 +270,12 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
 :root:root body .vrm-main :is(.vrm-a-venir-hote, .vrm-colis-prochain, .vrm-ann-geste) { margin-top: 4px !important; }
 
 } /* fin @layer vrm-premium */
+
+/* (DA 6) Ma journée à l'ordinateur : la tête vit dans une colonne étroite (« Ensuite » à droite) —
+   le bento en deux colonnes (une large, puis deux), pas quatre colonnes de 95 px. */
+@layer vrm-premium {
+@media (min-width: 768px) {
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:first-child:nth-last-child(odd) { grid-column: 1 / -1 !important; }
+}
+}
