@@ -20,7 +20,9 @@ import { photoACacherSelon, poserReglesStream, normaliserRegles, masquerTexteStr
 import { noterTicketDiscord } from '../communaute/discordAttente.js';
 import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
-import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit, apercuNumeroEcrit } from '../numeroEcrit.js';
+import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
+// (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
+const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
 import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
@@ -3250,11 +3252,26 @@ function NumeroEcritSetting({ onAnnonces }) {
   React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lire()); }), []);
   const basculer = () => {
     touche.current = true;
-    const n = { actif: !r.actif, depuis: new Date().toISOString() };
+    const n = { ...r, actif: !r.actif, depuis: new Date().toISOString() };
     setR(n); save(CLE_NUMERO_ECRIT, n);
     try { window.dispatchEvent(new Event('vrm-numero-ecrit')); } catch (_) {}
     toast(n.actif ? 'C’est noté : VRM ne donne plus de numéro tout seul, il lit le tien.' : 'VRM redonne un numéro aux annonces qui n’en ont pas.');
   };
+  // (9 nov.) « Où est ton numéro ? » : plusieurs cochables, jamais zéro (`basculerOu`).
+  const cocher = (cle) => {
+    touche.current = true;
+    const n = basculerOu(r, cle);
+    if (n.ou.length === r.ou.length && n.ou.every((k, i) => k === r.ou[i])) { toast('Garde au moins un endroit : sinon VRM ne saurait où lire ton numéro.'); return; }
+    setR(n); save(CLE_NUMERO_ECRIT, n);
+    try { window.dispatchEvent(new Event('vrm-numero-ecrit')); } catch (_) {}
+  };
+  // L'essai : il colle sa description (ou son titre), VRM dit ce qu'il lit. Rien n'est enregistré.
+  const [essai, setEssai] = React.useState('');
+  const lectureEssai = essai.trim() ? (() => {
+    const d = r.ou.includes('description') ? lireNumeroTexte(essai, 'description') : null;
+    const t = r.ou.includes('titre') && !essai.includes('\n') ? lireNumeroTexte(essai, 'titre') : null;
+    return d && d.etat !== 'rien' ? { ...d, ou: 'à la fin' } : t && t.etat !== 'rien' ? { ...t, ou: 'dans le titre' } : (d || t || { etat: 'rien', raison: 'aucun N° écrit' });
+  })() : null;
   // Vinted : l'aperçu publié par l'écran Annonces (mis à jour en direct).
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => ecouterApercuEcrit(maj), []);
@@ -3298,11 +3315,15 @@ function NumeroEcritSetting({ onAnnonces }) {
     if (!stop) setAutres(out);
   })(); return () => { stop = true; }; }, []);
   const sites = [
-    ['vinted', 'Vinted', vinted, 'la fin de la description, puis le titre'],
-    ['leboncoin', 'Leboncoin', autres === undefined ? undefined : autres.leboncoin, 'la référence pro, la fin de la description, le titre'],
-    ['vestiaire', 'Vestiaire Collective', autres === undefined ? undefined : autres.vestiaire, 'le titre'],
-    ['ebay', 'eBay', autres === undefined ? undefined : autres.ebay, 'le SKU, puis le titre'],
-  ];
+    ['vinted', 'Vinted', vinted, [['description', 'la fin de la description'], ['titre', 'le titre']]],
+    ['leboncoin', 'Leboncoin', autres === undefined ? undefined : autres.leboncoin, [['ref', 'la référence pro'], ['description', 'la fin de la description'], ['titre', 'le titre']]],
+    ['vestiaire', 'Vestiaire Collective', autres === undefined ? undefined : autres.vestiaire, [['titre', 'le titre']]],
+    ['ebay', 'eBay', autres === undefined ? undefined : autres.ebay, [['ref', 'le SKU'], ['titre', 'le titre']]],
+  ].map(([cle, nom, a, ou]) => {
+    // (9 nov.) Ce que VRM lit sur ce site, selon les endroits cochés.
+    const lus = ou.filter(([k]) => r.ou.includes(k)).map(([, t]) => t);
+    return [cle, nom, a, lus.length ? lus.join(', ') : 'rien ici (aucun endroit coché ne s’applique à ce site)'];
+  });
   const nomsDe = (a, etat) => (a ? a.lignes.filter((l) => l.etat === etat).map((l) => l.titre || 'Annonce') : []);
   const liste = (noms) => noms.slice(0, 3).join(' · ') + (noms.length > 3 ? '…' : '');
   const ligneSite = ([cle, nom, a, ou]) => {
@@ -3351,10 +3372,33 @@ function NumeroEcritSetting({ onAnnonces }) {
           </span>
         </button>
       </div>
+      {r.actif && <fieldset data-numero-ou={r.ou.join(',')} style={{border:'none',margin:'12px 0 0',padding:0}}>
+        <legend style={{fontSize:13,fontWeight:700,color:C.text,padding:0,marginBottom:4}}>Où est ton numéro ?</legend>
+        {OU_NUMERO.map((k) => (
+          <label key={k} data-numero-ou-case={k} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,cursor:'pointer',borderTop:`1px solid ${C.border}`}}>
+            <input type="checkbox" checked={r.ou.includes(k)} onChange={() => cocher(k)} style={{width:20,height:20,accentColor:C.accent,flexShrink:0}}/>
+            <span style={{flex:1,minWidth:0}}>
+              <span style={{display:'block',fontSize:14,color:C.text}}>{NOM_OU[k]}</span>
+              <span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45}}>{k === 'description' ? '« N° 123 » sur la dernière ligne. Vinted, Leboncoin.' : k === 'titre' ? 'Une seule fois, n’importe où dans le titre. Vinted, Leboncoin, Vestiaire, eBay.' : 'eBay : le SKU · Leboncoin pro : la référence. Vinted et Vestiaire : pas de champ lu pour l’instant.'}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>}
       <div data-numero-ecrit-exemple="" style={{marginTop:12,padding:'12px 14px',borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,fontSize:13,color:C.text,lineHeight:1.55}}>
         <div style={{fontWeight:700}}>Termine ta description par :</div>
         <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:15,marginTop:6}}>N° 123</div>
         <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #123 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être la pointure. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
+      </div>
+      <div data-numero-essai={lectureEssai ? lectureEssai.etat : 'vide'} style={{marginTop:12}}>
+        <label htmlFor="vrm-numero-essai" style={{display:'block',fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Essaie : colle une description</label>
+        <textarea id="vrm-numero-essai" value={essai} onChange={(e) => setEssai(e.target.value)} rows={3} placeholder={'Très bon état, pointure 42.\nN° 125'}
+          style={{width:'100%',boxSizing:'border-box',fontSize:16,lineHeight:1.4,padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.bg,color:C.text,resize:'vertical',fontFamily:'inherit'}}/>
+        {lectureEssai && <div role="status" data-numero-essai-cle={lectureEssai.etat === 'lu' ? lectureEssai.cle : ''} style={{fontSize:13,marginTop:6,lineHeight:1.5,color:lectureEssai.etat === 'lu' ? C.text : C.muted}}>
+          {lectureEssai.etat === 'lu' ? <>VRM lit <b>N°{lectureEssai.cle}</b> ({lectureEssai.ou}, « {lectureEssai.brut} »).</>
+            : lectureEssai.etat === 'ambigu' ? <>Deux numéros ({lectureEssai.cles.join(' et ')}) : VRM ne choisit pas. Garde-en un seul.</>
+            : lectureEssai.ailleurs ? <>Un N° est écrit, mais pas à la fin : mets « N° {lectureEssai.ailleurs} » sur la dernière ligne.</>
+            : <>Aucun numéro lu. Un nombre seul (« 42 ») n’est jamais pris : écris « N° 125 ».</>}
+        </div>}
       </div>
       <GuideReglage titre="Numéroter dans tes annonces" etapes={[
         ['Écris le numéro sur la boîte', 'Sur le carton, comme d’habitude.'],
