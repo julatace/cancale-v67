@@ -78,3 +78,8 @@ continue, avoir, TVA sur la marge (art. 297 A). Propositions pour aller plus loi
 | 28 | **Factures Pro aussi pour Leboncoin, eBay et Vestiaire** (même règle de preuve : n° de commande de la plateforme) | un pro vend partout | moyen (forme des e-mails à mesurer) |
 | 29 | **Facture en anglais** quand l'acheteur est à l'étranger (mentions identiques, traduites une fois, sans IA) | ventes vers la Belgique/l'Italie via Vinted | petit |
 | 30 | **Contrôle du seuil de TVA** (85 000 € / 93 500 €) relié aux factures : « tu factures sans TVA, tu es à 71 % du seuil » | éviter de dépasser le seuil sans le savoir | petit |
+
+### Décision de Julien sur la quatrième série (9 nov., soir)
+« Fais tout » ⇒ 23 à 30 validées. Lots : Q = 23 + 24 + 25 + 26 · R = 27 (livre de police) ·
+S = 28 (Leboncoin/eBay/Vestiaire : forme des e-mails à mesurer d'abord, par requête en lecture
+seule donnée à Julien) · T = 29 + 30. L'envoi automatique (23) reste ÉTEINT par défaut.
