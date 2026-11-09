@@ -27,7 +27,7 @@
 //  (`transporteurRelu`). Idempotente (un n° décidé ou vu n'est plus relu) et
 //  bornée (`max` bordereaux par passage, les plus récents d'abord).
 // ════════════════════════════════════════════════════════════════════════════
-import { transporteurDeTexteBordereau, transporteursNommes } from './transporteur-bordereau.js';
+import { transporteurDeTexteBordereau, transporteursNommes, suiviMondialRelayLu } from './transporteur-bordereau.js';
 import { TEXTE_MAX } from './resume-email.js';
 
 export const ID_BORD_TRANSPORTEURS = 'vrm_bord_transporteurs';
@@ -35,7 +35,7 @@ export const MAX_PAR_PASSAGE = 20;
 const VUS_MAX = 2000;
 const RE_TX = /^\d{6,20}$/;
 
-export const REQ_BORDS = 'app_data?id=like.email_bord_*&select=id,tx:meta->>transaction,transporteur:meta->>transporteur,recu:meta->>receivedAt';
+export const REQ_BORDS = 'app_data?id=like.email_bord_*&select=id,tx:meta->>transaction,transporteur:meta->>transporteur,suivi:meta->>suivi,recu:meta->>receivedAt';
 export const REQ_RECEPTIONS = 'app_data?id=like.email_reception_*&data->resume->>t=eq.bordereau&select=id,tx:data->resume->>tx,sujet:data->>subject';
 export const reqTextes = (cles) => `app_data?id=in.(${cles.map((c) => 'email_texte_' + c).join(',')})&select=id,texte:data->>texte`;
 
@@ -56,6 +56,22 @@ export function decisionPourTx(emails) {
   // Un e-mail du n° nomme X, un autre (rappel) ne nomme personne : le silence n'ajoute aucun nom.
   if (noms.length === 1) return { t: noms[0] };
   return { r: 'aucun' };
+}
+
+// Le n° Mondial Relay que disent les e-mails d'UN n° de transaction (la règle de la
+// réception, `suiviMondialRelayLu`). Un texte coupé compte, sauf si le n° touche la
+// coupure (il pourrait continuer au-delà). Deux n° différents ⇒ rien.
+export function suiviPourTx(emails) {
+  const lus = new Set();
+  for (const e of emails || []) {
+    if (!e || typeof e.texte !== 'string' || !e.texte.trim()) continue;
+    const s = String(e.sujet || '') + '\n' + e.texte;
+    const l = suiviMondialRelayLu(s);
+    if (!l) continue;
+    if (texteCoupe(e.texte) && l.fin >= s.length - 1) continue;
+    lus.add(l.n);
+  }
+  return lus.size === 1 ? [...lus][0] : '';
 }
 
 // La passe. `lireTout(path)` → tableau | null ; `getRow(id)` → objet | null (absente) | undefined (pas su) ;
@@ -87,11 +103,11 @@ export async function passeTransporteursAnciens({ lireTout, getRow, ecrire, max 
     if (b.transporteur != null) continue;                 // déjà rangé (même vide) : jamais touché
     if (parTx[tx] || vus[tx]) continue;                   // idempotent
     if (!emailsParTx.has(tx)) { sansEmail++; continue; }
-    candidats.push({ tx, recu: Date.parse(b.recu || '') || 0 });
+    candidats.push({ tx, recu: Date.parse(b.recu || '') || 0, sansSuivi: !String(b.suivi || '').trim() });
   }
   candidats.sort((a, b) => b.recu - a.recu || (a.tx < b.tx ? 1 : -1));
   const lot = candidats.slice(0, Math.max(0, max));
-  if (!lot.length) return { fait: true, ranges: 0, vus: 0, restants: 0, sansEmail };
+  if (!lot.length) return { fait: true, ranges: 0, suivis: 0, vus: 0, restants: 0, sansEmail };
 
   const cles = lot.flatMap((c) => emailsParTx.get(c.tx).map((e) => e.cle)).filter((c) => /^[A-Za-z0-9_-]{1,80}$/.test(c));
   const textes = cles.length ? await lireTout(reqTextes(cles)) : [];
@@ -99,25 +115,37 @@ export async function passeTransporteursAnciens({ lireTout, getRow, ecrire, max 
   const texteDe = new Map(textes.map((t) => [String(t.id || '').replace(/^email_texte_/, ''), t.texte]));
 
   const at = new Date(maintenant).toISOString();
-  let ranges = 0, nVus = 0;
+  let ranges = 0, suivis = 0, nVus = 0;
   for (const c of lot) {
-    const d = decisionPourTx(emailsParTx.get(c.tx).map((e) => ({ sujet: e.sujet, texte: texteDe.get(e.cle) })));
-    if (d.t) { parTx[c.tx] = { t: d.t, at }; ranges++; }
+    const emails = emailsParTx.get(c.tx).map((e) => ({ sujet: e.sujet, texte: texteDe.get(e.cle) }));
+    const d = decisionPourTx(emails);
+    // Le n° Mondial Relay : seulement pour un bordereau qui n'a AUCUN n° rangé.
+    const s = c.sansSuivi ? suiviPourTx(emails) : '';
+    if (d.t || s) { parTx[c.tx] = { ...(d.t ? { t: d.t } : {}), ...(s ? { s } : {}), at }; if (d.t) ranges++; if (s) suivis++; }
     else { vus[c.tx] = { at, r: d.r }; nVus++; }
   }
   // Borné : les « vus » les plus anciens tombent (ils seraient simplement relus).
   const clesVus = Object.keys(vus);
   if (clesVus.length > VUS_MAX) clesVus.sort((a, b) => String(vus[a].at).localeCompare(String(vus[b].at))).slice(0, clesVus.length - VUS_MAX).forEach((k) => delete vus[k]);
   const ok = await ecrire(ID_BORD_TRANSPORTEURS, { v: 1, parTx, vus, at });
-  if (!ok) return { fait: false, raison: 'écriture ratée', ranges: 0, vus: 0, restants: candidats.length };
-  return { fait: true, ranges, vus: nVus, restants: candidats.length - lot.length, sansEmail };
+  if (!ok) return { fait: false, raison: 'écriture ratée', ranges: 0, suivis: 0, vus: 0, restants: candidats.length };
+  return { fait: true, ranges, suivis, vus: nVus, restants: candidats.length - lot.length, sansEmail };
 }
 
-// L'app (et tout lecteur) : le transporteur relu pour un bordereau, SEULEMENT s'il n'en a pas.
+// L'app ET le serveur (widget, rappels, bilan) : ce qui a été relu pour un bordereau
+// (son n° de transaction), SEULEMENT là où il n'a rien — un transporteur ou un n°
+// déjà rangé n'est jamais remplacé. `ligne` : { parTx } (null = pas lue ⇒ rien).
 export function transporteurRelu(bord, ligne) {
   if (!bord) return bord;
-  if (bord.transporteur) return bord;
   const tx = String(bord.transaction || '');
   const e = ligne && ligne.parTx && ligne.parTx[tx];
-  return e && typeof e.t === 'string' && e.t ? { ...bord, transporteur: e.t, transporteurSource: 'email-relu' } : bord;
+  if (!e || typeof e !== 'object') return bord;
+  let out = bord;
+  if (!bord.transporteur && typeof e.t === 'string' && e.t) out = { ...out, transporteur: e.t, transporteurSource: 'email-relu' };
+  if (!String(bord.suivi || '').trim() && typeof e.s === 'string' && /^\d{8}$/.test(e.s)) out = { ...out, suivi: e.s, suiviSource: 'email-relu' };
+  return out;
 }
+// La lecture légère de la ligne (aucun PDF, aucun texte) et la fusion d'une liste.
+export const REQ_RELUS = `app_data?id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx`;
+export const ligneRelueDe = (rows) => (Array.isArray(rows) && rows[0] && rows[0].parTx && typeof rows[0].parTx === 'object' ? { parTx: rows[0].parTx } : null);
+export const avecRelus = (bords, rows) => { const l = ligneRelueDe(rows); return Array.isArray(bords) && l ? bords.map((b) => transporteurRelu(b, l)) : bords; };

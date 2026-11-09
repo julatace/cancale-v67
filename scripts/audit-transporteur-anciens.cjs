@@ -15,7 +15,13 @@
 //   T3  idempotent : second passage ⇒ aucune écriture ;
 //   T4  borné : 25 candidats ⇒ 20, puis 5 (les plus récents d'abord) ;
 //   T5  lecture ratée (bordereaux, suivis, textes, ligne de rangement) ⇒ rien écrit ;
-//   T6  l'app (`transporteurRelu`) n'écrase jamais un transporteur rangé.
+//   T6  l'app (`transporteurRelu`) n'écrase jamais un transporteur ni un n° rangé ;
+//   T7  MONDIAL RELAY AU DÉPART, ancien bordereau sans n° : le n° Mondial Relay écrit
+//       dans le texte de SON e-mail (« N° de suivi : 8 chiffres », la règle de la
+//       réception) est relu ; l'e-mail de dépôt Mondial Relay du MÊME n° fait alors
+//       quitter « À envoyer » — la VRAIE route `api/widget.js` et la composition du
+//       cron (`lireDonneesColis` + `txsAExpedier`), règle partagée `depart-vente.js` ;
+//       deux n° différents, un n° coupé, un dépôt d'un autre n° ⇒ elle reste.
 //  Données inventées (dépôt public). `--prouve` : chaque mutation rougit.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -35,8 +41,13 @@ const MUTATIONS = {
   'lecture des textes ratée prise pour vide': [[LIB, "if (!Array.isArray(textes)) return { fait: false, raison: 'textes illisibles — rien écrit' };", "if (!Array.isArray(textes)) textes = [];"], [LIB, "const textes = cles.length", "let textes = cles.length"]],
   'ligne de rangement illisible prise pour vide': [[LIB, "if (memo === undefined) return { fait: false, raison: 'ligne de rangement illisible — rien écrit' };", ""]],
   'identité par autre chose que le n°': [[LIB, "emailsParTx.get(tx).push({ cle: m[1], sujet: r.sujet || '' });", "emailsParTx.get(tx).push({ cle: m[1], sujet: r.sujet || '' }); for (const [k, v] of emailsParTx) if (k !== tx) v.push({ cle: m[1], sujet: r.sujet || '' });"]],
-  'select=data sur les bordereaux': [[LIB, "select=id,tx:meta->>transaction,transporteur:meta->>transporteur,recu:meta->>receivedAt'", "select=id,data,tx:meta->>transaction,transporteur:meta->>transporteur,recu:meta->>receivedAt'"]],
-  'app qui écrase': [[LIB, "if (bord.transporteur) return bord;", ""]],
+  'select=data sur les bordereaux': [[LIB, "select=id,tx:meta->>transaction,transporteur:meta->>transporteur,suivi:meta->>suivi,recu:meta->>receivedAt'", "select=id,data,tx:meta->>transaction,transporteur:meta->>transporteur,suivi:meta->>suivi,recu:meta->>receivedAt'"]],
+  'app qui écrase': [[LIB, "if (!bord.transporteur && typeof e.t === 'string' && e.t)", "if (typeof e.t === 'string' && e.t)"]],
+  'n° rangé écrasé': [[LIB, "if (!String(bord.suivi || '').trim() && typeof e.s === 'string'", "if (typeof e.s === 'string'"]],
+  'n° coupé qui compte': [[LIB, "if (texteCoupe(e.texte) && l.fin >= s.length - 1) continue;", ""]],
+  'deux n° ⇒ le premier': [[LIB, "return lus.size === 1 ? [...lus][0] : '';", "return lus.size >= 1 ? [...lus][0] : '';"]],
+  'widget sans les n° relus': [['api/widget.js', "  return avecRelus(b, relus);", "  return b;"]],
+  'cron sans les n° relus': [['api/ship-reminders.js', "  return avecRelus(b, relus);", "  return b;"]],
   'cron qui ne la lance pas': [['api/ship-reminders.js', "transporteursAnciens = await passeTransporteursAnciens({", "transporteursAnciens = await (async () => null)({"]],
 };
 if (process.argv.includes('--prouve')) prouver(__filename, R, MUTATIONS);
@@ -109,6 +120,7 @@ global.fetch = async (url, opts = {}) => {
   for (const [k, v] of q.entries()) {
     if (!/^(data|meta)->/.test(k)) continue;
     if (v.startsWith('eq.')) sel = sel.filter((l) => String(chemin(l, k)) === v.slice(3));
+    if (v.startsWith('in.(')) { const s = new Set(v.slice(4, -1).split(',')); sel = sel.filter((l) => s.has(String(chemin(l, k)))); }
     if (v === 'is.null') sel = sel.filter((l) => chemin(l, k) == null);
     if (v === 'not.is.null') sel = sel.filter((l) => chemin(l, k) != null);
   }
@@ -232,6 +244,55 @@ function base() {
     const b = lib.transporteurRelu({ transaction: '1000001' }, ligne);
     const c = lib.transporteurRelu({ transaction: '1000002' }, ligne);
     dit(a.transporteur === 'chronopost' && b.transporteur === 'mondialrelay' && b.transporteurSource === 'email-relu' && !c.transporteur, 'T6 l\'app : un transporteur rangé n\'est jamais remplacé ; un relu ne vaut que pour SON n°', JSON.stringify([a, b, c]));
+    const l2 = { parTx: { '1000003': { s: '60385202' } } };
+    const d = lib.transporteurRelu({ transaction: '1000003', suivi: 'XW123456789TS' }, l2);
+    const e = lib.transporteurRelu({ transaction: '1000003', suivi: '' }, l2);
+    dit(d.suivi === 'XW123456789TS' && e.suivi === '60385202' && e.suiviSource === 'email-relu', 'T6 un n° de suivi rangé n\'est jamais remplacé ; un bordereau sans n° reçoit le n° relu', JSON.stringify([d, e]));
+  });
+
+  await essaie('T7', async () => {
+    if (!mod) throw new Error('route absente');
+    const H = 3600e3, NOW = Date.now(), iso = (ms) => new Date(ms).toISOString();
+    const vente = (tx) => ({ transaction_id: Number(tx), title: 'Salomon XT-6 42', status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: iso(NOW - 50 * H), price: { amount: '80.0', currency_code: 'EUR' } });
+    const TX = ['33000000001', '33000000002', '33000000003', '33000000004'];
+    const poser = () => {
+      LIGNES = [
+        { owner: OWNER, id: 'main', data: { vrm_widget_token: '', vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_bords_hidden: {}, vinted_accounts_hidden: [], vinted_pickup_done: {}, vrm_colis_collected: [], vrm_lbc_colis_done: {}, vrm_vc_colis_done: {}, vrm_vc_numeros: {}, vrm_vc_liens: {} } },
+        { owner: OWNER, id: 'harvest_U1_orders_sold', data: { capturedAt: iso(NOW - 40 * H), resume: { at: iso(NOW - 40 * H), txns: TX.map(Number) }, payload: { my_orders: TX.map(vente) } } },
+        { owner: OWNER, id: 'harvest_U1_orders_purchased', data: { capturedAt: iso(NOW - 40 * H), resume: { at: iso(NOW - 40 * H), txns: [] }, payload: { my_orders: [] } } },
+        { owner: OWNER, id: 'panel_bords_done', data: {} },
+      ];
+      // Quatre anciens bordereaux (d'avant le 9 nov. : ni n° ni transporteur rangés).
+      for (const tx of TX) LIGNES.push(sansTransporteur(bord(tx, { suivi: '', recu: iso(NOW - 48 * H) })));
+      // A : le texte de SON e-mail dit « N° de suivi : 60385202 », et Mondial Relay dit le dépôt de CE n°.
+      LIGNES.push(reception('m1', TX[0]), texte('m1', 'N° de transaction : ' + TX[0] + '\nN° de suivi : 60385202\nDépose ton colis dans un Point Relais Mondial Relay.'));
+      // B : deux e-mails du même n° de transaction qui ne disent pas le même n° ⇒ rien.
+      LIGNES.push(reception('m2', TX[1]), texte('m2', 'N° de suivi : 60385203\nMondial Relay.'), reception('m3', TX[1]), texte('m3', 'N° de suivi : 60385204\nMondial Relay.'));
+      // C : texte coupé PILE après 8 chiffres d'un n° plus long ⇒ rien.
+      LIGNES.push(reception('m4', TX[2]), texte('m4', ('Mondial Relay. ' + 'z'.repeat(1600)).slice(0, 1477) + ' N° de suivi : 60385205…'));
+      // D : son n° est relu, mais le dépôt Mondial Relay est celui d'un AUTRE n° ⇒ reste.
+      LIGNES.push(reception('m5', TX[3]), texte('m5', 'N° de suivi : 60385206\nMondial Relay.'));
+      const depot = (n) => ({ owner: OWNER, id: 'email_track_mondialrelay_' + n, data: { type: 'suivi', carrier: 'mondialrelay', suivi: n, status: 'transit', statusLabel: 'En transit', subject: `Votre colis ${n} est entre de bonnes mains`, receivedAt: iso(NOW - 20 * H), emailAt: iso(NOW - 20 * H), sens: 'sortant' } });
+      LIGNES.push(depot('60385202'), depot('60385203'), depot('60385205'), depot('60385299'));
+    };
+    const { contexteVendeur } = await import('file://' + path.join(R, 'api', '_lib', 'owner.js'));
+    const SR = mod;
+    const widget = async () => { const w = (await import('file://' + path.join(R, 'api', 'widget.js'))).default; const res = { code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, send() { return this; }, end() { return this; } }; await w({ method: 'GET', headers: {}, query: {} }, res); return res; };
+    const cron = async () => { const d = await contexteVendeur.run({ owner: OWNER }, () => SR._banc.lireDonneesColis()); const t = SR._banc.txsAExpedier(d); return t ? new Set([...t.vinted].map(String)) : null; };
+    poser(); APPELS = []; ECRITS = []; PANNE = () => false;
+    const w0 = await widget(), c0 = await cron();
+    dit(w0.corps && w0.corps.ship && w0.corps.ship.vinted === 4 && c0 && TX.every((t) => c0.has(t)), 'T7 avant la relecture : les 4 ventes Mondial Relay attendent leur envoi (widget et rappels)', JSON.stringify([w0.corps && w0.corps.ship, c0 && [...c0]]));
+    const b = bilan(await lancer());
+    const r = rangement();
+    dit(b && b.suivis === 2 && r && r.parTx[TX[0]] && r.parTx[TX[0]].s === '60385202' && r.parTx[TX[3]] && r.parTx[TX[3]].s === '60385206', 'T7 le n° Mondial Relay écrit dans l’e-mail de SON bordereau est relu (2 n°)', JSON.stringify([b, r && r.parTx]));
+    dit(r && !(r.parTx[TX[1]] && r.parTx[TX[1]].s) && !(r.parTx[TX[2]] && r.parTx[TX[2]].s), 'T7 deux n° différents, ou un n° qui touche la coupure du texte ⇒ aucun n° relu', JSON.stringify(r && r.parTx));
+    const w1 = await widget(), c1 = await cron();
+    dit(w1.corps && w1.corps.ship && w1.corps.ship.vinted === 3, 'T7 widget : la vente déposée chez Mondial Relay quitte « À envoyer » (3 restent)', JSON.stringify(w1.corps && w1.corps.ship));
+    dit(c1 && !c1.has(TX[0]) && c1.has(TX[1]) && c1.has(TX[2]) && c1.has(TX[3]), 'T7 rappels du matin et du soir : la même (seule la vente au n° déposé sort)', JSON.stringify(c1 && [...c1]));
+    PANNE = (m, u) => m === 'GET' && /id=eq\.vrm_bord_transporteurs/.test(u);
+    const c2 = await cron();
+    dit(c2 && c2.has(TX[0]), 'T7 ligne relue illisible ⇒ rien fusionné : la vente reste « à envoyer » (pas su ≠ parti)', JSON.stringify(c2 && [...c2]));
+    PANNE = () => false;
   });
 
   console.log(`\n${ko ? '❌' : '✅'} transporteur des anciens bordereaux : ${ok} vert(s), ${ko} rouge(s)`);
