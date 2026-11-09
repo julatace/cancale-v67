@@ -96,8 +96,13 @@ ailleurs).
   serveur prévenu une fois, second chargement sans feuille, « Revoir »), B (deux comptes,
   une feuille), C (geste après 10 min, mouvement réduit ⇒ aucune animation), D (aucune
   mémoire ⇒ point de départ, aucune feuille), E (mémoire en 503 ⇒ rien écrit, rien montré).
-- Sur origin/main : rouge (aucune feuille). Mutation : `aAccueillir` qui ignore
-  `accueilli` ⇒ « second chargement ⇒ aucune feuille » rouge.
+- Branche : **105 verts, 0 rouge**. Sur origin/main (7acdfc36, banc copié dans l'arbre
+  d'avant) : **25 rouges au moins** (aucune feuille ; la route ne connaît pas `comptes`).
+  Mutation `aAccueillir` qui ignore `accueilli` : **5 rouges** (la feuille revient au
+  second chargement, « Revoir » ne rouvre plus seul le compte relié).
+- Captures regardées (390/1512, clair/sombre, mouvement réduit) : la feuille attend la
+  fin de l'écran d'ouverture (`#vrm-demarrage`, sinon elle passait dessous) ;
+  l'interrupteur allumé était blanc sur blanc en sombre — corrigé.
 - Audits verts : variables, tdz, icones, boutons, violet, coherence, fonctions-api,
   identite, notifications (8 familles), compte-pas-relu, bilan-semaine, notifs-centre.
 
