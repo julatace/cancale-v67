@@ -210,7 +210,12 @@ export function fusionnerInventaire(serveur, local) {
   const anciens = liste.slice(1).filter((s) => Object.keys(s.saisies || {}).length).slice(0, MAX_ANCIENS);
   return { courant, anciens };
 }
-const memeContenu = (x, y) => JSON.stringify(normaliserInventaire(x)) === JSON.stringify(normaliserInventaire(y));
+// (9 nov.) Comparé SANS l'ordre des clés : une ligne relue après fusion porte les mêmes
+// saisies dans un autre ordre — sans ça, chaque rejeu (retour du réseau) réécrivait la
+// ligne pour rien (rev +1). Rejouer est maintenant sans effet quand rien n'a changé.
+const stable = (v) => (Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
+  : (estObjet(v) ? '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}' : JSON.stringify(v)));
+const memeContenu = (x, y) => stable(normaliserInventaire(x)) === stable(normaliserInventaire(y));
 
 // ── 5. L'ÉCRITURE : lire, fusionner, réécrire en comparer-et-échanger ─────────
 //   lire()   → { existe, data } | null/undefined (pas su : RIEN ne s'écrit)
