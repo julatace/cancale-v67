@@ -87,8 +87,24 @@ en vente », « Plus tard ».
   pour un titre ; `champsAvant` + `appliquerOp` ⇒ état exact ; confirmations remplacées
   absentes et branchées sur `gesteVrm` ; 11 confirmations extérieures/irréversibles
   toujours là ; `lancerActionRecherche` sans save/vmrCmd/fetch/impression).
-- Banc `scripts/bancs/annuler-commandes.cjs` (390 tactile et 1512) — voir le résultat
-  et les mutations dans le rapport de la session (section suivante).
+- Banc `scripts/bancs/annuler-commandes.cjs` (390 tactile et 1512, base à état `data->>rev`) :
+  **79 verts** (après le merge d'origin/main, PR #1074-#1078 comprises). R1 « Marquer
+  vendue » et R2 « Masquer cet achat » : aucune confirmation, la ligne part avant
+  l'écriture, PATCH de `main` conditionnel `rev=eq.N` ⇒ N+1, « Annuler » ⇒ valeur d'avant
+  exacte (même ligne, rev+1), rien d'autre ne bouge ; E1 ⌘K « imprimer » ⇒ feuille
+  « Tout imprimer » sans PDF lu, « Imprimer » ⇒ confirmation, « Annuler » ⇒ rien ; K1-K6
+  les actions, aucune écriture de ses données, aucun envoi /api, aucune commande à
+  l'extension. Captures regardées (`<tmp>/vrm-bancs/annuler-commandes/`).
+- Sur `origin/main` (archive, banc copié dedans) : **32 rouges** ; l'audit y tombe
+  (module absent). Mutations : « Annuler » qui repose la même valeur ⇒ 4 rouges R1 au
+  banc + C4b à l'audit ; « Colis à retirer » qui mène à « À envoyer » ⇒ K2 rouge au banc +
+  A13 à l'audit.
+- Bancs voisins : `recherche-fiche` tout vert ; `double-vente` : le délier passe (sans
+  dialogue), ses 8 rouges sont les MÊMES sur origin/main ; `gestes-annuler` : G3 rouge
+  aussi sur origin/main (bouton caché par le design), G1 parfois rouge des deux côtés —
+  une écriture `vrm_vu` (marqueur du jour, autre ligne) tombe pendant la mesure.
+- Audits verts : recherche-fiche 66/66, recherche-universelle 65/65, achats-a-relier,
+  fournisseurs, geste-annulable.
 - `npm run build`, audits variables, tdz, coherence, identite, statuts, icones,
   geste-annulable verts.
 
