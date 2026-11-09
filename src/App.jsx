@@ -73,6 +73,7 @@ import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
+import InfosSms from './InfosSms.jsx';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -4936,6 +4937,15 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
     // brouillons) : datée, et complète ou non. Seule une lecture complète prouve
     // qu'un brouillon n'y est plus (`src/brouillonsProposables.js`).
     _vrmBrLecture: lectureBrouillons(payload, isFinite(ts) ? ts : NaN) };
+};
+// (9 nov.) Les informations reçues par SMS sans identité (src/InfosSms.jsx) : lecture légère, et la
+// ligne de SES liaisons (`vrm_sms_liens`, écrite sur son clic seulement).
+const lireInfosSms = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+const ecrireLiensSms = async (data) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_sms_liens', data })) });
+    return !!r.ok;
+  } catch (_) { return false; }
 };
 // (9 nov.) Ce que l'étiquette (PDF) de chaque vente nomme, relu au cron : { tx: { t, s? } } (null = pas lu).
 let _pdfEtiquettes = null;
@@ -19320,6 +19330,9 @@ const raisonAVerifier = (x) => {
   }
   // (3 nov.) Annoncé par Vinted, au même relais qu'un colis du transporteur, sans identité commune.
   // (6 nov.) Un SMS de Mondial Relay que VRM ne sait pas encore lire (seul son n° est gardé).
+  // (9 nov.) Chronopost (forme pas encore mesurée) et Vinted Go (code pas encore relié à un colis) aussi.
+  if (x.e.etat==='sms_inconnu' && x.t && x.t.carrier === 'vinted' && x.t.code) return `SMS Vinted Go : code ${x.t.code} pas encore relié à un de tes colis${x.t.limite ? ` — à retirer avant le ${new Date(String(x.t.limite).slice(0,10)+'T12:00:00Z').toLocaleDateString('fr-FR',{day:'numeric',month:'short',timeZone:'Europe/Paris'})}` : ''}`;
+  if (x.e.etat==='sms_inconnu' && x.t && x.t.carrier === 'chronopost') return "SMS de Chronopost pas encore reconnu : regarde le SMS ou le site Chronopost";
   if (x.e.etat==='sms_inconnu') return "SMS de Mondial Relay pas reconnu : regarde le SMS ou l'app Mondial Relay";
   if (x.e.etat==='doute_meme_relais') return "peut-être le même colis qu'un autre e-mail de ce relais — rien ne les relie";
   if (x.e.etat==='delai_depasse' && x.e.heurePassee && x.e.limiteAt) return `délai de retrait passé aujourd'hui à ${heureParis(x.e.limiteAt)}`;
@@ -29736,7 +29749,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // rangé avec son n° seul. Ni « à retirer » (rien ne prouve l'arrivée), ni caché : « à vérifier »,
       // sauf si une autre ligne du même n° dit déjà où il en est (disponible, retiré, reparti).
       if (t && t.source === 'sms' && t.smsAVerifier && t.status === 'info') {
-        const k = suiviDeLigne(t);
+        // (9 nov.) Un SMS Vinted Go n'a pas de n° : son CODE de retrait est son identité (api/_lib/sms-vintedgo.js).
+        const k = suiviDeLigne(t) || (t.code ? 'code:' + String(t.code).toUpperCase() : '');
         if (!k || nDispoEmail.has(k) || nJuges.has(k) || (collected && collected.has(colisKey(t))) || sortiParSuivi(t, fins)) continue;
         nJuges.add(k); aVerifier.push({ kind: 'email', t, e: { etat: 'sms_inconnu' }, o: commandeDuColis(t) }); continue;
       }
@@ -43838,6 +43852,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             })()}
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
+            {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
+            {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} /> : null}
             {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
                 <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton>
