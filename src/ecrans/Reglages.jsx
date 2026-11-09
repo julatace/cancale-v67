@@ -1260,6 +1260,32 @@ function BilanMoisSetting() {
   );
 }
 
+// (8 nov.) « M'envoyer un e-mail d'essai » : pour voir un VRAI e-mail de VRM dans sa
+// boîte. Sur SON clic, à l'adresse de SON compte (le serveur la lit, jamais l'écran),
+// 3 par heure (api/_lib/mail-essai.js). L'issue est dite telle quelle : envoyé ·
+// peut-être parti · rien n'est parti (et pourquoi).
+function MailEssaiSetting() {
+  const [etat, setEtat] = useState(null);   // null · 'envoi' · { ok, texte }
+  const envoyer = async () => {
+    if (etat === 'envoi') return; setEtat('envoi');
+    try {
+      const x = await fetch('/api/compte?mode=mail-essai', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await x.json().catch(() => null);
+      if (j && j.ok) setEtat({ ok: 'envoye', texte: `Envoyé à ${j.a}. Regarde ta boîte de réception dans une minute.` });
+      else setEtat({ ok: j && j.issue === 'incertain' ? 'incertain' : 'refuse', texte: (j && j.message) || 'Rien n’est parti : le serveur n’a pas répondu. Réessaie dans un instant.' });
+    } catch (_) { setEtat({ ok: 'refuse', texte: 'Rien n’est parti : pas de réseau. Réessaie quand tu as du réseau.' }); }
+  };
+  return (
+    <div data-mail-essai={etat && etat !== 'envoi' ? etat.ok : etat === 'envoi' ? 'envoi' : 'pret'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-ligne">
+        <span className="vrm-np-lib">Voir un e-mail de VRM<small>Un e-mail d’essai, à l’adresse de ton compte. Trois par heure au plus.</small></span>
+        <Bouton variante="secondaire" className="vrm-b-petit" disabled={etat === 'envoi'} onClick={envoyer}>{etat === 'envoi' ? 'Envoi…' : 'M’envoyer un e-mail d’essai'}</Bouton>
+      </div>
+      {etat && etat !== 'envoi' ? <div className="vrm-np-relance" role="status" style={{paddingTop:6}}>{etat.texte}</div> : null}
+    </div>
+  );
+}
+
 // (3 nov., 5 nov.) Sept types, un interrupteur chacun (api/_lib/notif-textes.js, la
 // règle que le serveur applique avant d'envoyer). Les anciennes catégories
 // fines restent lues comme réglage d'avant tant qu'une famille n'est pas posée.
@@ -1735,7 +1761,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
-        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/></> },
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
