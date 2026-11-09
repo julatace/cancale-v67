@@ -3,6 +3,9 @@
 import './stylesApp.js';
 import ChampSaisie from './composants/ChampSaisie.jsx';
 import ChoixPlateformes from './ChoixPlateformes.jsx';
+import ConfigurationDepart from './ConfigurationDepart.jsx';
+import { CLE_CONFIGURATION, CLE_METHODE_NUMERO, lireConfiguration, configurationAOuvrir } from './configurationDepart.js';
+import { CLE_SOCIETE_TVA, cotisationsUrssaf, profilFiscal, rappelDac7Journee } from './profilFiscal.js';
 import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './plateformesAffichage.js';
 
 import {lireBordereauVestiaire} from './bordereauVestiaire.js';
@@ -2382,6 +2385,10 @@ const SYNC_KEYS = [
   'vrm_numero_ecrit',
   // (8 nov.) Affichage Simple / Complet et « Je vends : Sneakers / Autre » (src/profilVendeur.js) : { choix, at }.
   'vrm_affichage','vrm_je_vends',CLE_PLATEFORMES,
+  // (9 nov.) La configuration de départ (src/configurationDepart.js) : { etat: 'fait'|'plusTard', at,
+  // statut: 'inconnu'|null } ; la TVA d'une société (src/profilFiscal.js) ; la méthode d'étiquetage
+  // (`vrm_methode_numero`, clé à confirmer avec la branche claude/numero-etiquette).
+  CLE_CONFIGURATION, CLE_SOCIETE_TVA, CLE_METHODE_NUMERO,
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
@@ -6850,7 +6857,9 @@ const REGIMES_FISCAUX = [
 ];
 const regimeValide = (r) => REGIMES_FISCAUX.some((x) => x[0] === r) ? r : null;
 const regimeFiscal = () => regimeValide(load('vinted_regime', null));
-const urssafConcerne = (r = regimeFiscal()) => r === 'micro';
+// (9 nov.) LA règle vit dans src/profilFiscal.js (`cotisationsUrssaf`) : Comptabilité,
+// Ma journée, Statistiques et la configuration de départ lisent la même.
+const urssafConcerne = (r = regimeFiscal()) => cotisationsUrssaf(r);
 const libelleRegime = (r) => (REGIMES_FISCAUX.find((x) => x[0] === r) || [])[1] || 'Statut pas encore choisi';
 // Trois états, comme tout réglage synchronisé : `undefined` tant que le nuage
 // n'est pas arrivé (on ne cache ni ne montre rien sur un « pas su »), puis le
@@ -18242,7 +18251,7 @@ function GuideDemarrageApp(props) {
   if (exempleActif()) return null;
   const sansVinted = Array.isArray(profil.plateformes) && !profil.plateformes.includes('vinted');
   const aRelier = sansVinted ? profil.plateformes.filter(id => profil.relies[id] !== true) : [];
-  return <><PlateformesSetting initial/>{sansVinted
+  return <><ReprendreConfiguration/>{sansVinted
     ? aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null
     : props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>}</>;
 }
@@ -18264,6 +18273,57 @@ function PlateformesSetting({ initial = false }) {
     onChoix={sites => new Promise((resolve, reject) => { save(CLE_PLATEFORMES, { sites, at: new Date().toISOString() }, ok => { if (!ok) { reject(new Error('stockage')); return; } maj(); toast('Choix conservé sur cet appareil. La synchronisation suit son état habituel.'); resolve(); }); })}/>;
 }
 export { PlateformesSetting };
+// ── MA CONFIGURATION, BRANCHÉE (9 nov.) ─────────────────────────────────────
+// Ce que l'écran plein écran reçoit : les clés TELLES QU'ENREGISTRÉES (rien
+// d'interprété ici, src/configurationDepart.js pré-sélectionne), la ligne
+// `push_prefs` LUE (trois états), et l'écriture : `save` rend son issue locale
+// (`quand(ok)`), la ligne des notifications est réécrite entière, comme dans
+// Réglages → Notifications. Un refus n'avance pas l'étape.
+async function ecrirePushPrefs(next) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([withOwner({ id: 'push_prefs', data: next })]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+}
+function ConfigurationDepartApp({ onFin }) {
+  const p = useProfilVendeur();
+  const lus = React.useMemo(() => ({
+    jeVends: load(CLE_JE_VENDS, null), plateformes: load(CLE_PLATEFORMES, null), regime: load('vinted_regime', null),
+    microOptions: load('vrm_micro_options', null), rythme: load('vinted_urssaf_freq', null), tauxBrut: load('vinted_urssaf_taux', null),
+    societeTva: load(CLE_SOCIETE_TVA, null), numeroEcrit: load(CLE_NUMERO_ECRIT, null), methodeNumero: load(CLE_METHODE_NUMERO, null),
+    affichage: load(CLE_AFFICHAGE, null), configuration: load(CLE_CONFIGURATION, null),
+  }), []);
+  const ecrire = React.useCallback((liste) => Promise.all((liste || []).map((w) => w.ligne
+    ? ecrirePushPrefs(w.valeur)
+    : new Promise((res) => save(w.cle, w.valeur, (ok) => res(ok !== false))))).then((r) => r.every(Boolean)), []);
+  const fermer = () => { if (!lireConfiguration(load(CLE_CONFIGURATION, null))) save(CLE_CONFIGURATION, { etat: 'plusTard', at: new Date().toISOString(), statut: null, version: 1 }); onFin && onFin('plusTard'); };
+  return <><FermeAuRetour fermer={fermer}/><ConfigurationDepart lus={lus} relies={p.relies || {}} lirePushPrefs={() => lireReglage('push_prefs')} ecrire={ecrire} onFin={(etat) => { toast(etat === 'fait' ? 'Ta configuration est enregistrée.' : 'Tes choix sont gardés. Tu peux reprendre dans Réglages → Ma configuration.'); onFin && onFin(etat); }}/></>;
+}
+// La carte de Ma journée qui RAMÈNE à la configuration (elle remplace la question
+// « Où vends-tu ? » posée ici avant le 9 nov.) : seulement si elle a été mise de côté,
+// ou jamais faite ni le choix des plateformes (un propriétaire, qui n'est pas interrompu).
+function ReprendreConfiguration() {
+  const [, maj] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || k === CLE_CONFIGURATION || k === CLE_PLATEFORMES) maj(); };
+    window.addEventListener('vrm:save', f);
+    const off = onCloudReady(maj);
+    return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
+  }, []);
+  if (!isCloudReady()) return null;
+  const conf = lireConfiguration(load(CLE_CONFIGURATION, null));
+  const aReprendre = conf ? conf.etat === 'plusTard' : !lirePlateformes(load(CLE_PLATEFORMES, null));
+  if (!aReprendre) return null;
+  return <section className="vrm-choix-plateformes" data-reprendre-configuration={conf ? 'plustard' : 'jamais'} aria-label="Ma configuration">
+    <h2 style={{fontSize:19,letterSpacing:-0.4,margin:'0 0 5px'}}>{conf ? 'Termine ta configuration' : 'Configure VRM'}</h2>
+    <p className="vrm-cp-note">Ce que tu vends, tes plateformes, ton statut, ton numéro : deux minutes, et VRM s’adapte à toi.</p>
+    <Bouton variante="primaire" data-configuration-ouvrir="" onClick={() => { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }}>{conf ? 'Reprendre' : 'Commencer'}</Bouton>
+  </section>;
+}
 // (8 nov.) La première vente : le compteur `nItems` des listes de ventes Vinted
 // (un scalaire par compte, jamais `select=data`) ; échec ⇒ `null`, jamais « aucune ».
 function useVentesGuide(actif, version = 0) {
@@ -49870,6 +49930,23 @@ function AppCoeur() {
     return ()=>{ vivant=false; clearTimeout(t); if(typeof stop==='function') stop(); };
   },[premierJour,bienvenue]);
   useEffect(()=>{ const o=()=>setVisite(true); window.addEventListener('vrm:visite',o); return ()=>window.removeEventListener('vrm:visite',o); },[]);
+  // (9 nov.) MA CONFIGURATION (src/ConfigurationDepart.jsx, règle src/configurationDepart.js) :
+  // plein écran, une fois au premier lancement — nuage lu, base qui répond, jamais pendant
+  // Bienvenue, jamais en mode exemple, jamais pour le propriétaire de l'installation (« pas su »
+  // ⇒ on n'ouvre pas), et seulement si ni la configuration ni le choix des plateformes n'a
+  // jamais été fait. Rejouable : Réglages → « Ma configuration », la carte de Ma journée
+  // (évènement `vrm:configuration`). La visite et les conseils attendent qu'elle soit fermée.
+  const [configOuverte,setConfigOuverte]=useState(false);
+  useEffect(()=>{
+    if(bienvenue||!accountsLoaded||baseKO) return undefined;
+    let vivant=true;
+    const stop=onCloudReady(()=>{ lireProprietaire().then((proprio)=>{
+      if(!vivant) return;
+      if(configurationAOuvrir({ pret:true, baseKO, exemple:exempleActif(), bienvenue, proprietaire:proprio, configuration:load(CLE_CONFIGURATION,null), plateformes:load(CLE_PLATEFORMES,null) })) setConfigOuverte(true);
+    }).catch(()=>{}); });
+    return ()=>{ vivant=false; if(typeof stop==='function') stop(); };
+  },[bienvenue,accountsLoaded,baseKO]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{ const o=()=>setConfigOuverte(true); window.addEventListener('vrm:configuration',o); return ()=>window.removeEventListener('vrm:configuration',o); },[]);
 
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   // (29 oct., revue) Le point « nouveau » de l'onglet Messages suit le geste
@@ -52628,12 +52705,13 @@ function AppCoeur() {
       {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark} vend={vendActuel()} ouInstaller={ouExtensionIci()}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
         onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/></GardeEcran>}
-      {visite && !bienvenue && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}
+      {configOuverte && !bienvenue && <GardeEcran nom="configuration" feuille onFermer={()=>setConfigOuverte(false)}><ConfigurationDepartApp onFin={()=>{ setConfigOuverte(false); if(tab!=='journee'&&!load(CLE_VISITE,null)) setTab('journee'); }}/></GardeEcran>}
+      {visite && !bienvenue && !configOuverte && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}
         onTerminer={(raison)=>{ setVisite(false); if(raison!=='rien') save(CLE_VISITE,{at:new Date().toISOString(),fin:raison}); }}/></GardeEcran>}
       {/* (6 nov.) L'ACCOMPAGNEMENT (src/Conseils.jsx) : une bulle au plus, jamais pendant
           Bienvenue ni la visite (ni pour une personne neuve qui ne l'a pas encore vue). */}
       <GardeEcran nom="conseils"><Conseils ecran={tab} lire={lireLigneAccompagnement} ecrire={ecrireLigneAccompagnement} z={8500}
-        contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi, vend: PROFIL_VENDEUR.vend || vendActuel() }}
+        contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || configOuverte || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi, vend: PROFIL_VENDEUR.vend || vendActuel() }}
         onEchec={(m)=>toast(m)}
         onAction={(a)=>{ if(String(a).startsWith('reglages:')){ DEMANDE_REGLAGE_SOUS.id=String(a).slice(9); if(tab==='settings'){ try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } else setTab('settings'); } }}/></GardeEcran>
       {/* (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS (src/CompteRelie.jsx) : la feuille, une fois par
@@ -52641,7 +52719,7 @@ function AppCoeur() {
           ni en mode exemple, hors ligne ou base injoignable ; rattrapable dans Comptes liés. */}
       <GardeEcran nom="compte-relie"><Suspense fallback={null}><AccueilComptesReliesParesseux comptesVinted={vintedAccounts}
         pret={!!accountsLoaded && nuagePret && !baseKO && !horsLigne && !exempleActif() && !!(authState.user && authState.user.id)}
-        silence={!!(bienvenue || visite)} onNav={setTab}/></Suspense></GardeEcran>
+        silence={!!(bienvenue || visite || configOuverte)} onNav={setTab}/></Suspense></GardeEcran>
       {/* Les chiffres que la COQUE publie pour les conseils (la même règle que leurs bandeaux). */}
       {ordi ? <ChiffreConseilExtension/> : <ChiffreConseil cle="coque.iphone" valeur={estIphoneSafari() ? (estInstallee() ? 'installee' : 'a-installer') : 'autre'}/>}
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>

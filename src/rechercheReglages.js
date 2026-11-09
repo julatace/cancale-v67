@@ -7,6 +7,7 @@ const termes={
  zoom:'taille lisibilite affichage agrandir reduire ecran',
  stream:'confidentialite flouter discretion cacher pseudo montants prix oeil masquer video filmer marques mots',
  'stream-on':'stream confidentialite flouter cacher montants oeil filmer',
+ configuration:'configuration demarrage depart personnaliser plateformes statut regime numero etiquetage affichage notifications',
  regime:'regime fiscal statut urssaf micro entreprise societe particulier taux',
  connexions:'etat extension synchro capture relu relecture fraicheur connexion',
  securite:'securite donnees acces protection',
