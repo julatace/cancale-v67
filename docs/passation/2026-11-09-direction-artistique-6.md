@@ -95,4 +95,7 @@ instantanée…), `npm run build`, un banc à la fois :
   (`.vrm-fu-objectif`) n'est rendue que si un objectif est posé ; un anneau demanderait du JSX (SVG).
 - Les écrans Leboncoin / eBay / Vestiaire, Stock, Statistiques, E-mails héritent des pilules, du sol et des
   rayons, mais n'ont pas été capturés un par un (base inventée sans comptes reliés).
+- Messages et Réglages changent PEU (chevrons, rayons, pilules) : ils étaient déjà en groupes iOS. Le
+  saut visible est sur les écrans à carte sombre (Ma journée, Ventes, Colis, Annonces, Achats, Compta).
+- Ma journée à l'ordinateur : bento en deux colonnes (une large, puis deux) dans la colonne de gauche.
 - Nettoyage des anciennes couches (fusion, finition, visuel…) toujours à faire.
