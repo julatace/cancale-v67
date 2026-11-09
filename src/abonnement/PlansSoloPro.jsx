@@ -167,11 +167,12 @@ export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
 }
 
 // Les deux offres côte à côte (Paramètres → Abonnement). `x` : la réponse du serveur.
-export function OffresSoloPro({ x, prixSolo, prixProAffiche, onChoisirPro, onChoisirSolo, occupe }) {
+export function OffresSoloPro({ x, prixSolo, prixActuel, prixProAffiche, onChoisirPro, onChoisirSolo, occupe }) {
   const plan = x && x.plan;
   const pro = (x && x.offres && x.offres.pro) || { ouvert: false };
-  const texteSolo = (x && x.offres && x.offres.solo && x.offres.solo.texte) || prixSolo;
-  const textePro = pro.ouvert && pro.texte ? pro.texte : prixProAffiche;
+  // Le prix de SON offre est celui de SON abonnement (lu chez Stripe), jamais celui du moment.
+  const texteSolo = (plan === 'solo' && prixActuel) || (x && x.offres && x.offres.solo && x.offres.solo.texte) || prixSolo;
+  const textePro = (plan === 'pro' && prixActuel) || (pro.ouvert && pro.texte ? pro.texte : prixProAffiche);
   return (
     <div className="vrm-plan-offres" data-offres="" data-plan={plan || 'pas-su'} data-pro-ouvert={pro.ouvert ? '' : undefined}>
       <div className="vrm-plan-offre" data-offre="solo" data-offre-actuelle={plan === 'solo' ? '' : undefined}>

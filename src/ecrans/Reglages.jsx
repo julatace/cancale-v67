@@ -2677,9 +2677,10 @@ function MonAbonnement() {
   const PRO_AFFICHE = `${PRIX_PRO_MOIS} € / mois`;
   const groupeOffres = (
     <div data-groupe-offres="">
-      <OffresSoloPro x={e} prixSolo={prixLisible(e && e.prix)} prixProAffiche={PRO_AFFICHE} occupe={occupe}
+      {/* Les offres ne se montrent qu'à un plan SÛR : un ancien prix (9,99 €…) ou un prix pas lu n'affiche jamais le prix du moment à côté du sien. */}
+      {e && (e.plan === 'solo' || e.plan === 'pro') && <OffresSoloPro x={e} prixSolo={prixLisible(e && e.prix)} prixActuel={et.prixAbonnement} prixProAffiche={PRO_AFFICHE} occupe={occupe}
         onChoisirPro={e && e.plan === 'solo' ? () => changerOffre('pro') : null}
-        onChoisirSolo={e && e.plan === 'pro' && !e.proprietaire ? () => changerOffre('solo') : null}/>
+        onChoisirSolo={e && e.plan === 'pro' && !e.proprietaire ? () => changerOffre('solo') : null}/>}
       {e && e.plan === 'solo' && (
         <GroupeIos titre="Le compte qui vend" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Tes autres comptes restent des comptes d’achat. Changement possible une fois tous les 30 jours.'}>
           <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Pas encore choisi</span>}
