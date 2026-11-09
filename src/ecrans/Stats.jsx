@@ -1570,7 +1570,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
                       if (!brutComptes || (c.plat !== 'Vinted' && comptes.filter((x) => x.plat === c.plat).length > 1)) return null;
                       const bc = brutComptes[cleBrutCompte(c.plat, c.k.split('|').slice(1).join('|'))];
                       const v = bc && bc.brut != null ? bc.brut : null;
-                      return <span className="vrm-sv-brut-compte" data-benef-notion="brut" data-benef-valeur={v == null ? '' : String(Math.round(v * 100))} data-sv-brut-couv={bc ? `${bc.nCout}/${bc.n}` : '0/0'} title={bc ? `${NOM_BENEFICE_BRUT} : ventes finalisées au prix d’achat connu, ${bc.nCout} sur ${bc.n}` : 'aucune vente finalisée sur la période'}>{' · '}brut {v == null ? '—' : fmt(v)}{bc && bc.n && bc.nCout < bc.n ? ` · ${bc.nCout} sur ${bc.n}` : ''}</span>; })()}</span>
+                      return <span className="vrm-sv-brut-compte" data-benef-notion="brut" data-benef-valeur={v == null ? '' : String(Math.round(v * 100))} data-sv-brut-couv={bc ? `${bc.nCout}/${bc.n}` : '0/0'} title={bc ? `${NOM_BENEFICE_BRUT} : ventes finalisées au prix d’achat connu, ${bc.nCout} sur ${bc.n}` : 'aucune vente finalisée sur la période'}>brut {v == null ? '—' : fmt(v)}{bc && bc.n && bc.nCout < bc.n ? ` · ${bc.nCout} sur ${bc.n}` : ''}</span>; })()}</span>
                     <span className="vrm-sv-chiffre" title={c.plat === 'Vinted' ? (c.mediane == null ? 'aucune vente datée' : `délai médian, sur ${pl(c.nDelai, 'vente datée', 'ventes datées')}`) : 'pas de date de mise en ligne sur cette plateforme'}>{jours(c.mediane)}</span>
                   </div>
                 ))}

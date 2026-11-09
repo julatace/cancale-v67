@@ -205,7 +205,7 @@ const gestes=(pg)=>pg.evaluate(()=>[...document.querySelectorAll('[data-qd-choix
         await aller(pg,'journee','[data-job]',3000);
         await pg.waitForSelector('[data-job="paires-dorment"]',{timeout:20000}).catch(()=>{});
         const c=await pg.evaluate(()=>{ const e=document.querySelector('[data-job="paires-dorment"]'); return e?{ n:e.getAttribute('data-n'), texte:e.innerText.replace(/\s+/g,' ') }:null; });
-        dit(c && c.n==='2' && /2 (paires|articles) en ligne depuis 30 j ou plus/.test(c.texte),'la carte « 2 paires en ligne depuis 30 j ou plus »',c&&JSON.stringify(c));
+        dit(c && c.n==='2' && /2 (paires|articles) en ligne depuis 30\s?j ou plus/.test(c.texte),'la carte « 2 paires en ligne depuis 30 j ou plus »',c&&JSON.stringify(c));
         const casesDort=await pg.locator('[data-tendance="dort"]').count();
         dit(casesDort===0,'le même nombre n’est pas redit dans Tendances',String(casesDort));
         await captureEl(pg,'[data-job="paires-dorment"]',`journee-dorment-${suf}`);
