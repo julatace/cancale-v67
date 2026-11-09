@@ -19,9 +19,9 @@ libère son numéro (le dire ici).
 | A | Ma journée instantanée + objectif du mois | PR #1074 | **en ligne** |
 | B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | `claude/annuler-commandes` | en cours |
 | C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | à lancer |
-| D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | `claude/hors-ligne-relie` | à lancer |
+| D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | `claude/hors-ligne-relie` | en cours |
 | E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | **fini, à intégrer** (`2026-11-09-solo-plateformes.md`, migration 030) |
-| F | prix plancher sous chaque offre + « déjà N paires de ce modèle » | `claude/plancher-stock` | à lancer |
+| F | prix plancher sous chaque offre + « déjà N paires de ce modèle » | PR #1079 | **en ligne** |
 | G | jauge 50 actions/h + journal « ce que VRM a fait » (ext. 5.337) | `claude/jauge-journal` | à lancer |
 | H | échéances .ics + alerte « nouvel appareil » (12 fonctions api au plus) | `claude/ics-appareil` | à lancer |
 | I | délais de litige (forme à mesurer par Julien) + marge par plateforme | `claude/litiges-marge` | à lancer |
@@ -48,7 +48,7 @@ libère son numéro (le dire ici).
 
 | — | transporteurs inconnus (PDF du bordereau, identité) + e-mails Vestiaire et Chronopost mieux lus (demandes de Julien) | PR #1074 | **en ligne** |
 
-| — | colis à retirer : relecture fréquente, retirés jamais montrés, carte = onglet (plainte de Julien) | `claude/retraits-frais` | en cours |
+| — | colis à retirer : relecture fréquente, retirés jamais montrés, carte = onglet (plainte de Julien) | PR #1079 | **en ligne** |
 | — | direction artistique 6 : refonte VISIBLE « Widgets » (« il n'y a pas un grand changement ») | `claude/direction-artistique-6` | en cours |
 | — | plus de balayage entre onglets ; vues Vinted à 0 = pas su | PR #1074 | **en ligne** |
 
