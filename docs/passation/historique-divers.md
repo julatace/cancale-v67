@@ -1082,3 +1082,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration transporteurs/Solo)
 - **9 nov. · Achats prêts à confirmer + export comptable** : saisie en série « Payé sur Vinted : 85,40 € » (reçu juste) ou « Article seul » — Garder / Corriger / Tout garder (confirmé), seulement par identité, rien écrit sans son clic ; Compta → « Exporter pour mon comptable » (mois/trimestre/année, CSV Excel + PDF 1 page : ventes datées au versement, à dater à part, achats au coût saisi, CA = ligne publiée, URSSAF seulement si micro). `src/exportComptable.js`, `docs/passation/2026-11-09-achats-export.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration journée instantanée)
+- **9 nov. · Direction artistique 2 (à valider)** : une grammaire de rangée (vignette 44, N° à largeur fixe, titre 1 ligne, sous-ligne, colonnes fixes, montant à droite) sur Colis, Ventes, Ma journée, Annonces, Achats, Messages ; en-tête unique et barre de recherche pleine. `docs/passation/2026-11-08-direction-artistique-2.md`. Branche `claude/direction-artistique-2`. Geste : regarder les planches.

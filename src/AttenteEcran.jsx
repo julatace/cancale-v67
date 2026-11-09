@@ -22,11 +22,19 @@
 //      lectures, src/memoireEcrans.js) et se complète en place.
 //  Tant qu'un écran attend, son squelette porte `data-demarrage-attente` : à
 //  l'ouverture de l'app, l'écran de démarrage (src/demarrage.js) reste devant.
+//  (9 nov., Julien : « Ma journée affichée tout de suite ») Un écran qui a un
+//  INSTANTANÉ (`instantane` : les derniers chiffres rendus sur CET appareil, pour
+//  CE compte — src/journeeInstantanee.js) le montre À LA PLACE du squelette, sans
+//  `data-demarrage-attente` (l'écran de démarrage s'en va), et n'ouvre l'écran vrai
+//  que quand ses données sont TOUTES là (`tout`), ou au plafond long
+//  (`plafondInstantaneMs`). L'instantané est inerte : aucun geste n'en part.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { Squelette } from './Squelette.jsx';
 
 export const PLAFOND_ATTENTE_MS = 2500;
+// Avec un instantané à montrer, l'écran vrai attend ses données jusqu'à ce plafond.
+export const PLAFOND_INSTANTANE_MS = 20000;
 const Ctx = React.createContext(null);
 // (6 nov., v36-raccords) L'écran est-il MONTRÉ ? Faux tant qu'il attend (monté, caché) :
 // un conseil (src/Conseils.jsx) ne se décide pas sur un écran que personne ne voit encore.
@@ -51,13 +59,19 @@ export function useAttentePlafond() {
   const ctx = React.useContext(Ctx);
   return !!(ctx && ctx.plafond);
 }
+// (9 nov.) Toutes les données essentielles de l'écran sont là (pas seulement le plafond) :
+// c'est le seul moment où un instantané peut être pris. Hors d'une attente : faux.
+export function useAttenteComplete() {
+  const ctx = React.useContext(Ctx);
+  return !!(ctx && ctx.tout);
+}
 
 // Les écrans déjà OUVERTS avec leurs données dans cette page (par vendeur) : y revenir
 // ne remonte pas le squelette — l'écran revient avec ce qu'il a en mémoire et se
 // complète en place (les lectures en cache se reposent dans les millisecondes qui suivent).
 const VUS = new Set();
 
-export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = false, plafondMs = PLAFOND_ATTENTE_MS, memoire = '', children }) {
+export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = false, plafondMs = PLAFOND_ATTENTE_MS, memoire = '', instantane = null, plafondInstantaneMs = PLAFOND_INSTANTANE_MS, children }) {
   const recus = React.useRef({});
   const [, rafraichir] = React.useState(0);
   const [plafond, setPlafond] = React.useState(false);
@@ -86,18 +100,24 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   React.useLayoutEffect(() => { if (visible && !ouvert) setOuvert(true); }, [visible, ouvert]);
   // Ouvert par ses données (pas par le plafond) : la prochaine fois, il revient sans squelette.
   React.useEffect(() => { if (tout && attendus.length) VUS.add(cleVu); }, [tout, cleVu, attendus.length]);
-  if (!visible) aAttendu.current = true;
+  // L'instantané n'est montré que tant que l'écran n'a jamais été ouvert : une fois ouvert, il le reste.
+  const avecInstantane = !!instantane && !ouvert;
+  const vuInstantane = React.useRef(false);
+  if (!visible && avecInstantane) vuInstantane.current = true;
+  if (!visible && !avecInstantane) aAttendu.current = true;
   React.useEffect(() => {
     if (ouvert) return undefined;
-    const t = setTimeout(() => setPlafond(true), plafondMs);
+    const t = setTimeout(() => setPlafond(true), avecInstantane ? Math.max(plafondMs, plafondInstantaneMs) : plafondMs);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ouvert]);
-  const ctx = React.useMemo(() => ({ signaler, oublier, plafond }), [signaler, oublier, plafond]);
+  }, [ouvert, avecInstantane]);
+  const ctx = React.useMemo(() => ({ signaler, oublier, plafond, tout }), [signaler, oublier, plafond, tout]);
   const manquent = visible ? [] : attendus.filter((n) => !la(n));
-  return <div className="vrm-attente" data-attente={visible ? (tout ? 'pret' : 'plafond') : 'attente'} data-attente-ecran={ecran} data-attente-manque={manquent.join(' ') || undefined}>
-    {!visible && <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>}
-    <div className={visible ? (aAttendu.current ? 'vrm-attente-pret' : undefined) : 'vrm-attente-cache'} aria-hidden={visible ? undefined : 'true'}>
+  return <div className="vrm-attente" data-attente={visible ? (tout ? 'pret' : 'plafond') : (avecInstantane ? 'instantane' : 'attente')} data-attente-ecran={ecran} data-attente-manque={manquent.join(' ') || undefined} data-attente-instantane={vuInstantane.current ? '1' : undefined}>
+    {/* L'instantané prend le cadre de l'écran prêt (`vrm-attente-pret` : mêmes marges), sans fondu. */}
+    {!visible && (avecInstantane ? <div className="vrm-attente-pret vrm-attente-sans-fondu" data-attente-instantane-cadre="">{instantane}</div> : <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>)}
+    {/* Remplacé EN PLACE : après un instantané, l'écran vrai arrive sans fondu (rien ne « réapparaît »). */}
+    <div className={visible ? (vuInstantane.current ? 'vrm-attente-pret vrm-attente-sans-fondu' : aAttendu.current ? 'vrm-attente-pret' : undefined) : 'vrm-attente-cache'} aria-hidden={visible ? undefined : 'true'}>
       <Ctx.Provider value={ctx}><VisibleCtx.Provider value={visible}>{children}</VisibleCtx.Provider></Ctx.Provider>
     </div>
   </div>;

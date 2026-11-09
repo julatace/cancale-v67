@@ -1,0 +1,59 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MA JOURNÉE TOUT DE SUITE (9 nov.) — l'instantané et la barre de l'objectif.
+   L'instantané reprend les classes de la tête de Ma journée (la place ne bouge pas
+   au remplacement) ; ce fichier n'ajoute que ce qui le DIT ancien : la mention
+   « Mis à jour il y a N min » à la place de « Modifier », des chiffres un ton plus
+   doux, et le geste « Vérification… » sans accent. Détail :
+   docs/passation/2026-11-09-journee-instantanee.md.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* La mention : la place et la taille de « Modifier » (même règle de position). */
+html body .vrm-app-shell .vrm-ji .vrm-fu-modifier.vrm-ji-age,
+html body .vrm-app-shell .vrm-ji .vrm-ji-age {
+  cursor: default; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font: 500 12px/1 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7));
+  background: none !important; padding: 0 4px; min-height: 44px; pointer-events: none;
+}
+html body .vrm-app-shell .vrm-ji .vrm-ji-age-seule { position: absolute; top: 18px; right: 16px; }
+html body .vrm-app-shell .vrm-ji .vrm-ji-point {
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .55; flex: none;
+  animation: vrm-ji-pouls 1.4s ease-in-out infinite;
+}
+@keyframes vrm-ji-pouls { 0%, 100% { opacity: .25; } 50% { opacity: .8; } }
+
+/* Des chiffres anciens : un ton plus doux que les chiffres relus (jamais présentés comme frais). */
+html body .vrm-app-shell .vrm-ji .vrm-ji-chiffres :is(.vrm-fu-case > b, .vrm-jv2-grand, .vrm-jv2-faits) { opacity: .78; }
+
+/* Le geste de la prochaine chose attend la relecture : visible, sans accent, sans clic. Dans la
+   couche de la direction artistique (ses `!important` y vivent), plus précis qu'elle. */
+@layer vrm-premium {
+  .vrm-main[data-ecran="journee"] .vrm-ji .vrm-jv2-prochain .vrm-day-task .vrm-day-task-action.vrm-ji-geste {
+    background: rgba(255,255,255,.12) !important; color: rgba(255,255,255,.78) !important; box-shadow: none !important;
+    min-width: 0 !important; padding: 0 12px !important; font: 600 13px/1 var(--vrm-police) !important;
+  }
+  .vrm-main[data-ecran="journee"] .vrm-ji .vrm-jv2-prochain .vrm-day-task .vrm-day-task-action.vrm-ji-geste * { color: rgba(255,255,255,.78) !important; }
+}
+/* Remplacé EN PLACE (src/AttenteEcran.jsx) : l'écran vrai arrive sans fondu après un instantané. */
+.vrm-attente-pret.vrm-attente-sans-fondu { animation: none !important; }
+html body .vrm-app-shell .vrm-ji .vrm-jv2-jour { cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  html body .vrm-app-shell .vrm-ji .vrm-ji-point { animation: none; }
+}
+
+/* ── L'OBJECTIF DU MOIS : la barre se touche, et dit ce qui reste ─────────── */
+html body .vrm-app-shell button.vrm-fu-objectif {
+  all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; width: 100%;
+  min-height: 44px; cursor: pointer; border-radius: 10px; -webkit-tap-highlight-color: transparent;
+}
+html body .vrm-app-shell button.vrm-fu-objectif:focus-visible { outline: 2px solid var(--fu-bleu, #0A84FF); outline-offset: 4px; }
+html body .vrm-app-shell button.vrm-fu-objectif:active { transform: scale(.99); }
+html body .vrm-app-shell .vrm-fu-objectif > .vrm-fu-objectif-ligne,
+html body .vrm-app-shell .vrm-fu-objectif > .vrm-fu-objectif-piste { display: flex; }
+html body .vrm-app-shell .vrm-fu-objectif > .vrm-fu-objectif-piste { display: block; }
+html body .vrm-app-shell .vrm-fu-objectif-reste {
+  display: block; font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7));
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html body .vrm-app-shell .vrm-fu-objectif-reste.is-atteint { color: #fff; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html body .vrm-app-shell button.vrm-fu-objectif:active { transform: none; } }
