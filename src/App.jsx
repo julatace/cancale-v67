@@ -65,6 +65,7 @@ import './design/guide-iphone.css'; // (8 nov.) style de ./GuideIphone.jsx, gard
 import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à sa place (son écran est chargé à la demande)
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
+import { transporteurRelu, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -4930,12 +4931,19 @@ const fetchEmailBordereaux = async () => {
     //    bordereau » sur Colis, avec le bouton « Générer » — alors que leurs PDF
     //    étaient en base. `null` = pas su (une page ratée aussi) : l'écran le dit
     //    et réessaie.
-    const rows = await lireTout(`id=like.email_bord_*&select=id,${champs}`, { strict: true });
+    // (9 nov.) Le transporteur RELU dans le texte de l'e-mail des anciens bordereaux
+    // (api/_lib/transporteur-anciens.js, cron du matin) : une ligne légère à part ;
+    // il ne remplace JAMAIS un transporteur rangé. Illisible ⇒ rien de fusionné.
+    const [rows, relus] = await Promise.all([
+      lireTout(`id=like.email_bord_*&select=id,${champs}`, { strict: true }),
+      lireTout(`id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx`, { strict: true }).catch(() => null),
+    ]);
     if (!Array.isArray(rows)) return null;
+    const ligneRelue = Array.isArray(relus) && relus[0] ? relus[0] : null;
     // `filename` est présent exactement quand un PDF l'est (vérifié : 50/50,
     // aucun écart) — il sert donc de témoin sans télécharger le PDF.
     return rows.filter(r => r && r.filename && r.filename !== 'None')
-      .map(r => ({ ...r, _row: r.id, hasPdf: true }))
+      .map(r => transporteurRelu({ ...r, _row: r.id, hasPdf: true }, ligneRelue))
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return null; }
 };

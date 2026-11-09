@@ -63,6 +63,8 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
+// (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
+import { passeTransporteursAnciens } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
@@ -743,8 +745,17 @@ async function traiterVendeur() {
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
   try { bilanMois = await bilanDuMoisVendeur(); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (9 nov.) Le transporteur des ANCIENS bordereaux, relu dans le texte gardé de
+  // LEUR e-mail (api/_lib/transporteur-anciens.js) : N par passage, idempotent ;
+  // une lecture ratée n'écrit rien, et un échec n'empêche aucun rappel.
+  let transporteursAnciens = null;
+  try {
+    transporteursAnciens = await passeTransporteursAnciens({
+      lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup,
+    });
+  } catch (e) { transporteursAnciens = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
