@@ -89,6 +89,9 @@
 - `claude/journee-v2` (Ma journée v2, Ventes ↔ Colis) — en production ; `2026-11-09-journee-v2.md`.
 - `claude/zero-banc-rouge` (~20 bancs au vert, 2 défauts de Colis) — en production ; `2026-11-09-zero-banc-rouge.md`.
 - `claude/suites-serveur` (Solo côté serveur, double vente Leboncoin) — en production (fait par une autre session sous le même nom de branche) ; `2026-11-09-suites-serveur.md`.
+- `claude/direction-artistique-4` (feuilles, saisie gardée, toasts, confirmations, états vides, pilules Colis) — en production ; `2026-11-09-direction-artistique-4.md`. Reste : faire passer les ateliers faits main (`VoileAtelier`) par `SheetShell` (poignée), pied d'actions collé sur les longues feuilles.
+
+**À 21 h le 9 nov., plus aucun chantier en cours** : tout ce qui suit dans « Chantiers en cours » est livré ; reste les suites et les décisions ci-dessous.
 
 ### Chantiers en cours au moment de cette passation (branches d'agents)
 - `claude/journee-v2` — Ma journée refaite (frise de la semaine cliquable, pile des ventes,
