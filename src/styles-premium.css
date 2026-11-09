@@ -228,6 +228,26 @@
 .vrm-main[data-ecran="journee"] .vrm-day-task :is(.vrm-day-task-ico, .vrm-day-task-icone) { width: 44px !important; height: 44px !important; border-radius: var(--p-r-vignette) !important; }
 /* « Voir » : une pilule calme, 15/600, bleu texte. */
 .vrm-main[data-ecran="journee"] .vrm-day-task-action { font-size: var(--p-t-texte) !important; }
+/* (9 nov., phase 2) La rangée de « À faire » suit la grammaire : [vignette 44] [titre /
+   note, une ligne chacun] [UNE action, largeur fixe, au même bord droit sur chaque rangée].
+   La note pressée n'est plus une phrase ambre : la phrase à l'encre, un point ambre devant. */
+.vrm-main[data-ecran="journee"] .vrm-day-task { column-gap: var(--p-g-gout) !important; padding-left: var(--p-g-bord) !important; padding-right: 12px !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task > :first-child { flex: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-textes { gap: 2px !important; min-width: 0 !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-title { line-height: var(--p-g-ligne-titre) !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-note { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-note.is-urgent { color: var(--p-encre) !important; font-weight: 500 !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-note.is-urgent::before {
+  content: "" !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--p-ambre-point) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important;
+}
+/* L'action : au même bord droit sur chaque rangée ; à l'ordinateur une colonne de 76 px
+   au moins, centrée (au téléphone la largeur naturelle : la place va au texte). */
+.vrm-main[data-ecran="journee"] .vrm-day-task > :last-child:not(.vrm-day-task-textes) { flex: none !important; justify-content: center !important; text-align: center !important; box-sizing: border-box !important; }
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="journee"] .vrm-day-task > :last-child:not(.vrm-day-task-textes) { min-width: 76px !important; }
+}
+/* La semaine passée : chiffres alignés à gauche de leur case, sur la même ligne de base. */
+.vrm-main[data-ecran="journee"] .vrm-js-cases { align-items: start !important; }
 
 /* ── 6. VENTES ────────────────────────────────────────────────────────────── */
 .vrm-main[data-ecran="ventes"] .vrm-tache-tete { padding-top: 12px !important; padding-bottom: 12px !important; }
