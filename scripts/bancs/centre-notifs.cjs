@@ -17,7 +17,7 @@ require('./_porte-banc.cjs');
 //      l'app ouvre l'objet (l'écran de la cible) ; « Tout marquer lu » ;
 //   D  une notification touchée sur le téléphone (`?notif=<n°>`) marque SON entrée lue ;
 //   E  « pas su » : la liste illisible dit « — », jamais « aucune » ;
-//   F  Réglages → Notifications : sept types, heures calmes (bascule ⇒ POST de
+//   F  Réglages → Notifications : huit types, heures calmes (bascule ⇒ POST de
 //      `push_prefs` avec `calme.actif`), regroupement, et la carte des e-mails
 //      de l'essai qui DIT « pas configuré » et ce qui manque.
 //  Données INVENTÉES (le dépôt est public).
@@ -212,7 +212,7 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           if (await sous.count()) { await sous.first().click(); await pg.waitForTimeout(800); }
           await pg.locator('[data-famille-notif]').first().waitFor({ state: 'attached', timeout: 6000 }).catch(() => {});
           const types = await pg.locator('[data-famille-notif]').evaluateAll((l) => l.map((e) => e.getAttribute('data-famille-notif')));
-          dit(types.length === 7 && ['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels'].every((t) => types.includes(t)), `${T} · F1 sept types réglables`, types.join(','));
+          dit(types.length === 8 && ['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes'].every((t) => types.includes(t)), `${T} · F1 huit types (dont « Nouveau compte relié ») réglables`, types.join(','));
           ecrits.length = 0;
           const calme = pg.locator('[data-np-calme] [role="switch"]');
           dit(await calme.count() === 1, `${T} · F2 l’interrupteur « Heures calmes » est là`);

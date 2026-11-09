@@ -201,6 +201,8 @@ async function main() {
       };
       const SEL = '[data-bord-card][data-tx-colis="9101"]';
       const fait = async (pg) => { const s = await LS(pg, 'vinted_ship_done'); return !!(s && s['9101']); };
+      // Attend l'état (jusqu'à 4 s) au lieu d'un délai fixe : l'écriture est différée (save).
+      const attendre = async (pg, voulu) => { for (let i = 0; i < 20; i++) { if ((await fait(pg)) === voulu) return voulu; await pg.waitForTimeout(200); } return !voulu; };
       // 1. glisser franc vers la droite
       let { ctx, pg, errs } = await ouvrir();
       dit(await pg.locator(SEL + '[data-glisse-fait]').count() === 1, 'C la carte « à envoyer » se glisse (data-glisse-fait)');
@@ -208,13 +210,13 @@ async function main() {
       const p1 = await glisser(pg, SEL, w * 0.6, 4, 12, 'colis-glisse-pendant-390');
       dit(p1.pret && /px/.test(p1.tr), 'C pendant le glisser : la carte suit le doigt, la coche est posée au seuil', JSON.stringify(p1));
       await pg.waitForTimeout(500);
-      dit(await fait(pg), 'C relâchée après le seuil : « Déposé » écrit (vinted_ship_done[9101])');
+      dit(await attendre(pg, true), 'C relâchée après le seuil : « Déposé » écrit (vinted_ship_done[9101])');
       const pil = pg.locator('[data-pilule-annuler]').first();
       dit(await pil.isVisible().catch(() => false), 'C la pilule « Annuler » est là');
       await shot(pg, 'colis-glisse-annuler-390');
       await pil.click().catch(() => {});
       await pg.waitForTimeout(800);
-      dit(!(await fait(pg)), 'C « Annuler » rétablit : plus rien dans vinted_ship_done[9101]');
+      dit(!(await attendre(pg, false)), 'C « Annuler » rétablit : plus rien dans vinted_ship_done[9101]');
       const tr = await pg.locator(SEL).first().evaluate((el) => el.style.translate || '');
       dit(!tr, 'C la carte est revenue en place', tr);
       dit(!errs.length, 'C aucune erreur', errs.slice(0, 2).join(' | '));
