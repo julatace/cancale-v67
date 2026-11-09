@@ -511,6 +511,7 @@ sans la fonction.
 | `secoursenvoi` | `commandesSecours` | **5.327.0** (8 nov.) | 3 échecs réseau/5xx de suite vers vrm.center ⇒ voie directe bornée (< 256 Ko, fusion par n°) ; trop lourd ⇒ rien écrit, dit sur la carte |
 | `connexioncarte` | `sessionDepuis` | **5.328.0** (8 nov.) | la fenêtre et la carte du logo commencent par « Me connecter » (email + mot de passe VRM), sans ouvrir VRM |
 | `cartesansonglet` | `prendreVerrouRenouv` | **5.329.0** (8 nov.) | la carte du logo porte elle-même e-mail + mot de passe (shadow root fermée, aucun onglet, plus d'iframe) ; un seul renouvellement de session pour toute l'extension |
+| `comptepush` | `signalerCompteRelie` | **5.331.0** (9 nov.) | « shop_x est relié à VRM » arrive tout de suite : après la 1re écriture d'un compte (Vinted, Leboncoin, Vestiaire), `POST /api/push {action:'comptes'}` avec la session, une fois par compte ; sans session rien ne part |
 | `cartecode` | `authCodeVerif` | **5.330.0** (9 nov.) | la carte du logo : « Me connecter avec un code » (e-mail, tout compte, jamais de compte créé), mot de passe replié, Google/Discord dans le MÊME onglet sur Orion (retour sur la page Vinted) |
 
 ---
@@ -534,7 +535,6 @@ sans la fonction.
 - **8 nov. · Aide et signalement** : « ? » après la phrase de chaque écran (3 questions, article, « Signaler ») ; signalement enrichi (capture SCHÉMATIQUE en nombres, 30 requêtes par famille, 50 erreurs, montants/pseudos masqués) ; centre d'aide `vrm.center/aide` (généré par `scripts/aide-generer.cjs`) ; alertes de plantage groupées (1/h) au propriétaire. `docs/passation/2026-11-08-aide-signalement.md`. Geste : ouvrir vrm.center/aide.
 
 - **8 nov. · Restes ventes** : une phrase répétée sur ≥ 2 lignes de Ventes (note « vue par e-mail » par compte, refus de facture commun) dite une fois en tête ; widget, rappels et bilan comptent les ventes vues par e-mail avec leur bordereau (`api/_lib/colis-ventes-email.js` importe les règles de l'app) ; Mondial Relay au départ : aucune identité sûre, 3 mesures à faire. `docs/passation/2026-11-08-restes-ventes.md`. Geste : aucun.
-- **8 nov. · Petits défauts des contrôles** : liens disabled bloqués, longs libellés contenus, boutons mobiles alignés, zéro explicite et seuil de recherche des mails expliqué. `docs/passation/2026-11-08-petits-defauts-controles.md`. Aucune extension à installer.
 
 
 
