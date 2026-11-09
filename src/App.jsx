@@ -210,6 +210,8 @@ const FactureRaisonsTeteParesseuse = lazy(() => import('./FacturePro.jsx').then(
 const FactureRaisonsTete = (props) => <Suspense fallback={null}><FactureRaisonsTeteParesseuse {...props}/></Suspense>;
 const ScannerColis = aLaDemande(() => import('./ScannerColis.jsx'), true);
 const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
+// (9 nov., lot AD) « Préparer mes colis » pas à pas : à la demande (sa feuille de style reste ICI).
+const PreparerColis = aLaDemande(() => import('./PreparerColis.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
 const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
@@ -448,6 +450,10 @@ import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { etatNumeroColis } from "./emballage.js";
 // (6 nov., vitesse 2) ModeEmballage : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-emballage.css";
+// (9 nov., lot AD) Préparer mes colis + mode relais. Le mode relais n'est PAS paresseux : il doit
+// s'ouvrir au comptoir sans réseau (codes de retrait hors ligne).
+import "./styles-preparer-relais.css";
+import ModeRelais from "./ModeRelais.jsx";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
@@ -16721,13 +16727,20 @@ const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null
 // (`codes-hors-ligne`, phase 3 réseau coupé), l'écran disait « aucune copie de
 // ta journée » alors que les codes étaient gardés sur l'appareil.
 function BlocCodesHorsLigne() {
+        // (9 nov., lot AD) Le MODE RELAIS hors ligne : les codes gardés sur l'appareil qui sont « à retirer »
+        // (`compte`, la liste publiée `vrm_colis_retirer`), un par écran ; « Retiré » attend que VRM réponde.
+        const [relais, setRelais] = useState(false);
         const c = codesHorsLigne(); if (!c) return null;
+        const comptes = c.codes.filter((x) => x && x.compte === true);
         const h = Math.max(0, Math.round((Date.now() - (c.at || 0)) / 3600000));
         const quand = h < 1 ? 'à l’instant' : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
         return (
           <div data-codes-hors-ligne style={{marginTop:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'16px 16px 10px'}}>
             <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
             <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
+            {comptes.length ? <Bouton variante="secondaire" icone="qr" data-relais-ouvrir="hors-ligne" onClick={() => setRelais(true)} style={{ minHeight: 44, marginBottom: 8 }}>Mode relais</Bouton> : null}
+            {relais ? <ModeRelais horsLigne colis={comptes.map((x, i) => ({ cle: 'hl:' + (x.id || i), ident: x.id || '', titre: x.titre || (x.carrier ? carrierName(x.carrier) : 'Colis'), lieu: x.lieu || '', code: x.code || '', suivi: x.suivi || '', qr: '', sansQrHorsLigne: !!x.qr }))}
+              note={`Codes gardés sur cet appareil, mis à jour ${quand}.`} onFermer={() => setRelais(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
             {c.codes.map((x, i) => (
               <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
                 <div style={{flex:1,minWidth:0}}>
@@ -28575,7 +28588,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const k = colisKey(t); if (!k) return;
     const ops = [{ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: oui, avant: collected.has(k) },
       { k: 'vrm_colis_collected_at', type: 'cle', id: k, apres: oui ? new Date().toISOString() : undefined, avant: collectedAt[k] }];
-    gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt });
+    // (9 nov., lot AD) L'identifiant du geste est rendu : le mode relais offre son « Annuler » dans sa feuille.
+    return gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt });
   };
   const markCollected = (t) => gesteCollecte(t, true);
   const unmarkCollected = (t) => gesteCollecte(t, false);
@@ -29592,7 +29606,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted, pas un rapprochement (§24). On ouvre donc toujours SA conversation,
   // même quand l'extension n'est pas encore passée.
   const lienConv = (o) => { const c = o && o.conversation_id; return c ? `https://www.vinted.fr/inbox/${c}` : ''; };
-  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }); };
+  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; return gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
@@ -30324,6 +30338,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
   // (9 nov.) `tx` : la vente sans bordereau e-mail prend ce que SON étiquette captée nomme (relu au cron, par n°).
   const transporteurVente = (b, tx) => { const k = String((b && b.transaction) || tx || ''); const et = pdfEtiquettesParTx(); return transporteurDeVente({ bord: b || null, pdf: (!b && k && et && et[k]) || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }); };
+  // (9 nov., lot AD) L'IDENTITÉ PUBLIÉE d'un colis à retirer (`vrm_colis_retirer.colis[i][3]`) : le n°
+  // de suivi (`e:`), sinon la transaction Vinted (`v:{compte}:{tx}`), sinon la clé de l'e-mail (`k:`).
+  // Une seule écriture de cette règle : la publication ci-dessous ET le mode relais (même liste).
+  const identRetraitEmail = (t) => { const su = normaliserSuivi(t && t.suivi); return su ? 'e:' + su : 'k:' + colisKey(t); };
+  const identRetraitVinted = (o) => { const uid = String((o && o._acc && o._acc.vinted_user_id) || ''); return uid ? `v:${uid}:${o.transaction_id}` : 'k:v' + (o && o.transaction_id); };
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -30357,11 +30376,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Vinted (le widget relit ce qu'en dit le transporteur) ; [6] l'heure de la
       // limite (Vinted Go). La limite et l'arrivée lues chez le transporteur
       // pour un achat vu par Vinted (`etatColisVinted`, `transpMap`).
-      const tupleEmail = t => { const a = arriveeColisEmail(t); const su = normaliserSuivi(t.suivi);
-          return [t.limite || '', a ? a.ms : 0, t.carrier || '', su ? 'e:' + su : 'k:' + colisKey(t), a && a.sur === 'oui' ? 1 : 0, '', t.limiteAt || '']; };
-      const tupleVinted = o => { const e = etatColisVinted(o, Date.now(), transpMap); const uid = String((o._acc && o._acc.vinted_user_id) || '');
+      const tupleEmail = t => { const a = arriveeColisEmail(t);
+          return [t.limite || '', a ? a.ms : 0, t.carrier || '', identRetraitEmail(t), a && a.sur === 'oui' ? 1 : 0, '', t.limiteAt || '']; };
+      const tupleVinted = o => { const e = etatColisVinted(o, Date.now(), transpMap);
           const nums = suivisAchat(o, indexSuivisAchats).map(normaliserSuivi).filter(Boolean).join(',');
-          return [e.limite || '', e.arriveeMs || 0, e.carrier || '', uid ? `v:${uid}:${o.transaction_id}` : 'k:v' + o.transaction_id, e.arriveeSure != null ? 1 : 0, nums, e.limiteAt || '']; };
+          return [e.limite || '', e.arriveeMs || 0, e.carrier || '', identRetraitVinted(o), e.arriveeSure != null ? 1 : 0, nums, e.limiteAt || '']; };
       const colis = pickupUnion.emailList.map(tupleEmail).concat(pickupUnion.extra.map(tupleVinted));
       // (tour 2 n° 7) Les « à vérifier » avec leur IDENTITÉ (même forme) : le
       // widget les relit chez le transporteur (`retirerPublie`, `verif`).
@@ -30409,15 +30428,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // on le signale). On n'écrit QUE si la liste n'est pas vide (§4.2 : une
       // liste momentanément vide n'efface pas la dernière connue).
       const codes = [];
+      const comptesE = new Set(pickupUnion.emailList);
       for (const t of pickupUnion.emailList.concat(pickupUnion.aVerifier.filter(x => x.kind === 'email').map(x => x.t))) {
         const code = codeRetrait(t.code); const lieu = (cleanLieu(t.lieu).nom || '').trim();
         const qr = !!(t && (t.qr || t.qrUrl || t.qrB64));
-        if (code || qr) codes.push({ code: code || '', lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr });
+        // (9 nov., lot AD) + `id` (l'identité publiée) et `compte` (dans « à retirer » = `vrm_colis_retirer`, ou
+        // seulement « à vérifier ») : le mode relais hors ligne ne montre QUE les colis comptés.
+        if (code || qr) codes.push({ code: code || '', lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
       }
       for (const o of pickupUnion.extra) {
         const r = colisRelais[String((o && o.transaction_id) || '')] || null;
         const code = r ? codeRetrait(r.code) : ''; const qr = !!(r && (r.qr || r.qrUrl || r.qrB64));
-        if (code || qr) codes.push({ code: code || '', lieu: (r && r.lieu) || '', carrier: '', suivi: '', titre: String((o && o.title) || '').slice(0, 60), qr });
+        if (code || qr) codes.push({ code: code || '', lieu: (r && r.lieu) || '', carrier: '', suivi: '', titre: String((o && o.title) || '').slice(0, 60), qr, id: identRetraitVinted(o), compte: true });
       }
       if (codes.length) {
         const avantC = load('vrm_codes_hors_ligne', null);
@@ -37809,6 +37831,113 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         emplacement, transporteur, transport: transporteur ? `Bordereau ${transporteur}${b && b.suivi ? ` · suivi ${b.suivi}` : ''}` : '' };
     });
   };
+  // ── (9 nov., lot AD, proposition 46) « PRÉPARER MES COLIS » PAS À PAS ─────────────────────
+  // Les colis de « À envoyer », DANS SON ORDRE (`colisAEnvoyerRanges` : le plus pressé d'abord, puis
+  // par transporteur — jamais trié par emplacement, refus du 11 oct.). Chaque colis porte la paire de
+  // SA vente par identité (§5) : Vinted = la vente par son n° de transaction (photo de l'annonce
+  // vendue, `effEntry`) ; Vestiaire = la vente par son id ; Leboncoin = la vente par son n° de
+  // transaction ; eBay = la commande. Un bordereau qu'aucune vente ne porte (e-mail sans vente) ⇒
+  // `paire: 'a-verifier'`, JAMAIS une photo devinée (`bordPhoto` passe par le N° de l'e-mail : non).
+  // « Colis fait » = `deposeScan` (« Annuler » 5 s, puis `marquerColisFait` : la même écriture que les
+  // cartes) ; Vestiaire et Leboncoin : leur coche de toujours ; eBay : rien (le dépôt se suit dans eBay).
+  const colisPreparer = () => {
+    let ranges = []; try { ranges = colisAEnvoyerRanges(); } catch (_) { ranges = []; }
+    const faitsVc = vcCarte('vrm_vc_colis_done') || {};
+    const faitsLbc = load('vrm_lbc_colis_done', {}) || {};
+    const numD = load('vinted_annonce_numeros', {}) || {};
+    const etatN = (num) => etatNumeroColis(num, { cleNum, conflits: conflitsNum, fiches: numeros, aVerifier: (f) => ficheAVerifier(f) || reattribueAEcrire(f) });
+    const nomTr = (x) => { const t = trNomColis(x); return t && t !== TRANSP_INCONNU ? t : ''; };
+    const L = [];
+    for (const x of ranges) {
+      if (x.__autre === 'vc') {
+        const v = x.v; if (!v || faitsVc[v.id]) continue; const num = v.num || ''; const titre = v.titre || 'Article Vestiaire';
+        L.push({ cle: 'vc:' + v.id, site: 'vestiaire', num, etatNum: etatN(num), titre, taille: v.taille || '', compte: 'Vestiaire', transporteur: nomTr(x),
+          limite: limiteVcTexte({ ...v, aExpedier: true }) || '', limiteAmbre: x.dl != null && x.dl <= 1, photo: v.photo || null, paire: 'sure', pdf: false,
+          imprimerEl: v.bordereau ? <BoutonImprimerVc v={v} carte/> : null,
+          sansBordereau: v.bordereau ? '' : v.etiquette === true ? 'Le bordereau est sur Vestiaire.' : 'Pas encore de bordereau sur Vestiaire.',
+          suivi: v.suivi || '', peutFaire: true, geste: { site: 'vestiaire', cle: 'vc:' + v.id, v, num, titre } });
+        continue;
+      }
+      if (x.__autre === 'eb') {
+        const num = x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '';
+        L.push({ cle: x.key, site: 'ebay', num, etatNum: etatN(num), titre: x.x.titre || `Commande ${x.x.orderId}`, compte: 'eBay', transporteur: '',
+          limite: x.dl == null ? '' : x.dl < 0 ? `${-x.dl} j de retard` : x.dl === 0 ? 'à envoyer aujourd’hui' : x.dl === 1 ? 'à envoyer demain' : `${x.dl} j pour l’envoyer`, limiteAmbre: x.dl != null && x.dl <= 1,
+          photo: x.x.ordre ? (photoCommande(x.x.ordre) || null) : null, paire: 'sure', pdf: false, peutFaire: false,
+          sansBordereau: 'L’étiquette se prend dans eBay, prépayée par le port de l’acheteur : le dépôt se suit dans eBay.', lien: lienCommandeEbay(x.x.orderId, x.x.compte), lienLib: 'Étiquette sur eBay' });
+        continue;
+      }
+      if (x.__autre === 'lbc') {
+        if (faitsLbc[x.x.txId]) continue;
+        const o = x.o || {}; const sure = Object.keys(o).length > 0;
+        const f = x.x.itemId ? numD[x.x.itemId] : null; const num = (f && f.numero != null) ? String(f.numero).trim() : '';
+        const titre = x.x.titre || o.title || '(sans titre)';
+        L.push({ cle: 'lbc:' + x.x.txId, site: 'leboncoin', num, etatNum: etatN(num), titre, compte: 'Leboncoin', transporteur: nomTr(x), limite: '', limiteAmbre: false,
+          photo: sure ? (photoArticle(o) || null) : null, paire: sure ? 'sure' : 'a-verifier', raisonPaire: sure ? '' : 'Cette vente Leboncoin n’a pas encore été relue : VRM ne montre pas de photo devinée. Vérifie la paire sur le carton.',
+          pdf: false, sansBordereau: o.label && o.label.voucherUrl ? 'Le bordereau Leboncoin s’imprime, tamponné, depuis l’écran Colis Leboncoin.' : 'Bordereau à générer sur Leboncoin.',
+          suivi: '', peutFaire: true, geste: { site: 'leboncoin', cle: 'lbc:' + x.x.txId, txId: x.x.txId, num, titre } });
+        continue;
+      }
+      const o = x.o, b = x.b; if (o ? isShipDone(o) : isBordShippedManual(b)) continue;
+      const sure = !!(o && o.transaction_id != null);
+      const e = o ? effEntry(o) : null;
+      const num = (b ? numForBord(b) : '') || ((e && e.numero) || '');
+      const capte = x.txn ? labelsCaptes[x.txn] : null;
+      const pdf = !!(b && b.hasPdf) || !!capte;
+      const titre = o ? (o.title || 'Vente') : ((b && (b.modele || b.article)) || 'Bordereau');
+      // L'e-mail du bordereau dit un autre N° que la vente (`numLitige`, « le seul cas où la paire peut être
+      // fausse ») : la photo reste celle de la VENTE (identité), le N° est à vérifier, dit en clair.
+      const litige = b && !x.venteEmail ? numLitige(b) : null;
+      L.push({ cle: 'v:' + (x.txn || x.key), site: 'vinted', num, etatNum: litige && etatN(num) === 'ok' ? 'litige' : etatN(num), litige, titre,
+        taille: (e && e.taille ? String(e.taille) : '') || (o ? String(o.size_title || o.size || '') : ''), compte: o && o._acc ? accNameOf(o._acc) : '', transporteur: nomTr(x),
+        limite: texteEnvoiColis(texteLimiteEnvoi(x.lim) || ''), limiteAmbre: x.dl != null && x.dl <= 1,
+        photo: sure ? (orderPhoto(o) || null) : null, paire: sure ? 'sure' : 'a-verifier',
+        raisonPaire: sure ? '' : 'Ce bordereau n’est relié à aucune vente par son n° de transaction : VRM ne montre pas de photo devinée. Vérifie la paire sur le bordereau et sur son carton.',
+        pdf, x, sansBordereau: pdf ? '' : 'Bordereau pas encore là : l’extension le génère quand tu passes sur Vinted.',
+        suivi: (b && b.suivi) || '', peutFaire: true, geste: { site: 'vinted', cle: 'v:' + (x.txn || x.key), o, b, num, titre } });
+    }
+    return L;
+  };
+  // Imprimer CE bordereau seul : la règle du bouton de la carte (le PDF capté par l'extension d'abord,
+  // l'e-mail en secours ; tamponné du N° et du titre ; + la facture pro quand elle existe).
+  const imprimerColisVinted = async (e) => {
+    if (!e) return;
+    const o = e.o, b = e.b;
+    const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+    const titre = o ? o.title : ((b && (b.modele || b.article)) || 'Bordereau');
+    const inv = b ? invForBord(b) : null;
+    const capte = e.txn ? labelsCaptes[e.txn] : null;
+    if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
+    const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+    if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
+    if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim() && e.txn) noterImprimeSansNum([e.txn]);
+  };
+  // ── (9 nov., lot AD, proposition 48) LE MODE RELAIS ─────────────────────────────────────────
+  // EXACTEMENT les colis publiés dans `vrm_colis_retirer` (`pickupUnion.emailList` + `.extra`, ceux que
+  // compte « À retirer ») — jamais les « à vérifier », « comptés avec », « en cours de vérification » ni
+  // les finis (`horsCompte` ou absents des cartes). Chacun avec SON identité publiée, son code, son QR,
+  // son point (les valeurs de SA carte, `cartesColis`). « Retiré » = `retirerColis` de la carte.
+  const colisModeRelais = () => {
+    const out = [];
+    let cartes = []; try { cartes = cartesColis(); } catch (_) { cartes = []; }
+    for (const x of cartes) {
+      if (!x || x.groupe !== 'retirer' || x.horsCompte) continue;
+      const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
+      const qr = t ? qrVivant(t) : (o ? (qrImage(relaisDe(o)) || '') : '');
+      out.push({ cle: x.cle, ident: t ? identRetraitEmail(t) : identRetraitVinted(o), titre: x.nom || 'Colis à retirer', photo: x.photo || null,
+        lieu: x.lieuNom || '', adresse: x.lieuAdresse || '', code: x.code || '', code2: x.code2 || '', qr, suivi: t ? (suiviDeLigne(t) || '') : '', src: x.src });
+    }
+    return out;
+  };
+  const retirerRelais = (x) => { const t = (x && x.src && x.src.t) || null, o = (x && x.src && x.src.o) || null; if (t) return markCollected(t); if (o) return markPickupDone(o); return null; };
+  const [preparerOuvert, setPreparerOuvert] = useState(false);
+  const [relaisOuvert, setRelaisOuvert] = useState(false);
+  // Le scanner ouvert DEPUIS « Préparer » : la clé du colis montré (le scan dit si c'est le bon bordereau).
+  const [scanAttendu, setScanAttendu] = useState('');
+  // Achats : « Scanner » et, quand un colis attend, « Mode relais » (même place, en tête).
+  const gestesRetraitAchats = pickupUnion.total > 0
+    ? <div className="vrm-achats-gestes" data-achats-gestes="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonScanRetrait}
+        <Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} data-achats-relais="" aria-label="Mode relais : les codes de retrait en très grand" onClick={() => setRelaisOuvert(true)}>Mode relais</Bouton></div>
+    : boutonScanRetrait;
   const ouvrirLot = () => {
     const L = lignesLotTous();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
@@ -41048,11 +41177,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (9 nov., lot V) « Scanner » au point relais : la caméra lit le colis ⇒ l'achat qui porte CE n°
             de suivi ou CE code de retrait (src/scanColis.js), « J'ai retiré » sur SON toucher. */}
         {!dansPlateforme && (modeRetraits
-          ? <ScreenHead icon="qr" title="Colis à retirer" desc="Les colis à aller chercher : code de retrait, date limite, point relais." right={boutonScanRetrait}/>
-          : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé." right={boutonScanRetrait}/>)}
+          ? <ScreenHead icon="qr" title="Colis à retirer" desc="Les colis à aller chercher : code de retrait, date limite, point relais." right={gestesRetraitAchats}/>
+          : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé." right={gestesRetraitAchats}/>)}
         {/* (9 nov.) Pas dans Colis → À retirer : ce bloc y est rendu SOUS la liste (avant « Argent à vérifier ») et Colis porte
             déjà « Scanner » en tête de l'onglet (mode retrait) ; il ne reste que dans l'espace plateforme → Achats. */}
-        {dansPlateforme && !modeRetraits && !baseKO && pickupUnion.total > 0 ? <div className="vrm-achats-scan" data-achats-scan="">{boutonScanRetrait}</div> : null}
+        {dansPlateforme && !modeRetraits && !baseKO && pickupUnion.total > 0 ? <div className="vrm-achats-scan" data-achats-scan="">{gestesRetraitAchats}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
@@ -44211,6 +44340,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
             {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
             {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} /> : null}
+            {/* (9 nov., lot AD) « Préparer mes colis » : un colis à la fois, plein écran, dans l'ordre de cette liste. */}
+            {/* Une rangée À ELLE (pas `.vrm-colis-outils`, rangée derrière « … ») : le geste du moment. */}
+            {onglet === 'envoyer' && (nEnv || 0) > 0 ? (
+              <div className="vrm-pas-a-pas-rangee" data-preparer-rangee="">
+                <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton>
+              </div>) : null}
             {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
                 <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton>
@@ -44220,6 +44355,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-colis-retirer" data-cible="colonne:retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
+                {/* (9 nov., lot AD) Le MODE RELAIS : au comptoir, chaque code en très grand, un par écran. */}
+                {pickupUnion.total > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
                 {(() => { // (9 nov., Julien : « le statut doit être regardé très souvent ») QUAND le suivi a été lu chez
                   // le transporteur pour la dernière fois (la plus récente lecture réussie, `lu` des lignes `transp_`) —
                   // discret, une ligne ; rien lu ⇒ rien dit (jamais « à l'instant » inventé).
@@ -45291,7 +45428,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
 
       {(curSub==='bordereaux' || curSub==='achats') && scanOuvert === 'retrait' ? <ScannerColis mode="retrait" trouver={trouverRetrait} onConfirmer={retirerScan} onFermer={() => setScanOuvert(false)} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
-      {curSub==='bordereaux' && scanOuvert && scanOuvert !== 'retrait' ? <ScannerColis mode="envoi" trouver={trouverScan} onConfirmer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => setScanOuvert(false)} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
+      {curSub==='bordereaux' && scanOuvert && scanOuvert !== 'retrait' ? <ScannerColis mode="envoi" trouver={trouverScan} attendu={scanAttendu} onConfirmer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => { setScanOuvert(false); setScanAttendu(''); }} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => { setScanOuvert(false); setScanAttendu(''); }}/></ScannerColis> : null}
+      {/* (9 nov., lot AD) « Préparer mes colis » (Colis → À envoyer) et le mode relais (À retirer, Achats). */}
+      {curSub==='bordereaux' && preparerOuvert ? <PreparerColis colis={colisPreparer()} uid={AUTH.user?.id || ''} attente={deposeScan.attente ? deposeScan.attente.cle : ''}
+          onFait={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
+          onImprimer={(c) => (c && c.site === 'vinted' && c.x ? imprimerColisVinted(c.x) : null)} onScanner={(c) => { setScanAttendu(c.cle); setScanOuvert('envoi'); }}
+          onFermer={() => setPreparerOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}
+          Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}/> : null}
+      {(curSub==='bordereaux' || curSub==='achats') && relaisOuvert ? <ModeRelais colis={colisModeRelais()} onRetire={retirerRelais} onAnnuler={(id) => _gestes.annuler(id)}
+          onFermer={() => setRelaisOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
       {curSub==='bordereaux' && !scanOuvert && !tourneeDepot ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
