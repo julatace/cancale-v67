@@ -124,7 +124,14 @@ const ouvrir = async (b, vp, tab) => {
 const mesurer = (pg) => pg.evaluate(() => {
   const main = document.querySelector('.vrm-main') || document.body;
   const vw = window.innerWidth;
-  const visible = (e) => { const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' && !e.closest('details:not([open]) > :not(summary)') && !e.closest('[aria-hidden="true"]'); };
+  // (9 nov.) Un élément « pour lecteur d'écran » (1 px, `clip: rect(0 0 0 0)` — la maquette
+  // FusionVentes garde ainsi les anciennes cellules, fusion.css §12) n'est pas affiché : il ne
+  // peut être ni coupé ni débordant. Le montant AFFICHÉ (`.vrm-fu-vente-prix`) reste mesuré.
+  const lecteurSeul = (e) => { for (let x = e; x && x !== document.body; x = x.parentElement) { const s = getComputedStyle(x); if (s.position === 'absolute' && /rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)/.test(s.clip)) return true; } return false; };
+  // AFFICHÉ = ce que l'œil voit (un montant `aria-hidden` doublé pour le lecteur d'écran est
+  // affiché : c'est lui qu'on mesure) ; `visible` écarte en plus ce qui est caché aux aides.
+  const affiche = (e) => { const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' && !e.closest('details:not([open]) > :not(summary)') && !lecteurSeul(e); };
+  const visible = (e) => affiche(e) && !e.closest('[aria-hidden="true"]');
   const hors = [];
   for (const e of main.querySelectorAll('*')) {
     if (!visible(e) || e.closest('svg')) continue;
@@ -133,11 +140,12 @@ const mesurer = (pg) => pg.evaluate(() => {
   }
   // Un montant « 65 € », « 149,90 € », « +12,40€ » : rogné ou cassé sur deux lignes.
   const RE = /^[+−-]?\s?\d[\d  .]*(,\d{1,2})?\s?€$/;
-  const coupes = [];
+  const coupes = []; let nMontants = 0;
   for (const e of main.querySelectorAll('*')) {
-    if (!visible(e) || e.children.length) continue;
+    if (!affiche(e) || e.children.length) continue;
     const t = (e.textContent || '').trim();
     if (!t || t.length > 16 || !RE.test(t)) continue;
+    nMontants++;
     const rg = document.createRange(); rg.selectNodeContents(e);
     const lignes = new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top)));
     const s = getComputedStyle(e);
@@ -150,7 +158,7 @@ const mesurer = (pg) => pg.evaluate(() => {
     if (r.height < 43.5) petites.push(`${Math.round(r.height)}px « ${(e.innerText || e.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 28)} »`);
   }
   return {
-    deb: document.documentElement.scrollWidth - vw, hors: hors.slice(0, 6), coupes, petites,
+    deb: document.documentElement.scrollWidth - vw, hors: hors.slice(0, 6), coupes, nMontants, petites,
     tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
   };
 });
@@ -166,7 +174,7 @@ const capture = async (pg, vp, nom) => {
 const communs = (m, vp, errs) => {
   dit(!m.tombe && errs.length === 0, 'l’écran s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
   dit(m.deb <= 1 && m.hors.length === 0, 'aucun débordement horizontal', `${m.deb} px ${m.hors.join(' | ')}`);
-  dit(m.coupes.length === 0, 'aucun montant coupé', m.coupes.join(' | '));
+  dit(m.coupes.length === 0, 'aucun montant coupé', `${m.nMontants} montants mesurés · ${m.coupes.join(' | ')}`);
   if (vp.width < 600) dit(m.petites.length === 0, 'aucune cible tactile sous 44 px', m.petites.slice(0, 6).join(' | '));
 };
 
@@ -195,16 +203,17 @@ const communs = (m, vp, errs) => {
         dit(lu.n === ATTENDU.toutes, `« Toutes » rend ${ATTENDU.toutes} ventes (l’annulée n’y est pas)`, `${lu.n}`);
         const somme = lu.prix.reduce((s, x) => s + (x || 0), 0);
         dit(lu.prix.every((x) => x != null) && somme === ATTENDU.sommeToutes, 'la somme des prix rendus est 696,90 €', `${somme / 100} € ${JSON.stringify(lu.prix)}`);
-        communs(await mesurer(pg), vp, errs);
+        const mV = await mesurer(pg);
+        // (9 nov.) Le contrôle des montants coupés ne passe pas à vide : chaque vente rendue a son montant AFFICHÉ mesuré.
+        dit(mV.nMontants >= ATTENDU.toutes, `les ${ATTENDU.toutes} montants des ventes affichés sont mesurés`, `${mV.nMontants}`);
+        communs(mV, vp, errs);
         await capture(pg, vp, 'ventes');
-        await pg.locator('button[aria-pressed]', { hasText: /^(À envoyer|À expédier)$/ }).first().click({ timeout: 4000 });
-        await pg.waitForTimeout(800);
-        const nA = await pg.evaluate(() => document.querySelectorAll('.vrm-sale-row[data-tx]').length);
-        dit(nA === ATTENDU.aExpedier, `« À expédier » rend ${ATTENDU.aExpedier} ventes`, `${nA}`);
-        const m2 = await mesurer(pg);
-        dit(m2.coupes.length === 0 && m2.deb <= 1, 'À expédier : rien de coupé ni de débordant', `${m2.deb} px ${m2.coupes.join(' | ')}`);
-        if (vp.width < 600) dit(m2.petites.length === 0, 'À expédier : aucune cible sous 44 px', m2.petites.slice(0, 6).join(' | '));
-        await capture(pg, vp, 'ventes-aexpedier');
+        // (9 nov., Ma journée v2) Plus de seconde liste « À envoyer » dans Ventes : l'état reste sur chaque vente
+        // (ATTENDU.aExpedier ventes le portent), la liste des colis vit dans Colis (un lien la nomme).
+        const nA = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sale-row[data-tx]')].filter((r) => /À envoyer/.test(r.innerText)).length);
+        dit(nA === ATTENDU.aExpedier, `« À envoyer » est l'état de ${ATTENDU.aExpedier} ventes de la liste`, `${nA}`);
+        const f = await pg.evaluate(() => ({ filtre: [...document.querySelectorAll('.vrm-filtres button[aria-pressed]')].some((x) => /^(À envoyer|À expédier)$/.test(x.innerText.trim())), lien: !!document.querySelector('[data-ventes-vers-colis]') }));
+        dit(!f.filtre && f.lien, 'Ventes : aucune seconde liste « À envoyer », un lien vers Colis', JSON.stringify(f));
         await ctx.close();
       });
       console.log(`\n── Colis, ${vp.width} px`);
@@ -215,12 +224,15 @@ const communs = (m, vp, errs) => {
         const lu = await pg.evaluate(() => {
           const r = document.querySelector('[data-colis-recap]');
           const n = (g) => document.querySelectorAll(`[data-bord-card][data-groupe-carte="${g}"]`).length;
-          return { recap: r ? r.getAttribute('data-colis-recap') : null, cartes: document.querySelectorAll('[data-bord-card]').length, pret: n('pret'), attente: n('attente'), lot: !!document.querySelector('[data-lot-ouvrir]'), lotTxt: (document.querySelector('[data-lot-ouvrir]') || {}).innerText || '' };
+          const lot = document.querySelector('[data-lot-ouvrir]');
+          return { recap: r ? r.getAttribute('data-colis-recap') : null, cartes: document.querySelectorAll('[data-bord-card]').length, pret: n('pret'), attente: n('attente'), lot: !!lot && lot.getAttribute('data-lot-ouvrir') === '1' && !lot.disabled, lotN: lot ? lot.getAttribute('data-imprimer-prets') : null, lotTxt: lot ? `${lot.innerText} · ${lot.getAttribute('title') || ''}` : '' };
         });
         dit(lu.recap === String(ATTENDU.colis), `le récapitulatif compte ${ATTENDU.colis} colis à envoyer`, lu.recap);
         dit(lu.cartes === ATTENDU.colis, `${ATTENDU.colis} cartes de colis`, `${lu.cartes}`);
         dit(lu.pret === ATTENDU.prets && lu.attente === ATTENDU.attente, `${ATTENDU.prets} prêts à imprimer, ${ATTENDU.attente} en attente`, `${lu.pret} · ${lu.attente}`);
-        dit(lu.lot && new RegExp(`\\b${ATTENDU.prets}\\b`).test(lu.lotTxt), `« Tout imprimer » annonce ${ATTENDU.prets} bordereaux`, lu.lotTxt.replace(/\s+/g, ' '));
+        // (9 nov.) Depuis le 5 nov. (« la barre du haut ne saute plus »), le bouton garde le même
+        // libellé ; le NOMBRE est porté par `data-imprimer-prets` et dit par son titre.
+        dit(lu.lot && lu.lotN === String(ATTENDU.prets) && new RegExp(`\\b${ATTENDU.prets}\\b`).test(lu.lotTxt), `« Tout imprimer » annonce ${ATTENDU.prets} bordereaux`, `${lu.lotN} · ${lu.lotTxt.replace(/\s+/g, ' ')}`);
         communs(await mesurer(pg), vp, errs);
         await capture(pg, vp, 'colis');
         await ctx.close();

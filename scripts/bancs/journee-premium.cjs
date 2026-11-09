@@ -127,7 +127,8 @@ const lire = (pg) => pg.evaluate(() => {
   const rc = courbe ? courbe.getBoundingClientRect() : null;
   // Visible sans clic : posé, de taille réelle, et pas dans un <details> fermé.
   const ferme = courbe && courbe.closest('details:not([open])');
-  const tuiles = [...document.querySelectorAll('[data-barre-jour] [data-tuile]')].map((e) => [e.getAttribute('data-tuile'), e.getAttribute('data-n')]);
+  // (9 nov., Ma journée v2) La prochaine chose à faire est posée EN TÊTE (`data-prochain`) : un geste du jour aussi.
+  const tuiles = [...document.querySelectorAll('[data-prochain][data-tuile], [data-barre-jour] [data-tuile]')].map((e) => [e.getAttribute('data-tuile'), e.getAttribute('data-n')]);
   // Un texte qui déborde de sa boîte (le « porte-monnaie » coupé de sa capture).
   const deborde = [];
   for (const e of document.querySelectorAll('.vrm-day-layout *')) {

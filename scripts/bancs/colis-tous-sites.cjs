@@ -28,7 +28,11 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
 const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, String((e && e.stack) || e).split('\n').slice(0, 2).join(' ')); } };
 
 process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
-delete process.env.SUPABASE_SERVICE_KEY;
+// (9 nov.) Depuis le 7 nov. (api/_lib/cle-service.js) une route sans clé de service répond
+// 503 et ne lit rien : le banc lui donne une clé FICTIVE (le faux fetch ne la regarde pas).
+// Les vendeurs du banc ne sont pas des UUID ⇒ accesVendeur rend « pas su », qui ne coupe
+// pas. Le 503 sans clé est tenu par scripts/audit-cle-service.cjs.
+process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.CRON_SECRET = 'cle-banc-cron'; // obligatoire depuis dc4799f (la route refuse sans elle)
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];

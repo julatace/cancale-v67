@@ -106,6 +106,7 @@ async function controles(racine, silencieux) {
   });
   // ── Ses réponses ───────────────────────────────────────────────────────────
   essai('R · « Toujours chez moi » ⇒ chez lui, plus de question', () => { const b = base(); b.decisions = { 1: { choix: 'chez-moi' } }; const e = etat(b); return (e === 'chez-moi' && C.chezLui(e)) || e; });
+  essai('R · « Remise en ligne » (9 nov.) ⇒ toujours chez lui, rien ne sort, aucune vente', () => { const b = base(); b.decisions = { 1: { choix: 'remise' } }; const e = etat(b); return (e === 'chez-moi' && C.chezLui(e)) || e; });
   essai('R · « Vendu en main propre » ⇒ vendu (sorti du stock)', () => { const b = base(); b.decisions = { 1: { choix: 'vendu-main', montant: 45 } }; const e = etat(b); return (e === 'vendue' && !C.chezLui(e)) || e; });
   essai('R · sans réponse, l\'article reste chez lui (jamais compté vendu, jamais sorti)', () => { const e = etat(base()); return (e === 'a-demander' && C.chezLui(e)) || e; });
   essai('R · déclaré parti ailleurs (« Elle n\'est plus là ») ⇒ « sortie », plus de question', () => { const b = base(); b.declaree = (id) => id === '1'; return etat(b) === 'sortie' || etat(b); });

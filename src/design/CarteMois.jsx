@@ -51,7 +51,10 @@ export function ChiffreRoule({ valeur }) {
 // (3 nov., carte réglable) `action` : un bouton discret en haut à droite (« Modifier ») ;
 // `nu` : la carte sans fond à elle, posée dans une tête déjà sombre (Ma journée, Compta) ;
 // `grandAttrs` : les attributs du grand chiffre (posés sur le chiffre même, « — » compris).
-export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, pile = null, enHaut = null, children = null, className = '', action = null, nu = false, grandAttrs = null, ...attrs }) {
+// (9 nov., Ma journée v2) `tete` : un bloc qui prend la place du grand chiffre (et de son
+// surtitre, de sa sous-ligne, de sa pile) — la frise de la semaine de Ma journée, qui porte
+// le MÊME chiffre (« vendu » du jour) pour le jour choisi : jamais deux fois à l'écran.
+export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, pile = null, enHaut = null, children = null, className = '', action = null, nu = false, grandAttrs = null, tete = null, ...attrs }) {
   const vide = valeur == null || valeur === '';
   // (3 nov., cas extrêmes) Un montant à 5 chiffres (« 35 211,97 € ») ne se coupe jamais
   // en « 35 211,9… » : la taille descend d'un pixel à la fois jusqu'à ce qu'il tienne
@@ -102,7 +105,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
           {action}
         </div>
       ) : action}
-      <div className="vrm-fu-carte-tete">
+      {tete ? tete : <div className="vrm-fu-carte-tete">
         <div className="vrm-fu-carte-txt">
           {surtitre && !enRangee ? <span className="vrm-fu-surtitre">{surtitre}</span> : null}
           <div ref={grandRef} className={'vrm-fu-grand' + (vide ? ' is-vide' : '')} {...(grandAttrs || {})}>{vide ? '—' : <ChiffreRoule valeur={valeur} />}</div>
@@ -113,7 +116,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
             identité — `PileVignettes` n'en cherche aucune) ; jamais à côté d'une courbe. */}
         {!(courbe && courbe.length) && pile && Array.isArray(pile.srcs) && pile.srcs.some(Boolean) && pile.Photo
           ? <PileVignettes className="vrm-fu-pile" srcs={pile.srcs} n={pile.n || 0} Photo={pile.Photo} mortes={pile.mortes} onMorte={pile.onMorte} data-fu-pile="" /> : null}
-      </div>
+      </div>}
       {cases.length ? (
         <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
           {cases.map((c) => {

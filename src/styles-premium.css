@@ -76,7 +76,8 @@
   --p-ambre-texte: #FFB340;
   --p-ombre: 0 0 0 .5px rgba(255,255,255,.06);
   --p-ombre-sombre: 0 0 0 .5px rgba(255,255,255,.08);
-  --p-nuit: radial-gradient(120% 140% at 100% 0%, #24406A 0%, #1A2638 50%, #16181D 100%);
+  /* (9 nov.) En sombre, le bas de la carte ne finit plus au gris des cartes (#1C1C1E) : il reste bleu nuit (banc journee-coherence E4). */
+  --p-nuit: radial-gradient(120% 140% at 100% 0%, #24406A 0%, #1C2B42 50%, #1A2436 100%);
 }
 
 @layer vrm-premium {
@@ -318,7 +319,8 @@
   .vrm-main[data-ecran="ventes"] .vrm-toutes-ligne + .vrm-toutes-ligne::before { left: 76px !important; }
   /* La carte sombre se couche : le chiffre à gauche, les cases à droite (comme Colis). */
   .vrm-main[data-ecran="ventes"] .vrm-fu-carte { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1.5fr) !important; grid-template-rows: auto 1fr !important; column-gap: 32px !important; row-gap: 6px !important; padding: 20px 24px 22px !important; }
-  .vrm-main[data-ecran="ventes"] .vrm-fu-carte > .vrm-fu-carte-haut { grid-column: 1 / -1 !important; }
+  /* (9 nov.) La cible de 44 px de « Modifier » ne mord plus sur la case de droite (banc journee-coherence E6). */
+  .vrm-main[data-ecran="ventes"] .vrm-fu-carte > .vrm-fu-carte-haut { grid-column: 1 / -1 !important; margin-bottom: -4px !important; }
   .vrm-main[data-ecran="ventes"] .vrm-fu-carte > .vrm-fu-carte-tete { grid-column: 1 !important; align-self: end !important; }
   .vrm-main[data-ecran="ventes"] .vrm-fu-carte > .vrm-fu-cases { grid-column: 2 !important; align-self: end !important; }
   .vrm-main:is([data-ecran="ventes"],[data-ecran="cat_bord"],[data-ecran="journee"]) .vrm-fu-grand { font-size: var(--p-t-chiffre-ordi) !important; }
@@ -515,10 +517,18 @@
 /* la limite et l'attente : la suite de la ligne 2, coupée à la fin si elle déborde */
 .vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:nth-child(2):has(.vrm-acct-tag, .vrm-colis-num) + div {
   flex: 1 1 0 !important;
+  /* (9 nov., banc ventes-colis-premium) Quand le bloc du compte n'est pas affiché, une base de 0
+     laissait la limite se loger à LARGEUR NULLE au bout de la ligne du titre : « 5 j pour
+     l'envoyer » était invisible au téléphone. Au moins 40 % : sinon elle passe à la ligne. */
+  min-width: 40% !important;
 }
 .vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:nth-child(2):has(.vrm-acct-tag, .vrm-colis-num) + div::before {
   content: "·" !important; color: var(--p-gris) !important; margin: 0 6px !important; flex: none !important;
 }
+/* (9 nov.) Le bloc du compte qui porte « N° en attente » est caché par la maquette Colis
+   (fusion.css : `div:has(> .vrm-colis-num)`, le N° se pose par « Poser le N° ») : pas de « · »
+   orphelin en tête de la limite. Même condition que la règle qui le cache. */
+.vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child > div:nth-child(2) > div:nth-child(2):has(> .vrm-colis-num) + div::before { content: none !important; }
 .vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:has([data-colis-dates]) {
   display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;
   font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important;
