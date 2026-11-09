@@ -6,7 +6,7 @@ const racine=process.env.VRM_UI_ROOT||path.resolve(__dirname,'../..');
  const srv=http.createServer((q,r)=>{if(q.url==='/logo-vrm-96.png'){r.setHeader('Content-Type','image/png');return r.end(fs.readFileSync(path.join(racine,'vinted-sync-extension/logo-vrm-96.png')));}r.setHeader('Content-Type',q.url.includes('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');if(q.url.startsWith('/compat-orion.js'))return r.end(fs.readFileSync(path.join(racine,'scripts/extension-orion/compat-orion.js')));if(q.url.startsWith('/popup.js'))return r.end(fs.readFileSync(path.join(racine,'vinted-sync-extension/popup.js')));r.end(html);});
  await new Promise(r=>srv.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+srv.address().port;
  const nav=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),args:['--no-sandbox']});let n=0;
- try{for(const mode of ['hybride','rappel'])for(const carte of [false,true]){
+ try{for(const mode of ['hybride','rappel'])for(const carte of [false]){ // 5.332 : sur Orion la carte ne pose jamais d'iframe (popup.html?mode=carte charge le formulaire de la carte)
   const p=await nav.newPage({viewport:{width:390,height:844}});p.setDefaultTimeout(5000);
   await p.addInitScript(({mode})=>{
    window.actions=[];window.ouvertures=0;window.etat=sessionStorage.getItem('etat')||'attente';window.connecte=sessionStorage.getItem('connecte')==='oui';const natif=window.setTimeout;window.setTimeout=(f,ms,...a)=>natif(f,ms===25000?1000:ms,...a);

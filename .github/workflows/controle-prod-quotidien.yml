@@ -1,0 +1,107 @@
+name: Contrôle quotidien de vrm.center (navigateur)
+# (9 nov.) Chaque matin à 7 h 10 (heure de Paris), et à la main : un vrai
+# Chromium ouvre https://vrm.center en iPhone et en ordinateur, EN LECTURE SEULE
+# (scripts/controle-prod-quotidien.cjs : toute requête d'écriture est bloquée
+# avant de partir, le service worker aussi ; aucun compte n'est créé) : accueil
+# et ses boutons, /statut, /aide, /recuperation.html ouverte par un lien expiré,
+# mode exemple (Ma journée, Colis, Ventes : rien lu en base, rien écrit),
+# /api/sante, extension servie (un dossier, la version que l'app attend),
+# manifeste et icônes, en-têtes de sécurité, temps de rendu.
+# Les sondes SERVEUR et la page /statut sont l'affaire de sondes-statut.yml et
+# disponibilite.yml : ce workflow ne les refait pas, il regarde ce que voit un client.
+#
+# CONTRE LE BRUIT (docs/passation/2026-11-08-ci-verte.md) :
+#   · un premier essai rouge est REJOUÉ une fois, 5 minutes plus tard ;
+#   · deux essais rouges ⇒ UNE issue GitHub au titre stable, ouverte ou MISE À
+#     JOUR (jamais une par jour, aucun commentaire quotidien), et le run en échec ;
+#   · retour au vert ⇒ l'issue est commentée et fermée toute seule.
+# Captures de chaque page : artefact « captures » du run (14 jours).
+# Compte de démo : seulement si les secrets PROD_DEMO_EMAIL et PROD_DEMO_MDP
+# existent (Settings → Secrets and variables → Actions) ; sinon sauté, et dit.
+on:
+  schedule:
+    # GitHub ne connaît que l'heure UTC : deux créneaux, un seul joue (voir « heure »).
+    - cron: '10 5 * * *'   # 7 h 10 à Paris en heure d'été (UTC+2)
+    - cron: '10 6 * * *'   # 7 h 10 à Paris en heure d'hiver (UTC+1)
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: controle-prod-quotidien
+  cancel-in-progress: false
+jobs:
+  controle:
+    name: vrm.center vu par un client
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Est-ce le créneau de 7 h 10 à Paris ?
+        id: heure
+        env:
+          CRENEAU: ${{ github.event.schedule }}
+        run: |
+          decalage=$(TZ=Europe/Paris date +%z)
+          joue=true
+          if [ "$CRENEAU" = "10 5 * * *" ] && [ "$decalage" != "+0200" ]; then joue=false; fi
+          if [ "$CRENEAU" = "10 6 * * *" ] && [ "$decalage" != "+0100" ]; then joue=false; fi
+          echo "Créneau « ${CRENEAU:-manuel} », Paris en UTC$decalage : joue=$joue"
+          echo "joue=$joue" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.heure.outputs.joue == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.heure.outputs.joue == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.heure.outputs.joue == 'true'
+      - name: Installer Chromium
+        if: steps.heure.outputs.joue == 'true'
+        run: |
+          npx playwright install --with-deps chromium
+          echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+      - name: Contrôler vrm.center (rejoué une fois après 5 min s'il est rouge)
+        id: controle
+        if: steps.heure.outputs.joue == 'true'
+        env:
+          PROD_DEMO_EMAIL: ${{ secrets.PROD_DEMO_EMAIL }}
+          PROD_DEMO_MDP: ${{ secrets.PROD_DEMO_MDP }}
+        run: |
+          set +e
+          CAPTURES=captures/essai-1 RESULTAT=resultat-essai-1.json node scripts/controle-prod-quotidien.cjs
+          code=$?
+          dernier=resultat-essai-1.json
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::Premier essai rouge : rejoué dans 5 minutes (une panne passagère ne doit faire aucun bruit)."
+            sleep 300
+            CAPTURES=captures/essai-2 RESULTAT=resultat-essai-2.json node scripts/controle-prod-quotidien.cjs
+            code=$?
+            dernier=resultat-essai-2.json
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "dernier=$dernier" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Garder les captures
+        if: always() && steps.heure.outputs.joue == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures
+          path: |
+            captures/
+            resultat-essai-*.json
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Ouvrir, mettre à jour ou fermer l'issue « en échec »
+        if: always() && steps.heure.outputs.joue == 'true' && steps.controle.outputs.code != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ETAT: ${{ steps.controle.outputs.code == '0' && 'vert' || 'rouge' }}
+          RESULTAT: ${{ steps.controle.outputs.dernier }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/controle-prod-issue.cjs
+      - name: Rouge deux fois ⇒ le run échoue
+        if: steps.heure.outputs.joue == 'true' && steps.controle.outputs.code != '0'
+        run: |
+          echo "::error::vrm.center : contrôle rouge deux fois de suite (le détail est dans l'issue « Contrôle quotidien de vrm.center : en échec » et dans l'étape « Contrôler vrm.center »)."
+          exit 1

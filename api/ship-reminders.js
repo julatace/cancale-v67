@@ -21,6 +21,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
+import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme } from './_lib/notif-textes.js';
@@ -56,6 +57,7 @@ import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis,
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
+import { passageClientsPartis } from './_lib/clients-partis.js';
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
 import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
 import { envoyerSmtp } from './_lib/smtp.js';
@@ -63,6 +65,8 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
+// (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
+import { passeTransporteursAnciens, avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
@@ -71,6 +75,7 @@ import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelectu
 import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_LENTEURS } from './_lib/veille-plantages.js';
 // (8 nov.) Les alertes de plantage restées en attente pendant l'heure de repos : dites ici.
 import { vidangerAlertesPlantages } from './_lib/alertes-plantages.js';
+import { noterPilotageDuJour } from './_lib/pilotage.js';
 // (6 nov.) La purge à 30 jours du HTML d'origine des e-mails (api/_lib/email-html.js).
 import { purgerHtml } from './_lib/email-html.js';
 // (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
@@ -78,6 +83,9 @@ import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.j
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+// (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
+import { passageSondes } from './_lib/statut-sondes.js';
+import { pushConfigure } from './_lib/push.js';
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
 const RELANCES_JUSQUA_MS = 60000;
@@ -239,7 +247,7 @@ async function lireDonneesBilan() {
   // (8 nov., « à envoyer » prouvé) Les bordereaux (leur n° de suivi) et les preuves de départ :
   // le bilan compte les colis à envoyer avec la règle du widget et de Colis (§11).
   const [bordsB, preuves, mailsVentes] = await Promise.all([
-    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_COLIS}`)),
+    lireBordsAvecRelus(BORD_COLIS),
     lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x))),
     // (8 nov.) Les e-mails de vente récents (scalaires `meta->>`, la requête de l'app).
     fetchPaginated(scoped(reqVentesEmail(Date.now()))),
@@ -743,8 +751,17 @@ async function traiterVendeur() {
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
   try { bilanMois = await bilanDuMoisVendeur(); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (9 nov.) Le transporteur des ANCIENS bordereaux, relu dans le texte gardé de
+  // LEUR e-mail (api/_lib/transporteur-anciens.js) : N par passage, idempotent ;
+  // une lecture ratée n'écrit rien, et un échec n'empêche aucun rappel.
+  let transporteursAnciens = null;
+  try {
+    transporteursAnciens = await passeTransporteursAnciens({
+      lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup,
+    });
+  } catch (e) { transporteursAnciens = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -934,15 +951,81 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
 const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_accounts_hidden'];
+// (9 nov.) Les bordereaux + ce qui a été RELU dans le texte de l'e-mail des anciens
+// (transporteur, n° Mondial Relay — api/_lib/transporteur-anciens.js), seulement là où
+// le bordereau n'a rien : la même fusion que le widget et l'app. Ligne illisible ⇒ rien fusionné.
+async function lireBordsAvecRelus(select) {
+  const [b, relus] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${select}`)),
+    fetchPaginated(scoped(REQ_RELUS)).catch(() => null),
+  ]);
+  return avecRelus(b, relus);
+}
 const BORD_COLIS = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
+// (9 nov., charge — scripts/charge/) LES LISTES DE VENTES SEULEMENT QUAND ELLES SERVENT.
+// Le matin et le soir lisaient la liste ENTIÈRE de chaque compte (≈ 100 Ko par
+// compte, ~2 Mo par vendeur et par jour au banc) pour trois usages : le résumé
+// « à expédier » (posé par l'extension DANS la ligne), la date des ventes à
+// expédier (limite estimée) et les n° connus (ventes vues par e-mail). On lit
+// d'abord le résumé seul (`txns`, `dates`, `capturedAt`) ; la liste entière n'est
+// relue QUE si un compte lié n'a pas de résumé (extension d'avant), si une vente
+// vue par e-mail est à juger (tous les comptes, exactement comme avant), ou pour
+// les comptes d'une vente à expédier sans date. Le résultat est le même qu'avec
+// les listes entières (scripts/audit-charge-rappels.cjs le compare).
+const SEL_RESUME_VENTES = 'id,txns:data->resume->txns,dates:data->resume->dates,cap:data->>capturedAt';
+const SEL_LISTE_VENTES = 'id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt';
+const uidLigneVentes = (id) => (String(id || '').match(/^harvest_(.+?)_orders_sold$/) || [])[1] || '';
+async function lireVentesColis(comptesL, lireListes) {
+  const resumes = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=${SEL_RESUME_VENTES}`));
+  if (!Array.isArray(resumes)) return null;
+  const vivants = Array.isArray(comptesL) ? new Set(comptesL.map((c) => String((c && c.vinted_user_id) || '')).filter(Boolean)) : null;
+  // Comptes liés pas sus, ou un compte lié sans résumé : la lecture d'avant.
+  const sansResume = resumes.some((l) => { const u = uidLigneVentes(l && l.id); return u && (!vivants || !vivants.size || vivants.has(u)) && !Array.isArray(l.txns); });
+  if (!vivants || !vivants.size || sansResume) return { lignes: await lireListes(), entieres: true };
+  return { lignes: resumes.map((l) => ({ id: l.id, orders: null, txns: l.txns, cap: l.cap, dates: l.dates })), entieres: false };
+}
+// Complète `d` (lu par résumé) avec les listes entières là où elles servent.
+// Rend `d` (inchangé quand rien ne manque) ; une relecture ratée rend `null`
+// pour les commandes (« pas su », comme une lecture ratée d'avant).
+async function completerVentesColis(d, lireListes) {
+  if (!d || !d.commandes || d.listesEntieres) return d;
+  const mettre = (lignes) => {
+    if (!Array.isArray(lignes)) { d.commandes = null; return; }
+    for (const l of lignes) { const u = uidLigneVentes(l && l.id); if (u && d.commandes[u]) d.commandes[u].orders = Array.isArray(l.orders) ? l.orders : []; }
+  };
+  // 1. Une vente vue par e-mail se juge sur les n° de TOUTES les listes : si le
+  //    résumé seul en laisse une à juger, toutes les listes sont relues (comme avant).
+  const avecResume = ventesEmailColis(d);
+  if (avecResume.txs.length) { mettre(await lireListes()); d.listesEntieres = true; return d; }
+  // 2. La date des ventes à expédier sans date dans le résumé : leurs seuls comptes.
+  const t = txsAExpedier(d);
+  if (!t) return d;
+  const manque = new Set();
+  for (const tx of t.vinted) {
+    let date = null, uid = null;
+    for (const [u, l] of Object.entries(d.commandes)) {
+      if (!Array.isArray(l.txns) || !l.txns.map(String).includes(String(tx))) continue;
+      uid = uid || u;
+      const dl = l.dates && typeof l.dates === 'object' && !Array.isArray(l.dates) ? l.dates[String(tx)] : null;
+      if (typeof dl === 'string' && Number.isFinite(Date.parse(dl))) { date = dl; break; }
+    }
+    if (!date && uid) manque.add(uid);
+  }
+  if (!manque.size) return d;
+  const ids = [...manque].map((u) => encodeURIComponent(`harvest_${u}_orders_sold`)).join(',');
+  mettre(await fetchPaginated(scoped(`app_data?id=in.(${ids})&select=${SEL_LISTE_VENTES}`)));
+  return d;
+}
 async function lireDonneesColis() {
   const BORD = BORD_COLIS;
-  const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL, dep, mailsVentes, panneau] = await Promise.all([
-    fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
+  const lireListes = () => fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=${SEL_LISTE_VENTES}`));
+  const comptesP = fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login'));
+  const [comptesL, m, ventes, ebay, bords, lbcL, vcV, vcL, dep, mailsVentes, panneau] = await Promise.all([
+    comptesP,
     getRowProjete('main', MAIN_COLIS),
-    fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt')),
+    comptesP.then((c) => lireVentesColis(c, lireListes)),
     lireCommandesEbay(),
-    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
+    lireBordsAvecRelus(BORD),
     // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : leurs seules ventes (§4.4).
     getRowProjete('lbc_ventes', ['ventes']),
     getRowProjete('vc_ventes', ['ventes']),
@@ -957,18 +1040,19 @@ async function lireDonneesColis() {
   // (8 nov., « à envoyer » prouvé) Les preuves de départ de la règle de Colis (api/_lib/depart-vente.js).
   const preuves = await lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x)));
   const comptes = Array.isArray(comptesL) ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || '') })).filter((c) => c.uid) : null;
+  const lignes = ventes ? ventes.lignes : null;
   let commandes = null;
   if (Array.isArray(lignes)) {
     commandes = {};
     for (const l of lignes) {
       const um = String((l && l.id) || '').match(/^harvest_(.+?)_orders_sold$/);
-      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null, cap: l.cap || null };
+      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null, cap: l.cap || null, ...(l.dates !== undefined ? { dates: l.dates } : {}) };
     }
   }
-  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords, departs, preuves,
+  return completerVentesColis({ comptes, commandes, listesEntieres: !ventes || ventes.entieres, main: m === undefined ? null : objet(m), ebay, bords, departs, preuves,
     mailsVentes: Array.isArray(mailsVentes) ? mailsVentes : null, panneau: panneau === undefined ? null : objet(panneau),
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
-    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {}, departs } };
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {}, departs } }, lireListes);
 }
 // Les ventes par transaction (leur DATE sert à la limite estimée), des seuls
 // comptes encore liés — la même portée que `txsAExpedier`.
@@ -979,6 +1063,13 @@ function ventesParTx(d) {
   for (const [uid, l] of Object.entries(d.commandes)) {
     if (vivants.size && !vivants.has(uid)) continue;
     for (const o of l.orders) if (o && o.transaction_id != null) out[String(o.transaction_id)] = o;
+  }
+  // (9 nov., charge) Liste pas relue : la date posée dans le résumé, par n° (même commande).
+  for (const [uid, l] of Object.entries(d.commandes)) {
+    if (vivants.size && !vivants.has(uid)) continue;
+    const dl = l.dates && typeof l.dates === 'object' && !Array.isArray(l.dates) ? l.dates : null;
+    if (!dl || !Array.isArray(l.txns)) continue;
+    for (const t of l.txns) { const k = String(t); if (!out[k] && typeof dl[k] === 'string' && Number.isFinite(Date.parse(dl[k]))) out[k] = { transaction_id: k, date: dl[k] }; }
   }
   // (8 nov.) La vente vue par e-mail : sa date (l'arrivée de l'e-mail), comme dans l'app.
   for (const [t, o] of Object.entries(ventesEmailColis(d).ventes)) if (!out[t]) out[t] = o;
@@ -1110,6 +1201,23 @@ async function veilleDesLenteurs(maintenant = Date.now()) {
   }));
 }
 
+// ── (9 nov.) LES SONDES DE vrm.center/statut (api/_lib/statut-sondes.js) ─────
+// `?moment=sondes` (GitHub, toutes les 10 min : .github/workflows/sondes-statut.yml),
+// et aussi au cron du matin et du soir. Une vraie connexion SMTP (aucun message)
+// une fois par heure au plus. L'incident ouvert part au PROPRIÉTAIRE seul
+// (VRM_OWNER_UID ou le propriétaire rangé en base), dans SON contexte.
+// `_bancSondes.envoyer` : le banc compte les notifications sans service de push.
+export const _bancSondes = { envoyer: null };
+async function sondesStatut(maintenant = Date.now()) {
+  const proprietaire = (await proprietaireInstallation()) || '';
+  const cfg = configurationRelances();
+  return passageSondes({
+    maintenant, proprietaire, pushPret: pushConfigure(), configSmtp: cfg,
+    smtp: () => envoyerSmtp({ seulementConnexion: true, hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE, de: process.env.RELANCES_EXPEDITEUR, a: process.env.RELANCES_EXPEDITEUR }),
+    envoyer: (notif) => (_bancSondes.envoyer ? _bancSondes.envoyer(notif, proprietaire) : contexteVendeur.run({ owner: proprietaire }, () => sendPushToAll({ ...notif, cat: 'signalement' }))),
+  });
+}
+
 // ── LES LIGNES DU PROPRIÉTAIRE NEUTRE (le curseur du cron) ─────────────────
 // Trois états : objet · `null` (absente) · `undefined` (pas su).
 async function lireNeutre(id) {
@@ -1144,8 +1252,11 @@ export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
   res.setHeader?.('Cache-Control','no-store');
   if (!secret) { res.status(503).json({ok:false,error:'cron-non-configure'});return; }
-  const auth = req.headers?.authorization || '';
-  if (auth !== `Bearer ${secret}`) { res.status(401).json({error:'clé invalide'});return; }
+  const auth = String(req.headers?.authorization || '');
+  // (9 nov., revue sécurité) Comparée en temps constant, comme la clé du script
+  // Gmail (email-inbound) : une comparaison qui s'arrête au premier écart.
+  const empreinte = (t) => crypto.createHash('sha256').update(String(t)).digest();
+  if (!crypto.timingSafeEqual(empreinte(auth), empreinte(`Bearer ${secret}`))) { res.status(401).json({error:'clé invalide'});return; }
   // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
   if (repondreSansCleService(res)) return;
 
@@ -1153,6 +1264,14 @@ export default async function handler(req, res) {
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
   // (ni URSSAF, ni bilan, ni rappel du matin).
   const moment = String((req.query && req.query.moment) || '');
+  // (9 nov.) `?moment=sondes` : les sondes de /statut, RIEN d'autre (aucun vendeur).
+  // État pas lu ou pas écrit ⇒ 503 (le workflow GitHub échoue : GitHub prévient).
+  if (moment === 'sondes') {
+    let s = null;
+    try { s = await sondesStatut(); } catch (e) { s = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(s && s.fait ? 200 : 503).json({ ok: !!(s && s.fait), moment: 'sondes', sondes: s });
+    return;
+  }
   const soir = moment === 'soir';
   const reveil = moment === 'reveil';
   const debutCron = Date.now();
@@ -1178,6 +1297,9 @@ export default async function handler(req, res) {
     //    fait échouer ni les autres ni les rappels (elle est dite dans la réponse).
     // (5 nov.) Les e-mails de l'essai gratuit (api/_lib/relances-essai.js). Sans
     // envoi configuré elle ne fait rien (et le dit dans la réponse).
+    // (9 nov.) Les sondes de /statut, aussi au matin et au soir (si GitHub ne passe pas).
+    let sondes = null;
+    if (!reveil) { try { sondes = await sondesStatut(debutCron); } catch (e) { sondes = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
@@ -1195,6 +1317,9 @@ export default async function handler(req, res) {
       const proprio = String(process.env.VRM_OWNER_UID).trim().toLowerCase();
       try { alertesPlantages = await vidangerAlertesPlantages({ proprio, maintenant: debutCron, pousser: (n) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(n)) }); } catch (e) { alertesPlantages = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     }
+    // (9 nov.) Un point par jour pour les courbes du tableau du propriétaire (api/_lib/pilotage.js).
+    let pilotage = null;
+    if (!soir && !reveil) { try { pilotage = await noterPilotageDuJour({ maintenant: debutCron }); } catch (e) { pilotage = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (6 nov.) Le HTML d'origine des e-mails (30 jours) : une purge ratée ne fait
     // échouer rien (elle est dite dans la réponse).
     let purgeHtml = null;
@@ -1206,6 +1331,11 @@ export default async function handler(req, res) {
     // éclats compris) : lecture projetée, une lecture ratée ne supprime rien.
     let purgeMesures = null;
     if (!soir && !reveil) { try { purgeMesures = await purgerMesuresAnciennes({ url: SUPABASE_URL, headers: HEADERS, proprietaire: await proprietaireInstallation(), maintenant: debutCron }); } catch (e) { purgeMesures = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (9 nov.) Les clients partis (api/_lib/clients-partis.js) : avis à 11 mois après
+    // la fin de l'abonnement, suppression à 12 (la fonction de « Supprimer mon compte »),
+    // bornés par passage ; une lecture ratée ne fait rien (dit dans la réponse).
+    let clientsPartis = null;
+    if (!soir && !reveil) { try { clientsPartis = await passageClientsPartis({ maintenant: debutCron }); } catch (e) { clientsPartis = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
 
     // ── LES VENDEURS, PAR LOTS (api/_lib/cron-lots.js) ─────────────────────────
     //    UNE passe PAR vendeur, chacun dans SON contexte (AsyncLocalStorage : deux
@@ -1227,7 +1357,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

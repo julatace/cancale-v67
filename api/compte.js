@@ -1,5 +1,5 @@
 import './_lib/sans-bruit.js';
-import {routeProfilAvatar,routeAvatarPublic,lignesPriveesProfil} from './_lib/profil-avatar.js';
+import {routeProfilAvatar,routeAvatarPublic} from './_lib/profil-avatar.js';
 import {configurationAuthPublique} from './_lib/auth-public.js';
 import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
@@ -44,9 +44,11 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 `harvest_{uid}_orders_*` — api/_lib/commandes-leger.js
 //   /api/compte?mode=mail-essai   (POST, session) « M'envoyer un e-mail d'essai » :
 //                                 à l'adresse de SON compte, 3/h — api/_lib/mail-essai.js
-//   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
-//                                 efface ses données, puis son compte (refusé au
-//                                 propriétaire de l'installation)
+//   /api/compte?mode=supprimer    (GET/POST, session) SUPPRIMER MON COMPTE : GET
+//                                 l'inventaire ; POST (« SUPPRIMER » + mot de passe
+//                                 ou connexion récente) résilie, efface, puis son
+//                                 compte (refusé au propriétaire de l'installation) ;
+//                                 `?mode=fermer` = la même fonction
 //
 // L'abonnement (Julien, 4 octobre) : 12,99 € par mois depuis le 11 octobre
 // (9,99 € avant — décision de Julien après l'étude des coûts), prélevé chaque
@@ -68,18 +70,24 @@ import { routePhotoroom } from './_lib/photoroom-cle.js';
 import { routeFacturePro } from './_lib/facture-pro.js';
 import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
-import { routeCommunaute, effacerCommunaute } from './_lib/communaute.js';
+import { routeEquipe } from './_lib/equipe.js';
+import { routeCommunaute } from './_lib/communaute.js';
 import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
 import { routeCommandes } from './_lib/commandes-leger.js';
-import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
+import { effacerCompte } from './_lib/effacer-compte.js';
+import { envoyerSmtp } from './_lib/smtp.js';
+import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
+import { routePilotage } from './_lib/pilotage.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
+// (9 nov.) L'état rangé par les sondes automatiques (projection publique, api/_lib/statut-sondes.js).
+import { statutPourSante } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
@@ -87,6 +95,8 @@ import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
+// (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
+import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO } from './_lib/plan-regle.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -170,11 +180,16 @@ const lirePrixStripe = (p) => ({
 //    `null` = pas su (pas d'abonnement vivant, Stripe muet, abonnement d'un autre
 //    client, plusieurs articles) : la carte écrit alors « Abonné » sans montant,
 //    jamais un prix deviné.
-async function prixDeLAbonnement(ligne) {
+// SON abonnement chez Stripe (vivant, à SON client) ; `null` = pas su.
+async function abonnementStripeDe(ligne) {
   if (!ligne || !ligne.abonnement_stripe || !ligne.client_stripe || !abonnementActif(ligne.statut)) return null;
   const r = await stripeApi('GET', `subscriptions/${encodeURIComponent(ligne.abonnement_stripe)}`);
   if (!r.ok || !r.data || r.data.customer !== ligne.client_stripe) return null;
-  const articles = r.data.items && Array.isArray(r.data.items.data) ? r.data.items.data : [];
+  return r.data;
+}
+function prixDeLAbonnement(sub) {
+  if (!sub) return null;
+  const articles = sub.items && Array.isArray(sub.items.data) ? sub.items.data : [];
   if (articles.length !== 1) return null;
   const a = articles[0], p = a && (a.price || a.plan);
   if (!p || (a.quantity != null && a.quantity !== 1)) return null;
@@ -198,6 +213,44 @@ async function prixDeLAbonnement(ligne) {
 //    audit-lancement.cjs exige que cette valeur soit celle écrite dans les CGV
 //    (et dans le repli de l'app) : une seule valeur (§11).
 export const PRIX_CGV = { centimes: 1699, devise: 'eur', intervalle: 'month' };
+// ⚠️⚠️ (9 nov.) LE PRIX DE PRO : 19,99 € / mois (décision de Julien du 9 nov. ;
+//    Solo reste 16,99 €). Écrit ICI, dans les CGV et dans l'app
+//    (src/accueil-reglages.js `PRIX_PRO_MOIS`) — audit-plans-solo-pro les compare.
+//    Le paiement Pro ne s'ouvre que quand le prix existe CHEZ STRIPE, que son
+//    identifiant (ou sa clé de recherche `vrm_pro_mensuel`) est dans
+//    `STRIPE_PRIX_PRO` sur Vercel, ET que Stripe dit exactement ce montant. Le
+//    montant prélevé est toujours celui de Stripe : s'il diffère, le paiement
+//    reste fermé et le propriétaire voit le montant de Stripe (`texteStripe`).
+export const PRIX_PRO_CGV = { centimes: 1999, devise: 'eur', intervalle: 'month' };
+const prixProCle = () => String(process.env.STRIPE_PRIX_PRO || '').trim();
+export const prixProConforme = (p) => !!(PRIX_PRO_CGV && p
+  && p.centimes === PRIX_PRO_CGV.centimes
+  && String(p.devise || '').toLowerCase() === PRIX_PRO_CGV.devise
+  && p.intervalle === PRIX_PRO_CGV.intervalle
+  && (p.nIntervalles == null || p.nIntervalles === 1));
+// Le prix Pro lu chez Stripe : par identifiant (`price_…`) ou par clé de recherche.
+async function lirePrixPro() {
+  const cle = prixProCle();
+  if (!cle) return null;
+  const r = /^price_/.test(cle)
+    ? await stripeApi('GET', `prices/${encodeURIComponent(cle)}`)
+    : await stripeApi('GET', 'prices', { 'lookup_keys[]': cle, active: 'true', limit: 1 });
+  const p = !r.ok || !r.data ? null : (Array.isArray(r.data.data) ? r.data.data[0] : r.data);
+  return p && p.id && p.active !== false ? { id: p.id, lookup_key: p.lookup_key || null, ...lirePrixStripe(p) } : null;
+}
+// L'offre Pro, telle que l'app la montre : ouverte (avec son prix) ou fermée,
+// avec la RAISON (le geste du propriétaire). Rien n'est appelé chez Stripe si
+// le prix n'est pas posé.
+async function offrePro() {
+  if (!prixProCle()) return { ouvert: false, raison: 'sans-prix-stripe', texte: null };
+  if (!stripePret()) return { ouvert: false, raison: 'stripe', texte: null };
+  const p = await lirePrixPro();
+  if (!p) return { ouvert: false, raison: 'prix-illisible', texte: null };
+  if (!prixProConforme(p)) return { ouvert: false, raison: 'prix-different', texte: null, texteStripe: prixTexte(p) };
+  return { ouvert: true, raison: null, texte: prixTexte(p), id: p.id };
+}
+// Les options de la règle : quel prix est Pro, quelle clé est Solo.
+const optsPlan = () => ({ prixPro: prixProCle(), cleSolo: PRIX_CLE || CLE_PRIX_SOLO });
 export const prixConforme = (p) => !!(p
   && p.centimes === PRIX_CGV.centimes
   && String(p.devise || '').toLowerCase() === PRIX_CGV.devise
@@ -276,13 +329,23 @@ async function ecrireStatut(owner, ligne, evenementTs) {
     ? ((avant && avant.impaye_depuis) || new Date((evenementTs || Math.floor(Date.now() / 1000)) * 1000).toISOString())
     : null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?on_conflict=owner`, {
+    const ecrire = (l) => fetch(`${SUPABASE_URL}/rest/v1/abonnements?on_conflict=owner`, {
       method: 'POST',
       headers: { ...h, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ owner, ...ligne, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() }]),
+      body: JSON.stringify([{ owner, ...l, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() }]),
     });
+    let r = await ecrire(ligne);
     if (r.ok) return { ok: true };
-    const t = await r.text().catch(() => '');
+    let t = await r.text().catch(() => '');
+    // (9 nov.) Migration 028 pas passée : les colonnes `plan`/`compte_vendeur`
+    // n'existent pas. Le STATUT compte plus que le plan : on le range sans elles
+    // (le plan reste lu en direct chez Stripe par l'app ; « pas su » côté serveur).
+    if (/PGRST204|42703|'plan'|compte_vendeur/.test(t) && ('plan' in ligne || 'compte_vendeur' in ligne)) {
+      const { plan: _p, compte_vendeur: _c, ...sans } = ligne;
+      r = await ecrire(sans);
+      if (r.ok) return { ok: true, sansPlan: true };
+      t = await r.text().catch(() => '');
+    }
     // 23503 : ce vendeur n'existe pas (compte VRM supprimé) — réessayer n'y
     // changera rien, on l'acquitte et on le dit dans les journaux.
     if (/23503/.test(t)) return { ok: true, ignore: 'vendeur-inconnu' };
@@ -388,6 +451,11 @@ async function vintedPris(req, res) {
 }
 
 const ligneDeLAbonnement = (sub, livemode) => ({
+  // (9 nov.) Le plan et le compte vendeur, lus du PRIX et des métadonnées que
+  // NOUS avons posées (route `compte-vendeur`) — jamais d'un champ du navigateur.
+  // Colonnes de la migration 028 : sans elle, l'écriture se refait sans ces deux.
+  plan: planDeLAbonnement(sub, optsPlan()).plan,
+  compte_vendeur: planDeLAbonnement(sub, optsPlan()).vendeur,
   statut: String(sub.status || 'incomplete'),
   client_stripe: typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || null,
   abonnement_stripe: sub.id || null,
@@ -455,7 +523,12 @@ async function abonnement(req, res) {
   if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
   // Le prix de l'OFFRE (clé `vrm_mensuel`) et celui de SON abonnement, lus
   // ensemble : ce ne sont pas les mêmes quand l'offre a changé depuis.
-  const [prix, prixAbo] = stripePret() ? await Promise.all([lirePrix(), prixDeLAbonnement(ligne)]) : [null, null];
+  const [prix, sub, pro] = stripePret() ? await Promise.all([lirePrix(), abonnementStripeDe(ligne), offrePro()]) : [null, null, await offrePro()];
+  const prixAbo = prixDeLAbonnement(sub);
+  // (9 nov.) LE PLAN : lu du PRIX Stripe réel de son abonnement (jamais d'un
+  // champ du navigateur). Propriétaire : Pro. Pas su ⇒ `null` (rien n'est bridé).
+  const lu = sub ? planDeLAbonnement(sub, optsPlan()) : null;
+  const plan = acc.proprietaire ? PLAN_PRO : (lu ? lu.plan : null);
   // Trois états : `true` le prix de Stripe est celui des CGV · `false` il en
   // diffère (le paiement est fermé) · `null` pas su (Stripe muet ou pas branché).
   const conforme = prix ? prixConforme(prix) : null;
@@ -514,6 +587,18 @@ async function abonnement(req, res) {
     // La fin de l'ESSAI : pendant « trialing », la période en cours EST l'essai
     // (Stripe : current_period_end = trial_end). Rien d'autre n'est deviné.
     finEssai: ligne && ligne.statut === 'trialing' ? (ligne.fin_periode || null) : null,
+    // (9 nov.) Solo / Pro. `plan` : 'solo' · 'pro' · null (pas su ⇒ rien bridé).
+    // `planRaison` dit pourquoi `null` (prix inconnu, CGV d'avant Solo…).
+    plan,
+    planRaison: plan ? null : (lu ? lu.raison : (sub === null && ligne && abonnementActif(ligne.statut) ? 'stripe-muet' : 'sans-abonnement')),
+    compteVendeur: !acc.proprietaire && lu && lu.vendeur
+      ? { uid: lu.vendeur, le: lu.vendeurLe, prochainChangement: prochainChangement(lu.vendeurLe) }
+      : null,
+    offres: {
+      solo: { texte: prix && conforme ? prixTexte(prix) : null, ouvert: !!(prix && conforme) },
+      // Le geste qui manque (`raison`) ne part qu'au propriétaire.
+      pro: { ouvert: pro.ouvert, texte: pro.ouvert ? pro.texte : null, raison: acc.proprietaire ? pro.raison : undefined, texteStripe: acc.proprietaire ? (pro.texteStripe || null) : undefined },
+    },
   });
 }
 
@@ -526,7 +611,9 @@ async function abonnement(req, res) {
 // 31 octobre : prix 16,99 € (sa décision), essai de 7 jours inchangé.
 // 8 novembre : fin de l'essai et rappels, lecture seule à l'expiration,
 //   parrainage (article 2), chemins Paramètres → Abonnement.
-const CGV_VERSION = '2026-11-08';
+// 9 novembre : deux offres, Solo (un compte vendeur + comptes d'achat) et Pro
+//   (les ventes de tous les comptes, prix à venir) — `CGV_PLANS_DEPUIS`.
+const CGV_VERSION = '2026-11-09';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -568,13 +655,17 @@ async function checkout(req, res) {
   //    CGV garde ce droit) : il reste, au prorata de la période écoulée.
   if (corps.accesImmediat !== true) return repondre(res, 400, { erreur: 'acces-immediat', message: "Coche « Je demande l'accès immédiat » avant de payer." });
   const accepteLe = new Date().toISOString();
-  const prix = await lirePrix();
+  // (9 nov.) S'abonner directement à Pro : seulement quand son prix est posé
+  // (Stripe + `PRIX_PRO_CGV` + CGV) ; sinon rien ne part.
+  const veutPro = corps.plan === PLAN_PRO;
+  if (veutPro && !(await offrePro()).ouvert) return repondre(res, 503, { erreur: 'pro-ferme', message: "L'offre Pro n'est pas encore ouverte : rien n'a été prélevé." });
+  const prix = veutPro ? await lirePrixPro() : await lirePrix();
   if (!prix) return repondre(res, 503, { erreur: 'prix', message: "Le prix de l'abonnement est introuvable chez Stripe." });
   // Le prix que Stripe facturerait n'est pas celui des CGV qu'il vient
   // d'accepter : on n'ouvre RIEN (voir `PRIX_CGV`). Le propriétaire le lit dans
   // les journaux et sur sa carte « Mon compte », avec le geste.
-  if (!prixConforme(prix)) {
-    console.warn('[stripe] prix « ' + PRIX_CLE + ' » =', prixTexte(prix), '≠ CGV', prixTexte(PRIX_CGV), '— paiement refusé. Geste : Stripe → Produits → ajouter un prix de', eurosLisibles(PRIX_CGV.centimes), 'par mois, clé de recherche « ' + PRIX_CLE + ' », « transférer la clé ».');
+  if (veutPro ? !prixProConforme(prix) : !prixConforme(prix)) {
+    console.warn('[stripe] prix « ' + (veutPro ? prixProCle() : PRIX_CLE) + ' » =', prixTexte(prix), '≠ CGV', prixTexte(PRIX_CGV), '— paiement refusé. Geste : Stripe → Produits → ajouter un prix de', eurosLisibles(PRIX_CGV.centimes), 'par mois, clé de recherche « ' + PRIX_CLE + ' », « transférer la clé ».');
     // ⚠️ Ce refus ne part JAMAIS au propriétaire (il a répondu 409 plus haut) :
     //    c'est un VENDEUR qui le lit. Il ne nomme donc pas le montant réglé chez
     //    Stripe (9,99 € à côté de CGV à 12,99 € : un prix qu'il ne paiera pas,
@@ -642,6 +733,90 @@ async function portail(req, res) {
   const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings&vue=abonnement` });
   if (!r.ok || !r.data.url) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu ouvrir la page de gestion. Réessaie dans un instant." });
   return repondre(res, 200, { url: r.data.url });
+}
+
+// ── SOLO : LE COMPTE QUI VEND (9 nov.) ──────────────────────────────────────
+// POST { uid } : le vendeur CHOISIT son compte vendeur (Paramètres → Abonnement,
+// feuille « Quel compte vend ? »). Jamais deviné : la seule écriture est ce clic.
+// Rangé dans les MÉTADONNÉES de SON abonnement Stripe (aucune table de plus ;
+// le webhook le recopie dans `abonnements.compte_vendeur`, migration 028).
+//   · le compte doit être l'un de SES comptes Vinted (lu avec SON jeton : RLS) ;
+//   · l'abonnement est le sien (client relu chez Stripe) et c'est un Solo ;
+//   · premier choix libre, puis un changement tous les 30 jours (dit avec la date).
+async function compteVendeur(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { erreur: 'session' });
+  const corps = await lireCorpsJson(req);
+  const uid = String((corps && corps.uid) || '').trim();
+  if (!uidValide(uid)) return repondre(res, 400, { erreur: 'compte', message: 'Choisis un de tes comptes Vinted.' });
+  if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché : rien à choisir." });
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Rien n'a changé ; réessaie dans un instant." });
+  if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est Pro : tous tes comptes vendent.' });
+  // Le compte est-il à LUI ? Lu avec SON jeton (la base ne lui montre que les siens).
+  let siens = null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const j = r.ok ? await r.json() : null;
+    siens = Array.isArray(j) ? new Set(j.map((x) => String(x && x.vinted_user_id))) : null;
+  } catch (_) { siens = null; }
+  if (siens === null) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes comptes. Rien n'a changé ; réessaie dans un instant." });
+  if (!siens.has(uid)) return repondre(res, 403, { erreur: 'pas-a-toi', message: "Ce compte n'est pas relié à ton VRM." });
+  const sub = await abonnementStripeDe(ligne);
+  if (!sub) return repondre(res, 409, { erreur: 'aucun', message: "Je ne trouve pas ton abonnement chez Stripe : rien n'a changé." });
+  const lu = planDeLAbonnement(sub, optsPlan());
+  if (lu.plan === PLAN_PRO) return repondre(res, 409, { erreur: 'pro', message: 'Tu es en Pro : tous tes comptes vendent.' });
+  if (lu.vendeur === uid) return repondre(res, 200, { ok: true, inchange: true, compteVendeur: { uid, le: lu.vendeurLe, prochainChangement: prochainChangement(lu.vendeurLe) } });
+  const attendre = lu.vendeur ? prochainChangement(lu.vendeurLe) : null;
+  if (attendre) return repondre(res, 429, { erreur: 'trop-tot', prochainChangement: attendre, message: `Tu as changé de compte vendeur il y a moins de 30 jours : prochain changement possible le ${new Date(attendre).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Europe/Paris' })}. Pour vendre sur tous tes comptes dès maintenant : Pro.` });
+  const le = new Date().toISOString();
+  const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(sub.id)}`, { metadata: { vrm_compte_vendeur: uid, vrm_compte_vendeur_le: le, vrm_compte_vendeur_avant: lu.vendeur || '' } }, `vrm-cv-${u.id}-${uid}-${Math.floor(Date.now() / 60000)}`);
+  if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
+  const relu = planDeLAbonnement(r.data, optsPlan());
+  if (relu.vendeur !== uid) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
+  return repondre(res, 200, { ok: true, compteVendeur: { uid, le: relu.vendeurLe, prochainChangement: prochainChangement(relu.vendeurLe) } });
+}
+
+// ── SOLO ⇄ PRO, AVEC PRORATA (9 nov.) ───────────────────────────────────────
+// POST { plan: 'pro' | 'solo', cgv: true } : change le PRIX de SON abonnement
+// (un seul article) ; Stripe calcule le prorata (`create_prorations`). Pro ne
+// s'ouvre que quand son prix est posé (`offrePro`). Les CGV de la nouvelle offre
+// s'acceptent dans VRM avant (case cochée), datées dans les métadonnées.
+async function changerPlan(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { erreur: 'session' });
+  const corps = await lireCorpsJson(req);
+  const cible = corps && (corps.plan === PLAN_PRO || corps.plan === PLAN_SOLO) ? corps.plan : '';
+  if (!cible) return repondre(res, 400, { erreur: 'plan', message: 'Offre inconnue.' });
+  if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché." });
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Rien n'a changé ; réessaie dans un instant." });
+  if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est Pro, gratuit : rien à changer.' });
+  if (!corps || corps.cgv !== true) return repondre(res, 400, { erreur: 'cgv', message: "Coche « J'accepte les conditions générales de vente » avant de changer d'offre." });
+  let prix;
+  if (cible === PLAN_PRO) {
+    const pro = await offrePro();
+    if (!pro.ouvert) return repondre(res, 503, { erreur: 'pro-ferme', message: "L'offre Pro n'est pas encore ouverte : rien n'a changé, rien n'a été prélevé." });
+    prix = await lirePrixPro();
+    if (!prix || !prixProConforme(prix)) return repondre(res, 503, { erreur: 'pro-ferme', message: "L'offre Pro n'est pas encore ouverte : rien n'a changé, rien n'a été prélevé." });
+  } else {
+    prix = await lirePrix();
+    if (!prix || !prixConforme(prix)) return repondre(res, 503, { erreur: 'prix-cgv', message: "Le paiement n'est pas encore ouvert : rien n'a changé." });
+  }
+  const sub = await abonnementStripeDe(ligne);
+  if (!sub) return repondre(res, 409, { erreur: 'aucun', message: "Je ne trouve pas ton abonnement chez Stripe : rien n'a changé." });
+  const lu = planDeLAbonnement(sub, optsPlan());
+  if (!lu.articleId) return repondre(res, 409, { erreur: 'article', message: "Ton abonnement a une forme que je ne sais pas changer : rien n'a changé. Écris-nous." });
+  if (lu.prixId === prix.id) return repondre(res, 200, { ok: true, inchange: true, plan: cible });
+  const le = new Date().toISOString();
+  const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(sub.id)}`, {
+    items: [{ id: lu.articleId, price: prix.id, quantity: 1 }],
+    proration_behavior: 'create_prorations',
+    metadata: { cgv_version: CGV_VERSION, cgv_acceptees_le: le, vrm_plan: cible, vrm_plan_change_le: le },
+  }, `vrm-plan-${u.id}-${cible}-${Math.floor(Date.now() / 60000)}`);
+  if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas changé ton offre : rien n'a changé, rien n'a été prélevé. Réessaie dans un instant." });
+  const relu = planDeLAbonnement(r.data, optsPlan());
+  return repondre(res, 200, { ok: true, plan: relu.plan || cible });
 }
 
 // ── LE PARRAINAGE (8 nov.) ──────────────────────────────────────────────────
@@ -972,50 +1147,7 @@ async function lireCorpsJson(req) {
   try { return JSON.parse(b.toString('utf8')); } catch (_) { return null; }
 }
 
-// Supprime au nom du SERVEUR (clé de service). Rend le nombre de lignes
-// effacées (`Content-Range: */N`), 0 si la table n'existe pas ici (404), ou
-// `null` si la base a refusé ou n'a pas répondu — jamais un succès supposé.
-async function effacer(chemin, SERVICE) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, {
-      method: 'DELETE',
-      headers: { ...sbCle(SERVICE), Prefer: 'count=exact,return=minimal' },
-    });
-    if (r.status === 404) return 0;
-    if (!r.ok) return null;
-    const m = /\/(\d+)\s*$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');
-    return m ? Number(m[1]) : 0;
-  } catch (_) { return null; }
-}
-
-// Le cache de photos détourées du vendeur (compartiment privé `detourage`,
-// dossier `{owner}/`). Rend le nombre de fichiers effacés, ou `null`.
-async function viderCacheDetourage(owner, SERVICE) {
-  let n = 0;
-  try {
-    for (let tour = 0; tour < 50; tour++) {
-      const l = await fetch(`${SUPABASE_URL}/storage/v1/object/list/detourage`, {
-        method: 'POST',
-        headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prefix: owner, limit: 100, offset: 0 }),
-      });
-      if (l.status === 404 || l.status === 400) return n;     // pas de compartiment ici
-      if (!l.ok) return null;
-      const items = await l.json();
-      if (!Array.isArray(items)) return null;
-      const noms = items.map((x) => x && x.name).filter((x) => typeof x === 'string' && x && !x.includes('/') && x !== '.emptyFolderPlaceholder');
-      if (!noms.length) return n;
-      const d = await fetch(`${SUPABASE_URL}/storage/v1/object/detourage`, {
-        method: 'DELETE',
-        headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prefixes: noms.map((x) => `${owner}/${x}`) }),
-      });
-      if (!d.ok) return null;
-      n += noms.length;
-    }
-    return null;                                              // trop long : on ne dit pas « fini »
-  } catch (_) { return null; }
-}
+// (9 nov.) `effacer` et `viderCacheDetourage` vivent dans api/_lib/effacer-compte.js.
 
 // Ferme TOUTES ses sessions (app, extension, autres appareils).
 async function fermerSessions(req) {
@@ -1027,7 +1159,7 @@ async function fermerSessions(req) {
 
 const NON_TOUCHE = "Rien n'a été effacé.";
 const nb = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
-const PROPRIO_REFUS = "Ce compte est celui du propriétaire de VRM : le fermer effacerait toute la boutique. C'est désactivé exprès.";
+const PROPRIO_REFUS = "Ce compte est celui du propriétaire de VRM : le supprimer effacerait toute la boutique. C'est désactivé exprès.";
 
 
 // ── Discord déjà affiché sur un AUTRE compte VRM (30 octobre) ────────────────
@@ -1066,102 +1198,114 @@ async function discordDeja(req, res) {
   } catch (_) { return repondre(res, 200, { trouve: null }); }
 }
 
-async function fermerCompte(req, res) {
+// ── SUPPRIMER MON COMPTE (9 novembre, RGPD art. 17) ─────────────────────────
+// `?mode=supprimer` (et l'ancien `?mode=fermer`, même fonction, même exigence) :
+//   GET  ce qui SERA effacé et gardé (l'inventaire), sans rien toucher ;
+//   POST la suppression, sur confirmation FORTE vérifiée ici
+//        (api/_lib/suppression-compte.js : « SUPPRIMER » + mot de passe, ou
+//        connexion de moins de 10 minutes).
+// Les gardes, dans l'ordre (chacune refuse sans rien toucher) : session prouvée
+// par Supabase · identifiant UUID, jamais le neutre · clé de service · jamais le
+// propriétaire de l'installation (VRM_OWNER_UID, ce que dit `vrm_acces`, ET ce
+// que dit `vrm_reglages` — « pas su » ⇒ refus) · confirmation · inventaire
+// (une lecture ratée ⇒ rien) · l'abonnement arrêté chez Stripe (muet ⇒ rien).
+// L'effacement : `effacerCompte` (api/_lib/effacer-compte.js), la MÊME fonction
+// que le départ des clients partis.
+async function gardesSuppression(req, res) {
   const u = await utilisateurDe(req);
-  if (!u) return repondre(res, 401, { erreur: 'session', message: 'Connecte-toi à VRM pour fermer ton compte.' });
-  if (!UUID_RE.test(u.id)) return repondre(res, 400, { erreur: 'identite', message: NON_TOUCHE });
+  if (u === undefined) { repondre(res, 503, { erreur: 'session-pas-su', message: `Le service de connexion ne répond pas. ${NON_TOUCHE} Réessaie dans un instant.` }); return null; }
+  if (!u) { repondre(res, 401, { erreur: 'session', message: `Connecte-toi à VRM pour supprimer ton compte. ${NON_TOUCHE}` }); return null; }
+  if (!UUID_RE.test(u.id) || u.id === PROPRIETAIRE_NEUTRE) { repondre(res, 400, { erreur: 'identite', message: NON_TOUCHE }); return null; }
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-  if (!SERVICE) return repondre(res, 503, { erreur: 'non-configure', message: `La fermeture de compte n'est pas encore branchée sur le serveur. ${NON_TOUCHE}` });
-  if (process.env.VRM_OWNER_UID && process.env.VRM_OWNER_UID === u.id) return repondre(res, 403, { erreur: 'proprietaire', message: PROPRIO_REFUS });
+  if (!SERVICE) { repondre(res, 503, { erreur: 'non-configure', message: `La suppression de compte n'est pas encore branchée sur le serveur. ${NON_TOUCHE}` }); return null; }
+  const env = String(process.env.VRM_OWNER_UID || '').trim().toLowerCase();
+  if (env && env === u.id.toLowerCase()) { repondre(res, 403, { erreur: 'proprietaire', proprietaire: true, message: PROPRIO_REFUS }); return null; }
   const acc = await accesDe(req);
-  if (acc === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu vérifier ton compte. ${NON_TOUCHE} Réessaie dans un instant.` });
-  if (acc.proprietaire) return repondre(res, 403, { erreur: 'proprietaire', message: PROPRIO_REFUS });
+  if (acc === undefined) { repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu vérifier ton compte. ${NON_TOUCHE} Réessaie dans un instant.` }); return null; }
+  if (acc.proprietaire) { repondre(res, 403, { erreur: 'proprietaire', proprietaire: true, message: PROPRIO_REFUS }); return null; }
+  const proprio = await lireProprietaire({ url: SUPABASE_URL, service: SERVICE });
+  if (proprio === undefined) { repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu vérifier ton compte. ${NON_TOUCHE} Réessaie dans un instant.` }); return null; }
+  if (proprio && proprio === u.id.toLowerCase()) { repondre(res, 403, { erreur: 'proprietaire', proprietaire: true, message: PROPRIO_REFUS }); return null; }
+  return { u, SERVICE, proprio };
+}
+
+async function apercuSuppression(req, res) {
+  const g = await gardesSuppression(req, res);
+  if (!g) return;
+  const inv = await inventaire({ url: SUPABASE_URL, service: g.SERVICE, owner: g.u.id, proprio: g.proprio });
+  if (!inv) return repondre(res, 503, { erreur: 'inventaire', message: "Je n'ai pas pu compter tes données. Réessaie dans un instant." });
+  const ligne = await ligneDe(req);
+  return repondre(res, 200, { ok: true, proprietaire: false, nombres: inv,
+    abonnement: ligne === undefined ? null : { actif: !!(ligne && abonnementActif(ligne.statut)), resilie: !!(ligne && ligne.annule_fin_periode), fin: (ligne && ligne.fin_periode) || null },
+    fenetreMinutes: FENETRE_RECENTE_MS / 60000, mot: MOT_CONFIRMATION });
+}
+
+async function supprimerCompte(req, res) {
+  const g = await gardesSuppression(req, res);
+  if (!g) return;
+  const { u, SERVICE, proprio } = g;
   // La confirmation est vérifiée ICI, pas seulement à l'écran.
   const corps = await lireCorpsJson(req);
-  const tape = String((corps && corps.confirmation) || '').trim().toLowerCase();
-  const email = String(u.email || '').trim().toLowerCase();
-  if (!email || tape !== email) return repondre(res, 400, { erreur: 'confirmation', message: `Recopie exactement ton adresse email pour confirmer. ${NON_TOUCHE}` });
+  const conf = await verifierConfirmation({ corps, utilisateur: u, jeton: jetonDe(req),
+    verifier: (email, mdp) => verifierMotDePasse({ url: SUPABASE_URL, anon: ANON, email, motDePasse: mdp, id: u.id }) });
+  if (!conf.ok) return repondre(res, conf.code, { ok: false, erreur: conf.erreur, message: conf.message });
+  // L'inventaire : une lecture ratée ⇒ rien n'est effacé.
+  const inv = await inventaire({ url: SUPABASE_URL, service: SERVICE, owner: u.id, proprio });
+  if (!inv) return repondre(res, 503, { ok: false, erreur: 'inventaire', message: `Je n'ai pas pu compter tes données. ${NON_TOUCHE} Réessaie dans un instant.` });
 
-  // 1) L'abonnement, d'abord.
+  // 1) L'abonnement, d'abord : on n'efface jamais un compte encore prélevé.
   const ligne = await ligneDe(req);
-  if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu lire ton abonnement. ${NON_TOUCHE} Réessaie dans un instant.` });
-  const etapes = { abonnement: 'aucun' };
+  if (ligne === undefined) return repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: `Je n'ai pas pu lire ton abonnement. ${NON_TOUCHE} Réessaie dans un instant.` });
+  const etapes = { abonnement: 'aucun', confirmation: conf.par };
   if (ligne && ligne.abonnement_stripe && ligne.client_stripe && abonnementActif(ligne.statut)) {
     const STRIPE_MUET = `Je n'ai pas pu arrêter ton abonnement chez Stripe. ${NON_TOUCHE} Réessaie dans un instant.`;
-    if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: STRIPE_MUET });
+    if (!stripePret()) return repondre(res, 503, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
     const id = encodeURIComponent(ligne.abonnement_stripe);
     const lu = await stripeApi('GET', `subscriptions/${id}`);
-    if (!lu.ok || !lu.data) return repondre(res, 502, { erreur: 'stripe', message: STRIPE_MUET });
-    if (lu.data.customer !== ligne.client_stripe) return repondre(res, 403, { erreur: 'pas-a-toi', message: NON_TOUCHE });
+    if (!lu.ok || !lu.data) return repondre(res, 502, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
+    if (lu.data.customer !== ligne.client_stripe) return repondre(res, 403, { ok: false, erreur: 'pas-a-toi', message: NON_TOUCHE });
     if (abonnementActif(lu.data.status)) {
       const impaye = lu.data.status === 'past_due';
-      const r = impaye
-        ? await stripeApi('DELETE', `subscriptions/${id}`, null, `vrm-fer-${u.id}`)
-        : await stripeApi('POST', `subscriptions/${id}`, { cancel_at_period_end: 'true' }, `vrm-fer-${u.id}-${Math.floor(Date.now() / 60000)}`);
-      if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: STRIPE_MUET });
-      etapes.abonnement = impaye ? 'arrete' : 'resilie';
+      if (!impaye && lu.data.cancel_at_period_end) etapes.abonnement = 'deja-resilie';     // rejoué : rien à refaire
+      else {
+        const r = impaye
+          ? await stripeApi('DELETE', `subscriptions/${id}`, null, `vrm-fer-${u.id}`)
+          : await stripeApi('POST', `subscriptions/${id}`, { cancel_at_period_end: 'true' }, `vrm-fer-${u.id}-${Math.floor(Date.now() / 60000)}`);
+        if (!r.ok || !r.data) return repondre(res, 502, { ok: false, erreur: 'stripe', message: STRIPE_MUET });
+        etapes.abonnement = impaye ? 'arrete' : 'resilie';
+      }
     } else etapes.abonnement = 'deja-fini';
   }
-
-  // 2) Ses sessions. 3) Ses données. 4) Ses photos. 5) Son compte de connexion.
-  //    Chaque étape n'a lieu que si la précédente a réussi : un échec laisse un
-  //    compte qu'il peut rouvrir pour relancer, jamais des données orphelines.
+  // 2) Ses sessions (l'extension ne pourra plus renouveler la sienne).
   etapes.sessions = (await fermerSessions(req)) ? 'fermees' : 'non-fermees';
-  const filtre = `owner=eq.${encodeURIComponent(u.id)}`;
-  // Les photos et preuves en attente vivent hors des lignes du navigateur.
-  // Si leur effacement échoue, le compte reste récupérable pour recommencer.
-  etapes.profilPrive=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=in.(${lignesPriveesProfil(u.id).join(',')})`,SERVICE);
-  if(etapes.profilPrive===null)return repondre(res,503,{ok:false,erreur:'profil-non-efface',message:'La photo de profil et les preuves de connexion n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
-  // (22 oct., revue) Ses preuves d'adresse de réception vivent AUSSI sous le
-  // propriétaire neutre : son identifiant et l'adresse (demande en attente,
-  // adresse prouvée, et son compteur de demandes — même préfixe). Elles
-  // partent AVANT ses données ; illisible ⇒ rien d'autre n'est effacé, et c'est dit.
-  etapes.preuvesAdresse=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=like.vrm_email_preuve_*&data->>owner=eq.${encodeURIComponent(u.id)}`,SERVICE);
-  if(etapes.preuvesAdresse===null)return repondre(res,503,{ok:false,erreur:'preuves-non-effacees',message:'Tes adresses de réception confirmées n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
-  etapes.favoris=await effacerFavorisDe(u.id);
-  if(etapes.favoris===null)return repondre(res,503,{ok:false,erreur:'favoris-non-effaces',message:'La file des messages aux favoris n’a pas pu être effacée. Ton compte est conservé pour réessayer.'});
-  etapes.donnees = await effacer(`app_data?${filtre}`, SERVICE);
-  etapes.comptesVinted = etapes.donnees === null ? null : await effacer(`vinted_accounts?${filtre}`, SERVICE);
-  etapes.compteurs = etapes.comptesVinted === null ? null : await effacer(`detourage_usage?${filtre}`, SERVICE);
-  // Son équipe (migration 016) : ses invitations comme vendeur ET comme membre.
-  // Base sans la 016 ⇒ 0 (rien à effacer) ; base muette ⇒ null (incomplet).
-  etapes.equipe = etapes.compteurs === null ? null : await effacerEquipe(u.id, SERVICE);
-  // Sa présence sur la carte de la communauté (migration 018) : présence,
-  // conversations, blocages, signalements. Base sans la 018 ⇒ 0.
-  etapes.communaute = etapes.equipe === null ? null : await effacerCommunaute(u.id, SERVICE);
-  etapes.photos = etapes.communaute === null ? null : await viderCacheDetourage(u.id, SERVICE);
-  let connexion = false;
-  if (etapes.photos !== null) {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { method: 'DELETE', headers: sbCle(SERVICE) });
-      connexion = r.ok;
-    } catch (_) { connexion = false; }
-  }
-  etapes.connexion = connexion ? 'supprimee' : 'conservee';
-
-  // Ce qui a été fait, ce qui ne l'a pas été — en clair.
-  const fait = [], pasFait = [];
-  if (etapes.abonnement === 'resilie') fait.push('abonnement résilié (aucun nouveau prélèvement)');
+  // 3) Tout le reste, compte de connexion en dernier.
+  const r = await effacerCompte({ url: SUPABASE_URL, service: SERVICE, owner: u.id, proprio, inv });
+  Object.assign(etapes, r.etapes);
+  const fait = [];
+  if (etapes.abonnement === 'resilie' || etapes.abonnement === 'deja-resilie') fait.push('abonnement résilié (aucun nouveau prélèvement)');
   if (etapes.abonnement === 'arrete') fait.push('abonnement arrêté');
-  if (etapes.preuvesAdresse > 0) fait.push('tes adresses de réception confirmées effacées');
-  if (etapes.donnees !== null) fait.push(`tes données effacées (${nb(etapes.donnees, 'élément', 'éléments')})`);
-  if (etapes.comptesVinted != null) fait.push(nb(etapes.comptesVinted, 'compte Vinted délié', 'comptes Vinted déliés'));
-  if (etapes.equipe != null && etapes.equipe > 0) fait.push(nb(etapes.equipe, 'invitation d’équipe effacée', 'invitations d’équipe effacées'));
-  if (etapes.communaute != null && etapes.communaute > 0) fait.push('ta présence sur la carte de la communauté effacée');
-  if (etapes.photos != null && etapes.photos > 0) fait.push(nb(etapes.photos, 'photo détourée effacée', 'photos détourées effacées'));
-  if (etapes.donnees === null) pasFait.push('tes données', 'tes comptes Vinted');
-  else if (etapes.comptesVinted === null) pasFait.push('tes comptes Vinted');
-  else if (etapes.compteurs === null) pasFait.push('tes compteurs de détourage');
-  else if (etapes.equipe === null) pasFait.push('ton équipe');
-  else if (etapes.communaute === null) pasFait.push('ta présence sur la carte de la communauté');
-  else if (etapes.photos === null) pasFait.push('tes photos détourées');
-  if (!connexion) pasFait.push('ton compte de connexion');
-  const ok = connexion && etapes.donnees !== null && etapes.comptesVinted !== null && etapes.compteurs !== null && etapes.equipe !== null && etapes.communaute !== null && etapes.photos !== null;
-  const message = ok
-    ? `Ton compte VRM est fermé : ${fait.join(', ')}.`
-    : `Fermeture INCOMPLÈTE. Fait : ${fait.length ? fait.join(', ') : 'rien'}. Pas encore effacé : ${pasFait.join(', ')}. Reconnecte-toi et relance « Fermer mon compte ».`;
-  if (!ok) console.warn('[fermer-compte] incomplet', JSON.stringify(etapes));
-  return repondre(res, ok ? 200 : 502, { ok, etapes, message });
+  fait.push(...r.fait);
+  // 4) Le journal minimal (sans contenu), puis l'e-mail — ni l'un ni l'autre ne
+  //    change l'issue (elle est dite à part).
+  etapes.journal = (await noterJournal({ url: SUPABASE_URL, service: SERVICE, owner: u.id, ok: r.ok, nombres: { ...inv, donneesEffacees: r.etapes.donnees } })) ? 'note' : 'non-note';
+  etapes.email = 'non-envoye';
+  if (r.ok && u.email && u.emailConfirme) {
+    const cfg = configurationRelances();
+    if (cfg.pret) {
+      try {
+        try { await lireMentions(); } catch (_) {}
+        const m = mailSuppression({ fait, contact: contactEmail() });
+        const v = await envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
+          de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: u.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } });
+        etapes.email = (v && v.issue) || 'incertain';
+      } catch (_) { etapes.email = 'incertain'; }
+    } else etapes.email = 'non-configure';
+  }
+  const message = r.ok
+    ? `Ton compte VRM est supprimé : ${fait.join(', ')}.`
+    : `Suppression INCOMPLÈTE. Fait : ${fait.length ? fait.join(', ') : 'rien'}. Pas encore effacé : ${r.pasFait.join(', ')}. Reconnecte-toi et relance « Supprimer mon compte ».`;
+  if (!r.ok) console.warn('[supprimer-compte] incomplet', JSON.stringify(etapes));
+  return repondre(res, r.ok ? 200 : 502, { ok: r.ok, etapes, message });
 }
 
 // La session est vérifiée avant toute lecture du CDN.
@@ -1404,7 +1548,7 @@ async function mesures(req, res) {
 async function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30');
-  const etat = await etatPublic({ pushPret: pushConfigure(), anon: ANON });
+  const [etat, statut] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
   return repondre(res, 200, {
     ok: true,
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
@@ -1415,6 +1559,7 @@ async function sante(req, res) {
     stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
     relancesEssai: configurationRelances().pret,
     etat,
+    statut,
   });
 }
 
@@ -1454,6 +1599,8 @@ export default async function handler(req, res) {
   if (mode === 'abonnement') return m === 'GET' ? abonnement(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'checkout') return m === 'POST' ? checkout(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'portail') return m === 'POST' ? portail(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'compte-vendeur') return m === 'POST' ? compteVendeur(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'changer-plan') return m === 'POST' ? changerPlan(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'parrainage') return (m === 'GET' || m === 'POST') ? parrainage(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'factures') return m === 'GET' ? factures(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
@@ -1469,10 +1616,22 @@ export default async function handler(req, res) {
   if (mode === 'discord') return m === 'GET' ? retourDiscord(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'discord-deja') return m === 'GET' ? discordDeja(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
-  if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  // (9 nov.) « Supprimer mon compte » : GET l'inventaire, POST la suppression ;
+  // l'ancien `fermer` mène à la MÊME fonction (même confirmation forte).
+  if (mode === 'supprimer' || mode === 'fermer') return m === 'POST' ? supprimerCompte(req, res) : (m === 'GET' && mode === 'supprimer') ? apercuSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
+  // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :
+  // jeton vérifié d'abord, propriétaire seul (403 sinon), clé de service après.
+  if (mode === 'pilotage') {
+    if (m !== 'GET') return repondre(res, 405, { erreur: 'GET seulement' });
+    const utilisateur = await vendeurExige(req, res);
+    if (!utilisateur) return;
+    res.setHeader('Cache-Control', 'no-store');
+    const r = await routePilotage({ utilisateur });
+    return repondre(res, r.code, r.corps);
+  }
   if (mode === 'mesures') return (m === 'GET' || m === 'POST') ? mesures(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

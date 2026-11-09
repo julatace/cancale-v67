@@ -710,11 +710,14 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     reset(); const r = faireRes(); await compte(req({ mode: 'sante' }), r);
     // (6 nov.) Sauf `etat`, la page d'état publique : trois mots permis par morceau
     // et l'heure de la vérification — toujours aucun secret (api/_lib/etat-public.js).
-    const { etat, ...oui } = r.corps || {};
+    // (9 nov.) `statut` : l'état PUBLIC des sondes (/statut automatique, api/_lib/statut-sondes.js) — mots fixes, dates et durées ;
+    // null quand pas encore vérifié. Jugé à part : jamais un secret (jeton, clé, e-mail).
+    const { etat, statut, ...oui } = r.corps || {};
+    const statutPropre = statut === undefined || statut === null || (typeof statut === 'object' && !/eyJ|sk_|rk_|whsec_|@|service_role/i.test(JSON.stringify(statut)));
     const valeurs = Object.values(oui);
     const etatPropre = etat === undefined || (etat && typeof etat === 'object' && JSON.stringify(Object.keys(etat)) === JSON.stringify(['base', 'emails', 'notifications', 'verifieA'])
       && ['base', 'emails', 'notifications'].every((k) => ['ok', 'panne', 'inconnu'].includes(etat[k])) && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(etat.verifieA));
-    dit(r.code === 200 && valeurs.every((v) => typeof v === 'boolean') && etatPropre, 'la route publique de santé ne rend que des oui/non et l’état public (aucun secret)', JSON.stringify(r.corps));
+    dit(r.code === 200 && valeurs.every((v) => typeof v === 'boolean') && etatPropre && statutPropre, 'la route publique de santé ne rend que des oui/non et l’état public (aucun secret)', JSON.stringify(r.corps));
   });
 
   console.log(ko ? `\n${ko} contrôle(s) en échec, ${ok} vert(s).` : `\n✅ abonnement : ${ok} contrôles verts.`);

@@ -92,9 +92,19 @@ function versionsPubliees({ racine } = {}) {
 
 // Les versions publiées dont AU MOINS UN contenu n'a pas la fonction `fn`.
 const aLaFonction = (bg, fn) => new RegExp('function\\s+' + fn + '\\b').test(bg || '');
+// (9 nov.) « fichier:fonction » : une capacité qui vit hors du service worker (la carte du
+// logo, `vrm-badge.js:cadreVoulu`) se juge dans CE fichier de chaque contenu publié.
+// Fichier illisible pour un commit ⇒ compté « sans » (pas su ≠ oui).
 function versionsSans(pub, fn) {
   const s = new Set();
-  for (const c of (pub && pub.commits) || []) if (!aLaFonction(c.bg, fn)) s.add(c.version);
+  const commits = (pub && pub.commits) || [];
+  if (String(fn).includes(':')) {
+    const [fic, nom] = String(fn).split(':');
+    const blobs = lireBlobs(pub.depot, commits.map((c) => `${c.sha}:vinted-sync-extension/${fic}`)) || [];
+    commits.forEach((c, k) => { if (!aLaFonction(blobs[k], nom)) s.add(c.version); });
+    return [...s];
+  }
+  for (const c of commits) if (!aLaFonction(c.bg, fn)) s.add(c.version);
   return [...s];
 }
 

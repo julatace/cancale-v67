@@ -66,7 +66,35 @@ const montantsDe = (...vs) => [...new Set(vs.map(centimes).filter((x) => x != nu
 // Le nom de domaine d'une photo n'est pas l'article : seule l'adresse est gardée pour la vignette.
 const urlPhoto = (p) => { if (!p) return ''; if (typeof p === 'string') return p; return str(p.url || p.full_size_url || (p.thumbnails && p.thumbnails[0] && p.thumbnails[0].url) || ''); };
 
-export const TYPES = ['paire', 'vente', 'achat', 'colis', 'annonce', 'facture'];
+export const TYPES = ['paire', 'vente', 'achat', 'colis', 'message', 'annonce', 'facture'];
+
+// (9 nov., recherche universelle) CE QUE LA REQUÊTE A L'AIR D'ÊTRE — pour le
+// DIRE (« Je cherche : un N° · un n° de transaction »), jamais pour décider à la
+// place de l'index : chaque genre reconnu est cherché, aucun n'est écarté sur
+// cette seule forme. Les genres, du plus sûr au moins sûr :
+//   montant · commande-ebay (12-34567-89012) · numero (cleNum : « b125 », « 007 »)
+//   · transaction (que des chiffres, 8 et plus) · suivi (lettres ET chiffres, 10 et
+//   plus) · code (4 à 8 lettres/chiffres) · pseudo · mots (le titre).
+// `numero` : la clé du N° reconnue par l'app (`lireNumeroCherche`) — c'est elle
+// qui fait foi pour les séries (préfixe, archive « B »), pas cette forme.
+export const GENRES_REQUETE = { montant: 'un montant', 'commande-ebay': 'un n° de commande eBay', numero: 'un N°', transaction: 'un n° de transaction ou de commande', suivi: 'un n° de suivi', code: 'un code de retrait', pseudo: 'un pseudo', mots: 'des mots du titre' };
+export function reconnaitreRequete(q, { numero = null } = {}) {
+  const brut = str(q).trim();
+  if (!brut) return { genres: [], principal: null };
+  const g = [];
+  const qa = alnum(brut);
+  if (montantCherche(brut) != null) return { genres: ['montant'], principal: 'montant' };
+  if (/^\d{2}-\d{5}-\d{5}$/.test(brut.replace(/\s+/g, ''))) g.push('commande-ebay');
+  if (numero) g.push('numero');
+  const un = !/\s/.test(brut);
+  if (un && /^\d{8,}$/.test(qa)) g.push('transaction');
+  if (un && qa.length >= 10 && /[A-Z]/.test(qa) && /\d/.test(qa)) g.push('suivi');
+  else if (un && /^\d{10,}$/.test(qa)) g.push('suivi');
+  if (un && qa.length >= 4 && qa.length <= 8 && !numero) g.push('code');
+  if (un && /^[a-z0-9._-]{3,}$/i.test(brut) && /[a-z]/i.test(brut)) g.push('pseudo');
+  if (/[a-z]/i.test(brut)) g.push('mots');
+  return { genres: g, principal: g[0] || 'mots' };
+}
 export const MAX_PAR_GROUPE = 25;
 
 // sources : { ventes, achats, pseudos: [{ tx, pseudo }], bordereaux: [{ tx, suivi }],
@@ -75,6 +103,13 @@ export const MAX_PAR_GROUPE = 25;
 //           annonces: [{ id, title, brand, size, price, photo, uid }] (en ligne, lues) — `null` = pas lues,
 //           factures: [{ id, number, refs (autres identités : n° de l'article), titre, acheteur, montant, date, pro }],
 //           numerosTx: { [transaction]: N° } (la correction posée à la main, sinon transaction → annonce → fiche)
+//           (9 nov.) autres: [{ site: 'ebay'|'leboncoin'|'vestiaire', id, ref, titre, pseudo, montant, date, numero, compte, photo }]
+//             — les ventes hors Vinted, chacune par SON n° de commande (eBay : orderId ; Leboncoin :
+//             l'id de la vente ; Vestiaire : l'id de la vente, la réf. du produit). Le N° n'y est
+//             que s'il est porté par une IDENTITÉ (SKU `VRM-{n°}`, lien, référence), jamais par le titre ;
+//           messages: [{ uid, conv, tx, titre, pseudo, date }] — une conversation Vinted par
+//             (compte, n° de conversation) ; elle se trouve par SA transaction, son interlocuteur,
+//             les mots de la paire — et ouvre CETTE conversation.
 // Chaque source peut manquer (null/undefined) : on indexe ce qu'on a.
 export function indexRecherche(sources) {
   const S = sources || {};
@@ -125,6 +160,30 @@ export function indexRecherche(sources) {
     parSuivi.set(k, e); entrees.push(e);
   }
   for (const e of entrees) if (e.type === 'colis' && !e.montants) { e.montants = []; e.photo = ''; e.numero = ''; }
+  // (9 nov.) LES VENTES HORS VINTED : une entrée par (site, id de la vente). Le n° de
+  // commande est une IDENTITÉ (`nums`, cherchée comme un n° de facture) ; le titre ne
+  // sert qu'à proposer.
+  const vusAutres = new Set();
+  for (const x of Array.isArray(S.autres) ? S.autres : []) {
+    if (!x || !x.site || x.id == null || !str(x.id).trim()) continue;
+    const cle = 'vente:' + x.site + ':' + str(x.id);
+    if (vusAutres.has(cle)) continue; vusAutres.add(cle);
+    const pseudo = str(x.pseudo).trim();
+    entrees.push({ type: 'vente', site: str(x.site), cle, id: str(x.id), tx: '', o: null, x, titre: str(x.titre), t: normaliser(x.titre),
+      numero: str(x.numero).trim(), commande: str(x.ref || x.id), nums: [...new Set([x.ref, x.id].map(alnum).filter((v) => v.length >= 5))], par0: 'commande',
+      photo: urlPhoto(x.photo), compte: str(x.compte || ''), pseudos: pseudo ? [normaliser(pseudo)] : [], pseudosAff: pseudo ? [pseudo] : [], suivis: [], codes: [],
+      montants: x.montant != null && Number.isFinite(Number(x.montant)) && Number(x.montant) > 0 ? [Math.round(Number(x.montant))] : [], date: str(x.date) });
+  }
+  // (9 nov.) LES CONVERSATIONS VINTED : une entrée par (compte, conversation).
+  const vusConv = new Set();
+  for (const m of Array.isArray(S.messages) ? S.messages : []) {
+    if (!m || m.conv == null || !str(m.conv).trim()) continue;
+    const cle = 'message:' + str(m.uid) + '_' + str(m.conv);
+    if (vusConv.has(cle)) continue; vusConv.add(cle);
+    const pseudo = str(m.pseudo).trim();
+    entrees.push({ type: 'message', cle, id: str(m.conv), compte: str(m.uid || ''), tx: alnum(m.tx), o: null, m, titre: str(m.titre), t: normaliser(m.titre),
+      numero: '', photo: urlPhoto(m.photo), pseudos: pseudo ? [normaliser(pseudo)] : [], pseudosAff: pseudo ? [pseudo] : [], suivis: [], codes: [], montants: [], date: str(m.date) });
+  }
   // (6 nov.) LES PAIRES : une entrée par fiche (l'id de SON annonce). Une annonce
   // en ligne qui a une fiche N° est la MÊME paire (même id) : elle allume
   // « en ligne » sur la fiche, jamais une seconde ligne. `null` = dressing pas lu.
@@ -169,7 +228,7 @@ export function indexRecherche(sources) {
 let _memo = { cles: null, index: null };
 export function indexMemo(sources) {
   const S = sources || {};
-  const cles = [S.ventes, S.achats, S.pseudos, S.bordereaux, S.colis, S.fiches, S.annonces, S.factures, S.numerosTx];
+  const cles = [S.ventes, S.achats, S.pseudos, S.bordereaux, S.colis, S.fiches, S.annonces, S.factures, S.numerosTx, S.autres, S.messages];
   if (_memo.cles && _memo.cles.length === cles.length && _memo.cles.every((x, i) => x === cles[i])) return _memo.index;
   const index = indexRecherche(S);
   _memo = { cles, index };
@@ -178,7 +237,7 @@ export function indexMemo(sources) {
 
 // Le rang d'une trouvaille : une identité exacte d'abord, puis une identité
 // partielle, le pseudo, enfin le titre.
-const RANG = { code: 0, numero: 0.5, suivi: 1, transaction: 1, facture: 1, montant: 2, pseudo: 3, titre: 4 };
+const RANG = { code: 0, numero: 0.5, suivi: 1, transaction: 1, commande: 1, facture: 1, montant: 2, pseudo: 3, titre: 4 };
 
 // Cherche `q` dans l'index. Rend { q, groupes: { paire: [...], vente: [...], … }, totaux, total }
 // chaque résultat = { e (l'entrée), par: 'code'|'numero'|'suivi'|'transaction'|'facture'|'montant'|'pseudo'|'titre', exact, valeur }.
@@ -204,7 +263,11 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null 
     if (!par && qa.length >= 4 && e.codes.length) { const c = e.codes.find((x) => x === qa); if (c) { par = 'code'; exact = true; valeur = c; } }
     if (!par && qa.length >= 6 && e.suivis.length) { const s = e.suivis.find((x) => x.includes(qa)); if (s) { par = 'suivi'; exact = s === qa; valeur = s; } }
     if (!par && chiffres && qa.length >= 5 && e.tx && e.tx.includes(qa)) { par = 'transaction'; exact = e.tx === qa; valeur = e.tx; }
-    if (!par && qa.length >= 3 && e.nums && e.nums.length) { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'facture'; exact = n === qa; valeur = e.facture; } }
+    if (!par && qa.length >= 3 && e.nums && e.nums.length) {
+      // (9 nov.) Un n° de commande (eBay, Leboncoin, Vestiaire) : cinq signes au moins, comme une transaction.
+      if (e.par0 === 'commande') { if (qa.length >= 5) { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'commande'; exact = n === qa; valeur = e.commande; } } }
+      else { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'facture'; exact = n === qa; valeur = e.facture; } }
+    }
     if (!par && qn.length >= 3 && e.pseudos.length) { const i = e.pseudos.findIndex((p) => p.includes(qn)); if (i >= 0) { par = 'pseudo'; exact = e.pseudos[i] === qn; valeur = e.pseudosAff[i]; } }
     if (!par && e.t && mots.every((m) => e.t.includes(m))) { par = 'titre'; }
     if (par) trouve.push({ e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) });
@@ -231,7 +294,13 @@ export function suggestions(index, { n = 3 } = {}) {
 // Où mène un résultat (l'écran existant, par IDENTITÉ) : { tab, cible }.
 export function destinationResultat(r) {
   const e = r && r.e; if (!e) return null;
-  if (e.type === 'vente') return e.tx ? { tab: 'ventes', cible: { type: 'vente', tx: e.tx } } : { tab: 'ventes', cible: null };
+  // (9 nov.) Une vente hors Vinted ouvre SA vente sur SON site, par SON n° de commande.
+  if (e.type === 'vente' && e.site === 'ebay') return { tab: 'ebay_ventes', ebay: { compte: e.compte || null, orderId: e.id } };
+  if (e.type === 'vente' && e.site === 'vestiaire') return { tab: 'vestiaire_ventes', sub: 'vestiaire', cible: { type: 'vcvente', vc: e.id } };
+  if (e.type === 'vente' && e.site === 'leboncoin') return { tab: 'ventes', sub: 'leboncoin', cible: null };
+  if (e.type === 'vente') return e.tx ? { tab: 'ventes', sub: 'vinted', cible: { type: 'vente', tx: e.tx } } : { tab: 'ventes', sub: 'vinted', cible: null };
+  // (9 nov.) Une conversation ouvre CETTE conversation (compte + n°).
+  if (e.type === 'message') return { tab: 'cat_msg', cible: { type: 'conv', conv: e.id, compte: e.compte || '' } };
   if (e.type === 'achat') return e.tx ? { tab: 'achats', cible: { type: 'achat', tx: e.tx } } : { tab: 'achats', cible: null };
   if (e.type === 'colis') {
     const c = e.c || {};

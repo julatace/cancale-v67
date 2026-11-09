@@ -20,7 +20,9 @@ import { photoACacherSelon, poserReglesStream, normaliserRegles, masquerTexteStr
 import { noterTicketDiscord } from '../communaute/discordAttente.js';
 import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
-import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit, apercuNumeroEcrit } from '../numeroEcrit.js';
+import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
+// (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
+const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
 import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
@@ -28,6 +30,10 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
+// (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
+import { OffresSoloPro, ouvrirQuelCompte } from '../abonnement/PlansSoloPro.jsx';
+import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
+import { publierAbonnement } from '../abonnement/etatAbonnement.js';
 
 // (8 nov.) « Vérifier mon installation » : le même contrôle que le guide de démarrage (src/guideDemarrage.js).
 import { VerifierInstallationApp } from '../App.jsx';
@@ -65,6 +71,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
+import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -1165,7 +1172,9 @@ async function sourcesExportDonnees() {
   };
 }
 async function exporterMesDonnees() {
-  if (lectureSeuleActive()) { toast(EXPORT_FERME); return; }
+  // (9 nov., Julien) Sans abonnement, l'export de SES données reste ouvert (RGPD, portabilité,
+  // art. 20) : il ne sert pas à utiliser VRM, seulement à repartir avec ses données. La
+  // « Sauvegarde complète » (restaurer VRM) reste, elle, fermée sans abonnement.
   try {
     const src = await sourcesExportDonnees();
     const zip = zipStocke(fichiersExport(feuillesExport(src)));
@@ -1665,7 +1674,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const corps = (<>
       {it.ic && <IconeReglage name={it.ic}/>}
       <span className="vrm-set-lib">
-        <b style={{color:C.text}}>{it.lib}</b>
+        <b style={{color: it.ton === 'danger' ? C.danger : C.text}}>{it.lib}</b>
         {/* (6 nov., onglets D) « Chaque réglage dit en une phrase ce qu'il fait » (demande du 6 nov.,
             qui remplace la critique #1.4 du 3 nov.) : la phrase revient, UNE ligne grise, courte ;
             une alerte (un élément) garde sa couleur. */}
@@ -1714,7 +1723,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── TES DONNÉES ET LES CONDITIONS
   const donnees = (
     <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
-      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Fermer ton compte</b> : « Fermer mon compte »</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
+      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Supprimer ton compte</b> : « Supprimer mon compte », tout en bas</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
         {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accentTexte,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
@@ -1859,6 +1868,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
+      // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
+      // voit l'entrée, et la route refuse tout autre compte (403).
+      proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'pulse', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>VRM semble en panne</summary><p>La page d’état dit, minute par minute, si la base, la réception des e-mails et les notifications fonctionnent, et les incidents connus. Si tout y fonctionne, le souci vient sans doute de cet appareil : recharge la page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
@@ -1912,7 +1924,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
-      AUTH.user && { id:'fermer', type:'panneau', ic:'trash', lib:'Fermer mon compte', el:<FermerCompte/> },
+    ]},
+    // (9 nov., RGPD) « Supprimer mon compte » : TOUT EN BAS de Mon compte, seul, discret
+    // (le libellé dans la couleur `danger` du thème — le rouge est réservé aux doublons, §7).
+    AUTH.user && { id:'supprimer', titre:null, items:[
+      { id:'fermer', type:'panneau', ic:'trash', lib:'Supprimer mon compte', ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
     ]},
   ] : [
     { id:'donnees', titre:'Tes données', items:[
@@ -2092,21 +2108,6 @@ const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', unc
 // on ne fait pas confiance à une seula moitié).
 const lienFacture = (u) => (typeof u === 'string' && /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//.test(u) ? u : null);
 
-// ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────
-// La politique de confidentialité promet l'effacement ; il fallait écrire à une
-// adresse qui n'existe pas encore. Le serveur fait le travail
-// (api/compte.js?mode=fermer) et rend ce qui a été fait ET ce qui ne l'a pas
-// été : l'écran l'affiche tel quel — jamais « compte fermé » sur un échec.
-// Trois états de réponse : `{ ok:true }` fermé · `{ ok:false, message }` dit
-// par le serveur · pas de réponse = PAS SU (on ne prétend ni l'un ni l'autre).
-async function fermerMonCompte(confirmation) {
-  try {
-    const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation }) });
-    const j = await r.json().catch(() => null);
-    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
-    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
-  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
-}
 // ── DOUBLE VÉRIFICATION — le panneau de Réglages → Mon compte → Connexion ──
 // Trois états pour la lecture des facteurs : `undefined` en cours · `null` pas
 // su (GoTrue injoignable : on le dit, « Réessayer ») · l'objet lu.
@@ -2483,81 +2484,144 @@ function JournalVrm() {
     </div>
   );
 }
-function FermerCompte() {
+// ── SUPPRIMER MON COMPTE (9 novembre, RGPD ; « Fermer mon compte » du 5 oct.) ──
+// Tout en bas de Mon compte. L'écran EXPLIQUE (ce qui part, ce qui reste et
+// pourquoi — les nombres viennent du serveur, `GET ?mode=supprimer`), propose
+// d'abord l'export, puis demande la confirmation FORTE : « SUPPRIMER » tapé, et
+// le mot de passe (un compte Google/Discord sans mot de passe : une connexion de
+// moins de 10 minutes). C'est le SERVEUR qui juge les deux
+// (api/_lib/suppression-compte.js) ; l'écran n'affiche que ce qu'il répond —
+// jamais « supprimé » sur un échec. `data-fermer-*` gardés (bancs).
+// Trois états de lecture : `undefined` en cours · `null` pas su · l'objet lu.
+async function supprimerMonCompte({ confirmation, motDePasse }) {
+  try {
+    const r = await fetch('/api/compte?mode=supprimer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation, motDePasse }) });
+    const j = await r.json().catch(() => null);
+    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
+    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la suppression a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
+  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la suppression a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
+}
+async function lireInventaireSuppression() {
+  try {
+    const r = await fetch('/api/compte?mode=supprimer', { headers: { ...enTeteSession() }, cache: 'no-store' });
+    const j = await r.json().catch(() => null);
+    if (j && j.proprietaire === true) return { proprietaire: true };
+    if (r.ok && j && j.ok && j.nombres) return j;
+    return null;
+  } catch (_) { return null; }
+}
+const MOT_SUPPRIMER = 'SUPPRIMER';
+// Le compte a-t-il un mot de passe ? (identités de Supabase) — `null` pas dit.
+const aMotDePasse = () => {
+  const u = AUTH.user || {};
+  const p = Array.isArray(u.identities) ? u.identities.map((i) => i && i.provider) : (u.app_metadata && Array.isArray(u.app_metadata.providers) ? u.app_metadata.providers : null);
+  return p ? p.includes('email') : null;
+};
+function FermerCompte({ onExporter }) {
   const [ouvert, setOuvert] = React.useState(false);
-  // `undefined` en cours · `null` pas su · l'objet du serveur (`proprietaire`).
   const [info, setInfo] = React.useState(undefined);
   const [tape, setTape] = React.useState('');
+  const [mdp, setMdp] = React.useState('');
   const [occupe, setOccupe] = React.useState(false);
   const [fin, setFin] = React.useState(null);
   // (9 octobre) Ses RÈGLES D'OFFRE eBay restent posées chez eBay après la
-  // fermeture : eBay continuera d'accepter. Compté sur tous ses comptes eBay ;
-  // `undefined` en cours · `null` pas su · { oui, peutEtre } (`compterReglesEbay`).
+  // suppression : eBay continuera d'accepter (`compterReglesEbay`).
   const [reglesEbayN, setReglesEbayN] = React.useState(undefined);
+  const [essai, setEssai] = React.useState(0);
   React.useEffect(() => {
-    if (!ouvert || info !== undefined) return;
-    let mort = false;
-    lireAbonnement().then((x) => { if (!mort) setInfo(x); });
+    if (!ouvert) return;
+    let mort = false; setInfo(undefined);
+    lireInventaireSuppression().then((x) => { if (!mort) setInfo(x); });
     compterReglesEbay().then((n) => { if (!mort) setReglesEbayN(n); }).catch(() => { if (!mort) setReglesEbayN(null); });
     return () => { mort = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ouvert]);
-  const email = String((AUTH.user && AUTH.user.email) || '');
-  const pareil = !!email && tape.trim().toLowerCase() === email.trim().toLowerCase();
+  }, [ouvert, essai]);
+  const pareil = tape.trim() === MOT_SUPPRIMER;
+  const avecMdp = aMotDePasse();
   const valider = async () => {
     if (!pareil || occupe) return;
     setOccupe(true);
-    const r = await fermerMonCompte(tape.trim());
-    setOccupe(false);
+    const r = await supprimerMonCompte({ confirmation: tape.trim(), motDePasse: mdp });
+    setOccupe(false); setMdp('');
     setFin(r);
-    // Fermé : on efface aussi ce navigateur, puis retour à l'accueil public.
-    if (r.ok) setTimeout(() => { try { authSignOut(); } catch (_) {} location.assign('/'); }, 4000);
+    if (r.ok) setTimeout(() => { try { authSignOut(); } catch (_) {} location.assign('/'); }, 6000);
   };
-  const txt = { fontSize: 12, color: C.muted, lineHeight: 1.55 };
+  const txt = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
+  const champ = { width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 16, minHeight: 44, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' };
+  const titreBloc = { display: 'block', fontSize: 13, fontWeight: 600, color: C.text, marginTop: 14 };
+  const n = info && info.nombres;
+  const nb = (x, un, plusieurs) => `${x} ${x > 1 ? plusieurs : un}`;
   return (
-    <div data-fermer-compte="" style={{ padding: '13px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 }}>
+    <div data-fermer-compte="" data-supprimer-compte="" style={{ padding: '13px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 }}>
       <button type="button" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert}
-        style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+        style={{ display: 'flex', width: '100%', minHeight: 44, alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text }}>Fermer mon compte</span>
-          <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 2 }}>Efface tes données et ton compte VRM, définitivement.</span>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.danger }}>Supprimer mon compte</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Efface ton compte VRM et tes données, définitivement.</span>
         </span>
-        <span style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
+        <span aria-hidden="true" style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
       </button>
       {ouvert && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
           {fin ? (
-            <div data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
+            <div role="status" data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
               {fin.message}
-              {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l'extension VRM de ton navigateur. Retour à l'accueil dans un instant…</div>}
+              {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l’extension VRM de ton navigateur. Retour à l’accueil dans un instant…</div>}
+              {!fin.ok && <div style={{ marginTop: 10 }}><Bouton variante="secondaire" onClick={() => setFin(null)}>Revenir</Bouton></div>}
             </div>
           ) : info === undefined ? (
-            <div style={txt}>Vérification de ton compte…</div>
+            <div style={txt}>Je compte ce qui serait supprimé…</div>
           ) : info === null ? (
-            <div data-fermer-etat="pas-su" style={txt}>Compte pas vérifié : rien n'est proposé. Rouvre cet écran dans un instant.</div>
+            <div data-fermer-etat="pas-su" style={txt}>
+              Je n’ai pas pu compter tes données : rien n’est proposé tant que ce n’est pas su.
+              <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={() => setEssai((x) => x + 1)}>Réessayer</Bouton></div>
+            </div>
           ) : info.proprietaire ? (
             <div data-fermer-etat="proprietaire" style={txt}>
-              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Fermer ce compte effacerait toute la boutique : désactivé ici, exprès.
+              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Supprimer ce compte effacerait toute la boutique : désactivé ici, exprès.
             </div>
           ) : (
             <div data-fermer-etat="possible">
-              <div style={txt}>
-                Seront effacés : <b style={{ color: C.text }}>tes données VRM</b> (ventes, annonces captées, numéros, compta, réglages), <b style={{ color: C.text }}>tes comptes Vinted liés</b> et <b style={{ color: C.text }}>ton compte de connexion</b>.
-                {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
-                {' '}C'est <b style={{ color: C.text }}>définitif</b> : fais d'abord une « Sauvegarde complète » (Réglages), puis retire l'extension VRM de ton navigateur.
-              </div>
+              <span style={{ ...titreBloc, marginTop: 0 }}>1. D’abord, garde une copie</span>
+              <div style={txt}>Un fichier sur ton appareil : ventes, achats, stock, compta, factures.</div>
+              {onExporter && <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={onExporter} data-supprimer-exporter="">Exporter mes données</Bouton></div>}
+
+              <span style={titreBloc}>2. Ce qui sera supprimé</span>
+              <ul data-supprimer-liste="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
+                <li>Tes données VRM : ventes, annonces captées, numéros, compta, réglages, notifications ({nb(Math.max(0, n.donnees - n.facturesPro), 'élément', 'éléments')}).</li>
+                <li>{n.comptesVinted ? `Tes comptes Vinted liés (${n.comptesVinted}) et leurs connexions.` : 'Tes connexions aux sites de revente.'}</li>
+                <li>Tes adresses de réception et adresses VRM, tes photos, ton équipe, ta présence sur la carte{n.signalements ? `, tes signalements (${n.signalements})` : ''}.</li>
+                <li>Ton compte de connexion, en dernier.</li>
+                {info.abonnement && info.abonnement.actif && <li data-supprimer-abonnement="">Ton abonnement est résilié d’abord : aucun nouveau prélèvement.</li>}
+              </ul>
+
+              <span style={titreBloc}>3. Ce qui est gardé, et pourquoi</span>
+              <ul data-supprimer-garde="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
+                {n.facturesPro > 0 && <li data-supprimer-factures={n.facturesPro}>{nb(n.facturesPro, 'facture Pro émise', 'factures Pro émises')} : gardée{n.facturesPro > 1 ? 's' : ''} 10 ans, sans accès, parce que la loi l’exige (art. L123-22 du Code de commerce), puis effacée{n.facturesPro > 1 ? 's' : ''}. Exporte-les : c’est à toi de les conserver aussi.</li>}
+                <li>Les factures de ton abonnement VRM, chez Stripe (même obligation de 10 ans).</li>
+                <li>Une ligne sans contenu — la date et des nombres, ni ton e-mail ni ton identifiant — qui prouve que la suppression a été faite ; effacée au bout de 3 ans.</li>
+              </ul>
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
-              {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la fermeture, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
-              <label style={{ display: 'block', ...txt, marginTop: 10 }}>
-                Pour confirmer, recopie ton adresse : <b style={{ color: C.text }}>{email}</b>
-                <input type="email" autoComplete="off" autoCapitalize="none" value={tape} onChange={(e) => setTape(e.target.value)} placeholder={email}
-                  data-fermer-confirmation=""
-                  style={{ width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+              {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la suppression, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
+
+              <span style={titreBloc}>4. Confirme que c’est toi</span>
+              <label style={{ display: 'block', ...txt, marginTop: 4 }}>
+                Tape <b style={{ color: C.text }}>{MOT_SUPPRIMER}</b> en majuscules
+                <input type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={tape} onChange={(e) => setTape(e.target.value)}
+                  data-fermer-confirmation="" aria-label={`Tape ${MOT_SUPPRIMER} pour confirmer`} style={champ}/>
               </label>
-              <button type="button" className="vrm-b vrm-b-primaire" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
-                style={{ marginTop: 10 }}>
-                {occupe ? 'Fermeture en cours…' : 'Fermer définitivement mon compte'}
-              </button>
+              <label style={{ display: 'block', ...txt, marginTop: 10 }}>
+                Ton mot de passe VRM{avecMdp === false ? ' (ton compte n’en a pas)' : ''}
+                <input type="password" autoComplete="current-password" value={mdp} onChange={(e) => setMdp(e.target.value)}
+                  data-supprimer-mdp="" style={champ}/>
+              </label>
+              <div style={{ ...txt, fontSize: 12, marginTop: 6 }}>
+                {avecMdp === false
+                  ? 'Compte ouvert avec Google ou Discord : laisse vide si tu t’es connecté il y a moins de 10 minutes ; sinon déconnecte-toi, reconnecte-toi, puis reviens ici.'
+                  : 'Sans mot de passe (compte Google ou Discord) : une connexion de moins de 10 minutes suffit.'}
+              </div>
+              <Bouton variante="danger" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
+                {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
+              </Bouton>
             </div>
           )}
         </div>
@@ -2648,6 +2712,46 @@ function MonAbonnement() {
     toast(r.annuleFinPeriode ? `✓ Abonnement résilié — VRM reste ouvert jusqu'au ${dateLisible(r.finPeriode || e.finPeriode)}` : '✓ Abonnement repris — rien ne change pour toi');
   };
   const et = etatAbonnement(e);
+  // (9 nov.) SOLO ⇄ PRO : le prix change chez Stripe (prorata), CGV cochées avant.
+  const changerOffre = async (plan) => {
+    if (!cgv) { setMsg("Coche les deux cases (conditions de vente et accès immédiat) avant de changer d'offre."); return; }
+    const oui = await askConfirm({ title: plan === 'pro' ? 'Passer à Pro ?' : 'Revenir à Solo ?',
+      desc: plan === 'pro'
+        ? 'Les ventes de tous tes comptes reviennent tout de suite, dans tes listes et tes totaux. Stripe calcule la différence au prorata sur ta prochaine facture.'
+        : 'Un seul compte vendra : tu le choisiras ensuite. Les ventes de tes autres comptes sortent de tes totaux, rien n’est supprimé. Stripe calcule la différence au prorata.',
+      ok: plan === 'pro' ? 'Passer à Pro' : 'Revenir à Solo', cancel: 'Annuler' });
+    if (!oui) return;
+    setOccupe(plan); setMsg('');
+    try {
+      const r = await fetch('/api/compte?mode=changer-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ plan, cgv: true, accesImmediat: true }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j && j.ok) {
+        const x = await lireAbonnement();
+        if (x) { setE(x); publierAbonnement(x); }
+        toast(plan === 'pro' ? '✓ Tu es en Pro : tous tes comptes vendent' : '✓ Tu es en Solo : choisis le compte qui vend');
+        if (plan === 'solo') ouvrirQuelCompte();
+      } else setMsg((j && j.message) || "Ton offre n'a pas changé. Réessaie dans un instant.");
+    } catch (_) { setMsg('Pas de connexion : ton offre n’a pas changé.'); }
+    setOccupe('');
+  };
+  const PRO_AFFICHE = `${PRIX_PRO_MOIS} € / mois`;
+  const groupeOffres = (
+    <div data-groupe-offres="">
+      {/* Les offres ne se montrent qu'à un plan SÛR : un ancien prix (9,99 €…) ou un prix pas lu n'affiche jamais le prix du moment à côté du sien. */}
+      {e && (e.plan === 'solo' || e.plan === 'pro') && <OffresSoloPro x={e} prixSolo={prixLisible(e && e.prix)} prixActuel={et.prixAbonnement} prixProAffiche={PRO_AFFICHE} occupe={occupe}
+        onChoisirPro={e && e.plan === 'solo' ? () => changerOffre('pro') : null}
+        onChoisirSolo={e && e.plan === 'pro' && !e.proprietaire ? () => changerOffre('solo') : null}/>}
+      {e && e.plan === 'solo' && (
+        <GroupeIos titre="Le compte qui vend" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Tes autres comptes restent des comptes d’achat. Changement possible une fois tous les 30 jours.'}>
+          <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Pas encore choisi</span>}
+            detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
+            onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
+        </GroupeIos>
+      )}
+      {e && e.plan === 'solo' && e.offres && e.offres.pro && e.offres.pro.ouvert && <CaseCgv cases={cases} onChange={setCases}/>}
+      {e && e.plan == null && e.planRaison === 'cgv-anterieures' && <div className="vrm-ios-groupe-pied" data-plan-raison="cgv-anterieures" style={{ margin: '8px 16px 0' }}>Ton abonnement a été pris avant les offres Solo et Pro : tous tes comptes vendent, comme le disaient tes conditions.</div>}
+    </div>
+  );
   const pied = <div className="vrm-ios-groupe-pied" style={{ margin: '12px 16px 0' }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>;
   if (e === undefined) return <div data-abonnement="chargement" data-abonnement-etat="chargement"><Tete etat="Ton abonnement" phrase="Je regarde…"/></div>;
   if (e === null) return <div data-abonnement="pas-su" data-abonnement-etat="pas-su"><Tete etat="Ton abonnement" phrase="Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé."/></div>;
@@ -2676,7 +2780,17 @@ function MonAbonnement() {
             Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
           </div>
         )}
+        {e.offres && e.offres.pro && !e.offres.pro.ouvert && (
+          <div data-pro-geste={e.offres.pro.raison || 'pas-su'} style={note}>
+            {e.offres.pro.raison === 'prix-different'
+              ? <>L'offre Pro reste <b>fermée</b> : le prix réglé chez Stripe (<b data-pro-prix-stripe="">{e.offres.pro.texteStripe || 'un autre montant'}</b>) n'est pas celui des conditions de vente ({PRIX_PRO_MOIS} € / mois). Corrige le prix « VRM Pro » dans Stripe.</>
+              : e.offres.pro.raison === 'prix-illisible'
+                ? <>L'offre Pro reste <b>fermée</b> : le prix posé dans <b>STRIPE_PRIX_PRO</b> est introuvable (ou archivé) chez Stripe.</>
+                : <>L'offre Pro ({PRIX_PRO_MOIS} € / mois) s'affiche « bientôt », sans paiement. Pour l'ouvrir : Stripe → Produits → « VRM Pro » → prix récurrent {PRIX_PRO_MOIS} € EUR mensuel, clé de recherche « vrm_pro_mensuel » → copie l'identifiant price_… dans Vercel, variable <b>STRIPE_PRIX_PRO</b>.</>}
+          </div>
+        )}
       </Tete>
+      {groupeOffres}
     </div>
   );
   // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
@@ -2716,6 +2830,7 @@ function MonAbonnement() {
     return (<>
       <div data-abonnement="actif" data-abonnement-etat={et.etat} data-resilie={annule ? '' : undefined} data-essai-jours={enEssai && Number.isInteger(et.jours) ? et.jours : undefined}>
         {tete}
+        {groupeOffres}
         {annule && (
           <div className="vrm-abo-actions" style={{ padding: '0 0' }}>
             <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
@@ -2791,6 +2906,7 @@ function MonAbonnement() {
           {!e.obligatoire && <> Pour l'instant VRM reste gratuit pour toi.</>}
         </span>}>
         {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+        <OffresSoloPro x={e} prixSolo={prixLisible(e.prix)} prixProAffiche={`${PRIX_PRO_MOIS} € / mois`}/>
         <CaseCgv cases={cases} onChange={setCases}/>
         <div className="vrm-abo-actions">
           <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
@@ -3136,11 +3252,26 @@ function NumeroEcritSetting({ onAnnonces }) {
   React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lire()); }), []);
   const basculer = () => {
     touche.current = true;
-    const n = { actif: !r.actif, depuis: new Date().toISOString() };
+    const n = { ...r, actif: !r.actif, depuis: new Date().toISOString() };
     setR(n); save(CLE_NUMERO_ECRIT, n);
     try { window.dispatchEvent(new Event('vrm-numero-ecrit')); } catch (_) {}
     toast(n.actif ? 'C’est noté : VRM ne donne plus de numéro tout seul, il lit le tien.' : 'VRM redonne un numéro aux annonces qui n’en ont pas.');
   };
+  // (9 nov.) « Où est ton numéro ? » : plusieurs cochables, jamais zéro (`basculerOu`).
+  const cocher = (cle) => {
+    touche.current = true;
+    const n = basculerOu(r, cle);
+    if (n.ou.length === r.ou.length && n.ou.every((k, i) => k === r.ou[i])) { toast('Garde au moins un endroit : sinon VRM ne saurait où lire ton numéro.'); return; }
+    setR(n); save(CLE_NUMERO_ECRIT, n);
+    try { window.dispatchEvent(new Event('vrm-numero-ecrit')); } catch (_) {}
+  };
+  // L'essai : il colle sa description (ou son titre), VRM dit ce qu'il lit. Rien n'est enregistré.
+  const [essai, setEssai] = React.useState('');
+  const lectureEssai = essai.trim() ? (() => {
+    const d = r.ou.includes('description') ? lireNumeroTexte(essai, 'description') : null;
+    const t = r.ou.includes('titre') && !essai.includes('\n') ? lireNumeroTexte(essai, 'titre') : null;
+    return d && d.etat !== 'rien' ? { ...d, ou: 'à la fin' } : t && t.etat !== 'rien' ? { ...t, ou: 'dans le titre' } : (d || t || { etat: 'rien', raison: 'aucun N° écrit' });
+  })() : null;
   // Vinted : l'aperçu publié par l'écran Annonces (mis à jour en direct).
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => ecouterApercuEcrit(maj), []);
@@ -3184,11 +3315,15 @@ function NumeroEcritSetting({ onAnnonces }) {
     if (!stop) setAutres(out);
   })(); return () => { stop = true; }; }, []);
   const sites = [
-    ['vinted', 'Vinted', vinted, 'la fin de la description, puis le titre'],
-    ['leboncoin', 'Leboncoin', autres === undefined ? undefined : autres.leboncoin, 'la référence pro, la fin de la description, le titre'],
-    ['vestiaire', 'Vestiaire Collective', autres === undefined ? undefined : autres.vestiaire, 'le titre'],
-    ['ebay', 'eBay', autres === undefined ? undefined : autres.ebay, 'le SKU, puis le titre'],
-  ];
+    ['vinted', 'Vinted', vinted, [['description', 'la fin de la description'], ['titre', 'le titre']]],
+    ['leboncoin', 'Leboncoin', autres === undefined ? undefined : autres.leboncoin, [['ref', 'la référence pro'], ['description', 'la fin de la description'], ['titre', 'le titre']]],
+    ['vestiaire', 'Vestiaire Collective', autres === undefined ? undefined : autres.vestiaire, [['titre', 'le titre']]],
+    ['ebay', 'eBay', autres === undefined ? undefined : autres.ebay, [['ref', 'le SKU'], ['titre', 'le titre']]],
+  ].map(([cle, nom, a, ou]) => {
+    // (9 nov.) Ce que VRM lit sur ce site, selon les endroits cochés.
+    const lus = ou.filter(([k]) => r.ou.includes(k)).map(([, t]) => t);
+    return [cle, nom, a, lus.length ? lus.join(', ') : 'rien ici (aucun endroit coché ne s’applique à ce site)'];
+  });
   const nomsDe = (a, etat) => (a ? a.lignes.filter((l) => l.etat === etat).map((l) => l.titre || 'Annonce') : []);
   const liste = (noms) => noms.slice(0, 3).join(' · ') + (noms.length > 3 ? '…' : '');
   const ligneSite = ([cle, nom, a, ou]) => {
@@ -3237,10 +3372,33 @@ function NumeroEcritSetting({ onAnnonces }) {
           </span>
         </button>
       </div>
+      {r.actif && <fieldset data-numero-ou={r.ou.join(',')} style={{border:'none',margin:'12px 0 0',padding:0}}>
+        <legend style={{fontSize:13,fontWeight:700,color:C.text,padding:0,marginBottom:4}}>Où est ton numéro ?</legend>
+        {OU_NUMERO.map((k) => (
+          <label key={k} data-numero-ou-case={k} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,cursor:'pointer',borderTop:`1px solid ${C.border}`}}>
+            <input type="checkbox" checked={r.ou.includes(k)} onChange={() => cocher(k)} style={{width:20,height:20,accentColor:C.accent,flexShrink:0}}/>
+            <span style={{flex:1,minWidth:0}}>
+              <span style={{display:'block',fontSize:14,color:C.text}}>{NOM_OU[k]}</span>
+              <span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45}}>{k === 'description' ? '« N° 123 » sur la dernière ligne. Vinted, Leboncoin.' : k === 'titre' ? 'Une seule fois, n’importe où dans le titre. Vinted, Leboncoin, Vestiaire, eBay.' : 'eBay : le SKU · Leboncoin pro : la référence. Vinted et Vestiaire : pas de champ lu pour l’instant.'}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>}
       <div data-numero-ecrit-exemple="" style={{marginTop:12,padding:'12px 14px',borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,fontSize:13,color:C.text,lineHeight:1.55}}>
         <div style={{fontWeight:700}}>Termine ta description par :</div>
         <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:15,marginTop:6}}>N° 123</div>
         <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #123 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être la pointure. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
+      </div>
+      <div data-numero-essai={lectureEssai ? lectureEssai.etat : 'vide'} style={{marginTop:12}}>
+        <label htmlFor="vrm-numero-essai" style={{display:'block',fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Essaie : colle une description</label>
+        <textarea id="vrm-numero-essai" value={essai} onChange={(e) => setEssai(e.target.value)} rows={3} placeholder={'Très bon état, pointure 42.\nN° 125'}
+          style={{width:'100%',boxSizing:'border-box',fontSize:16,lineHeight:1.4,padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.bg,color:C.text,resize:'vertical',fontFamily:'inherit'}}/>
+        {lectureEssai && <div role="status" data-numero-essai-cle={lectureEssai.etat === 'lu' ? lectureEssai.cle : ''} style={{fontSize:13,marginTop:6,lineHeight:1.5,color:lectureEssai.etat === 'lu' ? C.text : C.muted}}>
+          {lectureEssai.etat === 'lu' ? <>VRM lit <b>N°{lectureEssai.cle}</b> ({lectureEssai.ou}, « {lectureEssai.brut} »).</>
+            : lectureEssai.etat === 'ambigu' ? <>Deux numéros ({lectureEssai.cles.join(' et ')}) : VRM ne choisit pas. Garde-en un seul.</>
+            : lectureEssai.ailleurs ? <>Un N° est écrit, mais pas à la fin : mets « N° {lectureEssai.ailleurs} » sur la dernière ligne.</>
+            : <>Aucun numéro lu. Un nombre seul (« 42 ») n’est jamais pris : écris « N° 125 ».</>}
+        </div>}
       </div>
       <GuideReglage titre="Numéroter dans tes annonces" etapes={[
         ['Écris le numéro sur la boîte', 'Sur le carton, comme d’habitude.'],

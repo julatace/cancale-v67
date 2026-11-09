@@ -163,7 +163,14 @@ export function annulerDerniere(session, at = Date.now()) {
   const der = v[v.length - 1];
   return { session: avecN({ ...session, annulees: { ...(session.annulees || {}), [der.sid]: at } }), annulee: der };
 }
-export const terminerSession = (session, at = Date.now()) => (estObjet(session) ? { ...session, finAt: Math.max(Number(at) || 0, Number(session.reprisAt || 0) + 1) } : session);
+// (9 nov.) `constat` : le bilan FIGÉ au moment où il termine (`constatInventaire`) — ce
+// qu'il a constaté CE jour-là, relisible plus tard tel quel (« Inventaires précédents »),
+// même quand les annonces ont changé depuis. Absent (inventaire d'avant) ⇒ rien d'inventé.
+export const terminerSession = (session, at = Date.now(), constat = null) => {
+  if (!estObjet(session)) return session;
+  const finAt = Math.max(Number(at) || 0, Number(session.reprisAt || 0) + 1);
+  return estObjet(constat) ? { ...session, finAt, constat: { ...constat, at: finAt } } : { ...session, finAt };
+};
 export const reprendreSession = (session, at = Date.now()) => (estObjet(session) ? { ...session, reprisAt: Math.max(Number(at) || 0, Number(session.finAt || 0) + 1) } : session);
 
 // ── 4. LA FUSION (deux appareils, une écriture qui a raté) ───────────────────
@@ -176,8 +183,12 @@ export function fusionnerSession(a, b) {
   const saisies = { ...(estObjet(b.saisies) ? b.saisies : {}), ...(estObjet(a.saisies) ? a.saisies : {}) };
   const annulees = { ...(estObjet(b.annulees) ? b.annulees : {}), ...(estObjet(a.annulees) ? a.annulees : {}) };
   const debut = Math.min(Number(a.debut) || Infinity, Number(b.debut) || Infinity);
+  // (9 nov.) Le constat le plus récent gagne (une fin plus récente porte le sien).
+  const ca = estObjet(a.constat) ? a.constat : null, cb = estObjet(b.constat) ? b.constat : null;
+  const constat = ca && cb ? ((Number(cb.at) || 0) > (Number(ca.at) || 0) ? cb : ca) : (ca || cb);
   return avecN({ id: a.id, debut: Number.isFinite(debut) ? debut : 0,
-    finAt: Math.max(Number(a.finAt) || 0, Number(b.finAt) || 0), reprisAt: Math.max(Number(a.reprisAt) || 0, Number(b.reprisAt) || 0), saisies, annulees });
+    finAt: Math.max(Number(a.finAt) || 0, Number(b.finAt) || 0), reprisAt: Math.max(Number(a.reprisAt) || 0, Number(b.reprisAt) || 0), saisies, annulees,
+    ...(constat ? { constat } : {}) });
 }
 export const inventaireVide = () => ({ courant: null, anciens: [] });
 export function normaliserInventaire(d) {
@@ -199,7 +210,12 @@ export function fusionnerInventaire(serveur, local) {
   const anciens = liste.slice(1).filter((s) => Object.keys(s.saisies || {}).length).slice(0, MAX_ANCIENS);
   return { courant, anciens };
 }
-const memeContenu = (x, y) => JSON.stringify(normaliserInventaire(x)) === JSON.stringify(normaliserInventaire(y));
+// (9 nov.) Comparé SANS l'ordre des clés : une ligne relue après fusion porte les mêmes
+// saisies dans un autre ordre — sans ça, chaque rejeu (retour du réseau) réécrivait la
+// ligne pour rien (rev +1). Rejouer est maintenant sans effet quand rien n'a changé.
+const stable = (v) => (Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
+  : (estObjet(v) ? '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}' : JSON.stringify(v)));
+const memeContenu = (x, y) => stable(normaliserInventaire(x)) === stable(normaliserInventaire(y));
 
 // ── 5. L'ÉCRITURE : lire, fusionner, réécrire en comparer-et-échanger ─────────
 //   lire()   → { existe, data } | null/undefined (pas su : RIEN ne s'écrit)
@@ -277,4 +293,24 @@ export function bilanInventaire({ session, stock, cle = cleNumServeur } = {}) {
   [attendus, vendus, trop, passu, illisibles, doublons, pasASaPlace, manque, aConfirmer].forEach((l) => l.sort(triK));
   return { n: compterVus(session), vus, attendus, vendus, trop, passu, illisibles, manque, aConfirmer, doublons, pasASaPlace,
     vendusNonVus: vendusNonVus.sort(), lectures: Array.isArray(s.manque) ? s.manque : [], sansNumero: idx.sansNumero, su: !!s.su };
+}
+
+// ── 7. LE CONSTAT FIGÉ (9 nov.) ─────────────────────────────────────────────
+// Ce que le bilan disait AU MOMENT où il a terminé : des N° et des nombres, rien
+// d'autre (ni titre, ni photo, ni compte — la ligne reste légère). `base` : l'heure
+// de la liste des paires utilisée quand l'inventaire a été fait HORS CONNEXION
+// (src/inventaireHorsLigne.js) ; `null` = la liste du moment, lue en ligne.
+// « Pas su » reste « pas su » : `su: false` ⇒ aucun « à chercher » n'est figé.
+const MAX_CONSTAT = 300;
+export function constatInventaire(bilan, { base = null } = {}) {
+  if (!estObjet(bilan)) return null;
+  const ks = (l) => (Array.isArray(l) ? l : []).map((v) => String(v.k)).slice(0, MAX_CONSTAT);
+  const ns = (l) => (Array.isArray(l) ? l : []).map((u) => String(u.numero || (u.cles && u.cles[0]) || '')).filter(Boolean).slice(0, MAX_CONSTAT);
+  return {
+    v: 1, base: Number.isFinite(base) ? base : null, su: !!bilan.su,
+    vus: Number(bilan.n) || 0, attendus: Array.isArray(bilan.attendus) ? bilan.attendus.length : 0,
+    manque: bilan.su ? ns(bilan.manque) : [], aConfirmer: ns(bilan.aConfirmer),
+    trop: ks(bilan.trop), vendus: ks(bilan.vendus), doublons: ks(bilan.doublons), passu: ks(bilan.passu),
+    lectures: (Array.isArray(bilan.lectures) ? bilan.lectures : []).map((m) => String((m && m.nom) || '')).filter(Boolean).slice(0, 20),
+  };
 }
