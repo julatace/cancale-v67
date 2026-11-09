@@ -23,7 +23,21 @@
 // Module PUR : l'écran (FichePaire.jsx) et `audit-histoire-article.cjs`.
 import { parcoursPaire } from './fichePaire.js';
 
-export const ORDRE_HISTOIRE = ['achat', 'numero', 'stock', 'annonces', 'prix', 'offres', 'favoris', 'vente', 'colis', 'argent', 'retour'];
+export const ORDRE_HISTOIRE = ['achat', 'numero', 'stock', 'annonces', 'prix', 'offres', 'favoris', 'vente', 'colis', 'argent', 'retour', 'benefice'];
+// (9 nov., fiche paire) LA FRISE DU COLIS, prouvée par la transaction de LA vente :
+//   bordereau = l'e-mail `email_bord_*` de CETTE transaction (sa date de réception,
+//   son n° de suivi) ; déposé = SON clic « Colis fait » (`vinted_ship_done[tx]`, une
+//   date seulement si elle est écrite) ; arrivé au relais / retiré = les e-mails du
+//   transporteur (`email_track_*`) de CE n° de suivi — celui écrit sur le bordereau
+//   de la vente, jamais un suivi rapproché par ressemblance.
+//   d.colisVente : { [tx]: { bord: { at, suivi } | null, depose: ms | iso | null,
+//     suivis: [{ status, at }] | null } } — `null` = pas lu (« — »), absent = pas fourni.
+// (9 nov.) LE BÉNÉFICE en dernière étape : vente reçue − achat (− frais renseignés),
+//   le même calcul que l'écran Ventes (`beneficePaire`, via `parcoursPaire`) ; un
+//   manque est NOMMÉ (« prix d'achat pas saisi »), jamais un 0.
+// (9 nov.) LA SOURCE de chaque étape (`source` : l'écran et la cible, par identité)
+//   pour « Ouvrir » : l'achat par SON n° de transaction, la vente et le colis par la
+//   transaction de LA vente, l'annonce par SON id.
 const str = (v) => String(v == null ? '' : v).trim();
 const t = (iso) => { const x = Date.parse(iso || ''); return Number.isFinite(x) ? x : null; };
 const iso = (v) => (t(v) != null ? new Date(t(v)).toISOString() : null);
@@ -154,11 +168,24 @@ export function histoireArticle(rn, d = {}, o = {}) {
   {
     const e = ancien.get('colis');
     const ev = [];
+    let detailColis = e ? e.detail : null;
     if (e && e.tx) {
       const b = (rn.bordereaux || []).find((x) => x.tx === e.tx);
-      if (b) ev.push({ at: null, texte: { pret: 'Bordereau prêt', imprime: 'Bordereau imprimé', poste: 'Bordereau posté', attente: 'Bordereau attendu' }[b.etat] || 'Bordereau', preuve: `transaction ${e.tx}`, cle: 'bordereau' });
+      const cv = d.colisVente === undefined ? undefined : d.colisVente === null ? null : (d.colisVente[String(e.tx)] || {});
+      const bord = cv && cv.bord ? cv.bord : null;
+      if (b || bord) ev.push({ at: iso(bord && bord.at), texte: [(b && { pret: 'Bordereau prêt', imprime: 'Bordereau imprimé', poste: 'Bordereau posté', attente: 'Bordereau attendu' }[b.etat]) || 'Bordereau reçu', bord && str(bord.suivi) ? `suivi ${str(bord.suivi)}` : null].filter(Boolean).join(' · '), preuve: `transaction ${e.tx}`, cle: 'bordereau' });
+      if (cv) {
+        const dep = cv.depose == null ? null : (typeof cv.depose === 'number' ? (cv.depose > 0 ? new Date(cv.depose).toISOString() : null) : iso(cv.depose));
+        if (cv.depose != null && cv.depose !== false) ev.push({ at: dep, texte: 'Déposé · ton clic « Colis fait »', preuve: `transaction ${e.tx}`, cle: 'depose' });
+        const suivi = bord && str(bord.suivi) ? str(bord.suivi) : '';
+        if (suivi && Array.isArray(cv.suivis)) {
+          const LIB = { available: 'Arrivé au point relais de l’acheteur', delivered: 'Retiré par l’acheteur', retour: 'Reparti (retour à l’expéditeur)' };
+          const vus = new Set();
+          for (const t of cv.suivis) { if (!t || !LIB[t.status] || vus.has(t.status)) continue; vus.add(t.status); ev.push({ at: iso(t.at), texte: LIB[t.status], preuve: `suivi ${suivi}`, cle: t.status === 'delivered' ? 'livre' : t.status === 'available' ? 'relais' : 'retour-colis' }); }
+        } else if (suivi && cv.suivis === null) detailColis = [detailColis, 'e-mails du transporteur pas lus'].filter(Boolean).join(' · ');
+      } else if (cv === null) detailColis = [detailColis, 'bordereau et suivi pas lus'].filter(Boolean).join(' · ');
     }
-    pose('colis', e ? e.etat : 'passu', e ? e.titre : 'Colis', ev, e ? e.detail : null);
+    pose('colis', e ? e.etat : 'passu', e ? e.titre : 'Colis', ev, detailColis);
     if (e && e.tx) etapes[etapes.length - 1].tx = e.tx;
     if (e && e.aPoster) etapes[etapes.length - 1].aPoster = true;
   }
@@ -174,6 +201,32 @@ export function histoireArticle(rn, d = {}, o = {}) {
     if (ev.length) pose('retour', 'fait', 'Retour ou annulation', ev);
     else if (ventesPasLues) pose('retour', 'passu', 'Retour', [], 'tes ventes Vinted pas lues');
     else pose('retour', 'absent', 'Retour', [], 'aucun');
+  }
+
+  // 12. BÉNÉFICE — vente reçue − achat (− frais renseignés) : le chiffre de
+  // `parcoursPaire` (le même que Ventes), son calcul écrit, son manque NOMMÉ.
+  {
+    const r = p.resume || {};
+    const vendue = (etapes.find((x) => x.cle === 'vente') || {}).etat;
+    if (r.benefice != null) {
+      const frais = r.vente != null && r.achat != null ? r.vente - r.achat - r.benefice : null;
+      const sg = `${r.benefice > 0 ? '+' : r.benefice < 0 ? '−' : ''}${eur(Math.abs(r.benefice) / 100)}`;
+      pose('benefice', 'fait', `Bénéfice ${sg}`, [], [r.vente != null ? `vente ${eur(r.vente / 100)}` : null, r.achat != null ? `− achat ${eur(r.achat / 100)}` : null, frais ? `− frais ${eur(frais / 100)}` : null, r.benefPartiel ? 'frais pas tous confirmés' : null].filter(Boolean).join(' '));
+      etapes[etapes.length - 1].montant = r.benefice;
+    } else if (vendue === 'fait') pose('benefice', 'passu', 'Bénéfice', [], r.raisonBenef || 'pas calculable');
+    else if (vendue === 'passu') pose('benefice', 'passu', 'Bénéfice', [], 'tes ventes pas toutes lues');
+    else pose('benefice', 'absent', 'Bénéfice', [], 'rien de vendu');
+  }
+
+  // LA SOURCE de chaque étape (« Ouvrir » : l'écran d'où vient la donnée), par identité.
+  for (const e of etapes) {
+    const evs = e.evenements || [];
+    if (e.cle === 'achat') { const a = (ancien.get('achat') || {}).buyFromId; if (a) e.source = { tab: 'achats', cible: { type: 'achat', tx: String(a) } }; }
+    else if (e.cle === 'vente') { const v = evs.find((x) => x.tx); if (v) e.source = { tab: 'ventes', sub: 'vinted', cible: { type: 'vente', tx: String(v.tx) } }; else if (evs.length) e.source = { tab: 'ventes', sub: evs[0].cle === 'leboncoin' ? 'leboncoin' : evs[0].cle === 'ebay' ? 'ebay' : 'vinted', cible: null }; }
+    else if (e.cle === 'colis' && e.tx) e.source = { tab: 'cat_bord', cible: { type: 'colis', tx: String(e.tx) } };
+    else if (e.cle === 'argent' && e.etat !== 'absent') e.source = { tab: 'compta', cible: null };
+    else if (e.cle === 'annonces' && (rn.annonces || []).length) e.source = { tab: 'cat_annonces', cible: { type: 'annonce', id: String(rn.annonces[0].id) } };
+    else if (e.cle === 'stock' && e.etat === 'fait') e.source = { stock: p.num };
   }
 
   etapes.sort((a, b) => ORDRE_HISTOIRE.indexOf(a.cle) - ORDRE_HISTOIRE.indexOf(b.cle));

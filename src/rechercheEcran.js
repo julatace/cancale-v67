@@ -77,6 +77,67 @@ export function facturesPourRecherche(locales, pro) {
   return out;
 }
 
+// ── (9 nov.) LES VENTES HORS VINTED, chacune par SON n° de commande ──────────
+// ebay : commandes eBay lues (`ebay_orders*`, marquées `_compte`) ; lbc : ventes
+// Leboncoin PROUVÉES (`isSeller === true`, `_id` = la vente) ; vc : `vc_ventes.ventes`
+// ({ [id]: { productId, ref, date, montant… } }). Le N° de chaque vente vient des
+// règles d'IDENTITÉ de l'app, passées ici (`numEbay(commande, ligne)` : le SKU ;
+// `numLbc(vente)` : le lien ou la référence ; `numVc(id, vente)` : le lien, la
+// référence, le N° du produit) — jamais du titre. Une source `null` (pas lue) ⇒ rien.
+const prixEnCentimes = (v) => { if (v == null || v === '') return null; const n = Number(typeof v === 'object' ? (v.value != null ? v.value : v.amount) : String(v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+export function ventesAutresPourRecherche({ ebay = null, lbc = null, vc = null } = {}, { numEbay = () => '', numLbc = () => '', numVc = () => '' } = {}) {
+  const out = [];
+  for (const c of Array.isArray(ebay) ? ebay : []) {
+    if (!c || !str(c.orderId).trim()) continue;
+    const li = (Array.isArray(c.lineItems) ? c.lineItems : [])[0] || {};
+    let numero = ''; try { numero = str(numEbay(c, li) || ''); } catch (_) {}
+    out.push({ site: 'ebay', id: str(c.orderId), ref: str(c.orderId), titre: str(li.title), pseudo: str(c.buyer && c.buyer.username), montant: null, date: str(c.creationDate), numero, compte: str(c._compte || '') });
+  }
+  for (const v of Array.isArray(lbc) ? lbc : []) {
+    if (!v || v.isSeller !== true || !str(v._id).trim()) continue;
+    let numero = ''; try { numero = str(numLbc(v) || ''); } catch (_) {}
+    const p = Number(v.price);
+    out.push({ site: 'leboncoin', id: str(v._id), ref: str(v._id), titre: str(v.title), pseudo: '', montant: Number.isFinite(p) && p > 0 ? Math.round(p) : null, date: str(v.dateVente || v.date), numero });
+  }
+  // Vestiaire : la liste de l'app (`ventesVcDe` : chaque vente porte `id` et SON `num`
+  // par identité) ou la carte brute `vc_ventes.ventes` (le N° demandé à `numVc`).
+  const V = Array.isArray(vc) ? vc.filter((v) => v && v.id != null).map((v) => [str(v.id), v]) : (vc && typeof vc === 'object' ? Object.entries(vc) : []);
+  for (const [id, v] of V) {
+    if (!v || typeof v !== 'object' || !str(id).trim()) continue;
+    let numero = ''; try { numero = str(v.num != null && str(v.num).trim() ? v.num : (numVc(id, v) || '')); } catch (_) {}
+    out.push({ site: 'vestiaire', id: str(id), ref: str(v.productId || id), titre: str(v.titre || v.title), pseudo: '', montant: prixEnCentimes(v.montant), date: str(v.date), numero });
+  }
+  return out;
+}
+
+// ── (9 nov.) LES CONVERSATIONS VINTED, depuis la projection lue par la loupe ─
+// Lignes `harvest_{uid}_conv_{n°}` projetées (tx, titre, interlocuteur, date) :
+// l'identité est (compte, n° de conversation) — jamais un titre.
+export function messagesPourRecherche(lignes, garderCompte = () => true) {
+  if (!Array.isArray(lignes)) return null;
+  const out = [];
+  for (const r of lignes) {
+    const m = /^harvest_(\d+)_conv_(\d+)$/.exec(str(r && r.id));
+    if (!m || !garderCompte(m[1])) continue;
+    const ts = Number(r.ts);
+    out.push({ uid: m[1], conv: m[2], tx: str(r.tx), titre: str(r.titre), pseudo: str(r.login), date: Number.isFinite(ts) && ts > 0 ? new Date(ts * (ts < 1e12 ? 1000 : 1)).toISOString() : '' });
+  }
+  return out;
+}
+
+// ── (9 nov.) LE CLAVIER DE LA LOUPE : où va la flèche ───────────────────────
+// n : nombre de lignes focalisables du panneau · i : la ligne qui a le focus (-1 =
+// le champ) · touche : 'ArrowDown' | 'ArrowUp' | 'Home' | 'End'. Rend l'indice
+// visé, -1 pour revenir au champ, ou null (la touche ne fait rien ici).
+export function voisinClavier(n, i, touche) {
+  if (!Number.isFinite(n) || n <= 0) return touche === 'ArrowUp' && i >= 0 ? -1 : null;
+  if (touche === 'ArrowDown') return i < 0 ? 0 : Math.min(n - 1, i + 1);
+  if (touche === 'ArrowUp') return i <= 0 ? -1 : i - 1;
+  if (touche === 'Home') return i < 0 ? null : 0;
+  if (touche === 'End') return i < 0 ? null : n - 1;
+  return null;
+}
+
 // ── UN E-MAIL TROUVÉ par le moteur de l'écran E-mails (réponse de
 // `/api/email-rattacher?mode=journal&cherche=`) ⇒ un résultat de la loupe. Une
 // réponse qui n'a pas la forme attendue n'est PAS « aucun e-mail » : `null`. ──
@@ -95,12 +156,13 @@ export function motPastille(r) {
     case 'code': return `Code ${r.valeur}`;
     case 'transaction': return `Transaction ${r.valeur}`;
     case 'facture': return `Facture ${r.valeur}`;
+    case 'commande': return `Commande ${r.valeur}`;
     case 'montant': return Number.isFinite(r.valeur) ? eur(r.valeur) : '';
     case 'numero': return r.valeur ? `N°${r.valeur}` : '';
     default: return '';
   }
 }
-export const MOTIFS = { pseudo: 'Pseudo correspondant', suivi: 'Numéro de suivi correspondant', code: 'Code de retrait correspondant', transaction: 'Transaction correspondante', facture: 'Numéro de facture correspondant', montant: 'Montant exact', numero: 'Numéro VRM correspondant', titre: 'Titre, marque ou taille correspondants', recent: 'Vente récente' };
+export const MOTIFS = { pseudo: 'Pseudo correspondant', suivi: 'Numéro de suivi correspondant', code: 'Code de retrait correspondant', transaction: 'Transaction correspondante', facture: 'Numéro de facture correspondant', montant: 'Montant exact', commande: 'Numéro de commande correspondant', numero: 'Numéro VRM correspondant', titre: 'Titre, marque ou taille correspondants', recent: 'Vente récente' };
 
 // ── LES RÉCENTS (sur cet appareil) ──────────────────────────────────────────
 export const CLE_RECENTS = 'vrm_recherche_recents';
