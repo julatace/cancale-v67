@@ -130,8 +130,32 @@ contrôle est refait aussitôt et la porte se referme s'il échoue ; en ligne, r
 - `node scripts/audit-inventaire.cjs` 69/69, `--prouve` 17/17 (I7 relu sur `fabriquerStockInv`,
   le drapeau « en attente » admis à côté de la copie locale, `inputMode` au doigt).
 - `audit-journee-hors-ligne` vert (fenêtre de lecture 4 000 car. : la ligne porte `pdf`).
-- Bancs : `scripts/bancs/inventaire.cjs` (phases G-H-I-J ajoutées) et
-  `scripts/bancs/hors-ligne.cjs` (phase E ajoutée) — résultats et captures ci-dessous.
+- Audits demandés, verts : identite, statuts, variables, tdz, icones, boutons, violet,
+  coherence, file-envoi, notifications, vapid, csp, fonctions-api. `npm run build` vert.
+- **Banc `scripts/bancs/inventaire.cjs`** — phases G-H-I-J ajoutées (`BANC_PHASES=GHIJ`,
+  `BANC_SEUL=390|1512`, `BANC_THEME=clair|sombre`, `BANC_DIST=`) : pavé géant (12 touches
+  ≥ 56 px, 3-9-⌫-OK), vibration par jugement, liste figée au nom du vendeur, réseau coupé pendant
+  le tour (`context.setOffline(true)` ET la base qui refuse tout) ⇒ la feuille revient au même
+  point, 60/125/40 jugés comme en ligne, rechargé SANS réseau (service worker) ⇒ reprise à 5 N°,
+  bilan hors connexion (à chercher 1, B125 · à vérifier 60 · doublon 2 · pas su 125), aucune
+  tentative vers `vrm_inventaire` ni aucune écriture hors connexion ; retour du réseau ⇒ les 5
+  saisies arrivent UNE fois, rejouer une 2ᵉ fois ne réécrit rien (rev inchangé) ; « Revoir » le
+  constat figé ; AUCUNE écriture de N° sur tout le banc (corps des requêtes relus). A–E (6 nov.)
+  inchangés sauf `inputmode` : `none` + pavé au doigt, `numeric` à la souris.
+  - **Arbre d'avant** (`BANC_DIST=<dist de b3ec1b17>`) : rouge (3 KO : pas de liste figée, pas
+    de pavé, scénario bloqué).
+  - **Mutation** (build muté : le Stock ne fige plus la liste) : rouge (voir ci-dessous).
+- **Banc `scripts/bancs/hors-ligne.cjs`** — phase E ajoutée (`BANC_PHASES=E`, `BANC_TAILLES=`,
+  `BANC_DIST=`), en clair et en sombre : en ligne, Ventes → « Imprimer » range le bordereau
+  (`/hl-pdf/{uid}/email_bord_70001`, lui seul) ; la photo relie 70001/70002 à leurs lignes ; hors
+  connexion « Bordereau » est un `<a href=blob:>` dont les octets commencent par `%PDF-` ; la 70002
+  dit « pas gardé ici » ; « À déposer · 2 » et « Déposé » ; bandeau daté ; « Déposé » noté /
+  annulé / renoté = UNE marque, rien parti hors connexion, partie une fois au retour ; aucune
+  erreur, CSP de vercel.json respectée. 390 : vert.
+  - **Arbre d'avant** : rouge (aucun bordereau gardé, pas de « À déposer »).
+  - **Mutation** (`estLigneBordereau` rend toujours faux) : rouge (« aucun bordereau gardé »).
+- Captures regardées (390 clair/sombre : pavé, hors connexion, rechargé hors connexion, bilan
+  hors connexion, constat ; comptoir) : lisibles, rien coupé, ambre/rouge aux bons endroits.
 
 ## 5. Geste de Julien
 - Ouvrir le Stock une fois avec du réseau (la liste se fige toute seule), puis Stock →
