@@ -31,6 +31,8 @@ aucun seuil élargi, aucun `skip`. Deux sessions ont travaillé sur la branche (
 | `fiche-paire` | 2 | partie B (76dec571) : **vrai défaut** — paire partie dont la case a été libérée dite « pas rangée » | — | vert |
 | `suivi-colis` | 1 | partie B (967341e2) : la panne de `panel_colis_relais` servie aussi sur `id=in.(…)` | — | vert |
 | `lbc-supprimer` | 5 | partie B (4ecd1c23) : rangée défilante des filtres, Ma journée v2 | — | vert |
+| `glisser-onglet` | 3–4 | partie B, après la fusion de `main` (#1069–#1078) : périmé — `?tab=plat_ebay` revenait sur « Ventes · toutes » car le vendeur du banc (base vide) n'AFFICHE pas eBay (« Mes plateformes », 8 nov. : un site masqué ramène sur un site affiché) | `main` servi avec les 4 sites affichés ; rouge sans | vert |
+| `messages-volets` | 1 | partie B : périmé — l'en-tête d'offre est `ResumeOffre` depuis le 8 nov. (« Clarifier les offres ») : Prix affiché · Offre reçue · Ton minimum + repère | lu par `data-offre-prix` (recue 100 €, mini 105 €), `data-offre-niveau="sous-minimum"` et « 5 € sous ton minimum ». Mutation (offre et minimum inversés) ⇒ rouge | vert |
 
 ## Les vrais défauts corrigés dans l'app (partie A)
 
@@ -74,3 +76,11 @@ aucun seuil élargi, aucun `skip`. Deux sessions ont travaillé sur la branche (
 ## Vérifications
 `npm run build` vert ; audits `variables`, `tdz`, `coherence`, `identite`, `statuts` relancés
 après le dernier commit (voir le rapport de la session). `git grep` des marqueurs de conflit : vide.
+
+## Repasse après la fusion de `main` (#1069–#1078, 9 nov. au soir, partie B)
+Relancés UN PAR UN sur ce `main` : `annonces-coherence` 130, `outils-stats` 74, `emails-stats-clairs` 53,
+`stats-vitrine` 112, `reglages`, `reglages-premium` 264, `chiffres-coherents` 26, `lbc-supprimer`,
+`fiche-paire`, `suivi-colis`, `csp`, `iphone-reprise` 139, `colis-fiables`, `colis-tous-sites` 12,
+`rappel-soir` 17, `bilan-semaine` 27, `badge` 126, `colis-colonnes`, `ventes-colis-premium` 32,
+`achats-messages-premium` 62, `glisser-onglet`, `messages-volets` : tous verts. À regarder par Julien :
+la tuile Vendu dit « +213 % », la carte Comparer « +212,5 % » pour le même écart (deux arrondis).
