@@ -1,6 +1,6 @@
 // ── BANC : MA JOURNÉE TOUT DE SUITE + OBJECTIF DU MOIS (9 nov. 2026) ─────────
 //        npm run build && node scripts/bancs/journee-instantanee.cjs [dist]
-//        SHOTS=dossier  BANC_PORT=4483  JI_SEUL=390-light (une seule passe)
+//        SHOTS=dossier  BANC_PORT=4483  JI_SEUL=390-light (une seule passe)  JI_DUMP=1 (positions de la tête)
 // Données INVENTÉES (le dépôt est public), à la forme des lignes réelles (celles de
 // journee-v2 : un compte Vinted, trois ventes à expédier, 80 € et 45 € hier, 60 € il y a
 // 3 jours), et l'objectif du mois posé dans `main` (synchronisé) : 2 000 € de vendu.
@@ -187,7 +187,7 @@ async function main() {
         // L'instantané a 7 minutes : la mention doit le dire.
         const p0 = await ctx.newPage();
         await p0.goto(`http://localhost:${PORT}/__vide`);
-        await p0.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); s.t -= 7 * 60000; localStorage.setItem(k, JSON.stringify(s)); }, cle(UID));
+        await p0.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k) || "null"); if (s) { s.t -= 7 * 60000; localStorage.setItem(k, JSON.stringify(s)); } }, cle(UID));
         await p0.close();
         etat.tenir = true;
         const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
