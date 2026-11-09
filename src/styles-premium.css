@@ -640,4 +640,49 @@
   .vrm-main[data-ecran="cat_bord"] section.vrm-fu-carte[data-fu-colis-retirer] > .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; width: 100% !important; }
 }
 
+/* 10.5 ANNONCES */
+/* « N numéros à vérifier » : la rangée de la grammaire — [photo 44] [titre / « VRM dit N° »]
+   [les gestes dans une zone de largeur fixe à droite] ; au téléphone les gestes passent
+   dessous, sur toute la largeur (la case « Autre N° » garde la place d’un numéro). */
+.vrm-main[data-ecran="annonces"] [data-verif-carton] { column-gap: var(--p-g-gout) !important; row-gap: 8px !important; padding: 10px 0 !important; border-top-color: var(--p-filet) !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > :first-child { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; border-radius: var(--p-r-vignette) !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:nth-child(2) > div:first-child { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:nth-child(2) > div:nth-child(2) { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] [data-verif-actuel] { font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child { flex-wrap: nowrap !important; gap: 8px !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > :is(button, input) { min-height: 44px !important; border-radius: var(--p-r-ctrl) !important; font-size: var(--p-t-note) !important; box-sizing: border-box !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > button:first-child { font-variant-numeric: tabular-nums !important; min-width: 152px !important; }
+@media (max-width: 1023px) {
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:nth-child(2) { flex: 1 1 0 !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child { flex: 1 0 100% !important; min-width: 0 !important; margin-left: 0 !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > button:first-child { min-width: 0 !important; flex: none !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > input { flex: 1 1 0 !important; width: auto !important; min-width: 64px !important; }
+}
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] { flex-wrap: nowrap !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child { flex: 0 0 380px !important; justify-content: flex-end !important; }
+}
+/* La fiche d'une annonce (la grille) : UNE carte — la photo en haut, puis titre, prix,
+   bandes et chiffres dedans (jamais une carte dans une
+   carte) : les bandes vont d’un bord à l’autre, séparées d’un filet. Au téléphone, la ligne d’état garde la même hauteur sur chaque fiche : les
+   fiches d'une rangée finissent au même pixel. */
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche {
+  background: var(--p-carte) !important; border-radius: var(--p-r-carte) !important; box-shadow: var(--p-ombre) !important; overflow: hidden !important; border: 0 !important;
+}
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche a.vrm-fiche-photo { border-radius: 0 !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche a.vrm-fiche-photo img { border-radius: 0 !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info { padding: 10px 12px 4px !important; gap: 4px !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font: 700 17px/22px var(--vrm-police) !important; letter-spacing: -.012em !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche :is(.vrm-fiche-duo, .vrm-fiche-chiffres) { background: transparent !important; box-shadow: none !important; border: 0 !important; border-top: .5px solid var(--p-filet) !important; border-radius: 0 !important; margin-left: -12px !important; margin-right: -12px !important; width: auto !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche :is(.vrm-fiche-duo, .vrm-fiche-chiffres) > .vrm-fiche-cell { background: transparent !important; box-shadow: none !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; align-items: end !important; column-gap: 8px !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-stats-annonce] { font: 400 12px/16px var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; row-gap: 2px !important; min-width: 0 !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-plateformes] { align-self: end !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus-bouton { border-top: .5px solid var(--p-filet) !important; margin: 0 -12px !important; padding: 0 12px !important; width: calc(100% + 24px) !important; min-height: 44px !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus { padding: 0 12px 12px !important; }
+@media (max-width: 767px) {
+  .vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-stats-annonce] { min-height: 34px !important; align-content: flex-start !important; }
+}
+
 } /* fin @layer vrm-premium */
