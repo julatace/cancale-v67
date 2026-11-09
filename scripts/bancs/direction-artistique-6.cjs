@@ -182,7 +182,7 @@ const ECRANS = ['journee', 'ventes', 'cat_bord'];
             dit(C.every((c) => c.fond === CARTE && c.alpha > 0.95 && c.fond !== SOL), `${T} W3 fond de carte ${CARTE}, distinct du sol`, C.map((c) => c.fond + '/' + c.alpha).join(' '));
             dit(C.every((c) => c.rayon >= 22 && c.bord === 0), `${T} W3 rayon ≥ 22, sans bordure`, C.map((c) => c.rayon + '/' + c.bord).join(' '));
             dit(C.every((c) => c.chiffre && c.chiffre.t >= 28 && (c.chiffre.vide || c.chiffre.g >= 800) && c.chiffre.tab), `${T} W4 chiffre ≥ 28/800 tabulaire (le « — » d'un pas-su reste léger)`, JSON.stringify(C.map((c) => c.chiffre)));
-            dit(C.every((c) => c.libDessus && c.lib && c.lib.t >= 13 && c.lib.g >= 600), `${T} W4 libellé 13/600 au-dessus du chiffre`, JSON.stringify(C.map((c) => [c.libDessus, c.lib])));
+            dit(C.every((c) => c.libDessus && c.lib && c.lib.t >= (e === 'journee' && W < 600 ? 12 : 13) && c.lib.g >= 600), `${T} W4 libellé 13/600 au-dessus du chiffre (12 dans les trois widgets étroits de Ma journée au téléphone)`, JSON.stringify(C.map((c) => [c.libDessus, c.lib])));
             // Ma journée au téléphone : trois widgets sur UNE ligne (règle du 27 oct. : le premier geste
             // de « Ensuite » au-dessus de la barre du bas, banc journee-premium) ; ailleurs, le bento.
             if (e === 'journee' && W < 600) dit(C.every((c) => Math.abs(c.haut - C[0].haut) <= 1), `${T} W5 trois widgets sur une ligne (le premier geste reste au-dessus de la barre)`, C.map((c) => c.haut).join(','));
