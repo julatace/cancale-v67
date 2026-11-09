@@ -154,13 +154,29 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
 }
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > button.vrm-fu-case:active { transform: scale(.97) !important; }
 @media (prefers-reduced-motion: reduce) { :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case { transition: none !important; } :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > button.vrm-fu-case:active { transform: none !important; } }
+/* Ma journée au téléphone : trois widgets carrés sur UNE ligne (pas de bento sur deux rangées) —
+   la règle de Julien du 27 oct. : la première carte de « Ensuite » reste entière au-dessus de la
+   barre du bas, sans défiler, sur un téléphone de 844 px (banc journee-premium). */
+@media (max-width: 767px) {
+  /* La tête reste bord à bord au téléphone (sa forme depuis le 2 nov.) ; les widgets gardent la marge de 16. */
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete { margin-left: -16px !important; margin-right: -16px !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete::after { height: 14px !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete::before { border-radius: 0 0 var(--w-r-tete) var(--w-r-tete) !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; margin: 10px 16px 0 !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { grid-column: auto !important; min-height: 0 !important; padding: 10px 10px 10px 11px !important; border-radius: 22px !important; gap: 2px !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-size: 28px !important; margin-top: 4px !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case > span { font-size: 12px !important; letter-spacing: -.01em !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case > small { font-size: 12px !important; padding-top: 2px !important; }
+  /* Trois widgets étroits : pas de chevron (le widget entier se touche), le libellé garde toute la largeur. */
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > button.vrm-fu-case::after { content: none !important; display: none !important; }
+}
 /* Le grand chiffre de la carte sombre : 44/800 (52 à l'ordinateur). */
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) {
   font-size: 44px !important; font-weight: 800 !important; letter-spacing: -.035em !important; line-height: 1.02 !important; font-variant-numeric: tabular-nums !important;
 }
 @media (min-width: 1024px) { :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) :is(.vrm-fu-grand, .vrm-jv2-grand:not(.is-zero)) { font-size: 52px !important; } }
 /* Ma journée : la tête n'est plus bord à bord, c'est un widget comme les autres. */
-:root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete { margin: 8px 0 0 !important; width: auto !important; }
+@media (min-width: 768px) { :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete { margin: 8px 0 0 !important; width: auto !important; } }
 @media (min-width: 1024px) { :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete { margin-top: 0 !important; } }
 :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-jv2-argent { margin-bottom: 0 !important; }
 

@@ -15,7 +15,8 @@ require('./_porte-banc.cjs');
 //   W4  le chiffre d'un widget : ≥ 28 px, graisse ≥ 800, tabulaire ; le libellé
 //       au-dessus du chiffre, 13 px, graisse ≥ 600 ;
 //   W5  bento : un nombre impair de cases ⇒ la première est large (≥ 1,8 × une
-//       autre) ; chaque widget ≥ 44 px de haut (cible) ;
+//       autre) — sauf Ma journée au téléphone : trois widgets sur une ligne (règle
+//       du 27 oct., premier geste au-dessus de la barre) ; chaque widget ≥ 44 px ;
 //   W6  les groupes de rangées (Ventes, Ma journée) : rayon ≥ 22, fond de carte,
 //       aucune bordure ;
 //   W7  chevrons : « Voir » n'est plus un petit bouton gris dans les rangées de
@@ -182,7 +183,10 @@ const ECRANS = ['journee', 'ventes', 'cat_bord'];
             dit(C.every((c) => c.rayon >= 22 && c.bord === 0), `${T} W3 rayon ≥ 22, sans bordure`, C.map((c) => c.rayon + '/' + c.bord).join(' '));
             dit(C.every((c) => c.chiffre && c.chiffre.t >= 28 && (c.chiffre.vide || c.chiffre.g >= 800) && c.chiffre.tab), `${T} W4 chiffre ≥ 28/800 tabulaire (le « — » d'un pas-su reste léger)`, JSON.stringify(C.map((c) => c.chiffre)));
             dit(C.every((c) => c.libDessus && c.lib && c.lib.t >= 13 && c.lib.g >= 600), `${T} W4 libellé 13/600 au-dessus du chiffre`, JSON.stringify(C.map((c) => [c.libDessus, c.lib])));
-            if (C.length % 2 === 1 && C.length > 1) dit(C[0].larg >= 1.8 * C[1].larg, `${T} W5 bento : la première case est large`, C.map((c) => c.larg).join(','));
+            // Ma journée au téléphone : trois widgets sur UNE ligne (règle du 27 oct. : le premier geste
+            // de « Ensuite » au-dessus de la barre du bas, banc journee-premium) ; ailleurs, le bento.
+            if (e === 'journee' && W < 600) dit(C.every((c) => Math.abs(c.haut - C[0].haut) <= 1), `${T} W5 trois widgets sur une ligne (le premier geste reste au-dessus de la barre)`, C.map((c) => c.haut).join(','));
+            else if (C.length % 2 === 1 && C.length > 1) dit(C[0].larg >= 1.8 * C[1].larg, `${T} W5 bento : la première case est large`, C.map((c) => c.larg).join(','));
             dit(C.every((c) => c.h >= 44), `${T} W5 chaque widget ≥ 44 px`, C.map((c) => c.h).join(','));
           }
           if (m.groupes.length) dit(m.groupes.every((g) => g.rayon >= 22 && g.fond === CARTE && g.bord === 0), `${T} W6 groupes : rayon ≥ 22, fond ${CARTE}, sans bordure`, JSON.stringify(m.groupes));
