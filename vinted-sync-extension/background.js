@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.330.0';
+const CODE_VERSION = '5.331.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1582,6 +1582,8 @@ async function captureDomain(domain) {
   //    RÉUSSIE : un refus de la base fait réessayer à la requête suivante.
   const sig = empreinteCompte(row);
   if (await compteDejaEcrit(uid, sig)) { noterDiag('compte_inchange'); return uid; }
+  // 5.331 : jamais écrit depuis CE navigateur ⇒ première écriture de ce compte.
+  const premiere = !(await compteDejaConnuIci(uid));
   _refusComptes.delete(uid);
   let ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
   // 5.332 (migration 029) : un compte NEUF ne se crée plus par l'API de la base.
@@ -1592,6 +1594,7 @@ async function captureDomain(domain) {
   _refusComptes.delete(uid);
   if (ok === false && (refus === 'preuve' || refus === 'unicite')) ok = await lierCompteParServeur(row);
   if (ok !== false) await noterCompteEcrit(uid, sig);
+  if (ok === true) signalerCompteRelie('vinted', uid, premiere);
   return uid;
 }
 
@@ -1669,6 +1672,86 @@ async function compteDejaEcrit(uid, sig) {
     return !!(e && e.sig === sig && Date.now() - Number(e.at || 0) < COMPTE_REECRIT_MS);
   } catch (_) { return false; }                    // pas su : on écrit (comme avant)
 }
+// Une entrée (même ancienne) dans `vrmCompteEcrit` : ce Chrome a déjà écrit ce
+// compte. Pas su (stockage illisible) ⇒ « connu » : on ne signale rien sur un doute.
+async function compteDejaConnuIci(uid) {
+  try {
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    return !!m[String(uid)];
+  } catch (_) { return true; }
+}
+
+// ══ « shop_x EST RELIÉ À VRM » TOUT DE SUITE (5.331, 9 nov.) ══════════════════
+// L'extension écrit les comptes DIRECTEMENT en base (`vinted_accounts`,
+// `lbc_accounts`, `vc_session`) : sans app VRM ouverte, le serveur ne voyait un
+// compte neuf qu'au cron du matin ou du soir (passation 2026-11-08-compte-relie,
+// « Signal qui manque côté extension »). Après la PREMIÈRE écriture réussie d'un
+// compte, l'extension prévient `POST vrm.center/api/push { action:'comptes' }`
+// avec la session VRM : le corps ne dit RIEN (ni compte, ni nom) — la route relit
+// tout au nom du vendeur de la session et décide (point de départ, une fois par
+// compte, famille « Nouveau compte relié » — `api/_lib/compte-relie.js`).
+//   · une fois par compte : `vrmComptesSignales` ({ 'vinted:222': { at, fait } })
+//     dans `chrome.storage.local` (§4.9) ;
+//   · sans session VRM ⇒ AUCUN appel (le signal attend, 24 h au plus) ;
+//   · réseau, 5xx, 401, 429 ⇒ gardé, retenté à la prochaine écriture d'un compte ;
+//     un autre 4xx (refus jugé) ⇒ oublié ; 2xx ⇒ fait, plus jamais rappelé ;
+//   · un seul appel couvre tous les comptes en attente (la route relit tout).
+// eBay n'est pas ici : c'est la route eBay (OAuth) qui écrit `ebay_comptes`.
+const COMPTE_PUSH_URL = 'https://vrm.center/api/push';
+const COMPTE_PUSH_MAX_MS = 24 * 3600000;
+const RE_CLE_COMPTE_PUSH = /^(vinted|leboncoin|vestiaire):[\w:.-]{1,80}$/;
+let _chaineComptePush = Promise.resolve();
+function unComptePushALaFois(fn) {
+  const suite = _chaineComptePush.then(() => fn(), () => fn());
+  _chaineComptePush = suite.then(() => {}, () => {});
+  return suite;
+}
+// `premiere` : la ligne de CE compte n'existait pas avant cette écriture.
+// Rend une promesse (les audits l'attendent ; l'appelant n'a pas à le faire).
+function signalerCompteRelie(plateforme, id, premiere) {
+  return unComptePushALaFois(async () => {
+    try {
+      const cle = `${plateforme}:${String(id == null ? '' : id)}`;
+      if (!RE_CLE_COMPTE_PUSH.test(cle)) return 0;
+      const m = (await chrome.storage.local.get('vrmComptesSignales')).vrmComptesSignales || {};
+      if (premiere && !m[cle]) { m[cle] = { at: Date.now(), fait: false }; await chrome.storage.local.set({ vrmComptesSignales: m }); }
+    } catch (_) { return 0; }
+    return envoyerComptesSignalesUn();
+  });
+}
+function envoyerComptesSignales() { return unComptePushALaFois(envoyerComptesSignalesUn); }
+async function envoyerComptesSignalesUn() {
+  try {
+    const m = (await chrome.storage.local.get('vrmComptesSignales')).vrmComptesSignales || {};
+    const now = Date.now();
+    let change = false;
+    for (const k of Object.keys(m)) {
+      const e = m[k] || {};
+      if (!e.fait && now - Number(e.at || 0) > COMPTE_PUSH_MAX_MS) { delete m[k]; change = true; }
+    }
+    const enAttente = Object.keys(m).filter((k) => !(m[k] && m[k].fait));
+    // Mémo borné : les 200 derniers « faits » suffisent (un compte relié se signale une fois).
+    const faits = Object.keys(m).filter((k) => m[k] && m[k].fait).sort((a, b) => Number(m[b].at || 0) - Number(m[a].at || 0));
+    for (const k of faits.slice(200)) { delete m[k]; change = true; }
+    if (!enAttente.length) { if (change) await chrome.storage.local.set({ vrmComptesSignales: m }); return 0; }
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('compte_push_sans_session'); if (change) await chrome.storage.local.set({ vrmComptesSignales: m }); return 0; }
+    let status = 0;
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(COMPTE_PUSH_URL, { method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+        body: JSON.stringify({ action: 'comptes' }) });
+      clearTimeout(t); status = r.status;
+    } catch (_) { status = 0; }
+    const fini = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 429);
+    if (fini) { for (const k of enAttente) m[k] = { at: now, fait: true }; change = true; }
+    noterDiag(status >= 200 && status < 300 ? 'compte_push_envoye' : `compte_push_${fini ? 'refus' : 'ko'}_${status || 'reseau'}`);
+    if (change) await chrome.storage.local.set({ vrmComptesSignales: m });
+    return fini && status < 300 ? enAttente.length : 0;
+  } catch (_) { return 0; }
+}
+
 async function noterCompteEcrit(uid, sig) {
   try {
     const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
@@ -9655,6 +9738,8 @@ async function visiteVinted() {
     // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
     await envoyerNotifsRetrait();
+    // 5.331 : un « compte relié » resté en attente (réseau, session absente) repart ici.
+    await envoyerComptesSignales();
     await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -16800,8 +16885,11 @@ async function noterSessionVcMaintenant(id, tabId, forme, source) {
   const comptes = Object.assign({}, cur.comptes || {});
   comptes[String(id)] = new Date(now).toISOString();
   const data = { id: String(id), at: new Date(now).toISOString(), source: source === 'stream' ? 'stream' : 'users/me', forme: (Array.isArray(forme) ? forme : []).slice(0, 80).map(String), comptes: Object.fromEntries(Object.entries(comptes).slice(-10)) };
+  // 5.331 : un compte Vestiaire jamais rangé dans `vc_session` = sa première écriture.
+  const premiereVc = !(cur.comptes && cur.comptes[String(id)]) && String(cur.id || '') !== String(id);
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_session', data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true) signalerCompteRelie('vestiaire', String(id), premiereVc);
   return ok === true;
 }
 const _vcFilChaines = new Map();
@@ -18346,8 +18434,14 @@ async function storeLbcAccountUneFois(acc,owner) {
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
+    // 5.331 : ce compte (sous l'une ou l'autre de ses deux clés) n'était pas rangé
+    // avant, et il vient d'une source « moi » (jamais la fiche d'autrui).
+    const _nuLbc = idCompteLbc(acc.id);
+    const _premiereLbc = !prev[String(acc.id)] && !prev[_nuLbc] && !prev['lbc-account:' + _nuLbc]
+      && (acc.session === true || !!(acc.source && !LBC_URL_AUTRUI.test(String(acc.source))));
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id',owner);
     await noterFlux('leboncoin', _okFlux === true);
+    if (_okFlux === true) signalerCompteRelie('leboncoin', _nuLbc, _premiereLbc);
     if(_okFlux===true&&(await loadSession())?.user_id===owner){
     try {
       if (acc.courant === true && acc.source && !LBC_URL_AUTRUI.test(String(acc.source))) {

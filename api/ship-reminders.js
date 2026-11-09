@@ -64,6 +64,8 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
+// (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
+import { passeTransporteursAnciens, avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
@@ -243,7 +245,7 @@ async function lireDonneesBilan() {
   // (8 nov., « à envoyer » prouvé) Les bordereaux (leur n° de suivi) et les preuves de départ :
   // le bilan compte les colis à envoyer avec la règle du widget et de Colis (§11).
   const [bordsB, preuves, mailsVentes] = await Promise.all([
-    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_COLIS}`)),
+    lireBordsAvecRelus(BORD_COLIS),
     lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x))),
     // (8 nov.) Les e-mails de vente récents (scalaires `meta->>`, la requête de l'app).
     fetchPaginated(scoped(reqVentesEmail(Date.now()))),
@@ -747,8 +749,17 @@ async function traiterVendeur() {
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
   try { bilanMois = await bilanDuMoisVendeur(); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (9 nov.) Le transporteur des ANCIENS bordereaux, relu dans le texte gardé de
+  // LEUR e-mail (api/_lib/transporteur-anciens.js) : N par passage, idempotent ;
+  // une lecture ratée n'écrit rien, et un échec n'empêche aucun rappel.
+  let transporteursAnciens = null;
+  try {
+    transporteursAnciens = await passeTransporteursAnciens({
+      lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup,
+    });
+  } catch (e) { transporteursAnciens = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -938,6 +949,16 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
 const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_accounts_hidden'];
+// (9 nov.) Les bordereaux + ce qui a été RELU dans le texte de l'e-mail des anciens
+// (transporteur, n° Mondial Relay — api/_lib/transporteur-anciens.js), seulement là où
+// le bordereau n'a rien : la même fusion que le widget et l'app. Ligne illisible ⇒ rien fusionné.
+async function lireBordsAvecRelus(select) {
+  const [b, relus] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${select}`)),
+    fetchPaginated(scoped(REQ_RELUS)).catch(() => null),
+  ]);
+  return avecRelus(b, relus);
+}
 const BORD_COLIS = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
 async function lireDonneesColis() {
   const BORD = BORD_COLIS;
@@ -946,7 +967,7 @@ async function lireDonneesColis() {
     getRowProjete('main', MAIN_COLIS),
     fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt')),
     lireCommandesEbay(),
-    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
+    lireBordsAvecRelus(BORD),
     // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : leurs seules ventes (§4.4).
     getRowProjete('lbc_ventes', ['ventes']),
     getRowProjete('vc_ventes', ['ventes']),
