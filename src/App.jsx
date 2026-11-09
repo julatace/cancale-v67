@@ -9708,7 +9708,10 @@ const mapWardrobeItem = (it) => ({
   // ne suppose rien — n'affiché que si c'est bien un nombre). Précieux pour un
   // revendeur : beaucoup de vues sans vente = prix trop haut ; favoris = proche
   // de vendre. Voir badges dans l'onglet Annonces.
-  views: Number.isFinite(it.view_count) ? it.view_count : null,
+  // (9 nov., Julien : « ça met que mes annonces ont zéro vue ») Vinted renvoie `view_count: 0`
+  // sur des annonces qui ont 9 ou 10 favoris : ce 0 ne veut pas dire « aucune vue », il veut dire
+  // que Vinted ne donne plus le nombre. Pas su ≠ 0 (§5) : un 0 n'est jamais affiché comme un fait.
+  views: (Number.isFinite(it.view_count) && it.view_count > 0) ? it.view_count : null,
   favourites: Number.isFinite(it.favourite_count) ? it.favourite_count
             : (Number.isFinite(it.favourites_count) ? it.favourites_count : null),
   // Timestamp de mise en ligne (secondes epoch) si Vinted le fournit -> "âge".
@@ -50143,7 +50146,7 @@ function AppCoeur() {
       for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
       // (1er nov.) Vues et favoris de chaque annonce lue (la fiche d'une paire) :
       // un nombre seulement s'il est écrit, jamais un 0 deviné.
-      stats={}; crees={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; { const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts : (Number.isFinite(it.createdTs) ? it.createdTs : (it.photo && it.photo.high_resolution && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null)), id: it.id }, null); if (c != null) crees[String(it.id)] = c; } const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:Number.isFinite(it.view_count)?it.view_count:null,favoris:fav}; } }
+      stats={}; crees={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; { const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts : (Number.isFinite(it.createdTs) ? it.createdTs : (it.photo && it.photo.high_resolution && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null)), id: it.id }, null); if (c != null) crees[String(it.id)] = c; } const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:(Number.isFinite(it.view_count)&&it.view_count>0)?it.view_count:null,favoris:fav}; } }
       for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id));
       // 22 oct. : les masquées par Vinted — la même règle que l'écran Annonces (`<masquees-regle>`).
       const supp=await lireSupprimeesTous();
@@ -50162,7 +50165,7 @@ function AppCoeur() {
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
     if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan,stats,crees,versements:txnItem==null?null:versementsLus});
   })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[besoinNumData,revisionFiche]);
-  const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
+  // (9 nov.) Plus de balayage entre onglets : voir la coque (onTouchStart retiré).
   // Passer à l'onglet voisin au doigt ou avec les flèches du clavier.
   // La souris conserve ses gestes de sélection, sans changer de plateforme.
   // ⚠️⚠️ (16 oct., Julien : « quand je publie sur eBay et que j'appuie sur
@@ -52654,30 +52657,9 @@ function AppCoeur() {
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
     <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
-      onTouchStart={e=>{
-      // Pas de navigation par balayage quand le geste commence dans une
-      // surface flottante (modale, ajustement du tampon, carte...) :
-      // sinon glisser le tampon changeait d'onglet et perdait le réglage !
-      let n=e.target, overlay=false;
-      while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
-      if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
-      const t=e.touches&&e.touches[0];
-      // (5 nov.) Un geste parti du BORD de l'écran appartient au système : sur
-      // iPhone, le bord gauche est le « retour » de Safari. Il changeait AUSSI
-      // d'onglet (mesuré : Ventes → Annonces), puis le retour en jouait un
-      // second. On le laisse au système.
-      if(t && (t.clientX<BORD_SYSTEME || t.clientX>(window.innerWidth||0)-BORD_SYSTEME)){ swipeStart.current=null; return; }
-      if(t) swipeStart.current={x:t.clientX,y:t.clientY,t0:Date.now()};
-      }}
-      onTouchEnd={e=>{
-      const s=swipeStart.current; if(!s) return; swipeStart.current=null;
-      const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
-      // Un appui long (la sélection de texte) ou une sélection encore active
-      // n'est pas un balayage.
-      if(Date.now()-s.t0>BALAYAGE_MAX_MS || selectionActive()) return;
-      slideTab(t.clientX-s.x, t.clientY-s.y, 70);
-      }}
-      onTouchCancel={()=>{ swipeStart.current=null; }}
+      // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
+      // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
+      // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
 >
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
