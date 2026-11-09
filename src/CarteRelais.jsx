@@ -35,7 +35,6 @@ import './styles-colis-colonnes.css';
 import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.jsx';
 import { cleStatTransporteur } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
-import { explicationEnDouble } from './retraitPreuves.js';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -619,9 +618,11 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
         </details>) : null}
       {parSection.double.length ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-double" data-rp-section="double" data-rp-section-n={parSection.double.length} data-retirer-en-double={parSection.double.length}>
-          <summary className="vrm-rpf-section-titre is-repli"><span>Peut-être en double<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
-          {/* (6 nov.) Pourquoi « peut-être en double » : une phrase, une fois (src/retraitPreuves.js). */}
-          <p className="vrm-rp-sous vrm-rpf-double-pourquoi" data-double-explication={parSection.double.length}>{explicationEnDouble(parSection.double.length)}</p>
+          {/* (9 nov., 17 h 24, Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION ») Plus de « peut-être » ni de paragraphe :
+              chaque moitié Vinted a UN état, sur SA ligne — « Compté avec le n°…1234 » (le colis du transporteur
+              arrivé au même point, compté une fois). Un témoin = un carton : une moitié sans témoin libre est à
+              retirer, comptée ; une moitié dont le témoin est fini est dans les sortis (api/_lib/achat-arrive-relais.js). */}
+          <summary className="vrm-rpf-section-titre is-repli"><span>Comptés avec un autre colis<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
           <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
         </details>) : null}
       {nRoute ? (

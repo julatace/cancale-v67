@@ -210,12 +210,13 @@ export function aUnTemoin(t, cmd, temoins, opts = {}) {
 // RETIRÉS d'après le transporteur. Toutes restaient « peut-être en double » d'un colis… déjà retiré :
 // un colis fini n'est pas un douteux. Ici, chaque moitié reçoit SON témoin (le plus proche dans le temps,
 // jamais pris deux fois — deux moitiés ne sont pas le même carton) :
-//   · témoin encore montré (à retirer, à vérifier) ⇒ `doute` (« peut-être en double », comme avant) ;
-//   · témoin FINI (retiré, reparti, coché) ⇒ `probable` : « sans doute le même colis, fini » — DIT avec
-//     la raison du transporteur, jamais compté, jamais « peut-être en double ».
-// Plus de moitiés que de témoins : une moitié sans témoin libre garde la règle d'avant (un témoin
-// encore montré parmi les siens ⇒ doute ; tous finis ⇒ probable). Rien n'est relié par le titre ; rien
-// n'est déclaré « retiré » pour la moitié (elle n'a pas d'identité) : la phrase dit « sans doute ».
+//   · témoin encore montré (à retirer, à vérifier) ⇒ `doute` : la moitié est COMPTÉE AVEC ce colis (un
+//     carton, une fois) — dite « Compté avec le n°…1234 », jamais « peut-être en double » (17 h 24) ;
+//   · témoin FINI (retiré, reparti, coché) ⇒ `probable` : fini avec son témoin — DIT avec la fin lue chez
+//     le transporteur, jamais compté ;
+//   · plus de témoin libre (un témoin = un carton) ⇒ `seul` : un autre colis, À RETIRER, compté.
+// Rien n'est relié par le titre ; la moitié n'hérite d'aucune identité (ni code, ni n°, ni photo) : la
+// décision ne porte que sur le COMPTE (un carton une fois) et sur la phrase qui la dit.
 export function apparierTemoins(cands, { temoinActif, commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J } = {}) {
   const items = (cands || []).map((c, i) => ({ ...c, i, ms: arriveeMs(c.t), ws: temoinsDe(c.t, c.cmd, c.temoins, { commandeDe, fenetreJ }) }));
   const pris = new Set();
@@ -226,8 +227,10 @@ export function apparierTemoins(cands, { temoinActif, commandeDe = () => null, f
     if (!x.ws.length) { out[x.i] = { sorte: 'aucun', temoin: null }; continue; }
     const libres = x.ws.filter((w) => !pris.has(w)).sort((a, b) => ecart(x, a) - ecart(x, b));
     if (libres.length) { const w = libres[0]; pris.add(w); out[x.i] = { sorte: temoinActif(w) ? 'doute' : 'probable', temoin: w }; continue; }
-    const actif = x.ws.find((w) => temoinActif(w));
-    out[x.i] = actif ? { sorte: 'doute', temoin: actif } : { sorte: 'probable', temoin: [...x.ws].sort((a, b) => ecart(x, a) - ecart(x, b))[0] };
+    // (9 nov., 17 h 24, Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION ») Plus de témoin libre : un témoin = un
+    // carton, déjà pris par une autre moitié — celle-ci est un AUTRE colis (sa propre conversation, son propre
+    // achat) : elle est à retirer, comptée. Jamais un « peut-être ».
+    out[x.i] = { sorte: 'seul', temoin: null };
   }
   return out;
 }
@@ -243,7 +246,7 @@ export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion =
   }
   const cpOrphelins = new Map();
   garde.forEach((t, i) => { if (!cmds[i] && t.source !== 'vinted-commande') { const cp = cpDuLieu(t.lieu); if (cp) cpOrphelins.set(cp, (cpOrphelins.get(cp) || 0) + 1); } });
-  const reste = [], doutes = [], commandes = [], doutesCommandes = [], probables = [];
+  const reste = [], doutes = [], commandes = [], doutesCommandes = [], probables = [], doutesTemoins = [];
   // (9 nov.) Avec `temoinActif` : chaque moitié reçoit SON témoin (`apparierTemoins`).
   const apparie = new Map();
   if (Array.isArray(temoins) && typeof temoinActif === 'function') {
@@ -255,7 +258,7 @@ export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion =
     if (t.source === 'vinted-commande' && (!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))) {
       const a = apparie.get(i);
       if (a) {
-        if (a.sorte === 'doute') { doutes.push(t); doutesCommandes.push(cmds[i] || null); return; }
+        if (a.sorte === 'doute') { doutes.push(t); doutesCommandes.push(cmds[i] || null); doutesTemoins.push(a.temoin); return; }
         if (a.sorte === 'probable') { probables.push({ t, commande: cmds[i] || null, temoin: a.temoin }); return; }
       } else {
         const doute = Array.isArray(temoins)
@@ -266,7 +269,7 @@ export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion =
     }
     reste.push(t); commandes.push(cmds[i]);
   });
-  return { liste: reste, doutes, commandes, doutesCommandes, probables };
+  return { liste: reste, doutes, commandes, doutesCommandes, probables, doutesTemoins };
 }
 
 // ── LA LIGNE RANGÉE (une forme pour le serveur ET la relecture de l'app) ──────

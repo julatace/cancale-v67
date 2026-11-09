@@ -33,6 +33,7 @@ const { prouver, sansCommentaires } = require('./_mutations-audit.cjs');
 
 const MUTATIONS = {
   'un témoin fini reste un double': [['api/_lib/achat-arrive-relais.js', "out[x.i] = { sorte: temoinActif(w) ? 'doute' : 'probable', temoin: w }; continue; }", "out[x.i] = { sorte: 'doute', temoin: w }; continue; }"]],
+  'plus de témoin libre ⇒ encore « peut-être »': [['api/_lib/achat-arrive-relais.js', "out[x.i] = { sorte: 'seul', temoin: null };", "out[x.i] = { sorte: 'doute', temoin: x.ws[0] };"]],
   'un témoin pris deux fois': [['api/_lib/achat-arrive-relais.js', 'const libres = x.ws.filter((w) => !pris.has(w))', 'const libres = x.ws.filter((w) => true)']],
   "l'app ne branche pas la règle": [['src/App.jsx', 'temoins, sansIdentite, temoinActif: (w) => !temoinFini(w) });', 'temoins, sansIdentite });']],
   'la carte épingle les douteux': [['src/relaisColis.js', 'export const surLaCarte = (p) => !!p && !p.inconnu && Number(p.nComptes) > 0;', 'export const surLaCarte = (p) => !!p && !p.inconnu;']],
@@ -162,16 +163,17 @@ const transp = (owner, carrier, suivi, o = {}) => base.set(`${owner}|transp_${ca
     // le témoin fini ne sert qu'UNE fois — la seconde moitié reste « peut-être en double ».
     const r1b = M.regrouperArrivees([moitie(10, 0), moitie(11, 5 * MIN)], { commandeDe: () => null, temoins: [temoin(10, 60000, true), temoin(11, 2 * H, false)], temoinActif: actif });
     dit(r1b.doutes.length === 1 && (r1b.probables || []).length === 1, 'A1 un témoin ne sert qu’UNE moitié (deux moitiés ne sont pas le même carton)', JSON.stringify({ d: r1b.doutes.length, p: (r1b.probables || []).length }));
+    dit(r1b.doutesTemoins && r1b.doutesTemoins[0] && r1b.doutesTemoins[0].suivi === '820000011', 'A1 la moitié « comptée avec » porte SON témoin (pour dire « Compté avec le n°… »)');
     const r2 = M.regrouperArrivees(h, { commandeDe: () => null, temoins: w });
     dit(r2.doutes.length === 3 && !(r2.probables || []).length, 'A2 sans `temoinActif` : la règle d’avant (3 doutes)');
     const r3 = M.regrouperArrivees([moitie(4, 0), moitie(5, 30 * MIN)], { commandeDe: () => null, temoins: [temoin(4, 60000, false)], temoinActif: actif });
-    dit(r3.doutes.length === 2 && !(r3.probables || []).length, 'A3 deux moitiés, un témoin encore montré ⇒ deux doutes (jamais « fini » sur une seule voix)');
+    dit(r3.doutes.length === 1 && r3.liste.length === 1 && !(r3.probables || []).length, 'A3 deux moitiés, un témoin encore montré ⇒ une « comptée avec » lui, l’autre À RETIRER (un témoin = un carton ; jamais « peut-être »)', JSON.stringify({ d: r3.doutes.length, l: r3.liste.length }));
     const r4 = M.regrouperArrivees([moitie(6, 0), moitie(7, 30 * MIN)], { commandeDe: () => null, temoins: [temoin(6, 60000, true)], temoinActif: actif });
-    dit(r4.doutes.length === 0 && (r4.probables || []).length === 2 && r4.liste.length === 0, 'A3 deux moitiés, un témoin fini ⇒ deux « sans doute finis », aucune comptée');
+    dit(r4.doutes.length === 0 && (r4.probables || []).length === 1 && r4.liste.length === 1, 'A3 deux moitiés, un témoin fini ⇒ une finie avec lui, l’autre À RETIRER', JSON.stringify({ p: (r4.probables || []).length, l: r4.liste.length }));
     const r5 = M.regrouperArrivees([moitie(8, 0)], { commandeDe: () => null, temoins: [temoin(8, 9 * 86400000, true)], temoinActif: actif });
     dit(r5.liste.length === 1 && !r5.doutes.length && !(r5.probables || []).length, 'A4 un témoin hors des 3 jours ne touche pas la moitié (elle reste à retirer)');
     const app = sansCommentaires(fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8'));
-    dit(/regrouperArrivees\(emailList, \{[^}]*temoinActif: \(w\) => !temoinFini\(w\) \}\)/.test(app) && /noterProbable\(p\.t, p\.commande, p\.temoin\)/.test(app), 'A5 l’app branche la règle (`temoinActif`) et DIT chaque moitié « sans doute finie » (sortis)');
+    dit(/regrouperArrivees\(emailList, \{[^}]*temoinActif: \(w\) => !temoinFini\(w\) \}\)/.test(app) && /noterProbable\(p\.t, p\.commande, p\.temoin\)/.test(app), 'A5 l’app branche la règle (`temoinActif`) et DIT chaque moitié finie (sortis)');
     const RC = await importer('src/relaisColis.js');
     dit(typeof RC.surLaCarte === 'function' && RC.surLaCarte({ cle: 'p', nComptes: 1 }) && !RC.surLaCarte({ cle: 'p', nComptes: 0, arrives: [{ horsCompte: true }] }) && !RC.surLaCarte({ cle: 'p', nComptes: 0, nAttendus: 3 }),
       'A5 la carte n’épingle qu’un point où un colis COMPTÉ attend (ni « à vérifier », ni « en double », ni « en route »)');

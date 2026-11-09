@@ -42,7 +42,10 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
 const P1 = 'TABAC DU PORT, 12 RUE DU PORT, 35260 CANCALE';
 const P2 = 'PICKUP HOCHE, 29 RUE HOCHE, 56000 VANNES';
 const P3 = 'BAR DE LA GARE, 3 RUE DE LA GARE, 35400 SAINT-MALO';
-const GEO = { 35260: [-1.852, 48.677, 'Cancale'], 56000: [-2.76, 47.658, 'Vannes'], 35400: [-2.0, 48.648, 'Saint-Malo'] };
+const P4 = 'TABAC DES LICES, 4 PLACE DES LICES, 35000 RENNES';
+const GEO = { 35260: [-1.852, 48.677, 'Cancale'], 56000: [-2.76, 47.658, 'Vannes'], 35400: [-2.0, 48.648, 'Saint-Malo'], 35000: [-1.68, 48.11, 'Rennes'] };
+// (17 h 24) Les titres de SA capture (vendeurs allemands, espagnols…).
+const TITRES = ['Adidas spezial suède', 'Nike P-6000', 'Wildleder Stiefel von Tamaris', 'Zapatillas ADIDAS', 'Puma Suede', 'Asics Gel-1130', 'New Balance 550', 'Salomon XT-6', 'Nike Dunk Low', 'Adidas Samba', 'Converse Chuck 70', 'Vans Old Skool', 'Reebok Club C', 'Onitsuka Mexico 66', 'Nike Air Max 90'];
 const ligne = (carrier, suivi, o) => ({ id: `email_track_${carrier}_${suivi}`, data: { type: 'suivi', carrier, suivi, status: 'available', statusLabel: 'Arrivé au point de retrait', subject: `Votre colis ${suivi} est disponible`, code2: null, qrB64: null, qrUrl: null, qrType: null, consigne: false, account: 'compte_a', artTitle: null, ...o } });
 // Une moitié Vinted « Ton achat t'attend » (api/_lib/achat-arrive-relais.js `ligneArrivee`) : sans n° de suivi.
 const moitie = (conv, o) => ({ id: `email_track_autre_conv-${conv}`, data: { cleLigne: `email_track_autre_conv-${conv}`, type: 'suivi', carrier: 'autre', suivi: '', status: 'available', statusLabel: 'Arrivé au point relais (Vinted)', subject: 'Ton achat t’attend au point relais', code: null, code2: null, artTitle: `Achat ${conv}`, limite: null, consigne: false, conv, source: 'vinted-commande', forme: 'relais', account: '', recuSur: ['autre@exemple.fr'], ...o } });
@@ -74,10 +77,18 @@ const LIGNES = [
   transp('chronopost', 'XW300000021TS', { etat: 'disponible', etatAt: Z('11-08T08:50'), lu: Z('11-09T08:50'), libelle: 'Colis disponible en relais Pickup', limite: '2026-11-14', limiteSure: true }),
   moitie('conv-d1', { lieu: P2, emailAt: Z('11-08T09:05'), receivedAt: Z('11-08T09:05'), arriveLe: Z('11-08T09:05') }),
   moitie('conv-d2', { lieu: P2, emailAt: Z('11-08T09:20'), receivedAt: Z('11-08T09:20'), arriveLe: Z('11-08T09:20') }),
+  // P4 — LES 18 DE LA CAPTURE (avec les 3 de P1) : quinze moitiés Vinted (titres de vendeurs étrangers, adresse
+  //      sans compte relié) et quinze colis Mondial Relay au même point, tous RETIRÉS d'après le transporteur.
+  ...TITRES.flatMap((titre, i) => { const n = String(100 + i), j = 3 + (i % 5);
+    return [
+      ligne('mondialrelay', `82000${n}`, { code: `9${n}00`, lieu: P4, emailAt: Z(`11-0${j}T08:${String(i).padStart(2, '0')}`), receivedAt: Z(`11-0${j}T08:${String(i).padStart(2, '0')}`), arriveLe: Z(`11-0${j}T08:${String(i).padStart(2, '0')}`), limite: `2026-11-1${j - 2}`, account: '', recuSur: ['autre@exemple.fr'] }),
+      transp('mondialrelay', `82000${n}`, { etat: 'retire', fini: true, etatAt: Z(`11-0${j + 1}T15:00`), lu: Z(`11-0${j + 1}T16:00`), libelle: 'Colis livré au destinataire', cp: '35000' }),
+      moitie(`conv-r${n}`, { lieu: P4, artTitle: titre, emailAt: Z(`11-0${j}T08:${String(i).padStart(2, '0')}`).replace(':00.000Z', ':30.000Z'), receivedAt: Z(`11-0${j}T08:${String(i).padStart(2, '0')}`), arriveLe: Z(`11-0${j}T08:${String(i).padStart(2, '0')}`).replace(':00.000Z', ':30.000Z') }),
+    ]; }),
   // P3 — date limite passée : à vérifier.
   ligne('mondialrelay', '82000031', { code: '800031', lieu: P3, emailAt: Z('10-28T09:00'), receivedAt: Z('10-28T09:01'), arriveLe: Z('10-28T09:00'), limite: '2026-11-02' }),
 ];
-const RETIRES = ['82000011', '82000012', '82000013', '1789000000000401', '1789000000000402', 'conv-o1', 'conv-o2', 'conv-o3', 'conv-c1', 'conv-x2'];
+const RETIRES = ['82000011', '82000012', '82000013', '1789000000000401', '1789000000000402', 'conv-o1', 'conv-o2', 'conv-o3', 'conv-c1', 'conv-x2', ...TITRES.map((_, i) => `conv-r${100 + i}`), ...TITRES.map((_, i) => `82000${100 + i}`)];
 
 // ── La carte : un style raster et une tuile faite à la main (comme carte-stable.cjs) ──
 const crc = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return (b) => { let c = 0xffffffff; for (const x of b) c = t[(c ^ x) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }; })();
@@ -168,6 +179,7 @@ const lireEcran = (pg) => pg.evaluate(() => {
     carteEtat: col ? col.getAttribute('data-retirer-carte-etat') : null,
     epingles: [...document.querySelectorAll('[data-relais-epingle]')].map((e) => e.getAttribute('data-relais-n') + ':' + e.getAttribute('data-relais-sorte')),
     double: (document.querySelector('[data-retirer-en-double]') || { getAttribute: () => '0' }).getAttribute('data-retirer-en-double'),
+    expl: ((document.querySelector('[data-double-explication]') || {}).textContent || '').trim(),
     verifier: (document.querySelector('[data-retirer-a-verifier]') || { getAttribute: () => '0' }).getAttribute('data-retirer-a-verifier'),
     sortis: [...document.querySelectorAll('[data-sorti]')].map((e) => ({ cle: e.getAttribute('data-sorti'), via: e.getAttribute('data-sorti-via') || '', texte: ((e.querySelector('[data-sorti-texte]') || {}).textContent || '').trim() })),
     verifie: (document.querySelector('[data-retirer-verifie]') || { getAttribute: () => null }).getAttribute('data-retirer-verifie'),
@@ -199,20 +211,26 @@ const lireEcran = (pg) => pg.evaluate(() => {
         const m = await lireEcran(pg);
         const J = (o) => JSON.stringify(o);
         // F1
-        dit(m.ongletN === '1' && m.pub && m.pub.total === 1 && m.comptes === '1', 'F1 onglet « À retirer » = 1 = vrm_colis_retirer (Ma journée, cloche, widget) = la colonne', J({ onglet: m.ongletN, pub: m.pub && m.pub.total, colonne: m.comptes }));
+        // P2 : le Chronopost ET la seconde moitié Vinted (un témoin = un carton : plus de témoin libre ⇒ un autre colis).
+        dit(m.ongletN === '2' && m.pub && m.pub.total === 2 && m.comptes === '2', 'F1 onglet « À retirer » = 2 = vrm_colis_retirer (Ma journée, cloche, widget) = la colonne', J({ onglet: m.ongletN, pub: m.pub && m.pub.total, colonne: m.comptes }));
+        const d2 = m.lignes.filter((l) => /conv-d2/.test(l.cle));
+        dit(d2.length === 1 && !d2[0].hors && d2[0].section !== 'double', 'F1 la seconde moitié de P2 (aucun témoin libre) est À RETIRER, comptée — jamais « peut-être »', J(d2));
         // F2
         dit(m.surCarte === '1', 'F2 la carte ne place QUE le point où un colis compté attend (P2)', `sur la carte : ${m.surCarte}`);
-        if (m.carteEtat === 'pret') dit(m.epingles.length === 1 && m.epingles[0] === '1:aretirer', 'F2 une épingle, « 1 », à retirer', J(m.epingles));
+        if (m.carteEtat === 'pret') dit(m.epingles.length === 1 && m.epingles[0] === '2:aretirer', 'F2 une épingle, « 2 », à retirer', J(m.epingles));
         else console.log(`  · fond de carte « ${m.carteEtat} » ici : les épingles ne sont pas comptées`);
         // F3
-        dit(m.double === '2', 'F3 « Peut-être en double » = 2 (les deux moitiés de P2), pas les moitiés des colis retirés', `en double : ${m.double}`);
+        dit(m.double === '1', 'F3 UNE moitié « comptée avec » le Chronopost de P2 ; aucune des 18 moitiés des colis retirés', `comptés avec : ${m.double}`);
+        const st = await pg.evaluate(() => [...document.querySelectorAll('[data-rp-section="double"] [data-cc-carte]')].map((l) => ((l.querySelector('[data-rp-statut]') || {}).textContent || '').trim()));
+        const titreD = await pg.evaluate(() => ((document.querySelector('[data-rp-section="double"] summary') || {}).textContent || '').trim());
+        dit(st.length === 1 && st[0] === 'Compté avec le n°…21TS' && !/peut-être/i.test(titreD) && !m.expl, 'F3 la ligne dit UN état (« Compté avec le n°…21TS »), plus de « peut-être » ni de paragraphe', J({ st, titreD, expl: m.expl }));
         dit(m.verifier === '1', 'F3 « À vérifier » = 1 (P3, date limite passée)', `à vérifier : ${m.verifier}`);
         // F4
         const montres = m.lignes.filter((l) => RETIRES.some((k) => l.cle.includes(k)));
         dit(!montres.length, 'F4 aucun colis retiré n’est « à retirer », « à vérifier » ou « en double »', J(montres));
         const dits = RETIRES.filter((k) => m.sortis.some((s) => s.cle.includes(k) || s.texte.includes(k.slice(-4))));
         const prob = m.sortis.filter((s) => s.via === 'doute');
-        dit(prob.length === 3 && prob.every((s) => /^Sans doute le même colis que le n°…001[123] — Mondial Relay : retiré le [678] nov\./.test(s.texte)), 'F4 les trois moitiés des colis retirés sont DITES : « Sans doute le même colis que le n°…0011 — Mondial Relay : retiré le 6 nov. »', J(prob.map((s) => s.texte)));
+        dit(prob.length === 18 && prob.every((s) => /^Fini avec le n°…\d{4} — Mondial Relay : retiré le \d nov\./.test(s.texte)), 'F4 les 18 moitiés des colis retirés ont UN état, dit : « Fini avec le n°…0011 — Mondial Relay : retiré le 6 nov. »', J(prob.slice(0, 3).map((s) => s.texte)) + ` (${prob.length})`);
         dit(m.sortis.some((s) => /conv-x2/.test(s.cle) || s.via === 'code') && m.sortis.some((s) => s.via === 'commande' || /0401/.test(s.cle)), 'F4 la moitié au même code et celle de la commande sont dites sorties (par leur identité)', J(m.sortis.map((s) => s.cle + '·' + s.via)));
         // F5
         dit(m.verifie === '10' && /il y a 10 min/.test(m.verifieTexte), 'F5 « Suivi vérifié il y a 10 min » (la dernière lecture réussie)', m.verifieTexte);

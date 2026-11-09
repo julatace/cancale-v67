@@ -19362,7 +19362,7 @@ const raisonAVerifier = (x) => {
   // (3 nov.) Annoncé par Vinted, au même relais qu'un colis du transporteur, sans identité commune.
   // (6 nov.) Un SMS de Mondial Relay que VRM ne sait pas encore lire (seul son n° est gardé).
   if (x.e.etat==='sms_inconnu') return "SMS de Mondial Relay pas reconnu : regarde le SMS ou l'app Mondial Relay";
-  if (x.e.etat==='doute_meme_relais') return "peut-être le même colis qu'un autre e-mail de ce relais — rien ne les relie";
+  if (x.e.etat==='doute_meme_relais') return x.e.avecSuivi ? `compté avec le n°…${String(x.e.avecSuivi).slice(-4)}` : 'compté avec un autre colis de ce point';
   if (x.e.etat==='delai_depasse' && x.e.heurePassee && x.e.limiteAt) return `délai de retrait passé aujourd'hui à ${heureParis(x.e.limiteAt)}`;
   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : (x.e.limite || null); const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
   // (revue du 23 oct.) La garde de SON transporteur (`x.e.garde`).
@@ -29791,9 +29791,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       clesSortis.add(cle); sortis.push({ ...x, cle, fin: f, via, texte: texteSortie(f, { via }) });
     };
     const arriveeDeLigne = (t) => { const a = t ? arriveeColisEmail({ ...t, status: 'available' }) : null; return a && Number.isFinite(a.ms) ? a.ms : null; };
-    // (9 nov., retraits frais) UNE MOITIÉ VINTED « SANS DOUTE FINIE » (son témoin, le colis du transporteur
-    // arrivé au même point à 3 jours près, est fini) : notée dans les sortis avec ce que dit le témoin,
-    // précédé de « sans doute le même colis que » — jamais « retiré » affirmé pour elle (aucune identité).
+    // (9 nov., retraits frais) UNE MOITIÉ VINTED FINIE AVEC SON TÉMOIN (le colis du transporteur arrivé au même
+    // point à 3 jours près, un témoin = un carton, est fini) : notée dans les sortis avec ce que dit le témoin,
+    // « Fini avec le n°…0011 — Mondial Relay : retiré le 6 nov. » (17 h 24, Julien : « aucune hésitation »).
     // Elle reste dite tant que la fin du témoin est récente OU que sa propre arrivée a moins de 10 jours.
     const probables = [];
     const noterProbable = (t, o, w) => {
@@ -29808,7 +29808,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       clesSortis.add(cle);
       probables.push(cle);
       sortis.push({ kind: 'email', t, o: o || null, cle, fin, via: 'doute', probable: true, temoinSuivi: kw,
-        texte: `Sans doute le même colis que le n°…${String(kw).slice(-4)} — ${coche ? 'coché « J’ai retiré »' : texteSortie(fin, {})}` });
+        texte: `Fini avec le n°…${String(kw).slice(-4)} — ${coche ? 'coché « J’ai retiré »' : texteSortie(fin, {})}` });
     };
     const finVinted = (o, fin) => ({ source: 'vinted', etat: fin, at: null, statut: (o && ((etatTxn(o.transaction_id) || {}).ss || o.status)) || '' });
     for (const t of lignesColis) {
@@ -29916,7 +29916,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const commandeDe = (t) => cmdParColis.get(colisKey(t)) || commandeDuColis(t) || null;
       const r = regrouperArrivees(emailList, { commandeDe, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi, temoins, sansIdentite, temoinActif: (w) => !temoinFini(w) });
       r.liste.forEach((t, i) => { if (r.commandes[i]) cmdParColis.set(colisKey(t), r.commandes[i]); });
-      r.doutes.forEach((t, i) => aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais' }, o: (r.doutesCommandes && r.doutesCommandes[i]) || null }));
+      // (9 nov., 17 h 24) « Compté avec » : la moitié et SON témoin (le colis compté) — une ligne tranchée.
+      r.doutes.forEach((t, i) => { const w = r.doutesTemoins && r.doutesTemoins[i]; aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais', avecSuivi: w ? suiviDeLigne(w) : '', avecCarrier: (w && w.carrier) || '' }, o: (r.doutesCommandes && r.doutesCommandes[i]) || null }); });
       for (const p of (r.probables || [])) noterProbable(p.t, p.commande, p.temoin);
       emailList.splice(0, emailList.length, ...r.liste);
       // …et une moitié Vinted passée « à vérifier » par l'âge seul (garde dépassée), sans identité, dont
@@ -43789,6 +43790,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (6 nov.) Deux sources datées qui se contredisent (api/_lib/etat-colis.js) : ni « incident » ni « retour ».
             if (/rien ne l[’']explique/i.test(r)) return 'Contradiction';
             if (/instance|non r[ée]clam|retour|exp[ée]diteur|renvoy/i.test(r)) return 'Retour à l’expéditeur ?';
+            // (9 nov., 17 h 24) Une moitié Vinted comptée avec le colis du transporteur : l'état, tranché.
+            if (/^compt[ée] avec/i.test(String(x.raisonVerif || ''))) return String(x.raisonVerif).replace(/^c/, 'C');
             if (/m[eê]me colis|m[eê]me relais|doute|pas encore relu|\brelier\b|\breli[ée]s?\b/i.test(r)) return 'À relier';
             if (/incident|probl|transporteur/i.test(r)) return 'Incident';
             if (/d[ée]lai|depasse/i.test(r)) return 'Délai dépassé';
