@@ -27,7 +27,14 @@ export const MARQUE_CHRONO = /chronopost|chrono\s*relais|pickup\s+station/i;
 const N_CHRONO = /\b([XZ]W\s?\d{3}\s?\d{3}\s?\d{3}\s?(?:TS|SP))\b/i;
 const DISPO = /\b(?:est\s+(?:disponible|arriv[ée]e?)|vous\s+attend|est\s+en\s+attente)\b/i;
 const CODE = /\bcode\s*(?:de\s+retrait\s*)?:?\s*([A-Z0-9]{4,8})\b/i;
-const CONDITION = /\b(?:si|s['’])\s+(?:votre|le)\s+colis\s+n['’]est\s+pas/i;
+// Une CONDITION dans la phrase du constat (« si votre colis … est disponible … ») ne constate rien.
+const CONDITION = /\b(?:si|s['’]il|au\s+cas\s+o[uù]|lorsque|quand|d[eè]s\s+que)\b/i;
+export function dispoConstatee(t) {
+  const m = DISPO.exec(t);
+  if (!m) return false;
+  const debut = Math.max(t.lastIndexOf('.', m.index), t.lastIndexOf('!', m.index), t.lastIndexOf('?', m.index)) + 1;
+  return !CONDITION.test(t.slice(debut, m.index));
+}
 
 export function lireSmsChronopost({ texte = '', expediteur = '' } = {}) {
   const t = plat(texte);
@@ -39,7 +46,7 @@ export function lireSmsChronopost({ texte = '', expediteur = '' } = {}) {
   if (!suivi || !FORME_CHRONOPOST_PROPRE.test(suivi)) return { type: 'inconnu', suivi: '' };
   const c = CODE.exec(t);
   const code = c && /\d/.test(c[1]) && normaliserSuivi(c[1]) !== suivi ? c[1].toUpperCase() : '';
-  if (DISPO.test(t) && code && !CONDITION.test(t)) return { type: 'disponible', suivi, code };
+  if (code && dispoConstatee(t)) return { type: 'disponible', suivi, code };
   return { type: 'inconnu', suivi };
 }
 
