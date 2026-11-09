@@ -15407,7 +15407,7 @@ function LiensLegaux() {
 // ── Compte créé par Discord/Google sans le savoir (30 octobre) ──────────────
 // Julien avait relié Discord à son compte (pseudo seulement), puis « Se
 // connecter avec Discord » a créé un SECOND compte VRM, vide. On le dit avant
-// d'ouvrir l'app, et on propose de supprimer ce compte vide (la route « Fermer
+// d'ouvrir l'app, et on propose de supprimer ce compte vide (la route « Supprimer
 // mon compte », confirmée ici) pour pouvoir relier Discord au vrai compte.
 function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
   const nom = fournisseur === 'google' ? 'Google' : 'Discord';
@@ -15429,7 +15429,9 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
   const supprimer = async () => {
     setBusy(true); setErr('');
     try {
-      const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation: email }) });
+      // (9 nov.) La route de « Supprimer mon compte » : ce compte vient d'être ouvert par
+      // Google/Discord (connexion de moins de 10 min), son clic ici est la confirmation.
+      const r = await fetch('/api/compte?mode=supprimer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation: 'SUPPRIMER' }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(j?.message || 'Le compte n’a pas pu être supprimé. Réessaie.'); setBusy(false); return; }
       setEtape('fait');
@@ -15455,7 +15457,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'}, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
-          <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy || !email} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
+          <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
           <button type="button" className="vrm-b vrm-b-discret vrm-b-plein" onClick={() => setEtape('choix')} disabled={busy}>Annuler</button>
         </div>
       </>}

@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Une page à lire, calme : ce que VRM lit (par site), ce que l'extension fait
 // et quand, où c'est rangé, qui y a accès — puis les gestes (voir ce que
-// l'extension a fait, exporter, fermer le compte, l'état de VRM). Les phrases
+// l'extension a fait, exporter, supprimer le compte, l'état de VRM). Les phrases
 // viennent de `src/tesDonnees.js`, chacune tenue par une preuve dans le code
 // (`scripts/audit-confiance.cjs`). Aucune lecture ici : rien ne peut « ne pas
 // charger » — les gestes sont ceux des Paramètres (mêmes fonctions).
@@ -40,7 +40,7 @@ export default function TesDonnees({ onJournal, onExporter, onFermer, cloisonne 
       <GroupeIos titre="Tes gestes" data-td-groupe="gestes">
         {onJournal && <RangeeIos titre="Ce que l’extension a fait" detail="Chaque geste fait en ton nom, daté, avec sa preuve." onClick={onJournal} data-td-journal=""/>}
         {onExporter && <RangeeIos titre="Exporter mes données" detail="Un fichier sur ton appareil : ventes, achats, stock, compta." onClick={onExporter} data-td-exporter=""/>}
-        {onFermer && <RangeeIos titre="Fermer mon compte" detail="Tout effacer, définitivement, après confirmation." onClick={onFermer} data-td-fermer=""/>}
+        {onFermer && <RangeeIos titre="Supprimer mon compte" detail="Ce qui part, ce qui reste et pourquoi ; tout en bas de Mon compte." onClick={onFermer} data-td-fermer=""/>}
         <a className="vrm-td-lien" href="/statut" target="_blank" rel="noopener" data-td-statut="">
           <RangeeIos titre="État de VRM" detail="La base, les e-mails, les notifications, en direct." chevron/>
         </a>

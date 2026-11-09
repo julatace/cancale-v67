@@ -146,9 +146,16 @@ async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://check
       appels.push({ mode, methode: r.request().method(), auth: r.request().headers().authorization || '' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, annuleFinPeriode: mode === 'resilier', finPeriode: '2026-11-04T10:00:00.000Z' }) });
     }
-    if (/\/api\/compte\?mode=fermer/.test(u)) {
-      appels.push({ mode: 'fermer', methode: r.request().method(), auth: r.request().headers().authorization || '', corps: r.request().postData() || '' });
-      const f = fermer || { status: 200, body: { ok: true, message: 'Ton compte VRM est fermé : 3 données effacées.' } };
+    if (/\/api\/compte\?mode=(fermer|supprimer)/.test(u) && r.request().method() === 'GET') {
+      // (9 nov.) L'inventaire de « Supprimer mon compte » (api/compte.js, GET ?mode=supprimer).
+      const a = typeof abo === 'object' ? abo : null;
+      if (!a) return r.fulfill({ status: 503, contentType: 'application/json', body: '{"erreur":"inventaire"}' });
+      if (a.proprietaire) return r.fulfill({ status: 403, contentType: 'application/json', body: '{"erreur":"proprietaire","proprietaire":true}' });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, proprietaire: false, nombres: { donnees: 42, facturesPro: 3, comptesVinted: 2, preuvesAdresse: 1, indexJetons: 1, signalements: 0 }, abonnement: { actif: !!a.actif, resilie: !!a.annuleFinPeriode, fin: a.finPeriode }, fenetreMinutes: 10, mot: 'SUPPRIMER' }) });
+    }
+    if (/\/api\/compte\?mode=(fermer|supprimer)/.test(u)) {
+      appels.push({ mode: 'fermer', url: u, methode: r.request().method(), auth: r.request().headers().authorization || '', corps: r.request().postData() || '' });
+      const f = fermer || { status: 200, body: { ok: true, message: 'Ton compte VRM est supprimé : 3 données effacées.' } };
       return r.fulfill({ status: f.status, contentType: 'application/json', body: JSON.stringify(f.body) });
     }
     if (/\/api\/compte\?mode=(checkout|portail)/.test(u)) {
@@ -469,30 +476,35 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     });
     await essaie('fermer : vendeur', async () => {
       const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif, onglet: 'compte' });
-      dit(await pg.evaluate(() => !!document.querySelector('[data-fermer-compte]')), '« Fermer mon compte » existe dans Mon compte');
+      dit(await pg.evaluate(() => !!document.querySelector('[data-fermer-compte]')), '« Supprimer mon compte » existe dans Mon compte');
+      dit(await pg.evaluate(() => { const g = [...document.querySelectorAll('[data-groupe-reglages]')]; return g.length > 0 && g[g.length - 1].getAttribute('data-groupe-reglages') === 'supprimer'; }), '… TOUT EN BAS (le dernier groupe de Mon compte)');
       await ouvrirFermer(pg);
-      dit((await etatFermer(pg)) === 'possible', 'un vendeur abonné peut fermer son compte');
+      dit((await etatFermer(pg)) === 'possible', 'un vendeur abonné peut supprimer son compte');
+      const ex = await pg.evaluate(() => ({ exp: !!document.querySelector('[data-supprimer-exporter]'), fact: (document.querySelector('[data-supprimer-factures]') || {}).innerText || '', abo: !!document.querySelector('[data-supprimer-abonnement]'), liste: (document.querySelector('[data-supprimer-liste]') || {}).innerText || '' }));
+      dit(ex.exp && /3 factures Pro/.test(ex.fact) && /10 ans/.test(ex.fact) && ex.abo && /39 éléments/.test(ex.liste), 'il explique : l’export d’abord, ce qui part (nombres du serveur), ce qui reste et pourquoi (3 factures Pro, 10 ans), l’abonnement résilié', JSON.stringify(ex).slice(0, 160));
       const btn = pg.locator('[data-fermer-bouton]');
-      dit(await btn.isDisabled(), 'le bouton reste désactivé tant que l’adresse n’est pas recopiée');
-      await pg.fill('[data-fermer-confirmation]', 'autre@exemple.test'); await pg.waitForTimeout(200);
-      dit(await btn.isDisabled(), '… et avec une AUTRE adresse aussi');
-      await pg.fill('[data-fermer-confirmation]', 'Vendeuse@Exemple.test'); await pg.waitForTimeout(200);
-      dit(!(await btn.isDisabled()), '… et s’active avec SA propre adresse (majuscules indifférentes)');
+      dit(await btn.isDisabled(), 'le bouton reste désactivé tant que « SUPPRIMER » n’est pas tapé');
+      await pg.fill('[data-fermer-confirmation]', 'vendeuse@exemple.test'); await pg.waitForTimeout(200);
+      dit(await btn.isDisabled(), '… et avec l’adresse (l’ancienne confirmation) aussi');
+      await pg.fill('[data-fermer-confirmation]', 'supprimer'); await pg.waitForTimeout(200);
+      dit(await btn.isDisabled(), '… et en minuscules aussi');
+      await pg.fill('[data-fermer-confirmation]', 'SUPPRIMER'); await pg.fill('[data-supprimer-mdp]', 'mon-mot-de-passe'); await pg.waitForTimeout(200);
+      dit(!(await btn.isDisabled()), '… et s’active avec « SUPPRIMER »');
       await btn.click(); await pg.waitForTimeout(1200);
       const a = appels.find((x) => x.mode === 'fermer');
-      dit(!!a && a.methode === 'POST' && /^Bearer jeton-de-banc$/.test(a.auth) && /"confirmation":"Vendeuse@Exemple.test"/.test(a.corps), 'la demande part en POST, AVEC la session et l’adresse recopiée (le serveur la revérifie)', a ? `${a.methode} ${a.corps}` : 'aucune demande');
+      dit(!!a && a.methode === 'POST' && /mode=supprimer/.test(a.url) && /^Bearer jeton-de-banc$/.test(a.auth) && /"confirmation":"SUPPRIMER"/.test(a.corps) && /"motDePasse":"mon-mot-de-passe"/.test(a.corps), 'la demande part en POST ?mode=supprimer, AVEC la session, « SUPPRIMER » et le mot de passe (le serveur juge)', a ? `${a.methode} ${a.url.split('?')[1]}` : 'aucune demande');
       const res = await pg.evaluate(() => { const e = document.querySelector('[data-fermer-resultat]'); return e ? { etat: e.getAttribute('data-fermer-resultat'), t: e.innerText } : null; });
-      dit(!!res && res.etat === 'ferme' && /fermé/.test(res.t), 'le serveur dit « fermé » ⇒ l’écran le dit, avec ce que le serveur a fait', res && res.t.slice(0, 90));
+      dit(!!res && res.etat === 'ferme' && /supprimé/.test(res.t), 'le serveur dit « supprimé » ⇒ l’écran le dit, avec ce que le serveur a fait', res && res.t.slice(0, 90));
       await ctx.close();
     });
     await essaie('fermer : incomplet', async () => {
-      const message = 'Fermeture INCOMPLÈTE. Fait : 3 données effacées. Pas encore effacé : tes comptes Vinted, ton compte de connexion.';
+      const message = 'Suppression INCOMPLÈTE. Fait : 3 données effacées. Pas encore effacé : tes comptes Vinted, ton compte de connexion.';
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.sans, onglet: 'compte', fermer: { status: 502, body: { ok: false, message } } });
       await ouvrirFermer(pg);
-      await pg.fill('[data-fermer-confirmation]', 'vendeuse@exemple.test'); await pg.waitForTimeout(200);
+      await pg.fill('[data-fermer-confirmation]', 'SUPPRIMER'); await pg.waitForTimeout(200);
       await pg.locator('[data-fermer-bouton]').click(); await pg.waitForTimeout(1200);
       const res = await pg.evaluate(() => { const e = document.querySelector('[data-fermer-resultat]'); return e ? { etat: e.getAttribute('data-fermer-resultat'), t: e.innerText } : null; });
-      dit(!!res && res.etat === 'incomplet' && res.t.includes('comptes Vinted') && !/Retour à l'accueil/.test(res.t), 'un échec à mi-chemin : l’écran dit ce qui reste, jamais « fermé »', res && res.t.slice(0, 120));
+      dit(!!res && res.etat === 'incomplet' && res.t.includes('comptes Vinted') && !/Retour à l'accueil/.test(res.t), 'un échec à mi-chemin : l’écran dit ce qui reste, jamais « supprimé »', res && res.t.slice(0, 120));
       await ctx.close();
     });
     await essaie('fermer : propriétaire', async () => {
@@ -506,7 +518,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       const { ctx, pg } = await ouvrir(nav, { abo: 'panne', onglet: 'compte' });
       await ouvrirFermer(pg);
       const b = await pg.evaluate(() => !!document.querySelector('[data-fermer-bouton]'));
-      dit((await etatFermer(pg)) === 'pas-su' && !b, 'compte illisible : aucun bouton tant qu’on ne sait pas s’il est le propriétaire');
+      dit((await etatFermer(pg)) === 'pas-su' && !b, 'inventaire illisible : aucun bouton tant qu’on ne sait pas ce qui serait effacé ni s’il est le propriétaire');
       await ctx.close();
     });
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 160)); }
