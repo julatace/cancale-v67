@@ -20,7 +20,7 @@ import { sbCle } from './cle.js';
 import { accesVendeur } from './abonnement.js';
 import { decisionNotif, CATEGORIES_RETIREES, dansHeuresCalmes, regrouper } from './notif-textes.js';
 import { rangerNotif, corrigerEtat, lireLu, nonLuesDeGenre } from './journal-notifs.js';
-import { embellir, genreDe, etiquette, texteGroupe, imageSure, actionDe, ICONE_NOTIF, BADGE_NOTIF } from './notif-belle.js';
+import { embellir, genreDe, etiquette, etiquetteGroupe, texteGroupe, imageSure, actionDe, ICONE_NOTIF, BADGE_NOTIF } from './notif-belle.js';
 
 // La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
 // 200 → oui · 400 (colonne inconnue) → non · le reste (522, délai) → PAS SU.
@@ -415,7 +415,7 @@ export async function sendPushToAll(payload) {
   const regroupe = !cat || cat === 'test' ? false : regrouper(prefs);
   const aEnvoyer = {
     ...notif,
-    tag: etiquette({ tag: brut.tag, cat, regroupe }),
+    tag: etiquette({ tag: brut.tag, cat }),
     renotify: !maj,
     icon: ICONE_NOTIF, badge: BADGE_NOTIF,
   };
@@ -429,8 +429,12 @@ export async function sendPushToAll(payload) {
     // combien attendent (non lues du centre). Pas su ⇒ elle reste seule.
     const lu = rangee ? await lireLu().catch(() => null) : null;
     const k = rangee && lu ? nonLuesDeGenre(rangee.entrees, genre.id, lu) : 1;
-    Object.assign(aEnvoyer, texteGroupe(aEnvoyer, genre, k));
-    if (k > 1) delete aEnvoyer.image;           // la photo d'UNE vente ne coiffe pas trois ventes
+    aEnvoyer.genre = genre.id;
+    if (k > 1) {
+      Object.assign(aEnvoyer, texteGroupe(aEnvoyer, genre, k));
+      aEnvoyer.tagGroupe = etiquetteGroupe(genre);
+      delete aEnvoyer.image;                    // la photo d'UNE vente ne coiffe pas trois ventes
+    }
   }
   const act = actionDe(cat, brut.tag);
   if (act) aEnvoyer.actions = [{ action: act.action, title: act.title, url: aEnvoyer.url || '/' }];

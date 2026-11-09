@@ -216,13 +216,16 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           ecrits.length = 0;
           const calme = pg.locator('[data-np-calme] [role="switch"]');
           dit(await calme.count() === 1, `${T} · F2 l’interrupteur « Heures calmes » est là`);
+          // (8 nov.) Allumées PAR DÉFAUT (22 h → 8 h) sans rien posé : les heures se voient
+          // d'emblée ; le toucher les COUPE et l'écrit, le reste de la ligne gardé.
+          const heures = await pg.locator('[data-np-heures] input[type="time"]').count();
+          const avant = await pg.locator('[data-np-calme]').getAttribute('data-np-calme').catch(() => null);
+          dit(heures === 2 && avant === 'on', `${T} · F4 heures calmes allumées par défaut, début et fin visibles`, `${heures} ${avant}`);
           await calme.first().click().catch(() => {});
           await pg.waitForTimeout(500);
           const p = ecrits.find((l) => l.id === 'push_prefs');
-          dit(!!p && p.data.calme && p.data.calme.actif === true && p.data.familles && p.data.familles.messages === false, `${T} · F3 heures calmes ⇒ push_prefs.calme.actif écrit, le reste de la ligne GARDÉ`, JSON.stringify(p && p.data));
-          const heures = await pg.locator('[data-np-heures] input[type="time"]').count();
-          dit(heures === 2, `${T} · F4 début et fin des heures calmes`, String(heures));
-          dit(await pg.locator('[data-np-regrouper] [role="switch"]').count() === 1, `${T} · F5 « Regrouper par type »`);
+          dit(!!p && p.data.calme && p.data.calme.actif === false && p.data.familles && p.data.familles.messages === false, `${T} · F3 heures calmes coupées ⇒ push_prefs.calme.actif:false écrit, le reste de la ligne GARDÉ`, JSON.stringify(p && p.data));
+          dit(await pg.locator('[data-np-regrouper] [role="switch"]').count() === 1, `${T} · F5 « Regrouper »`);
           const rel = await pg.evaluate(() => { const e = document.querySelector('[data-relances-essai]'); return e ? { etat: e.getAttribute('data-relances-essai'), codes: e.querySelectorAll('code').length } : null; });
           dit(!!rel && rel.etat === 'non-configure' && rel.codes === 4, `${T} · F6 e-mails de l’essai : « pas configurés » et ce qui manque (au propriétaire)`, JSON.stringify(rel));
           const m = await mesurer(pg, mobile, '.vrm-set');

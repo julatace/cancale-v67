@@ -76,7 +76,10 @@ self.addEventListener('push', event => {
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = { body: event.data ? event.data.text() : '' }; }
   const title = data.title || 'VRM';
   const actions = Array.isArray(data.actions) ? data.actions.filter((x) => x && typeof x.action === 'string' && typeof x.title === 'string').slice(0, 2) : [];
-  const tag = typeof data.tag === 'string' && data.tag ? data.tag : 'vrm';
+  // Regroupée (`tagGroupe`) : elle prend l'étiquette du genre et ferme celles du
+  // même genre déjà affichées (« 3 bordereaux prêts à imprimer » au lieu de trois).
+  const tag = typeof data.tagGroupe === 'string' && data.tagGroupe ? data.tagGroupe : (typeof data.tag === 'string' && data.tag ? data.tag : 'vrm');
+  const genre = typeof data.genre === 'string' ? data.genre : '';
   const opts = {
     body: data.body || '',
     icon: ICONE_VRM,
@@ -85,13 +88,19 @@ self.addEventListener('push', event => {
     renotify: data.renotify !== false,   // même étiquette : re-sonne seulement pour un fait nouveau
     timestamp: Date.now(),
     data: {
+      genre,
       url: avecNotif(cheminApp(data.url), data.notif),
       actions: Object.fromEntries(actions.map((x) => [x.action, avecNotif(cheminApp(x.url || data.url), data.notif)])),
     },
   };
   if (actions.length) opts.actions = actions.map((x) => ({ action: x.action, title: x.title }));
   if (typeof data.image === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(data.image)) opts.image = data.image;
-  event.waitUntil(self.registration.showNotification(title, opts));
+  event.waitUntil((async () => {
+    if (data.tagGroupe && genre && self.registration.getNotifications) {
+      try { for (const n of await self.registration.getNotifications()) if (n.data && n.data.genre === genre) n.close(); } catch (_) {}
+    }
+    await self.registration.showNotification(title, opts);
+  })());
 });
 
 self.addEventListener('notificationclick', event => {

@@ -200,7 +200,7 @@ const hhmm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Mat
     await comme(J, () => P.sendPushToAll(VENTE));
     await comme(J, () => P.sendPushToAll({ ...VENTE, tag: 'sale-30000002' }));
     // (8 nov.) Regroupement PAR GENRE (api/_lib/notif-belle.js) : « 2 ventes ».
-    dit(pushes.length === 2 && pushes.every((x) => x.tag === 'vrm-vente'), 'R1 une notification PAR GENRE sur le téléphone (la seconde remplace la première)', pushes.map((x) => x.tag).join(' '));
+    dit(pushes.length === 2 && pushes.every((x) => x.genre === 'vente') && pushes[1].tagGroupe === 'vrm-vente', 'R1 une notification PAR GENRE sur le téléphone (la seconde, « vrm-vente », remplace la première)', pushes.map((x) => x.tagGroupe || x.tag).join(' '));
     dit(pushes[0].title === 'Vendu !' && pushes[1].title === '2 ventes', 'R2 la seconde dit « 2 ventes »', pushes[1] && pushes[1].title);
     base.set(k(J, 'push_journal_lu'), { luJusqua: 2, lus: [] });
     await comme(J, () => P.sendPushToAll({ ...VENTE, tag: 'sale-30000003' }));
@@ -210,7 +210,7 @@ const hhmm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Mat
     dit(pushes.length === 4 && pushes[3].title === 'Vendu !', 'R4 « lu » illisible : aucun nombre inventé, la notification part');
     prepare({ regrouper: false });
     await comme(J, () => P.sendPushToAll(VENTE));
-    dit(pushes[0].tag === 'vrm-' + VENTE.tag, 'R5 regroupement coupé : chaque notification garde son propre tag (celui de l’objet)', pushes[0].tag);
+    dit(pushes[0].tag === VENTE.tag && !pushes[0].tagGroupe, 'R5 regroupement coupé : chaque notification garde son propre tag (celui de l’objet)', pushes[0].tag);
   });
 
   await essaie('P — pas su, pas d’appareil', async () => {

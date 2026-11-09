@@ -73,7 +73,7 @@ export function embellir({ title = '', body = '' } = {}, cat = null) {
 // `re` : l'étiquette posée par l'émetteur (une par objet) ; `titre(k)` : la
 // notification regroupée ; `url` : l'écran de la liste ; `action` : le geste.
 export const GENRES = [
-  { id: 'bordereau', re: /^bord-/, titre: (k) => `${k} bordereaux prêts à imprimer`, url: DESTINATIONS.colis({}), action: { action: 'voir', title: 'Imprimer' } },
+  { id: 'bordereau', sansTitre: true, re: /^bord-/, titre: (k) => `${k} bordereaux prêts à imprimer`, url: DESTINATIONS.colis({}), action: { action: 'voir', title: 'Imprimer' } },
   { id: 'vente', re: /^(sale|vc-vente)-/, titre: (k) => `${k} ventes`, url: lienNotif('ventes'), action: { action: 'voir', title: 'Voir la vente' } },
   { id: 'argent', re: /^final-/, titre: (k) => `${k} versements reçus`, url: lienNotif('ventes', { site: 'vinted' }), action: null },
   { id: 'arrivee', re: /^(relais|retrait-code)-/, titre: (k) => `${k} colis t'attendent`, url: DESTINATIONS.retrait({}), action: { action: 'voir', title: 'Voir le code' } },
@@ -98,21 +98,18 @@ const ACTION_CAT = {
 };
 export const actionDe = (cat, tag) => { const g = genreDe(tag); return (g && g.action) || ACTION_CAT[cat] || null; };
 
-// L'étiquette envoyée au téléphone : regroupée ⇒ celle du genre ; sinon celle de
-// l'objet (posée par l'émetteur), préfixée pour ne jamais toucher une étiquette
-// d'une autre app.
-export function etiquette({ tag, cat, regroupe }) {
-  const g = regroupe ? genreDe(tag) : null;
-  if (g) return `vrm-${g.id}`;
-  const t = String(tag || '').replace(/[^A-Za-z0-9_|.-]/g, '').slice(0, 80);
-  return t ? (t.startsWith('vrm-') ? t : `vrm-${t}`) : `vrm-${cat || 'notif'}`;
-}
+// L'étiquette d'une notification : celle de l'OBJET (posée par l'émetteur — une
+// mise à jour du même objet remplace l'ancienne). Le regroupement en pose une
+// seconde, `tagGroupe` (« vrm-<genre> »), quand plusieurs du même genre attendent :
+// le service worker montre alors le groupe et ferme les notifications de ce genre.
+export const etiquette = ({ tag, cat }) => String(tag || '').replace(/[^A-Za-z0-9_|.:-]/g, '').slice(0, 120) || `vrm-${cat || 'notif'}`;
+export const etiquetteGroupe = (genre) => `vrm-${genre.id}`;
 
 // Le texte regroupé : `k` notifications NON LUES de ce genre (celle-ci comprise).
 // k ≤ 1 ⇒ inchangé. Le corps dit la dernière (son titre, puis son corps).
 export function texteGroupe(n, genre, k) {
   if (!genre || !(k > 1)) return n;
-  const derniere = [n.title, n.body].filter(Boolean).join(' · ');
+  const derniere = (genre.sansTitre && n.body ? [n.body] : [n.title, n.body]).filter(Boolean).join(' · ');
   return { title: couper(genre.titre(k), TITRE_MAX), body: couper(`Dernier : ${derniere}`, CORPS_MAX), url: genre.url };
 }
 

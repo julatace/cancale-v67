@@ -114,19 +114,19 @@ const EMOJI = /\p{Extended_Pictographic}/u;
     prepare(null, {});
     for (const tx of ['901', '902', '903']) await comme(() => P.sendPushToAll(BORD(tx)));
     const [a, , c] = pushes;
-    dit(pushes.length === 3 && a.tag === 'vrm-bordereau' && c.tag === 'vrm-bordereau', 'R1 une seule étiquette pour le genre « bordereau » : chaque nouvelle remplace l’ancienne sur le téléphone', pushes.map((x) => x.tag).join(','));
+    dit(pushes.length === 3 && a.tag === 'bord-901' && a.genre === 'bordereau' && !a.tagGroupe && c.tagGroupe === 'vrm-bordereau' && c.genre === 'bordereau', 'R1 seule, elle garde l’étiquette de SON colis ; à plusieurs, l’étiquette du genre « bordereau » (le téléphone n’en montre qu’une)', pushes.map((x) => x.tagGroupe || x.tag).join(','));
     dit(a.title === 'Bordereau prêt à imprimer' && a.url === L.DESTINATIONS.colis({ tx: '901' }), 'R2 la première reste elle-même (son colis)', `${a.title} ${a.url}`);
-    dit(c.title === '3 bordereaux prêts à imprimer' && c.url === L.DESTINATIONS.colis({}) && /^Dernier : Bordereau prêt à imprimer/.test(c.body), 'R3 la troisième dit « 3 bordereaux prêts à imprimer » et ouvre la LISTE des prêts', `${c.title} | ${c.body} | ${c.url}`);
+    dit(c.title === '3 bordereaux prêts à imprimer' && c.url === L.DESTINATIONS.colis({}) && /^Dernier : Air Max de banc/.test(c.body), 'R3 la troisième dit « 3 bordereaux prêts à imprimer » et ouvre la LISTE des prêts', `${c.title} | ${c.body} | ${c.url}`);
     dit(c.renotify === true, 'R4 un fait nouveau re-sonne (renotify)');
     prepare(null, {}); panne.add('push_journal_lu');
     for (const tx of ['911', '912']) await comme(() => P.sendPushToAll(BORD(tx)));
     dit(pushes[1] && pushes[1].title === 'Bordereau prêt à imprimer', 'R5 « lu » illisible : aucun nombre inventé, la notification reste seule', pushes[1] && pushes[1].title);
     prepare({ regrouper: false }, {});
     for (const tx of ['921', '922']) await comme(() => P.sendPushToAll(BORD(tx)));
-    dit(pushes.map((x) => x.tag).join(',') === 'vrm-bord-921,vrm-bord-922' && pushes[1].title === 'Bordereau prêt à imprimer', 'R6 regroupement coupé à la main : une étiquette PAR OBJET', pushes.map((x) => x.tag).join(','));
+    dit(pushes.map((x) => x.tagGroupe || x.tag).join(',') === 'bord-921,bord-922' && pushes[1].title === 'Bordereau prêt à imprimer' && !pushes.some((x) => x.genre), 'R6 regroupement coupé à la main : une étiquette PAR OBJET', pushes.map((x) => x.tagGroupe || x.tag).join(','));
     prepare(null, {});
     await comme(() => P.sendPushToAll(VENTE('931'))); await comme(() => P.sendPushToAll(BORD('932')));
-    dit(pushes[1] && pushes[1].tag === 'vrm-bordereau' && pushes[1].title === 'Bordereau prêt à imprimer', 'R7 deux genres différents ne se comptent pas ensemble');
+    dit(pushes[1] && !pushes[1].tagGroupe && pushes[1].title === 'Bordereau prêt à imprimer', 'R7 deux genres différents ne se comptent pas ensemble');
   }));
 
   await essaie('C — heures calmes', async () => {
@@ -160,7 +160,8 @@ const EMOJI = /\p{Extended_Pictographic}/u;
     const p = pushes[0] || {};
     dit(p.url === L.DESTINATIONS.colis({ tx: '951' }) && Array.isArray(p.actions) && p.actions[0].url === p.url && p.actions[0].title === 'Imprimer', 'U1 la charge porte l’adresse du colis et une action « Imprimer » vers la même carte', JSON.stringify(p.actions));
     const ecoute = {}; const montrees = []; const ouvertes = [];
-    const ctx = { self: { addEventListener: (n, f) => { ecoute[n] = f; }, registration: { showNotification: async (t, o) => { montrees.push({ t, o }); } }, skipWaiting() {} },
+    const fermees = [];
+    const ctx = { self: { addEventListener: (n, f) => { ecoute[n] = f; }, registration: { showNotification: async (t, o) => { montrees.push({ t, o }); }, getNotifications: async () => montrees.map((m) => ({ data: m.o.data, close: () => fermees.push(m.o.tag) })) }, skipWaiting() {} },
       clients: { matchAll: async () => [], openWindow: async (u) => { ouvertes.push(u); } }, caches: {}, URL, Response, fetch: async () => rep(''), atob: (s) => Buffer.from(s, 'base64').toString('binary'), console };
     vm.runInNewContext(fs.readFileSync(path.join(R, 'public', 'sw.js'), 'utf8'), ctx);
     const attente = []; const ev = (x) => ({ ...x, waitUntil: (pr) => attente.push(pr) });
@@ -178,6 +179,11 @@ const EMOJI = /\p{Extended_Pictographic}/u;
     ecoute.notificationclick(ev({ action: 'voir', notification: { close() {}, data: montrees[1].o.data } }));
     await Promise.all(attente.splice(0));
     dit(/^\/(\?|$)/.test(ouvertes[2] || ''), 'U4 une adresse hors de l’app n’est jamais ouverte', ouvertes[2]);
+    // U5 : un groupe ferme les notifications du même genre déjà affichées.
+    ecoute.push(ev({ data: { json: () => ({ ...p, title: '2 bordereaux prêts à imprimer', tagGroupe: 'vrm-bordereau', genre: 'bordereau' }) } }));
+    await Promise.all(attente.splice(0));
+    const g = montrees[montrees.length - 1];
+    dit(g.o.tag === 'vrm-bordereau' && fermees.includes(p.tag), 'U5 le groupe prend l’étiquette du genre et ferme la notification seule du même genre', JSON.stringify(fermees));
   }));
 
   await essaie('I — la photo prouvée', () => aHeure(midi, async () => {
