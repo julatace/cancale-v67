@@ -157,22 +157,23 @@
 
 /* ── LES REPLIS : une seule forme (revue du 16 oct.) ───────────────────────
    Une rangée de 44 px, libellé à l'encre, chevron › qui tourne à l'ouverture.
+   (9 nov.) Aussi dans les ateliers portés hors de .vrm-main (portail VoileAtelier, DA4) : la flèche revient.
    Plus de texte gris sans affordance, plus de triangle du navigateur. */
-.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary {
+:is(.vrm-main, .vrm-atelier-voile) :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary {
   list-style: none; align-items: center; gap: 8px; min-height: 44px; box-sizing: border-box;
   padding-block: 0; color: var(--vrm-ink); font-size: 15px; font-weight: 600; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help) > summary { display: flex; padding-inline: 2px; }
-.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::-webkit-details-marker { display: none; }
-.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::marker { content: ''; }
-.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::after {
+:is(.vrm-main, .vrm-atelier-voile) :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help) > summary { display: flex; padding-inline: 2px; }
+:is(.vrm-main, .vrm-atelier-voile) :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::-webkit-details-marker { display: none; }
+:is(.vrm-main, .vrm-atelier-voile) :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::marker { content: ''; }
+:is(.vrm-main, .vrm-atelier-voile) :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::after {
   content: ''; flex: none; width: 7px; height: 7px; margin-inline: auto 6px;
   border-right: 1.75px solid var(--vrm-muted); border-bottom: 1.75px solid var(--vrm-muted);
   transform: rotate(-45deg); transition: transform .18s var(--vrm-ease-out, ease);
 }
-.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary)[open] > summary::after { transform: translateY(-2px) rotate(45deg); }
-@media (prefers-reduced-motion: reduce) { .vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::after { transition: none; } }
+:is(.vrm-main, .vrm-atelier-voile) :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary)[open] > summary::after { transform: translateY(-2px) rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { :is(.vrm-main, .vrm-atelier-voile) :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::after { transition: none; } }
 
 /* Les deux volets de l'écran Statistiques (activité, stock) portent des chiffres
    DANS leur ligne : ils gardent leur texte en ligne, mais perdent le triangle du

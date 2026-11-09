@@ -852,4 +852,167 @@
 .vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-acc { flex: 0 2 auto !important; min-width: 3ch !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 .vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-etat { flex: none !important; white-space: nowrap !important; }
 
+/* ══ 12. DIRECTION ARTISTIQUE 4 (9 nov.) — feuilles, confirmations, toasts, états vides,
+   barre du bas. Passation : docs/passation/2026-11-09-direction-artistique-4.md ;
+   banc : scripts/bancs/direction-artistique-4.cjs. Une forme par fonction, rien de métier. ══ */
+
+/* 12.1 LA FEUILLE — une forme : sol gris groupé (fond de l'écran), rayon 20 en haut,
+   titre 20/700, croix d'icône dans un rond de 30 px (cible 44), contenu en GROUPES
+   blancs sans cadre (une case grise sur le sol gris ne se voit pas). */
+.vrm-fs { border: 0 !important; }
+.vrm-fs .vrm-fs-titre { font: 700 var(--p-t-section)/1.2 var(--vrm-police) !important; letter-spacing: var(--p-ap-section) !important; color: var(--p-encre) !important; }
+.vrm-fs .vrm-fs-sous-titre { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-fs .vrm-fs-croix-rond { background: var(--p-remplir) !important; color: var(--p-gris) !important; }
+
+/* Les ATELIERS faits main (Republier, brouillon, lots, file) prennent la même forme. */
+.vrm-atelier-voile { background: rgba(0,0,0,.46) !important; }
+.vrm-atelier-voile > div {
+  background: var(--p-fond) !important; color: var(--p-encre) !important;
+  border-radius: 20px 20px 0 0 !important; border: 0 !important;
+  box-shadow: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14) !important;
+  font-family: var(--vrm-police) !important;
+}
+:root[data-theme="dark"] .vrm-atelier-voile > div { box-shadow: 0 0 0 .5px rgba(255,255,255,.08) !important; }
+@media (min-width: 768px) {
+  /* Ordinateur : la feuille ne touche pas les bords, elle est posée au milieu,
+     ses quatre coins arrondis. */
+  .vrm-atelier-voile { align-items: center !important; padding: 24px !important; }
+  .vrm-atelier-voile > div { border-radius: 20px !important; max-height: min(86dvh, 860px) !important; }
+}
+/* La tête : le titre (20/700) et ses étapes, la croix ronde ; un filet de 0,5 px. */
+.vrm-atelier-voile > div > div:first-child { border-bottom: .5px solid var(--p-filet) !important; padding: 14px 10px 12px 18px !important; align-items: flex-start !important; }
+.vrm-atelier-voile > div > div:first-child > div:first-child > div:first-child { font: 700 var(--p-t-section)/1.2 var(--vrm-police) !important; letter-spacing: var(--p-ap-section) !important; color: var(--p-encre) !important; }
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"] {
+  width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; border-radius: 999px !important;
+  font-size: 0 !important; color: var(--p-gris) !important; position: relative !important; flex: none !important;
+  background: radial-gradient(circle at center, var(--p-remplir) 0 15px, transparent 15.5px) !important;
+}
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::before,
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::after {
+  content: '' !important; position: absolute !important; left: 50% !important; top: 50% !important;
+  width: 12px !important; height: 2.2px !important; border-radius: 2px !important; background: currentColor !important;
+}
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::before { transform: translate(-50%,-50%) rotate(45deg) !important; }
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::after { transform: translate(-50%,-50%) rotate(-45deg) !important; }
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]:disabled { opacity: .4 !important; }
+/* Le pied collé : fond PLEIN (rien ne passe dessous), filet de 0,5 px, gestes de 44. */
+.vrm-atelier-voile > div > .vrm-b-rangee:last-child { background: var(--p-fond) !important; border-top: .5px solid var(--p-filet) !important; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)) !important; }
+.vrm-atelier-voile > div > .vrm-b-rangee:last-child > .vrm-b { min-height: 44px !important; }
+/* Le libellé d'un réglage : 13/600 gris, en casse de phrase (plus de capitales espacées). */
+[data-republier] :is([data-republier-photos], [data-republier-description], [data-republier-brouillon], [data-republier-esp], div:has(> [data-republier-reductions]), div:has(> [data-republier-titre])) > span:first-child {
+  font: 600 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 0 !important;
+}
+/* Les réglages de l'atelier : un GROUPE blanc par réglage, sans cadre. */
+[data-republier] :is([data-republier-photos], [data-republier-description], [data-republier-brouillon], [data-republier-esp], div:has(> [data-republier-reductions]), div:has(> [data-republier-titre])) {
+  background: var(--p-carte) !important; border-radius: var(--p-r-ctrl) !important; padding: 12px 14px !important; border: 0 !important; box-shadow: var(--p-ombre) !important;
+}
+[data-republier] .vrm-repub-memes { background: transparent !important; padding: 0 2px !important; border-radius: 0 !important; }
+/* Les listes de l'atelier (le choix, l'aperçu, la file) : un groupe blanc, filets de 0,5 px. */
+[data-republier] :is(div:has(> [data-republier-apercu]), div:has(> [data-republier-ligne]), div:has(> [data-republier-paire])) {
+  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-ctrl) !important; box-shadow: var(--p-ombre) !important;
+}
+[data-republier] :is([data-republier-apercu], [data-republier-ligne], [data-republier-ordre]) { border-bottom: .5px solid var(--p-filet) !important; }
+[data-republier] :is([data-republier-apercu], [data-republier-ligne]):last-child { border-bottom: 0 !important; }
+[data-republier] [data-republier-paire] { border-bottom-width: .5px !important; border-bottom-color: var(--p-filet) !important; }
+[data-republier] [data-republier-paire]:last-child { border-bottom: 0 !important; }
+[data-republier] [data-republier-apercu] { padding: 10px 14px !important; font-size: var(--p-t-note) !important; }
+[data-republier] :is([data-republier-ligne], [data-republier-ordre]) { padding-left: 14px !important; padding-right: 6px !important; }
+[data-republier] .vrm-sel-liste { background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-ctrl) !important; box-shadow: var(--p-ombre) !important; }
+[data-republier] .vrm-sel-liste .vrm-sel-ligne { border-color: var(--p-filet) !important; border-width: 0 0 .5px !important; }
+[data-republier] .vrm-sel-liste .vrm-sel-photo { width: 44px !important; height: 44px !important; border-radius: var(--p-r-vignette) !important; }
+[data-republier] input[type="checkbox"] { width: 22px !important; height: 22px !important; }
+/* Les choix (baisse de prix, temps entre deux articles) : 44 au doigt ET à la souris dans
+   une feuille ; une pilule au repos est un remplissage gris sans cadre, l'active à l'encre. */
+[data-republier] [data-republier-reductions] > button:not([aria-pressed="true"]) { background: var(--p-remplir) !important; border: 0 !important; box-shadow: none !important; color: var(--p-encre) !important; }
+[data-republier] [data-republier-esp] [role="radiogroup"] button, [data-republier] [data-republier-esp] [role="tablist"] button, [data-republier] [data-republier-esp] [data-republier-esp-choix] { min-height: 44px !important; }
+/* Un champ de l'atelier : la forme du champ de recherche d'iOS (remplissage, sans cadre, 44). */
+[data-republier] :is(input:not([type]), input[type="text"], input[inputmode], select) { min-height: 44px !important; border: 0 !important; background: var(--p-remplir) !important; border-radius: var(--p-r-ctrl) !important; font-size: var(--p-t-texte) !important; color: var(--p-encre) !important; }
+/* Le geste principal pas encore permis : un bouton gris qui SE VOIT (plus un texte
+   gris sans forme, lu comme une étiquette). */
+:is(.vrm-fs, .vrm-atelier-voile) .vrm-b.vrm-b-primaire:disabled { background: var(--p-remplir) !important; color: var(--p-gris) !important; opacity: 1 !important; box-shadow: none !important; }
+
+/* 12.2 LA FEUILLE « ACTIONS » (Annonces → Sélectionner → Actions) : quatre tuiles
+   blanches (plus de case grise sur le sol gris), la paire à corriger en groupe blanc,
+   son manque dit par un POINT ambre devant la phrase (plus de trait ambre à gauche). */
+.vrm-act .vrm-act-choix { background: var(--p-carte) !important; border: 0 !important; box-shadow: var(--p-ombre) !important; border-radius: var(--p-r-ctrl) !important; color: var(--p-encre) !important; }
+.vrm-act .vrm-act-choix b { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; }
+.vrm-act .vrm-act-choix span { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-act .vrm-act-choix[aria-disabled="true"] { opacity: .5 !important; }
+.vrm-act .vrm-main-etape { font: 600 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; text-transform: none !important; letter-spacing: 0 !important; }
+.vrm-act .vrm-act-paire { background: var(--p-carte) !important; border: 0 !important; box-shadow: var(--p-ombre) !important; border-radius: var(--p-r-ctrl) !important; padding: 12px 14px 4px !important; }
+.vrm-act .vrm-act-paire-nom > b { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; }
+.vrm-act .vrm-act-pb > span { position: relative !important; padding-left: 15px !important; font: 400 var(--p-t-note)/1.4 var(--vrm-police) !important; color: var(--p-encre) !important; }
+.vrm-act .vrm-act-pb > span::before { content: '' !important; position: absolute !important; left: 0 !important; top: .5em !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--p-ambre-point) !important; }
+.vrm-act .vrm-act-muet { font: 400 var(--p-t-note)/1.4 var(--vrm-police) !important; color: var(--p-gris) !important; }
+
+/* 12.3 LA CONFIRMATION (askConfirm, askText, choix, vérifier avant de publier) — la
+   question 17/600 à l'encre, sa conséquence 15 grise, DEUX gestes de même taille côte
+   à côte : « Annuler » en bouton gris plein, la réponse en bleu. Aucun rouge. */
+.vrm-fs.vrm-confirmation .vrm-fs-corps > div:first-child:not([data-verif-sheet]),
+.vrm-fs.vrm-confirmation [data-verif-sheet] > div:first-child { font: 600 17px/1.3 var(--vrm-police) !important; letter-spacing: -.012em !important; color: var(--p-encre) !important; }
+.vrm-fs.vrm-confirmation .vrm-fs-corps > div:nth-child(2):not([data-ask-choix]):not(.vrm-ask-sugg):not(:has(> .vrm-b)) { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 6px !important; }
+.vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) { display: flex !important; gap: 12px !important; margin-top: 20px !important; }
+.vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) > .vrm-b { flex: 1 1 0 !important; min-width: 0 !important; box-sizing: border-box !important; height: 50px !important; min-height: 50px !important; padding: 0 12px !important; margin: 0 !important; border-radius: var(--p-r-ctrl) !important; font: 600 17px/1.2 var(--vrm-police) !important; }
+.vrm-fs.vrm-confirmation .vrm-b.vrm-b-discret { background: var(--p-remplir) !important; color: var(--p-encre) !important; }
+.vrm-fs.vrm-confirmation .vrm-fs-corps > .vrm-b.vrm-b-discret { min-height: 50px !important; margin-top: 12px !important; }
+.vrm-fs.vrm-confirmation form input { border: 0 !important; background: var(--p-carte) !important; min-height: 50px !important; font: 600 17px/1.2 var(--vrm-police) !important; box-shadow: var(--p-ombre) !important; }
+.vrm-fs.vrm-confirmation .vrm-verif-liste { border-top: 0 !important; background: var(--p-carte) !important; border-radius: var(--p-r-ctrl) !important; padding: 0 14px !important; box-shadow: var(--p-ombre) !important; }
+.vrm-fs.vrm-confirmation .vrm-verif-liste > div { border-bottom: .5px solid var(--p-filet) !important; }
+.vrm-fs.vrm-confirmation .vrm-verif-liste > div:last-child { border-bottom: 0 !important; }
+@media (min-width: 768px) { .vrm-fs.vrm-confirmation { max-width: 420px !important; } }
+
+/* 12.4 LE TOAST — un message posé sur une carte : rayon 14 (plus une pilule qui casse
+   un texte de deux lignes), texte 15 à l'encre, icône grise ; un échec est un geste à
+   refaire : icône AMBRE, jamais rouge, jamais de cadre coloré (§7). */
+.vrm-toasts .vrm-toast {
+  border: 0 !important; border-radius: 14px !important; background: var(--p-carte) !important;
+  box-shadow: 0 0 0 .5px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.14) !important;
+  padding: 12px 16px !important; min-height: 48px !important; gap: 10px !important; align-items: center !important;
+}
+:root[data-theme="dark"] .vrm-toasts .vrm-toast { background: #2C2C2E !important; box-shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 8px 28px rgba(0,0,0,.5) !important; }
+.vrm-toasts .vrm-toast > span:last-child { font: 400 var(--p-t-texte)/1.4 var(--vrm-police) !important; color: var(--p-encre) !important; }
+.vrm-toasts .vrm-toast .vrm-toast-icon { color: var(--p-gris) !important; }
+.vrm-toasts .vrm-toast[data-tone="ok"] .vrm-toast-icon { color: var(--p-encre) !important; }
+.vrm-toasts .vrm-toast[data-tone="err"] .vrm-toast-icon { color: var(--p-ambre-point) !important; }
+
+/* 12.5 L'ÉTAT VIDE — une forme : centré, le dessin gris, le titre 17/600 à l'encre, la
+   phrase 15 grise (36 caractères par ligne au plus). L'état « pas su » (EtatPanne,
+   LoadError) : une carte blanche, sa phrase 15/600, UN bouton gris (relire n'est pas
+   l'action principale de l'écran : jamais le bleu). */
+.vrm-app-shell .vrm-main :is(.vrm-vide-dessin, .vrm-empty-state, .vrm-toutes-vide) { text-align: center !important; align-items: center !important; }
+.vrm-app-shell .vrm-main .vrm-vide-dessin { padding: 32px 16px !important; gap: 6px !important; color: var(--p-gris) !important; }
+.vrm-app-shell .vrm-main :is(.vrm-vide-dessin, .vrm-toutes-vide) > p { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; max-width: 36ch !important; margin: 0 auto !important; }
+.vrm-app-shell .vrm-main .vrm-vide-dessin > p:first-of-type:not(:last-child), .vrm-app-shell .vrm-main .vrm-toutes-vide > .vrm-toutes-vide-titre { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.012em !important; }
+.vrm-app-shell .vrm-main .vrm-empty-state h3 { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.012em !important; }
+.vrm-app-shell .vrm-main .vrm-empty-state p { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; max-width: 36ch !important; margin-left: auto !important; margin-right: auto !important; }
+.vrm-etat-panne:not(.vrm-etat-panne-compact) { background: var(--p-carte) !important; box-shadow: var(--p-ombre) !important; border-radius: var(--p-r-ctrl) !important; }
+.vrm-etat-panne .vrm-etat-panne-repere { color: var(--p-gris) !important; }
+.vrm-erreur-chargement { background: var(--p-carte) !important; border-radius: var(--p-r-ctrl) !important; box-shadow: var(--p-ombre) !important; padding: 24px 16px !important; }
+.vrm-erreur-chargement > div:nth-child(2) { font: 600 var(--p-t-texte)/1.35 var(--vrm-police) !important; color: var(--p-encre) !important; }
+.vrm-erreur-chargement .vrm-erreur-chargement-bouton { background: var(--p-remplir) !important; color: var(--p-encre) !important; font: 600 var(--p-t-texte)/1 var(--vrm-police) !important; min-height: 44px !important; }
+
+/* 12.6 LA BARRE DU BAS (téléphone), sur TOUS les écrans — fond PLEIN (le contenu ne
+   transparaît plus sous un flou), filet de 0,5 px, libellé 10/500 gris, l'actif en
+   600 à l'encre et son icône bleue ; compteur = pastille ambre de 18 px tabulaire. */
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse) {
+  .vrm-app-shell .vrm-tabbar {
+    background: var(--p-carte) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    border-top: .5px solid var(--p-filet) !important; box-shadow: none !important;
+  }
+  :root[data-theme="dark"] .vrm-app-shell .vrm-tabbar { background: #121214 !important; }
+  .vrm-app-shell .vrm-tabbar > :is(.vrm-tab, .vrm-nav-more) { min-height: 49px !important; min-width: 44px !important; }
+  .vrm-app-shell .vrm-tabbar > :is(.vrm-tab, .vrm-nav-more) .vrm-nav-label { font: 500 10px/1.2 var(--vrm-police) !important; letter-spacing: .01em !important; color: var(--p-gris) !important; }
+  .vrm-app-shell .vrm-tabbar > :is(.vrm-tab, .vrm-nav-more) .vrm-nav-label[data-lib-long] { font-size: 10px !important; letter-spacing: 0 !important; }
+  .vrm-app-shell .vrm-tabbar > :is(.vrm-tab[aria-current="page"], .vrm-nav-more[aria-expanded="true"]) .vrm-nav-label { font-weight: 600 !important; color: var(--p-encre) !important; }
+  .vrm-app-shell .vrm-tabbar > .vrm-tab:not([aria-current="page"]) .vrm-tab-ic { color: var(--p-gris) !important; }
+  .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic { color: var(--p-accent) !important; }
+  .vrm-app-shell .vrm-tabbar .vrm-nav-badge-n {
+    border: 0 !important; box-shadow: 0 0 0 2px var(--p-carte) !important;
+    background: var(--p-ambre-point) !important; color: #fff !important;
+    min-width: 18px !important; height: 18px !important; padding: 0 5px !important; border-radius: 9px !important;
+    font: 700 11px/18px var(--vrm-police) !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums !important;
+  }
+  :root[data-theme="dark"] .vrm-app-shell .vrm-tabbar .vrm-nav-badge-n { color: #1C1C1E !important; box-shadow: 0 0 0 2px #121214 !important; }
+}
+
 } /* fin @layer vrm-premium */
