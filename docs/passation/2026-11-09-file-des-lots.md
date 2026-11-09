@@ -20,7 +20,7 @@ libère son numéro (le dire ici).
 | B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | `claude/annuler-commandes` | à lancer |
 | C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | à lancer |
 | D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | `claude/hors-ligne-relie` | à lancer |
-| E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | en cours |
+| E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | **fini, à intégrer** (`2026-11-09-solo-plateformes.md`, migration 030) |
 | F | prix plancher sous chaque offre + « déjà N paires de ce modèle » | `claude/plancher-stock` | à lancer |
 | G | jauge 50 actions/h + journal « ce que VRM a fait » (ext. 5.337) | `claude/jauge-journal` | à lancer |
 | H | échéances .ics + alerte « nouvel appareil » (12 fonctions api au plus) | `claude/ics-appareil` | à lancer |

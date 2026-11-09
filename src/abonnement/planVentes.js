@@ -11,15 +11,18 @@
 //     chaque total se recalcule d'un coup (aucun mémo oublié).
 // ⚠️ « Pas su » ne bride jamais : réponse illisible ⇒ règle libre.
 // ═══════════════════════════════════════════════════════════════════════════
-import { regleVentes, venteHorsPlan } from '../../api/_lib/plan-regle.js';
+import { regleVentes, venteHorsPlan, signatureRegle, brideAutres } from '../../api/_lib/plan-regle.js';
 import { suivreAbonnement, abonnementPublie } from './etatAbonnement.js';
 
-const LIBRE = Object.freeze({ plan: null, vendeur: null, bride: false });
+const LIBRE = regleVentes(null);
 const cle = (uid) => `vrm_plan_regle_${uid}`;
 let _regle = LIBRE, _uid = '';
 const _ecoutes = new Set();
 
-export const signatureDe = (r) => (r && r.bride && r.vendeur ? `solo:${r.vendeur}` : 'libre');
+// (9 nov., Solo par plateforme) La signature compte AUSSI le compte vendeur de
+// Leboncoin, eBay et Vestiaire (`signatureRegle`) : un choix sur l'une d'elles
+// remonte l'app comme un choix Vinted.
+export const signatureDe = (r) => signatureRegle(r);
 export const reglePlanCourante = () => _regle;
 export const signaturePlan = () => signatureDe(_regle);
 // Le prédicat qu'appellent `compteEcarte` (App.jsx) et les écrans : vrai
@@ -28,8 +31,9 @@ export const venteHorsPlanUid = (uid) => venteHorsPlan(_regle, uid);
 
 function poser(r) {
   const avant = signatureDe(_regle);
-  _regle = r && r.bride ? { plan: r.plan, vendeur: r.vendeur, bride: true } : (r ? { plan: r.plan || null, vendeur: null, bride: false } : LIBRE);
-  if (_uid) { try { _regle.bride ? localStorage.setItem(cle(_uid), JSON.stringify({ plan: _regle.plan, compteVendeur: _regle.vendeur })) : localStorage.removeItem(cle(_uid)); } catch (_) {} }
+  _regle = r && (r.bride || brideAutres(r)) ? r : (r ? { ...LIBRE, plan: r.plan || null } : LIBRE);
+  const garde = _regle.bride || brideAutres(_regle);
+  if (_uid) { try { garde ? localStorage.setItem(cle(_uid), JSON.stringify({ plan: _regle.plan, compteVendeur: _regle.bride ? _regle.vendeur : null, comptesVendeurs: _regle.autres })) : localStorage.removeItem(cle(_uid)); } catch (_) {} }
   if (signatureDe(_regle) !== avant) _ecoutes.forEach((f) => { try { f(_regle); } catch (_) {} });
 }
 

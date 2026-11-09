@@ -44,12 +44,17 @@ export async function regleDuVendeur(owner) {
       memo.set(owner, { v, t: Date.now() });
       return v;
     }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=statut,plan,compte_vendeur&limit=1`, { headers: sbCle(SERVICE) });
+    // (9 nov., Solo par plateforme) + `comptes_vendeurs` (migration 030) : le compte vendeur
+    // de Leboncoin, eBay, Vestiaire. 030 absente (colonne inconnue) ⇒ relu SANS elle : la règle
+    // Vinted s'applique comme avant, les autres plateformes sont « pas su » (rien bridé).
+    const lire = (cols) => fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=${cols}&limit=1`, { headers: sbCle(SERVICE) });
+    let r = await lire('statut,plan,compte_vendeur,comptes_vendeurs');
+    if (!r.ok && r.status === 400) r = await lire('statut,plan,compte_vendeur');
     if (!r.ok) return null;                          // 028 absente : colonne inconnue ⇒ pas su
     const j = await r.json();
     if (!Array.isArray(j)) return null;
     const l = j[0];
-    v = l && VIVANTS.has(String(l.statut || '')) ? regleVentes({ plan: l.plan, compteVendeur: l.compte_vendeur }) : regleVentes(null);
+    v = l && VIVANTS.has(String(l.statut || '')) ? regleVentes({ plan: l.plan, compteVendeur: l.compte_vendeur, comptesVendeurs: l.comptes_vendeurs }) : regleVentes(null);
   } catch (_) { return null; }
   if (memo.size > 1000) memo.clear();
   memo.set(owner, { v, t: Date.now() });
