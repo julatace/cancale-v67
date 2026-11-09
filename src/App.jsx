@@ -49168,6 +49168,10 @@ function FiltreSites({ tache, site, sites, onSite }) {
   const p = useProfilVendeur();
   const ctx = { mode: p.mode, relies: p.relies, choisi: site, plateformes: p.plateformes };
   React.useEffect(() => { if (Array.isArray(p.plateformes) && site !== 'toutes' && !p.plateformes.includes(site) && p.plateformes.length) onSite(t.toutes ? 'toutes' : p.plateformes[0]); }, [site, p.plateformes?.join('|')]);
+  // (9 nov., zéro banc rouge) Ses plateformes PAS ENCORE SUES (le nuage pas lu) : aucune rangée.
+  // Avant, les quatre sites s'affichaient puis la rangée disparaissait (un seul site affiché) :
+  // la barre du haut passait de 82 à 60 px et tout l'écran remontait (banc chargement, Annonces).
+  if (!Array.isArray(p.plateformes)) return null;
   return <SelecteurSites id={tache} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={onSite}/>;
 }
 // (5 nov.) UN ONGLET SANS DONNÉE : ce qui manque et le geste (`ONGLET_SANS_DONNEE`,
