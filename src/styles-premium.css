@@ -944,7 +944,7 @@
 .vrm-fs.vrm-confirmation [data-verif-sheet] > div:first-child { font: 600 17px/1.3 var(--vrm-police) !important; letter-spacing: -.012em !important; color: var(--p-encre) !important; }
 .vrm-fs.vrm-confirmation .vrm-fs-corps > div:nth-child(2):not([data-ask-choix]):not(.vrm-ask-sugg):not(:has(> .vrm-b)) { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 6px !important; }
 .vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) { display: flex !important; gap: 12px !important; margin-top: 20px !important; }
-.vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) > .vrm-b { flex: 1 1 0 !important; min-width: 0 !important; min-height: 50px !important; border-radius: var(--p-r-ctrl) !important; font: 600 17px/1.2 var(--vrm-police) !important; }
+.vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) > .vrm-b { flex: 1 1 0 !important; min-width: 0 !important; box-sizing: border-box !important; height: 50px !important; min-height: 50px !important; padding: 0 12px !important; margin: 0 !important; border-radius: var(--p-r-ctrl) !important; font: 600 17px/1.2 var(--vrm-police) !important; }
 .vrm-fs.vrm-confirmation .vrm-b.vrm-b-discret { background: var(--p-remplir) !important; color: var(--p-encre) !important; }
 .vrm-fs.vrm-confirmation .vrm-fs-corps > .vrm-b.vrm-b-discret { min-height: 50px !important; margin-top: 12px !important; }
 .vrm-fs.vrm-confirmation form input { border: 0 !important; background: var(--p-carte) !important; min-height: 50px !important; font: 600 17px/1.2 var(--vrm-police) !important; box-shadow: var(--p-ombre) !important; }
@@ -971,10 +971,10 @@
    phrase 15 grise (36 caractères par ligne au plus). L'état « pas su » (EtatPanne,
    LoadError) : une carte blanche, sa phrase 15/600, UN bouton gris (relire n'est pas
    l'action principale de l'écran : jamais le bleu). */
-.vrm-app-shell .vrm-main :is(.vrm-vide-dessin, .vrm-empty-state) { text-align: center !important; align-items: center !important; }
+.vrm-app-shell .vrm-main :is(.vrm-vide-dessin, .vrm-empty-state, .vrm-toutes-vide) { text-align: center !important; align-items: center !important; }
 .vrm-app-shell .vrm-main .vrm-vide-dessin { padding: 32px 16px !important; gap: 6px !important; color: var(--p-gris) !important; }
-.vrm-app-shell .vrm-main .vrm-vide-dessin > p { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; max-width: 36ch !important; margin: 0 auto !important; }
-.vrm-app-shell .vrm-main .vrm-vide-dessin > p:first-of-type:not(:last-child) { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.012em !important; }
+.vrm-app-shell .vrm-main :is(.vrm-vide-dessin, .vrm-toutes-vide) > p { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; max-width: 36ch !important; margin: 0 auto !important; }
+.vrm-app-shell .vrm-main .vrm-vide-dessin > p:first-of-type:not(:last-child), .vrm-app-shell .vrm-main .vrm-toutes-vide > .vrm-toutes-vide-titre { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.012em !important; }
 .vrm-app-shell .vrm-main .vrm-empty-state h3 { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.012em !important; }
 .vrm-app-shell .vrm-main .vrm-empty-state p { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; max-width: 36ch !important; margin-left: auto !important; margin-right: auto !important; }
 .vrm-etat-panne:not(.vrm-etat-panne-compact) { background: var(--p-carte) !important; box-shadow: var(--p-ombre) !important; border-radius: var(--p-r-ctrl) !important; }
