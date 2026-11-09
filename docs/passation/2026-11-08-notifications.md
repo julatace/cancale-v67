@@ -128,7 +128,11 @@ Pas de mesure neuve possible (§1). Ce que le code change, mécaniquement :
 |---|---|
 | `scripts/audit-notifs-belles.cjs` — EXÉCUTE `sendPushToAll`, `resumeReveil`, la cloche (`src/journalNotifs.js`) et le VRAI `public/sw.js` (machine virtuelle) ; horloge de Paris simulée (`VRM_NOTIF_HORLOGE`) | **41/41** ; sur `origin/main` (`--sur`) **25 rouges** (37 contrôles d'alors) ; 6 mutations ⇒ rouges : regroupement éteint par défaut (4), heures calmes éteintes par défaut (5), photo sans preuve (1), échéance < 10 h ignorée (1), emoji gardés (7), toucher qui ouvre l'accueil (1) |
 | `scripts/bancs/notifs-apercus.cjs` — vraies fabriques + vraie mise en forme, dessinées façon iOS / Android / macOS | 30/30 ; capture `apercus-notifications.png` regardée |
-| banc `centre-notifs` (390 tactile / 1512, clair / sombre) | voir §7 |
+| banc `centre-notifs` (390 tactile / 1512, clair / sombre ; F3/F4 remis : heures calmes allumées par défaut, le toucher les coupe) | **98/98**, captures regardées |
+| bancs `retrait-conv-push` 15, `colis-relais-push` 14, `offres-mini-push` 11, `double-vente-push` 29, `notif-messages` 38, `emails-action` 14, `agent-ebay-push` 16, `cible-evidence` (vert au 2e passage ; le 1er : un « à chaud » rouge, chemin non touché) | verts |
+| rouges IDENTIQUES sur `origin/main` (pas de ce chantier) | `rappel-soir` 9 (HTTP 503 de sa fausse base), `bilan-semaine` 21, `reglages` 6, `reglages-premium` 4 (import des e-mails, bilan du mois) |
+| `suivi-colis` (banc) | 1 rouge « K : `panel_colis_relais` illisible ⇒ aucune publication » — écran Colis/widget, pas les notifications ; non comparé à `main` (l'arbre de `main` n'a pas servi la page dans ce conteneur) |
+| audits voisins | `audit-statut-transporteurs`, `audit-rappel-urssaf`, `audit-double-vente(-ailleurs)`, `audit-suivi-colis`, `audit-suivi-vinted`, `audit-colis-heure`, `audit-signalement`, `audit-aide-signalement`, `audit-lbc-suppression`, `audit-sans-bruit`, `audit-vapid`, `audit-push`, `audit-variables`, `audit-tdz`, `audit-icones`, `audit-boutons`, `audit-violet`, `audit-coherence`, `audit-fonctions-api`, `audit-identite`, `audit-confiance`, `audit-premieres-minutes` : verts |
 | audits remis à la règle (sans emoji, regroupement par genre, heures calmes par défaut) | `audit-notifications` 31/31, `audit-notifs-centre` 28/28, `audit-reveil-calme` 13/13, `audit-transp-notif`, `audit-compte-pas-relu` 51/51, `audit-veille-plantages` 32/32, `audit-cibles-notif` |
 | `npm run build` | vert |
 
