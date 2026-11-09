@@ -1,6 +1,10 @@
 // (8 nov., démarrage léger) Les feuilles de style de l'app EN PREMIER (déplacées de src/main.jsx,
 // même ordre) : elles viennent avec ce morceau au lieu de bloquer index.html.
 import './stylesApp.js';
+import ChampSaisie from './composants/ChampSaisie.jsx';
+import ChoixPlateformes from './ChoixPlateformes.jsx';
+import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './plateformesAffichage.js';
+
 import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
 import {stockageParcours,lireReprise,garderReprise} from './repriseEcran.js';
@@ -2367,7 +2371,7 @@ const SYNC_KEYS = [
   // Allumé, VRM ne donne plus aucun N° tout seul ; il lit celui écrit dans l'annonce.
   'vrm_numero_ecrit',
   // (8 nov.) Affichage Simple / Complet et « Je vends : Sneakers / Autre » (src/profilVendeur.js) : { choix, at }.
-  'vrm_affichage','vrm_je_vends',
+  'vrm_affichage','vrm_je_vends',CLE_PLATEFORMES,
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
@@ -12109,43 +12113,6 @@ function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64,
   );
 }
 
-function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
-  const [txt, setTxt] = useState(value == null ? '' : String(value));
-  const [actif, setActif] = useState(false);
-  const avantRef = useRef(value == null ? '' : String(value));
-  const annuleRef = useRef(false);
-  // ⚠️ iOS Safari ZOOME dès qu'un champ focalisé fait MOINS de 16px (plainte de
-  // Julien : « quand j'appuie sur le prix d'achat sur le téléphone, ça zoome »).
-  // ChampSaisie est l'éditeur inline UNIQUE (N°, prix d'achat, plancher, boost,
-  // N° de vente) : on impose le plancher de 16px ICI, une seule fois (§11), pour
-  // tous les champs qu'il tape — le publieur eBay fait déjà pareil.
-  const styleSansZoom = (() => {
-    const s = { ...(style || {}) };
-    const t = parseFloat(s.fontSize);
-    if (!isFinite(t) || t < 16) s.fontSize = 16;
-    return s;
-  })();
-  useEffect(() => { if (!actif) setTxt(value == null ? '' : String(value)); }, [value, actif]);
-  const sortir = (v) => {
-    setActif(false);
-    if (annuleRef.current) { annuleRef.current = false; setTxt(avantRef.current); return; }
-    if (String(v) !== String(avantRef.current)) onCommit(v, avantRef.current);
-    else setTxt(value == null ? '' : String(value));
-  };
-  return (
-    <input {...p} value={txt} style={styleSansZoom}
-      onFocus={() => { setActif(true); avantRef.current = value == null ? '' : String(value); annuleRef.current = false; }}
-      onChange={ev => setTxt(ev.target.value)}
-      onBlur={ev => sortir(ev.target.value)}
-      onKeyDown={ev => {
-        // Entrée valide ET, en saisie en série, passe au champ suivant : c'est
-        // ce qui rend une longue liste de prix d'achat tenable au clavier.
-        if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur(); if (apresEntree) setTimeout(apresEntree, 0); }
-        else if (ev.key === 'Escape') { annuleRef.current = true; ev.currentTarget.blur(); }
-      }}
-    />
-  );
-}
 // ⟦→ ecrans/Achats.jsx #3⟧
 const SOURCE_ANCIENNE = { brocante: 'Brocante', fournisseur: 'Fournisseur', particulier: 'Particulier', 'vide-grenier': 'Vide-grenier', autre: 'Autre' };
 const libelleSourceAchat = (s) => SOURCE_ANCIENNE[s] || String(s || '').trim();
@@ -13935,8 +13902,8 @@ function EbayMessagesVolets({ compte, comptesEbay, ...p }) {
 // qu'un site avait en propre est réparti dans les tâches (sous-onglets du
 // site : Ventes · eBay « Commandes · À traiter · Offres », Annonces · eBay
 // « Annonces · Promotion », Colis « Vinted et eBay · Leboncoin », Compte eBay
-// dans Paramètres) ; « Plateformes » ne reste que dans la colonne de
-// l'ordinateur (sa maquette), comme raccourci vers ces tâches.
+// dans Paramètres) ; les raccourcis par plateforme sont retirés le 8 novembre : le choix des sites
+// se fait dans les tâches et dans Paramètres → Mes plateformes.
 // §4.11 : rien ne disparaît — chaque écran d'hier a son chemin (récit :
 // docs/passation/historique-interface-stock.md, « Navigation par tâche »), et
 // les anciens identifiants (`plat_vinted`, `cat_ventes`, `leboncoin`…) mènent au
@@ -13957,13 +13924,8 @@ const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[1],BOTTOM_TABS[2],ONGLET_MESSAGES,B
 // de À retirer », « que dans les deux onglets il n'y ait pas la même chose »,
 // « enlever Plateforme en bas des onglets glissants… répartis avec les onglets
 // du haut »). « Colis à retirer » (`retraits`) et « Achats » (`achats`) sont
-// DEUX écrans, l'un sous l'autre dans « Expédier ». Le groupe « Plateformes »
-// n'existe plus dans « Plus » (téléphone) : chaque section d'un site vit dans
-// sa tâche, en sous-onglets (src/navigationTache.js). Sur ORDINATEUR, la
-// colonne le garde (sa maquette : « fais exactement cette mise en page ») —
-// ses entrées (`ordi`) mènent à la tâche filtrée sur le site, aucun espace de
-// site à part. `site` : l'entrée n'existe que s'il a un compte sur ce site
-// (« aucune entrée vide ») ; pas su ⇒ montrée.
+// DEUX écrans distincts. Le 8 novembre, Julien retire les doublons par
+// plateforme de la colonne : les anciens liens restent résolus par la tâche.
 const GROUPES_PLUS=[
   { titre:'Vendre', items:[
     {...ONGLET_MESSAGES, tel:true},
@@ -13983,11 +13945,6 @@ const GROUPES_PLUS=[
   { titre:'Argent', items:[
     {id:'dashboard', icon:'chart', label:'Statistiques'},
     {id:'compta',    icon:'euro',  label:'Compta'},
-  ]},
-  { titre:'Plateformes', ordi:true, items:[
-    {id:'ebay_agent',     cle:'plat_ebay',      icon:'grid', site:'ebay',      label:'eBay'},
-    {id:'leboncoin',      cle:'plat_leboncoin', icon:'tag',  site:'leboncoin', label:'Leboncoin', avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }},
-    {id:'plat_vestiaire', cle:'plat_vestiaire', icon:'shop', site:'vestiaire', label:'Vestiaire'},
   ]},
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
@@ -14853,6 +14810,19 @@ function DefilementPartout() {
 function Toaster() {
   const [list, setList] = React.useState([]);
   React.useEffect(() => onToasts(setList), []);
+  React.useEffect(() => {
+    // pointerdown fonctionne aussi sur un bouton natif désactivé : aucun clic
+    // ni faux lien, l'action reste réellement bloquée.
+    const expliquer = e => {
+      if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      const b = e.target instanceof Element ? e.target.closest('button:disabled,[aria-disabled="true"]') : null;
+      if (!b) return;
+      const raison = b.getAttribute('title') || b.getAttribute('aria-description') || (b.getAttribute('aria-busy') === 'true' ? 'Cette action est en cours. Attends son résultat avant de réessayer.' : '');
+      if (raison) toast(raison, 'info');
+    };
+    document.addEventListener('pointerdown', expliquer, true);
+    return () => document.removeEventListener('pointerdown', expliquer, true);
+  }, []);
   // (23 oct.) AU-DESSUS de toute feuille, et EN HAUT de l'écran quand une feuille
   // est ouverte. À 210 sous la coque, un message dit depuis une feuille (« Échec
   // de la suppression — réessaie », « Ces bordereaux n'ont plus leur PDF… »)
@@ -18076,9 +18046,32 @@ function useNumerosGuide() {
 // prouve déjà l'extension, Ma journée ne questionne pas l'extension pour rien.
 function GuidePont({ children }) { const { etape } = useEtapePont(); return children(etape); }
 function GuideDemarrageApp(props) {
+  const profil = useProfilVendeur();
   if (exempleActif()) return null;
-  return props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>;
+  const sansVinted = Array.isArray(profil.plateformes) && !profil.plateformes.includes('vinted');
+  const aRelier = sansVinted ? profil.plateformes.filter(id => profil.relies[id] !== true) : [];
+  return <><PlateformesSetting initial/>{sansVinted
+    ? aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null
+    : props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>}</>;
 }
+// Préférences synchronisées et cloisonnées par le stockage du compte VRM.
+function PlateformesSetting({ initial = false }) {
+  const p = useProfilVendeur();
+  const [, maj] = React.useReducer(n => n + 1, 0);
+  React.useEffect(() => {
+    const f = e => { if (!e?.detail?.k || e.detail.k === CLE_PLATEFORMES) maj(); };
+    window.addEventListener('vrm:save', f);
+    const off = onCloudReady(maj);
+    return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
+  }, []);
+  const pret = isCloudReady();
+  const r = pret ? lirePlateformes(load(CLE_PLATEFORMES, null)) : null;
+  if (initial && (!pret || r)) return null;
+  return <ChoixPlateformes key={initial ? 'depart' : 'reglages'} initial={initial} pret={pret}
+    valeur={plateformesAffichees(r, p.relies)} relies={p.relies}
+    onChoix={sites => new Promise((resolve, reject) => { save(CLE_PLATEFORMES, { sites, at: new Date().toISOString() }, ok => { if (!ok) { reject(new Error('stockage')); return; } maj(); toast('Choix conservé sur cet appareil. La synchronisation suit son état habituel.'); resolve(); }); })}/>;
+}
+export { PlateformesSetting };
 // (8 nov.) La première vente : le compteur `nItems` des listes de ventes Vinted
 // (un scalaire par compte, jamais `select=data`) ; échec ⇒ `null`, jamais « aucune ».
 function useVentesGuide(actif, version = 0) {
@@ -27174,6 +27167,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
+  const profilPlateformes = useProfilVendeur();
   const vivant = useVivant();
   const cache = () => estCache(vivant);
   // (7 nov., vitesse) COLIS EN DEUX TEMPS : dessiner 70 cartes d'un coup gelait l'écran
@@ -36684,6 +36678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ventes Vinted, `colisEbay`, `colisVestiaire`, `pickupUnion` pour les
   // retraits, `venteStage` pour les partis. `colonnesColis` les range.
   const [siteColis, setSiteColis] = useState(() => (SITES_COLIS.includes(siteColisDemande) && siteColisDemande !== 'leboncoin') ? siteColisDemande : 'toutes');
+  useEffect(() => { if (Array.isArray(profilPlateformes.plateformes) && siteColis !== 'toutes' && !profilPlateformes.plateformes.includes(siteColis)) setSiteColis('toutes'); }, [siteColis, profilPlateformes.plateformes?.join('|')]);
   // (2 nov., Julien : « des données Vinted dans eBay, inadmissible ») Le filtre de
   // site vaut pour TOUT Colis, pas seulement les colonnes : un bloc d'un site ne
   // s'affiche que sous « Tous les sites » ou sous SON site. Seul le rouge « deux
@@ -42358,7 +42353,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               qui n'en a pas. */}
         </details>)}
         {listings.items && listings.items.length>0 && annShown.length===0 && (
-          <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px'}}>Aucune annonce ne correspond.</div>
+          <div data-ann-vue-vide="" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.6}}><b style={{display:'block',color:C.text}}>Aucune annonce dans cette vue</b>{annBase.length ? 'Tes annonces sont toujours là : la recherche ou le tri réduit la liste.' : 'Vérifie le compte sélectionné ou les comptes écartés : aucune annonce ne reste dans les comptes affichés.'}{(annSearch.trim() || annSort !== 'oldest') ? <div><Bouton variante="secondaire" data-ann-effacer-vue="" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Effacer la recherche et le tri</Bouton></div> : null}</div>
         )}
         {/* ⚠️ SUR ORDINATEUR, `minmax(160px, …)` FAISAIT DES COLONNES, PAS DES
             CARTES. Mesuré à 1512 px : 6 colonnes de ~180 px, donc tous les champs
@@ -42670,7 +42665,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {messageFilter.startsWith('repondre')&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
               {messageFilter==='unread' && nonLusAnciens>0 && <p className="vrm-inbox-feedback" data-nonlus-anciens={nonLusAnciens}>{nonLusAnciens} autre{nonLusAnciens>1?'s':''} marquée{nonLusAnciens>1?'s':''} non lue{nonLusAnciens>1?'s':''} sans message depuis plus de 7 jours — pas comptée{nonLusAnciens>1?'s':''} ici ni dans Ma journée ; {nonLusAnciens>1?'elles restent':'elle reste'} dans {'«\u00a0Toutes\u00a0»'}.</p>}
-              {messageFilter==='offres' && tri.length===0 && <p className="vrm-inbox-feedback">Plus aucune offre en attente dans cette sélection.</p>}
+              {messageFilter==='offres' && tri.length===0 && liste.length===0 && <p className="vrm-inbox-feedback">Plus aucune offre en attente dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:13,color:C.text,lineHeight:1.45,marginBottom:8}}>
                   <b>{nonLusAilleurs}</b> non lu{nonLusAilleurs>1?'s':''} sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'}, pas affiché{nonLusAilleurs>1?'s':''} ici — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'les':'le'} voir.
@@ -42706,6 +42701,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               )}
               {liste.length===0 && messageSearch.trim() && retireesIci.length===0 && <p data-msg-sans-resultat="" style={{fontSize:13,color:C.muted,lineHeight:1.45,margin:'4px 0 12px'}}>Aucune conversation ne correspond. Essaie un pseudo, un mot de l’article ou « N°12 ». <button type="button" className="vrm-pied-lien" data-pied-lien="effacer" onClick={()=>setMessageSearch('')}>{VERBES.effacer} la recherche</button></p>}
+              {tri.length===0 && liste.length>0 && messageFilter!=='all' && <div data-msg-filtre-vide="" className="vrm-vue-vide"><b>Aucune conversation dans ce filtre</b><p>Les conversations sont toujours disponibles dans « Toutes ».</p><Bouton variante="secondaire" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Voir toutes les conversations</Bouton></div>}
               {/* (5 nov., chantier G) L'état vide dit QUOI FAIRE, en une phrase, et nomme les comptes lus. */}
               {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" style={{fontSize:13,color:C.muted,lineHeight:1.5,padding:'14px 0'}}><b style={{display:'block',fontSize:15,color:C.text,marginBottom:2}}>Aucune conversation pour l’instant</b>Ouvre ta messagerie sur vinted.fr {NAV.dans} : l’extension relève les conversations de chaque compte en passant.</div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
@@ -43162,7 +43158,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Achats, Messages) ; un site sans compte relevé dit ce qui manque et le geste. */}
             <DansBarreHaut>
               <SelecteurSites id="colis" label="Filtrer les colis par site" valeur={siteColis}
-                options={optionsSelecteur({ toutes: true, site: siteColis, sites: null }).map((o) => (o.id !== 'toutes' && sitesPresents && !sitesPresents.has(o.id) && !vue.parSite[o.id] ? { ...o, sansCompte: true } : o))}
+                options={optionsSelecteur({ toutes: true, site: siteColis, sites: null }).filter(o => siteMontre(o.id, { plateformes: profilPlateformes.plateformes, choisi: siteColis })).map((o) => (o.id !== 'toutes' && sitesPresents && !sitesPresents.has(o.id) && !vue.parSite[o.id] ? { ...o, sansCompte: true } : o))}
                 onChoix={(x)=>{ if (x === 'leboncoin' && onColisLeboncoin) { onColisLeboncoin(); return; } setSiteColis(x); }}/>
             </DansBarreHaut>
             {siteColis !== 'toutes' && sitesPresents && !sitesPresents.has(siteColis) && !vue.parSite[siteColis] ? <OngletManque site={siteColis} onglet="colis" onNav={onNav}/> : null}
@@ -47509,7 +47505,7 @@ function poserProfilVendeur(p) {
 function useProfilVendeur() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesProfil.add(maj); return () => { _ecoutesProfil.delete(maj); }; }, []);
-  return PROFIL_VENDEUR;
+  return PROFIL_VENDEUR.uid === (AUTH.user?.id || '') ? PROFIL_VENDEUR : { mode: 'complet', usage: {}, relies: {}, contexte: {}, plateformes: null };
 }
 // Le propriétaire de l'installation, en TROIS états (true · false · null pas su).
 function proprioTri() {
@@ -48452,14 +48448,13 @@ function AncreDefilement() {
 // est celle des pastilles de filtre de l'app (`vrm-filtres`, §7).
 function FiltreSites({ tache, site, sites, onSite }) {
   // (5 nov.) Le sélecteur À LOGOS (`SelecteurSites`, règles `src/plateformes.js`) :
-  // les QUATRE sites, toujours, dans le même ordre (« les mêmes onglets que Vinted
-  // pour Leboncoin, eBay et Vestiaire ») ; « Tous » sur Ventes. Un site sans compte
-  // reste choisissable : son onglet dit ce qui manque et le geste (`OngletManque`).
+  // Les sites choisis ou reliés, dans le même ordre ; « Tous » sur Ventes.
+  // Un site choisi avant sa connexion dit ce qui manque et le geste (`OngletManque`).
   const t = TACHES_SITE[tache] || {};
-  // (8 nov.) Affichage Simple : un site PROUVÉ jamais relié ne prend pas de place
-  // (Vinted et le site choisi restent). « Tous » compte toujours tous les sites.
+  // (8 nov.) Ses plateformes, en Simple comme en Complet ; « Tous » conserve tous les calculs.
   const p = useProfilVendeur();
-  const ctx = { mode: p.mode, relies: p.relies, choisi: site };
+  const ctx = { mode: p.mode, relies: p.relies, choisi: site, plateformes: p.plateformes };
+  React.useEffect(() => { if (Array.isArray(p.plateformes) && site !== 'toutes' && !p.plateformes.includes(site) && p.plateformes.length) onSite(t.toutes ? 'toutes' : p.plateformes[0]); }, [site, p.plateformes?.join('|')]);
   return <SelecteurSites id={tache} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={onSite}/>;
 }
 // (5 nov.) UN ONGLET SANS DONNÉE : ce qui manque et le geste (`ONGLET_SANS_DONNEE`,
@@ -48708,6 +48703,7 @@ const ESSENTIELS_ECRAN = {
   compta: ['comptes', 'nuage', 'stats', 'carte'],
 };
 function AppCoeur() {
+  const profilNavigation = useProfilVendeur();
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
   const [authState,setAuthState]=useState(AUTH);
@@ -49684,12 +49680,12 @@ function AppCoeur() {
   // l'extension existe (`select=id`, aucune donnée lue). Pas su (lecture en
   // cours ou ratée) ⇒ le site est montré : « pas su » ne cache rien.
   const [sitesLus,setSitesLus]=useState(undefined);
-  useEffect(()=>{ let vivant=true; (async()=>{
-    try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id`,{headers:sbAuth()});
+  useEffect(()=>{ let vivant=true, timer, sequence=0; const relire=()=>{ clearTimeout(timer); timer=setTimeout(lire, 400); }; const lire=async()=>{ const numero=++sequence;
+    try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id`,{headers:sbAuth()});
       if(!r.ok) throw new Error('lecture'); const j=await r.json(); if(!Array.isArray(j)) throw new Error('forme');
-      const ids=new Set(j.map(x=>String(x&&x.id))); if(vivant) setSitesLus({ leboncoin:['lbc_listings','lbc_ventes','lbc_accounts'].some(k=>ids.has(k)), vestiaire:['vc_listings','vc_ventes'].some(k=>ids.has(k)), ebay:['ebay_orders','ebay_listings'].some(k=>ids.has(k)) });
-    }catch(_){ if(vivant) setSitesLus(null); }
-  })(); return ()=>{ vivant=false; }; },[]);
+      const ids=new Set(j.map(x=>String(x&&x.id))); if(vivant && numero===sequence) setSitesLus({ leboncoin:['lbc_listings','lbc_ventes','lbc_accounts'].some(k=>ids.has(k)), vestiaire:['vc_session','vc_listings','vc_ventes'].some(k=>ids.has(k)), ebay:['ebay_orders','ebay_listings'].some(k=>ids.has(k)) });
+    }catch(_){ if(vivant && numero===sequence) setSitesLus(avant=>avant===undefined?null:avant); }
+  }; lire(); const off=onCloudReady(relire); const ext=e=>{ if(e?.detail?.type==='maj') relire(); }; window.addEventListener('vrm:ext',ext); window.addEventListener('focus',relire); return ()=>{ vivant=false; clearTimeout(timer); if(typeof off==='function')off(); window.removeEventListener('vrm:ext',ext); window.removeEventListener('focus',relire); }; },[]);
   const sitesPresents=useMemo(()=>{
     const s=new Set();
     // (1er nov., vendeur neuf) VINTED EST TOUJOURS LÀ — c'est le site principal :
@@ -50659,7 +50655,7 @@ function AppCoeur() {
   useEffect(() => { let mort = false; lireProprietaire().then((x) => { if (!mort) setProprioProfil(typeof x === 'boolean' ? x : proprioTri()); }); return () => { mort = true; }; }, []);
   const [profilTick, setProfilTick] = useState(0);
   useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || k === CLE_AFFICHAGE || k === CLE_JE_VENDS || k === 'vrm_meubles' || k === 'vrm_repub_main') setProfilTick((t) => t + 1); };
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || k === CLE_PLATEFORMES || k === CLE_AFFICHAGE || k === CLE_JE_VENDS || k === 'vrm_meubles' || k === 'vrm_repub_main') setProfilTick((t) => t + 1); };
     window.addEventListener('vrm:save', f);
     const off = onCloudReady(() => setProfilTick((t) => t + 1));
     return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
@@ -50676,8 +50672,8 @@ function AppCoeur() {
     try { const r = load('vrm_repub_main', {}); repub = !!localStorage.getItem(JOURNAL_REPUB) || (r && typeof r === 'object' && Object.keys(r).length > 0); } catch (_) { repub = null; }
     const usage = { stock: meubles ? true : pret ? false : null, republier: repub ? true : pret ? false : null };
     const ebayRelie = !Array.isArray(comptesEbay) || !sitesLus ? null : (comptesEbay.some((c) => !c.implicite) || !!sitesLus.ebay);
-    const relies = { leboncoin: sitesLus ? !!sitesLus.leboncoin : null, vestiaire: sitesLus ? !!sitesLus.vestiaire : null, ebay: ebayRelie };
-    poserProfilVendeur({ mode: aff.mode, auto: aff.auto, vend: vd.vend, vendAuto: vd.auto, usage, relies, contexte });
+    const relies = { vinted: accountsLoaded && Array.isArray(vintedAccounts) ? vintedAccounts.length > 0 : null, leboncoin: sitesLus ? !!sitesLus.leboncoin : null, vestiaire: sitesLus ? !!sitesLus.vestiaire : null, ebay: ebayRelie };
+    poserProfilVendeur({ uid: AUTH.user?.id || '', mode: aff.mode, auto: aff.auto, vend: vd.vend, vendAuto: vd.auto, usage, relies, plateformes: pret ? plateformesAffichees(load(CLE_PLATEFORMES, null), relies) : null, contexte });
   }, [liveStatsVus, proprioProfil, accountsLoaded, vintedAccounts, sitesLus, comptesEbay, profilTick, nuagePret]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
@@ -52227,7 +52223,7 @@ function AppCoeur() {
         {tab==='cat_bord'&&platSub==='leboncoin'&&<GardeEcran nom="cat_bord:leboncoin">
           <DansBarreHaut>
             <SelecteurSites id="colis" label="Filtrer les colis par site" valeur="leboncoin"
-              options={optionsSelecteur({ toutes: true, site: 'leboncoin', sites: null }).map((o) => (o.id !== 'toutes' && o.id !== 'leboncoin' && sitesPresents && !sitesPresents.has(o.id) ? { ...o, sansCompte: true } : o))}
+              options={optionsSelecteur({ toutes: true, site: 'leboncoin', sites: null }).filter(o => siteMontre(o.id, { plateformes: profilNavigation.plateformes })).map((o) => (o.id !== 'toutes' && o.id !== 'leboncoin' && sitesPresents && !sitesPresents.has(o.id) ? { ...o, sansCompte: true } : o))}
               onChoix={(x)=>{ if(x!=='leboncoin') setPlatSub('site:'+x); }}/>
           </DansBarreHaut>
           {baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes}/></div>}

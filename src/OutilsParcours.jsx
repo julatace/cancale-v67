@@ -7,6 +7,8 @@ export function RecapSelection({lignes,coches}){
   <strong>{r.total} colis sélectionné{r.total>1?'s':''}</strong>
   <span>{r.sites.join(' · ')}{r.comptes>0?` · ${r.comptes} compte(s) identifié(s)`:''}</span>
   <div><span>{r.prets} avec bordereau</span><span>{r.sansPdf} sans bordereau</span><span>{r.dejaImprimes} déjà imprimé(s)</span></div>
+  {r.exclus>0&&<small role="status">{r.exclus} sélection(s) exclue(s) : colis absent de cette liste ou non sélectionnable. Seuls les {r.total} colis ci-dessus seront préparés.</small>}
+  <details><summary>Vérifier les {r.total} colis avant impression</summary><ul>{r.lignes.map(l=><li key={l.cle}>{l.num ? `N°${l.num} · ` : ''}{l.titre || l.e?.o?.title || l.lo?.title || l.v?.titre || 'Colis'}{l.site ? ` · ${l.site}` : ''}{l.pdf===false ? ' · bordereau manquant' : ''}</li>)}</ul></details>
   {r.dejaImprimes>0&&<small>Les bordereaux déjà imprimés restent dans ta sélection : vérifie avant de relancer.</small>}
  </section>;
 }

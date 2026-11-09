@@ -86,7 +86,8 @@ export function entreeMontree(t, { mode, usage = {}, relies = {} } = {}) {
 }
 // Les filtres de site (Ventes, Annonces, Messages, Achats) en Simple : Vinted,
 // le site choisi, et ceux qui ne sont pas PROUVÉS absents.
-export function siteMontre(site, { mode, relies = {}, choisi = '' } = {}) {
+export function siteMontre(site, { mode, relies = {}, choisi = '', plateformes = null } = {}) {
+  if (Array.isArray(plateformes)) return site === 'toutes' || plateformes.includes(site);
   if (mode !== 'simple') return true;
   if (site === 'vinted' || site === 'toutes' || site === choisi) return true;
   return relies[site] !== false;
