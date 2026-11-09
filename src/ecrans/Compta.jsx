@@ -3885,12 +3885,14 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   React.useEffect(() => {
     const montrer = () => {
       if (!DEMANDE_COMMANDE.export || Date.now() - DEMANDE_COMMANDE.export > 30000) return;
-      DEMANDE_COMMANDE.export = 0;
       if (!exportDevant) setAvance(true);
       let essais = 0;
       const viser = () => {
         const c = document.querySelector('[data-export-comptable]');
-        if (!c) { if (++essais < 20) setTimeout(viser, 100); return; }
+        if (!c) { if (++essais < 100) setTimeout(viser, 100); return; }
+        // Rangée dans « Documents et réglages » (replié) : le repli s'ouvre (son `onToggle` suit).
+        const d = c.closest('details'); if (d && !d.open && ++essais < 100) { d.open = true; setTimeout(viser, 60); return; }
+        DEMANDE_COMMANDE.export = 0;
         try { c.scrollIntoView({ block: 'center' }); } catch (_) {}
         const b = c.querySelector('[data-export-preparer]'); try { if (b) b.focus({ preventScroll: true }); } catch (_) {}
       };
