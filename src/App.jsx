@@ -275,6 +275,8 @@ import { noterPlantage, viderPlantages, ecouterViolationsCspDans, derniersPlanta
 import { instantaneEcran } from "./signalementContexte.js";
 import { lecturesRecentes } from "./lecturesRecentes.js";
 import { AideEcran as AideEcranBase } from "./composants/AideEcran.jsx";
+import { NoteSatisfaction } from "./composants/NoteSatisfaction.jsx";   // (9 nov.) « VRM t'aide-t-il ? » en bas de Ma journée
+import { ID_SATISFACTION } from "./satisfaction.js";
 import { SignalerProbleme as SignalerProblemeBase, SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from "./composants/SignalerProbleme.jsx";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
@@ -48702,6 +48704,33 @@ const ESSENTIELS_ECRAN = {
   garage: ['comptes', 'nuage', 'stock'],
   compta: ['comptes', 'nuage', 'stats', 'carte'],
 };
+// (9 nov.) « VRM t'aide-t-il ? » (src/satisfaction.js, src/composants/NoteSatisfaction.jsx) :
+// SA ligne `vrm_satisfaction` (RLS), l'abonnement et « propriétaire » lus par la
+// route existante. Trois états : une lecture ratée ne montre rien.
+async function lireNoteSatisfaction() {
+  const uid = AUTH.user?.id; if (!uid) return undefined;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${ID_SATISFACTION}&owner=eq.${encodeURIComponent(uid)}&select=data&limit=1`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    if (!Array.isArray(j)) return undefined;
+    return j[0] && j[0].data && typeof j[0].data === 'object' ? j[0].data : null;
+  } catch (_) { return undefined; }
+}
+async function ecrireNoteSatisfaction(data) {
+  if (!AUTH.user?.id || !CLOISONNE) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method:'POST', headers:{ ...sbAuth(), 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=representation' }, body: JSON.stringify([withOwner({ id: ID_SATISFACTION, data })]) });
+    if (!r.ok) return false;
+    const j = await r.json().catch(() => null);
+    return Array.isArray(j) && j.length === 1;
+  } catch (_) { return false; }
+}
+function NoteSatisfactionJournee() {
+  const uid = AUTH.user?.id || '';
+  if (!uid || !CLOISONNE) return null;
+  return <NoteSatisfaction key={uid} compteCreeLe={AUTH.user?.created_at || ''} lireEtat={lireNoteSatisfaction} ecrireEtat={ecrireNoteSatisfaction} lireAbonnement={lireAbonnement}/>;
+}
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
@@ -48732,6 +48761,22 @@ function AppCoeur() {
     plus_tard();
     window.addEventListener('vrm:plantage', plus_tard);
     return () => { vivant=false; if (t) clearTimeout(t); window.removeEventListener('vrm:plantage', plus_tard); };
+  },[]);
+  // ── LE SIGNE DE VIE DU JOUR (9 nov., `vrm_vu`, api/_lib/pilotage.js) ─────────
+  // « Actif sur 7 / 30 jours » dans le tableau du propriétaire : une ligne à lui
+  // (RLS), réécrite au plus une fois par jour de Paris et par appareil ; elle ne
+  // porte que le JOUR. Le serveur n'en lit que ce jour, jamais rien d'autre.
+  React.useEffect(()=>{
+    const uid = AUTH.user?.id; if (!uid || !CLOISONNE) return;
+    let jour = ''; try { jour = new Intl.DateTimeFormat('fr-CA', { timeZone:'Europe/Paris', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date()); } catch (_) { return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) return;
+    const cle = 'vrm_vu_jour_' + uid;
+    try { if (localStorage.getItem(cle) === jour) return; } catch (_) {}
+    const t = setTimeout(() => {
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method:'POST', headers:{ ...sbAuth(), 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([withOwner({ id:'vrm_vu', data:{ v:1, jour } })]) })
+        .then((r) => { if (r.ok) { try { localStorage.setItem(cle, jour); } catch (_) {} } }).catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
   },[]);
   // ── LE BILAN DES PHOTOS VINTED PART DANS SA BASE (`diag_photos`) ────────────
   // Pourquoi ses photos ne s'affichent pas, MESURÉ dans son navigateur
@@ -52167,6 +52212,7 @@ function AppCoeur() {
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
         {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
