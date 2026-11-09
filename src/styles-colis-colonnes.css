@@ -269,3 +269,10 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { paddin
 :root:root body .vrm-rpf-agrandir:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
 :root:root body .vrm-rpf-ligne-delai { padding: 0 0 12px calc(56px + 12px); margin-top: -4px; }
 :root:root body .vrm-rpf-ligne-delai .vrm-rpf-delai { margin-top: 0; }
+/* (9 nov., retraits frais) Le voile de MapLibre (« Deux doigts pour déplacer la carte ») s'affichait EN
+   TRAVERS de la carte à chaque défilement d'un doigt : éteint. L'indice bref de FondRelais le remplace
+   (en haut à gauche, il s'efface seul ; il ne prend aucun toucher). */
+.vrm-relais-fond .maplibregl-cooperative-gesture-screen { display: none !important; }
+:root:root body .vrm-relais-indice { position: absolute; left: 8px; top: 8px; z-index: 3; max-width: calc(100% - 16px); padding: 4px 10px; border-radius: 12px; font: 500 12px/18px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 3px rgba(0,0,0,.15); pointer-events: none; animation: vrm-indice-part 2.5s ease forwards; }
+@keyframes vrm-indice-part { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :root:root body .vrm-relais-indice { animation: none; } }

@@ -186,11 +186,13 @@ const memeDestinataire = (x, y) => {
 };
 const arriveeMs = (t) => { for (const k of ['arriveLe', 'emailAt', 'receivedAt']) { const v = Date.parse((t && t[k]) || ''); if (Number.isFinite(v)) return v; } return NaN; };
 export const FENETRE_DOUTE_J = 3;
-export function aUnTemoin(t, cmd, temoins, { commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J } = {}) {
-  const lt = cleLieuDoute(t && t.lieu); if (!lt) return false;
+// (9 nov., retraits frais) LES témoins d'une ligne (pas seulement « en a-t-elle un ») : la même règle,
+// qui rend la liste — `regrouperArrivees` en apparie UN à chaque moitié Vinted.
+export function temoinsDe(t, cmd, temoins, { commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J } = {}) {
+  const lt = cleLieuDoute(t && t.lieu); if (!lt) return [];
   const at = arriveeMs(t);
   const txT = cmd && cmd.transaction_id != null ? String(cmd.transaction_id) : '';
-  return (temoins || []).some((w) => {
+  return (temoins || []).filter((w) => {
     if (!w || w === t || w.source === 'vinted-commande') return false;
     if (!memeLieu(lt, cleLieuDoute(w.lieu)) || !memeDestinataire(t, w)) return false;
     const cw = commandeDe(w); const txW = cw && cw.transaction_id != null ? String(cw.transaction_id) : '';
@@ -199,7 +201,37 @@ export function aUnTemoin(t, cmd, temoins, { commandeDe = () => null, fenetreJ =
     return !Number.isFinite(at) || !Number.isFinite(aw) || Math.abs(aw - at) <= fenetreJ * 86400000;
   });
 }
-export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion = (m, s) => ({ ...s, ...m }), temoins = null, sansIdentite = null } = {}) {
+export function aUnTemoin(t, cmd, temoins, opts = {}) {
+  return temoinsDe(t, cmd, temoins, opts).length > 0;
+}
+// ── (9 nov., retraits frais) UNE MOITIÉ VINTED, UN TÉMOIN — ET UN TÉMOIN FINI N'EST PAS UN DOUBLE ──
+// Julien (9 nov., capture) : « À retirer · 0 » et « Peut-être en double · 18 ». Le 5 nov. on avait mesuré
+// 16 moitiés Vinted (adresse sans compte relié) face à 17 colis Mondial Relay au même point, dont 13
+// RETIRÉS d'après le transporteur. Toutes restaient « peut-être en double » d'un colis… déjà retiré :
+// un colis fini n'est pas un douteux. Ici, chaque moitié reçoit SON témoin (le plus proche dans le temps,
+// jamais pris deux fois — deux moitiés ne sont pas le même carton) :
+//   · témoin encore montré (à retirer, à vérifier) ⇒ `doute` (« peut-être en double », comme avant) ;
+//   · témoin FINI (retiré, reparti, coché) ⇒ `probable` : « sans doute le même colis, fini » — DIT avec
+//     la raison du transporteur, jamais compté, jamais « peut-être en double ».
+// Plus de moitiés que de témoins : une moitié sans témoin libre garde la règle d'avant (un témoin
+// encore montré parmi les siens ⇒ doute ; tous finis ⇒ probable). Rien n'est relié par le titre ; rien
+// n'est déclaré « retiré » pour la moitié (elle n'a pas d'identité) : la phrase dit « sans doute ».
+export function apparierTemoins(cands, { temoinActif, commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J } = {}) {
+  const items = (cands || []).map((c, i) => ({ ...c, i, ms: arriveeMs(c.t), ws: temoinsDe(c.t, c.cmd, c.temoins, { commandeDe, fenetreJ }) }));
+  const pris = new Set();
+  const ordre = [...items].sort((a, b) => (Number.isFinite(a.ms) ? a.ms : Infinity) - (Number.isFinite(b.ms) ? b.ms : Infinity) || a.i - b.i);
+  const ecart = (x, w) => { const aw = arriveeMs(w); return Number.isFinite(x.ms) && Number.isFinite(aw) ? Math.abs(aw - x.ms) : Infinity; };
+  const out = new Array(items.length);
+  for (const x of ordre) {
+    if (!x.ws.length) { out[x.i] = { sorte: 'aucun', temoin: null }; continue; }
+    const libres = x.ws.filter((w) => !pris.has(w)).sort((a, b) => ecart(x, a) - ecart(x, b));
+    if (libres.length) { const w = libres[0]; pris.add(w); out[x.i] = { sorte: temoinActif(w) ? 'doute' : 'probable', temoin: w }; continue; }
+    const actif = x.ws.find((w) => temoinActif(w));
+    out[x.i] = actif ? { sorte: 'doute', temoin: actif } : { sorte: 'probable', temoin: [...x.ws].sort((a, b) => ecart(x, a) - ecart(x, b))[0] };
+  }
+  return out;
+}
+export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion = (m, s) => ({ ...s, ...m }), temoins = null, sansIdentite = null, temoinActif = null } = {}) {
   const parTx = new Map(); const garde = []; const cmds = [];
   for (const t of liste || []) {
     const c = commandeDe(t); const k = c && c.transaction_id != null ? String(c.transaction_id) : '';
@@ -211,17 +243,30 @@ export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion =
   }
   const cpOrphelins = new Map();
   garde.forEach((t, i) => { if (!cmds[i] && t.source !== 'vinted-commande') { const cp = cpDuLieu(t.lieu); if (cp) cpOrphelins.set(cp, (cpOrphelins.get(cp) || 0) + 1); } });
-  const reste = [], doutes = [], commandes = [], doutesCommandes = [];
+  const reste = [], doutes = [], commandes = [], doutesCommandes = [], probables = [];
+  // (9 nov.) Avec `temoinActif` : chaque moitié reçoit SON témoin (`apparierTemoins`).
+  const apparie = new Map();
+  if (Array.isArray(temoins) && typeof temoinActif === 'function') {
+    const cands = [];
+    garde.forEach((t, i) => { if (t.source === 'vinted-commande' && (!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))) cands.push({ t, cmd: cmds[i], temoins, i }); });
+    apparierTemoins(cands, { temoinActif, commandeDe }).forEach((r, k) => apparie.set(cands[k].i, r));
+  }
   garde.forEach((t, i) => {
     if (t.source === 'vinted-commande' && (!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))) {
-      const doute = Array.isArray(temoins)
-        ? aUnTemoin(t, cmds[i], temoins, { commandeDe })
-        : (!cmds[i] && (() => { const cp = cpDuLieu(t.lieu); return !!cp && cpOrphelins.get(cp) > 0; })());
-      if (doute) { doutes.push(t); doutesCommandes.push(cmds[i] || null); return; }
+      const a = apparie.get(i);
+      if (a) {
+        if (a.sorte === 'doute') { doutes.push(t); doutesCommandes.push(cmds[i] || null); return; }
+        if (a.sorte === 'probable') { probables.push({ t, commande: cmds[i] || null, temoin: a.temoin }); return; }
+      } else {
+        const doute = Array.isArray(temoins)
+          ? aUnTemoin(t, cmds[i], temoins, { commandeDe })
+          : (!cmds[i] && (() => { const cp = cpDuLieu(t.lieu); return !!cp && cpOrphelins.get(cp) > 0; })());
+        if (doute) { doutes.push(t); doutesCommandes.push(cmds[i] || null); return; }
+      }
     }
     reste.push(t); commandes.push(cmds[i]);
   });
-  return { liste: reste, doutes, commandes, doutesCommandes };
+  return { liste: reste, doutes, commandes, doutesCommandes, probables };
 }
 
 // ── LA LIGNE RANGÉE (une forme pour le serveur ET la relecture de l'app) ──────
