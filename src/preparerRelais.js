@@ -85,11 +85,11 @@ export const CLE_SEANCE_PREPARER = 'vrm_preparer_seance';
 const DUREE_SEANCE = 12 * 3600e3;
 const cleStockage = (uid) => CLE_SEANCE_PREPARER + (uid ? '_' + String(uid) : '');
 export function lireSeancePreparer(uid, maintenant = Date.now()) {
-  const vide = { debut: maintenant, ordre: [], cle: '', faits: {} };
+  const vide = { debut: maintenant, ordre: [], cle: '', faits: {}, memo: {} };
   try {
     const s = JSON.parse(localStorage.getItem(cleStockage(uid)) || 'null');
     if (!s || typeof s !== 'object' || !Number.isFinite(s.debut) || maintenant - s.debut > DUREE_SEANCE) return vide;
-    return { debut: s.debut, ordre: Array.isArray(s.ordre) ? s.ordre.filter((k) => typeof k === 'string') : [], cle: typeof s.cle === 'string' ? s.cle : '', faits: s.faits && typeof s.faits === 'object' ? s.faits : {} };
+    return { debut: s.debut, ordre: Array.isArray(s.ordre) ? s.ordre.filter((k) => typeof k === 'string') : [], cle: typeof s.cle === 'string' ? s.cle : '', faits: s.faits && typeof s.faits === 'object' ? s.faits : {}, memo: s.memo && typeof s.memo === 'object' ? s.memo : {} };
   } catch (_) { return vide; }
 }
 export function ecrireSeancePreparer(uid, s) { try { localStorage.setItem(cleStockage(uid), JSON.stringify(s)); } catch (_) {} }

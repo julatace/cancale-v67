@@ -330,8 +330,8 @@ async function vue(b, nom, vp, sombre) {
     dit(r.etat === 'retire' && r.annuler, `${nom} : R5 « Retiré ✓ » et « Annuler » sous le code`, JSON.stringify(r && { etat: r.etat, annuler: r.annuler }));
     await shot('6-retire');
     // « Retiré » puis « Annuler » sur l'e-mail 90000021.
-    for (let k = 0; k < 4; k++) { r = await relais(pg); if (r.ident === 'e:90000021') break; await pg.click(k < 2 ? '[data-relais-precedent]' : '[data-relais-suivant]'); await pg.waitForTimeout(150); }
-    if (r.ident !== 'e:90000021') { await pg.evaluate(() => {}); for (let k = 0; k < 4; k++) { await pg.click('[data-relais-suivant]').catch(() => {}); r = await relais(pg); if (r.ident === 'e:90000021') break; } }
+    for (let k = 0; k < 4; k++) { await cliquer(pg, '[data-relais-precedent]:not([disabled])'); await pg.waitForTimeout(100); }
+    for (let k = 0; k < 4; k++) { r = await relais(pg); if (r.ident === 'e:90000021') break; await cliquer(pg, '[data-relais-suivant]:not([disabled])'); await pg.waitForTimeout(150); }
     dit(r.ident === 'e:90000021', `${nom} : R5 l'e-mail est dans la séance`, r.ident);
     await pg.click('[data-relais-retirer]'); await pg.waitForTimeout(500);
     await pg.click('[data-relais-annuler]'); await pg.waitForTimeout(2500);

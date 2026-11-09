@@ -114,3 +114,9 @@
 
 /* La rangée qui ouvre « Préparer mes colis » / « Mode relais » sur Colis (visible, pas derrière « … »). */
 .vrm-pas-a-pas-rangee { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+/* La pilule « Annuler » de l'app (gestes annulables) ne couvre pas la barre du haut de ces feuilles
+   (la croix « Fermer ») : elle passe au-dessus du pied. Le geste garde aussi son « Annuler » dans la feuille. */
+body:has(.vrm-relais, .vrm-prep-feuille) .vrm-pil-zone[data-pilule-place="haut"] { top: auto !important; bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
+.vrm-prep-feuille .vrm-emb-pied .vrm-emb-b { white-space: nowrap; }
+/* La règle commune des boutons ne réduit pas ces cibles de comptoir. */
+.vrm-relais .vrm-relais-b:not(#vrm-r-a):not(#vrm-r-b) { min-height: 56px !important; min-width: 56px !important; box-sizing: border-box; }
