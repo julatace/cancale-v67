@@ -32,19 +32,24 @@ du doute ne regardait pas si le témoin était fini.
 - **D2 / D4** `api/_lib/achat-arrive-relais.js` : `temoinsDe` (la liste des témoins, même règle que
   `aUnTemoin`) et `apparierTemoins` — chaque moitié reçoit SON témoin (le plus proche dans le temps, jamais
   pris deux fois). `regrouperArrivees(…, { temoinActif })` :
-  - témoin encore montré (à retirer, à vérifier) ⇒ `doutes` (« Peut-être en double », comme avant) ;
-  - témoin FINI ⇒ `probables` : « sans doute le même colis, fini » — jamais compté, jamais « en double » ;
-  - plus de moitiés que de témoins : un témoin montré parmi les siens ⇒ doute ; tous finis ⇒ probable ;
+  - témoin encore montré (à retirer, à vérifier) ⇒ `doutes` + `doutesTemoins` : la moitié est COMPTÉE AVEC ce
+    colis, une fois — sa ligne dit « Compté avec le n°…21TS » (section « Comptés avec un autre colis ») ;
+  - témoin FINI ⇒ `probables` : finie avec lui — dite dans les sortis, jamais comptée ;
+  - plus de témoin libre (un témoin = un carton, déjà pris par une autre moitié) ⇒ `seul` : un AUTRE colis
+    (sa conversation, son achat), À RETIRER, compté ;
   - sans `temoinActif`, la règle d'avant (rien ne change pour un autre appelant).
+  (17 h 24, Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION ») : plus de « Peut-être en double », plus du
+  paragraphe d'explication de 6 lignes (`explicationEnDouble` n'est plus rendue) ; chaque moitié a UN état.
 - `src/App.jsx` (`pickupUnion`) :
   - **D3** les témoins comprennent les lignes dont l'e-mail a dit « retiré »/« retour » (avec `arriveLe`) ;
   - `temoinFini(w)` = son n° fini (`finis`, la règle des fins), e-mail « retiré »/« retour », ou coché ;
-  - chaque moitié « probable » est NOTÉE dans « Sortis de « à retirer » » (`noterProbable`) :
-    « Sans doute le même colis que le n°…0011 — Mondial Relay : retiré le 6 nov. » (`data-sorti-via="doute"`),
+  - chaque moitié finie est NOTÉE dans « Sortis de « à retirer » » (`noterProbable`) :
+    « Fini avec le n°…0011 — Mondial Relay : retiré le 6 nov. » (`data-sorti-via="doute"`),
     gardée tant que la fin du témoin a moins de 3 jours OU que la moitié est arrivée il y a moins de 10 jours ;
   - une moitié passée « à vérifier » par l'âge seul, sans identité, dont TOUS les témoins sont finis : idem.
-  Le total « à retirer » ne change pas (ces moitiés n'étaient déjà pas comptées), sauf D3 (une moitié dont
-  le seul témoin était une ligne d'e-mail « retiré » ne compte plus).
+  Le total « à retirer » change dans deux cas, tous deux tranchés : D3 (une moitié dont le seul témoin était
+  une ligne d'e-mail « retiré » ne compte plus) et `seul` (une moitié de plus qu'il n'y a de colis du
+  transporteur au point est COMPTÉE — avant, « peut-être en double » et jamais comptée).
 - **D1** `src/relaisColis.js` `surLaCarte(p)` = un point où un colis COMPTÉ attend (`nComptes > 0`) ; les
   deux colonnes de `src/CarteRelais.jsx` n'épinglent et ne géocodent que ces points. Les « à vérifier »,
   « en double », « en route » restent dans leurs replis sous la carte. « À retirer · 0 » ⇒ pas de carte.
@@ -91,22 +96,26 @@ de plus de `ship-reminders` par jour, aucune fonction de plus.
 ## 4. Preuves (§6)
 
 - `scripts/audit-colis-frequent.cjs` (A1-A5, B, C1-C5 ; **exécute** la vraie route sur une fausse base
-  PostgREST à état et de faux transporteurs) : **20 verts** ; `--prouve` **8/8** mutations rouges (témoin
-  fini laissé double, témoin pris deux fois, app sans `temoinActif`, carte qui épingle les douteux, rythme
+  PostgREST à état et de faux transporteurs) : **21 verts** ; `--prouve` **9/9** mutations rouges (témoin
+  fini laissé double, « plus de témoin libre ⇒ encore peut-être », témoin pris deux fois, app sans `temoinActif`, carte qui épingle les douteux, rythme
   de 30 min, tous les vendeurs visités, « pas su = rien à faire », moment absent). Arbre `origin/main`
   (git archive, audit copié dedans) : **rouge** (A1-A5, B, C).
-- `scripts/bancs/retraits-frais.cjs` (la capture, 390 tactile sombre + 1512 clair) : **30 verts** —
-  onglet = publication = colonne = 1 ; la carte ne place que P2 (une épingle « 1 ») ; « Peut-être en
-  double » = 2 ; « À vérifier » = 1 ; aucun colis retiré nulle part ; chaque retiré DIT (« Sans doute le
-  même colis que le n°…0011 — Mondial Relay : retiré le 6 nov. », « — par son code de retrait », « — par
-  le n° de suivi de sa commande ») ; « Suivi vérifié il y a 10 min » ; « Relire compte_a · 3 j » et son
+- `scripts/bancs/retraits-frais.cjs` (les deux captures, 390 tactile sombre + 1512 clair) : **34 verts** —
+  18 moitiés Vinted (titres de sa capture : « Adidas spezial suède », « Nike P-6000 », « Wildleder Stiefel
+  von… », « Zapatillas ADIDAS »…) au point de colis Mondial Relay RETIRÉS ; à Vannes un Chronopost à
+  retirer et deux moitiés à côté. Onglet = publication = colonne = 2 (le Chronopost + la seconde moitié, sans
+  témoin libre) ; la carte ne place que Vannes (une épingle « 2 ») ; « Comptés avec un autre colis » = 1,
+  sa ligne « Compté avec le n°…21TS », aucun « peut-être », aucun paragraphe ; « À vérifier » = 1 ; aucun
+  colis retiré nulle part ; les 18 moitiés dites « Fini avec le n°…0011 — Mondial Relay : retiré le 6 nov. »,
+  les autres retirés dits par leur identité (« — par son code de retrait », « — par le n° de suivi de sa
+  commande ») ; « Suivi vérifié il y a 10 min » ; « Relire compte_a · 3 j » et son
   geste ; voile de MapLibre `display:none`, indice bref qui s'efface.
-  **Sur `origin/main` : 18 rouges** — la carte place 3 points (`1:aretirer`, `3:averifier`, `1:averifier`),
-  5 « en double » dont les 3 moitiés de colis retirés, « 1 compte à relire » sans nom, voile `flex` : la
-  capture de Julien. Mutations de l'app (build + banc) : sans `temoinActif` ⇒ 3 rouges ; `surLaCarte` sans
+  **Sur `origin/main` : 24 rouges** — la carte place 4 points (`1:aretirer`, `15:averifier`, `3:averifier`,
+  `1:averifier`), « Peut-être en double · 20 » avec chaque ligne « À relier » et le paragraphe « Vinted annonce
+  ces 20 colis… », « 1 compte à relire » sans nom, voile `flex` : les captures de Julien. Mutations de l'app (build + banc) : sans `temoinActif` ⇒ 3 rouges ; `surLaCarte` sans
   `nComptes` ⇒ 2 rouges ; voile rallumé ⇒ 1 rouge.
 - Captures regardées : 390 sombre (en-tête, carte à une épingle, indice, puce nommée), sortis (8 lignes,
-  les trois « sans doute »), 1512 clair.
+  les « Fini avec »), « Comptés avec un autre colis » (une ligne, son état), 1512 clair.
 - Audits verts : build, `variables`, `tdz`, `coherence`, `identite`, `statuts`, `fonctions-api`,
   `retrait-preuves` (D3 accepte `temoinActif`), `achat-attend-relais`, `retraits-suivi`, `suivi-colis`,
   `retrait-fiable`, `cron-lots`, `statut-transporteurs`, `transporteurs`, `transp-notif`,
@@ -145,12 +154,37 @@ par e-mail au lieu d'une par colis) : à regarder avec le chantier `claude/trans
 
 ## 6. Bancs voisins (lancés un par un sur le build final)
 
-Voir le rapport de la session (liste et résultats, avec ceux déjà rouges sur `origin/main`).
+Verts : `retraits-suivi` 39, `statut-colis` 81 (C13 mis à jour : « Compté avec le n°… », plus de
+paragraphe), `retirer-carte-delai` 111 (mis à jour : Quimper « à vérifier » n'a plus d'épingle et reste
+visible sous « À vérifier »), `colis-villes` 46, `colis-retirer-propre` 129.
+Rouges AVANT ce chantier, autant sur `origin/main` (même nombre) : `retrait-relais-carte` 11,
+`carte-stable` 3, `retrait-carte` 3, `relais-telephone` 3, `retrait-autre-ville` 5 (chantier
+`claude/zero-banc-rouge`).
+
+## 6 bis. D'où viennent les 18 « peut-être en double » (17 h 24) — mesuré dans le code
+
+Une moitié Vinted (`email_track_autre_conv-*`, `source: 'vinted-commande'`) devient un candidat au doute
+quand (`regrouperArrivees`) : (a) sa conversation ne mène à AUCUN achat relu (`achatParConversation` sur
+`buysBase` = les achats des comptes Vinted RELIÉS et relus par l'extension), ou (b) l'achat est trouvé mais
+n'a ni n° de suivi ni code connus (`sansIdentite`). Mesuré le 6 nov. : 18 des 19 arrivent sur une adresse
+qu'aucun compte relié ne porte ⇒ cas (a) : l'achat est sur un compte Vinted que VRM ne lit pas, donc
+`capterSuivisAchats` (suivi Vinted de l'achat, 5.217) ne peut pas le lire — l'extension ne lit que le compte
+connecté dans l'onglet et ses achats relus. Pistes de Julien :
+1. l'achat Vinted fait foi : appliqué quand l'achat est RELU (sa fin ⇒ sorti, `finCommandeAchat` ; son n° ou
+   son code ⇒ un seul colis, `finParIdentite`/`fusionnerParCode`, inchangés) ;
+2. au point relais sans n° ni code (b) ⇒ maintenant tranché par « un témoin = un carton » (compté avec le
+   colis du transporteur, ou à retirer) — jamais deux fois ;
+3. relecture automatique : impossible sans le compte (aucune version d'extension montée, 5.340.0 reste
+   libre) ; le geste qui la rend possible est dit sur la puce « Relire … » et sous « À retirer » (adresse non
+   reliée : « Paramètres → Comptes liés ») ;
+4. il ne reste aucun « peut-être » : chaque moitié est comptée avec un colis, finie avec lui, ou à retirer.
+Requête de mesure : §5, requête 1 (les moitiés par point, et combien d'une adresse non reliée).
 
 ## 7. Ce qui reste
 
-- Les moitiés Vinted d'une adresse reliée à aucun compte n'ont toujours AUCUNE identité : « sans doute »
-  est le mieux qu'on puisse dire. Le geste qui les relie pour de bon : relier l'adresse (E-mails → Relier
+- Les moitiés Vinted d'une adresse reliée à aucun compte n'ont toujours AUCUNE identité vers le colis du
+  transporteur : la règle « un témoin = un carton » tranche le COMPTE (jamais l'identité : la moitié n'hérite
+  ni du code, ni du n°, ni de la photo du témoin). Le geste qui les relie pour de bon : relier l'adresse (E-mails → Relier
   ma boîte) ou relire le compte d'achat sur Vinted.
 - L'extension n'a pas été rendue plus fréquente (budget de lecture 20/h, mémo de 3 h des suivis Vinted) :
   le serveur suffit pour Chronopost, Vinted Go et Mondial Relay ; l'extension reste le secours.
