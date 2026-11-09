@@ -23,6 +23,7 @@
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
+import { reglageCalme } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
@@ -58,8 +59,10 @@ import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
 import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
 import { envoyerSmtp } from './_lib/smtp.js';
+import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
+import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
@@ -465,7 +468,7 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
   for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
     const t = texteRappelRetrait(x);
-    envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
+    envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, echeance: x.limiteAt || null, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
   }
   // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
   return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
@@ -810,6 +813,10 @@ async function traiterVendeurApresRelecture() {
     // le rappel de 24 h, qui se tait pour les comptes qu'elle vient de nommer.
     let capture = null, enPanne = new Set();
     try { const r = await rappelPannesCapture(); capture = r.bilan; enPanne = r.uids; } catch (e) { capture = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS, app fermée partout : le filet
+    // (l'app ouverte prévient tout de suite, api/push.js action `comptes`). Une fois par compte.
+    let comptesRelies = null;
+    try { const r = await notifierComptesRelies(); comptesRelies = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { comptesRelies = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
     let relecture = null;
     try { relecture = await rappelComptesARelire(Date.now(), enPanne); } catch (e) { relecture = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
@@ -849,7 +856,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -867,14 +874,14 @@ async function traiterVendeurApresRelecture() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, relecture, capture, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, relecture, capture, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
@@ -915,7 +922,7 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
   const estime = est ? ` Date estimée pour ${est} (vente + 7 j : bordereau pas reçu par email ; la vraie limite peut tomber jusqu'à 3 j plus tard).` : '';
   const stop = nePasPoster ? ` ${nePasPoster > 1 ? `${nePasPoster} acheteurs eBay ont` : 'Un acheteur eBay a'} demandé l'annulation : ne poste pas ${nePasPoster > 1 ? 'ces colis' : 'ce colis'}.` : '';
   return {
-    title: nePasPoster && !total ? '✋ Commande eBay : ne poste pas' : overdue ? '⏰ Colis à expédier — du retard !' : '📮 Colis à expédier',
+    title: nePasPoster && !total ? 'Commande eBay : ne poste pas' : overdue ? 'Colis en retard à expédier' : 'Colis à expédier',   // (8 nov.) le retard DANS le titre, sans emoji
     body: (corps + estime + stop).trim() + (ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
   };
 }
@@ -1042,14 +1049,17 @@ async function rappelDuSoir() {
 // mémo pas écrit ⇒ rien ne part.
 async function traiterVendeurReveil(maintenant = Date.now()) {
   const prefs = await prefsDuVendeur();
-  if (!prefs || !prefs.calme || prefs.calme.actif !== true) return { reveil: 'calme-eteint' };
+  // (8 nov.) Heures calmes allumées par défaut : seul un `actif: false` posé les éteint.
+  // Préférences pas sues ⇒ rien (« pas su » n'envoie pas un récapitulatif inventé).
+  if (!prefs) return { reveil: 'pas-su' };
+  if (!reglageCalme(prefs).actif) return { reveil: 'calme-eteint' };
   const memo = await getRow(ID_REVEIL);
   if (memo === undefined) return { reveil: 'pas-su' };
   const [journal, lu] = await Promise.all([lireJournal(), lireLu()]);
   const r = resumeReveil({ prefs, journal, lu, dejaJour: memo && memo.jour, maintenant });
   if (!r.envoyer) return { reveil: r.raison };
   if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString() }))) return { reveil: 'memo-non-ecrit' };
-  const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url });
+  const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url, tag: 'vrm-reveil' });
   return { reveil: 'envoye', n: r.n, sent: envoi && envoi.sent };
 }
 async function traiterVendeurSoir() {
@@ -1077,7 +1087,9 @@ async function veilleDesPlantages(maintenant = Date.now()) {
     lireMemo: () => getRow(ID_MEMO_VEILLE),
     lireLignes: (depuisIso) => fetchPaginated(`app_data?id=like.plantage_*&meta->>at=gte.${encodeURIComponent(depuisIso)}&select=${SELECT_VEILLE}`),
     ecrireMemo: (memo) => ecrireDedup(ID_MEMO_VEILLE, memo),
-    envoyer: (notif) => sendPushToAll(notif),
+    // (8 nov.) Au propriétaire seul ; une catégorie (`signalement`) : rangée dans sa
+    // cloche et soumise à ses heures calmes (la veille tourne vers 6 h — elle attend 8 h).
+    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement' }),
   }));
 }
 
@@ -1092,7 +1104,9 @@ async function veilleDesLenteurs(maintenant = Date.now()) {
     // (7 nov.) Les éclats du jour additionnés (et l'ancienne ligne d'avant les éclats).
     lireJours: (jours) => histosDesJours({ lire: fetchPaginated, proprio: proprietaire, jours }),
     ecrireMemo: (memo) => ecrireDedup(ID_MEMO_LENTEURS, memo),
-    envoyer: (notif) => sendPushToAll(notif),
+    // (8 nov.) Au propriétaire seul ; une catégorie (`signalement`) : rangée dans sa
+    // cloche et soumise à ses heures calmes (la veille tourne vers 6 h — elle attend 8 h).
+    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement' }),
   }));
 }
 
@@ -1170,6 +1184,8 @@ export default async function handler(req, res) {
     // pour tout VRM (Brevo gratuit, `VRM_EMAILS_PAR_JOUR`), moins les e-mails de
     // l'essai déjà partis, 150 au plus (api/_lib/bilan-mois.js `partBilan`).
     COMPTEUR_BILAN_MOIS = { reste: !soir && !reveil ? partBilan({ dejaEnvoyes: relances && relances.envoyes }) : 0 };
+    // (8 nov.) L'identité de l'éditeur au pied du bilan (public/legal/editeur.js), lue une fois.
+    if (COMPTEUR_BILAN_MOIS.reste > 0) { try { await lireMentions(); } catch (_) {} }
     // (6 nov., filet 4) La veille des plantages.
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }

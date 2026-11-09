@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT — L'ADRESSE DE RÉCEPTION UNIQUE DE CHAQUE VENDEUR (8 nov. 2026)
 // ═══════════════════════════════════════════════════════════════════════════

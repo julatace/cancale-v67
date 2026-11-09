@@ -34,6 +34,16 @@
   try {
     rt.sendMessage({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe, code: code || '', error: error || '', error_description: q.get('error_description') || '' }, (r) => {
       try { void rt.lastError; } catch (_) {}
+      // 5.330 : parti du MÊME onglet (Orion, pas de petite fenêtre) ⇒ on y revient,
+      // sur la page Vinted d'où l'on est parti ; la carte y dit le résultat.
+      // Seulement une page https d'un site de la carte (le service worker l'a déjà
+      // vérifiée ; on revérifie ici), `replace` : « Retour » ne ramène pas ici.
+      const retour = r && typeof r.retour === 'string' ? r.retour : '';
+      if (retour && /^https:\/\/(?:[a-z0-9-]+\.)*(?:vinted\.(?:fr|com|it|de)|leboncoin\.fr|ebay\.fr|vestiairecollective\.com)\//i.test(retour)) {
+        dire(r.ok ? `C’est fait${r.email ? ' : connecté à VRM avec ' + r.email : ''}. Retour sur ta page…` : (r.message || 'Retour sur ta page…'));
+        try { location.replace(retour); } catch (_) {}
+        return;
+      }
       if (r && r.ok) dire(`C’est fait : l’extension VRM est connectée${r.email ? ' à ' + r.email : ''}. Tu peux fermer cet onglet.`);
       else if (r && r.message) dire(r.message);
       else if (fixe) dire('L’extension n’a pas répondu. Reviens sur Vinted, touche le logo VRM et recommence.');

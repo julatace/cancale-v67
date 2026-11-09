@@ -37,6 +37,7 @@ import crypto from 'crypto';
 import { sbCle } from './cle.js';
 import { coffrePret, chiffrerCoffre, dechiffrerCoffre } from './coffre.js';
 import { envoyerSmtp, FOURNISSEURS, fournisseurDe, hoteValide, emailSur } from './smtp.js';
+import { gabaritMail } from './mail-gabarit.js';
 import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, nomFichier, MESSAGE_DEFAUT, emailFacture, adresseVintedLisible, emailValide } from '../../src/facturePro/regle.js';
 import { preuveAcheteur } from '../../src/facturePro/rattachement.js';
 import { pdfFacture } from '../../src/facturePro/pdf.js';
@@ -220,11 +221,18 @@ async function identifiants(owner) {
   if (!d || !d.motDePasse) return { erreur: 'illisible' };
   return { b, d };
 }
+// (8 nov.) L'e-mail d'essai de SA boîte d'envoi : le gabarit commun (api/_lib/mail-gabarit.js).
+export const mailBoiteEssai = () => gabaritMail({
+  titre: 'Ta boîte envoie bien tes factures',
+  preentete: 'Tu peux supprimer ce message.',
+  paras: ['Si tu lis ce message, VRM sait envoyer tes factures depuis cette boîte.', 'Tu peux le supprimer : il ne sert qu’à vérifier l’envoi.'],
+  pied: { texte: 'Tu reçois ce message parce que tu as cliqué sur « Essayer » dans VRM (Ma facture → Envoi).' },
+});
 async function boiteEssai(owner, res) {
   const id = await identifiants(owner);
   if (id.erreur) return repondre(res, id.erreur === 'pas-su' ? 503 : 409, { erreur: id.erreur, message: id.erreur === 'pas-su' ? "La base n'a pas répondu." : 'Aucune boîte d’envoi connectée.' });
   const v = await envoyerSmtp({ hote: id.b.hote, port: id.b.port, utilisateur: id.d.utilisateur, motDePasse: id.d.motDePasse, de: id.b.adresse, a: id.b.adresse,
-    sujet: 'VRM — essai d’envoi de tes factures', texte: "Si tu lis ce message, VRM sait envoyer tes factures depuis cette boîte. Tu peux le supprimer." });
+    sujet: 'Essai d’envoi de tes factures', ...mailBoiteEssai() });
   if (v.issue === 'envoye') {
     await modifierSi(ID_BOITE, owner, condRev(id.b.rev), { ...id.b, essaiLe: new Date().toISOString(), rev: nouveauRev() });
     return repondre(res, 200, { ok: true, issue: 'envoye', a: id.b.adresse });

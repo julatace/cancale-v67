@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ─────────────────────────────────────────────────────────────────────────────
 // audit-facture-achat — LE REÇU D'ACHAT REÇU PAR EMAIL, RELIÉ À SON ACHAT PAR
 // IDENTITÉ (29 octobre).

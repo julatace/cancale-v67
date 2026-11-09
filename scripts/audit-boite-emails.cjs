@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  L'ÉCRAN « E-MAILS » (5 nov.) — la règle EXÉCUTÉE
 //

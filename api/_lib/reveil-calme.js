@@ -51,21 +51,28 @@ export function resumeReveil({ prefs, journal, lu, dejaJour, maintenant }) {
   if (lu === null || journal === null) return { envoyer: false, raison: 'pas-su' };
   const entrees = journal && Array.isArray(journal.entrees) ? journal.entrees : [];
   const parFamille = new Map();
+  let seule = null;
   for (const e of entrees) {
     if (!e || e.etat !== 'calme' || !Number.isSafeInteger(e.seq)) continue;
     const at = Date.parse(e.at);
     if (!Number.isFinite(at) || at > maintenant || maintenant - at > 86400e3) continue;
     if (estLue(e, lu || {})) continue;
     parFamille.set(e.famille, (parFamille.get(e.famille) || 0) + 1);
+    seule = e;
   }
   const n = [...parFamille.values()].reduce((a, b) => a + b, 0);
   if (!n) return { envoyer: false, raison: 'rien', jour };
   const morceaux = FAMILLES.filter((x) => parFamille.get(x.id)).map((x) => accord(parFamille.get(x.id), x.id, x.titre));
   const autres = n - FAMILLES.reduce((a, x) => a + (parFamille.get(x.id) || 0), 0);
   if (autres > 0) morceaux.push(accord(autres, 'autres', 'Autres'));
+  // (8 nov.) UNE seule gardée : elle sonne telle quelle (son titre, son geste, son
+  // écran) — « 1 notification · 1 code de retrait » ne disait pas lequel.
+  if (n === 1 && seule && seule.titre) {
+    return { envoyer: true, jour, n, title: seule.titre, body: seule.texte || '', url: typeof seule.url === 'string' && seule.url.startsWith('/') ? seule.url : '/?tab=journee&cloche=1' };
+  }
   return {
     envoyer: true, jour, n,
-    title: `Pendant tes heures calmes : ${n} notification${n > 1 ? 's' : ''}`,
+    title: `Cette nuit : ${n} notification${n > 1 ? 's' : ''}`,
     body: morceaux.join(' · '),
     url: '/?tab=journee&cloche=1',
   };

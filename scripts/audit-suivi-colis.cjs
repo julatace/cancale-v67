@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT (23 oct.) — LE SUIVI DES COLIS PAR N° ET PAR VINTED, LES NOTIFICATIONS.
 // Julien : « quand on reçoit un mail comme quoi on a retiré un colis, le numéro
 // de suivi est comparé à ceux dans les colis à retirer et ça retire les
@@ -338,7 +339,7 @@ function chargeApp(noms, injecte) {
     dit(retire.length === 0, 'un « retiré » de son achat ne sonne pas (3 nov. : il l\'a retiré lui-même)', JSON.stringify(retire.map((p) => [p.title, p.body])));
     const ap = pushes.length;
     await recoit(mr('Votre colis 30000041 est disponible 📦', 'Bonjour,\nVotre colis 30000041 vous attend toujours.\nVotre code de retrait est 482913\nPoint Relais\nBar Test\n5 Rue Exemple\n56000 Vannes', 4));
-    const apres = pushes.slice(ap).filter((p) => /📍|point de retrait/i.test(`${p.title} ${p.body}`));
+    const apres = pushes.slice(ap).filter((p) => /t'attend|Dernier jour|point de retrait/i.test(`${p.title} ${p.body}`));
     dit(apres.length === 0, 'UN RETIRÉ RESTE RETIRÉ : un rappel « disponible » (même avec un code neuf) reçu APRÈS ne sonne pas « 📍 à retirer »', JSON.stringify(apres.map((p) => p.title)));
     // C. « en transit » puis « retiré » (même clé) : le retiré sonne quand même.
     resetBase(); await oublis();
@@ -358,7 +359,7 @@ function chargeApp(noms, injecte) {
     resetBase(); await oublis();
     pannes.add('lire:meta->>suivi.eq.30000045');
     await recoit(mr('Votre colis 30000045 est disponible 📦', 'Bonjour,\nVotre colis 30000045 est disponible.\nVotre code de retrait est 111222\nPoint Relais\nBar Test\n5 Rue Exemple\n56000 Vannes', 9));
-    dit(pushes.filter((p) => /📍/.test(p.title)).length === 1, 'lecture des autres lignes ratée ⇒ « pas su » ne fait pas taire « 📍 » (on ne sait pas qu\'il est retiré)');
+    dit(pushes.filter((p) => /t'attend|Dernier jour/.test(p.title)).length === 1, 'lecture des autres lignes ratée ⇒ « pas su » ne fait pas taire « 📍 » (on ne sait pas qu\'il est retiré)');
   });
 
   // ══ 5. LE CRON DU MATIN ═══════════════════════════════════════════════════
@@ -387,7 +388,7 @@ function chargeApp(noms, injecte) {
     dit(JSON.stringify(tags) === JSON.stringify(['retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
       'cron : « dernier jour » (dont le n° lu dans le sujet) — « à vérifier » ne sonne plus (3 nov. : un délai passé n\'est pas un fait) — jamais le colis retiré ailleurs, coché, ni fini pour l\'app', `HTTP ${r1.code} · ${tags.join(' · ')}`);
     const d = p1.find((p) => p.tag === 'retrait-dernier-30000021') || {};
-    dit(/^📍 Dernier jour · /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=cat_bord&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour · <lieu> », le n° dans le texte, ouvre Colis → « À retirer », SA carte (31 oct.)', `${d.title} | ${d.body}`);
+    dit(/^Dernier jour · /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=cat_bord&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour · <lieu> », le n° dans le texte, ouvre Colis → « À retirer », SA carte (31 oct.)', `${d.title} | ${d.body}`);
     const v = p1.find((p) => p.tag === 'retrait-a_verifier-09440000000022') || {};
     // (29 oct.) « sans doute reparti » ne s'écrit plus : un délai dépassé ne prouve
     // rien (mesuré le 29 : 5 « sans doute repartis » sur 5 avaient été RETIRÉS) —
@@ -454,7 +455,7 @@ function chargeApp(noms, injecte) {
     resetBase(); await oublis();
     await recoit(vgo("Ton colis arrive aujourd'hui ! #1790000000000099", "Bonjour,\nBonne nouvelle : ton colis arrive aujourd'hui dans ta consigne Vinted Go.\nTu recevras ton code dès qu'il sera disponible.", 71));
     const l1 = lignesTrack().find((l) => /1790000000000099$/.test(l.id));
-    dit(l1 && l1.status !== 'available' && l1.suivi === '1790000000000099' && !pushes.some((p) => /📍|point de retrait/.test(p.title || '')),
+    dit(l1 && l1.status !== 'available' && l1.suivi === '1790000000000099' && !pushes.some((p) => /t'attend|Dernier jour|point de retrait/.test(p.title || '')),
       'le n° du sujet reste une IDENTITÉ (rangé) mais ne prouve pas l\'arrivée : la ligne n\'est pas « disponible », rien ne sonne « 📍 »', l1 ? `status=${l1.status} · push=${JSON.stringify(pushes.map((p) => p.title))}` : 'aucune ligne');
     // L'annonce d'arrivée AVEC un lieu lu (le garde-fou du n° du sujet ne joue pas) : c'est la règle « arrive aujourd'hui » qui tranche.
     resetBase(); await oublis();
@@ -465,7 +466,7 @@ function chargeApp(noms, injecte) {
     resetBase(); await oublis();
     await recoit(vgo('Rappel : ton colis #1790000000000097', 'Bonjour,\nTon colis est disponible.', 73));
     const l3 = lignesTrack().find((l) => /1790000000000097$/.test(l.id));
-    dit(l3 && l3.status === 'info' && !pushes.some((p) => /📍/.test(p.title || '')), 'n° lu dans le seul SUJET, sans code, ni QR, ni lieu ⇒ « info » (comme avant que ce n° soit lu)', l3 && `status=${l3.status}`);
+    dit(l3 && l3.status === 'info' && !pushes.some((p) => /t'attend|Dernier jour/.test(p.title || '')), 'n° lu dans le seul SUJET, sans code, ni QR, ni lieu ⇒ « info » (comme avant que ce n° soit lu)', l3 && `status=${l3.status}`);
     // L'autre sens : le même n° du sujet AVEC un code ⇒ à retirer (la preuve est là).
     resetBase(); await oublis();
     await recoit(vgo('Libère de la place dans la consigne : récupère ton colis #1790000000000096', 'Bonjour,\nTon colis t\'attend.\nTon code de retrait est 482913', 74));
@@ -547,7 +548,7 @@ function chargeApp(noms, injecte) {
     const ar = dispo ? AR.arriveeColisEmail(dispo) : null;
     const sorti = dispo ? S.sortiParSuivi(dispo, S.finsDesLignes(ls), ar ? ar.ms : null) : null;
     dit(sorti === 'reparti', 'un « reparti » TRAITÉ avant l\'e-mail d\'arrivée (rejeu du plus récent au plus ancien), mais ÉCRIT après elle ⇒ le colis est reparti', `arriveLe=${dispo && dispo.arriveLe} · sortiParSuivi=${sorti}`);
-    dit(!pushes.some((p) => /📍/.test(p.title || '')), 'et l\'arrivée traitée APRÈS ce retour ne sonne pas « 📍 »', JSON.stringify(pushes.map((p) => p.title)));
+    dit(!pushes.some((p) => /t'attend|Dernier jour/.test(p.title || '')), 'et l\'arrivée traitée APRÈS ce retour ne sonne pas « 📍 »', JSON.stringify(pushes.map((p) => p.title)));
     // Un retour ÉCRIT avant l'arrivée (un autre passage) mais traité après elle ne la fait pas sortir.
     const fins = S.finsDesLignes([{ status: 'retour', suivi: '30000078', receivedAt: '2026-10-28T09:00:00Z', emailAt: '2026-10-18T08:00:00Z' }]);
     dit(S.sortiParSuivis(['30000078'], fins, Date.parse('2026-10-22T08:00:00Z')) === null, 'un retour ÉCRIT avant l\'arrivée mais traité après elle ne compte pas (sa date d\'e-mail fait foi)');

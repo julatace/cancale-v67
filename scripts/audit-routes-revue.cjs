@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : revue adverse des routes serveur (17 octobre)
 //         node scripts/audit-routes-revue.cjs

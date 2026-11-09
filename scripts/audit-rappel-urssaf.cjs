@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : LE RAPPEL URSSAF À L'ÉCHÉANCE (20 octobre) — ET SA NOTIFICATION DU 1er (22 octobre)
 //         node scripts/audit-rappel-urssaf.cjs [--mutation=…]   ·   --recopie

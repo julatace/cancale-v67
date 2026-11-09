@@ -42,6 +42,8 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //   /api/compte?mode=commandes    (POST, session de l'extension) les ventes/achats
 //                                 envoyés LÉGERS, fusionnés dans la ligne
 //                                 `harvest_{uid}_orders_*` — api/_lib/commandes-leger.js
+//   /api/compte?mode=mail-essai   (POST, session) « M'envoyer un e-mail d'essai » :
+//                                 à l'adresse de SON compte, 3/h — api/_lib/mail-essai.js
 //   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
 //                                 efface ses données, puis son compte (refusé au
 //                                 propriétaire de l'installation)
@@ -81,6 +83,7 @@ import { etatPublic } from './_lib/etat-public.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
+import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
@@ -1350,6 +1353,16 @@ async function bilanMois(req, res) {
   });
 }
 
+// ── « M'ENVOYER UN E-MAIL D'ESSAI » (8 nov., api/_lib/mail-essai.js) ─────────
+// Sur SON clic, à l'adresse de SON compte (jamais une adresse du corps), 3 par heure.
+async function mailEssaiRoute(req, res) {
+  const u = await utilisateurDe(req);
+  if (u === undefined) return repondre(res, 503, { ok: false, raison: 'connexion-injoignable' });
+  if (!u) return repondre(res, 401, { ok: false, raison: 'session' });
+  const r = await envoyerMailEssai({ owner: u.id });
+  return repondre(res, r.code, r.corps);
+}
+
 // ── « SIGNALER UN PROBLÈME » (6 nov., api/_lib/signalement.js) ───────────────
 // La session d'abord : l'identifiant du compte VRM est celui de SA session,
 // jamais un champ du corps. Le reste (où c'est rangé, l'anti-abus, la
@@ -1468,5 +1481,6 @@ export default async function handler(req, res) {
   if (mode === 'relances') return (m === 'GET' || m === 'POST') ? relances(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (8 nov.) Le bilan du mois par e-mail : état, choix, lien « ne plus recevoir ».
   if (mode === 'bilan-mois') return (m === 'GET' || m === 'POST') ? bilanMois(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'mail-essai') return m === 'POST' ? mailEssaiRoute(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

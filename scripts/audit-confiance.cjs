@@ -29,6 +29,7 @@
 //    dans une copie : l'audit doit la voir).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const fs = require('fs');
 const path = require('path');
 const os = require('os');

@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // Audit : UNE seule clé publique de notifications, et des en-têtes de cache qui
 // ne figent que ce qui est immuable.
 //

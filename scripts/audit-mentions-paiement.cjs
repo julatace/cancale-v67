@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // Audit : le paiement ne s'ouvre pas sur des CGV qui ne disent ni QUI vend,
 // ni OÙ écrire (22 octobre, proposition n°15).
 //

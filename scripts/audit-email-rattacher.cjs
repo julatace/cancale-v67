@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  RATTACHER UN EMAIL MIS DE CÔTÉ — la vraie route, exécutée (§4.10).
 //        node scripts/audit-email-rattacher.cjs [--src dossier]

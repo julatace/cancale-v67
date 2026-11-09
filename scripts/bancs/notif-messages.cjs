@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « LES NOTIFICATIONS DES MESSAGES VINTED NE SONT PAS TOUJOURS ENVOYÉES »
 //        node scripts/bancs/notif-messages.cjs
@@ -184,7 +185,9 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
   // ══ A. La notification NOMME la paire et le compte ═════════════════════════
   console.log('\n── A. Un message : la notification dit de quelle paire il s’agit, et sur quel compte');
   await essaie('A', async () => {
-    reset({ achat: true, suivi: true, favori: true, facture: true, message: true });   // ses préférences mesurées
+    // (8 nov.) Regroupement coupé : ce bloc juge le texte de CHAQUE message (le regroupement
+    // par genre est jugé par scripts/audit-notifs-belles.cjs).
+    reset({ achat: true, suivi: true, favori: true, facture: true, message: true, regrouper: false });   // ses préférences mesurées
     const res = await recoit(emailMessage(1));
     dit(res.code === 200 && res.corps && res.corps.type === 'message', 'l’email est reconnu comme un message', `HTTP ${res.code} type=${res.corps && res.corps.type}`);
     dit(pushes.length === 2, 'une notification part vers chacun des 2 appareils', `${pushes.length} envoi(s)`);

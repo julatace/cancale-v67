@@ -9,13 +9,53 @@
 // (`?tab=…&cible=…`, src/cibleNotif.js) — l'élément est mis en évidence là-bas.
 // Règle pure : src/journalNotifs.js. Lectures et écritures : passées par l'app.
 import React from 'react';
-import { TYPES_CENTRE, ETAT_CENTRE, entreesDuJournal, estLue, marquerLues, toutLu, parJour, heureCourte, rechercheDe } from './journalNotifs.js';
+import { TYPES_CENTRE, ETAT_CENTRE, entreesDuJournal, estLue, marquerLues, toutLu, parJour, heureCourte, rechercheDe, regrouperLignes, quandRelatif } from './journalNotifs.js';
+import { ICONE_FAMILLE, GESTE_FAMILLE } from '../api/_lib/notif-belle.js';
 import { SheetShell } from './composants/SheetShell.jsx';
 import { EtatPanne } from './composants/EtatPanne.jsx';
 import { BoutonBase as Bouton } from './composants/Bouton.jsx';
 import { NOTIONS } from './libelles.js';
 
 const nomType = (f) => (TYPES_CENTRE.find((t) => t.id === f) || {}).titre || (f === 'test' ? 'Essai' : 'Autre');
+// (8 nov.) Une ligne de la cloche : l'icône de la famille, le fait, le texte, le
+// geste (ce que fait le toucher) et l'heure dite comme un téléphone.
+function LigneNotif({ e, nl, onOuvrir, Icon, retrait = false }) {
+  const va = !!rechercheDe(e.url);
+  return (
+    <button type="button" className={'vrm-cn-ligne' + (nl ? ' is-non-lue' : '') + (retrait ? ' is-retrait' : '')} data-centre-entree={e.seq} data-centre-type={e.famille} data-non-lue={nl ? '1' : '0'} data-centre-url={e.url} onClick={() => onOuvrir(e)}
+      aria-label={`${nl ? 'Non lue · ' : ''}${e.titre || 'Notification'}${e.texte ? ' · ' + e.texte : ''}`}>
+      <span className="vrm-cn-ic" data-centre-icone={ICONE_FAMILLE[e.famille] || 'bell2'} aria-hidden="true"><Icon name={ICONE_FAMILLE[e.famille] || 'bell2'} size={17}/>{nl ? <span className="vrm-cn-point"/> : null}</span>
+      <span className="vrm-cn-corps">
+        <span className="vrm-cn-meta"><span>{nomType(e.famille)}</span>{ETAT_CENTRE[e.etat] ? <span className="vrm-cn-etat" data-centre-etat-entree={e.etat}>{ETAT_CENTRE[e.etat]}</span> : null}<time dateTime={new Date(e.t).toISOString()} title={heureCourte(e.t)}>{quandRelatif(e.t)}</time></span>
+        <span className="vrm-cn-ti">{e.titre || 'Notification'}</span>
+        {e.texte ? <span className="vrm-cn-tx">{e.texte}</span> : null}
+        {va && GESTE_FAMILLE[e.famille] ? <span className="vrm-cn-geste" data-centre-geste="">{GESTE_FAMILLE[e.famille]}</span> : null}
+      </span>
+      {va ? <span className="vrm-cn-chevron" aria-hidden="true"><Icon name="chevron" size={14}/></span> : null}
+    </button>
+  );
+}
+// Plusieurs notifications du même genre le même jour : une ligne qui dit combien,
+// dépliable (le téléphone n'en a montré qu'une).
+function GroupeNotifs({ g, lu, onOuvrir, Icon }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const nl = g.items.filter((e) => !estLue(e, lu)).length;
+  return (
+    <>
+      <button type="button" className={'vrm-cn-ligne vrm-cn-groupe' + (nl ? ' is-non-lue' : '')} aria-expanded={ouvert} data-centre-groupe={g.genre} data-centre-groupe-n={g.items.length} onClick={() => setOuvert((v) => !v)}>
+        <span className="vrm-cn-ic" aria-hidden="true"><Icon name={ICONE_FAMILLE[g.famille] || 'bell2'} size={17}/>{nl ? <span className="vrm-cn-point"/> : null}</span>
+        <span className="vrm-cn-corps">
+          <span className="vrm-cn-meta"><span>{nomType(g.famille)}</span><time dateTime={new Date(g.t).toISOString()}>{quandRelatif(g.t)}</time></span>
+          <span className="vrm-cn-ti">{g.titre}</span>
+          <span className="vrm-cn-tx">Dernier : {g.items[0].titre}{g.items[0].texte ? ' · ' + g.items[0].texte : ''}</span>
+          <span className="vrm-cn-geste">{ouvert ? 'Replier' : `Voir les ${g.items.length}`}</span>
+        </span>
+        <span className={'vrm-cn-chevron' + (ouvert ? ' is-ouvert' : '')} aria-hidden="true"><Icon name="chevron" size={14}/></span>
+      </button>
+      {ouvert ? g.items.map((e) => <LigneNotif key={e.seq} e={e} nl={!estLue(e, lu)} onOuvrir={onOuvrir} Icon={Icon} retrait/>) : null}
+    </>
+  );
+}
 
 // La cloche de l'en-tête : la pastille dit le nombre de non-lues (rien si 0 ou
 // pas su — « pas su » n'affiche jamais « 0 »).
@@ -113,24 +153,11 @@ export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onRe
             <div key={g.cle} className="vrm-cn-jour">
               <h3 className="vrm-cn-jour-titre">{g.titre}</h3>
               <ul>
-                {g.items.map((e) => {
-                  const nl = !estLue(e, lu);
-                  const va = !!rechercheDe(e.url);
-                  return (
-                    <li key={e.seq}>
-                      <button type="button" className={'vrm-cn-ligne' + (nl ? ' is-non-lue' : '')} data-centre-entree={e.seq} data-centre-type={e.famille} data-non-lue={nl ? '1' : '0'} data-centre-url={e.url} onClick={() => ouvrir(e)}
-                        aria-label={`${nl ? 'Non lue · ' : ''}${e.titre || 'Notification'}${e.texte ? ' · ' + e.texte : ''}`}>
-                        <span className="vrm-cn-point" aria-hidden="true"/>
-                        <span className="vrm-cn-corps">
-                          <span className="vrm-cn-meta"><span>{nomType(e.famille)}</span>{ETAT_CENTRE[e.etat] ? <span className="vrm-cn-etat" data-centre-etat-entree={e.etat}>{ETAT_CENTRE[e.etat]}</span> : null}<time dateTime={new Date(e.t).toISOString()}>{heureCourte(e.t)}</time></span>
-                          <span className="vrm-cn-ti">{e.titre || 'Notification'}</span>
-                          {e.texte ? <span className="vrm-cn-tx">{e.texte}</span> : null}
-                        </span>
-                        {va ? <span className="vrm-cn-chevron" aria-hidden="true"><Icon name="chevron" size={14}/></span> : null}
-                      </button>
-                    </li>
-                  );
-                })}
+                {regrouperLignes(g.items).map((e) => (
+                  <li key={e.groupe ? e.cle : e.seq}>
+                    {e.groupe ? <GroupeNotifs g={e} lu={lu} onOuvrir={ouvrir} Icon={Icon}/> : <LigneNotif e={e} nl={!estLue(e, lu)} onOuvrir={ouvrir} Icon={Icon}/>}
+                  </li>
+                ))}
               </ul>
             </div>
           ))}

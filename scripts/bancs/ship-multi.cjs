@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE RAPPEL D'EXPÉDITION, PAR VENDEUR (node scripts/bancs/ship-multi.cjs)
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT : une offre reçue par email doit rendre LE BON MONTANT et l'acheteur.
 // ⚠️ Mesuré le 23 août sur les 184 offres archivées : le pseudo de l'acheteur
 // était vide sur TOUTES, et le montant sur une bonne partie — soit parce que le

@@ -38,6 +38,7 @@
 //  Lancer : node scripts/audit-emails-html.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path'), fs = require('fs');

@@ -22,6 +22,12 @@
 //    (`bouclier`) ; le mot de passe part UNE fois au service worker
 //    (`authLogin`), jamais gardé, jamais dans une adresse, jamais `postMessage`.
 //    « Se connecter avec VRM » n'existe plus dans la carte.
+//    5.330 (Julien : « certains ont créé leur compte avec Google ou Discord » —
+//    sans mot de passe) : d'abord « Me connecter avec un code » (un code reçu
+//    par e-mail, `authCodeDemande` / `authCodeVerif`, jamais rangé), puis
+//    « J'ai un mot de passe », puis Google / Discord — petite fenêtre sur
+//    ordinateur, CET onglet sur Orion (il revient sur la page, connecté).
+//    Jamais `chrome.tabs.create`, jamais `window.open`.
 //  - aucune lecture de données, aucune requête vers le site : l'état vient du
 //    service worker (session VRM, cookie du site, ce que les écritures ont noté).
 //  - aucune couleur quand tout va bien (§7). L'ambre ne s'allume que s'il y a
@@ -129,6 +135,19 @@
   .cx .fourn { display: flex; align-items: center; justify-content: center; gap: 8px; }
   .cx .etat { margin-top: 8px; font-size: 12px; color: var(--doux); }
   .cx .err { margin-top: 10px; }
+  /* 5.330 : le code reçu par e-mail — un vrai champ posé sur des cases. */
+  .cx .envoye { font-size: 14px; line-height: 1.4; color: var(--texte); margin-bottom: 2px; word-break: break-word; }
+  .cx .envoye b { font-weight: 600; }
+  .cx .cases { position: relative; display: flex; gap: 6px; }
+  .cx .case { flex: 1 1 0; min-width: 0; height: 52px; border-radius: 10px; border: 1px solid var(--bord); background: var(--champ);
+    display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--texte); }
+  .cx .case.cur { border-color: var(--accent); box-shadow: 0 0 0 3px var(--anneau); }
+  .cx .cases input#vrm-cx-code { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 52px; padding: 0; border: 0; border-radius: 10px;
+    background: transparent; color: transparent; caret-color: transparent; box-shadow: none; font-size: 16px; letter-spacing: 0; }
+  .cx .cases input#vrm-cx-code:focus { box-shadow: none; }
+  .cx .cases input#vrm-cx-code::selection { background: transparent; }
+  .cx .lien { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 13px; cursor: pointer; }
+  .cx .lien:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .cx [hidden] { display: none; }
   @media (prefers-reduced-motion: reduce) { .b, .btn { transition: none; } }
   .fermer { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent;
@@ -322,7 +341,8 @@
     else if (v.connecte) compteVrm = `<div class="val">${esc(v.email || 'connecté')}</div>`;
     else if (v.expiree) compteVrm = `<div class="val alerte">Session expirée${v.email ? ' (' + esc(v.email) + ')' : ''} — reconnecte-toi ci-dessous</div>`;
     else compteVrm = '<div class="val alerte">Pas connecté — connecte-toi ci-dessous</div>';
-    if (v && v.connecte && justeConnecte) compteVrm += '<div class="val gris" data-juste-connecte>C’est fait : l’extension est connectée.</div>';
+    // 5.330 : l'adresse dite UNE fois (« Connecté à VRM : x@y »), puis « C'est fait ».
+    if (v && v.connecte && justeConnecte) compteVrm = `<div class="val">Connecté à VRM${v.email ? ' : ' + esc(v.email) : ''}</div><div class="val gris" data-juste-connecte>C’est fait : l’extension est connectée.</div>`;
 
     const nomSite = NOM_SITE[e.plateforme] || 'ce site';
     let compteSite;
@@ -494,6 +514,14 @@
     if (r) etat = r;
     // 5.328 : connecté depuis la carte ⇒ elle reste ouverte et NOMME le compte.
     if (avant && etat && etat.vrm && etat.vrm.connecte) { justeConnecte = true; formulaireDemande = false; }
+    // 5.330 : de retour de Google / Discord dans CET onglet (Orion) ⇒ la carte
+    // s'ouvre d'elle-même, une fois, et dit le résultat.
+    const rev = r && r.oauthRevenu;
+    if (rev && (rev.etat === 'ok' || rev.etat === 'erreur')) {
+      doigt = true; carte.classList.add('on');
+      if (rev.etat === 'ok' && etat && etat.vrm && etat.vrm.connecte) { justeConnecte = true; formulaireDemande = false; }
+      else if (rev.etat === 'erreur') { formulaireDemande = true; erreurAuRetour = rev.message || 'La connexion n’a pas abouti.'; }
+    }
     rendre();
   }
 
@@ -525,7 +553,17 @@
   let formulaireEl = null, formulaireDemande = false, justeConnecte = false, changerCompte = false, envoiEnVol = false, fournisseurs = null, fournisseursDemandes = false;
   const EVTS_BOUCLIER = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'textInput', 'compositionstart', 'compositionupdate', 'compositionend', 'paste', 'copy', 'cut'];
   const vientDeLaCarte = (ev) => { try { const p = ev.composedPath(); return p[0] === hote || p.includes(hote); } catch (_) { return ev.target === hote; } };
-  const bouclier = (ev) => { if (formulaireEl && vientDeLaCarte(ev)) ev.stopImmediatePropagation(); };
+  // ⚠️ 5.330 : arrêté sur `window` en capture, l'événement n'atteint plus NOS
+  // champs non plus. Le champ du code a besoin de sa saisie (chiffres, cases) :
+  // elle lui est remise ICI, avant l'arrêt (`surSaisieCode`) — la page, elle,
+  // n'entend toujours rien.
+  let surSaisieCode = null;
+  const bouclier = (ev) => {
+    if (!formulaireEl || !vientDeLaCarte(ev)) return;
+    // (Vu de `window`, une racine FERMÉE cache sa cible : on lit le champ actif de la racine.)
+    try { const c = champ('vrm-cx-code'); if (ev.type === 'input' && surSaisieCode && c && ombre.activeElement === c) surSaisieCode(ev); } catch (_) {}
+    ev.stopImmediatePropagation();
+  };
   for (const t of EVTS_BOUCLIER) {
     try { window.addEventListener(t, bouclier, true); } catch (_) {}
     try { hote.addEventListener(t, (ev) => { if (formulaireEl) ev.stopPropagation(); }, false); } catch (_) {}
@@ -536,77 +574,240 @@
   };
   const NOM_FOURN = { google: 'Google', discord: 'Discord' };
   const champ = (id) => (formulaireEl ? formulaireEl.querySelector('#' + id) : null);
-  function focaliser() { setTimeout(() => { try { const m = champ('vrm-cx-mail'); const p = champ('vrm-cx-mdp'); (m && !m.value ? m : p || m).focus({ preventScroll: true }); } catch (_) {} }, 30); }
+  // ══ 5.330 : TROIS FAÇONS, DANS LA CARTE, DANS CET ORDRE ═════════════════
+  // Julien, 8 nov. : « il n'y a pas la connexion Discord et Google, parce que
+  // certains ont créé leur compte comme ça » — ces comptes n'ont pas de mot de
+  // passe. ⇒ 1. l'e-mail et « Me connecter avec un code » (un code reçu par
+  // e-mail, marche pour TOUS les comptes VRM) ; 2. « J'ai un mot de passe »
+  // (déplie le champ) ; 3. Google, Discord — dans une petite fenêtre sur
+  // ordinateur, dans CET onglet sur Orion (il revient ici, connecté).
+  // `modeCx` : 'code' (l'e-mail) · 'mdp' (e-mail + mot de passe) · 'saisie' (les cases du code).
+  let modeCx = 'code', mailSaisi = '', codeEnvoi = null, codeEtatDemande = false, minuteurRenvoi = null, erreurAuRetour = '';
+  const LONG_CODE = 6;
+  function focaliser() {
+    setTimeout(() => {
+      try {
+        const c = champ('vrm-cx-code'); if (c) { c.focus({ preventScroll: true }); return; }
+        const m = champ('vrm-cx-mail'); const p = champ('vrm-cx-mdp');
+        (m && !m.value ? m : p || m).focus({ preventScroll: true });
+      } catch (_) {}
+    }, 30);
+  }
   function direErreur(t) {
     const e = champ('vrm-cx-err'); if (!e) return;
     e.textContent = t || ''; e.hidden = !t;
   }
   function direEtat(t) { const e = champ('vrm-cx-etat'); if (!e) return; e.textContent = t || ''; e.hidden = !t; }
-  function poserFormulaire(montrer) {
+  function viderSecrets() {
+    try { const p = champ('vrm-cx-mdp'); if (p) p.value = ''; } catch (_) {}
+    try { const c = champ('vrm-cx-code'); if (c) c.value = ''; } catch (_) {}
+  }
+  function poserFormulaire(montrer, refaire) {
     if (!montrer) {
       connexion.hidden = true;
-      if (formulaireEl) { try { const p = champ('vrm-cx-mdp'); if (p) p.value = ''; } catch (_) {} }
-      formulaireEl = null; envoiEnVol = false;
+      if (formulaireEl) viderSecrets();
+      formulaireEl = null; envoiEnVol = false; clearInterval(minuteurRenvoi);
       if (connexion.childNodes.length) connexion.replaceChildren();
       return;
     }
     connexion.hidden = false;
-    if (formulaireEl) { rendreFournisseurs(); majAnnuler(); return; }
-    const mailConnu = etat && etat.vrm && etat.vrm.expiree && etat.vrm.email ? etat.vrm.email : '';
-    poserHtml(connexion, `<form class="cx" data-connexion-carte novalidate autocomplete="off">
-      <label class="lab" for="vrm-cx-mail">E-mail de ton compte VRM</label>
-      <input id="vrm-cx-mail" name="vrm-carte-identifiant" type="email" inputmode="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="prenom@exemple.fr" value="${esc(mailConnu)}" data-1p-ignore data-lpignore="true">
+    if (formulaireEl && !refaire) { rendreFournisseurs(); majAnnuler(); return; }
+    if (formulaireEl) { const m = champ('vrm-cx-mail'); if (m) mailSaisi = String(m.value || '').trim(); viderSecrets(); }
+    clearInterval(minuteurRenvoi);
+    if (!mailSaisi && etat && etat.vrm && etat.vrm.expiree && etat.vrm.email) mailSaisi = etat.vrm.email;
+    const mail = `<label class="lab" for="vrm-cx-mail">E-mail de ton compte VRM</label>
+      <input id="vrm-cx-mail" name="vrm-carte-identifiant" type="email" inputmode="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="${modeCx === 'mdp' ? 'next' : 'send'}" placeholder="prenom@exemple.fr" value="${esc(mailSaisi)}" data-1p-ignore data-lpignore="true">`;
+    const pied = `<button type="button" class="b sec" data-annuler-changer hidden>Annuler</button>
+      <div class="err" id="vrm-cx-err" role="alert" hidden></div>
+      <div class="etat" id="vrm-cx-etat" role="status" aria-live="polite" hidden></div>`;
+    let corps;
+    if (modeCx === 'saisie' && codeEnvoi) {
+      corps = `<div class="envoye">Code envoyé à <b>${esc(codeEnvoi.email)}</b>. Regarde ta boîte mail (et les indésirables).</div>
+      <label class="lab" for="vrm-cx-code">Code reçu par e-mail</label>
+      <div class="cases" data-cases>${Array.from({ length: LONG_CODE }, () => '<span class="case" aria-hidden="true"></span>').join('')}
+        <input id="vrm-cx-code" name="vrm-carte-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="vrm-cx-aide-code" data-1p-ignore data-lpignore="true">
+      </div>
+      <div class="aide" id="vrm-cx-aide-code">6 chiffres. Seul le dernier code reçu marche.</div>
+      <button type="submit" class="b" data-principal data-code-valider disabled>Valider le code</button>
+      ${pied}
+      <button type="button" class="b sec" data-code-renvoyer disabled>Renvoyer le code</button>
+      <button type="button" class="lien" data-code-changer>Changer d’e-mail</button>`;
+    } else if (modeCx === 'mdp') {
+      corps = `${mail}
       <label class="lab" for="vrm-cx-mdp">Mot de passe VRM</label>
       <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" data-1p-ignore data-lpignore="true">
       <div class="aide">Ceux de vrm.center — pas ceux de Vinted.</div>
-      <button type="submit" class="b" data-me-connecter>Me connecter</button>
-      <button type="button" class="b sec" data-annuler-changer hidden>Annuler</button>
-      <div class="err" id="vrm-cx-err" role="alert" hidden></div>
-      <div class="etat" id="vrm-cx-etat" role="status" hidden></div>
-      <div data-fournisseurs-carte hidden></div>
-      <a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>Mot de passe oublié ?</a>
-    </form>`);
+      <button type="submit" class="b" data-principal data-me-connecter>Me connecter</button>
+      ${pied}
+      <button type="button" class="b sec" data-basculer-mode>Recevoir un code à la place</button>
+      <a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>Mot de passe oublié ?</a>`;
+    } else {
+      corps = `${mail}
+      <button type="submit" class="b" data-principal data-code-demander>Me connecter avec un code</button>
+      <div class="aide">Un code à 6 chiffres arrive sur cet e-mail. Marche aussi si tu as créé ton compte avec Google ou Discord.</div>
+      ${pied}
+      <button type="button" class="b sec" data-basculer-mode>J’ai un mot de passe</button>`;
+    }
+    poserHtml(connexion, `<form class="cx" data-connexion-carte data-mode="${modeCx}" novalidate autocomplete="off">${corps}
+      <div data-fournisseurs-carte hidden></div></form>`);
     formulaireEl = connexion.querySelector('form');
-    formulaireEl.addEventListener('submit', (ev) => { ev.preventDefault(); ev.stopPropagation(); seConnecter(); });
-    formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { changerCompte = false; formulaireDemande = false; rendre(); });
+    formulaireEl.addEventListener('submit', (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (modeCx === 'mdp') seConnecter(); else if (modeCx === 'saisie') validerCode(); else demanderCode();
+    });
+    formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { changerCompte = false; formulaireDemande = false; modeCx = 'code'; rendre(); });
+    const bascule = formulaireEl.querySelector('[data-basculer-mode]');
+    if (bascule) bascule.addEventListener('click', () => { modeCx = modeCx === 'mdp' ? 'code' : 'mdp'; poserFormulaire(true, true); focaliser(); });
+    if (modeCx === 'saisie') brancherCases();
+    if (erreurAuRetour) { direErreur(erreurAuRetour); erreurAuRetour = ''; }
     rendreFournisseurs(); majAnnuler();
+    // Une demande de code déjà partie (iOS a pu recharger la page pendant qu'il
+    // lisait ses e-mails) : on reprend aux cases, une fois par page.
+    if (!codeEtatDemande && modeCx === 'code') {
+      codeEtatDemande = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'authCodeEtat' }, (r) => {
+          let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
+          if (err || !r || !r.enCours || !formulaireEl || modeCx !== 'code') return;
+          codeEnvoi = { email: r.email, at: r.at }; mailSaisi = r.email; modeCx = 'saisie';
+          poserFormulaire(true, true);
+        });
+      } catch (_) {}
+    }
   }
   function majAnnuler() { const b = formulaireEl && formulaireEl.querySelector('[data-annuler-changer]'); if (b) b.hidden = !changerCompte; }
+  // Les cases : UN vrai champ (chiffres seulement, `one-time-code` pour que
+  // l'iPhone propose le code reçu), posé sur des cases qui en montrent les
+  // chiffres. Coller ou remplir d'un coup un code complet le valide tout seul.
+  function brancherCases() {
+    const c = champ('vrm-cx-code'), boite = formulaireEl.querySelector('[data-cases]');
+    const valider = formulaireEl.querySelector('[data-code-valider]');
+    if (!c || !boite) return;
+    const peindre = () => {
+      const v = String(c.value || '');
+      const n = Math.max(LONG_CODE, Math.min(10, v.length));
+      let cases = boite.querySelectorAll('.case');
+      while (cases.length < n) { const s = document.createElement('span'); s.className = 'case'; s.setAttribute('aria-hidden', 'true'); boite.insertBefore(s, c); cases = boite.querySelectorAll('.case'); }
+      while (cases.length > n) { cases[cases.length - 1].remove(); cases = boite.querySelectorAll('.case'); }
+      const actif = c.matches(':focus');
+      cases.forEach((s, i) => { s.textContent = v[i] || ''; s.classList.toggle('cur', actif && i === Math.min(v.length, n - 1)); });
+      if (valider) valider.disabled = envoiEnVol || !/^\d{6,10}$/.test(v);
+    };
+    // Appelée par le bouclier (sur `window`, en capture) ; l'écouteur posé sur le
+    // champ ne sert que si le bouclier n'a pas pu être posé. Une fois par événement.
+    surSaisieCode = (ev) => {
+      if (ev && ev.__vrmCode) return; try { ev.__vrmCode = true; } catch (_) {}
+      if (champ('vrm-cx-code') !== c) return;
+      const avant = String(c.value || '');
+      const v = avant.replace(/\D+/g, '').slice(0, 10);
+      if (v !== avant) c.value = v;
+      if (v) direErreur('');
+      peindre();
+      // Un code COMPLET arrivé d'un coup (collé, ou proposé par l'iPhone) part tout seul.
+      const enBloc = ev && (ev.inputType === 'insertFromPaste' || ev.inputType === 'insertReplacementText' || (typeof ev.data === 'string' && ev.data.length > 1) || ev.inputType === undefined || ev.inputType === '');
+      if (enBloc && /^\d{6,10}$/.test(v)) validerCode();
+    };
+    c.addEventListener('input', surSaisieCode);
+    c.addEventListener('focus', peindre); c.addEventListener('blur', peindre);
+    peindre();
+    minuterRenvoi();
+    const ren = formulaireEl.querySelector('[data-code-renvoyer]');
+    if (ren) ren.addEventListener('click', () => demanderCode(true));
+    const chg = formulaireEl.querySelector('[data-code-changer]');
+    if (chg) chg.addEventListener('click', () => { modeCx = 'code'; codeEnvoi = null; poserFormulaire(true, true); focaliser(); });
+  }
+  function minuterRenvoi() {
+    clearInterval(minuteurRenvoi);
+    const ren = formulaireEl && formulaireEl.querySelector('[data-code-renvoyer]');
+    if (!ren || !codeEnvoi) return;
+    const tic = () => {
+      const reste = Math.ceil((60000 - (Date.now() - Number(codeEnvoi.at || 0))) / 1000);
+      if (reste > 0 && reste <= 60) { ren.disabled = true; ren.textContent = `Renvoyer le code (dans ${reste} s)`; return; }
+      ren.disabled = false; ren.textContent = 'Renvoyer le code'; clearInterval(minuteurRenvoi);
+    };
+    tic(); minuteurRenvoi = setInterval(tic, 1000);
+  }
+  // Une demande au service worker, jamais un bouton figé (iOS peut le suspendre en route).
+  function demanderAuFond(msg, finir) {
+    let fini = false;
+    const fin = (r, muet) => { if (fini) return; fini = true; clearTimeout(attente); finir(r, muet); };
+    const attente = setTimeout(() => fin(null, true), 20000);
+    try {
+      chrome.runtime.sendMessage(msg, (r) => {
+        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
+        fin(err ? null : r, !!err || r === undefined);
+      });
+    } catch (_) { fin(null, true); }
+  }
+  function demanderCode(renvoi) {
+    if (envoiEnVol || !formulaireEl) return;
+    const m = champ('vrm-cx-mail');
+    const email = renvoi && codeEnvoi ? codeEnvoi.email : String((m && m.value) || '').trim();
+    if (!email) { direErreur('Tape l’e-mail de ton compte VRM.'); try { m.focus(); } catch (_) {} return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur('Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    mailSaisi = email;
+    const b = formulaireEl.querySelector(renvoi ? '[data-code-renvoyer]' : '[data-code-demander]');
+    const texte = b ? b.textContent : '';
+    envoiEnVol = true; direErreur(''); direEtat('');
+    if (b) { b.disabled = true; b.textContent = 'Envoi du code…'; }
+    demanderAuFond({ from: 'vrm-badge', action: 'authCodeDemande', email }, (r, muet) => {
+      envoiEnVol = false;
+      if (r && r.ok) {
+        codeEnvoi = { email: r.email || email.toLowerCase(), at: Number(r.at) || Date.now() };
+        modeCx = 'saisie'; poserFormulaire(true, true);
+        if (renvoi) direEtat('Nouveau code envoyé. Seul ce dernier code marche.');
+        focaliser(); return;
+      }
+      if (b) { b.textContent = texte; b.disabled = false; }
+      if (renvoi) minuterRenvoi();
+      direErreur(muet ? 'L’extension n’a pas répondu. Réessaie dans un instant.' : ((r && r.error) || 'Le code n’a pas pu partir.'));
+    });
+  }
+  function validerCode() {
+    if (envoiEnVol || !formulaireEl || !codeEnvoi) return;
+    const c = champ('vrm-cx-code'), b = formulaireEl.querySelector('[data-code-valider]');
+    const code = String((c && c.value) || '').replace(/\D+/g, '');
+    if (!/^\d{6,10}$/.test(code)) { direErreur('Tape les 6 chiffres du code reçu par e-mail.'); return; }
+    envoiEnVol = true; direErreur(''); direEtat('');
+    if (b) { b.disabled = true; b.textContent = 'Vérification…'; }
+    demanderAuFond({ from: 'vrm-badge', action: 'authCodeVerif', email: codeEnvoi.email, code }, (r, muet) => {
+      envoiEnVol = false;
+      // Le code ne reste nulle part : le champ est vidé dès la réponse.
+      try { if (c) { c.value = ''; c.dispatchEvent(new Event('blur')); } } catch (_) {}
+      if (b) { b.textContent = 'Valider le code'; b.disabled = true; }
+      if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = 'code'; codeEnvoi = null; rafraichir(); return; }
+      if (r && r.expire) { modeCx = 'code'; poserFormulaire(true, true); }
+      direErreur(muet ? 'L’extension n’a pas répondu. Réessaie dans un instant.' : ((r && r.error) || 'Code refusé.'));
+      focaliser();
+    });
+  }
   function seConnecter() {
     if (envoiEnVol || !formulaireEl) return;
     const m = champ('vrm-cx-mail'), p = champ('vrm-cx-mdp'), b = formulaireEl.querySelector('[data-me-connecter]');
     const email = String((m && m.value) || '').trim(), password = String((p && p.value) || '');
     if (!email || !password) { direErreur(!email && !password ? 'Tape l’e-mail et le mot de passe de ton compte VRM.' : !email ? 'Tape l’e-mail de ton compte VRM.' : 'Tape ton mot de passe VRM.'); try { (!email ? m : p).focus(); } catch (_) {} return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur('Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    mailSaisi = email;
     envoiEnVol = true; direErreur(''); direEtat('');
     if (b) { b.disabled = true; b.textContent = 'Connexion…'; }
-    let fini = false;
-    const finir = (r, muet) => {
-      if (fini) return; fini = true; clearTimeout(attente); envoiEnVol = false;
+    demanderAuFond({ from: 'vrm-badge', action: 'authLogin', email, password }, (r, muet) => {
+      envoiEnVol = false;
       if (b) { b.disabled = false; b.textContent = 'Me connecter'; }
       try { if (p) p.value = ''; } catch (_) {}
-      if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; rafraichir(); return; }
+      if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = 'code'; rafraichir(); return; }
       if (muet) { direErreur('L’extension n’a pas répondu. Réessaie dans un instant.'); return; }
       if (r && r.captcha) { direErreur('VRM demande une vérification anti-robot que la carte ne sait pas afficher. Touche l’icône VRM dans les réglages de l’extension pour te connecter.'); return; }
       direErreur((r && r.error) || 'Connexion refusée.');
       try { if (p) p.focus(); } catch (_) {}
-    };
-    // iOS peut suspendre le service worker en route : jamais un bouton figé.
-    const attente = setTimeout(() => finir(null, true), 20000);
-    try {
-      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'authLogin', email, password }, (r) => {
-        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
-        finir(err ? null : r, !!err || r === undefined);
-      });
-    } catch (_) { finir(null, true); }
+    });
   }
-  // Google / Discord : seulement une petite fenêtre qui se ferme seule (jamais
-  // un onglet), et seulement pour un fournisseur que Supabase dit activé.
+  // Google / Discord : seulement pour un fournisseur que Supabase dit activé.
+  // Ordinateur : une petite fenêtre qui se ferme seule. Sans fenêtre (Orion) :
+  // CET onglet part chez Google / Discord et revient sur cette page, connecté.
   function rendreFournisseurs() {
     const box = formulaireEl && formulaireEl.querySelector('[data-fournisseurs-carte]');
     if (!box) return;
-    const peut = !!(etat && etat.oauthFenetre === true);
-    if (!peut) { box.hidden = true; box.setAttribute('data-fournisseurs', 'sans-fenetre'); return; }
+    if (modeCx === 'saisie') { box.hidden = true; return; }
     if (!fournisseursDemandes) {
       fournisseursDemandes = true;
       try {
@@ -620,22 +821,26 @@
     }
     const actifs = fournisseurs ? ['google', 'discord'].filter((f) => fournisseurs[f] === true) : [];
     box.setAttribute('data-fournisseurs', actifs.join(',') || 'aucun');
+    box.setAttribute('data-oauth', etat && etat.oauthFenetre === true ? 'fenetre' : 'meme-onglet');
     if (!actifs.length) { box.hidden = true; return; }
     if (box.querySelector('[data-fournisseur]')) { box.hidden = false; return; }
     poserHtml(box, `<div class="ou"><span>ou</span></div>` + actifs.map((f) => `<button type="button" class="b sec fourn" data-fournisseur="${f}">${LOGO_FOURN[f]}<span>Continuer avec ${NOM_FOURN[f]}</span></button>`).join(''));
     box.querySelectorAll('[data-fournisseur]').forEach((el) => el.addEventListener('click', () => connexionFournisseur(el.getAttribute('data-fournisseur'))));
     box.hidden = false;
   }
+  const URL_AUTORISE = /^https:\/\/[a-z0-9-]+\.supabase\.co\/auth\/v1\/authorize\?provider=(google|discord)&/;
   function connexionFournisseur(f) {
-    if (!NOM_FOURN[f]) return;
-    direErreur(''); direEtat(`Une petite fenêtre ${NOM_FOURN[f]} s’ouvre. Connecte-toi : elle se ferme toute seule.`);
-    try {
-      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'oauthDepart', fournisseur: f, fenetre: true }, (r) => {
-        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
-        if (err || !r) { direEtat(''); direErreur('L’extension n’a pas répondu. Connecte-toi avec ton e-mail et ton mot de passe VRM.'); return; }
-        if (!r.ok) { direEtat(''); direErreur(r.message || 'La connexion n’a pas pu démarrer.'); }
-      });
-    } catch (_) { direEtat(''); direErreur('La connexion n’a pas pu démarrer.'); }
+    if (!NOM_FOURN[f] || envoiEnVol) return;
+    const fenetre = !!(etat && etat.oauthFenetre === true);
+    direErreur(''); direEtat(fenetre ? `Une petite fenêtre ${NOM_FOURN[f]} s’ouvre. Connecte-toi : elle se ferme toute seule.` : `Je t’emmène chez ${NOM_FOURN[f]}, dans cet onglet. Tu reviendras ici, connecté.`);
+    demanderAuFond({ from: 'vrm-badge', action: 'oauthDepart', fournisseur: f }, (r, muet) => {
+      if (muet || !r) { direEtat(''); direErreur('L’extension n’a pas répondu. Connecte-toi avec un code reçu par e-mail.'); return; }
+      if (!r.ok) { direEtat(''); direErreur(r.message || 'La connexion n’a pas pu démarrer.'); return; }
+      // Sans fenêtre : CET onglet navigue (jamais un onglet de plus, jamais window.open).
+      if (r.memeOnglet && typeof r.url === 'string' && URL_AUTORISE.test(r.url) && r.url.split('?provider=')[1].startsWith(f + '&')) {
+        try { location.assign(r.url); } catch (_) { direEtat(''); direErreur('La connexion n’a pas pu démarrer.'); }
+      }
+    });
   }
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
   function fermerCarte() { doigt = false; justeConnecte = false; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }

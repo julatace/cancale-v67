@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE BILAN DE LA SEMAINE, EXÉCUTÉ (node scripts/bancs/bilan-semaine.cjs)
 // ═══════════════════════════════════════════════════════════════════════════

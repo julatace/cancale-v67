@@ -96,14 +96,14 @@ export function texteComptesARelire(liste) {
   if (l.length === 1) {
     const c = l[0];
     return {
-      title: `🔄 Compte Vinted pas relu : ${c.nom}`,
+      title: `Compte Vinted pas relu : ${c.nom}`,
       body: `Dernière lecture ${c.age || 'il y a plus de 24 h'}. Ouvre vinted.fr connecté sur ce compte, ${geste}.`,
     };
   }
   const montres = l.slice(0, NOMS_MAX).map((c) => (c.age ? `${c.nom} (${c.age.replace(/^il y a /, '')})` : c.nom));
   const reste = l.length - montres.length;
   return {
-    title: `🔄 ${l.length} comptes Vinted pas relus`,
+    title: `${l.length} comptes Vinted pas relus`,
     body: `${montres.join(', ')}${reste > 0 ? ` et ${reste} autre${reste > 1 ? 's' : ''}` : ''} : ouvre vinted.fr connecté sur chacun, ${geste}.`,
   };
 }

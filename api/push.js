@@ -7,6 +7,9 @@
 //   POST { action:'retrait', tx }            → l'extension a lu un code de retrait neuf (5.204)
 //   POST { action:'suivi', tx, uid }         → l'extension a vu une étape de plus dans le
 //                                              suivi Vinted d'un achat (5.214, _lib/suivi-vinted.js)
+//   POST { action:'comptes' }                → l'app a vu un compte relié pour la première fois :
+//                                              la route RELIT les comptes elle-même (rien du corps)
+//                                              et notifie une fois par compte (_lib/compte-relie.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -17,6 +20,7 @@ import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
 import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
 import { corsExtension } from './_lib/cors-extension.js';
+import { notifierComptesRelies } from './_lib/compte-relie.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -94,6 +98,13 @@ async function traiter(req, res) {
     if (body.action === 'suivi') {
       const r = await notifierSuiviVinted(body.tx, body.uid);
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS : « 🔗 shop_x est relié à VRM ».
+    // Le corps ne dit rien (ni compte, ni nom) : tout est relu ici, au nom de CE vendeur.
+    if (body.action === 'comptes') {
+      const r = await notifierComptesRelies();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
     if (body.action === 'subscribe') {

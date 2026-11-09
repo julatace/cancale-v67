@@ -155,11 +155,11 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     // onglet ») : pas connecté, la carte s'ouvre AVEC le formulaire dessiné
     // dedans — plus d'iframe (Orion ne l'affichait pas), plus de détour par VRM.
     dit(!l.envoyes.includes('lierAvecVRM') && l.form && !l.iframe && l.carteVisible, 'pas connecté : le clic ouvre la carte AVEC le formulaire dedans, sans iframe — VRM ne s’ouvre pas', JSON.stringify({ envoyes: l.envoyes, iframe: l.iframe, form: l.form }));
-    dit(l.champsPage === 0 && l.champsCarte === 2, 'AUCUN champ dans le DOM du site : e-mail et mot de passe sont dans la shadow root fermée', JSON.stringify({ page: l.champsPage, carte: l.champsCarte }));
+    dit(l.champsPage === 0 && l.champsCarte === 1, "AUCUN champ dans le DOM du site : l’e-mail est dans la shadow root fermée (5.330 : le mot de passe est replié)", JSON.stringify({ page: l.champsPage, carte: l.champsCarte }));
     dit(!/rien à taper|VRM s’ouvre et connecte/.test(l.carte), 'la carte ne promet plus « VRM s’ouvre… rien à taper »', l.carte.replace(/\n/g, ' · ').slice(0, 200));
     dit(/connecte-toi ci-dessous/.test(l.carte), '« Pas connecté — connecte-toi ci-dessous »', l.carte.slice(0, 120));
-    const hBtn = await pg.evaluate(() => Math.round(document.getElementById('vrm-badge').shadowRoot.querySelector('[data-me-connecter]').getBoundingClientRect().height));
-    dit(hBtn >= 44, '« Me connecter » fait 44 px au moins', 'hauteur ' + hBtn);
+    const hBtn = await pg.evaluate(() => Math.round(document.getElementById('vrm-badge').shadowRoot.querySelector('[data-principal]').getBoundingClientRect().height));
+    dit(hBtn >= 44, 'le bouton principal (« Me connecter avec un code ») fait 44 px au moins', 'hauteur ' + hBtn);
     await pg.mouse.move(200, 200); await pg.waitForTimeout(400);
     l = await lire(pg);
     dit(l.carteVisible, 'la souris qui sort ne referme pas une carte qui porte le formulaire', '');

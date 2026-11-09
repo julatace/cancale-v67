@@ -149,5 +149,6 @@ export function texteAlerte(enAttente, nomEcran = (e) => e) {
   const un = (t) => `${t.ecrans.length ? t.ecrans.slice(0, 2).map(nomEcran).join(', ') : 'l’app'} ×${t.n}${t.appareils > 1 ? ` (${t.appareils} appareils)` : ''}`;
   const tombe = enAttente.some((t) => t.garde);
   const quoi = enAttente.length === 1 ? (tombe ? 'un écran est tombé' : 'une erreur se répète') : `${enAttente.length} soucis`;
-  return { title: 'VRM', body: `VRM : ${quoi} chez des vendeurs (${total} fois) — ${enAttente.slice(0, 3).map(un).join(' · ')}${enAttente.length > 3 ? ' …' : ''}. Détail : Réglages → Sécurité des données.` };
+  // (8 nov.) Le titre dit le fait (≤ 40 caractères), le corps où regarder.
+  return { title: `${quoi.charAt(0).toUpperCase() + quoi.slice(1)} chez des vendeurs`, body: `${total} fois — ${enAttente.slice(0, 3).map(un).join(' · ')}${enAttente.length > 3 ? ' …' : ''}. Détail : Réglages → Sécurité des données.` };
 }

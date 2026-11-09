@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT — « SE CONNECTER AVEC DISCORD » (api/_lib/discord.js, 20 octobre)
 //  Exécute la VRAIE route (api/compte.js) avec un faux Discord : le lien ne

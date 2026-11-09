@@ -26,6 +26,7 @@
 //   node scripts/audit-bilan-mois.cjs --prouve   → chaque mutation de la règle doit faire ROUGIR
 // Aucune donnée réelle : tout est inventé ici.
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = path.join(__dirname, '..');

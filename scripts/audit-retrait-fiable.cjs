@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT (23 oct.) — LES COLIS À RETIRER, FIABLES.
 // Julien : « Pareil nouveau colis Mondial Relay mais c'est pas mis à jour dans
 // l'app… je veux que ça soit fiable, pour l'instant c'est catastrophique : il doit

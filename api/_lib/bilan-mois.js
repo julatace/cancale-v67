@@ -26,7 +26,7 @@
 // ⚠️ LE CANAL EXISTANT : le même serveur SMTP que les e-mails de l'essai
 //    (`RELANCES_SMTP_*`, `RELANCES_EXPEDITEUR`), la même adresse — celle DU
 //    COMPTE, confirmée (`adresseDuCompte`) —, le même gabarit
-//    (api/_lib/gabarit-email.js). Pas configuré ⇒ rien ne part (et le cron le dit).
+//    (api/_lib/mail-gabarit.js). Pas configuré ⇒ rien ne part (et le cron le dit).
 // ⚠️ LE PLAFOND : Brevo gratuit = 300 e-mails par jour pour TOUT VRM. Le passage
 //    du matin donne au bilan ce qui reste après les e-mails de l'essai, et 150 au
 //    plus (`VRM_EMAILS_PAR_JOUR`, 300 par défaut) ; ceux qui n'ont pas eu leur
@@ -38,7 +38,7 @@
 import crypto from 'node:crypto';
 import { calculerBilan, minuitParis, dateParis } from './bilan-semaine.js';
 import { beneficeDesJours } from './benefice-regle.js';
-import { gabaritEmail } from './gabarit-email.js';
+import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
 import { sbCle } from './cle.js';
 
 export const SITE = 'https://vrm.center';
@@ -121,6 +121,8 @@ export const euros = (x) => {
 const liste = (xs, max = 3) => (xs.length <= max ? xs.join(', ') : `${xs.slice(0, max).join(', ')} et ${xs.length - max} autre${xs.length - max > 1 ? 's' : ''}`);
 
 // « d’octobre », « d’avril », « d’août », mais « de novembre ».
+// « sur 4 ventes de 6 » : les ventes dont le prix d'achat est connu, sur toutes.
+const couverture = (be) => (Number.isInteger(be.n) && Number.isInteger(be.nCout) && be.n > 0 ? `sur ${be.nCout} vente${be.nCout > 1 ? 's' : ''} de ${be.n}` : '');
 export const deMois = (libelle) => (/^[aeiouyàâéèêîôû]/i.test(String(libelle)) ? 'd’' : 'de ') + libelle;
 export function texteBilanMois(b, { lien = '' } = {}) {
   // « Au moins 0 » ne se dit jamais (§5) : un total partiel nul s'écrit « — ».
@@ -129,8 +131,11 @@ export function texteBilanMois(b, { lien = '' } = {}) {
   const chiffres = [
     ['Ventes', val(v.etat, v.n, String), v.etat === 'pas-su' ? 'pas lues' : ''],
     ['Vendu', val(v.etat, v.eur, euros), 'au jour de la vente'],
-    ['Reçu', val(r.etat, r.eur, euros), r.etat === 'pas-su' ? 'pas su' : 'versé ce mois-ci'],
-    ['Bénéfice brut', be.etat === 'pas-su' ? '—' : `${be.etat === 'partiel' ? 'au moins ' : ''}${euros(be.brut)}`, be.etat === 'pas-su' ? be.raison : be.etat === 'partiel' ? be.manque.join(' · ') : 'vente − prix d’achat'],
+    ['Reçu', val(r.etat, r.eur, euros), r.etat === 'pas-su' ? 'versements pas lus' : 'versé ce mois-ci'],
+    // (8 nov.) La COUVERTURE à côté du chiffre (§5) : « sur 4 ventes de 6 » et le manque nommé ;
+    // un partiel nul s'écrit « — » comme les autres (« au moins 0,00 € » ne se dit jamais).
+    ['Bénéfice brut', be.etat === 'pas-su' ? '—' : val(be.etat, be.brut, euros), be.etat === 'pas-su' ? be.raison
+      : be.etat === 'partiel' ? [couverture(be), ...be.manque].filter(Boolean).join(' · ') : `vente − prix d’achat${be.n ? `, sur ${be.n} vente${be.n > 1 ? 's' : ''}` : ''}`],
   ];
   if (b.meilleure) chiffres.push(['Ta plus belle vente', euros(b.meilleure.eur), [b.meilleure.titre, b.meilleure.plateforme].filter(Boolean).join(' · ')]);
   const manque = [...new Set([...(v.etat === 'partiel' ? v.manque : []), ...(r.etat === 'partiel' ? r.manque : [])])];
@@ -138,12 +143,14 @@ export function texteBilanMois(b, { lien = '' } = {}) {
   if (manque.length) suite.push(`« Au moins » : il manque ${liste(manque)}. Le détail est dans Compta.`);
   suite.push('Les chiffres suivent les règles de l’app : vendu au jour de la vente, reçu au jour du versement, bénéfice sur les ventes dont tu as noté le prix d’achat.');
   const titre = `Ton mois ${deMois(b.libelle)}`;
+  // Le préentête : les deux chiffres qui comptent, tels qu'écrits dans le tableau.
+  const preentete = `Vendu : ${chiffres[1][1]} · Reçu : ${chiffres[2][1]}`;
   const { texte, html } = gabaritEmail({
-    titre, paras: [`Le résumé ${deMois(b.libelle)}, compté par VRM sur tous tes comptes.`], chiffres, suite,
+    titre, preentete, paras: [`Le résumé ${deMois(b.libelle)}, compté par VRM sur tous tes comptes.`], chiffres, suite, facultatif: true,
     bouton: { mot: 'Ouvrir la Compta', url: `${SITE}/?tab=compta` },
     pied: { texte: 'Tu reçois ce bilan parce que tu l’as activé dans VRM (Réglages → Notifications).', ...(lien ? { lien, motLien: 'ne plus recevoir ce bilan' } : {}) },
   });
-  return { sujet: `Ton bilan ${deMois(b.libelle)} — VRM`, texte, html };
+  return { sujet: `Ton bilan ${deMois(b.libelle)}`, texte, html };
 }
 
 // ── LE LIEN « NE PLUS RECEVOIR » (signé, comme celui de l'essai) ───────────

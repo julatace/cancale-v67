@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE CRON DU MATIN RELIT eBAY AVANT DE COMPTER (node scripts/bancs/ebay-relecture-cron.cjs)
 // ═══════════════════════════════════════════════════════════════════════════

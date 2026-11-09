@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ── LE CODE DE RETRAIT NE DOIT JAMAIS DISPARAÎTRE ────────────────────────────
 // Un colis non retiré repart chez l'expéditeur : c'est de l'argent perdu, et
 // c'est irréversible. Ce contrôle fige ce qui a été RELEVÉ sur les vrais emails

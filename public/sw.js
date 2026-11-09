@@ -64,28 +64,49 @@ const avecNotif = (url, n) => {
   if (!Number.isSafeInteger(n) || n <= 0 || !u.startsWith('/')) return u;
   return u + (u.includes('?') ? '&' : '?') + 'notif=' + n;
 };
+// (8 nov.) La forme vient du serveur (api/_lib/notif-belle.js) : icône de VRM,
+// badge MONOCHROME (Android le dessine dans la barre d'état), étiquette par
+// genre ou par objet, `renotify` seulement pour un fait nouveau, une action
+// (Android, Chrome, Edge ; iOS l'ignore) qui ouvre le même écran que le toucher.
+// L'image n'arrive que prouvée (la photo de l'e-mail de CETTE vente).
+const cheminApp = (u) => (typeof u === 'string' && u.startsWith('/') && !u.startsWith('//') ? u : '/');
+const ICONE_VRM = '/vrm-icon-v5-192.png', BADGE_VRM = '/vrm-badge-96.png';
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = { body: event.data ? event.data.text() : '' }; }
   const title = data.title || 'VRM';
+  const actions = Array.isArray(data.actions) ? data.actions.filter((x) => x && typeof x.action === 'string' && typeof x.title === 'string').slice(0, 2) : [];
+  // Regroupée (`tagGroupe`) : elle prend l'étiquette du genre et ferme celles du
+  // même genre déjà affichées (« 3 bordereaux prêts à imprimer » au lieu de trois).
+  const tag = typeof data.tagGroupe === 'string' && data.tagGroupe ? data.tagGroupe : (typeof data.tag === 'string' && data.tag ? data.tag : 'vrm');
+  const genre = typeof data.genre === 'string' ? data.genre : '';
   const opts = {
     body: data.body || '',
-    icon: '/vrm-icon-v5-192.png',
-    badge: '/vrm-icon-v5-192.png',
-    tag: data.tag || 'vrm',
-    renotify: true,            // même tag : re-sonne au lieu de rester silencieux
-    vibrate: [80, 40, 80],     // petite vibration (Android) pour attirer l'œil
-    data: { url: avecNotif(data.url || '/', data.notif) },
+    icon: ICONE_VRM,
+    badge: BADGE_VRM,
+    tag,
+    renotify: data.renotify !== false,   // même étiquette : re-sonne seulement pour un fait nouveau
+    timestamp: Date.now(),
+    data: {
+      genre,
+      url: avecNotif(cheminApp(data.url), data.notif),
+      actions: Object.fromEntries(actions.map((x) => [x.action, avecNotif(cheminApp(x.url || data.url), data.notif)])),
+    },
   };
-  // Notification RICHE : si le serveur a joint la photo de l'article, on
-  // l'affiche en grand (rendu bien plus pro qu'un texte seul).
-  if (data.image) opts.image = data.image;
-  event.waitUntil(self.registration.showNotification(title, opts));
+  if (actions.length) opts.actions = actions.map((x) => ({ action: x.action, title: x.title }));
+  if (typeof data.image === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(data.image)) opts.image = data.image;
+  event.waitUntil((async () => {
+    if (data.tagGroupe && genre && self.registration.getNotifications) {
+      try { for (const n of await self.registration.getNotifications()) if (n.data && n.data.genre === genre) n.close(); } catch (_) {}
+    }
+    await self.registration.showNotification(title, opts);
+  })());
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/';
+  const d = event.notification.data || {};
+  const url = (event.action && d.actions && d.actions[event.action]) || d.url || '/';
   event.waitUntil((async () => {
     const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of all) {

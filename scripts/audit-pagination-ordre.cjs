@@ -16,6 +16,7 @@
 //  Lancer : node scripts/audit-pagination-ordre.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), vm = require('vm');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');

@@ -22,6 +22,7 @@
 //   F  famille coupée ⇒ rien ; catégories retirées ⇒ rien même allumées avant
 //   V  deux vendeurs : chacun ses appareils, ses clés
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const R = path.join(__dirname, '..');
@@ -157,18 +158,18 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
     await recoit(MR_DISPO('84603328', '454602'));
     const p = pushes[0] || {};
     dit(pushes.length === 1, 'B1 « Votre colis … est disponible » : UNE notification', resume());
-    dit(p.title === "📍 Ton colis Mondial Relay t'attend", 'B2 titre exact « 📍 Ton colis Mondial Relay t’attend »', p.title);
+    dit(p.title === "Ton colis Mondial Relay t'attend", 'B2 titre exact « Ton colis Mondial Relay t’attend » (8 nov. : sans emoji)', p.title);
     dit(p.body === "Tabac du Quai, Portville · code 454602 · jusqu'au 12/11", 'B3 corps exact « Tabac du Quai, Portville · code 454602 · jusqu’au 12/11 »', p.body);
     dit(p.url === '/?tab=cat_bord&cible=retrait&suivi=84603328', 'B4 le toucher ouvre Colis → À retirer, SUR ce colis', p.url);
     dit(p.tel === TEL_J, 'B5 sur le téléphone du vendeur de l’adresse de réception', p.tel);
     prepare();
     await recoit(VG_LIBERE('1UW1T3JAAW7UK', 'N58590'));
     const q = pushes[0] || {};
-    dit(pushes.length === 1 && q.title === "📍 Ton colis Vinted Go t'attend" && /^Consigne Laverie Banc|Laverie Banc/.test(q.body) && /code N58590/.test(q.body), 'B6 Vinted Go « Libère de la place … récupère ton colis » : « 📍 … t’attend », la consigne et le code', resume());
+    dit(pushes.length === 1 && q.title === "Ton colis Vinted Go t'attend" && /^Consigne Laverie Banc|Laverie Banc/.test(q.body) && /code N58590/.test(q.body), 'B6 Vinted Go « Libère de la place … récupère ton colis » : « … t’attend », la consigne et le code', resume());
     prepare();
     await recoit(V_COMMANDE('Nike Shox', "Ta commande t'attend ici : Laverie Banc - Portville, 3 Rue du Phare, 99990 Portville. Utilise le code K48213 pour la retirer.", CONV(2)));
     const r = pushes[0] || {};
-    dit(pushes.length === 1 && r.title === "📍 Nike Shox t'attend" && /code K48213/.test(r.body), 'B7 Vinted « t’attend ici … Utilise le code » : « 📍 Nike Shox t’attend · … · code K48213 »', resume());
+    dit(pushes.length === 1 && r.title === "Nike Shox t'attend" && /code K48213/.test(r.body), 'B7 Vinted « t’attend ici … Utilise le code » : « Nike Shox t’attend · … · code K48213 »', resume());
   });
 
   await essaie('C — une seule fois par objet', async () => {
@@ -205,7 +206,7 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
   await essaie('D — perdu, retiré, en transit', async () => {
     prepare();
     await recoit(V_PERDU('Nike air Max 1'));
-    dit(pushes.length === 1 && pushes[0].title === '⚠️ Colis peut-être perdu · Nike air Max 1' && !pushes.some((p) => /livr|retir|✅/i.test(p.title)), 'D1 « le colis semble avoir été perdu » : « ⚠️ Colis peut-être perdu · Nike air Max 1 », jamais « livré »', resume());
+    dit(pushes.length === 1 && pushes[0].title === 'Colis peut-être perdu · Nike air Max 1' && !pushes.some((p) => /livr|retir|✅/i.test(p.title)), 'D1 « le colis semble avoir été perdu » : « Colis peut-être perdu · Nike air Max 1 », jamais « livré »', resume());
     const lp = [...base.entries()].find(([x]) => x.startsWith(J + '|email_track_autre_'));
     dit(lp && lp[1].status !== 'delivered', 'D2 et la ligne n’est pas « livré / retiré »', lp && lp[1].status);
     await recoit(V_PERDU('Nike air Max 1'));
@@ -229,7 +230,7 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
     dit(T.decisionNotif({ message: false }, 'message') === false && T.decisionNotif({}, 'message') === true && T.decisionNotif({ familles: { messages: true }, message: false }, 'message') === true, 'F4 sans famille posée, l’ancien réglage décide ; la famille posée l’emporte');
     const fams = new Set(Object.values(T.FAMILLE_DE));
     // (5 nov.) Sept types : la double vente a le sien, « Compta » devient « Rappels » (héritage de l’ancien réglage).
-    dit(['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels'].every((f) => fams.has(f)) && T.FAMILLES.length === 7, 'F5 sept types : Ventes, Offres, Messages, Colis à poster, Codes de retrait, Double vente, Rappels');
+    dit(['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes'].every((f) => fams.has(f)) && T.FAMILLES.length === 8, 'F5 huit types : Ventes, Offres, Messages, Colis à poster, Codes de retrait, Double vente, Rappels, Nouveau compte relié');
     dit(T.decisionNotif({ familles: { ventes: false } }, 'doublevente') === false && T.decisionNotif({ familles: { ventes: false, doublevente: true } }, 'doublevente') === true && T.decisionNotif({ familles: { compta: false } }, 'urssaf') === false && T.decisionNotif({ familles: { poster: false } }, 'soir') === false, 'F6 un type neuf hérite de l’ancien réglage tant qu’il n’est pas posé');
   });
 

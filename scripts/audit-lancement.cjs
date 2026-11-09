@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ⚠️⚠️ OUVRIR VRM À D'AUTRES REVENDEURS — CE QU'UNE NOUVELLE PERSONNE RENCONTRE EN PREMIER
 //
 // Mesuré le 5 octobre, avant d'ouvrir l'app à d'autres revendeurs :
@@ -44,6 +45,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       SUPABASE_URL: 'https://base.test', SUPABASE_KEY: 'cle-publique', AUTH: { session: { access_token: 'a.b.c' } },
       writeSession: () => {}, sessionFrom: (x) => x, encodeURIComponent, JSON, String, Promise,
       // src/captcha.js tel qu'il est livré (clé de site vide : rien ne change)
+      langueNavigateur: () => 'fr', // src/langueCompte.js (8 nov.) : importé par App.jsx
       captchaActif: () => false, routeProtegee: () => false, jetonCaptcha: () => null, etatCaptcha: () => ({ statut: 'inactif' }),
       consommerCaptcha: () => {}, corpsAvecCaptcha: (p, b) => b, MSG_CAPTCHA_ATTENTE: '', MSG_CAPTCHA_REFUS: '', MSG_CAPTCHA_ERREUR: '',
       window: { location: { origin: 'https://vrm.center', pathname: '/' } },

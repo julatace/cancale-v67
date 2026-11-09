@@ -185,6 +185,8 @@ const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ 
 // chargement (pas de squelette sur chaque ligne de la liste).
 // (8 nov.) La ligne ambre « compte pas relu » : son morceau à part (il importe App.jsx).
 const AlerteCaptureParesseuse = lazy(() => import('./ToutVaBien.jsx').then((m) => ({ default: m.AlerteCapture })));
+// (8 nov.) « shop_x est relié à VRM » : la feuille d'accueil d'un compte relié pour la première fois (src/CompteRelie.jsx).
+const AccueilComptesReliesParesseux = lazy(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
 const FactureVenteLigneParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
 const FactureVenteLigne = (props) => <Suspense fallback={null}><FactureVenteLigneParesseuse ligne {...props}/></Suspense>;
 // (8 nov.) Le refus de facture commun à plusieurs lignes, dit une fois en tête de la liste (§7).
@@ -378,6 +380,7 @@ import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
+import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU } from "./colisEnvoyes.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -464,6 +467,9 @@ import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à «
 import "./styles-design-2026.css";
 import "./styles-parcours-clairs.css";
 import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos, glisser, tournée, statistiques, apparence — EN DERNIER
+// (8 nov., direction artistique) Ma journée, Ventes, Colis au niveau « premium » : une couche
+// CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
+import "./styles-premium.css";
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
@@ -479,6 +485,7 @@ import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
+import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -511,7 +518,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.329.0';
+const EXT_ATTENDUE = '5.330.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -938,7 +945,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
+const EXT_CAPACITES = { cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1627,7 +1634,7 @@ const authConfirmFromLink = async (raw, email) => {
   }
   if (!q) return { ok: false, error: "Ce n'est ni un lien, ni un code à 6 chiffres." };
   const type = q.get('type') || 'signup';
-  if(type==='recovery'||typeFragment==='recovery')return{ok:false,recovery:true,error:'Ce lien sert à changer ton mot de passe. Ouvre la récupération ci-dessous, puis colle le lien reçu.'};
+  if(type==='recovery'||typeFragment==='recovery')return{ok:false,recovery:true,error:'Ce lien sert à changer ton mot de passe : ouvre-le directement depuis l’e-mail, sur cet appareil. Sinon, redemande un e-mail ci-dessous.'};
   const hash = q.get('token_hash');
   const token = q.get('token');
   if (!hash && !token) return { ok: false, error: "Ce lien ne contient pas de jeton de confirmation." };
@@ -1718,7 +1725,8 @@ const useSecondesRestantes = (fin) => {
   return fin > Date.now() ? Math.ceil((fin - Date.now()) / 1000) : 0;
 };
 const authSignUp  = async (email, password) => {
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password });
+  // (8 nov.) `data.langue` : la langue des e-mails de compte (modèles Supabase).
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur() } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
@@ -2051,6 +2059,10 @@ const authBoot = async () => {
   if (AUTH.user && AUTH.user.id) ensureLocalOwner(AUTH.user.id);
   prechargerDemarrage();
   _emitAuth();
+  // (8 nov.) Un compte créé avant que la langue soit rangée la reçoit une fois,
+  // plus tard (rien ne doit retarder le premier écran). Raté ⇒ réessayé au
+  // prochain chargement ; jamais par-dessus une langue déjà rangée.
+  setTimeout(() => { if (RECOVERY_PENDING) return; const s2 = AUTH.session; poserLangueUneFois({ url: SUPABASE_URL, cle: SUPABASE_KEY, jeton: s2 && s2.access_token, uid: s2 && s2.user && s2.user.id, stockage: (() => { try { return localStorage; } catch (_) { return null; } })() }).catch(() => {}); }, 8000);
 };
 // ── LE PREMIER ÉCRAN N'ATTEND PLUS SON PROPRE RENDU (16 octobre) ─────────────
 // Mesuré au banc `vitesse.cjs` (téléphone, processeur ×4) : Ma journée enchaînait
@@ -4906,7 +4918,7 @@ const fetchEmailBordereaux = async () => {
     // afficher des titres. On ne prend que les champs utiles : 21 Ko.
     // Le PDF est récupéré à la demande, au moment d'imprimer (lirePdfLigne).
     const champs = ['uid','type','suivi','modele','numero','taille','account','article',
-                    'filename','posKnown','dateLimite','receivedAt','transaction']
+                    'filename','posKnown','dateLimite','receivedAt','transaction','transporteur']
                    .map(c => `${c}:meta->>${c}`).join(',');
     // ⚠️⚠️ (1er nov.) TOUTES LES PAGES (`lireTout`) : au-delà de 1 000 bordereaux
     //    la base coupait EN SILENCE par ordre d'identifiant — `email_bord_{tx}`,
@@ -11989,6 +12001,22 @@ function pushNotif(title, body, vers){
   }catch(_){/* ignore */}
   return false;
 }
+// (8 nov., Julien : « des infos qui servent à rien ») Une alerte LOCALE ne double
+// jamais une notification du serveur (api/_lib/push.js) : l'app au premier plan
+// montre déjà le bandeau ; un appareil abonné aux notifications de VRM reçoit la
+// vente par le serveur — et « pas su » (abonnement illisible) ne sonne pas non
+// plus. Reste : l'app ouverte en arrière-plan sur un appareil NON abonné.
+async function alerteLocale(title, body, vers){
+  try{
+    if(typeof document!=='undefined' && document.visibilityState==='visible') return false;
+    if(typeof navigator!=='undefined' && navigator.serviceWorker){
+      const reg=await Promise.race([navigator.serviceWorker.ready, new Promise(r=>setTimeout(()=>r(null),1500))]);
+      const sub=reg&&reg.pushManager ? await reg.pushManager.getSubscription().catch(()=>undefined) : undefined;
+      if(sub!==null) return false;
+    }
+  }catch(_){ return false; }
+  return pushNotif(title, body, vers);
+}
 
 
 // Garage : une seule zone neutre. L'utilisateur ajoute lui-même ses colonnes
@@ -15603,6 +15631,7 @@ function AuthScreen() {
   const [info, setInfo] = React.useState('');
   const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
   const [confirmLink, setConfirmLink] = React.useState('');      // lien du mail, collé à la main
+  const [resetEnvoye, setResetEnvoye] = React.useState('');      // (8 nov.) adresse à qui le lien vient de partir
   // 22 oct. : GoTrue a refusé un email redemandé trop tôt (« after N seconds »)
   // ⇒ les boutons qui envoient un email restent grisés jusqu'à `finAttente`, et
   // la phrase dit le temps qui reste. Une autre adresse tapée remet à zéro.
@@ -15627,6 +15656,8 @@ function AuthScreen() {
   const changerMode = (suivant) => {
     if(busy||demandeEnCours.current)return;
     setMode(suivant);setErr('');setInfo('');setNeedConfirm(false);setConfirmLink('');
+    // L'attente posée par NOTRE envoi réussi ne suit pas sur un autre écran (un refus de Supabase, lui, garde la sienne).
+    if(resetEnvoye){setResetEnvoye('');setFinAttente(0);}
   };
 
   const oauth = async (p) => {
@@ -15697,7 +15728,11 @@ function AuthScreen() {
         if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un e-mail, utilise le lien le plus récent.');return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
-        setInfo("Si un compte existe avec cet e-mail, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
+        // (8 nov.) La phrase dit le geste ; « Renvoyer » attend l'intervalle de
+        // Supabase (60 s) sur le bouton lui-même.
+        const adresse=String(email).trim().toLowerCase();
+        setResetEnvoye(adresse);setFinAttente(Date.now()+60*1000);
+        setInfo(`On t’a envoyé un e-mail à ${adresse}. Ouvre-le sur cet appareil.`);
       } else if (mode === 'up') {
         // On l'écrit AVANT de partir : `save` range dans le navigateur et le
         // nuage suivra à la première synchro. Écrit seulement s'il l'a donné —
@@ -15916,7 +15951,7 @@ function AuthScreen() {
           {mode!=='newpw' && (
             <label className="vrm-cx-champ"><span>Adresse e-mail</span>
               <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" required
-                disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={field}/>
+                disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);setResetEnvoye('');}} style={field}/>
             </label>
           )}
           {mode!=='reset' && (
@@ -15942,7 +15977,7 @@ function AuthScreen() {
           {err  && <div role="alert" style={{fontSize:13,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {/* Le décompte vit sur le bouton qui envoie (inscription, mot de passe
               oublié, « Renvoyer » d'un compte pas confirmé) ; sinon dans la phrase. */}
-          {enAttenteEmail && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? TEXTE_DELAI_EMAIL_BOUTON : texteDelaiEmail(resteAttente)}</div>}
+          {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? TEXTE_DELAI_EMAIL_BOUTON : texteDelaiEmail(resteAttente)}</div>}
           {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
@@ -15984,13 +16019,15 @@ function AuthScreen() {
           )}
           {info && <div role="status" aria-live="polite" style={{fontSize:13,color:C.accentTexte,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
-          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Tu as déjà un lien qui ne s’ouvre pas ? <a href="/recuperation.html" style={{color:C.accentTexte}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
+          {/* (8 nov., Julien) « Tu as déjà un lien qui ne s'ouvre pas ? … colle le
+              lien reçu » le déroutait : la page de récupération propose elle-même
+              un nouvel e-mail (et la voie « coller ») quand un lien a échoué. */}
           {/* L'attente ne porte que sur ce qui ENVOIE un email (inscription, lien de
               mot de passe) — jamais sur « Se connecter ». */}
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && mode==='reset' && resetEnvoye) ? `Renvoyer dans ${resteAttente} s` : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? (resetEnvoye ? 'Renvoyer l’e-mail' : 'Envoyer le lien') : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
@@ -29549,7 +29586,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'e-mail du MÊME n°, sinon la forme du n° — jamais deviné ; rien ⇒ « pas lu ».
   // Une vente Vinted : par le n° de suivi de SON bordereau (e-mail du bordereau).
   const transporteurColis = (declare, suivi) => transporteurDuColis({ declare: declare || '', suivi: suivi || '', transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
-  const transporteurVente = (b) => transporteurColis('', b && b.suivi);
+  // (9 nov., Colis → Envoyés) La vente Vinted : par SON bordereau (même n° de transaction) —
+  // la ligne de départ lue chez le transporteur pour son n°, le transporteur NOMMÉ dans l'e-mail
+  // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
+  const transporteurVente = (b) => transporteurDeVente({ bord: b || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -36806,6 +36846,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [outilsColis, curSub]);
   // (5 nov.) « Tournée de dépôt » : la feuille des colis à envoyer, par transporteur.
   const [tourneeDepot, setTourneeDepot] = useState(false);
+  // (9 nov.) Colis → Envoyés : la pastille de transporteur choisie (« tous » par défaut).
+  const [filtreEnvoyes, setFiltreEnvoyes] = useState('tous');
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
   // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
   // (5 nov.) Leboncoin aussi (la tournée) : sa coche « Colis fait » de toujours (`vrm_lbc_colis_done`).
@@ -37138,13 +37180,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const exTout = vintedLu ? expeditions().filter(e => !e.o || matchOrd(e.o)) : [];
     const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
     const autresColis = [
-      ...(voitSite('vestiaire') ? (((colisVestiaire(vcEtat) || {}).aEnvoyer) || []) : []).map((v) => { const tr = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return { __autre: 'vc', key: 'vc:' + v.id, v, tr, trNom: (tr && tr.nom) || 'Autres', dl: joursAvantVc(v.limite) }; }),
-      ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => ({ __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr: transporteurDuColis({ declare: '' }), trNom: 'Autres', dl: x.jours })),
-      ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: (tr && tr.nom) || 'Autres', dl: null }; }),
+      ...(voitSite('vestiaire') ? (((colisVestiaire(vcEtat) || {}).aEnvoyer) || []) : []).map((v) => { const tr = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return { __autre: 'vc', key: 'vc:' + v.id, v, tr, trNom: nomEnvoye(tr), dl: joursAvantVc(v.limite) }; }),
+      ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => ({ __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr: transporteurDuColis({ declare: '' }), trNom: TRANSP_INCONNU, dl: x.jours })),
+      ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: nomEnvoye(tr), dl: null }; }),
     ];
     return { vintedLu, exTout, autresColis };
   };
-  const trNomColis = (x) => { if (x.__autre) return x.trNom; const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };
+  const trNomColis = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(transporteurVente(x.b)); };
   const estPosteColis = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
   // (5 nov., chantier D) « TEMPS DE PRÉPARATION » : depuis combien de jours chaque vente attend son
   // envoi — jours de calendrier depuis la date de VENTE lue (src/colisEnvoi.js), jamais deviné : une
@@ -37243,7 +37285,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         }
       }
     } catch (_) {}
-    return out.sort((a, b) => a.rang - b.rang);
+    // (9 nov.) LA DATE QUI RANGE UN COLIS ENVOYÉ (src/colisEnvoyes.js `quandEnvoye`) : la prise
+    // en charge LUE (transporteur, son e-mail du MÊME n°), sinon son « Colis fait », sinon la vente.
+    return out.sort((a, b) => a.rang - b.rang).map((x) => {
+      const tx = x.o && x.o.transaction_id != null ? String(x.o.transaction_id) : '';
+      const rv = tx && x.site === 'vinted' ? partisVinted.get(tx) : null;
+      const depart = x.depart || (rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null);
+      const coche = x.type === 'coche' && tx ? (shipDone[tx] || null) : (rv && rv.type === 'colis-fait' ? rv.at : null);
+      const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : (x.lo && x.lo.dateVente);
+      return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
+    });
   };
   // La coque monte sous « À retirer » les outils de retrait (suivi à la main,
   // e-mails, « Tout est OK ») : elle apprend ici l'onglet réellement montré.
@@ -43775,7 +43826,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
                 // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
                 // (le plus pressé d'abord) ; les transporteurs dans l'ordre de leur premier colis.
-                const trNomDe = (x) => { if (x.__autre) return x.trNom; const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };  // (3 nov., critique #15) « Autres », pas le jargon « Transporteur pas lu »
+                const trNomDe = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(transporteurVente(x.b)); };  // (9 nov.) « Transporteur inconnu » (des mots simples), plus « Autres » fourre-tout
                 // (3 nov.) Tous les sites : le plus pressé d'abord (jours avant la limite ; sans limite à la fin,
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
                 // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
@@ -44147,10 +44198,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
           if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis marqué « Déposé » arrive ici, jusqu’à sa livraison.</span></div></>;
           const plusieursComptes = (accounts || []).length > 1;
-          const nomT = (x) => (x.tr && x.tr.nom) || 'Autres';
-          const ordreT = new Map(); L.forEach((x) => { const k = nomT(x); if (!ordreT.has(k)) ordreT.set(k, ordreT.size); });
-          const LT = L.map((x, k) => [x, k]).sort((a, b) => ordreT.get(nomT(a[0])) - ordreT.get(nomT(b[0])) || a[1] - b[1]).map(([x]) => x);
-          const nParT = {}; L.forEach((x) => { const k = nomT(x); nParT[k] = (nParT[k] || 0) + 1; });
+          // (9 nov., Julien : « mets le plus récent en haut, comme pour tous les onglets ») UNE liste,
+          // la plus récente en haut (src/colisEnvoyes.js : prise en charge lue, sinon « Colis fait »,
+          // sinon la vente), le transporteur sur chaque carte, et des pastilles pour n'en voir qu'un.
+          // Avant : des groupes par transporteur, et « Autres » pour tout ce qui n'était pas lu.
+          const nomT = (x) => nomEnvoye(x.tr);
+          const pastillesT = filtresTransporteurs(L);
+          const { liste: LF, filtre: filtreT } = filtrerEnvoyes(L, filtreEnvoyes);
+          const LT = rangerEnvoyes(LF);
           const postes = L.filter((x) => x.type === 'coche');
           const nbAuRelais = L.filter((x) => x.st && x.st.label === 'Au relais').length;
           const sousDe = (x) => {
@@ -44165,10 +44220,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
           };
           return (
-            <>{retoursHaut}<section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais}>
+            <>{retoursHaut}<section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais} data-envoyes-tri="recent" data-envoyes-filtre={filtreT}>
+              {pastillesT.length > 1 && (
+                <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyes-filtres="" style={{display:'flex',gap:6,marginBottom:10}}>
+                  <button type="button" aria-pressed={filtreT === 'tous'} data-envoyes-filtre-choix="tous" data-envoyes-filtre-n={L.length} onClick={() => setFiltreEnvoyes('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {L.length}</button>
+                  {pastillesT.map((p) => (
+                    <button key={p.nom} type="button" aria-pressed={filtreT === p.nom} data-envoyes-filtre-choix={p.nom} data-envoyes-filtre-cle={p.cle || 'inconnu'} data-envoyes-filtre-n={p.n} onClick={() => setFiltreEnvoyes(filtreT === p.nom ? 'tous' : p.nom)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.nom} · {p.n}</button>
+                  ))}
+                </div>
+              )}
+              <p className="vrm-colis-envoyes-tri" data-envoyes-phrase="" style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>Le plus récent en haut : prise en charge lue, sinon « Colis fait », sinon date de vente.</p>
               <div className="vrm-colis-grille" style={{display:'flex',flexDirection:'column',gap:6}}>
                 {LT.map((x, ix) => {
-                  const ouvreT = ix === 0 || nomT(LT[ix-1]) !== nomT(x);
                   const so = sousDe(x);
                   const frise = friseColisFusion(x.lues || {}, {});
                   const tx = x.o ? String(x.o.transaction_id) : '';
@@ -44180,14 +44243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : null;
                   return (
                     <React.Fragment key={x.cle}>
-                      {ouvreT && (
-                        <div data-groupe-transp={nomT(x)} className="vrm-fu-groupe-transp">
-                          <span className="vrm-fu-groupe-tuile" aria-hidden="true">{x.tr && x.tr.cle ? <LogoTransporteur cle={x.tr.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                          <h3>{nomT(x)}</h3>
-                          <span>{nParT[nomT(x)]} colis</span>
-                        </div>
-                      )}
-                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site} data-depart-lu={x.depart ? (x.depart.carrier || x.depart.type) : undefined} data-depart-preuve={x.depart ? (x.depart.type || 'transporteur') : undefined}
+                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-envoye-rang={ix} data-envoye-transp={(x.tr && x.tr.cle) || (x.tr && x.tr.nom ? 'autre' : 'inconnu')} data-envoye-transp-source={(x.tr && x.tr.source) || ''} data-envoye-quand={x.quand && x.quand.ms != null ? String(x.quand.ms) : ''} data-envoye-quand-source={(x.quand && x.quand.source) || ''} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site} data-depart-lu={x.depart ? (x.depart.carrier || x.depart.type) : undefined} data-depart-preuve={x.depart ? (x.depart.type || 'transporteur') : undefined}
                         {...(x.type === 'coche' && x.np ? { 'data-tx': tx, 'data-limite': x.np.limiteDepassee ? 'depassee' : 'ok' } : {})} {...(x.type === 'coche' ? { 'data-postes-pas-partis': x.np ? '1' : undefined, 'data-postes-recents': x.np ? undefined : '1' } : {})}
                         style={{padding:'14px',border:`1px solid ${so.ambre ? C.warn + '66' : C.border}`,background:C.card,borderRadius:12}}>
                         <div style={{display:'flex',gap:12,alignItems:'center'}}>
@@ -44197,7 +44253,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                           <div style={{flex:'1 1 150px',minWidth:0}}>
                             <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? <><Numero n={x.num} taille="petit"/>{' '}</> : null}{x.titre}</span></div>
-                            <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{so.t}</span>
+                            <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{(filtreT !== 'tous' || so.t.includes(nomT(x))) ? so.t : <><span data-colis-envoye-transp="">{nomT(x)}</span>{' · '}{so.t}</>}</span>
                           </div>
                         </div>
                         <Frise etapes={frise} cle={x.cle} className="vrm-colis-frise" label="Où en est le colis"/>
@@ -48981,6 +49037,8 @@ function AppCoeur() {
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
       if(t==='settings'&&section==='signalements') DEMANDE_SIGNALEMENTS.on=true;
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
+      // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
+      if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
       const tt=(t==='cat_achats'&&vue==='achats')?'achats':t;
@@ -50062,14 +50120,10 @@ function AppCoeur() {
       setNotifBanner({ventes:newV, factures:newF});
 
       // Notification navigateur si activée
-      if(notifEnabled){
-        if(newV>0&&newF>0){
-          pushNotif('VRM', `${newV} vente${newV>1?'s':''} comptabilisée${newV>1?'s':''} et ${newF} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`, '?tab=compta');
-        } else if(newV>0){
-          pushNotif('Vente comptabilisée', `${newV} nouvelle${newV>1?'s':''} vente${newV>1?'s':''} en comptabilité.`, '?tab=compta');
-        } else if(newF>0){
-          pushNotif('Nouvelle facture', `${newF} nouvelle${newF>1?'s':''} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`, '?tab=compta&section=factures');
-        }
+      // (8 nov.) La facture reçue ne sonne plus (aucun geste : le bandeau la dit) ; la
+      // vente seulement par `alerteLocale` (jamais en double du serveur).
+      if(notifEnabled && newV>0){
+        alerteLocale(newV>1?`${newV} nouvelles ventes`:'Nouvelle vente', 'Prépare le colis dans Ventes.', '?tab=ventes');
       }
     }
 
@@ -51202,7 +51256,7 @@ function AppCoeur() {
           const parts=[];
           if(newSales>0) parts.push(`${newSales} nouvelle${newSales>1?'s':''} vente${newSales>1?'s':''}`);
           if(newMsgs>0) parts.push(`${newMsgs} nouveau${newMsgs>1?'x':''} message${newMsgs>1?'s':''}`);
-          if(parts.length) pushNotif('Vinted', parts.join(' · '), newSales>0 ? '?tab=ventes&site=vinted' : '?tab=messages&site=vinted');
+          if(parts.length) alerteLocale(newSales>0 ? (newSales>1?`${newSales} nouvelles ventes`:'Nouvelle vente') : (newMsgs>1?`${newMsgs} nouveaux messages`:'Nouveau message'), parts.join(' · '), newSales>0 ? '?tab=ventes&site=vinted' : '?tab=messages&site=vinted');
         }
       }
     })();
@@ -51935,7 +51989,7 @@ function AppCoeur() {
               const res=await askNotifPermission();
               if(res==='granted'){
                 setNotifEnabled(true); save('vinted_notif_enabled',true);
-                pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
+                pushNotif('Alertes activées','Une nouvelle vente s’affichera ici quand VRM est ouvert.');
               } else if(res==='denied'){
                 toast("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
               } else if(res==='unsupported'){
@@ -52216,6 +52270,12 @@ function AppCoeur() {
         contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi, vend: PROFIL_VENDEUR.vend || vendActuel() }}
         onEchec={(m)=>toast(m)}
         onAction={(a)=>{ if(String(a).startsWith('reglages:')){ DEMANDE_REGLAGE_SOUS.id=String(a).slice(9); if(tab==='settings'){ try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } else setTab('settings'); } }}/></GardeEcran>
+      {/* (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS (src/CompteRelie.jsx) : la feuille, une fois par
+          compte et par vendeur (sa ligne `vrm_comptes_relies`), jamais pendant Bienvenue ni la visite,
+          ni en mode exemple, hors ligne ou base injoignable ; rattrapable dans Comptes liés. */}
+      <GardeEcran nom="compte-relie"><Suspense fallback={null}><AccueilComptesReliesParesseux comptesVinted={vintedAccounts}
+        pret={!!accountsLoaded && nuagePret && !baseKO && !horsLigne && !exempleActif() && !!(authState.user && authState.user.id)}
+        silence={!!(bienvenue || visite)} onNav={setTab}/></Suspense></GardeEcran>
       {/* Les chiffres que la COQUE publie pour les conseils (la même règle que leurs bandeaux). */}
       {ordi ? <ChiffreConseilExtension/> : <ChiffreConseil cle="coque.iphone" valeur={estIphoneSafari() ? (estInstallee() ? 'installee' : 'a-installer') : 'autre'}/>}
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>

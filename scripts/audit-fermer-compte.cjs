@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ⚠️⚠️ « FERMER MON COMPTE » — L'OPÉRATION LA PLUS DESTRUCTRICE DU SERVEUR, EXÉCUTÉE
 //
 // La politique de confidentialité promet l'effacement des données à la clôture
