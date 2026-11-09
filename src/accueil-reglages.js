@@ -26,6 +26,14 @@ export const VESTIAIRE_BRANCHE = false;
 // depuis le 27 octobre — 12,99 € avant, 9,99 € avant le 11 octobre). Le banc
 // compare les deux : la page ne peut pas dire un autre prix.
 export const PRIX_MOIS = '16,99';
+// (9 nov.) Deux offres. Solo = `PRIX_MOIS` (un compte vendeur + comptes d'achat).
+// Pro = les ventes de tous les comptes, 19,99 € / mois (décision de Julien du
+// 9 nov.) — le même montant que `PRIX_PRO_CGV` (api/compte.js) et les CGV. Le
+// paiement Pro reste fermé tant que son prix Stripe n'est pas posé
+// (`STRIPE_PRIX_PRO`) : la page dit « bientôt ».
+export const PRIX_PRO_MOIS = '19,99';
+// `true` le jour où le paiement Pro est ouvert (prix Stripe posé, `STRIPE_PRIX_PRO`) : la page cesse de dire « bientôt ».
+export const PRO_OUVERT = false;
 
 // (8 nov.) La durée de l'essai gratuit : celle que donne le serveur
 // (api/compte.js `trial_period_days`, api/_lib/relances-essai.js
