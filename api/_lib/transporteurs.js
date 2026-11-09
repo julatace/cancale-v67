@@ -754,7 +754,13 @@ export function sensDeLigne(t, envoyes) {
   return null;
 }
 // Les intervalles (le serveur décide, jugés sur `essai` rangé en base).
-export const RYTHME_MS = { disponible: 30 * 60000, en_route: 2 * 3600000, inconnu: 2 * 3600000, incident: 2 * 3600000, retour_expediteur: 2 * 3600000 };
+// (9 nov., retraits frais — Julien : « le statut de la disponibilité des colis doit être regardé très
+// souvent ; on ne doit pas avoir un colis s'il a été retiré ») Un colis AU POINT RELAIS est relu toutes
+// les 15 min (avant 30), un colis en route toutes les heures (avant 2 h) ; le reste ne change pas. Ce
+// rythme ne sert que quand un passage a lieu : app ouverte (toutes les 5 min), et désormais le passage
+// « colis » (api/ship-reminders.js?moment=colis, GitHub toutes les 15 min de 6 h à 23 h) qui ne visite
+// QUE les vendeurs ayant une ligne due (api/_lib/colis-frequent.js).
+export const RYTHME_MS = { disponible: 15 * 60000, en_route: 60 * 60000, inconnu: 2 * 3600000, incident: 2 * 3600000, retour_expediteur: 2 * 3600000 };
 export const RECUL_MS = [30, 60, 120, 360].map((m) => m * 60000);
 export const INTROUVABLE_MS = 6 * 3600000;
 export const INTROUVABLE_MAX = 3;

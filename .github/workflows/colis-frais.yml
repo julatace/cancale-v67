@@ -1,0 +1,39 @@
+name: Statut des colis (toutes les 15 min)
+# (9 nov., retraits frais) Julien : « le statut de la disponibilité des colis doit être
+# regardé très souvent ; on ne doit pas avoir un colis s'il a été retiré ». Le plan
+# gratuit de Vercel ne lance un cron qu'une fois par jour : GitHub appelle donc
+# api/ship-reminders.js?moment=colis toutes les 15 min, de 5 h à 21 h 45 UTC (6 h → 23 h
+# à Paris l'hiver). La route ne visite QUE les vendeurs qui ont un colis actif dû
+# (au point relais : relu toutes les 15 min ; en route : toutes les heures) —
+# api/_lib/colis-frequent.js. Le journal ne porte que des nombres.
+# La route répond 503 quand elle n'a pas pu lire qui visiter : le job échoue.
+# Sans le secret `CRON_SECRET` dans GitHub (Settings → Secrets and variables →
+# Actions, le même que sondes-statut.yml), rien n'est appelé et le journal le dit.
+on:
+  schedule:
+    - cron: '6,21,36,51 5-21 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: colis-frais
+  cancel-in-progress: false
+jobs:
+  colis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Relire le statut des colis actifs
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET absent des secrets GitHub : aucun statut de colis n'est relu."
+            exit 0
+          fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 150 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vrm.center/api/ship-reminders?moment=colis")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,dus:r.dus,traites:r.traites,restants:r.restants,lus:r.lus,changes:r.changes,echecs:r.echecs,raison:r.raison}))" || true
+          test "$code" = "200"

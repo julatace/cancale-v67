@@ -118,3 +118,20 @@ d'un bordereau (Colis), VRM affiche en grand **la paire attendue dans ce colis**
 titre, taille — retrouvée par l'IDENTITÉ (n° de suivi ⇒ vente ⇒ annonce ⇒ fiche, §5), jamais par
 ressemblance. Deux paires possibles ou aucune ⇒ dit, rien deviné (« mieux vaut un blanc qu'un faux »).
 Utile AVANT de fermer le carton (vérifier qu'on met la bonne paire) et au dépôt.
+
+## Sixième série (9 nov., soir) — à valider
+
+Vérifié dans le code : aucune n'existe. Rien de la liste refusée (ni rangement suggéré, ni
+alerte « achat jamais arrivé », ni « argent bloqué », ni widget enrichi). Elles suivent ses
+demandes du soir : « pas d'hésitation », « tout doit être parfait », rapidité.
+
+| # | proposition | pourquoi | effort |
+|---|---|---|---|
+| 43 | **« À trancher »** : UN seul endroit pour tout ce que VRM n'a pas pu décider (colis douteux, achats sans prix, N° à vérifier, ventes à dater, SMS non reliés), une ligne = un geste, objectif zéro, un badge | « tu ne peux pas avoir d'hésitation » : les doutes ne sont plus éparpillés dans 8 écrans | moyen |
+| 44 | **Colis et Ventes instantanés** (même mécanisme que Ma journée : derniers chiffres de l'appareil en ~1 s, gestes gardés jusqu'à la vérification) | ouverture rapide là où il va le plus souvent | moyen |
+| 45 | **Même annonce sur deux comptes Vinted** (même photo, identité §5) ⇒ prévenu AVANT la double vente | deux comptes, une paire : le risque le plus coûteux | petit |
+| 46 | **« Préparer mes colis » pas à pas** : un colis à la fois en plein écran (photo de la paire, N°, taille, bordereau à imprimer ou scanner, « Colis fait »), puis le suivant | emballer 18 colis sans se tromper ni chercher | moyen |
+| 47 | **Une ligne de fraîcheur unique** en haut : « Tout est à jour · vérifié il y a 3 min », ou le compte/la source en retard NOMMÉ avec son geste | savoir d'un coup d'œil si ce qu'il voit est sûr | petit |
+| 48 | **Mode relais** : au point relais, les codes de retrait en plein écran, luminosité maximale, un code (et son QR) par écran, glisser pour le suivant, « Retiré » sous chacun | plus rapide au comptoir, sans chercher dans les listes | petit |
+| 49 | **Historique d'un N°** : quand et pourquoi un N° a été posé, changé (doublon réglé, republication, à la main) — lecture seule dans la fiche paire | confiance : un N° écrit sur un carton ne change jamais sans trace | petit |
+| 50 | **Siri / Raccourcis : « Ajoute un achat dans VRM »** (lien profond qui ouvre la saisie d'achat pré-remplie, et « Où est le N°124 ? ») | saisir un achat à la volée sans ouvrir l'app | petit |

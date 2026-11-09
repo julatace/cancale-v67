@@ -87,6 +87,7 @@ import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.j
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
 import { passageSondes } from './_lib/statut-sondes.js';
 import { pushConfigure } from './_lib/push.js';
@@ -719,7 +720,7 @@ const resumeRelecture = (r) => !r ? null : (!r.fait ? { fait: false, reason: r.r
 // comptent avec ce qui a été lu. Un abonnement coupé ⇒ aucune lecture ; « pas
 // su » ne coupe pas. Un échec ne bloque RIEN (les rappels partent sur ce qu'on
 // savait). Le bilan ne porte que des nombres — aucun n° de suivi.
-async function lireTransporteursDuVendeur() {
+async function lireTransporteursDuVendeur({ max = MAX_CRON, maxDeparts = MAX_DEPARTS_CRON, budgetMs = BUDGET_CRON_MS } = {}) {
   const owner = proprietaireCourant() || '';
   if (!owner) return { fait: false, reason: 'vendeur' };
   if ((await accesVendeur(owner)) === false) return { fait: false, reason: 'abonnement' };
@@ -731,8 +732,8 @@ async function lireTransporteursDuVendeur() {
   let minuteur;
   try {
     const r = await Promise.race([
-      passageTransporteurs({ max: MAX_CRON, maxDeparts: MAX_DEPARTS_CRON, budgetMs: BUDGET_CRON_MS - 2000, signal: arret.signal }),
-      new Promise((ok) => { minuteur = setTimeout(() => ok({ ok: false, raison: 'delai' }), BUDGET_CRON_MS); }),
+      passageTransporteurs({ max, maxDeparts, budgetMs: budgetMs - 2000, signal: arret.signal }),
+      new Promise((ok) => { minuteur = setTimeout(() => ok({ ok: false, raison: 'delai' }), budgetMs); }),
     ]);
     if (!r || !r.ok) return { fait: false, reason: (r && r.raison) || 'pas-su' };
     return { fait: true, lus: r.lus.filter((x) => x.res === 'ok').length, echecs: r.lus.filter((x) => x.res !== 'ok').length, changes: r.lus.filter((x) => x.change).length, navigateur: r.besoinNavigateur.length, ...(r.arrete ? { arrete: true } : {}) };
@@ -1294,6 +1295,26 @@ export default async function handler(req, res) {
     let s = null;
     try { s = await sondesStatut(); } catch (e) { s = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     res.status(s && s.fait ? 200 : 503).json({ ok: !!(s && s.fait), moment: 'sondes', sondes: s });
+    return;
+  }
+  // (9 nov., retraits frais) `?moment=colis` : le statut des colis ACTIFS chez le transporteur, et RIEN
+  // d'autre (ni rappel, ni bilan, ni sonde) — GitHub toutes les 15 min (.github/workflows/colis-frais.yml).
+  // Seuls les vendeurs qui ont une ligne due sont visités (api/_lib/colis-frequent.js) ; sélection pas
+  // lue ⇒ 503, personne n'est visité.
+  if (moment === 'colis') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'colis', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageColisFrequent({
+        lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(),
+        traiter: (o) => contexteVendeur.run({ owner: o }, () => lireTransporteursDuVendeur({ max: MAX_LECTURES_VENDEUR, maxDeparts: MAX_DEPARTS_VENDEUR, budgetMs: BUDGET_VENDEUR_MS })),
+      });
+    } catch (e) { r = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    // Le bilan ne porte que des NOMBRES (aucun vendeur nommé, aucun n° de suivi) : il part dans le journal GitHub.
+    const bilans = (r && r.bilans) || [];
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'colis', dus: r && r.dus, traites: r && r.traites, restants: r && r.restants, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint,
+      lus: bilans.reduce((t, b) => t + (Number(b.lus) || 0), 0), changes: bilans.reduce((t, b) => t + (Number(b.changes) || 0), 0), ...(r && !r.fait ? { raison: r.raison || r.erreur || 'pas-su' } : {}) });
     return;
   }
   const soir = moment === 'soir';

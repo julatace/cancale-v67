@@ -337,6 +337,12 @@ export function nombreEpingle(p) {
   return { n: p.nAttendus || 0, sorte: 'enroute' };
 }
 
+// (9 nov., retraits frais) UNE ÉPINGLE SUR LA CARTE DE « À RETIRER » = un point où un colis COMPTÉ attend
+// (`nComptes`, le même nombre que l'onglet, Ma journée, la cloche et le widget). Les « à vérifier », « peut-
+// être en double » et « en route » restent dans leurs replis sous la carte — jamais une épingle : la carte
+// disait 18 points sous un onglet « À retirer · 0 ».
+export const surLaCarte = (p) => !!p && !p.inconnu && Number(p.nComptes) > 0;
+
 // ── LA COLONNE « À RETIRER », PAR POINT (1er nov.) ──────────────────────────
 // Julien : « je crois qu'il n'y a pas tous les points relais, il ne doit pas y
 // avoir d'erreur et ça doit être un peu plus clair ». Chaque colis de la colonne
