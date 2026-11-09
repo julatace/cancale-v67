@@ -193,6 +193,9 @@
   .connexion { margin: 0; border-top: 0; padding: 0 0 2px; }`;
     ombre.appendChild(st);
     carte.classList.add('on');
+    // Le cadre part (navigation, quelle qu'elle soit) : la carte le cache AVANT
+    // que l'autre page ne s'affiche, et attend un nouveau « prête ».
+    try { window.addEventListener('pagehide', () => direAuSite({ __vrmCarte: 'depart' })); } catch (_) {}
     try { new ResizeObserver(() => direAuSite({ __vrmCarte: 'hauteur', h: Math.ceil(hote.getBoundingClientRect().height) + 6 })).observe(hote); } catch (_) {}
   }
 
@@ -719,6 +722,8 @@
       } else if (d.__vrmCarte === 'hauteur') {
         cadreH = Math.max(60, Math.min(640, Math.ceil(Number(d.h) || 0)));
         if (cadrePret) cadreEl.style.height = cadreH + 'px';
+      } else if (d.__vrmCarte === 'depart') {
+        attendrePrete();
       } else if (d.__vrmCarte === 'annuler') {
         changerCompte = false; formulaireDemande = false; rendre();
       } else if (d.__vrmCarte === 'aller' && cadrePret) {

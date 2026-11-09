@@ -19,7 +19,11 @@
 //  la page, `tabs.create` / `window.open` jamais appelés, session rangée, code
 //  et mot de passe rangés nulle part et dans aucune adresse ; et l'autre sens
 //  (mauvais code, mauvais mot de passe, adresse inconnue : rien rangé).
-//  `--badge chemin --src chemin --retour chemin` : d'autres copies (preuve §6.1).
+//  5.332 (défaut #6) : sur Chrome / Edge / Firefox (manifeste v3, pas le paquet
+//  Orion), le formulaire vit dans l'IFRAME de l'extension (une autre origine :
+//  la page n'entend aucune touche) ; cadre muet ⇒ cette carte en < 2 s ; cadre
+//  détourné par la page ⇒ jamais montré ; Orion ⇒ aucun iframe tenté.
+//  `--badge chemin --src chemin --retour chemin --ext dossier` : d'autres copies (preuve §6.1).
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const path = require('path');
@@ -31,6 +35,8 @@ const RACINE = path.join(__dirname, '..', '..');
 const EXT = path.join(RACINE, 'vinted-sync-extension');
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? path.resolve(process.argv[i + 1]) : null; };
 const BADGE = fs.readFileSync(arg('--badge') || path.join(EXT, 'vrm-badge.js'), 'utf8');
+// 5.332 : les fichiers du cadre (popup.html, popup.js, vrm-badge.js) — `--ext dossier` pour une autre copie.
+const EXT_CADRE = arg('--ext') || (arg('--badge') ? path.dirname(arg('--badge')) : EXT);
 const SRC = arg('--src') || path.join(EXT, 'background.js');
 const RETOUR_JS = fs.readFileSync(arg('--retour') || path.join(EXT, 'oauth-retour.js'), 'utf8');
 const RETOUR_HTML = fs.readFileSync(path.join(RACINE, 'public', 'extension-retour.html'), 'utf8');
@@ -174,6 +180,99 @@ const resume = (l) => l.carte.replace(/\n/g, ' · ').slice(0, 240);
 // dans une adresse visitée, ni dans une adresse appelée par le service worker.
 const nullePart = (f, o, secret) => !JSON.stringify(f.store).includes(secret) && !o.urls.some((u) => u.includes(secret)) && !f.gt.j.corps.some((c) => c.split(' ')[0].includes(secret));
 const aucuneOuverture = (f, o, l) => f.ouvertures.tabs.length === 0 && f.ouvertures.fenetres.length === 0 && !(l.ouverts || []).length && !o.erreurs.some((e) => /onglet|fenêtre/.test(e)) && !o.messages.includes('ouvrirVRM') && !o.messages.includes('lierAvecVRM');
+
+// ── 5.332 : un onglet « Chrome » (manifeste v3, pas de paquet Orion) ────────
+// Le cadre de l'extension est servi depuis https://ext.test (une AUTRE origine
+// que la page, comme chrome-extension://…) : la vraie popup.html, le vrai
+// popup.js, le vrai vrm-badge.js. `cadre: 'muet'` : la page d'extension ne dit
+// rien (comme Orion en 5.328). `orionPage` : le paquet Orion (compat posée).
+const EXT_FICHIERS = { 'popup.html': 'text/html', 'popup.js': 'text/javascript', 'vrm-badge.js': 'text/javascript', 'parcours-popup.js': 'text/javascript', 'logo-vrm-96.png': 'image/png' };
+async function ongletChrome(nav, f, { scheme = 'light', mobile = true, cadre = 'vrai', orionPage = false } = {}) {
+  const ctx = await nav.newContext(mobile
+    ? { colorScheme: scheme, viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
+    : { colorScheme: scheme, viewport: { width: 1512, height: 900 } });
+  const pg = await ctx.newPage();
+  const erreurs = [], urls = [], messages = [], cadreDemandes = [];
+  pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 200)));
+  pg.on('popup', () => erreurs.push('une fenêtre ou un onglet s’est ouvert depuis la page'));
+  ctx.on('page', (p) => { if (p !== pg) erreurs.push('un AUTRE onglet s’est ouvert : ' + p.url()); });
+  await ctx.route('**/*', (r) => {
+    const u = r.request().url();
+    if (r.request().isNavigationRequest()) urls.push(u);
+    if (/^https:\/\/ext\.test\//.test(u)) {
+      const nom = new URL(u).pathname.slice(1);
+      if (nom === 'popup.html') cadreDemandes.push(u);
+      if (nom === 'popup.html' && cadre === 'muet') return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><body></body>' });
+      if (EXT_FICHIERS[nom]) return r.fulfill({ status: 200, contentType: EXT_FICHIERS[nom], body: fs.readFileSync(path.join(EXT_CADRE, nom)) });
+      return r.fulfill({ status: 404, body: '' });
+    }
+    if (/^https:\/\/evil\.test\//.test(u)) return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><body style="background:#fff"><p>evil — connexion VRM</p><input type="password" placeholder="Mot de passe VRM"></body>' });
+    if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
+    return r.fulfill({ status: 200, contentType: 'text/html', body: PAGE_VINTED });
+  });
+  await pg.exposeFunction('__fond', async (msg, ici) => {
+    messages.push(msg && msg.action);
+    const r = await f.envoyer(msg, { id: 'x', tab: { id: 7, url: ici }, url: ici });
+    return r === undefined ? null : JSON.parse(JSON.stringify(r));
+  });
+  await ctx.addInitScript(({ badge, version, orionPage, urlVinted }) => {
+    window.__ouverts = [];
+    window.open = (...a) => { window.__ouverts.push(a[0]); return null; };
+    const ext = location.hostname === 'ext.test';
+    // Le service worker voit l'ONGLET (vinted.fr), y compris pour son cadre.
+    const ici = ext ? urlVinted : location.href;
+    window.chrome = {
+      runtime: {
+        id: 'x', lastError: null,
+        getURL: (p) => 'https://ext.test/' + p,
+        getManifest: () => ({ version, manifest_version: 3 }),
+        sendMessage: (msg, cb) => { window.__fond(msg, ici).then((r) => { if (typeof cb === 'function') cb(r === null ? undefined : r); }); },
+      },
+      storage: { onChanged: { addListener() {} } },
+    };
+    const orig = Element.prototype.attachShadow;
+    window.__modes = [];
+    Element.prototype.attachShadow = function (o) { window.__modes.push(o && o.mode); const r = orig.call(this, o); if (this.id === 'vrm-badge') window.__racine = r; return r; };
+    if (ext || location.hostname === 'evil.test') return;
+    if (orionPage) window.__vrmOrionCompat = true;
+    // La page du site : un écouteur posé en capture AVANT la carte (la limite de la 5.329).
+    window.__entendu = [];
+    window.addEventListener('keydown', (e) => window.__entendu.push('win-keydown-capture-avant:' + e.key), true);
+    window.addEventListener('input', (e) => window.__entendu.push('win-input-capture-avant:' + (e.data || '')), true);
+    document.addEventListener('keydown', (e) => window.__entendu.push('doc-keydown:' + e.key), false);
+    document.addEventListener('DOMContentLoaded', () => {
+      const s = document.createElement('script'); s.textContent = badge; document.documentElement.appendChild(s);
+    });
+  }, { badge: BADGE, version: VERSION, orionPage, urlVinted: URL_VINTED });
+  return { ctx, pg, erreurs, urls, messages, cadreDemandes };
+}
+const lireCadre = (pg) => pg.evaluate(() => {
+  const r = window.__racine;
+  const c = r && r.querySelector('.connexion');
+  const f = r && r.querySelector('iframe');
+  const carte = r && r.querySelector('.carte');
+  return {
+    cadre: c ? (c.getAttribute('data-cadre') || '') : '',
+    iframes: r ? r.querySelectorAll('iframe').length : 0,
+    iframeSrc: f ? f.getAttribute('src') : '',
+    iframeVisible: !!(f && getComputedStyle(f).visibility === 'visible' && f.getBoundingClientRect().height > 0 && carte && getComputedStyle(carte).display !== 'none'),
+    iframeH: f ? Math.round(f.getBoundingClientRect().height) : 0,
+    formTop: !!(r && r.querySelector('form[data-connexion-carte]')),
+    champsPage: document.querySelectorAll('input').length,
+    carte: carte ? carte.innerText : '',
+    ouverts: (window.__ouverts || []).slice(),
+    deborde: document.documentElement.scrollWidth > window.innerWidth,
+  };
+});
+const cadreFrame = (pg) => pg.frames().find((x) => /^https:\/\/ext\.test\/popup\.html\?mode=carte/.test(x.url()));
+const lireDansCadre = (fr) => fr.evaluate(() => {
+  const r = window.__racine; const q = (s) => (r ? r.querySelector(s) : null);
+  const form = q('form[data-connexion-carte]');
+  const y = (s) => { const el = q(s); return el && el.offsetParent ? Math.round(el.getBoundingClientRect().top) : null; };
+  const o = { mail: y('#vrm-cx-mail'), code: y('[data-code-demander]'), mdp: y('[data-basculer-mode]'), google: y('[data-fournisseur="google"]') };
+  return { form: !!form, mode: form ? form.getAttribute('data-mode') : '', principal: q('[data-principal]') ? q('[data-principal]').textContent.trim() : '',
+    ordreOk: o.mail != null && o.code > o.mail && o.mdp > o.code && (o.google == null || o.google > o.mdp), ordre: o, mdpVisible: !!(q('#vrm-cx-mdp') && q('#vrm-cx-mdp').offsetParent) };
+});
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
@@ -358,6 +457,113 @@ const aucuneOuverture = (f, o, l) => f.ouvertures.tabs.length === 0 && f.ouvertu
     await toucher(pg, '[data-fournisseur="google"]'); await pg.waitForTimeout(400);
     dit(f.ouvertures.fenetres.length === 1 && f.ouvertures.fenetres[0].type === 'popup' && /\/auth\/v1\/authorize\?provider=google/.test(f.ouvertures.fenetres[0].url) && f.ouvertures.tabs.length === 0 && pg.url() === URL_VINTED,
       'Google : UNE petite fenêtre (type popup), aucun onglet, la page ne bouge pas', JSON.stringify({ fen: f.ouvertures.fenetres.map((x) => x.type), tabs: f.ouvertures.tabs, url: pg.url() }));
+    await o.ctx.close();
+  });
+
+  // ══ 5.332 : CHROME / EDGE / FIREFOX — LE FORMULAIRE DANS L'IFRAME DE L'EXTENSION ══
+  // Décision de Julien (9 nov., défaut #6). Le cadre est servi depuis une AUTRE
+  // origine (`https://ext.test`, comme `chrome-extension://…`) : la VRAIE
+  // popup.html + popup.js, qui charge le VRAI vrm-badge.js en mode cadre. La page
+  // vinted.fr pose un écouteur de clavier en capture AVANT la carte (la limite
+  // de la shadow root, 5.329) : avec l'iframe, il n'entend rien.
+  await essaie('chrome iframe', async () => {
+    for (const [nomCas, mobile] of [['ordinateur 1512', false], ['Chrome Android 390', true]]) {
+      console.log(`\n── Chrome (${nomCas}) : le formulaire dans l’iframe de l’extension, la page n’entend rien`);
+      const f = fond({ fenetres: !mobile, orion: false });
+      const o = await ongletChrome(nav, f, { mobile }); await allerVinted(o);
+      const { pg } = o;
+      const t0 = Date.now();
+      if (mobile) await pg.tap('#vrm-badge'); else await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 22);
+      await pg.waitForFunction(() => { const r = window.__racine; const c = r && r.querySelector('.connexion'); return c && /pret|repli/.test(c.getAttribute('data-cadre') || ''); }, null, { timeout: 4000 }).catch(() => {});
+      const dt = Date.now() - t0;
+      await pg.waitForTimeout(300);   // la hauteur dite par le cadre après « prête »
+      let l = await lireCadre(pg);
+      dit(l.cadre === 'pret' && l.iframeVisible && /^https:\/\/ext\.test\/popup\.html\?mode=carte/.test(l.iframeSrc) && !l.formTop && l.champsPage === 1, 'pas connecté : le formulaire est dans l’iframe de l’extension (popup.html?mode=carte), aucun champ dans la carte du site ni dans son DOM', JSON.stringify({ cadre: l.cadre, vis: l.iframeVisible, src: l.iframeSrc, formTop: l.formTop, champs: l.champsPage, dt }));
+      const fr = cadreFrame(pg);
+      const lf = fr ? await lireDansCadre(fr) : null;
+      dit(!!lf && lf.form && lf.mode === 'code' && lf.ordreOk && lf.principal.includes('code'), 'dans le cadre : le même formulaire (e-mail, « Me connecter avec un code », mot de passe replié, Google / Discord)', JSON.stringify(lf));
+      dit(l.iframeH >= 150 && l.iframeH <= 640 && !l.deborde, 'le cadre prend la hauteur du formulaire (dit par lui), rien ne déborde', JSON.stringify({ h: l.iframeH, deborde: l.deborde }));
+      await pg.screenshot({ path: path.join(SORTIE, `carte-cadre-chrome-${mobile ? '390' : '1512'}.png`) });
+      // La frappe : l'e-mail puis le code, DANS le cadre. (Sans cadre — code
+      // d'avant — on tape dans la carte : la page doit alors ENTENDRE, c'est la limite.)
+      if (!fr) {
+        await pg.evaluate(() => window.__racine.querySelector('#vrm-cx-mail').focus());
+        await pg.keyboard.type('google@exemple.fr', { delay: 5 });
+        const ent = await pg.evaluate(() => (window.__entendu || []).slice());
+        dit(ent.length === 0, 'la page du site n’a RIEN entendu — même son écouteur posé en capture AVANT la carte', JSON.stringify(ent.slice(0, 4)));
+        await o.ctx.close(); continue;
+      }
+      await fr.evaluate(() => { const el = window.__racine.querySelector('#vrm-cx-mail'); el.focus(); });
+      await pg.keyboard.type('google@exemple.fr', { delay: 5 });
+      await fr.evaluate(() => window.__racine.querySelector('[data-code-demander]').click());
+      await fr.waitForFunction(() => !!window.__racine.querySelector('#vrm-cx-code'), null, { timeout: 4000 });
+      dit(f.gt.j.otp.length === 1 && f.gt.j.otp[0].create_user === false && f.gt.j.otp[0].email === 'google@exemple.fr', 'le code est demandé (create_user:false) depuis le cadre', JSON.stringify(f.gt.j.otp));
+      await fr.evaluate(() => window.__racine.querySelector('#vrm-cx-code').focus());
+      await pg.keyboard.type(CODE_BON, { delay: 5 });
+      await fr.evaluate(() => window.__racine.querySelector('[data-code-valider]').click());
+      await pg.waitForTimeout(700);
+      const entendu = await pg.evaluate(() => (window.__entendu || []).slice());
+      dit(entendu.length === 0, 'la page du site n’a RIEN entendu — même son écouteur posé en capture AVANT la carte', JSON.stringify(entendu.slice(0, 6)));
+      dit(!!(f.store.vrmSession && f.store.vrmSession.access_token) && nullePart(f, o, CODE_BON), 'bon code ⇒ session rangée par le service worker ; le code n’est rangé nulle part', JSON.stringify({ s: !!f.store.vrmSession }));
+      await pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await pg.waitForTimeout(500);
+      l = await lireCadre(pg);
+      dit(/Connecté à VRM/.test(l.carte) && l.iframes === 0, 'connecté : la carte nomme le compte, le cadre est retiré', JSON.stringify({ carte: l.carte.slice(0, 120), n: l.iframes }));
+      dit(aucuneOuverture(f, o, { ouverts: l.ouverts }), 'aucun onglet, aucune fenêtre', JSON.stringify({ tabs: f.ouvertures.tabs, fen: f.ouvertures.fenetres.length, ouverts: l.ouverts }));
+      await o.ctx.close();
+    }
+  });
+
+  console.log('\n── Chrome : cadre MUET (la page d’extension ne s’affiche pas) ⇒ la carte actuelle en moins de 2 s');
+  await essaie('cadre muet', async () => {
+    const f = fond({ fenetres: true, orion: false });
+    const o = await ongletChrome(nav, f, { mobile: true, cadre: 'muet' }); await allerVinted(o);
+    const { pg } = o;
+    const t0 = Date.now();
+    await pg.tap('#vrm-badge');
+    await pg.waitForFunction(() => { const r = window.__racine; return !!(r && r.querySelector('form[data-connexion-carte]')); }, null, { timeout: 6000 }).catch(() => {});
+    const dt = Date.now() - t0;
+    const l = await lireCadre(pg);
+    dit(l.formTop && l.cadre === 'repli' && l.iframes === 0 && dt < 2000, `repli en ${dt} ms (< 2 s) : le formulaire dessiné dans la carte, plus d’iframe`, JSON.stringify({ form: l.formTop, cadre: l.cadre, n: l.iframes, dt }));
+    dit(aucuneOuverture(f, o, { ouverts: l.ouverts }) && !o.messages.includes('lierAvecVRM'), 'jamais d’onglet, jamais « Se connecter avec VRM »', JSON.stringify(f.ouvertures.tabs));
+    await o.ctx.close();
+  });
+
+  console.log('\n── Chrome : le cadre navigue ailleurs (fausse connexion) ⇒ jamais montré');
+  await essaie('cadre détourné', async () => {
+    const f = fond({ fenetres: true, orion: false });
+    const o = await ongletChrome(nav, f, { mobile: true }); await allerVinted(o);
+    const { pg } = o;
+    await pg.tap('#vrm-badge');
+    await pg.waitForFunction(() => { const r = window.__racine; const c = r && r.querySelector('.connexion'); return c && c.getAttribute('data-cadre') === 'pret'; }, null, { timeout: 4000 }).catch(() => {});
+    // Mesuré ici : `window.frames` de la page ne voit PAS le cadre (il est dans la
+    // racine fermée) — la page ne peut pas le viser. On fait naviguer le cadre
+    // de l'extérieur (le banc), comme le ferait une redirection : la règle
+    // « montré seulement après un “prête” venu de l'extension » doit tenir.
+    const nFrames = await pg.evaluate(() => window.frames.length);
+    dit(nFrames === 0, 'la page ne peut même pas atteindre le cadre (`window.frames` vide : il vit dans la racine fermée)', 'frames : ' + nFrames);
+    const fr0 = cadreFrame(pg);
+    await fr0.evaluate(() => { location.href = 'https://evil.test/phish'; }).catch(() => {});
+    await pg.waitForFunction(() => true, null, { timeout: 100 }).catch(() => {});
+    for (let i = 0; i < 40 && !pg.frames().some((x) => /evil\.test/.test(x.url())); i++) await pg.waitForTimeout(50);
+    await pg.waitForTimeout(150);
+    let l = await lireCadre(pg);
+    const vuPendant = l.iframeVisible && /evil/.test(l.iframeDoc || '');
+    dit(!l.iframeVisible || l.iframes === 0, 'dès son chargement, la fausse page est CACHÉE (jamais montrée dans la carte)', JSON.stringify({ vis: l.iframeVisible, cadre: l.cadre, vuPendant }));
+    await pg.waitForTimeout(1800);
+    l = await lireCadre(pg);
+    dit(l.formTop && l.cadre === 'repli' && l.iframes === 0, 'puis la carte retombe sur son formulaire dessiné (l’iframe est retiré)', JSON.stringify({ form: l.formTop, cadre: l.cadre, n: l.iframes }));
+    await o.ctx.close();
+  });
+
+  console.log('\n── Orion simulé (paquet compat, même avec un manifeste v3) : la carte actuelle, aucun iframe tenté');
+  await essaie('orion sans iframe', async () => {
+    const f = fond();
+    const o = await ongletChrome(nav, f, { mobile: true, orionPage: true }); await allerVinted(o);
+    const { pg } = o;
+    await pg.tap('#vrm-badge'); await pg.waitForTimeout(500);
+    const l = await lireCadre(pg);
+    dit(l.formTop && l.iframes === 0 && !o.cadreDemandes.length, 'formulaire dessiné tout de suite, aucune page d’extension demandée', JSON.stringify({ form: l.formTop, n: l.iframes, demandes: o.cadreDemandes }));
     await o.ctx.close();
   });
 
