@@ -46,8 +46,12 @@ const JOUR = 86400000;
 const PARIS = 'Europe/Paris';
 
 // L'heure qu'il est À PARIS à l'instant `t`, comme si c'était de l'UTC.
+// (9 nov., vitesse) Le format créé UNE fois (même texte) : le refaire à chaque appel coûtait
+// ~70 ms au démarrage de l'app au téléphone (Ma journée l'appelle pour chaque jour).
+let _fmtParis = null;
 function murParis(t) {
-  const p = new Intl.DateTimeFormat('en-US', { timeZone: PARIS, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(t));
+  if (!_fmtParis) _fmtParis = new Intl.DateTimeFormat('en-US', { timeZone: PARIS, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+  const p = _fmtParis.formatToParts(new Date(t));
   const g = (k) => Number((p.find((x) => x.type === k) || {}).value);
   return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second'));
 }
@@ -60,7 +64,8 @@ export function minuitParis(ymd) {
   for (let i = 0; i < 2; i++) t = mur - (murParis(t) - Math.floor(t / 1000) * 1000);
   return t;
 }
-export const dateParis = (t) => new Date(t).toLocaleDateString('en-CA', { timeZone: PARIS });
+let _fmtDateParis = null;
+export const dateParis = (t) => (_fmtDateParis || (_fmtDateParis = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }))).format(new Date(t));
 const plusJours = (ymd, k) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + k)).toISOString().slice(0, 10); };
 
 // La semaine TERMINÉE la plus récente (lundi 00:00 → lundi suivant 00:00, à

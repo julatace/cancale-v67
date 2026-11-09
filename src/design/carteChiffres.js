@@ -26,6 +26,7 @@
 // feuille ne le propose pas). Exécuté par scripts/audit-carte-chiffres.cjs.
 
 import { aVenirPour } from '../argentAVenir.js';
+import { dateLocale } from '../formatsDate.js';   // (9 nov., vitesse) un format créé une fois
 
 export const CLE_CARTE_STATS = 'vrm_carte_stats';
 
@@ -242,7 +243,7 @@ export const libelleCase = (def, p, pGrand, sel) => {
 // même ligne (`vinted_urssaf_mois.recu`, `recuDuMois` sur `ventesDeclarables`
 // à la date de VERSEMENT), les mêmes trois états. L'audit compare les deux.
 export const RECU_MAX_AGE_MS = 3 * 86400000;
-const ymParis = (t) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7);
+const ymParis = (t) => dateLocale(new Date(t), 'en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7);
 export const recuPublie = (publie, ym, maintenant = Date.now()) => {
   if (!publie || typeof publie !== 'object' || !Array.isArray(publie.mois)) return { valeur: null, raison: 'absente' };
   const at = Number(publie.at);
