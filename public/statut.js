@@ -148,8 +148,8 @@
     if (min == null) return '';
     if (min < 60) return min + ' min';
     var h = Math.floor(min / 60), m = min % 60;
-    if (h < 48) return h + ' h' + (m ? ' ' + (m < 10 ? '0' : '') + m : '');
-    return Math.round(h / 24) + ' jours';
+    if (h < 48) return h + ' h' + (m ? ' ' + (m < 10 ? '0' : '') + m : '');
+    return Math.round(h / 24) + ' jours';
   };
   var ilYa = function (t) {
     var min = Math.max(0, Math.round((Date.now() - t) / 60000));
@@ -174,16 +174,28 @@
       var depuis = x.silenceH < 1 ? 'il y a moins d’une heure' : 'il y a ' + x.silenceH + ' h';
       return quoi + ' ' + depuis + (x.raison === 'silence' && x.seuilH ? ' — d’habitude moins de ' + x.seuilH + ' h.' : '.');
     }
+    // Les sondes arrêtées : dit UNE fois, dans la phrase du haut (jamais sur chaque ligne).
+    if (x.raison === 'sondes-arretees') return '';
     return DETAIL[x.raison] || '';
   };
+
+  // La sonde EN DIRECT (/api/sante → etat : base, e-mails, notifications ; 'ok' · 'panne' · 'inconnu').
+  // Elle remplace l'état rangé quand celui-ci manque ou est périmé ; une panne de la
+  // base dite en direct passe toujours (l'état rangé n'a peut-être pas pu s'écrire).
+  var DIRECT = { ok: 'ok', panne: 'degrade' };
+  function etatDe(st, direct, c) {
+    var d = direct && typeof direct === 'object' ? direct[c] : null;
+    if (c === 'base' && d === 'panne') return { etat: 'degrade', raison: 'erreur-http' };
+    if (st && !st.perime) return st.composants[c];
+    if (DIRECT[d]) return { etat: DIRECT[d], raison: d === 'ok' ? (c === 'notifications' ? 'configure' : 'repond') : 'erreur-http' };
+    return st ? st.composants[c] : { etat: 'pas_su', raison: 'pas-sonde' };
+  }
 
   function poserComposants(st, direct) {
     COMPOSANTS.forEach(function (c) {
       var li = document.querySelector('[data-statut-morceau="' + c + '"]');
       if (!li) return;
-      var x = st ? st.composants[c] : { etat: 'pas_su', raison: 'pas-sonde' };
-      // La sonde EN DIRECT (/api/sante → etat) peut dire une panne de la base que l'état rangé n'a pas pu écrire.
-      if (c === 'base' && direct === 'panne') x = { etat: 'degrade', raison: 'erreur-http' };
+      var x = etatDe(st, direct, c);
       li.setAttribute('data-etat', x.etat);
       li.querySelector('.mot').textContent = x.etat === 'ok' ? MOT_OK[c] : x.etat === 'degrade' ? 'Dégradé' : (MOT_PAS_SU[x.raison] || 'Pas vérifié');
       var d = li.querySelector('.detail'); if (d) d.textContent = detailDe(c, x);
@@ -216,15 +228,15 @@
       maj.textContent = 'La page n’a pas pu joindre VRM.';
       return;
     }
-    var direct = sante.etat && sante.etat.base;
-    var degrades = st ? COMPOSANTS.filter(function (c) { return st.composants[c].etat === 'degrade'; }) : [];
-    if (direct === 'panne' && !dans(degrades, 'base')) degrades.unshift('base');
-    var vus = st ? COMPOSANTS.filter(function (c) { return st.composants[c].etat !== 'pas_su'; }) : [];
+    var etats = {};
+    COMPOSANTS.forEach(function (c) { etats[c] = etatDe(st, sante.etat, c).etat; });
+    var degrades = COMPOSANTS.filter(function (c) { return etats[c] === 'degrade'; });
+    var vus = COMPOSANTS.filter(function (c) { return etats[c] !== 'pas_su'; });
     if (degrades.length) {
       main.setAttribute('data-etat-global', 'panne');
       titre.textContent = 'Incident en cours sur ' + liste(degrades.map(function (c) { return NOMS[c]; }));
       phrase.textContent = degrades.length === 1 ? PHRASES[degrades[0]] + ' On s’en occupe.' : 'On s’en occupe. Le reste fonctionne, et rien de ce qui est déjà enregistré n’est perdu.';
-    } else if (!st || !vus.length) {
+    } else if (!vus.length) {
       main.setAttribute('data-etat-global', 'partiel');
       titre.textContent = 'État pas vérifié';
       phrase.textContent = st && st.perime ? 'Les vérifications automatiques ne sont pas passées récemment : on ne peut pas dire que tout va bien.' : 'Les vérifications automatiques n’ont encore rien rangé.';
@@ -284,7 +296,7 @@
     ]).then(function (r) {
       var sante = r[0], st = sante ? statutSur(sante.statut) : null;
       etatAffiche = { st: st, sante: sante };
-      poserComposants(st, sante && sante.etat ? sante.etat.base : null);
+      poserComposants(st, sante ? sante.etat : null);
       poserTete(st, sante);
       afficherIncidents(st ? st.incidents : [], r[1]);
       var ver = document.getElementById('version-ext');
