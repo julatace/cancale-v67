@@ -54,9 +54,12 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
 
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
-  await pg.route('**/*', (r) => /logo-vrm-96\.png/.test(r.request().url())
+  const demandes = [];
+  await pg.route('**/*', (r) => { demandes.push(r.request().url()); return /logo-vrm-96\.png/.test(r.request().url())
     ? r.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(EXT, 'logo-vrm-96.png')) })
-    : r.fulfill({ status: 200, contentType: 'text/html', body: html }));
+    // 5.332 : la carte (`?mode=carte`) charge vrm-badge.js en mode cadre — servi vide ici.
+    : /vrm-badge\.js/.test(r.request().url()) ? r.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.__badgeCharge = true;' })
+    : r.fulfill({ status: 200, contentType: 'text/html', body: html }); });
   await pg.goto('https://ext.test/popup.html' + (carte ? '?mode=carte' : mode ? '?mode=' + mode : ''));
   // Le faux `chrome` : même forme que le vrai (callbacks), rien de plus.
   await pg.evaluate(({ e, faux }) => {
@@ -138,6 +141,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   const boutons = await pg.evaluate(() => Array.from(document.querySelectorAll('button')).filter((b) => b.offsetParent).map((b) => b.id));
   const recharges = await pg.evaluate(() => window.__recharges);
   const reparation = await pg.evaluate(() => document.body.getAttribute('data-reparation'));
+  const cadre = await pg.evaluate(() => ({ badge: window.__badgeCharge === true, drapeau: window.__vrmCadre === true, vide: document.body.children.length === 0 }));
   const secours = await pg.evaluate(() => document.body.getAttribute('data-lier-secours'));
   const mem = await pg.evaluate(() => window.__mem);
   const transp = await pg.evaluate(() => { const b = document.getElementById('transpBox'); const btn = document.getElementById('transpPermisBtn');
@@ -173,7 +177,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
     mot: (() => { const m = document.getElementById('mdpOauthMot'); return m && !m.hidden && m.offsetParent ? m.textContent : ''; })(),
   }));
   await ctx.close();
-  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours, look, transp, fourn };
+  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours, look, transp, fourn, cadre };
 }
 const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { await a.click(); await pg.waitForTimeout(120); } };
 
@@ -245,7 +249,7 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   const BRUT = { ok: false, error: 'captcha protection: request disallowed (no captcha response (captcha_token) found in request)' };
   const TRADUIT = { ok: false, captcha: true, error: 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».' };
   for (const [nom, rep] of [['refus brut', BRUT], ['refus traduit', TRADUIT]]) {
-    for (const carte of [false, true]) {
+    for (const carte of [false]) {   // 5.332 : la carte charge le formulaire de la carte (cadre)
       await essaie('captcha ' + nom + (carte ? ' (carte)' : ''), async () => {
         const r = await rendre(nav, { ok: true, connecte: false }, { carte, geste: tape, faux: { loginRep: rep } });
         const lieu = carte ? ' (carte)' : '';
@@ -298,8 +302,6 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
       const m = r.messages.find((x) => x.action === 'oauthDepart');
       dit(!!m && m.fournisseur === fourn && !r.envoyes.includes('lierAvecVRM'), `clic « Continuer avec ${fourn} » : l’OAuth part DANS l’extension (oauthDepart), pas par VRM`, JSON.stringify(r.messages.map((x) => x.action)));
       dit(r.ferme && !r.envoyes.includes('authLogin'), 'la fenêtre se referme, aucun mot de passe envoyé', JSON.stringify(r.envoyes));
-      const k = await rendre(nav, { ok: true, connecte: false }, { carte: true, faux: { fournisseurs: LES_DEUX, oauthRep: { ok: false, code: 'ferme', message: 'La connexion avec Discord n’est pas ouverte sur VRM. Connecte-toi avec ton email et ton mot de passe VRM.' } }, geste: (pg) => pg.click('#oauth-' + fourn) });
-      dit(/n’est pas ouverte sur VRM/.test(k.txt) && !k.ferme, 'un départ refusé : la raison est DITE, jamais un échec muet', k.txt.replace(/\n/g, ' · ').slice(0, 200));
       const p = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX, oauthFerme: true, lierFerme: true, codeFerme: true, manifeste: '5.325.0' }, geste: async (pg) => { await pg.click('#oauth-' + fourn); await pg.waitForTimeout(400); } });
       dit(p.ouvert === `https://vrm.center/?tab=plat_vinted&lier-extension=abcdefghijklmnopabcdefghijklmnop&connexion=${fourn}`, `fond d’avant (sans oauthDepart) : la fenêtre ouvre VRM elle-même, avec connexion=${fourn}`, String(p.ouvert));
     });
@@ -321,11 +323,6 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     const r = await rendre(nav, { ok: true, connecte: false }, { faux: { fournisseurs: LES_DEUX, orion: true } });
     dit(r.fourn.boutons.length === 2 && r.fourn.formY != null && r.fourn.boutons.every((x) => x.y > r.fourn.formY), 'Orion : le même ordre que partout (mot de passe, puis Google / Discord)', JSON.stringify(r.fourn));
     dit(r.fourn.mot === 'Compte créé avec Google ou Discord ? Utilise les boutons au-dessus.', 'Orion : et la phrase est vraie (« au-dessus »)', r.fourn.mot);
-  });
-  await essaie('carte', async () => {
-    const r = await rendre(nav, { ok: true, connecte: false }, { carte: true, faux: { fournisseurs: LES_DEUX, capture: 'popup-oauth-carte.png' } });
-    dit(r.fourn.boutons.length === 2, 'dans la petite carte aussi', JSON.stringify(r.fourn.boutons));
-    dit(!r.deborde, 'et tout y tient (320 × 720, la plus grande hauteur que la carte donne au cadre), sans défilement');
   });
 
   // ── 2. CONNECTÉ — on ne redemande rien ───────────────────────────────────
@@ -378,8 +375,6 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(!!d.ouvert && d.ferme, 'le fond ne répond pas : VRM s’ouvre quand même (au plus 1,5 s d’attente)', JSON.stringify({ ouvert: d.ouvert, ferme: d.ferme }));
     const e = await rendre(nav, { ok: true, connecte: false }, { faux: { permis: false } });
     dit(!e.transp.bouton, 'pas connecté : pas de bouton (la connexion d’abord)', JSON.stringify(e.boutons));
-    const f = await rendre(nav, CO, { carte: true, faux: { permis: false } });
-    dit(f.transp.etat === 'manque-carte' && !f.transp.bouton && /icône VRM/.test(f.txt) && !f.deborde, 'dans la petite carte : une ligne qui dit où le faire (l’icône), et tout y tient', JSON.stringify({ etat: f.transp.etat, bouton: f.transp.bouton, deborde: f.deborde }));
   });
 
   // ── 3. SESSION EXPIRÉE — un troisième état, pas « non connecté » ─────────
@@ -404,23 +399,21 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(mort.champs.some((c) => c.id === 'pw' && c.visible), 'autre sens : une session MORTE redemande bien le mot de passe', JSON.stringify(mort.champs));
   });
 
-  // ── 4. LA CARTE (iframe sur le site, 2 octobre) ──────────────────────────
-  console.log('\n── La même connexion, dans la petite carte en bas à droite');
+  // ── 4. LA CARTE (iframe sur le site) — 5.332 : elle délègue au formulaire de la carte ──
+  // Défaut #6 (décision de Julien, 9 nov.) : dans la carte d'un site, cette page
+  // ne montre plus SA connexion (mot de passe seul, « Se connecter avec VRM » qui
+  // ouvrait VRM) : elle charge vrm-badge.js en mode cadre — le formulaire de la
+  // carte (code par e-mail, mot de passe, Google / Discord), jugé par le banc
+  // carte-orion-sans-onglet. Ici : la délégation, et rien d'autre.
+  console.log('\n── La petite carte (popup.html?mode=carte) : le formulaire de la carte, chargé en cadre');
   await essaie('carte', async () => {
-    const cd = await rendre(nav, { ok: true, connecte: false, cloisonne: true }, { carte: true });
-    dit(!cd.erreurs.length, 'elle s’exécute sans erreur', cd.erreurs[0]);
-    dit(cd.boutons[0] === 'inBtn' && cd.champs.filter((c) => c.visible).length === 2, 'pas connecté : le mot de passe VRM tout de suite dans la carte (5.328)', JSON.stringify(cd.boutons));
-    dit(!cd.deborde, 'tout tient dans la carte (320 × 720), sans défilement');
-    const cl = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: (pg) => pg.click('#lierBtn') });
-    dit(cl.envoyes.includes('lierAvecVRM') && !cl.ferme, 'dans la carte : le clic demande au service worker d’ouvrir VRM (la carte, elle, reste dans le site)', JSON.stringify(cl.envoyes));
-    const cm = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: async (pg) => { await ouvrirMdp(pg); await pg.fill('#mail', 'a@b.fr'); await pg.fill('#pw', 'x'); await pg.click('#inBtn'); } });
-    const login = cm.messages.find((m) => m.action === 'authLogin');
-    dit(!!login && login.ouvrir === false && !cm.ouvert, 'au mot de passe : la connexion reste dans l’extension, sans ouvrir VRM', JSON.stringify(login));
-    const cc = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, { carte: true });
-    dit(!cc.ouvert && !cc.ferme, 'connectée, la carte ne s’ouvre pas toute seule sur VRM (elle est dans le site)', cc.ouvert);
-    dit(/sophie@exemple\.fr/.test(cc.txt), 'elle nomme le compte VRM', cc.txt.slice(0, 120));
-    dit(cc.boutons.includes('vrmBtn') && cc.boutons.includes('outBtn'), 'et propose « Ouvrir VRM » et « Se déconnecter »', JSON.stringify(cc.boutons));
-    dit(!cc.champs.some((c) => c.id === 'pw'), 'sans champ mot de passe');
+    for (const etat of [{ ok: true, connecte: false, cloisonne: true }, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }]) {
+      const cd = await rendre(nav, etat, { carte: true });
+      const nom = etat.connecte ? 'connecté' : 'pas connecté';
+      dit(!cd.erreurs.length, `${nom} : elle s’exécute sans erreur`, cd.erreurs[0]);
+      dit(cd.cadre.badge && cd.cadre.drapeau && cd.cadre.vide, `${nom} : vrm-badge.js chargé en mode cadre (__vrmCadre), la page vidée`, JSON.stringify(cd.cadre));
+      dit(!cd.champs.length && !cd.boutons.length && !cd.envoyes.length && !cd.ouvert && !cd.ferme, `${nom} : aucun champ, aucun bouton, aucun message ni onglet de popup.js (plus de « Se connecter avec VRM »)`, JSON.stringify({ c: cd.champs.length, b: cd.boutons, e: cd.envoyes, o: cd.ouvert }));
+    }
   });
 
   // ── 5. LA RÉPARATION D'UN CODE PÉRIMÉ (`?mode=reparer`, 11 octobre) ───────
@@ -452,7 +445,7 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     // #0071E3 / #0A84FF, rayon 12 ; dans la carte, le cadre est transparent (le
     // verre de la carte est derrière).
     for (const [scheme, fond, accent] of [['dark', 'rgb(0, 0, 0)', 'rgb(10, 132, 255)'], ['light', 'rgb(242, 242, 247)', 'rgb(0, 113, 227)']]) {
-      for (const carte of [false, true]) {
+      for (const carte of [false]) {   // 5.332 : la carte n'affiche plus ce formulaire (cadre)
         const r = await rendre(nav, { ok: true, connecte: false }, { carte, scheme, geste: ouvrirMdp });
         const ou = `${scheme}${carte ? ' · carte' : ''}`;
         const fondAttendu = carte ? 'rgba(0, 0, 0, 0)' : fond;
@@ -463,9 +456,6 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
         dit(r.look.cibles.length >= 4 && !petits.length, `${ou} : chaque cible (boutons, champs, lien) fait au moins 44 px`, JSON.stringify(petits.length ? petits : r.look.cibles));
       }
     }
-    const co = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr' }, { carte: true, scheme: 'light' });
-    const petits = co.look.cibles.filter((c) => c.h < 44);
-    dit(!petits.length && co.look.cibles.length >= 2, 'connectée (carte, clair) : « Ouvrir VRM » et « Se déconnecter » ≥ 44 px', JSON.stringify(co.look.cibles));
   });
 
   // ── 19 octobre : AU DOIGT, SUR UN TÉLÉPHONE (Firefox Android, iPhone) ──

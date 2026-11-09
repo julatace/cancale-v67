@@ -33,9 +33,6 @@ function direALaCarte(quoi) {
     window.parent.postMessage(quoi === 'hauteur' ? { __vrmCarte: 'hauteur', h } : { __vrmCarte: 'prete' }, '*');
   } catch (_) {}
 }
-if (CARTE) {
-  try { new ResizeObserver(() => direALaCarte('hauteur')).observe(document.body); } catch (_) {}
-}
 
 // Un email est du texte saisi : il n'entre jamais dans du HTML sans être échappé.
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -480,5 +477,18 @@ function chargerAuth(rester) {
     });
   });
 }
+// 5.332 (défaut #6, décision de Julien du 9 nov.) : dans la carte d'un site,
+// cette page n'affiche plus SA connexion : elle charge le formulaire de la carte
+// (vrm-badge.js, en mode « cadre » — code par e-mail, mot de passe, Google /
+// Discord, le MÊME code que la carte dessinée, §11), ici à l'origine de
+// l'extension : la page du site n'en entend aucune touche.
+function lancerCadre() {
+  try { document.body.replaceChildren(); document.body.classList.remove('decide'); } catch (_) {}
+  globalThis.__vrmCadre = true;
+  const s = document.createElement('script');
+  s.src = 'vrm-badge.js';
+  (document.head || document.documentElement).appendChild(s);
+}
 if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
+else if (CARTE) lancerCadre();
 else chargerAuth();
