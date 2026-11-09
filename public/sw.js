@@ -19,7 +19,10 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil((async () => {
   // Purge les anciens caches de coquille lors d'une mise à jour.
   const keys = await caches.keys();
-  await Promise.all(keys.filter(k => k !== CACHE && k !== CACHE_QR).map(k => caches.delete(k)));
+  // (9 nov.) Les réserves du hors connexion (`vrm-hl-*` : les QR, et les bordereaux déjà
+  // ouverts — src/bordereauxHorsLigne.js) sont des DONNÉES du vendeur, pas une version de
+  // la coquille : la page les remplit et les vide (déconnexion), la mise à jour les garde.
+  await Promise.all(keys.filter(k => k !== CACHE && k !== CACHE_QR && !k.startsWith('vrm-hl-')).map(k => caches.delete(k)));
   await clients.claim();
 })()));
 
