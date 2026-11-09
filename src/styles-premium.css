@@ -804,4 +804,14 @@
 .vrm-main[data-ecran="dashboard"] .vrm-sv-n { font: 400 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; text-align: right !important; color: var(--p-encre) !important; }
 .vrm-main[data-ecran="dashboard"] .vrm-sv-chiffre { font-variant-numeric: tabular-nums !important; }
 
+/* 11.4 COMPTA — les replis (« Vendu et reçu », « Bilan du mois »…) sont les rangées d'un
+   groupe : 48 px partout (60 à l'ordinateur, 44 au téléphone : deux hauteurs pour la même
+   rangée), le titre 15/500 à l'encre, le chevron gris, le filet après le bord. Les
+   montants de Compta en chiffres tabulaires. Aucun montant ni règle ne change. */
+.vrm-main[data-ecran="compta"] .vrm-compta-replis { padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-repli > summary { min-height: 48px !important; padding: 0 !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-repli-titre { font: 500 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.004em !important; }
+.vrm-main[data-ecran="compta"] :is(.vrm-urssaf-val, .vrm-fu-prevision-montant, .vrm-compta-q-n, .vrm-display) { font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-question { border-radius: var(--p-r-carte) !important; }
+
 } /* fin @layer vrm-premium */
