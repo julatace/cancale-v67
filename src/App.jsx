@@ -9269,6 +9269,8 @@ const taillePicto = (style) => {
 //     de quelques secondes et ne les remontrait jamais. Ce composant dessine
 //     lui-même le pictogramme à leur place. Pour une autre adresse (un <img>
 //     ordinaire), `onError` part sur l'erreur du navigateur, comme avant.
+// (9 nov., vitesse) `decoding="async"` : la photo se décode hors du fil qui dessine l'écran
+// (aucun effet sur son chargement ni sur `onLoad`).
 function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
@@ -9306,11 +9308,11 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
   }
   if (etat === 'ok') {
-    return <img src={photosVinted.blobDe(src)} style={style} alt="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
+    return <img src={photosVinted.blobDe(src)} decoding="async" style={style} alt="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
-    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} alt="" {...reste} data-photo-vinted="natif"
+    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} decoding="async" style={style} alt="" {...reste} data-photo-vinted="natif"
       onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
       onError={() => photosVinted.echecNatif(src)}/>;
   }
