@@ -520,6 +520,12 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **9 nov. (soir) · PASSATION GÉNÉRALE** : état, décisions, ce qui reste, gestes de Julien, leçons d'intégration — `docs/passation/2026-11-09-passation-generale.md` (à lire en premier).
+- **9 nov. · Leboncoin clair (5.335)** : rattrapage après connexion, `X` = `lbc-account:X`, « Mes annonces » relue en entier, « à retirer » seulement si vue en ligne < 24 h, carte en 3 lignes. `docs/passation/2026-11-09-leboncoin-clair.md`. Geste : 5.335 + « Mes annonces » sur chaque compte.
+- **9 nov. · Offres Solo 16,99 € / Pro 19,99 €** : un compte vendeur Vinted en Solo (ventes des autres en aperçu, hors totaux) ; plan lu du prix Stripe ; migration 028. `docs/passation/2026-11-09-plans-solo-pro.md`. Geste : prix Pro Stripe + `STRIPE_PRIX_PRO`, 028.
+- **9 nov. · Sécurité** : revue (aucune fuite entre vendeurs ; `/api/ai` exige une session) puis liaison Vinted prouvée (029) et carte en iframe hors Orion (5.332). `docs/passation/2026-11-09-securite.md`, `-securite-2.md`. Geste : requêtes SQL de contrôle, 029 avant 023.
+- **9 nov. · RGPD** : « Supprimer mon compte », clients partis (e-mail 11 mois, suppression 12 mois), export de ses données ouvert sans abonnement (sa décision). `docs/passation/2026-11-09-rgpd-compte.md`. Geste : relire la politique.
+- **9 nov. · Vendre plus / Recherche ⌘K + fiche paire / Achats proposés + export comptable / Inventaire + hors ligne / Tableau du propriétaire / Fiabilité 5.331 / Charge + sauvegarde / Direction artistique 3** : une passation chacun (`docs/passation/2026-11-09-*.md`). Geste : aucun (sauf Vercel Pro vers ~70 vendeurs).
 - **9 nov. · Ma configuration (plein écran) + profil fiscal** : au 1er lancement (jamais pour le propriétaire, jamais chez un vendeur qui a déjà choisi ses plateformes), une étape par écran — je vends, plateformes, statut (particulier · micro achat-revente/prestations · société · je ne sais pas = `null`), micro (rythme, VL, ACRE ⇒ taux), TVA société (`vrm_societe_tva`), N° (`vrm_numero_ecrit` actif+`ou`), affichage, notifications ; rien n'est écrasé ; rejouable Réglages → Affichage → Ma configuration. `src/profilFiscal.js` = LA règle par statut (Compta, Ma journée DAC7, Notifications ; taux et seuils services vérifiés). `docs/passation/2026-11-09-configuration-depart.md`. Geste : aucun.
 - **9 nov. · Vitesse du démarrage** : Tournée cachée plus calculée, achats des colis indexés, formats de date créés une fois, cache des ventes écrit hors de l'ouverture ; processeur −15 % à l'ouverture, Colis 1er passage 6,0 → 4,1 s ; « Ma journée < 3 s » PAS atteint (prête = montage + plafond 2,5 s, carte/notifs tardives). `docs/passation/2026-11-09-vitesse-demarrage.md`, banc `demarrage-vitesse`. Geste : aucun (décider du plafond).
 - **9 nov. · Où est ton numéro ? + remise en ligne** : « je l'écris » choisit OÙ (fin de description · titre · référence plateforme, jamais zéro, `vrm_numero_ecrit.ou`) + essai ; extension 5.334 lit la description (dressing, Leboncoin entière ; `numEcrit`) ; annonce supprimée puis nouvelle ⇒ « même paire que N°X ? » (photo = forte, marque+taille+modèle = simple ; SON clic, `poserNumero`) — `src/remiseEnLigne.js`. `docs/passation/2026-11-09-numero-etiquette.md`. Geste : installer la 5.334 ; Vinted pro : capture à faire.
@@ -527,58 +533,15 @@ sans la fonction.
 - **9 nov. · Achats prêts à confirmer + export comptable** : saisie en série « Payé sur Vinted : 85,40 € » (reçu juste) ou « Article seul » — Garder / Corriger / Tout garder (confirmé), seulement par identité, rien écrit sans son clic ; Compta → « Exporter pour mon comptable » (mois/trimestre/année, CSV Excel + PDF 1 page : ventes datées au versement, à dater à part, achats au coût saisi, CA = ligne publiée, URSSAF seulement si micro). `src/exportComptable.js`, `docs/passation/2026-11-09-achats-export.md`. Geste : aucun.
 - **9 nov. · Contrôle quotidien de la prod en navigateur** : 7 h 10 Paris, Chromium iPhone + ordinateur en lecture seule (accueil, /statut, /aide, lien de récupération expiré, mode exemple sans base, /api/sante, zip, manifeste, en-têtes) ; rouge ⇒ rejoué après 5 min, puis UNE issue tenue à jour, fermée au vert ; captures en artefact. `docs/passation/2026-11-09-controle-prod.md`. Geste : facultatif (compte de démo, réglage des e-mails GitHub).
 - **9 nov. · /statut automatique** : sondes toutes les 10 min (`ship-reminders?moment=sondes` via GitHub `sondes-statut.yml`, + crons matin/soir) sur base, connexion, e-mails reçus (silence comparé à l'historique), envoi SMTP, notifications, extension ; ligne neutre `statut_sondes` ; 2 ratées de suite ⇒ incident + 1 notification, retour ⇒ fermé avec durée ; page 30 jours, « pas su » gris ; bandeau discret dans l'app. `docs/passation/2026-11-09-statut-auto.md`. Geste : `CRON_SECRET` dans les secrets GitHub.
-- **8 nov. (nuit) · Beaux e-mails** : un gabarit commun `api/_lib/mail-gabarit.js` (logo, préentête, 520, sombre toléré, UN bouton bleu, « Gérer mes e-mails » sur les facultatifs, éditeur seulement si rempli) pour essai j1/j3/j6, bilan du mois (couverture « sur N ventes de M », jamais « au moins 0 »), preuve d'adresse, facture Pro, essai de boîte ; « M’envoyer un e-mail d’essai » (Réglages → Notifications, 3/h) ; `audit-mails-envoyes` (+ `--mutations`), `scripts/mails-apercus.cjs`. `docs/passation/2026-11-08-mails-envoyes.md`. Geste : s'envoyer l'e-mail d'essai.
-- **8 nov. · Nouveau compte relié** : feuille « shop_x est relié à VRM » une fois par compte (identité, ligne `vrm_comptes_relies`, point de départ posé par l'app ⇒ jamais pour les comptes déjà là), première lecture cochée sur preuve (annonces/ventes/achats/porte-monnaie, nombre lu ou « En cours », geste après 3 min), nom court · totaux · règle des N° ; notification famille « Nouveau compte relié » (`api/_lib/compte-relie.js`, via `/api/push` + cron), rattrapable dans Comptes liés. `docs/passation/2026-11-08-compte-relie.md`. Geste : aucun.
-- **8 nov. · Notifications belles et utiles** : une forme pour tout ce qui sonne (`api/_lib/notif-belle.js` : sans emoji, titre ≤ 40 qui dit le fait, corps = geste + échéance, badge monochrome, actions, photo seulement prouvée) ; regroupement par genre et heures calmes 22 h → 8 h ALLUMÉS par défaut (sauf double vente et limite < 10 h) ; cloche regroupée pareil ; doublons locaux retirés. `docs/passation/2026-11-08-notifications.md`. Geste : aucun.
-- **8 nov. · Navigation et plateformes choisies** : colonne par tâches sans doublons, choix au démarrage et Paramètres → Affichage → Mes plateformes ; connexions reconnues automatiquement, totaux inchangés. Saisies refusées conservées, boutons grisés expliqués au toucher et sélections d’impression détaillées. `docs/passation/2026-11-08-navigation-plateformes.md`. Aucun geste technique.
-- **8 nov. · Périodes et garde Orion** : une ancienne plage montre ses dates réelles ; focus rendu à la fermeture du calendrier ; garde ajusté strictement au retour OAuth commun 5.328, avec huit altérations refusées. `docs/passation/2026-11-08-periodes-et-garde-orion.md`. Aucune extension à réinstaller.
-- **8 nov. · Mot de passe oublié + e-mails FR/EN** : `/recuperation.html` à l'identité de l'app, accepte toutes les formes de lien Supabase (token_hash, access_token, `?code`, `#error=otp_expired`), « Enregistrer » ⇒ connecté ; lien raté ⇒ renvoi, « coller » seulement là ; 6 modèles fabriqués par `scripts/modeles-email.cjs` (FR, EN si `user_metadata.langue`=en ; code en grand dans Magic Link). `docs/passation/2026-11-08-recuperation-mails.md`. Geste : `docs/supabase-modeles-email.md`.
-- **8 nov. · Fermetures involontaires** : une interruption de glissement ne ferme plus la feuille ; Échap de composition ne ferme plus un fil eBay. `docs/passation/2026-11-08-bugs-fermeture-fenetres.md`. Aucune extension à réinstaller.
-- **8 nov. (soir) · Extension 5.329 : connexion DANS la carte, sans iframe ni onglet** : e-mail + mot de passe dessinés dans la shadow root fermée du logo (l'iframe de la 5.328 ne s'affichait pas sur Orion ⇒ « Se connecter avec VRM » ouvrait VRM) ; Google/Discord seulement en petite fenêtre (pas sur Orion) ; « déconnecté » = renouvellement lent affiché « expirée », verrou de renouvellement partagé, rangement vérifié. `docs/passation/2026-11-08-connexion-carte-2.md`. Geste : installer la 5.329.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.323.0** (6 nov.). **À lire en premier : `docs/passation/2026-11-07-passation-generale.md`** (tout ce qui reste, 4 branches `claude/attente-*` à fusionner), puis `docs/passation/2026-11-02-liste.md`. **Production** : https://vrm.center,
+**Extension servie : 5.335.0** (9 nov.). **À lire en premier : `docs/passation/2026-11-09-passation-generale.md`** (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Comptabilité → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l'extension **5.317.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome), puis sur Vestiaire ouvrir la messagerie (`/chat/`) et une conversation.
+- Installer l'extension **5.335.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
