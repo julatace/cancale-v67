@@ -197,14 +197,12 @@ const communs = (m, vp, errs) => {
         dit(lu.prix.every((x) => x != null) && somme === ATTENDU.sommeToutes, 'la somme des prix rendus est 696,90 €', `${somme / 100} € ${JSON.stringify(lu.prix)}`);
         communs(await mesurer(pg), vp, errs);
         await capture(pg, vp, 'ventes');
-        await pg.locator('button[aria-pressed]', { hasText: /^(À envoyer|À expédier)$/ }).first().click({ timeout: 4000 });
-        await pg.waitForTimeout(800);
-        const nA = await pg.evaluate(() => document.querySelectorAll('.vrm-sale-row[data-tx]').length);
-        dit(nA === ATTENDU.aExpedier, `« À expédier » rend ${ATTENDU.aExpedier} ventes`, `${nA}`);
-        const m2 = await mesurer(pg);
-        dit(m2.coupes.length === 0 && m2.deb <= 1, 'À expédier : rien de coupé ni de débordant', `${m2.deb} px ${m2.coupes.join(' | ')}`);
-        if (vp.width < 600) dit(m2.petites.length === 0, 'À expédier : aucune cible sous 44 px', m2.petites.slice(0, 6).join(' | '));
-        await capture(pg, vp, 'ventes-aexpedier');
+        // (9 nov., Ma journée v2) Plus de seconde liste « À envoyer » dans Ventes : l'état reste sur chaque vente
+        // (ATTENDU.aExpedier ventes le portent), la liste des colis vit dans Colis (un lien la nomme).
+        const nA = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sale-row[data-tx]')].filter((r) => /À envoyer/.test(r.innerText)).length);
+        dit(nA === ATTENDU.aExpedier, `« À envoyer » est l'état de ${ATTENDU.aExpedier} ventes de la liste`, `${nA}`);
+        const f = await pg.evaluate(() => ({ filtre: [...document.querySelectorAll('.vrm-filtres button[aria-pressed]')].some((x) => /^(À envoyer|À expédier)$/.test(x.innerText.trim())), lien: !!document.querySelector('[data-ventes-vers-colis]') }));
+        dit(!f.filtre && f.lien, 'Ventes : aucune seconde liste « À envoyer », un lien vers Colis', JSON.stringify(f));
         await ctx.close();
       });
       console.log(`\n── Colis, ${vp.width} px`);

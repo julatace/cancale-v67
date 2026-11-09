@@ -193,17 +193,19 @@ const ouvrir = async (b, vp, sombre, tab) => {
 const mesureJournee = (pg) => pg.evaluate(() => {
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const rgb = (x) => { const m = /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?/.exec(x || ''); return m ? { r: +m[1], g: +m[2], b: +m[3], a: m[4] == null ? 1 : +m[4] } : null; };
-  const liste = document.querySelector('.vrm-fu-afaire');
+  // (9 nov., Ma journée v2) « À faire » = la prochaine chose (en tête, `.vrm-jv2-prochain`) + « Ensuite ».
+  const racines = [...document.querySelectorAll('.vrm-jv2-prochain, .vrm-fu-afaire')];
+  const liste = racines.length ? { querySelectorAll: (q) => racines.flatMap((r) => [...r.querySelectorAll(q)]) } : null;
   const taches = liste ? [...liste.querySelectorAll('.vrm-day-task')].filter(vis) : [];
   const lignes = taches.map((t) => {
     const p = t.querySelector('[data-pile]');
     return { cas: t.getAttribute('data-case') || t.getAttribute('data-job') || '', n: t.getAttribute('data-n'), pile: p ? { n: p.getAttribute('data-pile-n'), photos: Number(p.getAttribute('data-pile-photos')), plus: Number(p.getAttribute('data-pile-plus')), estPile: p.classList.contains('is-pile'), srcs: [...p.querySelectorAll('[data-vignette-src]')].map((v) => v.getAttribute('data-vignette-src')), imgs: [...p.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth > 0).length, w: Math.round(p.querySelector('.vrm-pile-v').getBoundingClientRect().width), rayon: getComputedStyle(p.querySelector('.vrm-pile-v')).borderTopLeftRadius } : null,
-      fond: getComputedStyle(t).backgroundColor, titre: (t.querySelector('.vrm-day-task-title') || {}).textContent || '' };
+      fond: getComputedStyle(t).backgroundColor, prochain: t.hasAttribute('data-prochain'), titre: (t.querySelector('.vrm-day-task-title') || {}).textContent || '' };
   });
   // Une « pastille pleine colorée » : un élément de 20 px ou plus, fond plein ambre ou encre/noir.
   const pleines = liste ? [...liste.querySelectorAll('*')].filter(vis).filter((e) => {
     const b = e.getBoundingClientRect(); if (b.width < 20 || b.height < 20) return false;
-    if (e.closest('[data-fu-principal]')) return false;
+    if (e.closest('[data-fu-principal]') || e.closest('[data-prochain] .vrm-day-task-action')) return false;
     const c = rgb(getComputedStyle(e).backgroundColor); if (!c || c.a < 0.5) return false;
     const ambre = c.r > 200 && c.g > 120 && c.g < 190 && c.b < 60;
     const encre = c.r < 60 && c.g < 60 && c.b < 60 && !document.documentElement.getAttribute('data-theme')?.includes('dark');
@@ -211,7 +213,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
     return ambre || encre || encreClaire;
   }).map((e) => `${e.className} ${getComputedStyle(e).backgroundColor}`) : [];
   const bleus = liste ? [...liste.querySelectorAll('*')].filter(vis).filter((e) => { const c = rgb(getComputedStyle(e).backgroundColor); return c && c.a > 0.5 && c.b > 200 && c.r < 40 && c.g > 90 && c.g < 150; }) : [];
-  return { lignes, pleines, bleus: bleus.length, bleuPrincipal: bleus.every((e) => e.closest('[data-fu-principal]')), pastilles: liste ? [...liste.querySelectorAll('.vrm-fu-pastille')].filter(vis).length : 0,
+  return { lignes, pleines, bleus: bleus.length, bleuPrincipal: bleus.every((e) => e.closest('[data-fu-principal]') || e.closest('[data-prochain]')), pastilles: liste ? [...liste.querySelectorAll('.vrm-fu-pastille')].filter(vis).length : 0,
     pubEnv: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'); } catch (_) { return null; } })(),
     deb: document.documentElement.scrollWidth - window.innerWidth };
 });
@@ -227,7 +229,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
       { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'journee');
         await essaie('journee', async () => {
           await pg.locator('.vrm-day-layout').first().waitFor({ timeout: 30000 });
-          if (JEU !== 'zero') await pg.locator('.vrm-fu-afaire [data-case="envoyer"]').first().waitFor({ timeout: 20000 });
+          if (JEU !== 'zero') await pg.locator(':is(.vrm-jv2-prochain, .vrm-fu-afaire) [data-case="envoyer"], [data-prochain][data-case="envoyer"]').first().waitFor({ timeout: 20000 });
           await pg.waitForTimeout(2200);
           const m = await mesureJournee(pg);
           const env = m.lignes.find((l) => l.cas === 'envoyer');
@@ -261,7 +263,9 @@ const mesureJournee = (pg) => pg.evaluate(() => {
             }
           }
           dit(m.pastilles === 0 && !m.pleines.length, 'J3 · aucune pastille pleine colorée (ni ambre, ni encre)', m.pleines.slice(0, 3).join(' | '));
-          dit(new Set(m.lignes.map((l) => l.fond)).size <= 1, 'J3 · un seul fond de carte (pas de carte grisée)', [...new Set(m.lignes.map((l) => l.fond))].join(' | '));
+          // (9 nov., Ma journée v2) La prochaine chose vit dans la tête sombre (sur voile) : jugée à part ; les cartes de « Ensuite » ont UN fond.
+          const ensuite = m.lignes.filter((l) => !l.prochain);
+          dit(new Set(ensuite.map((l) => l.fond)).size <= 1, 'J3 · un seul fond de carte dans « Ensuite » (pas de carte grisée)', [...new Set(ensuite.map((l) => l.fond))].join(' | '));
           dit(m.bleus <= 1 && m.bleuPrincipal, 'J3 · le bleu seulement sur le geste principal', `${m.bleus} bleu(s)`);
           dit(m.deb <= 1, 'aucun débordement horizontal', `${m.deb}px`);
           if (SHOTS) {
