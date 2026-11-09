@@ -61,7 +61,7 @@ export const CHOIX_VENDS = [
 ];
 export const CHOIX_STATUT = [
   { v: 'particulier', titre: 'Particulier', sous: 'Je vends mes propres affaires.', effet: 'Rien à déclarer à l’URSSAF.' },
-  { v: 'micro-vente', titre: 'Micro-entreprise · achat-revente', sous: 'J’achète pour revendre.', effet: 'VRM estime tes cotisations et te rappelle chaque déclaration.' },
+  { v: 'micro-vente', titre: 'Micro-entreprise · achat‑revente', sous: 'J’achète pour revendre.', effet: 'VRM estime tes cotisations et te rappelle chaque déclaration.' },
   { v: 'micro-services', titre: 'Micro-entreprise · prestations', sous: 'Je vends un service (BIC).', effet: 'Le taux des prestations de services commerciales.' },
   { v: 'societe', titre: 'Société', sous: 'EI au réel, EURL, SASU, SARL…', effet: 'Livre des recettes et export pour ton comptable.' },
   { v: 'inconnu', titre: 'Je ne sais pas encore', sous: 'Rien n’est calculé tant que tu n’as pas choisi.', effet: 'Une aide courte et les pages officielles.' },

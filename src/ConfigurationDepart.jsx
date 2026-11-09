@@ -184,11 +184,11 @@ function corpsEtape(cle, { choix: c, poser, lus, aller }) {
     const s = seuilsActivite(new Date().getFullYear(), activite);
     return (<>
       <h2 className="vrm-cfg-question">Tu déclares</h2>
-      <Groupe label="Rythme de déclaration" colonnes="2">
+      <Groupe label="Rythme de déclaration" colonnes="duo">
         {CHOIX_RYTHME.map((x) => <Carte key={x.v} choisi={c.rythme === x.v} onClick={() => poser({ rythme: x.v })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `rythme:${x.v}` }} />)}
       </Groupe>
       <h2 className="vrm-cfg-question">Versement libératoire de l’impôt</h2>
-      <Groupe label="Versement libératoire" colonnes="2">
+      <Groupe label="Versement libératoire" colonnes="duo">
         {CHOIX_LIBERATOIRE.map((x) => <Carte key={x.v} choisi={c.liberatoire === x.v} onClick={() => poser({ liberatoire: x.v })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `liberatoire:${x.v}` }} />)}
       </Groupe>
       <h2 className="vrm-cfg-question">ACRE (aide à la création)</h2>

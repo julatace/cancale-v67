@@ -42,13 +42,17 @@
 @keyframes vrmCfgEntre { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .vrm-cfg-sur { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--cfg-gris); font-variant-numeric: tabular-nums; text-align: center; }
 .vrm-cfg-titre { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.022em; line-height: 1.12; text-align: center; text-wrap: balance; }
-.vrm-cfg-titre:focus { outline: none; }
+/* Le titre reçoit le focus à chaque étape (lecteur d'écran) : pas d'anneau, ce n'est pas une commande. */
+.vrm-cfg .vrm-cfg-titre:focus, .vrm-cfg .vrm-cfg-titre:focus-visible { outline: none !important; box-shadow: none !important; }
 .vrm-cfg-sous { margin: 10px auto 24px; max-width: 46ch; font-size: 17px; line-height: 1.45; color: var(--cfg-gris); text-align: center; text-wrap: pretty; }
 .vrm-cfg-question { margin: 20px 0 10px; font-size: 15px; font-weight: 600; color: var(--cfg-encre); letter-spacing: -.01em; }
 .vrm-cfg-question:first-of-type { margin-top: 0; }
 
 .vrm-cfg-grille { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 @media (min-width: 560px) { .vrm-cfg-grille[data-colonnes="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Deux réponses courtes (mois / trimestre, oui / non) : côte à côte même au téléphone. */
+.vrm-cfg-grille[data-colonnes="duo"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vrm-cfg-grille[data-colonnes="duo"] .vrm-cfg-carte { align-items: flex-start; padding: 14px; gap: 10px; }
 .vrm-cfg-carte {
   appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%;
   min-height: 64px; padding: 14px 16px; text-align: left; cursor: pointer;
