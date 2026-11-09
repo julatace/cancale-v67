@@ -83,3 +83,25 @@ continue, avoir, TVA sur la marge (art. 297 A). Propositions pour aller plus loi
 « Fais tout » ⇒ 23 à 30 validées. Lots : Q = 23 + 24 + 25 + 26 · R = 27 (livre de police) ·
 S = 28 (Leboncoin/eBay/Vestiaire : forme des e-mails à mesurer d'abord, par requête en lecture
 seule donnée à Julien) · T = 29 + 30. L'envoi automatique (23) reste ÉTEINT par défaut.
+
+## Cinquième série — sur toute l'app (9 nov., soir) — à valider
+
+Vérifié dans le code : aucune n'existe (badge d'icône, corbeille, vues enregistrées,
+inventaire de fin d'année, contrôle des annonces : absents ; la caméra lit déjà les QR de
+retrait, pas les bordereaux). Rien de la liste refusée, ni prix venu des autres vendeurs
+(ce serait un prix conseillé).
+
+| # | écran | proposition | pourquoi | effort |
+|---|---|---|---|---|
+| 31 | Annonces | **Annonces à compléter** : moins de 5 photos, taille ou marque absente, description très courte, pas de N° — liste avec le geste | une annonce complète se vend mieux ; règles fixes, aucune IA | petit |
+| 32 | Ventes | **L'avis reçu sur chaque vente** (note, date — déjà relevés par l'extension 5.319) | voir d'un coup quelle vente a donné une mauvaise note | petit |
+| 33 | Colis | **Scanner au dépôt** : la caméra lit le code du bordereau au point relais ⇒ « déposé » coché sur CE colis (identité = n° de suivi) | dire que c'est déposé sans chercher le colis dans la liste | moyen |
+| 34 | Stock / Compta | **Inventaire de fin d'année** : paires présentes au 31/12 au prix d'achat, couverture dite (« 140 sur 152 ont un prix ») ; export PDF/CSV | un pro doit déclarer son stock final ; le total partiel dit son manque | petit |
+| 35 | Partout | **Sélection multiple et actions en lot**, la même forme sur Annonces, Ventes, Colis, Achats | une seule façon de faire, partout | moyen |
+| 36 | Partout | **Vues enregistrées** (« Nike taille 42 en ligne depuis +30 j ») en un toucher | les mêmes filtres reviennent chaque jour | petit |
+| 37 | Partout (ordinateur) | **Fiche à côté de la liste** : ouvrir une paire dans un panneau à droite sans quitter la liste | aller vite sur un grand écran | moyen |
+| 38 | Partout | **Corbeille 30 jours** pour ce qui est supprimé DANS VRM (fiche, achat, note) — récupérable | une erreur se répare ; un N° n'est jamais redonné pour autant | moyen |
+| 39 | iPhone | **Le nombre de colis à envoyer sur l'icône de VRM** (pastille de l'écran d'accueil) | savoir sans ouvrir | petit |
+| 40 | Extension | **Sur vinted.fr, sur SES annonces** : « N°124 · acheté 60 € · en ligne depuis 23 j » discret sous chaque annonce (lecture seule) | l'info au bon endroit, sans changer d'onglet | moyen (ext.) |
+| 41 | Extension | **Pendant un ACHAT sur Vinted** : la calculette (13) et « tu as déjà 2 paires de ce modèle » (8) dans la page | décider au moment d'acheter | moyen (ext.) |
+| 42 | Messages | **Messages des quatre plateformes dans un seul fil par acheteur et par paire**, avec la plateforme marquée | ne plus aller chercher où il a écrit (si pas déjà le cas partout) | moyen |
