@@ -473,7 +473,7 @@ import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, 
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
-import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
+import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
@@ -30926,9 +30926,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return { uid, nom: accNameOf(a), ok: !ko.has(uid), lu: listings.lues ? listings.lues[uid] : null,
         enLigne: listings.items.filter((it) => String(it && it._acc && it._acc.vinted_user_id) === uid) };
     });
-    return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum });
+    // (9 nov., lot AF) `dateDe` : depuis quand chaque annonce est en ligne (la date que
+    // l'écran Annonces affiche, `dateMiseEnLigneMs`) — l'alerte la montre, null = pas lue.
+    // Coût : un passage par annonce, un index par clé photo (union-find) — jamais O(n²).
+    return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum, dateDe: (it) => dateMiseEnLigneMs(it, listingDates) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff]);
+  }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff, listingDates]);
   // (29 oct.) La lecture des annonces telle que la règle de l'offre la juge
   // (`annonceOffreEnVente`) : la MÊME que l'écran Annonces (§11) — en ligne, à
   // confirmer, masquées, brouillons, l'heure de la lecture qui fait foi par compte
@@ -42713,6 +42716,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const noms = {}; accounts.forEach(a => { noms[String(a.vinted_user_id)] = accNameOf(a); });
           return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} aConfirmer={annAConfirmer} numeros={numeros} activite={liveStats && liveStats.annActivite}/>;
         })()}
+        {/* (9 nov., lot AF) LA MÊME PAIRE EN LIGNE DEUX FOIS (`enLigneDeux`, src/enLigneDeuxFois.js) :
+            mêmes groupes que la carte de Ma journée (§11) — même PHOTO EXACTE ou `recreeDe`, lectures
+            de moins de 24 h, jamais le titre. AMBRE, avant la double vente ; le geste est le sien,
+            sur vinted.fr (VRM ne supprime rien, §3). */}
+        {enLigneDeux && enLigneDeux.vinted.length > 0 && <EnLigneDeuxFoisAlerte groupes={enLigneDeux.vinted} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted} Feuille={SheetShell}/>}
         {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
         {listings.error && <EtatPanne quoi="Tes annonces Vinted" data-ann-panne="" onReessayer={()=>loadListings(true)}/>}
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du

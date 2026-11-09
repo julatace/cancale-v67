@@ -15,3 +15,17 @@
   border: 1px solid var(--vrm-line, #E5E5EA); color: var(--vrm-ink, inherit); text-decoration: none; font-weight: 500; font-size: 14px; box-sizing: border-box; }
 .vrm-deux-fois-geste { margin: 2px 0 8px; font-size: 13px; opacity: .8; }
 .vrm-deux-fois-manque { font-size: 12px; opacity: .7; border-top: 1px solid var(--vrm-line, #E5E5EA); padding-top: 10px; }
+
+/* (9 nov., lot AF) L'alerte de l'écran Annonces : AMBRE (un geste à faire), jamais rouge.
+   Groupe blanc rayon 24 de la DA6, filet ambre à gauche ; liens à 44 px. */
+.vrm-deux-fois-alerte { margin: 0 0 12px; padding: 12px 14px; border-radius: 24px; background: var(--vrm-surface, #FFFFFF);
+  box-shadow: inset 3px 0 0 var(--vrm-warn, #B25000); color: var(--vrm-ink, inherit); min-width: 0; }
+.vrm-deux-fois-alerte-tete { margin: 0 0 6px; line-height: 1.4; }
+.vrm-deux-fois-alerte-tete b { display: block; font-size: 15px; font-weight: 600; color: var(--vrm-warn, #B25000); }
+.vrm-deux-fois-alerte-tete span { display: block; font-size: 13px; color: var(--vrm-muted, inherit); }
+.vrm-deux-fois-alerte-groupe { list-style: none; margin: 0; padding: 4px 0 0; border-top: 1px solid var(--vrm-line, #E5E5EA); }
+.vrm-deux-fois-alerte-groupe li { display: flex; align-items: center; gap: 10px; padding: 6px 0; min-width: 0; }
+.vrm-deux-fois-alerte-txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.vrm-deux-fois-alerte-txt b { display: block; font-weight: 500; font-size: 14px; line-height: 1.35; }
+.vrm-deux-fois-alerte-txt small { display: block; font-size: 12px; color: var(--vrm-muted, inherit); font-variant-numeric: tabular-nums; }
+.vrm-deux-fois-tout { min-height: 44px; }
