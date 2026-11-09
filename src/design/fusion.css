@@ -671,7 +671,9 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-scre
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: none !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head h1 { display: block !important; }
 /* Ce que la maquette ne montre pas */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is(.vrm-filtre-site:not([data-selecteur-logos]), [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note, [data-colis-filtre-note], .vrm-colis-groupe) { display: none !important; }
+/* (9 nov., banc colis-fiables) Les notes EXPLICATIVES sont retirées ; la note « N colis sont arrivés sur une
+   adresse reliée à aucun compte » porte un GESTE (« Paramètres → Comptes liés ») : elle reste (2 nov., §2.7). */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is(.vrm-filtre-site:not([data-selecteur-logos]), [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note:not([data-pickup-sans-compte]), [data-colis-filtre-note], .vrm-colis-groupe) { display: none !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-outils { display: none !important; }
 /* Le sélecteur « J'envoie · 3 / Je reçois · 2 » */
 /* (5 nov., chantier A) Le segmenté lui-même — piste, segments, actif — est la règle unique de styles-coque.css. */

@@ -56,6 +56,12 @@ const ROWS = [
   { id: 'panel_colis_relais', data: { '9601': { code: 'C11111', lieu: 'Tabac du Port, 4 Quai Gambetta, 35260 Cancale', at: j(1), url: 'https://www.vinted.fr/inbox/7601' } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: j(0), payload: { my_orders: ACHATS_A } } },
   { id: 'harvest_222_orders_purchased', data: { capturedAt: j(9), payload: { my_orders: ACHATS_B } } },
+  // (9 nov.) La VRAIE forme : l'extension relit ventes ET achats d'un compte à la même
+  // visite — un compte relu il y a 9 j a aussi ses ventes datées d'il y a 9 j. Depuis le
+  // 3 nov., la fraîcheur se dit sur Colis par la puce « N comptes à relire »
+  // (`data-comptes-a-relire`, source `liveStats.dataAge*` = les lectures des ventes).
+  { id: 'harvest_111_orders_sold', data: { capturedAt: j(0), payload: { my_orders: [] } } },
+  { id: 'harvest_222_orders_sold', data: { capturedAt: j(9), payload: { my_orders: [] } } },
   // La transaction de l'achat 9603 (son état). ⚠️ (23 oct., soir) Son n° de suivi
   // n'est PLUS lu dans la transaction : mesuré, 0 transaction réelle sur 1 290 n'en
   // porte (`shipment.tracking_code`, une lecture morte). Il vient de la LIGNE DE
@@ -106,6 +112,7 @@ const ROWS_R = ROWS.map((r) => {
   if (r.id === 'harvest_111_orders_purchased') return { ...r, data: { ...r.data, payload: { my_orders: ACHATS_A.concat(VIEUX) } } };
   return r;
 }).concat([
+  { id: 'harvest_333_orders_sold', data: { capturedAt: j(3), payload: { my_orders: [] } } },
   { id: 'harvest_333_orders_purchased', data: { capturedAt: j(3), payload: { my_orders: [{ transaction_id: 9605, conversation_id: 7605, title: 'Adidas Samba taille 41', price: { amount: '40', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: j(4) }] } } },
   track('email_track_mondialrelay_30000010', { carrier: 'mondialrelay', suivi: '30000010', subject: 'Votre colis 30000010 est disponible 📦', receivedAt: j(1), account: 'compte_a', code: null, lieu: null, limite: null }),
   track('email_track_vinted_1790000000000011', { carrier: 'vinted', suivi: '1790000000000011', subject: 'Ton colis est arrivé à la consigne', receivedAt: j(83), account: 'compte_a', code: 'B00011', lieu: 'Consigne Banc, 11 Rue Exemple, 35000 Rennes', limite: null }),
@@ -161,7 +168,9 @@ async function preparer(b, vp, quand, sombre, opts = {}) {
     if (opts.journal) opts.journal.push(u);
     if (/id=like\.email_track_/.test(u)) {
       if (opts.suivis === 'ko' || (opts.etat && opts.etat.suivis === 'ko')) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
-      if (Number.isFinite(opts.suivis)) return new Promise((res) => setTimeout(res, opts.suivis)).then(() => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ROWS_S.filter((r) => /^email_track_/.test(r.id)).map((r) => ({ ...r, updated_at: iso(NOW) }))) }));
+      // (9 nov.) `suivis: { tenu }` : la lecture est TENUE jusqu'à ce que le banc la lâche
+      // (§6.5 : un « pendant » se joue sur une requête tenue, jamais sur un délai fixe).
+      if (opts.suivis && opts.suivis.tenu) return opts.suivis.tenu.then(() => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ROWS_S.filter((r) => /^email_track_/.test(r.id)).map((r) => ({ ...r, updated_at: iso(NOW) }))) }));
     }
     if (/select=owner/.test(u)) return rep([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return rep(opts.accounts || ACCOUNTS);
@@ -179,7 +188,21 @@ async function preparer(b, vp, quand, sombre, opts = {}) {
   return { ctx, pg, errs };
 }
 
-const lire = (pg) => pg.evaluate(() => {
+// (9 nov.) Depuis le 4 nov. (« Simplifier les actions de retrait », commit 56b41722),
+// « À retirer » est une LIGNE par colis : son détail (n° de suivi, compte, date limite
+// exacte) s'ouvre par « ⌄ » (`.vrm-rpf-ouvrir`), et « À vérifier » est un <details>
+// replié. Le banc déplie tout, comme le ferait Julien, PUIS lit — la même règle jugée
+// (le même détail, les mêmes attributs), plus rien de caché par la présentation. Il
+// attend que chaque ligne montre son détail (condition, jamais un délai fixe).
+const deplier = async (pg) => {
+  await pg.evaluate(() => {
+    for (const d of document.querySelectorAll('[data-cc-colonne="retirer"] details')) d.open = true;
+    for (const b of document.querySelectorAll('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir[aria-expanded="false"]')) b.click();
+  });
+  await pg.waitForFunction(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] .vrm-rpf-ligne')].every((l) => l.querySelector('[data-rp-detail]')), null, { timeout: 5000 }).catch(() => {});
+};
+const lire = async (pg) => { await deplier(pg); return lireBrut(pg); };
+const lireBrut = (pg) => pg.evaluate(() => {
   const at = (s, a) => { const e = document.querySelector(s); return e ? e.getAttribute(a) : null; };
   // (2 nov., colis clair) Colis → « À retirer » : une carte par colis, sous son point ;
   // les « à vérifier » dans leur groupe en bas (`data-hors-compte`).
@@ -193,7 +216,7 @@ const lire = (pg) => pg.evaluate(() => {
   return {
     total: at('[data-pickup-total]', 'data-pickup-total'), aVerifier: at('[data-pickup-a-verifier]', 'data-pickup-a-verifier'),
     sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length, sansCompteGeste: document.querySelectorAll('[data-pickup-sans-compte] [data-pickup-sans-compte-geste]').length,
-    blocAVerifier: at('[data-retirer-a-verifier]', 'data-retirer-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
+    blocAVerifier: at('[data-retirer-a-verifier]', 'data-retirer-a-verifier'), relire: at('[data-comptes-a-relire]', 'data-comptes-a-relire'), relireTitre: at('[data-comptes-a-relire]', 'title'), nRelire: document.querySelectorAll('[data-comptes-a-relire]').length,
     cartes, aVerif, repartis, texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     // L'ordre des points relais : la liste des n° de suivi de chaque bloc, dans l'ordre affiché.
     blocs: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]:not([data-retirer-a-verifier])')].map((b) => [...b.querySelectorAll('[data-rp-suivi]')].map((x) => x.getAttribute('data-rp-suivi'))),
@@ -226,7 +249,12 @@ async function main() {
         // Le lieu s'écrit UNE fois, en tête du point relais (pas sur chaque carte).
         const b8 = L.blocsTexte[L.blocs.findIndex((b) => b.includes('30000008'))] || '';
         dit(c8 && /taba'banc/i.test(b8) && !/lieu non indiqu/i.test(b8), `${T} ligne rangée avant le correctif : le lieu est RELU dans les lignes gardées (« POINT RELAIS® » le faisait manquer)`, b8.replace(/\n/g, ' ¦ ').slice(0, 160) || 'absent');
-        dit(c8 && c8.limite === 'inconnue' && /Date limite de retrait inconnue/.test(c8.limiteTxt) && !/non indiqu/i.test(L.texte), `${T} … sa date limite est « inconnue » (jamais « non indiquée dans l'e-mail » : l'e-mail la portait, la route ne savait pas la lire)`, c8 && `${c8.limite} « ${c8.limiteTxt} »`);
+        // (9 nov.) Depuis le 6 nov. (commit 39377544, « date limite estimée par la garde du
+        // transporteur lu », CLAUDE.md §5 Retrait) : sans date LUE, la garde de SON
+        // transporteur, dite « estimé » — arrivé le 21/10 chez Mondial Relay (5 j) ⇒ vers le
+        // 26/10. Jamais « non indiquée dans l'e-mail », jamais une date présentée comme lue.
+        const est8 = await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-cc-carte]')].find((c) => c.querySelector('[data-rp-suivi="30000008"]')); const l = e && e.querySelector('[data-colis-limite]'); return l ? l.getAttribute('data-colis-limite-estimee') : null; });
+        dit(c8 && c8.limite === 'estimee' && est8 === '2026-10-26' && /estimé/.test(c8.limiteTxt) && /Mondial Relay/.test(c8.limiteTxt) && !/non indiqu/i.test(L.texte), `${T} … sa date limite n'est pas lue : ESTIMÉE par la garde de Mondial Relay (vers le 26/10, dit « estimé »), jamais « non indiquée dans l'e-mail »`, c8 && `${c8.limite} ${est8} « ${c8.limiteTxt} »`);
         dit(!L.cartes.some((c) => c.suivi === 'XW000000009TS') && !L.aVerif.some((x) => x.suivi === 'XW000000009TS') && !/prochains jours/i.test(L.texte), `${T} « Information sur votre colis » (« sera disponible dans les prochains jours ») n'est ni à retirer ni à vérifier : il n'est pas arrivé`);
         const ordre = (s) => L.blocs.findIndex((b) => b.includes(s));
         dit(ordre('30000008') >= 0 && ordre('30000008') < ordre('09440000000002'), `${T} un point relais sans date limite ne passe plus derrière tous les autres (trié sur ce qui reste de la garde)`, `ordre : ${L.blocs.map((b) => b.join('+')).join(' · ')}`);
@@ -260,7 +288,7 @@ async function main() {
         // ligne de fraîcheur qui nomme compte_b —, plus sous la ligne du colis.
         const salo = L.aVerif.find((x) => x.raison === 'trop_long' && /Salomon XT-6/.test(x.t));
         dit(!!salo, `${T} l'achat Vinted lu « déposé » il y a 9 j ⇒ « à vérifier »`);
-        dit(salo && !/il y a 9 j/.test(salo.t) && (L.texte.match(/il y a 9 j/g) || []).length === 1, `${T} … l'âge de la lecture (9 j) est dit UNE fois — par la ligne qui nomme compte_b —, pas sous chaque colis`, `×${(L.texte.match(/il y a 9 j/g) || []).length} · ligne : ${salo ? salo.t.replace(/\n/g, ' ¦ ').slice(0, 140) : 'absente'}`);
+        dit(salo && !/il y a 9 j/.test(salo.t) && !/il y a 9 j/.test(L.texte) && L.nRelire === 1 && /compte_b/.test(L.relireTitre || '') && /il y a 9 j/.test(L.relireTitre || ''), `${T} … l'âge de la lecture (9 j) est dit UNE fois — par la puce « comptes à relire » qui nomme compte_b (3 nov.) —, pas sous chaque colis`, `puce ×${L.nRelire} « ${L.relireTitre} » · ligne : ${salo ? salo.t.replace(/\n/g, ' ¦ ').slice(0, 140) : 'absente'}`);
         dit(!/\bperdus?\b/i.test(L.texte), `${T} le mot « perdu » n'apparaît nulle part`);
         // ── repartis : par le transporteur, ou par la commande liée par IDENTITÉ
         dit(L.repartis.some((x) => x.suivi === '30000006'), `${T} « retourné à l'expéditeur » (écrit par le transporteur) ⇒ « reparti »`);
@@ -268,7 +296,7 @@ async function main() {
         dit(L.repartis.some((x) => x.suivi === '30000005' || x.tx === '9603') && !carte('30000005'), `${T} commande liée par son n° de suivi « non réclamée » ⇒ « reparti », plus « à retirer »`);
         dit(!L.repartis.some((x) => x.suivi === '30000001'), `${T} une commande au MÊME TITRE (une autre paire) ne fait pas repartir le Mondial Relay (§5)`);
         // ── fraîcheur, une fois, avec le compte et le geste
-        dit(L.nFraicheur === 1 && /222:9/.test(L.fraicheur || '') && /compte_b/.test(L.texte), `${T} « achats relus il y a 9 j sur compte_b » dit une fois`, `${L.fraicheur} ×${L.nFraicheur}`);
+        dit(L.nRelire === 1 && L.relire === '1' && /compte_b/.test(L.relireTitre || ''), `${T} « 1 compte à relire » (compte_b, il y a 9 j) dit une fois, avec son geste`, `${L.relire} « ${L.relireTitre} » ×${L.nRelire}`);
         if (process.env.SHOTS) await pg.screenshot({ path: path.join(process.env.SHOTS, `colis-fiables-${P.vp.width}${P.sombre ? '-sombre' : ''}.png`), fullPage: true });
         // ── Ma journée : le même nombre, et la ligne « à vérifier »
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
@@ -321,12 +349,14 @@ async function main() {
         dit(D5 && D5.pasLu && D5.suivre && D5.haut >= 44, `${T} … « code pas lu — ouvre l'e-mail du transporteur », avec « Suivi ↗ » (44 px)`, JSON.stringify(D5));
         dit(L.total === '6', `${T} … et il compte : « à retirer » 6 (1, 2, 8, 10, Asics, Samba)`, `total=${L.total}`);
         // défaut 10
-        const nCode = await pg.evaluate(() => [...document.querySelectorAll('[data-a-verifier-code="oui"]')].length);
-        const phrase = (/(\d+) ont encore leur code ou leur QR/.exec(L.texte) || [])[1];
-        dit(phrase === '4' && nCode === 4, `${T} [défaut 10] « 4 ont encore leur code » : la même règle que les lignes (e-mails ET colis vus par Vinted)`, `phrase=${phrase} · lignes=${nCode}`);
+        // (9 nov.) Depuis la ligne par colis (4 nov.), la phrase « N ont encore leur code »
+        // n'existe plus : chaque ligne « à vérifier » qui a encore son code le MONTRE (« Code »).
+        // La règle jugée reste la même : e-mails ET colis vus par Vinted, 4 lignes.
+        const D10 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-hors-compte][data-a-verifier-code]')]; return { oui: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui').length, ouiSansCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-code]')).length, nonAvecCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'non' && x.querySelector('[data-rp-code]')).length, vinted: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-suivi]:not([data-rp-suivi=""])')).length }; });
+        dit(D10.oui === 4 && D10.ouiSansCode === 0 && D10.nonAvecCode === 0 && D10.vinted >= 1, `${T} [défaut 10] 4 « à vérifier » ont encore leur code, et chacune le montre : la même règle sur chaque ligne (e-mails ET colis vus par Vinted)`, JSON.stringify(D10));
         // défaut 11
-        const D11 = await pg.evaluate(() => ({ fr: (document.querySelector('[data-fraicheur-achats]') || {}).getAttribute ? document.querySelector('[data-fraicheur-achats]').getAttribute('data-fraicheur-achats') : null, ages: [...document.querySelectorAll('[data-capture-age]')].map((x) => x.getAttribute('data-capture-age')) }));
-        dit(D11.fr && /333:3/.test(D11.fr) && !D11.ages.length, `${T} [défaut 11] compte_c relu il y a 3 j : dit par la ligne de fraîcheur, pas redit sous la carte de son colis`, JSON.stringify(D11));
+        const D11 = await pg.evaluate(() => ({ fr: (document.querySelector('[data-comptes-a-relire]') || { getAttribute: () => null }).getAttribute('data-comptes-a-relire'), n: document.querySelectorAll('[data-comptes-a-relire]').length, samba: ([...document.querySelectorAll('[data-cc-carte]')].find((c) => /Samba/.test(c.innerText)) || { innerText: '' }).innerText, ages: [...document.querySelectorAll('[data-capture-age]')].map((x) => x.getAttribute('data-capture-age')) }));
+        dit(D11.fr === '2' && D11.n === 1 && !D11.ages.length && !!D11.samba, `${T} [défaut 11] compte_c relu il y a 3 j : compté UNE fois par la puce « 2 comptes à relire » (compte_b, compte_c), pas redit sous la carte de son colis`, JSON.stringify({ ...D11, samba: D11.samba.replace(/\n/g, ' ¦ ').slice(0, 100) }));
         dit(!errs.length, `${T} aucune erreur d'app`, errs[0]);
         // défaut 14 : Ma journée ne décompresse pas les transactions des vieux achats
         journal.length = 0;
@@ -368,21 +398,32 @@ async function main() {
       etat.suivis = 'ko';
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3500);
-      const J = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); return { n: t ? t.getAttribute('data-n') : null, titre: t ? t.getAttribute('title') : null }; });
-      dit(J.n === '' && /pas lus/.test(J.titre || ''), '[défaut 6] Ma journée : la case « À retirer » dit « — » (pas « 1 »), et pourquoi', JSON.stringify(J));
+      // (9 nov.) Ma journée (chantier E1, 5 nov.) : une case PAS LUE n'est jamais une case —
+      // ni « 1 », ni zéro ; quand rien d'autre n'est à faire, la ligne NOMME ce qui n'est pas
+      // lu (`data-pas-lu`). La raison et « Réessayer » sont dits dans Colis (contrôles ci-dessus).
+      await pg.locator('[data-pas-lu], [data-tuile="retirer"], .vrm-fu-afaire:not([data-afaire-attente])').first().waitFor({ timeout: 15000, state: 'attached' }).catch(() => {});
+      const J = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const pl = document.querySelector('[data-pas-lu]'); return { n: t ? t.getAttribute('data-n') : null, titre: t ? t.getAttribute('title') : null, pasLu: pl ? pl.getAttribute('data-pas-lu') : null, un: /1 colis à retirer/.test(document.body.innerText) }; });
+      dit((J.n === null || J.n === '') && !J.un && (/À retirer/.test(J.pasLu || '') || (J.n === '' && /pas lus/.test(J.titre || ''))), '[défaut 6] Ma journée : « À retirer » n\'est pas compté (pas « 1 ») et il est DIT pas lu', JSON.stringify(J));
       dit(!errs.length, 'revue suivis KO : aucune erreur d\'app', errs[0]);
       await ctx.close();
     });
     // défaut 12 : pendant la lecture des e-mails de suivi, Ma journée ne montre
     // pas le total partiel des seuls colis vus par Vinted.
     await essaie('revue suivis lents', async () => {
-      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, NOW, false, { suivis: 6000 });
+      let lacher; const tenu = new Promise((r) => { lacher = r; });
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, NOW, false, { suivis: { tenu } });
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000, state: 'attached' }).catch(() => {});
-      await pg.waitForTimeout(1500);
-      const A = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const v = document.querySelector('[data-job="retrait-a-verifier"]'); return { n: t ? t.getAttribute('data-n') : null, job: v ? v.getAttribute('data-n') : null }; });
-      dit(A.n === '' && A.job == null, '[défaut 12] e-mails de suivi en cours de lecture : « À retirer » dit « — » et aucune ligne « à vérifier » partielle', JSON.stringify(A));
-      await pg.waitForTimeout(7000);
+      // (9 nov.) Ma journée (E1, 5 nov.) : pendant les lectures, « À faire » est une place en
+      // lignes de chargement (`data-afaire-attente`), ou la ligne qui nomme ce qui n'est pas lu —
+      // jamais un nombre partiel. La lecture est TENUE par le faux serveur (§6.5) ; on laisse
+      // le reste (ventes, achats) se lire.
+      await pg.locator('[data-afaire-attente], [data-pas-lu], [data-tuile="retirer"]').first().waitFor({ timeout: 20000, state: 'attached' }).catch(() => {});
+      await pg.waitForTimeout(2500);
+      const A = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const v = document.querySelector('[data-job="retrait-a-verifier"]'); const pl = document.querySelector('[data-pas-lu]'); return { n: t ? t.getAttribute('data-n') : null, job: v ? v.getAttribute('data-n') : null, attente: !!document.querySelector('[data-afaire-attente]'), pasLu: pl ? pl.getAttribute('data-pas-lu') : null }; });
+      dit((A.n === null || A.n === '') && A.job == null && (A.attente || /À retirer/.test(A.pasLu || '') || A.n === ''), '[défaut 12] e-mails de suivi en cours de lecture : « À retirer » n\'a aucun nombre (place en attente, ou « pas lu ») et aucune ligne « à vérifier » partielle', JSON.stringify(A));
+      lacher();
+      await pg.locator('[data-tuile="retirer"][data-n="4"]').first().waitFor({ timeout: 20000, state: 'attached' }).catch(() => {});
+      await pg.locator('[data-job="retrait-a-verifier"]').first().waitFor({ timeout: 5000, state: 'attached' }).catch(() => {});
       const B = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const v = document.querySelector('[data-job="retrait-a-verifier"]'); return { n: t ? t.getAttribute('data-n') : null, job: v ? v.getAttribute('data-n') : null }; });
       dit(B.n === '4' && B.job === '3', '[défaut 12] … une fois lus : 4 à retirer, 3 à vérifier', JSON.stringify(B));
       dit(!errs.length, 'revue suivis lents : aucune erreur d\'app', errs[0]);
