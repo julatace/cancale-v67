@@ -26,3 +26,12 @@ fidèles, ni rangement suggéré, ni photo de carton → N°.
 | 12 | **Ouverture encore plus légère** : listes gardées par appareil et revalidées par `data.rev` (noté le 9 nov.) | tous | ouverture plus rapide sur 4G ; touche la règle des publieurs uniques, à faire prudemment | gros |
 
 Recommandation : 1, 2, 5 d'abord (petits, utiles à tous, aucun risque), puis 3 et 4.
+
+## Décision de Julien (9 nov., soir)
+« Juste pour la vidéo non car le site est pas fini, fais tout sinon, même l'aide, on fera les
+vidéos après. » ⇒ **les 12 sont validées** ; l'aide contextuelle (11) se fait **sans vidéo**
+(3 phrases), les vidéos viendront plus tard.
+
+Lots : F = 1 + 8 · G = 2 + 3 (extension 5.337) · H = 4 + 5 (serveur, 12 fonctions au plus) ·
+I = 6 + 7 · J = 9 + 10 + 11 · K = 12 (en dernier, touche la règle des publieurs uniques).
+Réservation de versions d'extension : 5.336 = baisse de prix en série (lot C), 5.337 = lot G.
