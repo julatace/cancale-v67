@@ -25,6 +25,10 @@ if (process.argv.includes('--prouve')) {
     ['revenueIgnoree', 'app', "if (k && (vivants.has(k) || out.has(k) || (sortis && sortis.has(k)))) continue;", "if (k && (out.has(k) || (sortis && sortis.has(k)))) continue;"],
     ['carteSansCache', 'src', "if (!c || !(Date.now() - Number(c.lu || 0) < LBC_A_RETIRER_RELU_MS)) {", "if (true) {"],
     ['carteSansCompte', 'src', "if (c && c.u !== u) c = null;", ""],
+    // (9 nov.) « à retirer » exige la lecture complète < 24 h qui montre l'annonce en ligne.
+    ['sansPreuveLbc', 'app', "const e = lbcEnLigneProuvee(ad, vendusLbc, lectures, maintenant);\n    if (e.etat !== 'enligne') { if (e.etat === 'aconfirmer' && !doute.has(k)) doute.set(k, Object.assign(ligne, { raison: e.raison, lu: e.lu })); continue; }\n    out.set(k, Object.assign(ligne, { lu: e.lu }));\n  }\n  for (const pid of (posted || [])) {\n    const p = String(pid);\n    if (!/^\\d+$/.test(p) || !vendus.has(p)) continue;", "out.set(k, Object.assign(ligne, { lu: null }));\n  }\n  for (const pid of (posted || [])) {\n    const p = String(pid);\n    if (!/^\\d+$/.test(p) || !vendus.has(p)) continue;"],
+    ['publieeCommePreuve', 'app', "if (!doute.has(k || ('pid:' + p))) doute.set(k || ('pid:' + p), {", "if (!out.has(k || ('pid:' + p))) out.set(k || ('pid:' + p), {"],
+    ['carteSansFraicheur', 'src', "if (!r || !r.lbcId || !(lu > 0) || !(now - lu <= LBC_LECTURE_FRAICHE_MS)) return false;", "if (!r) return false;"],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lbc-a-retirer-'));
   let tous = true;
@@ -61,13 +65,20 @@ function extraire(src, nom) {
   console.log('── 1. LA RÈGLE DE L’APP (aRetirerDeLbcVinted)');
   let R = null;
   await essaie('la règle se charge', async () => {
-    const noms = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'numeroLbcIdentite', 'LBC_PAUSE_INDEX_MS', 'lbcSortieDe', 'LBC_ANNONCE_MORTE', 'annonceLbcEnVente', 'numDeTitreLbc', 'clesAnnonceLbc', 'aRetirerDeLbcVinted'];
-    const code = 'const load = (k, d) => d;\n' + '/* (7 nov.) « Je numérote moi-même » ÉTEINT : src/numeroEcrit.js, jugé par audit-numero-ecrit */ const numeroEcritLbc = () => ""; const numeroEcritActif = () => false;\n' + noms.map((n) => extraire(APP, n)).join('\n') + '\n;this.R = { aRetirerDeLbcVinted };';
+    const noms = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'numeroLbcIdentite', 'LBC_PAUSE_INDEX_MS', 'lbcSortieDe', 'LBC_ANNONCE_MORTE', 'annonceLbcEnVente', 'numDeTitreLbc', 'clesAnnonceLbc', 'idCompteLbcApp', 'lbcEnLigneProuvee', 'lbcIdentiteSortie', 'aRetirerDeLbcVinted', 'aRetirerDeLbcEbay'];
+    // (9 nov.) La règle « en ligne » de Leboncoin (src/enLigneLbc.js), exécutée telle quelle.
+    const enLigne = fs.readFileSync(path.join(racine, 'src/enLigneLbc.js'), 'utf8').replace(/^export /gm, '');
+    const code = 'const load = (k, d) => d;\n' + '/* (7 nov.) « Je numérote moi-même » ÉTEINT : src/numeroEcrit.js, jugé par audit-numero-ecrit */ const numeroEcritLbc = () => ""; const numeroEcritActif = () => false;\n' + enLigne + '\n' + noms.map((n) => extraire(APP, n)).join('\n') + '\n;this.R = { aRetirerDeLbcVinted, aRetirerDeLbcEbay };';
     const ctx = {}; vm.createContext(ctx); vm.runInContext(code, ctx); R = ctx.R;
   });
-  const f = R ? R.aRetirerDeLbcVinted : () => { throw new Error('règle absente'); };
+  // (9 nov.) Par défaut : une lecture COMPLÈTE de « Mes annonces » du compte, il y a
+  // une heure, qui porte les annonces de l'essai (la preuve « encore en ligne »).
+  const IL_Y_A_1H = new Date(Date.now() - 3600e3).toISOString();
+  const LECTURE = { compte: { at: IL_Y_A_1H, total: 4, n: 4, ids: ['3290000104', '3290000102', '3290000101', '3290000009'] } };
+  const f0 = R ? R.aRetirerDeLbcVinted : () => { throw new Error('règle absente'); };
+  const f = (o) => f0(Object.assign({ lectures: LECTURE }, o));
   const num = (n, t) => ({ numero: n, title: t || 'Paire ' + n });
-  const ad = (id, ref, extra) => Object.assign({ id: String(id), subject: 'Annonce ' + id, ref, status: 'active', account: 'compte', seenAt: new Date().toISOString(), url: 'https://www.leboncoin.fr/ad/chaussures/' + id, price: 55 }, extra || {});
+  const ad = (id, ref, extra) => Object.assign({ id: String(id), subject: 'Annonce ' + id, ref, status: 'active', account: 'compte', seenAt: new Date(Date.now() - 2 * 3600e3).toISOString(), url: 'https://www.leboncoin.fr/ad/chaussures/' + id, price: 55 }, extra || {});
   const nums = { '1001': num('18', 'Nike shox TL'), '2001': num('2', 'Jordan 4 gris'), '2002': num('2', 'Jordan 4 gris'), '3001': num('23', 'Air max 1') };
   await essaie('N°18 réelle', async () => {
     const r = f({ posted: ['1001'], numeros: nums, enLigne: new Set(['1001', '3001']), vendus: new Set(['1001']), itemsLbc: { '3290000104': ad(3290000104, '18'), '3290000102': ad(3290000102, '23') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
@@ -75,7 +86,7 @@ function extraire(src, nom) {
   });
   await essaie('republiée', async () => {
     const r = f({ posted: ['2001'], numeros: nums, enLigne: new Set(['2002']), vendus: new Set(['2001']), itemsLbc: { '3290000101': ad(3290000101, '2') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
-    dit(Array.isArray(r) && r.length === 0, 'une AUTRE annonce Vinted en ligne et non vendue porte le N° ⇒ la paire est revenue : rien', JSON.stringify(r));
+    dit(Array.isArray(r) && r.length === 0 && r.aConfirmer.length === 0, 'une AUTRE annonce Vinted en ligne et non vendue porte le N° ⇒ la paire est revenue : rien (ni à retirer, ni à confirmer)', JSON.stringify({ r, a: r && r.aConfirmer }));
   });
   await essaie('pas su', async () => {
     const r = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: null, itemsLbc: { '3290000104': ad(3290000104, '18') }, liens: {}, vendusLbc: new Set(), sortis: new Set() });
@@ -92,13 +103,51 @@ function extraire(src, nom) {
   await essaie('déjà partie de Leboncoin', async () => {
     const it = { '3290000104': ad(3290000104, '18', { status: 'deleted', supprimeeAt: new Date().toISOString() }) };
     const r1 = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: it, liens: {}, vendusLbc: new Set(), sortis: new Set() });
-    dit(Array.isArray(r1) && r1.length === 1 && r1[0].lbcId === '', 'annonce reliée supprimée mais SANS preuve qu’aucune autre ne porte la paire ⇒ la ligne « publiée » reste (doute)', JSON.stringify(r1));
+    // (9 nov.) Julien : « elle propose de supprimer des annonces vendues sur Vinted qui ne
+    // sont plus sur Leboncoin ». La ligne seulement « publiée » n'est plus « à retirer » :
+    // elle est À CONFIRMER (dite à côté, jamais proposée à la suppression).
+    dit(Array.isArray(r1) && r1.length === 0 && Array.isArray(r1.aConfirmer) && r1.aConfirmer.length === 0, 'la seule annonce Leboncoin connue de la paire est supprimée ⇒ rien à retirer, rien à confirmer', JSON.stringify({ r1, a: r1 && r1.aConfirmer }));
+    const r1b = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: {}, liens: {}, vendusLbc: new Set(), sortis: new Set() });
+    dit(Array.isArray(r1b) && r1b.length === 0 && r1b.aConfirmer.length === 1 && r1b.aConfirmer[0].numero === '18', 'marquée « publiée », aucune annonce Leboncoin relue ⇒ pas « à retirer », mais « à confirmer » (le doute reste dit)', JSON.stringify({ r1b, a: r1b && r1b.aConfirmer }));
     const r2 = f({ posted: ['1001'], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: it, liens: {}, vendusLbc: new Set(), sortis: new Set(['18']) });
     dit(Array.isArray(r2) && r2.length === 0, '… avec la preuve (liste complète de ses comptes après la marque) ⇒ plus rien à retirer', JSON.stringify(r2));
   });
   await essaie('vendue sur Leboncoin', async () => {
     const r = f({ posted: [], numeros: nums, enLigne: new Set(), vendus: new Set(['1001']), itemsLbc: { '3290000104': ad(3290000104, '18') }, liens: {}, vendusLbc: new Set(['3290000104']), sortis: new Set() });
     dit(Array.isArray(r) && r.length === 0, 'une annonce vendue sur Leboncoin n’y est plus en vente : rien à retirer (l’autre alerte, « vendue deux fois », la dit)', JSON.stringify(r));
+  });
+
+  console.log('\n── 1 bis. « À RETIRER » SE PROUVE CÔTÉ LEBONCOIN (9 nov.) : lecture complète < 24 h');
+  const base18 = { posted: ['1001'], numeros: nums, enLigne: new Set(['1001']), vendus: new Set(['1001']), itemsLbc: { '3290000104': ad(3290000104, '18') }, liens: {}, vendusLbc: new Set(), sortis: new Set() };
+  await essaie('absente de la lecture complète', async () => {
+    const r = f0(Object.assign({}, base18, { lectures: { compte: { at: IL_Y_A_1H, total: 1, n: 1, ids: ['3290000999'] } } }));
+    dit(Array.isArray(r) && r.length === 0 && r.aConfirmer.length === 0, 'vendue sur Vinted, ABSENTE de la dernière lecture complète (il y a 1 h) ⇒ ni à retirer, ni à confirmer : elle n’est plus sur Leboncoin', JSON.stringify({ r, a: r && r.aConfirmer }));
+  });
+  await essaie('lecture vieille', async () => {
+    const r = f0(Object.assign({}, base18, { lectures: { compte: { at: new Date(Date.now() - 30 * 3600e3).toISOString(), total: 1, n: 1, ids: ['3290000104'] } } }));
+    dit(Array.isArray(r) && r.length === 0 && r.aConfirmer.length === 1 && r.aConfirmer[0].raison === 'vieille', 'lecture complète de plus de 24 h ⇒ pas proposée à la suppression, « à confirmer » (raison : vieille)', JSON.stringify({ r, a: r && r.aConfirmer }));
+  });
+  await essaie('jamais lue', async () => {
+    const r = f0(Object.assign({}, base18, { lectures: {} }));
+    dit(Array.isArray(r) && r.length === 0 && r.aConfirmer.length === 1 && r.aConfirmer[0].raison === 'jamais', 'aucune lecture complète ⇒ « à confirmer » (raison : jamais), rien proposé', JSON.stringify({ r, a: r && r.aConfirmer }));
+    const r2 = f0(Object.assign({}, base18, { lectures: null }));
+    dit(Array.isArray(r2) && r2.length === 0, 'lectures illisibles (null) ⇒ rien n’est prouvé en ligne', JSON.stringify(r2));
+  });
+  await essaie('lecture partielle', async () => {
+    const r = f0(Object.assign({}, base18, { lectures: { compte: { at: IL_Y_A_1H, total: 37, n: 35 } } }));
+    dit(Array.isArray(r) && r.length === 0 && r.aConfirmer.length === 1, 'une lecture PARTIELLE (35 sur 37) ne prouve rien', JSON.stringify({ r, a: r && r.aConfirmer }));
+  });
+  await essaie('prouvée', async () => {
+    const r = f0(Object.assign({}, base18, { lectures: { 'lbc-account:compte': { at: IL_Y_A_1H, total: 1, n: 1, ids: ['3290000104'] } } }));
+    dit(Array.isArray(r) && r.length === 1 && r[0].lbcId === '3290000104' && Number.isFinite(r[0].lu) && r[0].compte === 'compte', 'lecture complète < 24 h qui la porte (compte privé « lbc-account:X » = « X ») ⇒ à retirer, avec la date de la preuve et le compte', JSON.stringify(r));
+  });
+  await essaie('eBay : même preuve', async () => {
+    const g = R.aRetirerDeLbcEbay;
+    const o = { soldEbay: new Set(['18']), posted: [], numeros: nums, itemsLbc: { '3290000104': ad(3290000104, '18') }, liens: {}, vendusLbc: new Set(), sortis: new Set(), deja: new Set() };
+    const r1 = g(Object.assign({}, o, { lectures: LECTURE }));
+    const r2 = g(Object.assign({}, o, { lectures: { compte: { at: IL_Y_A_1H, total: 1, n: 1, ids: ['1'] } } }));
+    const r3 = g(Object.assign({}, o, { posted: ['1001'], itemsLbc: {}, lectures: LECTURE }));
+    dit(r1.length === 1 && r2.length === 0 && r3.length === 0 && r3.aConfirmer.length === 1, 'vendue sur eBay : en ligne prouvé ⇒ à retirer ; absente de la lecture ⇒ rien ; seulement « publiée » ⇒ à confirmer', JSON.stringify({ r1, r2, r3, a3: r3.aConfirmer }));
   });
 
   console.log('\n── 2. LE LOGO VRM SUR LEBONCOIN.FR LIT LE RÉSUMÉ PUBLIÉ (background.js)');
@@ -140,6 +189,14 @@ function extraire(src, nom) {
     local.vrmLbcARetirer.lu = Date.now() - 6 * 60e3; panne = true;
     const d2 = await ctx.lbcARetirerPourCarte();
     dit(d2 && d2.liste && d2.liste.length === 1, 'base en panne ⇒ la dernière connue (pas su ≠ rien à retirer)', JSON.stringify(d2));
+    // (9 nov.) La carte ne montre que les lignes PROUVÉES en ligne (preuve < 24 h,
+    // pas contredite par une lecture complète plus récente faite dans ce navigateur).
+    const P = ctx.aRetirerProuveCarte, now = Date.now();
+    const L = [{ numero: '18', lbcId: '3290000104', lu: now - 3600e3, compte: 'compte' }, { numero: '23', lbcId: '3290000102', lu: now - 30 * 3600e3, compte: 'compte' }, { numero: '7', lbcId: '3290000107' }];
+    const p1 = typeof P === 'function' ? P(L, null, now) : null;
+    dit(Array.isArray(p1) && p1.length === 1 && p1[0].numero === '18', 'carte : preuve de 1 h ⇒ montrée ; preuve de 30 h ou absente ⇒ cachée', JSON.stringify(p1));
+    const p2 = typeof P === 'function' ? P(L, { compte: { at: now - 60e3, total: 1, ids: ['3290000999'] } }, now) : null;
+    dit(Array.isArray(p2) && p2.length === 0, 'carte : une lecture complète plus récente, ici, sans l’annonce ⇒ plus « à retirer »', JSON.stringify(p2));
   });
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ tout est vert');

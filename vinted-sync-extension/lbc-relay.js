@@ -4,13 +4,43 @@
   const vus=new Set();
   const pausesEnAttente=new Map();     // jeton → réponse au fond (22 oct.)
   const envoisEnAttente=new Map();     // 5.318 : jeton → réponse au fond (répondre dans un fil)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.334.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.335.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
   const signaler=erreurCapture=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur:true,erreurCapture});}catch(_){}};
+  // 5.335 (9 nov.) : ce que la page a lu PENDANT que l'extension n'était pas
+  // connectée à VRM (le fond répond `sansSession`) n'est plus jeté : gardé ici
+  // (en mémoire, ce document seulement, 48 messages / 4 Mo / 30 min au plus) et
+  // rejoué — l'identité d'abord, par la même garde — dès qu'une session existe.
+  // Avant, ce « non » passait pour un refus DÉFINITIF de l'identité : toutes les
+  // annonces du document étaient jetées, rien n'était relu après la connexion.
+  const REJOUABLES=['lbcSessionPrivee','lbcRaw','lbcVente','lbcListeComplete'];
+  let enAttenteSession=[],octetsSession=0,identiteEnAttente=false,minuterieSession=null,attenteDepuis=0;
+  const garderPourSession=(m,taille)=>{
+    if(m.action==='lbcSessionPrivee'){enAttenteSession=enAttenteSession.filter(x=>x.m.action!=='lbcSessionPrivee');identiteEnAttente=true;}
+    enAttenteSession.push({m,taille});octetsSession+=taille;
+    while(enAttenteSession.length>48||octetsSession>4000000){const i=enAttenteSession.findIndex(x=>x.m.action!=='lbcSessionPrivee');if(i<0)break;octetsSession-=enAttenteSession[i].taille;enAttenteSession.splice(i,1);}
+    if(!attenteDepuis)attenteDepuis=Date.now();
+    if(!minuterieSession)minuterieSession=setInterval(sonderSession,30000);
+  };
+  const rejouer=()=>{
+    if(!enAttenteSession.length)return 0;
+    const tout=enAttenteSession;enAttenteSession=[];octetsSession=0;identiteEnAttente=false;attenteDepuis=0;
+    if(minuterieSession){clearInterval(minuterieSession);minuterieSession=null;}
+    tout.sort((a,b)=>(a.m.action==='lbcSessionPrivee'?0:1)-(b.m.action==='lbcSessionPrivee'?0:1));
+    for(const x of tout)transmettre(x.m);
+    return tout.length;
+  };
+  const sonderSession=()=>{
+    if(!enAttenteSession.length||Date.now()-attenteDepuis>1800000){enAttenteSession=[];octetsSession=0;identiteEnAttente=false;attenteDepuis=0;if(minuterieSession){clearInterval(minuterieSession);minuterieSession=null;}return;}
+    try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcSessionPrete'},r=>{void chrome.runtime.lastError;if(r&&r.ok===true)rejouer();});}catch(_){}
+  };
   const transmettre=m=>{
     if(identiteRefusee&&['lbcRaw','lbcVente'].includes(m.action)&&String(m.session||'').startsWith('lbc-account:'))return;
+    // L'identité attend la session : ses listes l'attendent avec elle (sinon le fond,
+    // connecté entre-temps, les refuserait faute de compte enregistré).
+    if(identiteEnAttente&&['lbcRaw','lbcVente'].includes(m.action)&&String(m.session||'').startsWith('lbc-account:')){garderPourSession(m,new TextEncoder().encode(JSON.stringify(m)).length);return;}
     const taille=new TextEncoder().encode(JSON.stringify(m)).length;
     if(taille>3500000||file.length>=64||tailleFile+taille>4000000){signaler('taille');return;}
     file.push({m,taille});tailleFile+=taille;vider();
@@ -18,9 +48,14 @@
   const vider=()=>{
     if(enCours||!file.length)return;enCours=true;
     const {m,taille}=file.shift();tailleFile-=taille;
-    let fini=false;const suite=ok=>{
+    let fini=false;const suite=(ok,sansSession)=>{
       if(fini)return;fini=true;clearTimeout(timer);
       if(m.action==='lbcVente'&&Number.isSafeInteger(m.sequence))try{window.postMessage({__tag:'CANCALE_LBC_ACCUSE',sequence:m.sequence,ok:ok===true},'*');}catch(_){}
+      if(!ok&&sansSession===true&&REJOUABLES.includes(m.action)){
+        garderPourSession(m,taille);
+        if(m.action==='lbcSessionPrivee')signaler('session');
+        enCours=false;vider();return;
+      }
       if(m.action==='lbcSessionPrivee'){
         identiteRefusee=!ok;signaler(ok?null:'identite');
         if(!ok){for(let i=file.length-1;i>=0;i--)if(['lbcRaw','lbcVente'].includes(file[i].m.action)){tailleFile-=file[i].taille;file.splice(i,1);}}
@@ -28,7 +63,7 @@
       enCours=false;vider();
     };
     const timer=setTimeout(()=>suite(false),20000);
-    try{chrome.runtime.sendMessage(m,r=>{const erreur=chrome.runtime.lastError;suite(!erreur&&r?.ok===true);});}catch(_){suite(false);}
+    try{chrome.runtime.sendMessage(m,r=>{const erreur=chrome.runtime.lastError;suite(!erreur&&r?.ok===true,!erreur&&r?.sansSession===true);});}catch(_){suite(false);}
   };
   // L'observateur réseau MAIN world (lbc-inject.js) est injecté via le manifest
   // (content_script world:MAIN) → immunisé à la CSP de Leboncoin. Ici on ne fait
@@ -87,6 +122,12 @@
     pausesEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
     window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:msg.action==='lbcSupprimeAnnonce'?'supprime':'pause',id,jeton},'*');
     return true;
+  });}catch(_){}
+  // 5.335 : le fond dit qu'une session VRM vient d'arriver ⇒ on rejoue ce qu'on garde.
+  try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
+    if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcRejouer')return;
+    if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
+    sendResponse({ok:true,n:rejouer()});
   });}catch(_){}
   // 5.318 (3 nov.) : RÉPONDRE dans un fil, sur SON clic. L'ordre ne vient QUE du fond
   // (jamais de la page), pour le cadre principal ; pas de réponse en 20 s ⇒ « muet ».

@@ -535,7 +535,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.334.0';
+const EXT_ATTENDUE = '5.335.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -962,7 +962,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -46910,7 +46910,9 @@ function numerosLbcSortis(items, liens, vendues, preuve) {
 // sur une lecture incomplète (l'appelant le garde).
 async function publierLbcARetirer(liste) {
   if (!AUTH.user) return;
-  const propre = (liste || []).filter((r) => r && (cleNum(r.numero) || /^\d{5,15}$/.test(String(r.lbcId || '')))).slice(0, 30).map((r) => ({ numero: String(r.numero || ''), lbcId: /^\d{5,15}$/.test(String(r.lbcId || '')) ? String(r.lbcId) : '', titre: String(r.titre || '').slice(0, 80), url: /^https:\/\/(?:www\.)?leboncoin\.fr\//.test(String(r.url || '')) ? String(r.url) : '' }));
+  // (9 nov.) + `lu` : la date de la lecture COMPLÈTE qui prouve l'annonce en ligne
+  // (ms) — la carte du logo ne montre plus une ligne dont la preuve a 24 h.
+  const propre = (liste || []).filter((r) => r && (cleNum(r.numero) || /^\d{5,15}$/.test(String(r.lbcId || '')))).slice(0, 30).map((r) => ({ numero: String(r.numero || ''), lbcId: /^\d{5,15}$/.test(String(r.lbcId || '')) ? String(r.lbcId) : '', titre: String(r.titre || '').slice(0, 80), url: /^https:\/\/(?:www\.)?leboncoin\.fr\//.test(String(r.url || '')) ? String(r.url) : '', lu: Number.isFinite(Number(r.lu)) && Number(r.lu) > 0 ? Number(r.lu) : null, compte: idCompteLbcApp(r.compte || '').slice(0, 64) }));
   const empreinte = JSON.stringify(propre);
   const memo = load('vrm_lbc_a_retirer_pub', null);
   if (memo && memo.e === empreinte && Date.now() - Number(memo.at || 0) < 6 * 3600e3) return;
@@ -46937,9 +46939,36 @@ function lbcPostesEncoreEnVente(posted, numeros, sortis) {
   const nums = numeros || {};
   return new Set([...posted].filter((id) => { const k = cleNum((nums[String(id)] || {}).numero); return !(k && sortis.has(k)); }));
 }
-function aRetirerDeLbcVinted({ posted, numeros, enLigne, vendus, itemsLbc, liens, vendusLbc, sortis }) {
+// ⚠️⚠️ (9 nov., Julien : « elle propose de supprimer des annonces vendues sur
+// Vinted qui ne sont plus sur Leboncoin ») « À RETIRER » SE PROUVE AUSSI CÔTÉ
+// LEBONCOIN : une ligne n'est proposée que si la DERNIÈRE lecture COMPLÈTE de
+// « Mes annonces » de son compte, de moins de 24 h, montre l'annonce encore en
+// ligne (`etatEnLigneLbc` === 'enligne', la règle de Vinted `<enligne-regle>`
+// appliquée à Leboncoin, src/enLigneLbc.js). Lecture plus vieille, jamais faite,
+// ou paire seulement marquée « publiée » (aucune annonce Leboncoin relue) ⇒
+// `aConfirmer` (rendu À CÔTÉ de la liste, avec le geste « ouvre Mes annonces ») :
+// jamais proposée à la suppression, jamais oubliée en silence. `lectures`
+// illisible (`null`) ⇒ rien n'est prouvé (pas su ≠ en ligne).
+function lbcEnLigneProuvee(ad, vendusLbc, lectures, maintenant) {
+  return etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendusLbc), lectures: lectures || null, maintenant: maintenant == null ? Date.now() : maintenant });
+}
+// Toutes les annonces Leboncoin connues qui portent CE N° par identité sont
+// SORTIES (absentes d'une lecture complète, supprimées, vendues ici…) ⇒ la paire
+// marquée « publiée » n'a rien à confirmer : la seule annonce connue est partie.
+function lbcIdentiteSortie(k, itemsLbc, liens, vendusLbc, lectures, maintenant) {
+  if (!k) return false;
+  let vu = false;
+  for (const ad of Object.values(itemsLbc || {})) {
+    if (!ad || ad.id == null || numeroLbcIdentite({ itemId: ad.id }, itemsLbc, liens) !== k) continue;
+    vu = true;
+    if (lbcEnLigneProuvee(ad, vendusLbc, lectures, maintenant).etat !== 'sortie') return false;
+  }
+  return vu;
+}
+function aRetirerDeLbcVinted({ posted, numeros, enLigne, vendus, itemsLbc, liens, vendusLbc, sortis, lectures, maintenant }) {
   if (!(vendus && typeof vendus.has === 'function')) return null;
   const nums = numeros || {};
+  const doute = new Map();
   const vivants = new Set(), vendusN = new Map();
   for (const id of (enLigne || [])) { if (vendus.has(String(id))) continue; const k = cleNum((nums[String(id)] || {}).numero); if (k) vivants.add(k); }
   for (const id of Object.keys(nums)) { if (!vendus.has(String(id))) continue; const k = cleNum((nums[id] || {}).numero); if (k && !vendusN.has(k)) vendusN.set(k, String(id)); }
@@ -46951,7 +46980,10 @@ function aRetirerDeLbcVinted({ posted, numeros, enLigne, vendus, itemsLbc, liens
     if (!annonceLbcEnVente(ad, vendusLbc)) continue;
     if (vivants.has(k) || !vendusN.has(k) || out.has(k)) continue;
     const prix = Number(ad.price);
-    out.set(k, { numero: k, lbcId: String(ad.id), titre: String(ad.subject || ad.title || ''), url: String(ad.url || ''), vinted: vendusN.get(k), prix: isFinite(prix) && prix > 0 ? prix : null });
+    const ligne = { numero: k, lbcId: String(ad.id), titre: String(ad.subject || ad.title || ''), url: String(ad.url || ''), vinted: vendusN.get(k), prix: isFinite(prix) && prix > 0 ? prix : null, compte: idCompteLbcApp(ad.account || ad.lbcUser || '') };
+    const e = lbcEnLigneProuvee(ad, vendusLbc, lectures, maintenant);
+    if (e.etat !== 'enligne') { if (e.etat === 'aconfirmer' && !doute.has(k)) doute.set(k, Object.assign(ligne, { raison: e.raison, lu: e.lu })); continue; }
+    out.set(k, Object.assign(ligne, { lu: e.lu }));
   }
   for (const pid of (posted || [])) {
     const p = String(pid);
@@ -46961,9 +46993,15 @@ function aRetirerDeLbcVinted({ posted, numeros, enLigne, vendus, itemsLbc, liens
     // pas : une AUTRE peut porter la paire (22 oct.) — seule la preuve (`sortis` :
     // liste complète de chacun de ses comptes après la marque) la retire.
     if (k && (vivants.has(k) || out.has(k) || (sortis && sortis.has(k)))) continue;
-    out.set(k || ('pid:' + p), { numero: k || '', lbcId: '', titre: String((nums[p] || {}).title || ''), url: '', vinted: p, prix: null });
+    // (9 nov.) Marquée « publiée » seulement : aucune annonce Leboncoin relue ne
+    // la montre en ligne ⇒ à confirmer, jamais « à retirer ».
+    if (lbcIdentiteSortie(k, itemsLbc, liens, vendusLbc, lectures, maintenant)) continue;
+    if (!doute.has(k || ('pid:' + p))) doute.set(k || ('pid:' + p), { numero: k || '', lbcId: '', titre: String((nums[p] || {}).title || ''), url: '', vinted: p, prix: null, raison: 'pasrelue', lu: null });
   }
-  return [...out.values()].sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
+  const tri = (a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true });
+  const res = [...out.values()].sort(tri);
+  res.aConfirmer = [...doute.entries()].filter(([k]) => !out.has(k)).map(([, v]) => v).sort(tri);
+  return res;
 }
 // </lbc-a-retirer-regle>
 // (29 oct., revue 2) « VENDUE SUR eBAY ⇒ À RETIRER DE LEBONCOIN » : UNE règle pour
@@ -46991,10 +47029,10 @@ function numerosVendusVc(liste) {
   for (const v of liste) if (v && v.num && !vcVenteAnnulee(v)) out.add(cleNum(v.num));
   return out;
 }
-function aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc, liens, vendusLbc, sortis, deja }) {
+function aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc, liens, vendusLbc, sortis, deja, lectures, maintenant }) {
   if (!(soldEbay && typeof soldEbay.has === 'function')) return null;
   const nums = numeros || {};
-  const out = new Map();
+  const out = new Map(), doute = new Map();
   const ecarte = (k) => !k || !soldEbay.has(k) || out.has(k) || (deja && deja.has(k)) || (sortis && sortis.has(k));
   for (const ad of Object.values(itemsLbc || {})) {
     if (!ad || ad.id == null) continue;
@@ -47002,16 +47040,23 @@ function aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc, liens, vendusL
     if (ecarte(k)) continue;
     if (!annonceLbcEnVente(ad, vendusLbc)) continue;
     const prix = Number(ad.price);
-    out.set(k, { numero: k, lbcId: String(ad.id), ident: true, titre: String(ad.subject || ad.title || ''), url: String(ad.url || ''), prix: isFinite(prix) && prix > 0 ? prix : null });
+    const ligne = { numero: k, lbcId: String(ad.id), ident: true, titre: String(ad.subject || ad.title || ''), url: String(ad.url || ''), prix: isFinite(prix) && prix > 0 ? prix : null, compte: idCompteLbcApp(ad.account || ad.lbcUser || '') };
+    // (9 nov.) La même preuve que « vendue sur Vinted » : en ligne selon une lecture complète < 24 h.
+    const e = lbcEnLigneProuvee(ad, vendusLbc, lectures, maintenant);
+    if (e.etat !== 'enligne') { if (e.etat === 'aconfirmer' && !doute.has(k)) doute.set(k, Object.assign(ligne, { raison: e.raison, lu: e.lu })); continue; }
+    out.set(k, Object.assign(ligne, { lu: e.lu }));
   }
   for (const pid of (posted || [])) {
     const p = String(pid);
     if (!/^\d+$/.test(p)) continue;
     const k = cleNum((nums[p] || {}).numero);
-    if (ecarte(k)) continue;
-    out.set(k, { numero: k, lbcId: '', ident: false, titre: String((nums[p] || {}).title || ''), url: '', prix: null });
+    if (ecarte(k) || doute.has(k) || lbcIdentiteSortie(k, itemsLbc, liens, vendusLbc, lectures, maintenant)) continue;
+    doute.set(k, { numero: k, lbcId: '', ident: false, titre: String((nums[p] || {}).title || ''), url: '', prix: null, raison: 'pasrelue', lu: null });
   }
-  return [...out.values()].sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
+  const tri = (a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true });
+  const res = [...out.values()].sort(tri);
+  res.aConfirmer = [...doute.entries()].filter(([k]) => !out.has(k)).map(([, v]) => v).sort(tri);
+  return res;
 }
 // ⟦→ ecrans/Leboncoin.jsx #7⟧
 
@@ -51438,7 +51483,7 @@ function AppCoeur() {
       // (6 octobre) Gardées pour l'anti double vente eBay plus bas : une paire
       // vendue sur Leboncoin et PROGRAMMÉE sur eBay se dit aussi (§11).
       // `undefined` = pas lu · `null` = pas su · objet = lu.
-      let ventesLbcLu=null, lbcItemsLu=undefined;
+      let ventesLbcLu=null, lbcItemsLu=undefined, lbcLecturesLu=null;
       try{
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,{headers:sbAuth(),vrmFond:true});
         if(r.ok){
@@ -51481,6 +51526,7 @@ function AppCoeur() {
         const ls=await lbcListingsSession();
         const items=ls?ls.items:null;
         if(lbcItemsLu===undefined) lbcItemsLu=items||null;
+        lbcLecturesLu=ls?ls.lectures:null;
         const liensR=load('vrm_lbc_liens',{})||{};
         let sortis=null;
         if(items){
@@ -51502,7 +51548,7 @@ function AppCoeur() {
         if(aJuger && nuageAuDepart){
           const preuveN=await lirePreuvesVenteVinted().catch(()=>null);
           const vendusR=preuveN&&preuveN.vendus?preuveN.vendus:null;
-          lbcARetirer=aRetirerDeLbcVinted({posted:postedIds, numeros:nums, enLigne:lbcOnlineIds, vendus:vendusR, itemsLbc:items, liens:liensR, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis});
+          lbcARetirer=aRetirerDeLbcVinted({posted:postedIds, numeros:nums, enLigne:lbcOnlineIds, vendus:vendusR, itemsLbc:items, liens:liensR, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis, lectures:ls?ls.lectures:null});
           const toutesLues=[...lusParCompte.values()].every(v=>v&&v[2]&&Array.isArray(v[2].items));
           if(lbcARetirer && preuveN && items && ventesLbcLu && toutesLues) publierLbcARetirer(lbcARetirer).catch(()=>{});
         } else if(!aJuger && items && ventesLbcLu) publierLbcARetirer([]).catch(()=>{});
@@ -51588,14 +51634,14 @@ function AppCoeur() {
           if(soldEbayN && soldEbayN.size){
             const vintedRemN=new Set((lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean));
             const liensE=load('vrm_lbc_liens',{})||{};
-            const reE=aRetirerDeLbcEbay({soldEbay:soldEbayN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensE, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:vintedRemN});
+            const reE=aRetirerDeLbcEbay({soldEbay:soldEbayN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensE, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:vintedRemN, lectures:lbcLecturesLu});
             lbcRemoveEbayCount=reE?reE.length:0; lbcSupprEbay=(reE||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
           // (1er nov., audit A1) Vendue sur Vestiaire, encore en ligne sur Leboncoin : la règle de l'écran Leboncoin.
           const soldVcN=numerosVendusVc(ventesVcN);
           if(soldVcN && soldVcN.size){
             const dejaN=new Set([...(lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean)]);
-            const reV=aRetirerDeLbcEbay({soldEbay:soldVcN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:load('vrm_lbc_liens',{})||{}, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:dejaN});
+            const reV=aRetirerDeLbcEbay({soldEbay:soldVcN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:load('vrm_lbc_liens',{})||{}, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:dejaN, lectures:lbcLecturesLu});
             lbcRemoveVcCount=reV?reV.length:0; lbcSupprVc=(reV||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
         }

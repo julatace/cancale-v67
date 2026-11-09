@@ -515,6 +515,7 @@ sans la fonction.
 | `cartecode` | `authCodeVerif` | **5.330.0** (9 nov.) | la carte du logo : « Me connecter avec un code » (e-mail, tout compte, jamais de compte créé), mot de passe replié, Google/Discord dans le MÊME onglet sur Orion (retour sur la page Vinted) |
 | `cartecadre` | `cadreVoulu` (vrm-badge.js) | **5.332.0** (9 nov.) | Chrome/Edge/Firefox : le formulaire de la carte dans un iframe de l'extension (`popup.html?mode=carte`, la page n'entend aucune touche) ; Orion ou cadre muet 1,5 s ⇒ la carte dessinée ; jamais d'onglet |
 | `numerodescription` | `lectureNumeroDescription` | **5.334.0** (9 nov.) | le N° écrit à la fin de la description lu par l'extension (dressing Vinted, description Leboncoin ENTIÈRE) : seule la lecture (`numEcrit`) est rangée, jamais le texte ; règle recopiée de `src/numeroEcrit.js` (`audit-numero-etiquette --recopie`) |
+| `lbcclair` | `resumeCarteLbc` | **5.335.0** (9 nov.) | sur leboncoin.fr : « Compte Leboncoin : pseudo ✓ · Annonces : N lues en entier ✓ · Ventes » et UN geste ; ce que la page a lu avant la connexion à VRM est rejoué ; « à retirer » seulement prouvé (lecture complète < 24 h) |
 
 ---
 

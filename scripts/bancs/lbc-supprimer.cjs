@@ -274,21 +274,20 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       console.log(`── ${vp.width} px · vendue sur eBay, reliée par la marque « publiée » : écran = Ma journée`);
       const lbcN15 = { '3290000005': Object.assign({}, ITEMS['3290000005'], { subject: 'Salomon XT-6 blanc n15' }) };
       const oe = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { posted: ['5001', '5003', '5004'], items: lbcN15, extra: [ebayRow] });
-      await oe.pg.waitForSelector('[data-lbc-retirer-ebay]', { timeout: 10000 }).catch(() => {});
+      // ⚠️ (9 nov., Julien : « elle propose de supprimer des annonces vendues sur Vinted
+      // qui ne sont plus sur Leboncoin ») Reliée par sa seule marque « publiée », aucune
+      // annonce Leboncoin ne PROUVE la paire en ligne : elle n'est plus « à retirer »
+      // (ni à l'écran, ni dans Ma journée) mais « à confirmer », dite avec le geste.
+      await oe.pg.waitForSelector('[data-lbc-retirer-aconfirmer]', { timeout: 10000 }).catch(() => {});
       await oe.pg.waitForTimeout(800);
-      const ve = await oe.pg.evaluate(() => { const bl = document.querySelector('[data-lbc-retirer-ebay]'); const zone = bl ? bl.parentElement : null; const lignes = zone ? [...zone.querySelectorAll('[data-lbc-retirer]')].map((e) => (/N°(\S+)/.exec(e.innerText) || [])[1]) : []; return { n: bl ? bl.getAttribute('data-lbc-retirer-ebay') : null, lignes, gestes: zone ? zone.querySelectorAll('[data-lbc-supprimer],[data-lbc-pause]').length : -1, sansIdent: !!document.querySelector('[data-lbc-ebay-sans-ident]') }; });
-      dit(ve.n === '1' && ve.lignes.join(',') === '15' && ve.gestes === 0 && ve.sansIdent, 'écran Leboncoin : « 1 vendue sur eBay — à retirer » (N°15), sans « Supprimer » ni pause, et la raison dite', JSON.stringify(ve));
+      const ve = await oe.pg.evaluate(() => ({ ebay: document.querySelectorAll('[data-lbc-retirer-ebay]').length, conf: [...document.querySelectorAll('[data-lbc-retirer-aconfirmer-num]')].map((e) => e.getAttribute('data-lbc-retirer-aconfirmer-num')), texte: (document.querySelector('[data-lbc-retirer-aconfirmer]') || {}).innerText || '', gestes: document.querySelectorAll('[data-lbc-retirer-aconfirmer] [data-lbc-supprimer], [data-lbc-retirer-aconfirmer] [data-lbc-pause]').length }));
+      dit(ve.ebay === 0 && ve.conf.includes('15') && /vendue sur eBay/.test(ve.texte) && /Mes annonces/.test(ve.texte) && ve.gestes === 0, 'écran Leboncoin : la N°15 vendue sur eBay, seulement « publiée » ⇒ « à confirmer » avec le geste, jamais « à retirer » ni Supprimer', JSON.stringify(ve).slice(0, 300));
+      { const el = await oe.pg.$('[data-lbc-retirer-aconfirmer]'); if (el) { await el.scrollIntoViewIfNeeded().catch(() => {}); await oe.pg.screenshot({ path: path.join(process.env.BANC_CAPTURES || require('os').tmpdir(), 'lbc-a-confirmer-' + vp.width + '.png') }); } }
       await oe.ctx.close();
       const oje = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' }, { tab: 'journee', posted: ['5001', '5003', '5004'], items: lbcN15, extra: [ebayRow] });
-      await oje.pg.waitForFunction(() => /vendues? sur eBay/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
-      await oje.pg.waitForTimeout(1200);
+      await oje.pg.waitForTimeout(4000);
       const tj = await oje.pg.evaluate(() => { const m = /(\d+) à retirer de Leboncoin \(vendues? sur eBay\)/.exec(document.body.innerText); return m ? Number(m[1]) : 0; });
-      dit(tj === 1, 'Ma journée : « 1 à retirer de Leboncoin (vendue sur eBay) » — le même nombre que l’écran', String(tj));
-      await oje.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job], button, a, div')].reverse().find((x) => /à retirer de Leboncoin \(vendues? sur eBay\)/.test(x.innerText || '') && x.innerText.length < 200); if (e) e.click(); });
-      await oje.pg.waitForSelector('[data-lbc-retirer-ebay]', { timeout: 20000 }).catch(() => {});
-      await oje.pg.waitForTimeout(1500);
-      const cible = await oje.pg.evaluate(() => !!document.querySelector('[data-lbc-retirer-ebay]'));
-      dit(cible, '« Voir » de Ma journée trouve « vendue sur eBay — à retirer » sur l’écran Leboncoin');
+      dit(tj === 0, 'Ma journée : rien « à retirer (vendue sur eBay) » sans preuve que l’annonce est en ligne — le même nombre que l’écran', String(tj));
       dit(oje.errs.length === 0, 'aucune erreur d’app (Ma journée, eBay)', oje.errs.join(' | ').slice(0, 160));
       await oje.ctx.close();
 
