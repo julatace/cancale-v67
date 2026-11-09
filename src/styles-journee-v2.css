@@ -1,0 +1,188 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MA JOURNÉE v2 (9 nov.) — la STRUCTURE de l'écran d'accueil.
+   Dans la même couche que la direction artistique (`@layer vrm-premium`, jetons
+   `--p-*`), chargée APRÈS elle : à sélecteur égal, la dernière déclaration gagne.
+   Ce fichier ne touche que les blocs neufs (`.vrm-jv2-*`, la prochaine chose à
+   faire posée dans la tête, la carte groupée des articles supprimés) ; la forme
+   de tout le reste appartient à la direction artistique (styles-premium.css).
+   Détail : docs/passation/2026-11-09-journee-v2.md.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* ── 1. LA PROCHAINE CHOSE À FAIRE, dans la tête sombre ──────────────────────
+   Une rangée sur voile (pas une carte blanche dans une carte sombre) : la photo,
+   le fait en blanc, sa note, et LE geste de l'écran en bleu (le seul bleu). */
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain { margin: 18px 0 2px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain > .vrm-day-task {
+  display: flex !important; align-items: center !important; gap: 12px !important;
+  width: 100% !important; box-sizing: border-box !important; min-height: 68px !important;
+  margin: 0 !important; padding: 12px 12px 12px 12px !important;
+  border: 0 !important; border-radius: 16px !important; box-shadow: none !important;
+  background: rgba(255,255,255,.10) !important; color: #fff !important; text-align: left !important;
+  font-family: var(--vrm-police) !important; cursor: pointer;
+  transition: transform 140ms var(--p-sortie), background-color 140ms ease;
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain > .vrm-day-task::before,
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain > .vrm-day-task::after { content: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain > button.vrm-day-task:active { transform: scale(.98); background: rgba(255,255,255,.14) !important; }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-main[data-ecran="journee"] .vrm-jv2-prochain > button.vrm-day-task:hover { background: rgba(255,255,255,.14) !important; }
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-day-task-textes { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; gap: 2px !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-day-task-title {
+  font: 600 17px/1.25 var(--vrm-police) !important; letter-spacing: -.012em !important; color: #fff !important;
+  white-space: normal !important; overflow: hidden !important; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-day-task-note { font: 400 13px/1.3 var(--vrm-police) !important; color: rgba(255,255,255,.72) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-day-task-note.is-urgent { color: #FFB340 !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-pile { width: 52px !important; height: 52px !important; flex: none !important; margin: 0 8px 0 0 !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-pile .vrm-pile-v { width: 48px !important; height: 48px !important; border-radius: 12px !important; box-shadow: 0 0 0 1.5px rgba(255,255,255,.9) !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-pile .vrm-pile-v.is-tuile { background: rgba(255,255,255,.12) !important; color: #fff !important; box-shadow: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-day-task-action {
+  flex: none !important; display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+  min-width: 72px; min-height: 44px !important; padding: 0 16px !important; border-radius: 999px !important;
+  background: var(--p-accent) !important; color: #fff !important; font: 600 15px/1 var(--vrm-police) !important;
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-day-task-action * { color: #fff !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain .vrm-fu-point { background: var(--p-ambre-point) !important; }
+/* Une carte « groupe » (litige, Leboncoin, URSSAF) posée en tête : ses gestes passent dessous. */
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain > .vrm-day-task.is-groupe { flex-wrap: wrap !important; cursor: default; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain > .vrm-day-task.is-groupe .vrm-day-task-ouvrir { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 12px; background: none; border: 0; color: inherit; text-align: left; padding: 0; font: inherit; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain > .vrm-day-task.is-groupe .vrm-day-task-geste { min-height: 44px !important; border-radius: 999px !important; background: var(--p-accent) !important; color: #fff !important; border: 0 !important; }
+
+/* UN seul bleu à l'écran : quand la prochaine chose est en tête, le geste principal de la
+   liste « Ensuite » repasse en pilule grise (le même geste, la même étiquette). */
+.vrm-main[data-ecran="journee"] .vrm-fu-journee:has(.vrm-jv2-prochain) .vrm-day-task-list .vrm-day-task-action.is-principal {
+  background: var(--p-remplir) !important; color: var(--p-encre) !important;
+}
+.vrm-main[data-ecran="journee"] .vrm-fu-journee:has(.vrm-jv2-prochain) .vrm-day-task-list .vrm-day-task-action.is-principal * { color: var(--p-encre) !important; }
+
+/* ── 2. LA FRISE DES SEPT JOURS, qui se touche ──────────────────────────────
+   Sept boutons de 44 px au moins ; le jour choisi en pastille blanche, aujourd'hui
+   cerclé ; sous la date, une barre fine dont la hauteur suit le VENDU du jour
+   (aucune barre : rien de vendu, ou pas lu). Pas de point coloré, pas d'axe. */
+.vrm-main[data-ecran="journee"] .vrm-jv2-argent { margin-top: 18px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-frise { display: flex !important; gap: 0 !important; margin: 0 -6px !important; padding: 0 !important; list-style: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-frise > .vrm-fu-jour { flex: 1 1 0 !important; display: block !important; min-width: 0; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-jour {
+  width: 100% !important; min-height: 72px !important; padding: 6px 0 8px !important; margin: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: #fff !important;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 5px;
+  font-family: var(--vrm-police); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  border-radius: 14px; transition: transform 120ms var(--p-sortie);
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-jour:active { transform: scale(.94); }
+.vrm-main[data-ecran="journee"] .vrm-jv2-jour:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-jour > span { font: 600 11px/1 var(--vrm-police); color: rgba(255,255,255,.55); letter-spacing: .02em; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-jour > b {
+  width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font: 600 16px/1 var(--vrm-police); font-variant-numeric: tabular-nums; color: rgba(255,255,255,.92);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.vrm-main[data-ecran="journee"] .vrm-fu-jour[data-auj] .vrm-jv2-jour > b { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55); }
+.vrm-main[data-ecran="journee"] .vrm-fu-jour[data-auj] .vrm-jv2-jour > span { color: #fff; }
+.vrm-main[data-ecran="journee"] .vrm-fu-jour[data-choisi] .vrm-jv2-jour > b { background: #fff; color: #1D1D1F; box-shadow: none; font-weight: 700; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-barre {
+  display: block; width: 4px; height: 14px; border-radius: 2px; background: rgba(255,255,255,.42);
+  transform-origin: 50% 100%; transform: scaleY(var(--h, 0)); transition: transform 320ms var(--p-sortie), background-color 160ms ease;
+}
+.vrm-main[data-ecran="journee"] .vrm-fu-jour[data-choisi] .vrm-jv2-barre { background: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-main[data-ecran="journee"] .vrm-fu-jour:not([data-choisi]) .vrm-jv2-jour:hover > b { background: rgba(255,255,255,.12); }
+}
+
+/* ── 3. LE JOUR (ou la semaine) CHOISI ─────────────────────────────────────── */
+.vrm-main[data-ecran="journee"] .vrm-jv2-periode { margin-top: 10px; padding-top: 14px; box-shadow: inset 0 .5px 0 rgba(255,255,255,.14); }
+.vrm-main[data-ecran="journee"] .vrm-jv2-quand { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: -6px 0 0; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-nom { font: 600 15px/1.3 var(--vrm-police); color: rgba(255,255,255,.78); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-sem {
+  position: relative; flex: none; min-height: 44px !important; height: auto !important; padding: 0 14px !important; border: 0 !important; background: none !important; box-shadow: none !important; color: #fff !important;
+  font: 600 13px/1 var(--vrm-police); cursor: pointer; z-index: 0; -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--p-sortie);
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-sem::before { content: ""; position: absolute; inset: 6px 0; border-radius: 999px; background: rgba(255,255,255,.12); z-index: -1; transition: background-color 160ms ease; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-sem[aria-pressed="true"] { color: #1D1D1F !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-sem[aria-pressed="true"]::before { background: #fff; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-sem:active { transform: scale(.96); }
+.vrm-main[data-ecran="journee"] .vrm-jv2-sem:focus-visible { outline: 2px solid #fff; outline-offset: 0; border-radius: 999px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-corps { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-chiffre { flex: 1 1 auto; min-width: 0; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-grand { margin: 0 !important; color: #fff !important; white-space: nowrap; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-grand.is-vide { color: rgba(255,255,255,.66) !important; font-weight: 400 !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-grand.is-zero { font: 600 24px/1.2 var(--vrm-police) !important; letter-spacing: -.016em !important; color: rgba(255,255,255,.86) !important; padding: 8px 0 2px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-grand .vrm-fu-borne { font-size: 17px; font-weight: 600; color: rgba(255,255,255,.66); margin-right: 4px; vertical-align: .3em; letter-spacing: 0; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-faits { margin: 4px 0 0 !important; font: 400 13px/1.45 var(--vrm-police) !important; color: rgba(255,255,255,.72) !important; font-variant-numeric: tabular-nums; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-faits > span { white-space: nowrap; }
+/* Le point qui sépare deux faits reste en FIN de ligne (jamais un « · » qui ouvre une ligne). */
+.vrm-main[data-ecran="journee"] .vrm-jv2-faits > span:not(:last-child)::after { content: " ·"; }
+
+/* La pile des ventes de la période : en éventail, comme des tirages posés sur la table
+   (Julien, 9 nov. : « j'aimais bien la superposition des ventes »). Elle se touche ⇒ Ventes. */
+.vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton {
+  flex: none; position: relative; width: 112px !important; height: 96px !important; min-height: 0 !important; margin: 0 -4px 0 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important;
+  cursor: pointer; border-radius: 16px; -webkit-tap-highlight-color: transparent; transition: transform 160ms var(--p-sortie);
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton:active { transform: scale(.95); }
+.vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-pile { position: absolute !important; inset: 0 !important; width: auto !important; height: auto !important; display: block !important; transform: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-pile .vrm-pile-v {
+  position: absolute !important; left: 22px !important; top: 12px !important; width: 68px !important; height: 68px !important; margin: 0 !important;
+  border-radius: 14px !important; background-color: #2C2C2E !important; box-shadow: 0 0 0 2px #fff, 0 8px 18px -6px rgba(0,0,0,.55) !important;
+  transform-origin: 50% 90%;
+  transform: translateX(calc((var(--k, 0) - 1) * -14px)) rotate(calc(var(--k, 0) * 7deg - 7deg));
+}
+.vrm-main[data-ecran="journee"] .vrm-jv2-pile:not(.is-pile) .vrm-pile-v { transform: rotate(-4deg); }
+.vrm-main[data-ecran="journee"] .vrm-jv2-pile .vrm-pile-plus {
+  position: absolute !important; right: 2px !important; bottom: 4px !important; left: auto !important; top: auto !important; z-index: 9;
+  min-width: 26px; height: 22px; padding: 0 7px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  background: #fff !important; color: #1D1D1F !important; font: 700 12px/1 var(--vrm-police) !important; font-variant-numeric: tabular-nums; box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* L'éventail s'ouvre en arrivant (une fois par période choisie : le panneau est remonté). */
+  .vrm-main[data-ecran="journee"] .vrm-jv2-pile .vrm-pile-v { animation: vrm-jv2-eventail 460ms var(--p-sortie) both; animation-delay: calc(var(--k, 0) * 50ms); }
+  .vrm-main[data-ecran="journee"] .vrm-jv2-periode { animation: vrm-jv2-entree 240ms var(--p-sortie) both; }
+}
+@keyframes vrm-jv2-eventail { from { transform: translateX(0) rotate(0deg) scale(.92); opacity: 0; } }
+@keyframes vrm-jv2-entree { from { opacity: 0; transform: translateY(6px); } }
+
+/* ── 4. LES CASES DU MOIS sous la frise (la carte réglable, sans son grand chiffre) ── */
+.vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-jv2-argent + .vrm-fu-carte-nu { margin-top: 14px; }
+.vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-carte-nu > .vrm-fu-cases { margin-top: 0 !important; }
+
+/* ── 5. « ENSUITE » et la carte des articles supprimés de Vinted ─────────── */
+.vrm-main[data-ecran="journee"] .vrm-jv2-rien-dautre { margin: 0; padding: 4px 4px 0; font: 400 15px/1.4 var(--vrm-police); color: var(--p-gris); }
+.vrm-main[data-ecran="journee"] .vrm-day-task.vrm-cycle-groupe { display: block !important; padding: 12px 0 4px 16px !important; cursor: default; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-groupe-tete { display: flex; align-items: center; gap: 12px; padding-right: 12px; min-height: 44px; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-groupe-tete .vrm-day-task-textes { flex: 1 1 auto; min-width: 0; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-tous { flex: none; min-height: 44px !important; border-radius: 999px !important; padding: 0 14px !important; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-rangees { list-style: none; margin: 6px 0 0; padding: 0; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-rangee {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  min-height: 60px; padding: 8px 12px 8px 0; position: relative;
+}
+.vrm-main[data-ecran="journee"] .vrm-cycle-rangee::before { content: ""; position: absolute; left: 56px; right: 0; top: 0; height: .5px; background: var(--p-filet); }
+.vrm-main[data-ecran="journee"] .vrm-cycle-photo { width: 44px; height: 44px; border-radius: var(--p-r-vignette); overflow: hidden; background: var(--p-case); display: flex; align-items: center; justify-content: center; color: var(--p-gris-2); }
+.vrm-main[data-ecran="journee"] .vrm-cycle-photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-txt { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-txt > :first-child { flex: none; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 15px/1.3 var(--vrm-police); color: var(--p-encre); }
+.vrm-main[data-ecran="journee"] .vrm-cycle-menu { position: relative; display: inline-flex; align-items: center; flex: none; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-menu > select {
+  -webkit-appearance: none; appearance: none; min-height: 44px; max-width: 150px; padding: 0 30px 0 14px; margin: 0;
+  border: 0; border-radius: 999px; background: var(--p-remplir); color: var(--p-encre);
+  font: 600 15px/1 var(--vrm-police); cursor: pointer; text-overflow: ellipsis;
+}
+.vrm-main[data-ecran="journee"] .vrm-cycle-menu > select:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-menu > select:disabled { opacity: .5; cursor: default; }
+.vrm-main[data-ecran="journee"] .vrm-cycle-menu > svg { position: absolute; right: 11px; pointer-events: none; color: var(--p-gris-2); transform: rotate(90deg); }
+
+/* ── 6. ORDINATEUR : la tête (prochaine chose, frise, cases) à gauche, « Ensuite » à droite ── */
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton { width: 128px !important; height: 104px !important; }
+  .vrm-main[data-ecran="journee"] .vrm-jv2-pile .vrm-pile-v { width: 76px !important; height: 76px !important; left: 26px !important; }
+  .vrm-main[data-ecran="journee"] .vrm-jv2-jour { min-height: 68px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrm-main[data-ecran="journee"] :is(.vrm-jv2-jour, .vrm-jv2-sem, .vrm-jv2-pile-bouton, .vrm-jv2-prochain > .vrm-day-task, .vrm-jv2-barre) { transition: none !important; }
+}
+
+} /* fin @layer vrm-premium */

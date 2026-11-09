@@ -100,7 +100,7 @@ import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee 
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
-import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
+import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX, ORDRE_CHOIX as ORDRE_CHOIX_CYCLE } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
 import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
@@ -478,6 +478,7 @@ import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos,
 // (8 nov., direction artistique) Ma journée, Ventes, Colis au niveau « premium » : une couche
 // CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
 import "./styles-premium.css";
+import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
@@ -26007,6 +26008,132 @@ function JournalSemaineCarte({ liveStats }) {
     </section>
   );
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// (9 nov., Ma journée v2) LA FRISE DE LA SEMAINE, QUI SE TOUCHE.
+// ═══════════════════════════════════════════════════════════════════════════
+// Julien, 9 nov. : « le gros calendrier ne sert à rien car on ne peut pas cliquer
+// sur les jours de la semaine » ; « Aujourd'hui 0 € vendu » en énorme le matin
+// n'apporte rien ; la carte « Semaine du 2 nov. » redisait en partie la tête.
+// Maintenant UN bloc : les sept derniers jours (aujourd'hui à droite) — toucher un
+// jour montre CE jour-là ; « Semaine du … » montre la semaine passée (lundi →
+// dimanche, la période du bilan du lundi). Pour la période choisie : le VENDU (le
+// grand chiffre), le nombre de ventes, l'argent VERSÉ ce jour-là, les colis
+// envoyés (ses gestes « Colis fait »), et la pile des photos de ses ventes
+// (touchée ⇒ Ventes).
+// ⚠️ AUCUNE RÈGLE NOUVELLE (§11) : chaque chiffre est celui de `journalSemaine`
+//    (src/journalSemaine.js — `bilanLignes` sur les lignes de « Vendu », les
+//    gestes « Colis fait »), appelé avec la période du jour au lieu de la semaine ;
+//    le versé est `recuPublieEntre` (la ligne publiée par Ventes, `recuJours`).
+//    Trois états partout : en cours · pas su (« — » et la raison) · lu.
+// ⚠️ Le jour montré par défaut : aujourd'hui s'il y a une vente PROUVÉE aujourd'hui,
+//    sinon le dernier jour des sept où il a vendu (« le dernier chiffre utile »),
+//    sinon aujourd'hui. Il le dit en toutes lettres (« Samedi 7 novembre »).
+// ⚠️ Les photos de la pile sont celles des ventes Vinted de la période (par leur
+//    transaction, `photosEntre` de l'écran) : la pile ne cherche rien (PileVignettes).
+const jourIso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const LETTRES_JOUR = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const majusculeJ = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = null, mortes, onMorte, maintenant: maint = null }) {
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
+  const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
+  const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
+  const ligneUrssaf = useLigneUrssaf();
+  const vendu = venduEtat(liveStats) !== 'lu' ? (venduEtat(liveStats) === 'pasSu' ? null : undefined)
+    : { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] };
+  const colisFaits = pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {};
+  const maintenant = maint || Date.now();
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  // Les sept jours, le plus ancien à gauche. `fin` = minuit du lendemain (heure locale : un
+  // passage à l'heure d'hiver ne décale aucun jour).
+  const jours = [6, 5, 4, 3, 2, 1, 0].map((k) => {
+    const d = new Date(minuit); d.setDate(d.getDate() - k);
+    const f = new Date(d); f.setDate(f.getDate() + 1);
+    const iso = jourIso(d.getTime());
+    const J = journalSemaine({ maintenant, vendu, joursBenef: pub, colisFaits, R: { ...REGLES_JOURNAL, semainePassee: () => ({ lundi: iso, dimanche: iso, debut: d.getTime(), fin: f.getTime() }) } });
+    return { k, d, debut: d.getTime(), fin: f.getTime(), iso, J };
+  });
+  const S = journalSemaine({ maintenant, vendu, joursBenef: pub, colisFaits, R: REGLES_JOURNAL });
+  const vJ = (j) => (j && j.J && j.J.vendu && j.J.vendu.valeur != null ? j.J.vendu.valeur : null);
+  const auto = (() => {
+    const auj = jours[6];
+    if (vJ(auj) > 0) return 0;
+    for (let i = 5; i >= 0; i--) if (vJ(jours[i]) > 0) return jours[i].k;
+    return 0;
+  })();
+  const [choix, setChoix] = React.useState(null);
+  const sel = choix == null ? auto : choix;
+  const semaine = sel === 'sem';
+  const jSel = semaine ? null : (jours.find((j) => j.k === sel) || jours[6]);
+  const P = semaine ? { J: S, debut: S.debut, fin: S.fin } : jSel;
+  const J = P.J;
+  const max = Math.max(0, ...jours.map((j) => vJ(j) || 0));
+  // Le versé de la période (jour local, la ligne publiée par Ventes). `undefined` = pas encore lue.
+  const verse = ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuPublieEntre(ligneUrssaf, { de: P.debut, a: P.fin - 1 });
+  const nom = semaine ? S.titre : sel === 0 ? 'Aujourd’hui' : sel === 1 ? 'Hier' : majusculeJ(dateJourFr(jSel.d));
+  const auMoins = (x) => x && x.partiel ? 'au moins ' : '';
+  const pl = (n, mot) => `${n.toLocaleString('fr-FR')} ${mot}${n > 1 ? 's' : ''}`;
+  // Les faits de la période, chacun avec son état (§5 : « — » dit sa raison, jamais un 0 inventé).
+  const faitVentes = J.ventes.valeur == null ? (J.ventes.raison === 'encours' ? 'ventes : lecture…' : 'ventes pas lues')
+    : J.ventes.valeur === 0 ? 'aucune vente' : `${auMoins(J.ventes)}${pl(J.ventes.valeur, 'vente')}`;
+  const faitVerse = verse.valeur == null ? (verse.raison === 'encours' ? 'versements : lecture…' : 'versements pas lus')
+    : verse.valeur === 0 ? 'rien de versé' : `${auMoins(verse)}${montant(verse.valeur)} versé${verse.valeur >= 2 ? 's' : ''}`;
+  const faitColis = J.colis.valeur == null ? (J.colis.raison === 'nonNotes' ? 'envois pas notés' : J.colis.raison === 'encours' ? 'colis : lecture…' : 'colis pas sus')
+    : J.colis.valeur === 0 ? 'aucun colis envoyé' : `${auMoins(J.colis)}${J.colis.valeur.toLocaleString('fr-FR')} colis envoyé${J.colis.valeur > 1 ? 's' : ''}`;
+  const vSel = J.vendu.valeur;
+  const photos = typeof photosEntre === 'function' ? photosEntre(P.debut, P.fin) : [];
+  const nPile = J.ventes.valeur != null ? J.ventes.valeur : photos.length;
+  const auj = jours[6];
+  const vAuj = vJ(auj);
+  return (
+    <div className="vrm-jv2-argent" data-jv2-argent="" data-jv2-periode={semaine ? 'semaine' : jSel.iso}
+      data-fu-vendu-jour={vendu && vAuj != null ? String(Math.round(vAuj * 100)) : ''}>
+      <ol className="vrm-fu-semaine vrm-jv2-frise" aria-label="Les sept derniers jours" data-fu-semaine="">
+        {jours.map((j) => {
+          const v = vJ(j), n = j.J.ventes.valeur;
+          const choisi = !semaine && j.k === sel;
+          const lib = `${majusculeJ(dateJourFr(j.d))}${n != null ? ` · ${n === 0 ? 'aucune vente' : pl(n, 'vente') + (v != null ? ' · ' + montant(v) : '')}` : ''}`;
+          return (
+            <li key={j.k} className="vrm-fu-jour" data-auj={j.k === 0 ? '' : undefined} data-vendu={n != null ? String(n) : undefined} data-jv2-jour={j.iso} data-choisi={choisi ? '' : undefined}>
+              <button type="button" className="vrm-jv2-jour" aria-pressed={choisi} aria-label={lib} title={lib} data-jv2-toucher={j.iso} onClick={() => setChoix(j.k)}>
+                <span aria-hidden="true">{LETTRES_JOUR[j.d.getDay()]}</span><b>{j.d.getDate()}</b>
+                <i className="vrm-jv2-barre" aria-hidden="true" data-barre={v > 0 ? String(Math.round(v * 100)) : undefined} style={{ '--h': v > 0 && max > 0 ? (0.18 + 0.82 * v / max).toFixed(3) : 0 }}/>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="vrm-jv2-periode" key={semaine ? 'sem' : jSel.iso} data-jv2-panneau="" {...(semaine ? { 'data-journal-semaine': S.lundi } : {})}>
+        <div className="vrm-jv2-quand">
+          <span className="vrm-jv2-nom" data-jv2-nom="">{nom}</span>
+          <button type="button" className="vrm-jv2-sem" aria-pressed={semaine} data-jv2-semaine={S.lundi} onClick={() => setChoix(semaine ? null : 'sem')}>{semaine ? 'Revenir aux jours' : S.titre}</button>
+        </div>
+        <div className="vrm-jv2-corps">
+          <div className="vrm-jv2-chiffre">
+            {vSel == null
+              ? <div className="vrm-fu-grand vrm-jv2-grand is-vide" data-jv2-vendu="">—</div>
+              : vSel === 0
+                ? <div className="vrm-jv2-grand is-zero" data-jv2-vendu="0">Rien vendu</div>
+                : <div className="vrm-fu-grand vrm-jv2-grand" data-jv2-vendu={String(Math.round(vSel * 100))} data-partiel={J.vendu.partiel ? '1' : undefined}>{J.vendu.partiel ? <span className="vrm-fu-borne">au moins </span> : null}{montant(vSel)}</div>}
+            <p className="vrm-jv2-faits">
+              <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined}>{faitVentes}</span>
+              {' '}
+              <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} title={verse.partiel && verse.manque && verse.manque.length ? `au moins — sans ${verse.manque.join(', ')}` : 'L’argent versé par tes sites ce jour-là (la date du versement)'}>{faitVerse}</span>
+              {' '}
+              <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? `au moins — sans ${J.colis.manque.join(', ')}` : 'Les colis que tu as notés « Colis fait » ce jour-là'}>{faitColis}</span>
+            </p>
+          </div>
+          {photos.length && Photo
+            ? <button type="button" className="vrm-jv2-pile-bouton" data-jv2-pile={String(nPile)} aria-label={`Voir les ventes (${faitVentes})`} title="Voir dans Ventes" onClick={() => onVentes && onVentes()}>
+                <PileVignettes className="vrm-jv2-pile" srcs={photos} n={nPile} Photo={Photo} mortes={mortes} onMorte={onMorte}/>
+              </button>
+            : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ⟦→ ecrans/Stats.jsx #18⟧
 function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
  return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
@@ -26465,7 +26592,7 @@ const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, b
 // `page` : une clé de PAGES_CARTE ; `sel` : { site, compte: {uid, login, nom} | null, periode } ;
 // `locaux` : les cases propres de la page ({ id → { nom, court, type, valeur, partiel, onClick, attrs, affiche } }) ;
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).
-function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, pile = null, ...rest }) {
+function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, pile = null, tete = null, ...rest }) {
   const [reglage, poser] = useReglageCarte();
   const [objectif, poserObjectif] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
@@ -26477,7 +26604,7 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
     || (base.enPreparation.urssaf && !base.ligneUrssaf)
     || Object.values(locaux || {}).some((x) => x && x.enCours)) ? undefined : true);
   const sources = locaux ? { ...base, locaux } : base;
-  return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs, pile }} {...rest}/>;
+  return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs, pile, tete }} {...rest}/>;
 }
 // Le compte choisi, dit pour la carte : { uid, login, nom } ou null (tous).
 const compteCarte = (uid, accounts) => {
@@ -27435,6 +27562,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       setCycleRepondus((m) => ({ ...m, [c.id]: choix }));
       toast(`N°${c.numero} : ${LIBELLE_CHOIX[choix].toLowerCase()}`, 'ok');
+      if (onCycle) onCycle();
+    } finally { setCycleEnVol(null); }
+  };
+  // (9 nov., Ma journée v2) « Tous chez moi » : la MÊME réponse que « Toujours chez moi », pour les
+  // articles de la carte, en une fois — confirmée d'abord (il voit la liste des N°). Rien d'autre écrit.
+  const repondreCycleTous = async (liste) => {
+    const l = (liste || []).filter((c) => c && c.id != null);
+    if (!l.length || cycleEnVol) return;
+    const ok = await askConfirm({ title: `${l.length} articles toujours chez toi ?`, desc: l.map((c) => `N°${c.numero}`).join(', '), ok: 'Oui, tous chez moi' });
+    if (!ok) return;
+    setCycleEnVol('tous');
+    try {
+      const at = new Date().toISOString();
+      const dec = { ...lireObjet(CYCLE_DECISIONS) };
+      for (const c of l) dec[c.id] = { choix: CHOIX_CYCLE.CHEZ_MOI, numero: c.numero, at };
+      save(CYCLE_DECISIONS, dec);
+      setCycleRepondus((m) => { const n = { ...m }; for (const c of l) n[c.id] = CHOIX_CYCLE.CHEZ_MOI; return n; });
+      toast(`${l.length} articles : toujours chez toi`, 'ok');
       if (onCycle) onCycle();
     } finally { setCycleEnVol(null); }
   };
@@ -38819,7 +38964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-day-task is-groupe vrm-cycle-carte" key={'cycle' + c.id} role="group" data-job="supprime-vinted" data-cycle-id={c.id} data-cycle-num={c.numero} title={`${x.court}${x.detail ? '\n' + x.detail : ''}`}>
             <div className="vrm-cycle-tete">{corpsTache(j, x)}</div>
             <div className="vrm-cycle-choix">
-              {[CHOIX_CYCLE.CHEZ_MOI, CHOIX_CYCLE.VENDU_MAIN, CHOIX_CYCLE.SEPARE].map((ch) => (
+              {ORDRE_CHOIX_CYCLE.map((ch) => (
                 <Bouton key={ch} variante="secondaire" className="vrm-b-petit vrm-day-task-geste" data-cycle-choix={ch} disabled={!!cycleEnVol} onClick={() => repondreCycle(c, ch)}>{LIBELLE_CHOIX[ch]}</Bouton>
               ))}
             </div>
@@ -39192,73 +39337,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           ) : null;
         }
-        return (
-          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee">
-            <ScreenHead icon="sun" title="Ma journée"/>
-
-            {/* (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee,
-                « sans textes explicatifs ») LA TÊTE SOMBRE, bord à bord : le bonjour, le
-                titre, la semaine, deux cases — « Vendu aujourd'hui » (`bilanVentes`, la règle
-                de « Vendu ») et « Bénéfice du mois » (`BeneficeJournee`, publication
-                `vrm_benefice_jours`). Rien d'autre. */}
-            {!baseKO && (() => {
-              const actifsT = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length;
-              const ventesPasLues = actifsT>0 && nomsVentesKO.length>=actifsT && jourN===0;
-              return (
-              <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
-                <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
-                <h1 className="vrm-fu-titre-tete">Ma journée</h1>
-                {/* (8 nov., « beauté ») LA PHRASE DU JOUR : les cases publiées (« À envoyer », « À retirer »,
-                    leur limite) mises en mots, le ton selon l'heure (src/phraseJour.js) ; rien de lu ⇒ la
-                    phrase fixe de l'écran. Aucun nombre recalculé. */}
-                {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
-                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
-                    : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
-                {/* Les sept derniers jours, aujourd'hui à droite (maquette). */}
-                <ol className="vrm-fu-semaine" aria-label="Les sept derniers jours" data-fu-semaine="">
-                  {[6,5,4,3,2,1,0].map((k)=>{ const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-k);
-                    // (5 nov., chantier E1) Un point sous un jour où il a VENDU (la règle de « Vendu » :
-                    // `bilanLignes` sur `ventesFaites`) ; le nombre et le montant dans l'infobulle. Ventes pas
-                    // lues : aucun point (rien lu ne vaut pas « rien vendu »).
-                    const lignesJ = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes) ? liveStats.venduLignes : null;
-                    const f = new Date(d); f.setDate(f.getDate()+1);
-                    const bj = lignesJ ? bilanLignes(lignesJ, d.getTime(), f.getTime()-1) : null;
-                    const nom = dateJourFr(d);
-                    return (
-                      <li key={k} className="vrm-fu-jour" data-auj={k===0?'':undefined} data-vendu={bj ? String(bj.n) : undefined}
-                        title={bj && bj.n > 0 ? `${nom} · ${bj.n} vente${bj.n>1?'s':''} · ${montant(bj.eur)}` : nom}>
-                        <span aria-hidden="true">{['D','L','M','M','J','V','S'][d.getDay()]}</span><b>{d.getDate()}</b>
-                      </li>); })}
-                </ol>
-                {/* (3 nov., carte réglable par page) Les chiffres de la tête : un grand chiffre + trois
-                    cases, choisis par Julien (« Modifier »). Défaut = vendu aujourd'hui, bénéfice du mois
-                    (`chiffreBenefice`, la lecture de Compta), vendu du mois, reçu du mois. Les attributs que
-                    les bancs lisent restent sur LEUR chiffre (`data-fu-vendu-jour`, `data-journee-benef…`). */}
-                {!premierJour && (
-                  <CarteStatsApp page="journee" aide liveStats={liveStats} nu ici="journee" onNav={onNav}
-                    sel={{ site: 'toutes', compte: null, periode: null }}
-                    pile={(() => { const auj = new Date().toDateString(); const v = dernieresVentes.filter((o) => o._t && new Date(o._t).toDateString() === auj);
-                      return v.length ? { srcs: v.map((o) => orderPhoto(o)), n: v.length, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null; })()}
-                    attrsDe={(x) => {
-                      if (x.place.id === 'vendu' && x.p === 'jour') return { 'data-fu-vendu-jour': x.valeur == null || ventesPasLues ? '' : String(Math.round(x.valeur * 100)) };
-                      if (x.place.id === 'benefice' && x.p === 'mois') { const B = x.B, e2 = (v) => v == null ? '' : String(Math.round(v * 100) / 100);
-                        return { 'data-journee-benef': '', 'data-journee-benef-etat': x.etat || '', 'data-journee-benef-n': B ? String(B.n) : '', 'data-journee-benef-ncout': B ? String(B.nCout) : '',
-                          'data-journee-benef-brut': B && B.nCout > 0 ? e2(B.brut) : '', 'data-journee-benef-net': B ? e2(B.netFinal) : '', 'data-journee-benef-raison': B ? B.raison : '' }; }
-                      return null;
-                    }}/>
-                )}
-              </section>
-              ); })()}
-
-            {/* (4 nov.) La semaine passée, en tête (repliable) : src/journalSemaine.js. */}
-            {!baseKO && !premierJour && <JournalSemaineCarte liveStats={liveStats}/>}
-            {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
-
             {/* « À FAIRE » (maquette) : une carte par geste — pastille chiffrée (encre ; ambre
                 si c'est pressé), un titre, une ligne courte, le geste en pilule. Les cases du
                 jour (À envoyer, À retirer, Messages, Prix à baisser : leurs MÊMES compteurs,
                 `data-tuile`) et les alertes (urgentes d'abord), puis le reste. */}
-            {!baseKO && !premierJour && (() => {
+        const AF = (baseKO || premierJour) ? { prochain: null, section: null } : (() => {
               // (8 nov.) Affichage Simple : le conseil « Prix à baisser » se tait (src/profilVendeur.js) ;
               // son compteur reste publié dans le bloc caché ci-dessous (aucun nombre ne change).
               const cases = T.filter((x) => !x.pasSu && x.t && x.t.n > 0 && caseJourneeMontree(x.id, PROFIL_VENDEUR.mode));
@@ -39268,7 +39351,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // envoyer est DÉJÀ comptée dans « N colis à poster » (`colisAutres.vestiaire`, la même règle) et
               // sa photo est dans la pile : plus une seconde carte qui redit le même colis (§7).
               const envoyerVu = cases.some((x) => x.id === 'envoyer');
-              const autres = jobsAFaire.filter((j) => j.id !== 'emballer' && !(envoyerVu && j.id === 'vestiaire-envoyer'));
+              const autres0 = jobsAFaire.filter((j) => j.id !== 'emballer' && !(envoyerVu && j.id === 'vestiaire-envoyer'));
+              // (9 nov., Ma journée v2 — capture de Julien : « N°5 supprimé de Vinted… » répété N fois, trois gros
+              // boutons chacun) Les articles supprimés de Vinted forment UNE carte : une rangée compacte par
+              // article (photo, N°, titre sur une ligne) et SA réponse dans un menu ; « Tous chez moi » d'un coup,
+              // confirmé. Les mêmes réponses, la même écriture (`repondreCycle`) : rien n'est écrit sans son clic.
+              const cyclesJ = autres0.filter((j) => j.cycle);
+              const autres = autres0.filter((j) => !j.cycle);
               // (3 nov.) Le nombre revient dans le titre : la vignette montre DE QUOI il s'agit (les photos),
               // plus un chiffre en pastille colorée (Julien : « les couleurs… j'aime pas trop »).
               const libCase = (id, n) => ({ envoyer: `${n} colis ${Lbas.aEnvoyer}`, retirer: `${n} colis ${Lbas.aRetirer}`, messages: `${n} message${n > 1 ? 's' : ''}`, prix: `${n} prix à baisser` })[id];
@@ -39308,7 +39397,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
               const carteARelier = () => {
@@ -39364,6 +39453,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </button>
                 );
               };
+              const carteCycles = (liste) => {
+                const cs = liste.map((j) => j.cycle);
+                const n = cs.length, total = cycle && Number(cycle.total) > n ? Number(cycle.total) : n;
+                const titre = n === 1 && total === 1 ? `N°${cs[0].numero} supprimé de Vinted` : `${total} articles supprimés de Vinted`;
+                const note = total > n ? `Que deviennent-ils ? Les ${n} premiers ici` : n > 1 ? 'Que deviennent-ils ?' : 'Que devient-il ?';
+                return (
+                  <div key="cycles" className="vrm-day-task is-groupe vrm-cycle-groupe" role="group" aria-label={titre} data-job="supprime-vinted" data-cycle-groupe={String(total)} data-n={String(total)}>
+                    <div className="vrm-cycle-groupe-tete">
+                      <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note">{note}</span></span>
+                      {n > 1 ? <Bouton variante="secondaire" className="vrm-b-petit vrm-cycle-tous" data-cycle-tous={CHOIX_CYCLE.CHEZ_MOI} disabled={!!cycleEnVol} onClick={() => repondreCycleTous(cs)}>Tous chez moi</Bouton> : null}
+                    </div>
+                    <ul className="vrm-cycle-rangees">
+                      {cs.map((c) => (
+                        <li key={c.id} className="vrm-cycle-rangee" data-cycle-id={c.id} data-cycle-num={c.numero}>
+                          <span className="vrm-cycle-photo" aria-hidden="true">{c.photo && !imgMortes.has(c.photo) ? <PhotoVinted src={c.photo} alt="" loading="lazy" decoding="async" onError={() => noterImgMorte(c.photo)}/> : <Icon name="tag" size={18}/>}</span>
+                          <span className="vrm-cycle-txt"><Numero n={c.numero} taille="petit"/><span className="vrm-cycle-titre" title={String(c.title || '')}>{enArticles(String(c.title || '').slice(0, 120)) || 'Article'}</span></span>
+                          <label className="vrm-cycle-menu">
+                            <span className="vrm-sr">{`Que devient le N°${c.numero} ?`}</span>
+                            <select value="" data-cycle-select={c.id} disabled={!!cycleEnVol} onChange={(e) => { const v = e.target.value; if (v) repondreCycle(c, v); }}>
+                              <option value="" disabled>Choisir</option>
+                              {ORDRE_CHOIX_CYCLE.map((ch) => <option key={ch} value={ch} data-cycle-choix={ch}>{LIBELLE_CHOIX[ch]}</option>)}
+                            </select>
+                            <Icon name="chevron" size={14}/>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              };
               const carteCase = (x) => {
                 const so = sousCase(x);
                 const presse = !!(x.t && x.t.presses && (x.t.presses.urgent || x.t.presses.nAuj > 0)) || !!(x.t && x.t.alerte);
@@ -39377,42 +39496,52 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </button>
                 );
               };
-              if (loading) return null;
+              if (loading) return { prochain: null, section: null };
               // (6 nov.) Les actions du jour de la coque (la cloche) pas encore rangées : la liste
               // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
               // Et jamais « Rien à faire… : pas lu » pendant qu'elles se lisent.
-              if (!alertesLues) return (
+              if (!alertesLues) return { prochain: null, section: (
                 <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-afaire-attente="">
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2></div>
                   <SqLignes n={3} montant={false}/>
                 </section>
-              );
+              ) };
               // (5 nov., chantier E1, §5) « Rien à faire » ne se dit que sur ce qui a été LU : une case
               // pas lue (« — ») n'est pas une case à zéro. Sinon la ligne nomme ce qui manque.
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
-              if (nGestes === 0) return pasLus.length
+              if (nGestes === 0) return { prochain: null, section: pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
-                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96}/><p>Rien à faire</p></div>;
-              return (
+                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96}/><p>Rien à faire</p></div> };
+              // (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE sort de la liste : elle se pose EN TÊTE,
+              // dans la carte sombre, avant l'argent (Julien : l'ordre = ce qu'il faut faire maintenant, puis
+              // l'argent, puis le reste). L'ordre de toujours (le plus pressé d'abord) la désigne ; les
+              // mêmes éléments, les mêmes attributs, dits une seule fois (elle n'est plus redite dans la liste).
+              const listeAF = [
+                ...alertesArgent.map((j, i) => ({ el: tache(j, i), alerte: true })),
+                ...(carteAilleurs ? [{ el: carteVendusAilleurs() }] : []),
+                ...(deuxFois.length ? [{ el: carteDeuxFois() }] : []),
+                ...cases.map((x) => ({ el: carteCase(x) })),
+                ...(comptesARelierJour.length ? [{ el: carteARelier() }] : []),
+                ...(sortiesStock.length ? [{ el: carteSortieStock() }] : []),
+                ...(cyclesJ.length ? [{ el: carteCycles(cyclesJ) }] : []),
+                ...autres.map((j, i) => ({ el: tache(j, i) })),
+                ...(urssafJob ? [{ el: tache(urssafJob, 99) }] : []),
+              ].filter((x) => x.el && React.isValidElement(x.el));
+              // Une carte de gestes groupés (un choix par rangée) reste dans la liste : la tête porte UN geste.
+              const premierAF = listeAF.find((x) => !(x.el.props && x.el.props['data-cycle-groupe'] != null)) || null;
+              const prochainAF = premierAF ? React.cloneElement(premierAF.el, { className: ((premierAF.el.props && premierAF.el.props.className) || '') + ' is-prochain', 'data-prochain': '' }) : null;
+              const resteAF = listeAF.filter((x) => x !== premierAF);
+              const alertesReste = resteAF.filter((x) => x.alerte), autresReste = resteAF.filter((x) => !x.alerte);
+              return { prochain: prochainAF, section: (
                 <section className="vrm-fu-afaire" aria-label="À faire">
-                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
-                  {/* (8 nov., « beauté ») L'ÉCRAN D'ACCUEIL : la PREMIÈRE ligne (l'ordre de toujours, le plus
-                      pressé d'abord) devient la grande carte « prochaine chose à faire » (sa photo par identité,
-                      son titre, son geste en un tap) ; les autres, une rangée de petites cartes. Les MÊMES
-                      éléments, les mêmes attributs : seule la forme change (`is-prochain`, styles-beaute.css). */}
-                  {(() => { let premier = true; const P = (el) => { if (!premier || !el || !React.isValidElement(el)) return el; premier = false;
-                    return React.cloneElement(el, { className: ((el.props && el.props.className) || '') + ' is-prochain', 'data-prochain': '' }); };
-                  return (
+                  {/* (9 nov., Ma journée v2) « Ensuite » : le reste, après la prochaine chose (posée en tête).
+                      Le nombre de gestes compte TOUT (la prochaine comprise) : le même compte qu'avant. */}
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">{resteAF.length ? 'Ensuite' : 'À faire'}</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
+                  {resteAF.length ? (
                   <div className="vrm-day-task-list vrm-accueil-jour" data-barre-jour="" data-accueil-n={nGestes}>
-                    {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map((j, i) => P(tache(j, i)))}</div> : null}
-                    {carteAilleurs ? P(carteVendusAilleurs()) : null}
-                    {deuxFois.length ? P(carteDeuxFois()) : null}
-                    {cases.map((x) => P(carteCase(x)))}
-                    {comptesARelierJour.length ? P(carteARelier()) : null}
-                    {sortiesStock.length ? P(carteSortieStock()) : null}
-                    {autres.map((j, i) => P(tache(j, i)))}
-                    {urssafJob ? P(tache(urssafJob, 99)) : null}
-                  </div>); })()}
+                    {alertesReste.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesReste.map((x) => x.el)}</div> : null}
+                    {autresReste.map((x) => x.el)}
+                  </div>) : <p className="vrm-fu-vide vrm-jv2-rien-dautre" data-accueil-n={nGestes}>Rien d’autre pour l’instant.</p>}
                   {feuilleAilleurs ? (
                     <SheetShell titre="Vendus ailleurs" sousTitre={carteAilleurs && carteAilleurs.n ? `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} à retirer` : undefined} onClose={() => setFeuilleAilleurs(false)} maxWidth={560} data-feuille-ailleurs="">
                       <div className="vrm-bilan-sync vrm-va-feuille">
@@ -39428,8 +39557,70 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* Les cases à zéro restent lisibles par les autres écrans et les bancs (mêmes compteurs), sans place à l'écran. */}
                   <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
                 </section>
-              );
-            })()}
+              ) };
+        })();
+        return (
+          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee">
+            <ScreenHead icon="sun" title="Ma journée"/>
+
+            {/* (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee,
+                « sans textes explicatifs ») LA TÊTE SOMBRE, bord à bord : le bonjour, le
+                titre, la semaine, deux cases — « Vendu aujourd'hui » (`bilanVentes`, la règle
+                de « Vendu ») et « Bénéfice du mois » (`BeneficeJournee`, publication
+                `vrm_benefice_jours`). Rien d'autre. */}
+            {!baseKO && (() => {
+              const actifsT = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length;
+              // (9 nov.) « vendu aujourd'hui » pas lu : la frise le dit elle-même (`data-fu-vendu-jour` vide, « — »).
+              return (
+              <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
+                <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
+                <h1 className="vrm-fu-titre-tete">Ma journée</h1>
+                {/* (8 nov., « beauté ») LA PHRASE DU JOUR : les cases publiées (« À envoyer », « À retirer »,
+                    leur limite) mises en mots, le ton selon l'heure (src/phraseJour.js) ; rien de lu ⇒ la
+                    phrase fixe de l'écran. Aucun nombre recalculé. */}
+                {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
+                  return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
+                    : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
+                {/* (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE, en tête : avant l'argent. La carte de
+                    « À faire » qui vient en premier dans l'ordre de toujours (le plus pressé d'abord), avec son
+                    geste ; elle n'est plus redite dans la liste « Ensuite ». */}
+                {AF.prochain ? <div className="vrm-jv2-prochain" data-jv2-prochain="">{AF.prochain}</div> : null}
+                {/* (9 nov., Ma journée v2) L'ARGENT : la frise des sept jours, qui se TOUCHE (un jour ⇒ ce jour-là ;
+                    « Semaine du … » ⇒ la semaine passée — l'ancienne carte « Semaine », fondue ici), puis les
+                    cases du mois choisies par Julien (« Modifier »). Le grand chiffre par défaut de la carte
+                    (« vendu · aujourd'hui ») EST le chiffre du jour de la frise : il n'est plus écrit deux fois. */}
+                {!premierJour && (
+                  <FriseJournee liveStats={liveStats} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte}
+                    onVentes={() => onNav && onNav('cat_ventes')}
+                    photosEntre={(de, a) => (sales.items || [])
+                      .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
+                      .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
+                      .sort((x, y) => y.t - x.t).map((x) => orderPhoto(x.o)).filter(Boolean)}/>
+                )}
+                {/* (3 nov., carte réglable par page) Les chiffres de la tête : un grand chiffre + trois
+                    cases, choisis par Julien (« Modifier »). Défaut = vendu aujourd'hui (porté par la frise
+                    ci-dessus), bénéfice du mois (`chiffreBenefice`, la lecture de Compta), vendu du mois, reçu du
+                    mois. Les attributs que les bancs lisent restent sur LEUR chiffre (`data-journee-benef…`). */}
+                {!premierJour && (
+                  <CarteStatsApp page="journee" aide liveStats={liveStats} nu ici="journee" onNav={onNav}
+                    sel={{ site: 'toutes', compte: null, periode: null }}
+                    tete={(g) => (g && g.place && g.place.id === 'vendu' && g.p === 'jour' && !g.hors) ? <React.Fragment/> : null}
+                    attrsDe={(x) => {
+                      if (x.place.id === 'benefice' && x.p === 'mois') { const B = x.B, e2 = (v) => v == null ? '' : String(Math.round(v * 100) / 100);
+                        return { 'data-journee-benef': '', 'data-journee-benef-etat': x.etat || '', 'data-journee-benef-n': B ? String(B.n) : '', 'data-journee-benef-ncout': B ? String(B.nCout) : '',
+                          'data-journee-benef-brut': B && B.nCout > 0 ? e2(B.brut) : '', 'data-journee-benef-net': B ? e2(B.netFinal) : '', 'data-journee-benef-raison': B ? B.raison : '' }; }
+                      return null;
+                    }}/>
+                )}
+              </section>
+              ); })()}
+
+            {/* (9 nov., Ma journée v2) La carte « Semaine du … » (4 nov.) n'est plus une carte à part : la semaine
+                passée se touche dans la frise de la tête (« Semaine du … »), avec les MÊMES règles
+                (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
+            {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
+
+            {AF.section}
 
             {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières
                 ventes, stock, tendances) n'est plus rendue sur Ma journée : la maquette n'a que la
