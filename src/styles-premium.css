@@ -742,4 +742,23 @@
   .vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row { grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) var(--p-g-montant) 44px !important; padding-right: 10px !important; }
 }
 
+/* ══ 11. PHASE 3 (9 nov.) — les écrans restants, la même grammaire ══════════ */
+
+/* 11.1 STOCK — le résumé : le chiffre à sa taille (34/700 tabulaire), son mot en gris,
+   les faits en note 13 grise (les nombres à l'encre) ; les rangées de la liste suivent
+   la grammaire : vignette 44, titre 15/600 sur une ligne, note 13, geste à droite,
+   filet 0,5 qui commence après la vignette. */
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n { font: 700 var(--p-t-titre)/1.1 var(--vrm-police) !important; letter-spacing: var(--p-ap-titre) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n > span { font: 400 var(--p-t-texte)/1 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n > small { font: 400 var(--p-t-texte)/1.3 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--p-gris) !important; margin-left: 6px !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-l { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 6px !important; max-width: 72ch !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-l b { color: var(--p-encre) !important; font-weight: 600 !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-liste-ligne { gap: var(--p-g-gout) !important; padding: 10px 0 !important; min-height: 64px !important; border-top: 0 !important; position: relative !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-liste-ligne + .vrm-s2d-liste-ligne::before { content: "" !important; position: absolute !important; top: 0 !important; left: calc(var(--p-g-vignette) + var(--p-g-gout)) !important; right: 0 !important; height: .5px !important; background: var(--p-filet) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-vig { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; border-radius: var(--p-r-vignette) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-t { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-s { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-s b { color: var(--p-encre) !important; font-weight: 500 !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-gestes { flex: none !important; }
+
 } /* fin @layer vrm-premium */
