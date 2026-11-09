@@ -51417,8 +51417,13 @@ function AppCoeur() {
         <GardeEcran nom={t+':'+site} resetKey={platSub}>
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
-            : <VentesToutes sites={sitesPresents} ventesVinted={ventesCoqueEmail} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
-                onOuvrir={(l)=>{ if(l.site==='ebay'){ DEMANDE_EBAY_CIBLE.compte=l.compteRef||null; DEMANDE_EBAY_CIBLE.id=l.id; DEMANDE_EBAY_CIBLE.at=Date.now(); setTab('ebay_ventes'); return; } setPlatSub(l.site); }}/>)
+            : <><VentesToutes sites={sitesPresents} ventesVinted={ventesCoqueEmail} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
+                onOuvrir={(l)=>{ if(l.site==='ebay'){ DEMANDE_EBAY_CIBLE.compte=l.compteRef||null; DEMANDE_EBAY_CIBLE.id=l.id; DEMANDE_EBAY_CIBLE.at=Date.now(); setTab('ebay_ventes'); return; } setPlatSub(l.site); }}/>
+          {/* (9 nov.) Solo : les ventes des comptes d'achat, en aperçu sous la liste (jamais supprimées). */}
+          {t==='ventes' && <div style={{padding:'0 16px'}}><VentesHorsPlan ventes={Array.isArray(ventesCoque) ? ventesCoque.filter(o => o && classifyOrderStatus(o.status) !== 'cancelled') : null}
+            comptes={(vintedAccounts || []).filter(a => a && a.vinted_user_id != null).map(a => ({ uid: String(a.vinted_user_id), nom: (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)] || a.login || ('#' + a.vinted_user_id) }))}
+            aEnvoyer={(o) => aExpedier(o) && !(load('vinted_ship_done', {}) || {})[String(o.transaction_id)]} prix={(o) => (o.price && o.price.amount != null ? fmt(Number(o.price.amount)) : '')}
+            onPro={() => voirAbonnement(setTab)}/></div>}</>)
           : (sitesPresents && !sitesPresents.has(site)) ? <OngletManque site={site} onglet={t} onNav={setTab}/>
           : site==='vinted' ? rendreVinted(sec)
           : site==='leboncoin' ? rendreLeboncoin(sec)

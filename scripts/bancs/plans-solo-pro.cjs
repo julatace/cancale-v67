@@ -107,7 +107,8 @@ async function ouvrir(nav, { abo, tab = 'ventes', largeur = 1512, sombre = false
   return { ctx, pg, erreurs, appels, etat };
 }
 const lireVentes = (pg) => pg.evaluate(() => {
-  const rows = [...document.querySelectorAll('.vrm-sale-row[data-tx]')].map((e) => e.getAttribute('data-tx'));
+  // La liste « Tous » de l'écran Ventes (une rangée par vente, `data-toutes-id` = son n°).
+  const rows = [...document.querySelectorAll('[data-toutes-vente="vinted"][data-toutes-id]')].map((e) => e.getAttribute('data-toutes-id'));
   const h = document.querySelector('[data-ventes-hors-plan]');
   const bloc = h ? h.querySelector('[data-hors-plan-compte]') : null;
   const lignes = bloc ? [...bloc.querySelectorAll('.vrm-plan-ligne')] : [];
@@ -117,7 +118,7 @@ const lireVentes = (pg) => pg.evaluate(() => {
     rows, hors: !!h, compte: bloc && bloc.getAttribute('data-hors-plan-compte'), n: bloc && bloc.getAttribute('data-hors-plan-n'), aEnvoyer: bloc && bloc.getAttribute('data-hors-plan-a-envoyer'),
     nettes: lignes.slice(0, 3).filter((l) => !l.hasAttribute('data-apercu-floute')).length, floutees: fl.length,
     inertes: fl.every((l) => l.hasAttribute('inert') && l.getAttribute('aria-hidden') === 'true'), flou: s ? s.filter : '',
-    pro: !!(bloc && bloc.querySelector('[data-passer-pro]')), phrase: bloc ? bloc.innerText.slice(0, 200) : '',
+    pro: !!(bloc && bloc.querySelector('[data-passer-pro]')), phrase: bloc ? bloc.innerText.slice(0, 800) : '',
     bandeau: !!document.querySelector('[data-bandeau-compte-vendeur]'),
     deborde: document.documentElement.scrollWidth - window.innerWidth,
   };
@@ -181,6 +182,7 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
     for (const [nom, abo, largeur, sombre] of [['fermé', ETATS.solo111, 1512, false], ['fermé', ETATS.solo111, 390, true], ['ouvert', ETATS.soloProOuvert, 1512, true]]) {
       await essaie(`offres ${nom} ${largeur}`, async () => {
         const { ctx, pg } = await ouvrir(nav, { abo, tab: 'settings', largeur, sombre });
+        await pg.waitForSelector('[data-offres]', { timeout: 10000 }).catch(() => {});   // l'écran Paramètres est chargé à la demande
         const o = await pg.evaluate(() => { const g = document.querySelector('[data-offres]'); if (!g) return null; const r = (s) => g.querySelector(s); return { plan: g.getAttribute('data-plan'), solo: (r('[data-prix-solo]') || {}).innerText, pro: (r('[data-prix-pro]') || {}).innerText, bientot: !!r('[data-pro-bientot]'), bouton: !!r('[data-passer-pro]'), actuelle: (g.querySelector('[data-offre-actuelle]') || {}).getAttribute ? g.querySelector('[data-offre-actuelle]').getAttribute('data-offre') : null, cv: (document.querySelector('[data-compte-vendeur]') || {}).getAttribute ? document.querySelector('[data-compte-vendeur]').getAttribute('data-compte-vendeur') : null, cote: (() => { const a = g.children[0].getBoundingClientRect(), b = g.children[1].getBoundingClientRect(); return Math.abs(a.top - b.top) < 4; })(), deborde: document.documentElement.scrollWidth - window.innerWidth }; });
         if (nom === 'fermé') dit(o && o.plan === 'solo' && /16,99/.test(o.solo) && /19,99\s€ \/ mois/.test(o.pro) && o.bientot && !o.bouton && o.actuelle === 'solo' && o.cv === '111', `${largeur} : Solo 16,99 € (ton offre) · Pro 19,99 € « bientôt », sans bouton ; le compte qui vend`, JSON.stringify(o));
         else dit(o && o.bouton && !o.bientot && /19,99/.test(o.pro), 'Pro ouvert (prix Stripe posé) : « Passer à Pro »', JSON.stringify(o));
