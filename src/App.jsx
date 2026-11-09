@@ -26105,7 +26105,7 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = 
       </ol>
       <div className="vrm-jv2-periode" key={semaine ? 'sem' : jSel.iso} data-jv2-panneau="" {...(semaine ? { 'data-journal-semaine': S.lundi } : {})}>
         <div className="vrm-jv2-quand">
-          <span className="vrm-jv2-nom" data-jv2-nom="">{nom}</span>
+          <span className="vrm-fu-surtitre vrm-jv2-nom" data-jv2-nom="">{nom}</span>
           <button type="button" className="vrm-jv2-sem" aria-pressed={semaine} data-jv2-semaine={S.lundi} onClick={() => setChoix(semaine ? null : 'sem')}>{semaine ? 'Revenir aux jours' : S.titre}</button>
         </div>
         <div className="vrm-jv2-corps">
