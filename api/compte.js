@@ -205,15 +205,15 @@ function prixDeLAbonnement(sub) {
 //    audit-lancement.cjs exige que cette valeur soit celle écrite dans les CGV
 //    (et dans le repli de l'app) : une seule valeur (§11).
 export const PRIX_CGV = { centimes: 1699, devise: 'eur', intervalle: 'month' };
-// ⚠️⚠️ (9 nov.) LE PRIX DE PRO N'EST PAS FIXÉ PAR JULIEN : VIDE EXPRÈS. Pro (« les
-//    ventes de tous tes comptes ») ne s'ouvre au paiement que quand LES TROIS sont
-//    posés et disent la même chose : (1) le prix créé chez Stripe et son
-//    identifiant (ou sa clé de recherche) dans `STRIPE_PRIX_PRO` sur Vercel ;
-//    (2) ce montant ici, `{ centimes, devise: 'eur', intervalle: 'month' }` ;
-//    (3) le même montant écrit dans les CGV (public/legal/cgv.html). Tant que
-//    l'un manque, l'app affiche Pro « bientôt », sans bouton de paiement, et dit
-//    au propriétaire le geste qui manque. Jamais un prix inventé.
-export const PRIX_PRO_CGV = null;
+// ⚠️⚠️ (9 nov.) LE PRIX DE PRO : 19,99 € / mois (décision de Julien du 9 nov. ;
+//    Solo reste 16,99 €). Écrit ICI, dans les CGV et dans l'app
+//    (src/accueil-reglages.js `PRIX_PRO_MOIS`) — audit-plans-solo-pro les compare.
+//    Le paiement Pro ne s'ouvre que quand le prix existe CHEZ STRIPE, que son
+//    identifiant (ou sa clé de recherche `vrm_pro_mensuel`) est dans
+//    `STRIPE_PRIX_PRO` sur Vercel, ET que Stripe dit exactement ce montant. Le
+//    montant prélevé est toujours celui de Stripe : s'il diffère, le paiement
+//    reste fermé et le propriétaire voit le montant de Stripe (`texteStripe`).
+export const PRIX_PRO_CGV = { centimes: 1999, devise: 'eur', intervalle: 'month' };
 const prixProCle = () => String(process.env.STRIPE_PRIX_PRO || '').trim();
 export const prixProConforme = (p) => !!(PRIX_PRO_CGV && p
   && p.centimes === PRIX_PRO_CGV.centimes
@@ -235,7 +235,6 @@ async function lirePrixPro() {
 // le prix n'est pas posé.
 async function offrePro() {
   if (!prixProCle()) return { ouvert: false, raison: 'sans-prix-stripe', texte: null };
-  if (!PRIX_PRO_CGV) return { ouvert: false, raison: 'sans-prix-cgv', texte: null };
   if (!stripePret()) return { ouvert: false, raison: 'stripe', texte: null };
   const p = await lirePrixPro();
   if (!p) return { ouvert: false, raison: 'prix-illisible', texte: null };

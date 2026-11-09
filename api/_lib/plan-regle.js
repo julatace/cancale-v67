@@ -43,6 +43,8 @@ const uidDe = (u) => String(u == null ? '' : u).trim();
 
 // La clé de recherche Stripe du prix Solo (celle de `PRIX_CLE` dans api/compte.js).
 export const CLE_PRIX_SOLO = 'vrm_mensuel';
+// La clé de recherche du prix Pro chez Stripe (geste de Julien, passation du 9 nov.).
+export const CLE_PRIX_PRO = 'vrm_pro_mensuel';
 
 // Le PLAN d'un prix Stripe. `pro` : l'identifiant OU la clé de recherche posée
 // dans `STRIPE_PRIX_PRO` (vide ⇒ aucun prix n'est Pro). `solo` : la clé de
@@ -51,7 +53,7 @@ export function planDuPrix(prix, { prixPro = '', cleSolo = CLE_PRIX_SOLO } = {})
   if (!prix || typeof prix !== 'object') return null;
   const id = String(prix.id || ''), cle = String(prix.lookup_key || '');
   const pro = String(prixPro || '').trim();
-  if (pro && (id === pro || cle === pro)) return PLAN_PRO;
+  if ((pro && (id === pro || cle === pro)) || cle === CLE_PRIX_PRO) return PLAN_PRO;
   if (cleSolo && cle === cleSolo) return PLAN_SOLO;
   return null;
 }
