@@ -36,14 +36,28 @@ export function candidatsDuScan(brut) {
   return out;
 }
 
-// `colis` : [{ cle, suivis: [n°…], deja: bool, … }]. Rend
+// (9 nov., lot V) AU RETRAIT d'un ACHAT, l'étiquette peut porter le n° de suivi OU le
+// code de retrait (souvent 6 caractères) : la valeur brute est retenue dès 4 caractères,
+// en plus des formes ci-dessus. Toujours une égalité EXACTE ensuite (un code de retrait
+// n'existe que pour UN colis, §5).
+export function candidatsRetrait(brut) {
+  const out = candidatsDuScan(brut);
+  const s = normaliserN(brut);
+  if (s && s.length >= 4 && !out.includes(s)) out.push(s);
+  return out;
+}
+
+// `colis` : [{ cle, suivis: [n°…], deja: bool, sansVente?: bool, … }]. Rend
 //  · { etat: 'trouve', colis }   un seul colis, pas encore déposé ;
 //  · { etat: 'deja', colis }     un seul colis, déjà déposé / parti ;
 //  · { etat: 'ambigu', colis: [..] }  plusieurs colis portent ce n° ⇒ rien ;
 //  · { etat: 'inconnu' }         aucun colis ne porte ce n° ⇒ rien ;
+//  · { etat: 'sansVente', colis } un seul colis, mais son bordereau n'est relié à
+//                                 AUCUNE vente (pas de paire à montrer) ⇒ rien ;
 //  · { etat: 'vide' }            lecture vide.
-export function trouverParScan(brut, colis) {
-  const cands = candidatsDuScan(brut);
+// `candidats` : la règle des n° qu'une lecture désigne (`candidatsRetrait` aux achats).
+export function trouverParScan(brut, colis, { candidats = candidatsDuScan } = {}) {
+  const cands = candidats(brut);
   if (!cands.length) return { etat: 'vide', candidats: cands };
   const parCle = new Map();
   for (const c of (Array.isArray(colis) ? colis : [])) {
@@ -54,7 +68,9 @@ export function trouverParScan(brut, colis) {
   const L = [...parCle.values()];
   if (!L.length) return { etat: 'inconnu', candidats: cands };
   if (L.length > 1) return { etat: 'ambigu', colis: L, candidats: cands };
-  return { etat: L[0].deja ? 'deja' : 'trouve', colis: L[0], candidats: cands };
+  if (L[0].deja) return { etat: 'deja', colis: L[0], candidats: cands };
+  if (L[0].sansVente) return { etat: 'sansVente', colis: L[0], candidats: cands };
+  return { etat: 'trouve', colis: L[0], candidats: cands };
 }
 
 // Une même lecture répétée par la caméra (le code reste dans le cadre) ne

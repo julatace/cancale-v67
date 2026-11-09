@@ -226,6 +226,10 @@ const lireStats = (pg) => pg.evaluate(() => {
   const page = q('.vrm-statistiques-premium');
   return { tuiles, meilleur: meilleur ? meilleur.getAttribute('data-sv-meilleur') : null, lignesCompte, replis,
     hero: !!q('[data-stats-carte="hero"]'), vitTexte: vit ? vit.innerText : '', pageTexte: page ? page.innerText : '',
+    // (9 nov.) Le texte de l'écran SANS la carte « Comparer » (5-6 nov., `src/comparerMois.js`,
+    // banc argent-mois) : un tableau qui pose deux mois côte à côte redit par construction le mois
+    // en cours. Le reste de l'écran, lui, ne doit écrire le montant qu'une fois.
+    pageHorsComparer: page ? (() => { const c = page.querySelector('[data-comparer]'); return c ? page.innerText.replace(c.innerText, '') : page.innerText; })() : '',
     topComptes: top('[data-sv-carte="comptes"]'), topBarres: top('[data-sv-carte="barres"]'),
     deborde: document.documentElement.scrollWidth > innerWidth + 1 };
 });
@@ -295,7 +299,8 @@ if (require.main === module && !EXPLORE) (async () => {
         await pg.waitForTimeout(600);
         let r = await lireStats(pg);
         await capture(pg, `stats-${suf}`);
-        dit(r.tuiles.map((t) => t.k).join(',') === 'vendu,benefice,delai,enligne' && r.tuiles.every((t) => t.sous.trim().length > 8), `${suf} : 4 chiffres en tête, chacun avec sa phrase`, r.tuiles.map((t) => t.k + ':' + t.sous).join(' / '));
+        // (9 nov.) + « CA depuis le début » (`total`, demande de Julien du 7 nov.) : 5 chiffres en tête.
+        dit(r.tuiles.map((t) => t.k).join(',') === 'vendu,benefice,delai,enligne,total' && r.tuiles.every((t) => t.sous.trim().length > 8), `${suf} : 5 chiffres en tête (dont « CA depuis le début »), chacun avec sa phrase`, r.tuiles.map((t) => t.k + ':' + t.sous).join(' / '));
         dit(/par rapport à septembre/.test(r.tuiles[0].sous), `${suf} : l'écart dit à quoi il se compare`, r.tuiles[0].sous);
         dit(!/médiane?|\bs\d\d\b|Délai médian/.test(r.vitTexte), `${suf} : ni « médiane » ni « s44 » en haut de l'écran`);
         const l = r.lignesCompte;
@@ -303,9 +308,13 @@ if (require.main === module && !EXPLORE) (async () => {
         dit(l[0].n >= 5 && l[0].n > l[1].n ? r.meilleur === l[0].k : r.meilleur === null, `${suf} : « quel compte vend le mieux » nomme celui qui a le plus de ventes — seulement à 5 ventes ou plus`, `${r.meilleur} · ${JSON.stringify(l)}`);
         if (T.nom === '390') dit(r.topComptes != null && r.topBarres != null && r.topComptes < r.topBarres, '390 : au téléphone, le compte qui vend le mieux passe avant le graphique', `${r.topComptes} < ${r.topBarres}`);
         dit(r.replis.length === 2 && r.replis.every((x) => !x.ouvert) && !r.hero, `${suf} : le détail est rangé en 2 volets fermés, rien n'y est calculé`, JSON.stringify(r.replis));
-        const eur = r.tuiles[0].eur; const montant = (Number(eur) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €';
-        const fois = r.pageTexte.split(montant.replace(/ /g, ' ')).length - 1 || r.pageTexte.split(montant).length - 1;
-        dit(fois === 1, `${suf} : le montant vendu de la période (${montant}) est écrit une seule fois`, String(fois));
+        // (9 nov.) Le montant à la règle du 5 nov. (`montant`, src/format.js) : centimes seulement s'ils
+        // existent (« 250 € ») ; espaces normalisées des deux côtés ; un montant plus long qui le contient
+        // (« 1 250 € », « 1250 € ») ne compte pas.
+        const eur = Number(r.tuiles[0].eur); const montant = (eur % 100 ? (eur / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (eur / 100).toLocaleString('fr-FR')) + ' €';
+        const esp = (x) => x.replace(/[  ]/g, ' ');
+        const fois = (esp(r.pageHorsComparer).match(new RegExp('(^|[^\\d,])' + esp(montant).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+        dit(fois === 1, `${suf} : le montant vendu de la période (${montant}) est écrit une seule fois (hors « Comparer »)`, String(fois));
         await pg.locator('[data-stats-repli="argent"] > summary').click(); await pg.waitForTimeout(800);
         r = await lireStats(pg);
         dit(r.hero && r.replis.find((x) => x.id === 'argent').ouvert, `${suf} : ouvrir « L'argent depuis le début » montre le finalisé`);

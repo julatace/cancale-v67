@@ -85,6 +85,14 @@
 
 ## 4. Ce qui reste
 
+### Livrés après la première version de cette passation (9 nov., soir)
+- `claude/journee-v2` (Ma journée v2, Ventes ↔ Colis) — en production ; `2026-11-09-journee-v2.md`.
+- `claude/zero-banc-rouge` (~20 bancs au vert, 2 défauts de Colis) — en production ; `2026-11-09-zero-banc-rouge.md`.
+- `claude/suites-serveur` (Solo côté serveur, double vente Leboncoin) — en production (fait par une autre session sous le même nom de branche) ; `2026-11-09-suites-serveur.md`.
+- `claude/direction-artistique-4` (feuilles, saisie gardée, toasts, confirmations, états vides, pilules Colis) — en production ; `2026-11-09-direction-artistique-4.md`. Reste : faire passer les ateliers faits main (`VoileAtelier`) par `SheetShell` (poignée), pied d'actions collé sur les longues feuilles.
+
+**À 21 h le 9 nov., plus aucun chantier en cours** : tout ce qui suit dans « Chantiers en cours » est livré ; reste les suites et les décisions ci-dessous.
+
 ### Chantiers en cours au moment de cette passation (branches d'agents)
 - `claude/journee-v2` — Ma journée refaite (frise de la semaine cliquable, pile des ventes,
   plus de « 0 € » géant, « + 1756 à dater » avec unité, UNE carte pour les paires
@@ -109,6 +117,8 @@ d'intégration (vrai merge), vérifier (§6), puis PR vers `main`.
 - Vinted Pro : champ « numéro d'étiquetage » (il faut une capture d'une annonce Pro).
 - L'app n'affiche pas encore « ce compte Vinted est déjà relié à un autre compte VRM »
   (seul le journal de l'extension le dit, 5.332).
+- Ma journée : la ligne « à retirer : pas lu » ne dit plus pourquoi (la raison et « Réessayer » ne sont que dans Colis) — relevé par `claude/zero-banc-rouge`.
+- Colis : la puce « comptes à relire » ne regarde que la fraîcheur des VENTES ; un compte dont seuls les achats sont vieux n'est pas nommé.
 - `SECURITE.md` décrit encore septembre : à réécrire depuis `2026-11-09-securite.md`.
 
 ### Décisions attendues de Julien

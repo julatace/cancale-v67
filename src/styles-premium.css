@@ -1015,4 +1015,49 @@
   :root[data-theme="dark"] .vrm-app-shell .vrm-tabbar .vrm-nav-badge-n { color: #1C1C1E !important; box-shadow: 0 0 0 2px #121214 !important; }
 }
 
+
+/* ══ 13. PHASE 4, suite (9 nov. soir) — ce que la forme ne disait pas encore ════════
+   docs/passation/2026-11-09-direction-artistique-4.md (§ « Suite »). */
+
+/* 13.1 LA CONFIRMATION D'UN GESTE IRRÉVERSIBLE (`askConfirm({ irreversible: true })` :
+   supprimer chez Leboncoin, terminer chez eBay) — la réponse en AMBRE plein (un geste
+   sans retour), jamais rouge (§7 : le rouge est aux deux paires sous un N°). Toutes les
+   autres confirmations gardent le bleu. */
+.vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire {
+  background: var(--p-ambre-texte) !important; color: #FFFFFF !important; box-shadow: none !important;
+}
+:root[data-theme="dark"] .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire { background: #FFB340 !important; color: #1C1C1E !important; }
+
+/* 13.2 UNE FEUILLE QUI NE PEUT PAS SE FERMER (`bloque`, un envoi en cours) : sa croix
+   reste à sa place, éteinte ; la toucher dit pourquoi (le `title`, lu par Toaster). */
+html body .vrm-fs button.vrm-fs-croix:disabled { cursor: not-allowed !important; opacity: .4 !important; }
+
+/* 13.3 LES MESSAGES ET LA PILULE « ANNULER » AU TÉLÉPHONE — au-dessus de la barre du bas
+   ET du clavier (`--vrm-clavier`, posé par Toaster depuis `visualViewport`) ; un message
+   dit pendant que la pilule est là monte d'un cran au lieu de la couvrir. */
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse) {
+  .vrm-pil-zone:not([data-pilule-place="haut"]) { bottom: max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px)) !important; }
+  body:has(.vrm-pil-zone[data-pilule-place="bas"] .vrm-pil) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px)) + 60px) !important; }
+  body:has(.vrm-pil-zone[data-pilule-place="haut"] .vrm-pil) .vrm-toasts[data-toasts-place="haut"] { top: calc(72px + env(safe-area-inset-top)) !important; }
+}
+/* Le dessin de l'état vide de Messages (même taille que celui des Ventes). */
+.vrm-app-shell .vrm-main [data-msg-vide] svg.vrm-illustration { margin: 0 auto 6px !important; color: var(--p-gris-2) !important; }
+
+
+/* 13.4 COLIS À L'ORDINATEUR — « Relier » / « Poser le N° » (un geste à faire sur une
+   rangée sans N°) tombaient SOUS la rangée, à cheval sur le filet (la zone d'action a
+   une hauteur nulle : « … » et le bordereau y sont posés en absolu). Grammaire : le
+   geste prend la place de l'ÉTAT (colonne 2, vide tant que rien n'est fait), centré sur
+   la rangée comme le bordereau. Une rangée qui porte déjà sa frise garde la frise : la
+   zone d'action passe alors sur une 2e ligne de la rangée (jamais de chevauchement). */
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="cat_bord"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not(:has(> .vrm-colis-frise)) > .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
+    position: absolute !important; top: 50% !important; transform: translateY(-50%) !important; margin: 0 !important;
+    left: calc(100% - var(--p-g-bord) - var(--p-g-action) - 24px - var(--p-g-etat)) !important;
+  }
+  .vrm-main[data-ecran="cat_bord"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > .vrm-colis-actions:has(> :is([data-geste="relier"], [data-geste="poser-num"])) {
+    grid-column: 2 / -1 !important; grid-row: 2 !important; height: auto !important; display: flex !important; justify-content: flex-start !important;
+  }
+}
+
 } /* fin @layer vrm-premium */

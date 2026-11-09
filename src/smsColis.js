@@ -49,13 +49,26 @@ export const ETAPES_RACCOURCI = [
   { cle: 'automatisation', dessin: 'onglet', titre: 'Ouvre Raccourcis, onglet « Automatisation »',
     mots: ['Ouvre l’app Raccourcis', 'Touche l’onglet « Automatisation » en bas', 'Touche « + » (ou « Nouvelle automatisation »)'] },
   { cle: 'declencheur', dessin: 'message', titre: 'Choisis « Message »',
-    mots: ['Dans la liste, touche « Message »', '« Le message contient » : touche « Choisir », écris « colis », touche « OK »', 'Laisse « Expéditeur » vide (MRELAY n’est pas un contact)'] },
+    mots: ['Dans la liste, touche « Message »', '« Le message contient » : touche « Choisir », écris « colis », touche « OK »', 'Laisse « Expéditeur » vide : MRELAY (Mondial Relay), Pickup, VintedGo et Chronopost ne sont pas des contacts, et leurs SMS contiennent tous « colis »'] },
   { cle: 'immediat', dessin: 'immediat', titre: 'Coche « Exécuter immédiatement »',
     mots: ['Coche « Exécuter immédiatement » (pas « Exécuter après confirmation »)', 'Touche « Suivant »', 'Touche « Nouveau raccourci vide »'] },
   { cle: 'url', dessin: 'url', titre: 'Ajoute « Obtenir le contenu de l’URL »',
     mots: ['Touche « Ajouter une action », cherche « Obtenir le contenu de l’URL » et touche-la', 'Touche « URL » et colle l’adresse copiée ci-dessus', 'Touche la flèche « › » de l’action pour voir ses réglages'] },
   { cle: 'post', dessin: 'json', titre: 'Méthode « POST », corps « JSON »',
-    mots: ['« Méthode » : choisis « POST »', '« Corps de la requête » : choisis « JSON »', '« Ajouter un nouveau champ » → « Texte » : clé texte, valeur : la variable « Entrée du raccourci »', 'Touche « OK » en haut à droite'] },
+    mots: ['« Méthode » : choisis « POST »', '« Corps de la requête » : choisis « JSON »', '« Ajouter un nouveau champ » → « Texte » : clé texte, valeur : la variable « Entrée du raccourci »', 'Si Raccourcis le propose : un 2ᵉ champ « Texte », clé expediteur, valeur : « Entrée du raccourci » réglée sur « Expéditeur » (facultatif, VRM lit aussi le texte)', 'Touche « OK » en haut à droite'] },
+  // (9 nov.) Les SMS de Vestiaire Collective (« VestiaireCo ») ne contiennent pas « colis » :
+  // une 2ᵉ automatisation, identique, sur le mot « article ».
+  { cle: 'vestiaire', dessin: 'message', titre: 'Vestiaire : une 2ᵉ automatisation sur « article »',
+    mots: ['Refais les étapes 1 à 5 avec « Le message contient » : « article »', 'Elle attrape les SMS de VestiaireCo (« Votre article … vient d’etre vendu », « N’oubliez pas d’expédier votre article … »)', 'Chronopost : quand tu en reçois un, copie-le à VRM (il n’est pas encore appris : seul son n° est gardé, « à vérifier »)'] },
+];
+
+// (9 nov.) Les expéditeurs que VRM sait lire (api/_lib/sms-*.js) et ce qu'il en fait.
+export const EXPEDITEURS_SMS = [
+  { nom: 'MRELAY', quoi: 'Mondial Relay : colis arrivé au relais ou en casier, son code, le rappel' },
+  { nom: 'VintedGo', quoi: 'Vinted Go : le code de retrait et la date limite (relié au colis qui porte ce code)' },
+  { nom: 'Pickup', quoi: 'Pickup : le relais et le Pass à présenter (sans n° : jamais relié tout seul)' },
+  { nom: 'VestiaireCo', quoi: 'Vestiaire : la marque vendue et la date limite d’envoi (sans n° de commande : jamais reliée toute seule)' },
+  { nom: 'Chronopost', quoi: 'Chronopost : pas encore appris — son n° seul, « à vérifier »' },
 ];
 
 // Ce que la carte dit du résultat d'un essai (la réponse de la route).

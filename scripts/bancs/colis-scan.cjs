@@ -3,8 +3,11 @@
 // bordereaux e-mail (`email_bord_{tx}`, champ `suivi`), un colis déjà coché « Colis fait »
 // (`vinted_ship_done`). La caméra et le détecteur sont FAUX : `navigator.mediaDevices.getUserMedia` rend
 // le flux d'un canvas, `window.BarcodeDetector` rend la valeur posée par le banc (`__scan(valeur)`).
+// (9 nov., lot V) LA RÈGLE A CHANGÉ : le scan MONTRE la paire attendue et n'écrit rien ; « Déposé » est
+// SON toucher sur « C'est la bonne paire · Colis fait » (`toucher`, ci-dessous) — le même geste différé
+// 5 s. Le reste du banc est inchangé (banc complet du lot V : scanner-colis-achats.cjs).
 // Exige (jugé sur data-* et sur ce qui est ÉCRIT dans `vinted_ship_done`, §6.4) :
-//  A. n° connu (forme Chronopost) ⇒ « Déposé », SON colis (data-scan-cle), la barre « Annuler » ;
+//  A. n° connu (forme Chronopost) ⇒ SON colis (data-scan-cle) ; son toucher ⇒ « Colis fait », la barre « Annuler » ;
 //  B. deux colis au MÊME titre : seul celui du n° scanné est déposé (l'autre jamais écrit) ;
 //  C. code-barres InPost/Mondial Relay à 26 chiffres ⇒ le colis du n° imprimé (chiffres 3 à 10) ;
 //  D. « Annuler » dans les 5 s ⇒ rien n'est écrit ;
@@ -100,6 +103,8 @@ async function scenario(b, nom, vue) {
   const ecrits = () => pg.evaluate(() => { try { return Object.keys(JSON.parse(localStorage.getItem('vinted_ship_done') || '{}')).sort(); } catch (_) { return null; } });
   const res = () => pg.evaluate(() => { const e = document.querySelector('[data-scan-resultat]'); return e ? { etat: e.getAttribute('data-scan-resultat'), cle: e.getAttribute('data-scan-cle'), n: Number(e.getAttribute('data-scan-n')) } : null; });
   const attendre = async (n) => { for (let i = 0; i < 40; i++) { const r = await res(); if (r && r.n >= n) return r; await pg.waitForTimeout(100); } return res(); };
+  // (9 nov.) Le scan montre ; SON toucher pose « Colis fait » (rien avant). Rend l'état d'après.
+  const toucher = async (r) => { if (!r || r.etat !== 'trouve') return r; await pg.click(`[data-scan-confirmer="${r.cle}"]`); return res(); };
   const bouton = await pg.$('[data-colis-scanner]');
   dit(!!bouton, `${nom} : le bouton « Scanner » est dans Colis → À envoyer`);
   if (!bouton) { await ctx.close(); return; }
@@ -114,8 +119,8 @@ async function scenario(b, nom, vue) {
   dit(JSON.stringify(avant) === '["9104"]', `${nom} : avant tout scan, seul le colis déjà coché est écrit`, JSON.stringify(avant));
   // A + B : le premier « Nike Air Max 90 blanche taille 42 » (n° Chronopost connu).
   await pg.evaluate(() => window.__scan('XA123456789FR'));
-  let r = await attendre(1);
-  dit(r && r.etat === 'depose' && r.cle === 'v:9101', `${nom} : A n° connu ⇒ « Déposé », SON colis`, JSON.stringify(r));
+  let r = await toucher(await attendre(1));
+  dit(r && r.etat === 'fait' && r.cle === 'v:9101', `${nom} : A n° connu ⇒ « Déposé », SON colis`, JSON.stringify(r));
   const barre = await pg.$('[data-scan-sheet] [data-depose-annuler="v:9101"]');
   dit(!!barre, `${nom} : A la barre « Annuler » (5 s) est là`);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `scan-${nom}-depose.png`) });
@@ -126,8 +131,8 @@ async function scenario(b, nom, vue) {
   dit(r && r.n === 1, `${nom} : F une lecture répétée (le code reste dans le cadre) ne compte qu'une fois`, JSON.stringify(r));
   // C + H : code-barres InPost / Mondial Relay (26 chiffres) ; écrit le premier.
   await pg.evaluate(() => window.__scan('56412345670101402623166859'));
-  r = await attendre(2);
-  dit(r && r.etat === 'depose' && r.cle === 'v:9103', `${nom} : C code à 26 chiffres ⇒ le colis du n° imprimé (41234567)`, JSON.stringify(r));
+  r = await toucher(await attendre(2));
+  dit(r && r.etat === 'fait' && r.cle === 'v:9103', `${nom} : C code à 26 chiffres ⇒ le colis du n° imprimé (41234567)`, JSON.stringify(r));
   await pg.waitForTimeout(1600);
   let e = await ecrits();
   dit(JSON.stringify(e) === '["9101","9104"]', `${nom} : H le second scan a écrit le premier (et SEULEMENT lui : jamais 9102, même titre)`, JSON.stringify(e));
@@ -151,12 +156,12 @@ async function scenario(b, nom, vue) {
   await pg.fill('[data-scan-saisie]', 'Nike Air Max 90 blanche taille 42');
   await pg.click('[data-scan-ok]');
   r = await attendre(5);
-  dit(r && r.etat !== 'depose' && !r.cle, `${nom} : un titre n'est jamais une identité`, JSON.stringify(r));
+  dit(r && r.etat !== 'trouve' && r.etat !== 'fait' && !r.cle, `${nom} : un titre n'est jamais une identité`, JSON.stringify(r));
   // G : clavier.
   await pg.fill('[data-scan-saisie]', 'xb 223 456 789 fr');
   await pg.click('[data-scan-ok]');
-  r = await attendre(6);
-  dit(r && r.etat === 'depose' && r.cle === 'v:9102', `${nom} : G n° tapé (espaces, minuscules) ⇒ « Déposé »`, JSON.stringify(r));
+  r = await toucher(await attendre(6));
+  dit(r && r.etat === 'fait' && r.cle === 'v:9102', `${nom} : G n° tapé (espaces, minuscules) ⇒ « Déposé »`, JSON.stringify(r));
   const flux = await pg.evaluate(() => window.__flux);
   dit(flux === 1, `${nom} : F scans en série, la caméra n'a été ouverte qu'une fois`, String(flux));
   await pg.waitForTimeout(5800);
