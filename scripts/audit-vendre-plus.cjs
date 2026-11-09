@@ -72,6 +72,10 @@ async function audit(src, bavard) {
   const g2 = M.gestesDormeuse({ numero: '', favoris: null, url: '', cap: () => 'retard', version: (c) => ({ recreer: '5.248.0', republiermodif: '5.247.0' })[c] });
   dit(!g2.some((x) => x.k === 'favoris'), 'favoris pas lus ⇒ pas de « offre aux favoris »');
   dit(M.gestesDormeuse({ favoris: 0, cap: capOk }).every((x) => x.k !== 'favoris'), 'zéro favori lu ⇒ pas de « offre aux favoris »');
+  // (9 nov.) Les sites qu'il n'affiche pas (« Mes plateformes ») ne sont pas proposés ; pas su ⇒ tous.
+  const g3 = M.gestesDormeuse({ numero: '12', url: 'u', cap: capOk, sites: ['vinted', 'ebay'] });
+  dit(g3.map((x) => x.k).join(',') === 'republier,prix,vinted,ebay', 'sites affichés Vinted + eBay ⇒ ni Leboncoin ni Vestiaire proposés', g3.map((x) => x.k).join(','));
+  dit(M.gestesDormeuse({ numero: '12', url: 'u', cap: capOk, sites: ['vinted'] }).map((x) => x.k).join(',') === 'republier,prix,vinted', 'Vinted seul ⇒ aucun « Préparer sur … »');
   const r = Object.fromEntries(g2.map((x) => [x.k, x.bloque]));
   dit(/5\.248\.0/.test(r.republier) && /5\.247\.0/.test(r.prix) && /lien/.test(r.vinted) && /N°/.test(r.lbc) && /N°/.test(r.vestiaire), 'chaque geste bloqué dit pourquoi (version, lien, N°)', JSON.stringify(r));
 

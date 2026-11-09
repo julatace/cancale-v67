@@ -41,7 +41,11 @@ const rows = [...FXok('sold'), ...FXok('purch'), ...dressingsDuJour(FXok('listin
 // Les quatre lignes de réglages, telles qu'elles existent chez lui (formes
 // mesurées le 15 septembre ; contenus synthétiques).
 const REGLAGES = {
-  push_prefs: { achat: true, suivi: true, favori: true, facture: true, message: true },
+  // (9 nov.) Depuis le 5 nov. les notifications se règlent par FAMILLE (`familles`,
+  // api/_lib/notif-textes.js) ; les anciennes clés restent dans la ligne et ne doivent
+  // pas être perdues par une réécriture.
+  push_prefs: { achat: true, suivi: true, favori: true, facture: true, message: true,
+    familles: { ventes: true, offres: true, messages: true, poster: true, arrives: true, doublevente: true, rappels: true }, regrouper: true },
   vrm_email_config: { startDate: '2026-07-10', updatedAt: '2026-07-15T21:18:21.389Z' },
   vrm_pro_facture: { actif: true, prefixe: 'VRM', tauxTva: 20, nom: 'MA RAISON SOCIALE',
     siret: '00000000000000', adresse: '1 rue du Banc', ville: 'Cancale', codePostal: '35260',
@@ -129,7 +133,11 @@ const MENSONGES = [
         return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, S))); }
       return j([]);
     });
-    await pg.route('**/api/**', (r2) => r2.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
+    // (9 nov.) « Import des e-mails Vinted » n'est monté que pour le PROPRIÉTAIRE de
+    // l'installation (`/api/compte?mode=abonnement` → `proprietaire`) : c'est lui, ce banc.
+    await pg.route('**/api/**', (r2) => /mode=abonnement/.test(r2.request().url())
+      ? r2.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, proprietaire: true, configure: false, obligatoire: false, statut: null }) })
+      : r2.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
     await pg.goto('http://localhost:4482/?tab=' + tab, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(5000);
     // Déplie le panneau des notifications (c'est un <details>).
@@ -153,8 +161,12 @@ const MENSONGES = [
     // (17 oct.) Le nom de l'entreprise est dans l'EN-TÊTE de toutes les pages
     // (`data-nom-entreprise`, exprès) : le corps de l'écran se lit sans lui.
     const corps = (await pg.evaluate(() => { const c = document.body.cloneNode(true); c.querySelectorAll('[data-nom-entreprise]').forEach((e) => e.remove()); document.body.appendChild(c); c.style.position = 'absolute'; const t = c.innerText || ''; c.remove(); return t; })) + '\n' + champs.join('\n');
+    const etats = await pg.evaluate(() => ({
+      adresses: Array.from(document.querySelectorAll('[data-adresses]')).map((e) => e.getAttribute('data-adresses')),
+      fiche: Array.from(document.querySelectorAll('[data-fp-fiche]')).map((e) => e.getAttribute('data-fp-fiche')),
+    }));
     await ctx.close();
-    return { txt, corps, errs, ecrits };
+    return { txt, corps, errs, ecrits, etats };
   };
 
   // Le geste qui détruit : basculer UNE notification. Sur le code d'avant, il
@@ -162,16 +174,21 @@ const MENSONGES = [
   const basculer = async (pg) => {
     // (2 nov.) Depuis le 1er nov., chaque panneau des Paramètres est un SOUS-ÉCRAN
     // (monté mais caché) : on l'ouvre par sa rangée, comme Julien, avant le clic.
-    const id = await pg.evaluate(() => { const x = document.querySelector('button[aria-label*="Suivi du colis"]'); const s = x && x.closest('[data-sous-ecran]'); return s ? s.getAttribute('data-sous-ecran') : null; });
+    // (9 nov.) Depuis le 5 nov., une ligne par FAMILLE (« Colis à poster » remplace « Suivi du colis »).
+    const id = await pg.evaluate(() => { const x = document.querySelector('button[role="switch"][aria-label^="Colis à poster"]'); const s = x && x.closest('[data-sous-ecran]'); return s ? s.getAttribute('data-sous-ecran') : null; });
     if (id) { try { await pg.locator(`[data-sous-ouvrir="${id}"]`).first().click({ timeout: 2500 }); await pg.waitForTimeout(500); } catch (_) {} }
-    const b2 = pg.locator('button[aria-label*="Suivi du colis"]');
+    const b2 = pg.locator('button[role="switch"][aria-label^="Colis à poster"]');
     if (await b2.count()) { try { await b2.first().click({ timeout: 2500 }); } catch (_) {} }
   };
 
   // ══════════════════════════════════════════════════════════════════════════
   console.log('── LECTURE RATÉE, ÉCRITURE POSSIBLE (le cas qui détruit)');
   {
-    const r = await rendre(true, basculer);
+    // (9 nov.) Le bloc « N réglages n'ont pas pu être lus » vit sur la LISTE des Paramètres ;
+    // le sous-écran ouvert pour basculer porte la pastille. On lit la liste AVANT d'ouvrir.
+    let liste = '';
+    const r = await rendre(true, async (pg) => { liste = await pg.evaluate(() => document.body.innerText || ''); await basculer(pg); });
+    r.txt = liste + '\n' + r.txt;
     for (const [re, quoi] of MENSONGES) {
       dit(!re.test(r.txt), `Réglages n'affirme pas ${quoi}`);
     }
@@ -197,7 +214,9 @@ const MENSONGES = [
     // lequel regarder.
     // (« la facturation Pro » vit dans l'onglet Factures depuis le 30 sept. :
     //  elle n'est plus montée sur Réglages, donc plus nommée ici — voir plus bas.)
-    for (const nom of ['les notifications', 'tes adresses de réception', "la date d'import des emails"]) {
+    // (9 nov.) « Mes adresses de réception » vit sur l'écran E-mails (« Relier ma boîte ») depuis le
+    // 6 nov. — jugée plus bas, sur cet écran ; et « e-mails » s'écrit avec un trait d'union (7 nov.).
+    for (const nom of ['les notifications', "la date d'import des e-mails"]) {
       dit(r.txt.includes(nom), `et il nomme « ${nom} »`);
     }
     // Et le panneau lui-même porte la marque — se taire dessus laisserait croire
@@ -220,20 +239,50 @@ const MENSONGES = [
     const r = await rendre(false, basculer);
     dit(/10\/07\/2026|2026-07-10/.test(r.txt), 'la date d\'import lue est bien la sienne',
       'sinon l\'écran affiche autre chose que ce qui est enregistré');
-    dit(/a@exemple\.test/.test(r.txt) && /b@exemple\.test/.test(r.txt),
-      'ses deux adresses de réception sont là');
     dit(!/n'ai pas pu lire ce réglage/i.test(r.txt), 'et aucune fausse alerte quand la base répond');
     const w = r.ecrits.filter((x) => x && x.id === 'push_prefs');
     dit(w.length > 0, 'basculer une notification écrit pour de vrai',
       w.length ? '' : 'un panneau qui n\'écrit jamais passerait la première moitié de ce banc');
     if (w.length) {
       const d3 = w[w.length - 1].data || {};
-      const perdues = Object.keys(REGLAGES.push_prefs).filter((k) => !(k in d3));
+      const f0 = REGLAGES.push_prefs.familles, f3 = d3.familles || {};
+      const perdues = [...Object.keys(REGLAGES.push_prefs).filter((k) => !(k in d3)),
+        ...Object.keys(f0).filter((k) => !(k in f3)).map((k) => 'familles.' + k)];
       dit(perdues.length === 0, 'et les autres préférences sont TOUTES conservées',
         perdues.length ? `perdues : ${perdues.join(', ')}` : `${Object.keys(d3).length} clés écrites`);
-      dit(d3.suivi === false, 'et c\'est bien celle qu\'il a cliquée qui change',
-        `suivi = ${JSON.stringify(d3.suivi)}`);
+      const changees = Object.keys(f0).filter((k) => f3[k] !== f0[k]);
+      dit(f3.poster === false && changees.join() === 'poster', 'et c\'est bien celle qu\'il a cliquée qui change (« Colis à poster »), elle seule',
+        `familles changées : ${JSON.stringify(changees)} · poster = ${JSON.stringify(f3.poster)}`);
     }
+    dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // (9 nov.) LES ADRESSES DE RÉCEPTION — sur l'écran E-mails, « Relier ma boîte » (depuis
+  // le 6 nov. ; « Paramètres → E-mails » y mène). Même règle : lecture ratée ⇒ rien n'est
+  // réécrit et le panneau le dit ; marche normale ⇒ ses deux adresses.
+  const versRelier = async (pg) => {
+    const v = pg.locator('[data-boite-vue="relier"]');
+    try { await v.first().click({ timeout: 4000 }); } catch (_) {}
+    await pg.waitForTimeout(800);
+    // … puis la rubrique « Adresses » de ses réglages d'e-mails.
+    try { await pg.locator('[data-email-onglet="adresses"]').first().click({ timeout: 4000 }); } catch (_) {}
+    await pg.waitForTimeout(1500);
+  };
+  console.log('\n── ADRESSES DE RÉCEPTION (écran E-mails), lecture ratée');
+  {
+    const r = await rendre(true, versRelier, 'emails');
+    const w = r.ecrits.filter((x) => x && x.id === 'vrm_email_owners');
+    dit(w.length === 0, 'les adresses de réception ne sont pas réécrites depuis une lecture ratée', w.map((x) => JSON.stringify(x.data).slice(0, 70)).join(' | '));
+    dit(!/Aucune adresse déclarée/i.test(r.txt), 'l\'écran n\'affirme pas « Aucune adresse déclarée »');
+    dit(r.etats.adresses.includes('pas-su'), 'et le panneau dit qu\'il n\'a pas pu lire la liste', JSON.stringify(r.etats.adresses));
+    dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
+  }
+  console.log('\n── ADRESSES DE RÉCEPTION (écran E-mails), marche normale');
+  {
+    const r = await rendre(false, versRelier, 'emails');
+    dit(/a@exemple\.test/.test(r.txt) && /b@exemple\.test/.test(r.txt), 'ses deux adresses de réception sont là');
+    dit(!r.etats.adresses.includes('pas-su'), 'et aucune fausse alerte quand la base répond', JSON.stringify(r.etats.adresses));
     dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
   }
 
@@ -263,7 +312,9 @@ const MENSONGES = [
     const w = r.ecrits.filter((x) => x && x.id === 'vrm_pro_facture');
     dit(w.length === 0, 'la facturation Pro n\'est pas réécrite depuis une lecture ratée',
       w.map((x) => JSON.stringify(x.data).slice(0, 70)).join(' | '));
-    dit(/réglage pas lu/.test(r.txt), 'et le panneau porte sa pastille');
+    // (9 nov.) « Ma facture » (src/FacturePro.jsx) dit sa lecture ratée par sa fiche
+    // `data-fp-fiche="passu"` (« n'a pas pu être lue… rien ne sera écrit par-dessus »).
+    dit(/réglage pas lu/.test(r.txt) || r.etats.fiche.includes('passu'), 'et le panneau dit qu\'il n\'a pas pu lire', JSON.stringify(r.etats.fiche));
     dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
   }
   console.log('\n── FACTURATION PRO (onglet Factures), marche normale');

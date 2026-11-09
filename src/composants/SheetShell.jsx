@@ -23,7 +23,9 @@
 // encre foncée, MÊME en mode sombre — un écran noir se lit mal sous un néon.
 //
 // API (docs/passation/2026-11-05-chantier-b.md) :
-//   <SheetShell onClose titre? sousTitre? croix? lumineuse? maxWidth? z? FermeAuRetour? {...data-*}>
+//   <SheetShell onClose titre? sousTitre? croix? lumineuse? maxWidth? z? bloque? FermeAuRetour? {...data-*}>
+//   (9 nov., DA4) Un pied d'actions collé en bas : un enfant `.vrm-fs-pied` en dernier
+//   (fond de la feuille, filet, zone sûre) — styles-premium.css §12.
 // Dans App.jsx, `SheetShell` est un relais qui fournit le vrai `FermeAuRetour`.
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
@@ -52,12 +54,21 @@ const translationAffichee = (el) => {
 const elastique = (depasse, dim, k = 0.55) => (depasse * dim * k) / (dim + k * Math.abs(depasse));
 
 export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre, sousTitre, croix, lumineuse = false,
-  FermeAuRetour, className = '', ...rest }) {
+  FermeAuRetour, className = '', bloque = '', ...rest }) {
   const refFeuille = React.useRef(null);
   const refVoile = React.useRef(null);
   const refAnim = React.useRef(null);
   const refGeste = React.useRef(null);
   const refFermer = React.useRef(onClose); refFermer.current = onClose;
+  // (9 nov., DA4) `bloque` : une phrase (« Mets en pause pour fermer ») tant que la
+  // feuille ne peut pas se fermer (un envoi en cours). La croix est grisée et la dit,
+  // le glisser revient toujours : rien ne part en bas pour rester caché hors de l'écran.
+  const refBloque = React.useRef(bloque); refBloque.current = bloque;
+  const refMonte = React.useRef(true);
+  // Ce qui avait le focus AVANT la feuille (lu au premier rendu : un `autoFocus` d'un
+  // enfant le prend avant les effets).
+  const [focusAvant] = React.useState(() => { try { return typeof document !== 'undefined' ? document.activeElement : null; } catch (_) { return null; } });
+  React.useEffect(() => () => { refMonte.current = false; }, []);
   const [idTitre] = React.useState(() => 'vrm-fs-titre-' + (++_idTitre));
   const avecCroix = croix != null ? !!croix : titre != null;
 
@@ -101,10 +112,31 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
     a.onfinish = () => { if (refAnim.current === a) refAnim.current = null; };
     return () => arreterAnim();
   }, []);
-  // Le focus entre dans la feuille (sauf si un champ s'y est déjà donné le focus).
+  // Le focus entre dans la feuille (sauf si un champ s'y est déjà donné le focus),
+  // y reste (Tab et Maj+Tab tournent DANS la feuille du dessus : rien derrière le
+  // voile ne se prend au clavier), et revient à ce qui l'avait à la fermeture.
   React.useEffect(() => {
     const el = refFeuille.current;
+    const avant = focusAvant;
     if (el && !el.contains(document.activeElement)) { try { el.focus({ preventScroll: true }); } catch (_) {} }
+    const piege = (e) => {
+      if (e.key !== 'Tab' || !el || !el.isConnected) return;
+      const feuilles = document.querySelectorAll('[data-feuille]');
+      if (feuilles[feuilles.length - 1] !== el) return;           // seule la feuille du dessus garde le focus
+      const pris = [...el.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+        .filter((x) => x.getClientRects().length && getComputedStyle(x).visibility !== 'hidden');
+      if (!pris.length) { e.preventDefault(); try { el.focus({ preventScroll: true }); } catch (_) {} return; }
+      const premier = pris[0], dernier = pris[pris.length - 1], ici = document.activeElement;
+      if (e.shiftKey && (ici === premier || ici === el || !el.contains(ici))) { e.preventDefault(); dernier.focus(); }
+      else if (!e.shiftKey && (ici === dernier || !el.contains(ici))) { e.preventDefault(); premier.focus(); }
+    };
+    document.addEventListener('keydown', piege, true);
+    return () => {
+      document.removeEventListener('keydown', piege, true);
+      if (avant && avant.isConnected && typeof avant.focus === 'function' && (!document.activeElement || document.activeElement === document.body || (el && el.contains(document.activeElement)))) {
+        try { avant.focus({ preventScroll: true }); } catch (_) {}
+      }
+    };
   }, []);
 
   const debut = (e) => {
@@ -139,13 +171,18 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
     const v = a && b && b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0;   // px/ms, positif = vers le bas
     const projete = g.y + (v * 0.998) / (1 - 0.998);             // la projection d'Apple (déc. 0,998)
     const aBouge = Math.abs(g.y - g.y0) >= 6;                     // un simple toucher ne décide rien
-    const part = aBouge && g.y > 0 && (projete > h * 0.5 || v > 0.6);
+    const part = !refBloque.current && aBouge && g.y > 0 && (projete > h * 0.5 || v > 0.6);
     el.setAttribute('data-feuille-geste', part ? 'part' : 'revient');
     if (!aBouge) { if (g.y !== 0) animer(g.y, 0, 300, EASE_FEUILLE); return; }
     if (part) {
       const reste = Math.max(0, h - g.y);
       const duree = Math.max(140, Math.min(260, v > 0 ? reste / v : 260));
-      animer(g.y, h, duree, 'cubic-bezier(.2,.8,.3,1)', () => { const f = refFermer.current; if (f) f(); });
+      // Une feuille qui REFUSE de se fermer (une saisie à garder, un envoi en cours)
+      // reste montée : elle remonte au lieu de rester cachée sous le bord de l'écran.
+      animer(g.y, h, duree, 'cubic-bezier(.2,.8,.3,1)', () => {
+        const f = refFermer.current; if (f) f();
+        setTimeout(() => { if (refMonte.current && refFeuille.current && refFeuille.current.isConnected) animer(h, 0, 300, EASE_FEUILLE); }, 0);
+      });
     } else if (g.y !== 0) {
       animer(g.y, 0, 300, EASE_FEUILLE);
     }
@@ -162,7 +199,7 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
   const cls = `vrm-fs${lumineuse ? ' vrm-fs-lumineuse' : ''}${className ? ' ' + className : ''}`;
   const contenu = (
     <div className="vrm-fs-cadre" data-feuille-cadre="" style={{ zIndex: z }}>
-      <div ref={refVoile} className="vrm-fs-voile" data-feuille-voile="" onClick={() => { const f = refFermer.current; if (f) f(); }} aria-hidden="true"/>
+      <div ref={refVoile} className="vrm-fs-voile" data-feuille-voile="" onClick={() => { if (refBloque.current) return; const f = refFermer.current; if (f) f(); }} aria-hidden="true"/>
       {FermeAuRetour ? <FermeAuRetour fermer={onClose}/> : null}
       <div ref={refFeuille} className={cls} role="dialog" aria-modal="true" tabIndex={-1}
         {...(titre != null ? { 'aria-labelledby': idTitre } : {})}
@@ -177,6 +214,7 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
             </div>
             {avecCroix ? (
               <button type="button" className="vrm-fs-croix" data-feuille-croix="" aria-label="Fermer"
+                disabled={!!bloque} title={bloque || undefined}
                 onClick={() => { const f = refFermer.current; if (f) f(); }}>
                 <span className="vrm-fs-croix-rond"><IconeComposant nom="close" taille={15} trait={2.2}/></span>
               </button>
