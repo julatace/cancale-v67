@@ -253,7 +253,8 @@ const mesureJournee = (pg) => pg.evaluate(() => {
               if (!SANS) dit(env.pile.imgs === env.pile.photos, 'les photos se chargent (pas de cadre vide)', `${env.pile.imgs}/${env.pile.photos}`);
               // (échelle fermée, 3 nov.) Le rayon 10 n'est pas sur l'échelle Fusion (6·12·14·20·24) : 12.
               dit(env.pile.w === 44 && env.pile.rayon === '12px', 'vignette 44 px, rayon 12 (échelle fermée, 3 nov.)', `${env.pile.w}px ${env.pile.rayon}`);
-              dit(/^\d+ colis à poster/.test(env.titre.trim()), 'le titre dit le nombre (« 3 colis à poster »)', env.titre);
+              // (5 nov., chantier E1) le mot de l'app est « à envoyer » (« à poster » est écarté, src/libelles.js).
+              dit(/^\d+ colis à envoyer/.test(env.titre.trim()), 'le titre dit le nombre (« 3 colis à envoyer »)', env.titre);
             }
             if (JEU === 'base' || SANS) {
               const ret = m.lignes.find((l) => l.cas === 'retirer'), msg = m.lignes.find((l) => l.cas === 'messages'), prix = m.lignes.find((l) => l.cas === 'prix');
