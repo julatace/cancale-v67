@@ -203,7 +203,7 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
               <span className={'vrm-scan-kicker is-' + res.etat}>{res.etat === 'deja' ? M.deja : res.etat === 'fait' ? M.fait + ' ✓' : M.tete}</span>
               <span className="vrm-scan-ligne1">{c.num ? <b className="vrm-scan-num" data-scan-num={c.num}>N°{c.num}</b> : null}<span className="vrm-scan-titre" data-scan-titre="">{c.titre}</span></span>
               <span className="vrm-scan-sous">
-                {c.taille ? <span data-scan-taille="">{c.taille}</span> : null}
+                {c.taille ? <span data-scan-taille={c.taille}>{/^\d/.test(String(c.taille)) ? `Taille ${c.taille}` : c.taille}</span> : null}
                 {c.compte ? <span className="vrm-sensible" data-stream-type="compte" data-scan-compte="">{c.compte}</span> : null}
                 {c.personne ? <span className="vrm-sensible" data-stream-type="acheteur" data-scan-personne={M.personne}>{c.personne}</span> : null}
                 {Number.isFinite(c.prix) ? <span data-montant="" data-scan-prix={String(c.prix)}>{euros(c.prix)}</span> : null}

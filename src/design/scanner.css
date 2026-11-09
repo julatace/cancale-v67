@@ -36,7 +36,7 @@
 .vrm-screen-head h1 { word-break: normal; overflow-wrap: normal; }
 /* (9 nov., lot V) LA PAIRE ATTENDUE, en grand : photo, N° en pastille, titre, sous-ligne ; UN geste (bleu,
    l'accent rare) ; un message ambre quand rien n'est relié (« rien n'est coché »). La série « Scannés ». */
-.vrm-scan.a-paire .vrm-scan-vue { flex: 0 1 30vh; min-height: 140px; }
+.vrm-scan.a-paire .vrm-scan-vue { flex: 1 1 30vh; min-height: 140px; }
 .vrm-scan-res { gap: 10px; }
 .vrm-scan-attente { color: #8e8e93; font-size: 15px; }
 .vrm-scan-sans { position: absolute; inset: 0; margin: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #d1d1d6; font-size: 16px; line-height: 1.35; }
