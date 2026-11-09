@@ -142,6 +142,12 @@ contrôle est refait aussitôt et la porte se referme s'il échoue ; en ligne, r
   saisies arrivent UNE fois, rejouer une 2ᵉ fois ne réécrit rien (rev inchangé) ; « Revoir » le
   constat figé ; AUCUNE écriture de N° sur tout le banc (corps des requêtes relus). A–E (6 nov.)
   inchangés sauf `inputmode` : `none` + pavé au doigt, `numeric` à la souris.
+  - **Résultats** (machine très chargée, charge ≈ 35) : passage complet 166 OK / 3 KO — 390
+    clair A (attente de 25 s dépassée sous la charge) et 1512 : une LECTURE de `vrm_inventaire`
+    tentée par la feuille en ligne pendant la seconde où le réseau coupe (elle échoue, rien n'est
+    écrit) — le banc compte maintenant à part les lectures et ne juge rouge que les écritures ;
+    rejoués un à un : **390 clair 53/53 vert**, **1512 clair 51/51 vert** ; 390 sombre et 1512
+    sombre verts sur G-H-I-J au passage complet.
   - **Arbre d'avant** (`BANC_DIST=<dist de b3ec1b17>`) : rouge (3 KO : pas de liste figée, pas
     de pavé, scénario bloqué).
   - **Mutation** (build muté : le Stock ne fige plus la liste) : rouge (voir ci-dessous).
@@ -151,7 +157,7 @@ contrôle est refait aussitôt et la porte se referme s'il échoue ; en ligne, r
   connexion « Bordereau » est un `<a href=blob:>` dont les octets commencent par `%PDF-` ; la 70002
   dit « pas gardé ici » ; « À déposer · 2 » et « Déposé » ; bandeau daté ; « Déposé » noté /
   annulé / renoté = UNE marque, rien parti hors connexion, partie une fois au retour ; aucune
-  erreur, CSP de vercel.json respectée. 390 : vert.
+  erreur, CSP de vercel.json respectée. 390 et 1512, clair et sombre : verts.
   - **Arbre d'avant** : rouge (aucun bordereau gardé, pas de « À déposer »).
   - **Mutation** (`estLigneBordereau` rend toujours faux) : rouge (« aucun bordereau gardé »).
 - Captures regardées (390 clair/sombre : pavé, hors connexion, rechargé hors connexion, bilan
