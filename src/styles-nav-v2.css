@@ -163,6 +163,24 @@
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button:active { transform: none; }
 }
 
+/* ── 4 bis. UNE FENÊTRE BASSE : LA COLONNE SE RESSERRE (`data-rail-densite`, SideBar) ──
+   Jamais une entrée coupée ni Paramètres sous le bord (styles-finition.css, 1er nov.) :
+   les rangées et les airs se resserrent d'un cran à chaque densité, avant que toute
+   la colonne ne défile. */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2][data-rail-densite] .vrm-rail-button { min-height: 34px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2][data-rail-densite] [data-nav-groupe].vrm-rail-management-group { margin-top: 10px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) > .vrm-sidebar-brand { padding-bottom: 8px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) .vrm-rail-button { min-height: 32px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) [data-nav-groupe].vrm-rail-management-group { margin-top: 6px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) .vrm-rail-section-label { padding-bottom: 2px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="3"], [data-rail-densite="4"]) .vrm-nav-compte { display: none !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="3"], [data-rail-densite="4"]) > .vrm-rail-pied { margin-top: 6px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2][data-rail-densite="4"] .vrm-rail-button { min-height: 30px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2][data-rail-defile] { overflow-y: auto !important; scrollbar-width: none; }
+@media (pointer: coarse) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2][data-rail-densite] .vrm-rail-button { min-height: 44px !important; }
+}
+
 /* ── 5. LES TITRES DE GROUPE ET LES COMPTEURS ─────────────────────────────── */
 .vrm-app-shell nav.vrm-sidebar[data-nav-v2] [data-nav-groupe].vrm-rail-management-group { margin-top: 18px !important; padding: 0 !important; border: 0 !important; }
 .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-section-label {
@@ -225,7 +243,7 @@
   .vrm-app-shell:has(> nav.vrm-sidebar[data-nav-v2]) > .vrm-main,
   .vrm-app-shell:has(> nav.vrm-sidebar[data-nav-v2]) > .vrm-exemple-bandeau { margin-left: calc(var(--n2-rail) + var(--n2-marge) + 20px) !important; }
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-sidebar-brand { justify-content: center !important; padding: 0 0 12px !important; }
-  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-sidebar-mot { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-sidebar-mot { display: none !important; }
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button { justify-content: center !important; padding: 0 !important; min-height: 40px !important; gap: 0 !important; }
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-lib { display: none !important; }
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-section-label { text-align: center; padding: 0 0 4px !important; font-size: 10px !important; letter-spacing: 0 !important; }
@@ -266,5 +284,30 @@
 .vrm-b.vrm-b-primaire:not(:disabled):active { filter: brightness(.94) !important; }
 .vrm-b:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: 2px !important; }
 @media (prefers-reduced-motion: reduce) { .vrm-b:not(:disabled):active { transform: none !important; } }
+
+/* ── 10. LA BARRE DE RECHERCHE DU HAUT (ordinateur), assortie à la colonne ── */
+/* Le champ de recherche de macOS : un remplissage neutre (pas une carte blanche
+   posée sur le gris), rayon 12, 38 px ; au focus il s'éclaire et prend un halo
+   d'accent doux. La touche « / » devient une petite capsule neutre. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-main > .vrm-barre-haut .vrm-barre-recherche {
+    min-height: 38px !important; border-radius: 12px !important; border: 0 !important;
+    background: var(--n2-b-second) !important; box-shadow: none !important;
+    color: var(--n2-titre) !important; font-size: 14px !important; padding: 0 12px !important; gap: 8px !important;
+    transition: background-color 140ms ease, box-shadow 160ms ease !important;
+  }
+  .vrm-main > .vrm-barre-haut .vrm-barre-recherche input { font-size: 14px !important; }
+  .vrm-main > .vrm-barre-haut .vrm-barre-recherche:focus-within {
+    background: var(--p-carte, #FFFFFF) !important;
+    box-shadow: 0 0 0 .5px var(--n2-bord), 0 0 0 4px color-mix(in srgb, var(--vrm-accent, #0071E3) 22%, transparent) !important;
+  }
+  .vrm-main > .vrm-barre-haut .vrm-barre-kbd {
+    border: 0 !important; border-radius: 6px !important; padding: 3px 7px !important;
+    background: var(--n2-compteur) !important; color: var(--n2-titre) !important; font: 600 11px/1 var(--vrm-police) !important;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .vrm-main > .vrm-barre-haut .vrm-barre-recherche:not(:focus-within):hover { background: var(--n2-b-second-survol) !important; box-shadow: none !important; }
+}
 
 } /* fin @layer vrm-premium */
