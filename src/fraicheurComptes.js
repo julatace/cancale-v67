@@ -110,7 +110,8 @@ export function ligneFraicheur(c, { maintenant = Date.now(), dans = 'dans ce nav
     geste = true;
   }
   if (c.horsTotaux && !c.masque) bloque = bloque ? `${bloque} · hors des totaux (ton choix)` : 'hors des totaux (ton choix)';
-  return { plateforme, id: String(c.id), nom, etat, age, quand, bloque, geste, ventesRetard };
+  // `lu` (9 nov.) : la date de la lecture, pour ranger « le plus ancien d'abord » (src/fraicheur.js).
+  return { plateforme, id: String(c.id), nom, etat, age, quand, bloque, geste, ventesRetard, lu: tsDe(c.lu) };
 }
 
 // Toutes les lignes, dans l'ordre : ce qui demande un geste d'abord, puis le

@@ -116,8 +116,9 @@ export function fraicheurUnique({ baseKO = false, horsLigne = false, capture, ac
     if (estExclu(p.plateforme, p.id)) continue;
     enPanne.add(`${p.plateforme}:${p.id}`);
     retards.push({ cle: `panne:${p.plateforme}:${p.id}`, source: 'panne', plateforme: p.plateforme, id: String(p.id), gravite: GRAVITE.panne, depuisMs: ts(p.lu) || 0,
-      nom: p.nom, texte: `n’arrive plus dans VRM${p.age ? ` (pas relu depuis ${String(p.age).replace(/^il y a /, '')})` : ''}`,
-      geste: String(p.geste || ''), gesteCourt: 'voir pourquoi', vers: 'toutvabien', cleAlerte: p.cle });
+      nom: p.nom, texte: `n’arrive plus dans VRM — ${p.refus ? String(p.cause || '').split(' · ')[0] : String(p.cause || '')}${p.appareil ? ` (${p.appareil.nom})` : ''}`,
+      depuisTexte: p.age ? `pas relu depuis ${String(p.age).replace(/^il y a /, '')}` : '',
+      geste: String(p.geste || ''), gesteCourt: '', vers: 'toutvabien', cleAlerte: p.cle });
   }
 
   // 2. L'extension, toutes extensions confondues.
@@ -141,7 +142,8 @@ export function fraicheurUnique({ baseKO = false, horsLigne = false, capture, ac
     retards.push({ cle: `compte:${l.plateforme}:${l.id}`, source: 'compte', plateforme: l.plateforme, id: l.id, gravite: GRAVITE.compte,
       depuisMs: l.etat === 'jamais' ? 0 : (ts(l.lu) || lu || 0), nom: l.nom, texte, geste: l.bloque, gesteCourt: gesteCourt(l.plateforme, l.etat === 'delie' ? 'delie' : l.ventesRetard && l.etat !== 'a-relire' ? 'ventes' : 'relire'), vers: 'vintedaccounts' });
   }
-  // 3 bis. Les achats d'un compte Vinted (actif, pas déjà nommé).
+  // 3 bis. Les achats d'un compte Vinted (actif, pas déjà nommé). Par défaut, ceux que la capture a lus.
+  if (achats === undefined) achats = capture.achats;
   if (achats === null) passu.push('tes achats');
   else if (achats && typeof achats === 'object') {
     const deja = new Set(retards.map((r) => `${r.plateforme}:${r.id}`));
