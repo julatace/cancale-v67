@@ -41,7 +41,12 @@ async function page(nav, telephone, tab) {
   const pg = await ctx.newPage();
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_prenom', JSON.stringify('Shopcancale')); } catch (_) {} }, SESSION);
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
-  await pg.route('**/rest/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' }));
+  // (9 nov.) Le vendeur du banc AFFICHE ses quatre sites (« Mes plateformes », 8 nov.) : sans ce
+  // choix, seul Vinted est affiché et `?tab=plat_ebay` revient sur un site affiché (« Ventes · toutes »).
+  const MAIN = { vrm_plateformes_affichees: { sites: ['vinted', 'leboncoin', 'ebay', 'vestiaire'], at: '2026-11-01T10:00:00.000Z' } };
+  await pg.route('**/rest/v1/**', (r) => (/id=eq\.main(&|$)/.test(decodeURIComponent(r.request().url())) && r.request().method() === 'GET'
+    ? r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/1' }, body: JSON.stringify([{ id: 'main', updated_at: '2026-11-01T10:00:00.000Z', data: MAIN }]) })
+    : r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' })));
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
   await pg.route('**://*.vinted.net/**', (r) => r.abort());
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });

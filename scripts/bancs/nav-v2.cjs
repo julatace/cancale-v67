@@ -190,7 +190,10 @@ const lireColonne = (pg) => pg.evaluate(() => {
         dit(/gradient/.test(b.p.img) && /inset/.test(b.p.ombre), `${T} N8 primaire : reflet (dégradé) + ombre intérieure fine`, JSON.stringify(b.p));
         dit(b.p.poids >= 600 && b.s.poids >= 600, `${T} N8 texte 600`, `${b.p.poids}/${b.s.poids}`);
         dit(b.s.bord === 0 && !/inset 0 0 0 1px/.test(b.s.ombre), `${T} N8 secondaire sans bordure`, JSON.stringify(b.s));
-        dit([6, 12, 14, 20, 24].includes(b.p.rayon) && [6, 12, 14, 20, 24].includes(b.s.rayon), `${T} N8 rayon de l'échelle fermée (6·12·14·20·24)`, `${b.p.rayon}/${b.s.rayon}`);
+        // (9 nov., DA 6 — consigne de Julien relayée : « primaire = pilule pleine, secondaire = pilule grise ») :
+        // la pilule (rayon ≥ la moitié de la hauteur) rejoint l'échelle fermée.
+        const okR = (r, h) => [6, 12, 14, 20, 24].includes(r) || r >= h / 2;
+        dit(okR(b.p.rayon, b.p.h) && okR(b.s.rayon, b.s.h), `${T} N8 rayon de l'échelle fermée (6·12·14·20·24) ou pilule`, `${b.p.rayon}/${b.s.rayon}`);
         dit(b.p.h >= 36 && b.s.h >= 36, `${T} N8 ≥ 36 px à la souris`, `${b.p.h}/${b.s.h}`);
         dit(erreurs.length === 0, `${T} aucune erreur de page`, erreurs.join(' | '));
         await ctx.close();
