@@ -1043,4 +1043,21 @@ html body .vrm-fs button.vrm-fs-croix:disabled { cursor: not-allowed !important;
 /* Le dessin de l'état vide de Messages (même taille que celui des Ventes). */
 .vrm-app-shell .vrm-main [data-msg-vide] svg.vrm-illustration { margin: 0 auto 6px !important; color: var(--p-gris-2) !important; }
 
+
+/* 13.4 COLIS À L'ORDINATEUR — « Relier » / « Poser le N° » (un geste à faire sur une
+   rangée sans N°) tombaient SOUS la rangée, à cheval sur le filet (la zone d'action a
+   une hauteur nulle : « … » et le bordereau y sont posés en absolu). Grammaire : le
+   geste prend la place de l'ÉTAT (colonne 2, vide tant que rien n'est fait), centré sur
+   la rangée comme le bordereau. Une rangée qui porte déjà sa frise garde la frise : la
+   zone d'action passe alors sur une 2e ligne de la rangée (jamais de chevauchement). */
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="cat_bord"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not(:has(> .vrm-colis-frise)) > .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
+    position: absolute !important; top: 50% !important; transform: translateY(-50%) !important; margin: 0 !important;
+    left: calc(100% - var(--p-g-bord) - var(--p-g-action) - 24px - var(--p-g-etat)) !important;
+  }
+  .vrm-main[data-ecran="cat_bord"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > .vrm-colis-actions:has(> :is([data-geste="relier"], [data-geste="poser-num"])) {
+    grid-column: 2 / -1 !important; grid-row: 2 !important; height: auto !important; display: flex !important; justify-content: flex-start !important;
+  }
+}
+
 } /* fin @layer vrm-premium */
