@@ -97,19 +97,41 @@ dans « à jour ». Les gestes courts viennent de `gesteCourt` (src/fraicheurCom
   l'ordre ; F appareils en 503 ⇒ « Pas pu tout vérifier » + « Réessayer ». Partout : UNE ligne, aucune
   seconde voix, hauteur identique de « Vérification… » à la réponse, cibles 44 px, aucun débordement,
   aucune erreur. Captures regardées (`captures/fraicheur-unique-*.png`).
-  - **Sur `origin/main`** (git archive + build, banc copié DEDANS) : voir §6.
-  - **Mutation** (build muté) : voir §6.
+  - **Sur `origin/main`** (archive de `origin/main` + build, banc copié DEDANS) : **28 rouges** (aucune
+    ligne : ni « à jour », ni compte nommé, ni ordre, ni « pas su »).
+  - **Mutation** (build muté : `if (passu.length) return 'passu'` retiré ET tri de gravité retiré) :
+    **8 rouges** — « pas su » devient « Tout est à jour · vérifié à l'instant » (390 et 1512), et le compte
+    passe avant l'extension (« compte:vinted:111, extension:muette »).
+- Lectures de la ligne : elles partent quand l'écran a reçu ses données essentielles
+  (`data-attente="pret"`, src/AttenteEcran.jsx) ou au plus tard 15 s après l'ouverture, au repos du
+  navigateur — jamais en concurrence avec celles de l'écran.
 - `scripts/bancs/tout-va-bien.cjs` : **71/71** (la panne : nom, « réseau coupé », « Orion · iPhone »,
   « Voir » → Tout va bien ? — désormais portés par la ligne unique).
+- Bancs relancés un à la fois : `iphone-reprise` 139/139 (un B5 rouge au 1er passage, vert au second —
+  toucher « Plus » puis « Ventes », instable, rien à voir avec la ligne), `nav-v2` 54/54,
+  `direction-artistique-6` 184/184, `journee-instantanee` 0 rouge (CLS au remplacement 0,0000 aux 4
+  combinaisons), `hors-ligne-froid` 80/80, `retraits-frais` 34/34 (F6 lit la ligne du haut),
+  `colis-fiables` vert, `colis-retirer-propre` 129/129, `vague3-ecrans` F 15/15 (K : 18 rouges de contraste
+  de la carte sombre, sans rapport — jetons de couleur, aucun fichier touché ici), `chargement` : voir §6.
 - `npm run build` ; audits `variables tdz coherence identite statuts icones` verts ; `vague3-ecrans`,
   `finitions-v36`, `vente-email-fraiche`, `colis-frequent` verts.
 
 ## 6. Ce qui reste
 
-- Bancs qui lisaient la puce de Colis (`data-comptes-a-relire`) ou la ligne d'Achats
-  (`data-fraicheur-achats`) : `retraits-frais` (D6), `colis-fiables` (D11), `colis-retirer-propre`,
-  `vague3-ecrans`, `revue-30oct` — à remettre à la règle (ils doivent lire la ligne du haut,
-  `[data-fraicheur-unique]`, `data-fraicheur-source="compte"`). Voir le rapport de la branche.
+- Les bancs qui lisaient la puce de Colis ou la ligne d'Achats lisent maintenant la ligne du haut
+  (`data-fraicheur-a-relire`, `data-fraicheur-a-relire-noms`, `title` = toutes les phrases) :
+  `retraits-frais`, `colis-fiables`, `colis-retirer-propre`, `vague3-ecrans` — verts. `revue-30oct` est
+  mis à la règle mais ne tourne pas ici (il lit les fixtures réelles `fx/`, absentes du dépôt).
+- **`chargement`, 390 px réseau lent** : Ventes, Colis, Achats sortent rouges (CLS 0,024 · 0,072 · 0,033 ;
+  0 sur `origin/main`). Mesuré : le décalage n'est PAS la ligne (elle garde 44 px de « Vérification… » à la
+  réponse) mais l'arrivée tardive, après le plafond d'attente, d'un bloc de l'écran AU-DESSUS de sa carte
+  (« 35 bordereaux à imprimer » sur Colis : la carte passe de 294 à 407 px). Ce saut existe aussi sur
+  `origin/main` (captures du même banc à 35 s puis 37 s : la carte passe de 238 à 352 px) mais l'API
+  `layout-shift` de Chromium ne l'y rapporte pas ; une simple case vide de 54 px en haut (expérience : la
+  ligne remplacée par un `div` statique de même taille, aucune lecture) suffit à ce qu'il soit compté —
+  c'est la géométrie, pas la ligne. Les lectures de la ligne attendent déjà l'écran. Le vrai correctif est
+  dans l'écran (réserver la place du bloc, ou l'attendre avant de se montrer) : chantier
+  `claude/colis-ventes-instantanes` en cours sur ces écrans — à vérifier à l'intégration.
 - La ligne ne lit pas l'état du COLLECTEUR d'e-mails (service relevé il y a > 20 min) : c'est un état du
   service, dit par `/statut` et `BandeauStatut` ; si Julien le veut dans la ligne, c'est `etatCollecteur`
   (src/receptionEmail.js), à brancher en source de gravité 5.
