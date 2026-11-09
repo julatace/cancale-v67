@@ -46,4 +46,6 @@ libère son numéro (le dire ici).
 | AA | sur vinted.fr : infos sous SES annonces + calculette pendant un achat (ext. 5.339) | `claude/extension-infos` | à lancer |
 | AB | un seul fil par acheteur et par paire, toutes plateformes | `claude/fil-unique` | à lancer |
 
+| — | transporteurs inconnus (PDF du bordereau, identité) + e-mails Vestiaire et Chronopost mieux lus (demandes de Julien) | `claude/transporteurs-emails` | en cours |
+
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
