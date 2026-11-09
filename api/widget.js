@@ -22,6 +22,12 @@ import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
+// (9 nov., suites serveur) L'offre Solo / Pro : la règle (api/_lib/plan-regle.js, la même que l'app)
+// et l'offre du vendeur (api/_lib/plan-vendeur.js). Seul le REPLI sur les e-mails de vente la lit :
+// la photo publiée par l'app (`widget_stats`, `vinted_urssaf_mois`) l'applique déjà ; les colis
+// à envoyer ne sont pas bridés (l'app non plus : « un colis caché est un colis perdu »).
+import { regleDuVendeur } from './_lib/plan-vendeur.js';
+import { venteHorsPlan } from './_lib/plan-regle.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -754,9 +760,10 @@ export default async function handler(req, res) {
     // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
     // c'est-à-dire tant que l'extension n'a pas recapté une fois.
     const vivants = await comptesVivants();
-    const [bords, txSold, txBuy, sales, m, snap, eb, departs] = await Promise.all([
+    const [bords, txSold, txBuy, sales, m, snap, eb, departs, regle] = await Promise.all([
       bordRows(), comptesAExpedierOuRetirer('sold', vivants), comptesAExpedierOuRetirer('purchased', vivants),
       rows('email_sale_*'), main(), snapshot(), colisEbayDuVendeur(), lireDeparts(),
+      regleDuVendeur(owner).catch(() => null),
     ]);
     const sold = txSold ? [] : await harvestOrders('sold', vivants);
     const autres = m ? await colisAutresSites(m.vrm_lbc_colis_done, m, departs) : { leboncoin: null, vestiaire: null };
@@ -880,6 +887,10 @@ export default async function handler(req, res) {
     let moneyMonth = 0, salesMonth = 0, sansPrixEmails = 0;
     for (const s of sales) {
       if (String(s.receivedAt || '').slice(0, 7) !== ym) continue;
+      // (9 nov., suites serveur) SOLO : la vente d'un compte d'achat (son `uid`, rangé
+      // avec l'e-mail par l'adresse de réception) n'entre dans aucun total — la règle
+      // de l'app (`venteHorsPlan`). Offre pas sue, compte pas relevé ⇒ comptée.
+      if (venteHorsPlan(regle, s.uid)) continue;
       salesMonth += 1;
       const p = parseFloat(String(s.prix || '').replace(',', '.'));
       if (!isNaN(p) && p > 0) moneyMonth += p;

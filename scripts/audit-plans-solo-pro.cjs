@@ -117,7 +117,11 @@ const MUTATIONS = [
   await essaie('câblage App.jsx', async () => {
     const app = sansCommentaires(lire('src/App.jsx'));
     const compta = sansCommentaires(lire('src/ecrans/Compta.jsx'));
-    dit(/const compteEcarte = \(uid, masques, panneau\) => compteEcarteChoix\(uid, masques, panneau\) \|\| venteHorsPlanUid\(uid\);/.test(app), 'les totaux des ventes (`compteEcarte`) écartent les comptes hors offre');
+    // (9 nov., suites serveur) La règle est PURE (`compteEcarteRegle`, la règle de l'offre en
+    // argument — recopiée telle quelle dans api/_lib/ventes-regle.js) ; `compteEcarte` lui passe
+    // la règle courante de l'app. Exécutée app = serveur : audit-bilan-semaine, audit-suites-serveur.
+    dit(/const compteEcarteRegle = \(uid, masques, panneau, regle\) => compteEcarteChoix\(uid, masques, panneau\) \|\| venteHorsPlan\(regle, uid\);/.test(app)
+      && /const compteEcarte = \(uid, masques, panneau\) => compteEcarteRegle\(uid, masques, panneau, reglePlanCourante\(\)\);/.test(app), 'les totaux des ventes (`compteEcarte`) écartent les comptes hors offre');
     dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => \(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
       'les ACHATS d’un compte d’achat restent (acctOff = le choix seul, sans l’offre)');
     dit(/exclu: \(o\) => compteEcarteChoix\(o && o\._uid/.test(compta), 'Compta → registre des achats : les achats des comptes d’achat comptent');

@@ -18,6 +18,11 @@
 // (1er nov.) Les règles Vestiaire ont UN propriétaire (api/_lib/vestiaire-regle.js),
 // importé tel quel par l'app et ici — ce n'est pas une recopie.
 import { vcVenteAnnulee, montantRecuVc, dateVersementVc, dateVenteVc, etapeMotVc } from './vestiaire-regle.js';
+// (9 nov., suites serveur) L'offre Solo / Pro a UN propriétaire (api/_lib/plan-regle.js),
+// importé tel quel par l'app ET ici : `compteEcarteRegle` (recopié d'App.jsx) l'appelle.
+// La règle de l'offre d'un vendeur est lue côté serveur par api/_lib/plan-vendeur.js
+// (`regleDuVendeur`) et passée en 4e argument ; absente ou « pas su » ⇒ le choix seul.
+import { venteHorsPlan } from './plan-regle.js';
 
 export const classifyOrderStatus = (status) => {
   const s = status || '';
@@ -293,4 +298,6 @@ export const compteEcarteChoix = (uid, masques, panneau) => {
   return (masques && masques.has(k)) || pa[k] === true;
 };
 
-export const compteEcarte = compteEcarteChoix;
+export const compteEcarteRegle = (uid, masques, panneau, regle) => compteEcarteChoix(uid, masques, panneau) || venteHorsPlan(regle, uid);
+
+export const compteEcarte = compteEcarteRegle;

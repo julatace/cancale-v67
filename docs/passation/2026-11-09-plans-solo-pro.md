@@ -110,3 +110,4 @@ vend ? » 390, offres 1512 sombre (Pro ouvert).
 - Offres automatiques et favoris (extension) ne regardent pas l'offre : l'extension n'est pas
   touchée ici (5.331/5.332 en cours ailleurs).
 - **Suite (9 nov., intégration)** : les bilans et rappels SERVEUR (`api/_lib/ventes-regle.js`) n'appliquent que le choix du vendeur (`compteEcarteChoix`, sous le nom `compteEcarte`), pas encore l'offre Solo (ventes hors plan) ; à faire avec l'état du plan lu côté serveur (`api/_lib/plan-regle.js`).
+  → **Fait le 9 nov.** : `docs/passation/2026-11-09-suites-serveur.md` (bilans, widget, offres mini ; règle pure `compteEcarteRegle`).

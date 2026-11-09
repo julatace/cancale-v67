@@ -94,6 +94,7 @@ Vinted qui ne sont plus sur Leboncoin ».
   « liste pas encore lue en entier » et le geste.
 - L'alerte serveur de double vente (`api/_lib/double-vente.js`) garde
   `annonceLbcEnVente` (pas changée ici).
+  → **Aligné le 9 nov.** (`2026-11-09-suites-serveur.md`) : `etatEnLigneLbc` (src/enLigneLbc.js) exigé aussi côté serveur.
 
 ## Geste de Julien
 

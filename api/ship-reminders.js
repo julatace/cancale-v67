@@ -70,6 +70,10 @@ import { passeTransporteursAnciens, avecRelus, REQ_RELUS } from './_lib/transpor
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
+// (9 nov., suites serveur) L'offre Solo / Pro du vendeur (la ligne `abonnements` rangée par le
+// webhook, la règle d'api/_lib/plan-regle.js) : bilans et rappel des offres au prix mini.
+import { regleDuVendeur } from './_lib/plan-vendeur.js';
+import { venteHorsPlan } from './_lib/plan-regle.js';
 import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
 // (6 nov., filet 4) La veille des plantages : le propriétaire prévenu d'un type JAMAIS VU (api/_lib/veille-plantages.js).
 import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_LENTEURS } from './_lib/veille-plantages.js';
@@ -226,7 +230,7 @@ const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 // Lit tout ce que le bilan d'UN vendeur demande. Chaque source vaut `null`
 // quand sa lecture a échoué — jamais `[]` à sa place (« rien lu » ≠ « rien »).
 async function lireDonneesBilan() {
-  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn, vcV, vcL, dep] = await Promise.all([
+  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn, vcV, vcL, dep, regle] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_BILAN),
     getRow('panel_accounts_off'),
@@ -242,6 +246,9 @@ async function lireDonneesBilan() {
     getRowProjete('vc_listings', ['liens']),
     // (8 nov.) Les départs prouvés chez le transporteur (api/_lib/depart-colis.js).
     fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)),
+    // (9 nov., suites serveur) L'offre du vendeur : en Solo, les ventes des comptes d'achat
+    // n'entrent dans aucun total (`compteEcarte`, 4e argument). `null` = pas su ⇒ rien bridé.
+    regleDuVendeur(proprietaireCourant()).catch(() => null),
   ]);
   const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
   // (8 nov., « à envoyer » prouvé) Les bordereaux (leur n° de suivi) et les preuves de départ :
@@ -270,6 +277,7 @@ async function lireDonneesBilan() {
     masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
     exclusAutres: mm ? objet(mm.vrm_comptes_exclus) : null,
     panneau: panneau === undefined ? null : objet(panneau),
+    regle: regle || null,
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
     // Les colis Leboncoin et Vestiaire à poster (`txsAExpedier`) : les mêmes lignes.
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
@@ -545,11 +553,18 @@ async function rappelsOffresMini(maintenant = Date.now()) {
   if (!planchers.size) return 'aucun prix mini posé';
   const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_conv_%25&${filtresOffresMini(planchers, maintenant)}&${OFFRES_MINI_FILTRE}&select=id,opp:data->payload->conversation->opposite_user->>id,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`));
   if (rows === null) return 'conversations illisibles — rien envoyé';       // « pas su » ⇒ rien
+  // (9 nov., suites serveur) SOLO : les offres d'un compte d'achat sont hors de son offre
+  // (api/_lib/plan-regle.js : « ventes, annonces, colis à envoyer, offres et compta » du
+  // compte vendeur). Le compte = celui de la LIGNE (`harvest_{uid}_conv_{id}`, une identité).
+  // Offre illisible (`null`) ⇒ rien n'est bridé.
+  const regle = await regleDuVendeur(proprietaireCourant()).catch(() => null);
   const auMini = [];
   const convDe = new Map();   // offre → sa conversation (l'identité de la LIGNE, harvest_{uid}_conv_{id})
   for (const r of rows) {
     const item = r && r.item != null && r.item !== '' ? String(r.item) : null;
     if (!item || !planchers.has(item)) continue;
+    const cpt = /^harvest_(\d+)_conv_/.exec(String((r && r.id) || ''));
+    if (cpt && venteHorsPlan(regle, cpt[1])) continue;
     const off = offreCouranteServeur(r && r.opp != null ? r.opp : null, r && r.msgs);
     if (off && off.prix >= planchers.get(item)) { auMini.push(off.oid); const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String((r && r.id) || '')); if (m) convDe.set(off.oid, { compte: m[1], conv: m[2] }); }
   }
