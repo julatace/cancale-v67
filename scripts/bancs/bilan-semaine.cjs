@@ -26,7 +26,11 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, St
 
 // ── Faux Web Push : on capture ce qui partirait, rien ne part ───────────────
 process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
-delete process.env.SUPABASE_SERVICE_KEY;      // accesVendeur → « pas su » ne coupe pas
+// (9 nov.) Depuis le 7 nov. (api/_lib/cle-service.js) une route sans clé de service répond
+// 503 et ne lit rien : le banc lui donne une clé FICTIVE (le faux fetch ne la regarde pas).
+// Les vendeurs du banc ne sont pas des UUID ⇒ accesVendeur rend « pas su », qui ne coupe
+// pas. Le 503 sans clé est tenu par scripts/audit-cle-service.cjs.
+process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.CRON_SECRET = 'cle-banc-cron'; // obligatoire depuis dc4799f (la route refuse sans elle)
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];
@@ -157,7 +161,10 @@ function regleApp() {
   for (const n of ast.program.body) if (n.type === 'VariableDeclaration') for (const d of n.declarations) if (d.id && noms.includes(d.id.name)) vm.runInContext('const ' + src.slice(d.start, d.end) + `;\nthis.${d.id.name} = ${d.id.name};`, ctx);
   return ctx;
 }
-const euros = (x) => `${Number(x).toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(Number(x)) ? 0 : 2, maximumFractionDigits: 2 })} €`;
+// (9 nov.) Depuis la mise en forme partagée des notifications (api/_lib/notif-belle.js, 8 nov.),
+// tout blanc (espace fine insécable de toLocaleString comprise) devient une espace simple : on
+// compare le NOMBRE, pas le caractère d'espacement (§6.4).
+const euros = (x) => `${Number(x).toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(Number(x)) ? 0 : 2, maximumFractionDigits: 2 })} €`.replace(/\s+/g, ' ');
 const res = () => ({ code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } });
 
 (async () => {

@@ -397,12 +397,19 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
             // Rien PAR-DESSUS la colonne : au milieu de chaque libellé visible, c'est la colonne qu'on touche.
             const recouverts = libs.filter((e) => { const q = e.getBoundingClientRect(); if (q.bottom < 0 || q.top > innerHeight) return false; const h = document.elementFromPoint(q.left + Math.min(q.width - 1, 30), q.top + q.height / 2); return !h || !side.contains(h); }).map((e) => e.innerText);
             const mot = side.querySelector('.vrm-sidebar-mot');
-            return { coupes, recouverts, mot: mot ? mot.innerText : '', largeur: Math.round(sr.width), groupes: [...side.querySelectorAll('.vrm-rail-section-label')].map((e) => e.innerText) };
+            return { coupes, recouverts, mot: mot ? mot.innerText : '', largeur: Math.round(sr.width), groupes: [...side.querySelectorAll('[data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), titresVus: [...side.querySelectorAll('[data-nav-groupe]')].filter((g) => { const l = g.querySelector('.vrm-rail-section-label'); return l && l.getClientRects().length; }).map((g) => g.getAttribute('data-nav-groupe')) };
           });
           await capture(pg, `colonne-${c.w}x${c.h}${c.zoom ? '-z' : ''}-${c.sombre ? 'sombre' : 'clair'}`);
           dit(!!r && r.mot === 'VRM' && r.coupes.length === 0, `O ${qui} : « VRM » entier et aucun libellé de la colonne coupé`, JSON.stringify(r));
           dit(!!r && r.recouverts.length === 0, `O ${qui} : rien ne passe par-dessus la colonne`, JSON.stringify(r && r.recouverts));
-          dit(!!r && ['Vendre', 'Gérer', 'Argent', 'Plateformes'].every((g) => r.groupes.includes(g)), `O ${qui} : les groupes Vendre · Gérer · Argent · Plateformes sont là, en entier`, JSON.stringify(r && r.groupes));
+          // (9 nov.) Le groupe « Plateformes » est RETIRÉ de la colonne (décision du 8 nov.,
+          // docs/passation/2026-11-08-navigation-plateformes.md : « tâches uniques, groupes
+          // Vendre / Gérer / Argent et Paramètres au pied », les sites dans les tâches). Les
+          // groupes se lisent sur `data-nav-groupe` (la règle), pas sur le texte affiché
+          // (mis en capitales par la feuille de style) ; les titres Vendre · Gérer · Argent
+          // doivent être VISIBLES (« Moi », au pied, peut taire son titre) ; « en entier » =
+          // le contrôle des libellés coupés ci-dessus.
+          dit(!!r && ['Vendre', 'Gérer', 'Argent', 'Moi'].every((g) => r.groupes.includes(g)) && ['Vendre', 'Gérer', 'Argent'].every((g) => r.titresVus.includes(g)) && !r.groupes.includes('Plateformes'), `O ${qui} : les groupes Vendre · Gérer · Argent · Moi sont là, en entier, sans doublon « Plateformes »`, JSON.stringify(r && { groupes: r.groupes, titresVus: r.titresVus }));
           await ctx.close();
         });
       }

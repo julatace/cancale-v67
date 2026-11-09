@@ -91,6 +91,12 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
 srv.listen(PORT);
 
+// (9 nov.) LA VRAIE FORME (§6.3) : la colonne `meta` que la base calcule à chaque écriture
+// (migration 004, `vrm_meta` : les scalaires de premier niveau ≤ 600 car., `_pdf`), et les
+// filtres que l'app envoie (`id=in.(…)`, `data->>k=not.is.null`…). Sans eux, la lecture des
+// e-mails de suivi par `id=in.(…)` rendait [] : le colis Chronopost de l'e-mail n'existait pas.
+const { test: filtrePg } = require('./_minipgrest.cjs');
+const metaDe = (d) => { if (!d || typeof d !== 'object' || Array.isArray(d)) return null; const m = {}; for (const [k, v] of Object.entries(d)) if (['string', 'number', 'boolean'].includes(typeof v) && JSON.stringify(v).length <= 600) m[k] = v; if (d.pdfB64) m._pdf = true; return m; };
 const projette = (row, sel) => {
   if (!sel || sel === '*') return row;
   const out = {};
@@ -99,6 +105,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    if (src === 'meta') { out[alias] = metaDe(row.data); continue; }
     let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
     out[alias] = v == null ? null : v;
   }
@@ -155,8 +162,11 @@ async function ouvrir(b, vp, tab) {
     const eq = /id=eq\.([^&]*)/.exec(u);
     if(eq&&prefsFavoris.has(eq[1]))return j([prefsFavoris.get(eq[1])]);
     if (eq) return j(LIGNES.filter((r) => r.id === eq[1]).map(forme));
+    const filtres = (r) => [...new URL(u.replace(/#/g, '%23')).searchParams.entries()].every(([k, v]) => !/^data(->>|->)/.test(k) || filtrePg(r, k, v));
+    const ins = /id=in\.\(([^)]*)\)/.exec(u);
+    if (ins) { const ids = ins[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(LIGNES.filter((r) => ids.includes(r.id) && filtres(r)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id) && filtres(r)).map(forme)); }
     return j([]);
   });
   let fileFavoris={active:false,raison:'',jobs:[]};
