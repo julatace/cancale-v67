@@ -277,6 +277,14 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
     // ── La fenêtre du reçu d'achat : le VRAI `openReceipt`, ses deux boutons ──
     console.log(`── ${vp.width} px — reçu, facture, bordereau`);
     await pg.goto(`${ORIGINE}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
+    // (9 nov.) Depuis les colis « un point = une carte » en rangées (Colis v2), le QR d'un
+    // colis à retirer est dans le DÉTAIL de sa rangée : on ouvre Colis → À retirer et la
+    // rangée, comme au comptoir (la tournée des écrans ne l'ouvre pas).
+    await pg.goto(`${ORIGINE}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
+    for (let i = 0; i < 20 && !(await pg.$('[data-colis-ident="r:e:VGSBANC000001"]')); i++) await pg.waitForTimeout(250);
+    await pg.evaluate(() => { const l = document.querySelector('[data-colis-ident="r:e:VGSBANC000001"] .vrm-rpf-ouvrir[aria-expanded="false"]'); if (l) l.click(); });
+    for (let i = 0; i < 20 && !(VG.https + VG.http); i++) await pg.waitForTimeout(250);
+    await pg.goto(`${ORIGINE}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
     // (22 oct., revue) Le QR Vinted Go (http dans sa base) part en https, et ne
     // fait signaler aucune violation (la tournée des écrans juge les violations).
     // (9 nov.) Depuis la ligne par colis (4 nov.), le QR n'est dessiné qu'à l'ouverture de la
