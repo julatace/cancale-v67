@@ -211,7 +211,8 @@ export function histoireArticle(rn, d = {}, o = {}) {
     if (r.benefice != null) {
       const frais = r.vente != null && r.achat != null ? r.vente - r.achat - r.benefice : null;
       const sg = `${r.benefice > 0 ? '+' : r.benefice < 0 ? '−' : ''}${eur(Math.abs(r.benefice) / 100)}`;
-      pose('benefice', 'fait', `Bénéfice ${sg}`, [], [r.vente != null ? `vente ${eur(r.vente / 100)}` : null, r.achat != null ? `− achat ${eur(r.achat / 100)}` : null, frais ? `− frais ${eur(frais / 100)}` : null, r.benefPartiel ? 'frais pas tous confirmés' : null].filter(Boolean).join(' '));
+      const calcul = [r.vente != null ? `vente ${eur(r.vente / 100)}` : null, r.achat != null ? `− achat ${eur(r.achat / 100)}` : null, frais ? `− frais ${eur(frais / 100)}` : null].filter(Boolean).join(' ');
+      pose('benefice', 'fait', `Bénéfice ${sg}`, [], [calcul, r.benefPartiel ? 'frais pas tous confirmés' : null].filter(Boolean).join(' · '));
       etapes[etapes.length - 1].montant = r.benefice;
     } else if (vendue === 'fait') pose('benefice', 'passu', 'Bénéfice', [], r.raisonBenef || 'pas calculable');
     else if (vendue === 'passu') pose('benefice', 'passu', 'Bénéfice', [], 'tes ventes pas toutes lues');

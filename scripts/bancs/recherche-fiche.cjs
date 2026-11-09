@@ -4,14 +4,14 @@
 //        BANC_PORT=… · BANC_DIST=… (un autre build) · SHOTS=… (les captures)
 // ═══════════════════════════════════════════════════════════════════════════
 // Données INVENTÉES (le dépôt est public), à la forme des lignes réelles :
-//   · 50 paires au MÊME titre (N°201 à N°250), deux vendues sur Vinted (9226 → N°227,
-//     9210 → N°211), chacune avec SON bordereau (`email_bord_*` : transaction, suivi,
+//   · 50 paires au MÊME titre (N°201 à N°250), deux vendues sur Vinted (22999990226 → N°227,
+//     22999990210 → N°211), chacune avec SON bordereau (`email_bord_*` : transaction, suivi,
 //     date), le N°227 retiré par l'acheteur (`email_track_*` de SON suivi) et un suivi
 //     qui lui RESSEMBLE (un caractère de différence) qui ne doit jamais entrer ;
 //   · « B125 » et « 125 » (deux paires, deux numéros) ;
 //   · une commande eBay (12-34507-89007, SKU VRM-208), une vente Leboncoin prouvée
 //     (3001234567), une vente Vestiaire (55001, produit 91000777, N°230) ;
-//   · 50 conversations Vinted au même titre, dont celle de la vente 9226 (pseudo17).
+//   · 50 conversations Vinted au même titre, dont celle de la vente 22999990226 (pseudo17).
 // Il exige, à 390 px tactile et 1512 px, en clair et en sombre :
 //   A. la loupe s'ouvre (⌘K/Ctrl+K sur ordinateur, la loupe sur iPhone) ; champ vide :
 //      ce qu'on peut taper (`data-recherche-aide`) ;
@@ -47,19 +47,19 @@ const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 
 const item = (id, title) => ({ id: Number(id), title, price: { amount: '60.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false });
 const LISTINGS = Array.from({ length: 50 }, (_, i) => item(7200 + i, TITRE)).filter((x) => ![7226, 7210].includes(x.id)).concat([item(7300, FICHES[7300].title), item(7301, FICHES[7301].title)]);
 const vente = (tx, j, prix) => ({ transaction_id: tx, title: TITRE, status: 'Commande finalisée', transaction_user_status: 'completed', price: { amount: prix, currency_code: 'EUR' }, date: ilYa(j) });
-const VENTES = [vente(9226, 5, '70'), vente(9210, 6, '70')];
+const VENTES = [vente(22999990226, 5, '70'), vente(22999990210, 6, '70')];
 const txn = (tx, it, s, su) => ({ id: `harvest_111_txn_${tx}`, data: { capturedAt: iso(M), payload: { transaction: { id: tx, item_id: it, status: s, status_title: 'x', status_updated_at: su } } } });
 const conv = (n, tx, login) => ({ id: `harvest_111_conv_${n}`, data: { capturedAt: iso(M), payload: { conversation: { id: n, transaction: { id: tx, item_id: 7200, item_title: TITRE, status: 450, current_user_side: 'seller' }, opposite_user: { id: 5000 + n, login }, messages: [] } } } });
 const CONVS = Array.from({ length: 50 }, (_, i) => conv(80000 + i, 9000000 + i, 'pseudo' + i));
-CONVS[17] = conv(80017, 9226, 'pseudo17');
+CONVS[17] = conv(80017, 22999990226, 'pseudo17');
 const ROWS = [
   { id: 'main', data: { vinted_annonce_numeros: FICHES, vinted_used_numeros: Object.values(FICHES).map((f) => f.numero) } },
   { id: 'harvest_111_listings', data: { capturedAt: iso(M - 600e3), payload: { items: LISTINGS, pagination: { total_entries: LISTINGS.length } } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: iso(M), nItems: VENTES.length, payload: { my_orders: VENTES } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(M), nItems: 0, payload: { my_orders: [] } } },
-  txn(9226, 7226, 450, ilYa(1)), txn(9210, 7210, 300, ilYa(2)),
-  { id: 'email_bord_9226', data: { type: 'bordereau', transaction: '9226', suivi: '6A11111111111', filename: 'b.pdf', pdfB64: 'JVBERi0x', receivedAt: '2026-11-04T12:00:00.000Z' } },
-  { id: 'email_bord_9210', data: { type: 'bordereau', transaction: '9210', suivi: '6A22222222222', filename: 'c.pdf', pdfB64: 'JVBERi0x', receivedAt: '2026-11-03T12:00:00.000Z' } },
+  txn(22999990226, 7226, 450, ilYa(1)), txn(22999990210, 7210, 300, ilYa(2)),
+  { id: 'email_bord_9226', data: { type: 'bordereau', transaction: '22999990226', suivi: '6A11111111111', filename: 'b.pdf', pdfB64: 'JVBERi0x', receivedAt: '2026-11-04T12:00:00.000Z' } },
+  { id: 'email_bord_9210', data: { type: 'bordereau', transaction: '22999990210', suivi: '6A22222222222', filename: 'c.pdf', pdfB64: 'JVBERi0x', receivedAt: '2026-11-03T12:00:00.000Z' } },
   { id: 'email_track_x1', data: { type: 'suivi', suivi: '6A11111111111', status: 'delivered', sens: 'sortant', receivedAt: '2026-11-07T08:00:00.000Z', retireLe: '2026-11-07T07:30:00.000Z' } },
   { id: 'email_track_x2', data: { type: 'suivi', suivi: '6A1111111111X', status: 'delivered', sens: 'sortant', receivedAt: '2026-11-01T08:00:00.000Z', retireLe: '2026-11-01T08:00:00.000Z' } },
   { id: 'lbc_ventes', data: { ventes: { 3001234567: { isSeller: true, itemId: '2700001', title: 'Salomon XT-6 noir', price: 6500, dateVente: ilYa(3) } } } },
@@ -116,7 +116,7 @@ async function preparer(b, vp, { sombre = false } = {}) {
   const pg = await ctx.newPage();
   const errs = [], lectures = [];
   pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(({ s, n, sd }) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vinted_ship_done', JSON.stringify(sd)); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { s: sombre, n: FICHES, sd: { 9226: Date.parse('2026-11-05T09:00:00Z') } });
+  await pg.addInitScript(({ s, n, sd }) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vinted_ship_done', JSON.stringify(sd)); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { s: sombre, n: FICHES, sd: { 22999990226: Date.parse('2026-11-05T09:00:00Z') } });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
@@ -189,11 +189,15 @@ const ficheLue = async (pg, n) => {
   for (let i = 0; i < 60; i++) { const f = await lireFiche(pg); if (f && f.lecture === '0' && (f.etats.colis !== undefined)) { await pg.waitForTimeout(400); return lireFiche(pg); } await pg.waitForTimeout(250); }
   return lireFiche(pg);
 };
-const ouvrirFiche = async (pg, n) => {
+// `attendre(f)` : la lecture en plus de la fiche (colis de la vente) arrive APRÈS la
+// lecture de la coque — attendue sur ce qui est rendu (au plus 15 s), jamais un délai fixe.
+const ouvrirFiche = async (pg, n, attendre = null) => {
   await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });
   await pg.waitForTimeout(200);
   await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), n);
-  return ficheLue(pg, n);
+  let f = await ficheLue(pg, n);
+  for (let i = 0; attendre && i < 60 && !(f && attendre(f)); i++) { await pg.waitForTimeout(250); f = await lireFiche(pg); }
+  return f;
 };
 
 (async () => {
@@ -214,10 +218,10 @@ const ouvrirFiche = async (pg, n) => {
         await pg.screenshot({ path: path.join(SHOTS, `rf-vide-${suf}.png`) });
       });
       await essaie('B', async () => {
-        await taper(pg, '9226');
+        await taper(pg, '22999990226');
         const r = await res(pg);
         const v = r.r.find((x) => x.type === 'vente'), m = r.r.find((x) => x.type === 'message');
-        dit(v && v.par === 'transaction' && v.cle === 'vente:9226', `B ${TT} n° de transaction ⇒ SA vente`, r.r);
+        dit(v && v.par === 'transaction' && v.cle === 'vente:22999990226', `B ${TT} n° de transaction ⇒ SA vente`, r.r);
         dit(m && m.par === 'transaction' && m.conv === '80017' && r.r.filter((x) => x.type === 'message').length === 1, `B ${TT} n° de transaction ⇒ SA conversation (une seule, sur 50 au même titre)`, r.r);
         dit(r.groupes.includes('vente') && r.groupes.includes('message') && r.groupes.indexOf('vente') < r.groupes.indexOf('message'), `B ${TT} résultats groupés par type (Ventes, puis Messages)`, r.groupes);
         dit(/transaction/.test(r.compris || ''), `B ${TT} « Je cherche un n° de transaction » est dit`, r.compris);
@@ -269,14 +273,14 @@ const ouvrirFiche = async (pg, n) => {
         }
       });
       await essaie('E', async () => {
-        const f = await ouvrirFiche(pg, '227');
+        const f = await ouvrirFiche(pg, '227', (x) => x.evs.some((e) => e.cle === 'livre'));
         dit(!!f && f.ordre.slice(-1)[0] === 'benefice' && f.ordre[0] === 'achat', `E ${TT} la frise du N°227 va de l'achat au bénéfice`, f && f.ordre);
         const bo = f.evs.find((x) => x.cle === 'bordereau'), de = f.evs.find((x) => x.cle === 'depose'), li = f.evs.find((x) => x.cle === 'livre');
         dit(bo && /6A11111111111/.test(bo.t) && bo.at === '2026-11-04T12:00:00.000Z', `E ${TT} SON bordereau : SON suivi, daté par SON e-mail`, f.evs);
         dit(de && de.at === '2026-11-05T09:00:00.000Z', `E ${TT} déposé : SON clic « Colis fait », daté`, f.evs);
         dit(li && li.at === '2026-11-07T07:30:00.000Z', `E ${TT} retiré par l'acheteur : daté par l'e-mail de CE suivi`, f.evs);
         dit(!f.evs.some((x) => x.at === '2026-11-01T08:00:00.000Z' || /6A1111111111X/.test(x.t)), `E ${TT} le suivi qui RESSEMBLE n'entre jamais`, f.evs);
-        dit(f.txs.join() === '9226', `E ${TT} SA vente : la transaction 9226`, f.txs);
+        dit(f.txs.join() === '22999990226', `E ${TT} SA vente : la transaction 22999990226`, f.txs);
         dit(f.etats.benefice === 'fait' && f.benef === '3400' && /\+34/.test(f.textes.benefice) && /vente 70/.test(f.textes.benefice) && /achat 36/.test(f.textes.benefice), `E ${TT} bénéfice +34 € = vente 70 € − achat 36 €`, [f.benef, f.textes.benefice]);
         dit(f.sources.includes('vente') && f.sources.includes('colis'), `E ${TT} « Ouvrir dans … » sur la vente et le colis`, f.sources);
         dit(f.petits.length === 0, `G ${TT} chaque bouton de la fiche fait au moins 44 px`, f.petits);
@@ -291,16 +295,20 @@ const ouvrirFiche = async (pg, n) => {
         dit(!apres.fiche, `E ${TT} « Ouvrir dans Ventes » ferme la fiche et ouvre l'écran`, apres);
       });
       await essaie('F', async () => {
-        const f = await ouvrirFiche(pg, '211');
-        dit(!!f && f.txs.join() === '9210' && f.evs.some((x) => /6A22222222222/.test(x.t)) && !f.evs.some((x) => /6A111/.test(x.t)), `F ${TT} le N°211 (même titre) : SA vente, SON suivi, rien du N°227`, f && [f.txs, f.evs]);
+        const f = await ouvrirFiche(pg, '211', (x) => x.evs.some((e) => /6A2/.test(e.t)));
+        dit(!!f && f.txs.join() === '22999990210' && f.evs.some((x) => /6A22222222222/.test(x.t)) && !f.evs.some((x) => /6A111/.test(x.t)), `F ${TT} le N°211 (même titre) : SA vente, SON suivi, rien du N°227`, f && [f.txs, f.evs]);
         dit(!!f && !f.evs.some((x) => x.cle === 'depose' || x.cle === 'livre'), `F ${TT} le N°211 : ni dépôt ni retrait empruntés`, f && f.evs);
         const g = await ouvrirFiche(pg, '228');
         dit(!!g && !g.txs.length && !g.evs.length && g.etats.benefice === 'absent' && /rien de vendu/.test(g.textes.benefice), `F ${TT} le N°228 (même titre, pas vendu) : aucun colis, bénéfice « rien de vendu »`, g && [g.txs, g.evs, g.textes.benefice]);
         await pg.screenshot({ path: path.join(SHOTS, `rf-fiche-228-${suf}.png`) });
         await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });
       });
-      const lourdes = lectures.filter((u) => /harvest_[^&]*_conv_|email_bord_|email_track_/.test(u) && /select=(data|id,data)(&|$)/.test(u));
-      dit(!lourdes.length, `G ${TT} conversations, bordereaux, suivis : lus projetés (jamais select=data)`, lourdes[0]);
+      // Les lectures de CE chantier (la loupe : conversations ; la fiche : bordereaux par SA
+      // transaction, suivis par SON n°). (Colis / Ma journée lisent encore `email_track_*`
+      // par `select=id,data` — mesuré le 6 nov., pas de cette branche.)
+      const miennes = lectures.filter((u) => /harvest_[^&]*_conv_/.test(u) || /email_bord_[^&]*&data->>transaction=in\./.test(u) || /email_track_[^&]*&data->>suivi=in\./.test(u));
+      const lourdes = miennes.filter((u) => /select=(data|id,data)(&|$)/.test(u));
+      dit(miennes.length >= 3 && !lourdes.length, `G ${TT} conversations, bordereaux, suivis : lus projetés (jamais select=data)`, lourdes[0] || miennes.length);
       dit(!errs.length, `G ${TT} aucune erreur de page`, errs[0]);
       await ctx.close();
     }
