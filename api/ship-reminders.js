@@ -21,6 +21,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
+import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme } from './_lib/notif-textes.js';
@@ -1144,8 +1145,11 @@ export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
   res.setHeader?.('Cache-Control','no-store');
   if (!secret) { res.status(503).json({ok:false,error:'cron-non-configure'});return; }
-  const auth = req.headers?.authorization || '';
-  if (auth !== `Bearer ${secret}`) { res.status(401).json({error:'clé invalide'});return; }
+  const auth = String(req.headers?.authorization || '');
+  // (9 nov., revue sécurité) Comparée en temps constant, comme la clé du script
+  // Gmail (email-inbound) : une comparaison qui s'arrête au premier écart.
+  const empreinte = (t) => crypto.createHash('sha256').update(String(t)).digest();
+  if (!crypto.timingSafeEqual(empreinte(auth), empreinte(`Bearer ${secret}`))) { res.status(401).json({error:'clé invalide'});return; }
   // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
   if (repondreSansCleService(res)) return;
 

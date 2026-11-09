@@ -56,12 +56,19 @@ export default async function handler(req, res) {
   //    du détourage) ; personne d'autre — « no-key », l'app retombe sur ses
   //    suggestions calculées. Jamais un repli sur sa clé.
   const cleVendeur = typeof b.key === 'string' && b.key.trim() ? b.key.trim() : '';
+  // ⚠️ (9 nov., revue sécurité) SESSION EXIGÉE POUR TOUT POST, clé du vendeur
+  //    comprise. Avec une clé dans le corps, la route appelait Anthropic SANS
+  //    rien vérifier : vrm.center servait de relais ouvert à n'importe qui (une
+  //    clé volée « blanchie » par notre adresse, chaque appel payé en temps de
+  //    fonction sur le plan de Julien). L'app envoie toujours sa session.
+  const u = await utilisateurDe(req);
+  if (u === undefined) { res.status(503).json({ ok: false, reason: 'connexion-injoignable', message: 'Le service de connexion ne répond pas — réessaie dans un instant.' }); return; }
+  if (!u) { res.status(401).json({ ok: false, reason: 'session', message: "Connecte-toi à VRM pour utiliser l'assistant." }); return; }
+  if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', message: "Ton abonnement VRM n'est plus actif." }); return; }
+  if (cleVendeur.length > 300) { res.status(400).json({ ok: false, reason: 'cle' }); return; }
   let key = cleVendeur;
   if (!key && cleServeur) {
-    // LA CLÉ DU SERVEUR SE PAIE : session exigée (et un abonnement en règle).
-    const u = await utilisateurDe(req);
-    if (!u) { res.status(401).json({ ok: false, reason: 'session', message: "Connecte-toi à VRM pour utiliser l'assistant." }); return; }
-    if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', message: "Ton abonnement VRM n'est plus actif." }); return; }
+    // LA CLÉ DU SERVEUR SE PAIE : pour le seul propriétaire de l'installation.
     const proprio = String(process.env.VRM_OWNER_UID || '');
     if (proprio && u.id === proprio) key = cleServeur;
     else { res.status(200).json({ ok: false, reason: 'no-key', message: "L'assistant IA a besoin de TA clé. VRM n'utilise pas la sienne pour toi." }); return; }

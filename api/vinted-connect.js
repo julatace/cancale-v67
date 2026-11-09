@@ -171,9 +171,23 @@ export default async function handler(req, res) {
       return;
     }
 
-    // 3) Profil (pseudo) — best-effort, ne bloque pas la connexion si indisponible.
+    // 3) Profil : la PREUVE que ce jeton est bien un jeton Vinted de CE compte.
+    // ⚠️ (9 nov., revue sécurité) Le jeton n'est qu'un JWT DÉCODÉ, jamais vérifié
+    //    (sa signature appartient à Vinted). Un jeton fabriqué à la main avec un
+    //    `exp` lointain et l'`account_id` d'un autre vendeur (visible sur son
+    //    profil public) était rangé tel quel : le compte Vinted de quelqu'un
+    //    d'autre « relié » chez soi (et, avec l'unicité de la 023, refusé ensuite
+    //    à son vrai propriétaire). Seul Vinted peut dire si le jeton est vrai :
+    //    il vérifie la signature ; un jeton accepté par Vinted porte un
+    //    `account_id` écrit par Vinted. Sans profil lu, RIEN n'est rangé.
+    //    (Le `user.id` du profil n'est PAS l'`account_id` — background.js — il
+    //    ne se compare donc pas ; un `account_id` dans le profil, s'il y est, oui.)
     const profile = await fetchProfile({ host, accessToken: tokens.access_token, anonId, csrfToken });
-    const login = profile?.login || null;
+    if (!profile || (profile.account_id != null && String(profile.account_id) !== vintedUserId)) {
+      res.status(401).json({ error: 'Vinted n\'a pas confirmé ce compte avec ce token. Reconnecte-toi sur vinted.fr, puis recopie le token via l\'extension.' });
+      return;
+    }
+    const login = profile.login || null;
 
     // 4) Upsert Supabase.
     const nowIso = new Date().toISOString();
