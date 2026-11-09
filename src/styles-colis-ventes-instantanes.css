@@ -42,3 +42,15 @@ html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir { border: 1px solid var(--v
 html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir-titre { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
 html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir-ligne { font-size: 13px; color: var(--vrm-muted); margin-top: 2px; overflow-wrap: anywhere; }
 html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir-total { font-size: 22px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; opacity: .78; }
+
+/* À partir de 768 px, les colis sont des LIGNES (styles-mineral.css, `data-colis-lignes`) : une
+   ligne basse, la photo petite, le geste à droite ; le transporteur est dit par l'en-tête du groupe. */
+@media (min-width: 768px) {
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte { display: flex !important; align-items: center !important; gap: 14px !important; padding: 8px 12px !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte > :first-child { flex: 1 1 auto !important; min-width: 0 !important; align-items: center !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-inst-photo { width: 44px !important; height: 52px !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-colis-titre { -webkit-line-clamp: 1 !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-colis-actions { display: flex !important; flex: none !important; margin-top: 0 !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-rangee-bord { display: flex; align-items: center; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-transporteur { display: none !important; }
+}

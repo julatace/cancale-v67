@@ -168,7 +168,7 @@ export function VentesInstantanee({ snap, maintenant = null, fmt = null, ordi = 
         ) : null}
         <div className="vrm-ventes-toutes" data-inst-ventes={String(M.lignes.length)} style={{ padding: '4px 16px 16px' }}>
           {M.replis.map((r, i) => (
-            <div key={i} className="vrm-toutes-repli"><div className="vrm-toutes-repli-tete"><span className="vrm-toutes-repli-txt">{r}</span><span className="vrm-toutes-repli-chevron" aria-hidden="true">›</span></div></div>
+            <div key={i} className="vrm-toutes-repli"><div className="vrm-toutes-repli-tete"><span className="vrm-toutes-repli-txt">{r}</span>{" "}<span className="vrm-toutes-repli-chevron" aria-hidden="true">›</span></div></div>
           ))}
           <div className="vrm-toutes-liste" role="list">
             {M.lignes.map((l, i) => (
