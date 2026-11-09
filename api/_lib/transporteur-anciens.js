@@ -29,6 +29,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { transporteurDeTexteBordereau, transporteursNommes, suiviMondialRelayLu } from './transporteur-bordereau.js';
 import { TEXTE_MAX } from './resume-email.js';
+import { transporteurDeForme } from './suivi-colis.js';
+import { transporteurDuPdf } from './transporteur-pdf.js';
 
 export const ID_BORD_TRANSPORTEURS = 'vrm_bord_transporteurs';
 export const MAX_PAR_PASSAGE = 20;
@@ -127,7 +129,7 @@ export async function passeTransporteursAnciens({ lireTout, getRow, ecrire, max 
   // Borné : les « vus » les plus anciens tombent (ils seraient simplement relus).
   const clesVus = Object.keys(vus);
   if (clesVus.length > VUS_MAX) clesVus.sort((a, b) => String(vus[a].at).localeCompare(String(vus[b].at))).slice(0, clesVus.length - VUS_MAX).forEach((k) => delete vus[k]);
-  const ok = await ecrire(ID_BORD_TRANSPORTEURS, { v: 1, parTx, vus, at });
+  const ok = await ecrire(ID_BORD_TRANSPORTEURS, { ...cur, v: 1, parTx, vus, at });   // (9 nov.) `pdf`/`pdfVus` gardés
   if (!ok) return { fait: false, raison: 'écriture ratée', ranges: 0, suivis: 0, vus: 0, restants: candidats.length };
   return { fait: true, ranges, suivis, vus: nVus, restants: candidats.length - lot.length, sansEmail };
 }
@@ -138,14 +140,97 @@ export async function passeTransporteursAnciens({ lireTout, getRow, ecrire, max 
 export function transporteurRelu(bord, ligne) {
   if (!bord) return bord;
   const tx = String(bord.transaction || '');
-  const e = ligne && ligne.parTx && ligne.parTx[tx];
-  if (!e || typeof e !== 'object') return bord;
   let out = bord;
+  // (9 nov.) Le PDF relu (passe `passeTransporteursPdf`) : seulement là où la réception n'a rien rangé.
+  const p = ligne && ligne.pdf && ligne.pdf[tx];
+  if (p && typeof p === 'object') {
+    if (!bord.transporteurPdf && typeof p.t === 'string' && p.t) out = { ...out, transporteurPdf: p.t, transporteurPdfSource: 'pdf-relu' };
+    if (!String(out.suivi || '').trim() && typeof p.s === 'string' && transporteurDeForme(p.s)) out = { ...out, suivi: p.s, suiviSource: 'pdf-relu' };
+  }
+  const e = ligne && ligne.parTx && ligne.parTx[tx];
+  if (!e || typeof e !== 'object') return out;
   if (!bord.transporteur && typeof e.t === 'string' && e.t) out = { ...out, transporteur: e.t, transporteurSource: 'email-relu' };
-  if (!String(bord.suivi || '').trim() && typeof e.s === 'string' && /^\d{8}$/.test(e.s)) out = { ...out, suivi: e.s, suiviSource: 'email-relu' };
+  if (!String(out.suivi || '').trim() && typeof e.s === 'string' && /^\d{8}$/.test(e.s)) out = { ...out, suivi: e.s, suiviSource: 'email-relu' };
   return out;
 }
 // La lecture légère de la ligne (aucun PDF, aucun texte) et la fusion d'une liste.
-export const REQ_RELUS = `app_data?id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx`;
-export const ligneRelueDe = (rows) => (Array.isArray(rows) && rows[0] && rows[0].parTx && typeof rows[0].parTx === 'object' ? { parTx: rows[0].parTx } : null);
+export const REQ_RELUS = `app_data?id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx,pdf:data->pdf`;
+export const ligneRelueDe = (rows) => {
+  const r = Array.isArray(rows) && rows[0];
+  if (!r) return null;
+  const parTx = r.parTx && typeof r.parTx === 'object' ? r.parTx : null;
+  const pdf = r.pdf && typeof r.pdf === 'object' ? r.pdf : null;
+  return parTx || pdf ? { parTx: parTx || {}, pdf: pdf || {} } : null;
+};
 export const avecRelus = (bords, rows) => { const l = ligneRelueDe(rows); return Array.isArray(bords) && l ? bords.map((b) => transporteurRelu(b, l)) : bords; };
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (9 nov.) LE PDF DES ANCIENS BORDEREAUX — la même règle qu'à la réception
+//  (`transporteurDuPdf`, api/_lib/transporteur-pdf.js), en rattrapage BORNÉ :
+//  · candidats : `email_bord_*` avec PDF (`meta._pdf`) jamais lu (`pdfLu` absent)
+//    et sans transporteur ou sans n° ; `harvest_*_label_{tx}` (capté par
+//    l'extension) quand AUCUN bordereau e-mail avec PDF n'existe pour ce n° ;
+//  · identité : le n° de transaction de la ligne (`email_bord_{tx}`, `meta.tx`),
+//    jamais un titre ;
+//  · égress (§4.4) : UN PDF par requête (`data->>pdfB64`, rien d'autre),
+//    `MAX_PDF_PAR_PASSAGE` par passage, les plus récents d'abord ;
+//  · idempotent : un n° décidé (`pdf[tx]`) ou vu (`pdfVus[tx]`) n'est plus relu ;
+//  · une lecture ratée (listes, ligne de rangement) ⇒ RIEN écrit ; un PDF dont
+//    la lecture rate n'est pas noté (relu au passage suivant) ;
+//  · résultat dans `vrm_bord_transporteurs` : `pdf: { tx: { t, s? } }` (léger,
+//    lu par l'app) et `pdfVus: { tx: { r, at } }` (jamais lu par l'app).
+// ════════════════════════════════════════════════════════════════════════════
+export const MAX_PDF_PAR_PASSAGE = 6;
+export const REQ_BORDS_PDF = 'app_data?id=like.email_bord_*&meta->>_pdf=eq.true&select=id,tx:meta->>transaction,pdfLu:meta->>pdfLu,transporteur:meta->>transporteur,suivi:meta->>suivi,recu:meta->>receivedAt';
+export const REQ_LABELS_PDF = 'app_data?id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,tx:meta->>tx,cap:meta->>capturedAt';
+export const reqPdf = (id) => `app_data?id=eq.${encodeURIComponent(id)}&select=pdf:data->>pdfB64`;
+
+export function candidatsPdf(bords, labels, cur) {
+  const pdf = (cur && cur.pdf) || {}, vus = (cur && cur.pdfVus) || {};
+  const out = []; const avecEmail = new Set();
+  for (const b of bords || []) {
+    const tx = String((b && b.tx) || '') || String((b && b.id) || '').replace(/^email_bord_/, '');
+    if (!RE_TX.test(tx)) continue;
+    avecEmail.add(tx);
+    if (b.pdfLu != null) continue;                                   // lu à la réception
+    if (b.transporteur && String(b.suivi || '').trim()) continue;    // rien à apprendre
+    if (pdf[tx] || vus[tx]) continue;
+    out.push({ tx, id: b.id, at: Date.parse(b.recu || '') || 0 });
+  }
+  for (const l of labels || []) {
+    const id = String((l && l.id) || '');
+    if (/_label_latest$/.test(id)) continue;
+    const tx = String((l && l.tx) || '');
+    if (!RE_TX.test(tx) || avecEmail.has(tx) || pdf[tx] || vus[tx]) continue;
+    if (out.some((c) => c.tx === tx)) continue;
+    out.push({ tx, id, at: Date.parse(l.cap || '') || 0 });
+  }
+  return out.sort((a, b) => b.at - a.at || (a.tx < b.tx ? 1 : -1));
+}
+
+// `lirePdf(id)` → base64 | '' (la ligne n'a pas/plus de PDF) | null (pas su).
+export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf, max = MAX_PDF_PAR_PASSAGE, maintenant = Date.now() }) {
+  const [bords, labels] = await Promise.all([lireTout(REQ_BORDS_PDF), lireTout(REQ_LABELS_PDF)]);
+  if (!Array.isArray(bords) || !Array.isArray(labels)) return { fait: false, raison: 'lecture ratée — rien écrit' };
+  const memo = await getRow(ID_BORD_TRANSPORTEURS);
+  if (memo === undefined) return { fait: false, raison: 'ligne de rangement illisible — rien écrit' };
+  const cur = memo && typeof memo === 'object' ? memo : {};
+  const cands = candidatsPdf(bords, labels, cur);
+  const lot = cands.slice(0, Math.max(0, max));
+  if (!lot.length) return { fait: true, ranges: 0, vus: 0, restants: 0 };
+  const pdf = { ...(cur.pdf || {}) }, pdfVus = { ...(cur.pdfVus || {}) };
+  const at = new Date(maintenant).toISOString();
+  let ranges = 0, nVus = 0, rates = 0;
+  for (const c of lot) {
+    const b64 = await lirePdf(c.id);
+    if (b64 == null) { rates++; continue; }
+    if (!b64) { pdfVus[c.tx] = { r: 'sans-pdf', at }; nVus++; continue; }
+    const d = await transporteurDuPdf(b64);
+    if (d.etat === 'ok') { pdf[c.tx] = { t: d.t, ...(d.s ? { s: d.s } : {}) }; ranges++; }
+    else { pdfVus[c.tx] = { r: d.etat, at }; nVus++; }
+  }
+  if (!ranges && !nVus) return { fait: true, ranges: 0, vus: 0, rates, restants: cands.length };
+  const ok = await ecrire(ID_BORD_TRANSPORTEURS, { ...cur, v: 1, pdf, pdfVus, at });
+  if (!ok) return { fait: false, raison: 'écriture ratée', ranges: 0, vus: 0, restants: cands.length };
+  return { fait: true, ranges, vus: nVus, rates, restants: cands.length - ranges - nVus };
+}

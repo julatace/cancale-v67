@@ -83,3 +83,38 @@ export const progressionObjectif = (obj, x) => {
   const pct = Math.max(0, Math.min(100, Math.floor((val / obj.valeur) * 100)));
   return { type: obj.type, objectif: obj.valeur, valeur: val, pct, partiel: !!(x && x.partiel), atteint: val >= obj.valeur, manque: (x && x.manque) || [] };
 };
+
+// ── CE QUI RESTE, ET LE RYTHME (9 nov., Julien) ─────────────────────────────
+// « 1 240 € sur 2 000 € · encore 760 € · ≈ 35 €/jour d'ici le 30 ». Rien de
+// recalculé : le reste vient de la progression (la valeur = la case « Vendu ·
+// mois »). Aujourd'hui compte parmi les jours qui restent (on peut encore vendre
+// aujourd'hui). Le rythme s'arrondit VERS LE HAUT (35 €/jour qui tiennent
+// l'objectif, jamais 34 qui le ratent). Une valeur « au moins » rend un reste
+// « au plus ». Pas su ⇒ null (la barre dit « — »).
+export const joursRestantsMois = (maintenant = Date.now()) => {
+  const d = new Date(maintenant);
+  const dernier = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  return { jours: dernier - d.getDate() + 1, dernier };
+};
+export const resteObjectif = (prog, maintenant = Date.now()) => {
+  if (!prog || prog.valeur == null) return null;
+  const { jours, dernier } = joursRestantsMois(maintenant);
+  if (prog.atteint) return { atteint: true, reste: 0, parJour: null, jours, dernier, auPlus: false };
+  const eur = prog.type === 'ca';
+  const reste = eur ? Math.round((prog.objectif - prog.valeur) * 100) / 100 : prog.objectif - prog.valeur;
+  const parJour = jours > 0 ? Math.ceil((eur ? Math.round(reste * 100) / 100 : reste) / jours - 1e-9) : null;
+  return { atteint: false, reste, parJour, jours, dernier, auPlus: !!prog.partiel };
+};
+// La phrase sous la barre (`montre` met un montant ou un nombre en forme).
+export const phraseResteObjectif = (prog, montre, maintenant = Date.now()) => {
+  const r = resteObjectif(prog, maintenant);
+  if (!prog) return '';
+  if (!r) return 'Vendu du mois pas lu';
+  if (r.atteint) return 'Objectif atteint';
+  const eur = prog.type === 'ca';
+  const ap = r.auPlus ? 'au plus ' : '';
+  const reste = eur ? montre(r.reste) : `${r.reste} vente${r.reste > 1 ? 's' : ''}`;
+  if (r.jours <= 1) return `encore ${ap}${reste} aujourd’hui`;
+  const rythme = eur ? `${montre(r.parJour)}/jour` : `${r.parJour} vente${r.parJour > 1 ? 's' : ''} par jour`;
+  return `encore ${ap}${reste} · ≈ ${ap}${rythme} d’ici le ${r.dernier}`;
+};

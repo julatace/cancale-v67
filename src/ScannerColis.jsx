@@ -1,13 +1,17 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  SCANNER POUR DÉPOSER (3 nov., choix de Julien n° 1) — la feuille caméra.
-//  Aucune règle ici : `trouver(brut)` (src/scanColis.js, par le n° de suivi
-//  EXACT) dit quel colis ; `onDeposer(colis)` est le geste existant « Déposé »
-//  (annulable 5 s, la barre est posée par l'écran). Scans en série : la caméra
-//  reste ouverte ; une même lecture ne compte qu'une fois (2,5 s).
+//  SCANNER (3 nov., choix de Julien n° 1 ; 9 nov., lot V : « la paire qu'il doit
+//  y avoir dedans », et la même chose pour les ACHATS au point relais).
+//  Aucune règle ici : `trouver(brut)` (src/scanColis.js, par le n° de suivi ou le
+//  code de retrait EXACT) dit quel colis ; la feuille MONTRE la paire attendue
+//  (photo, N°, titre, taille, compte, acheteur/vendeur) et RIEN n'est écrit sans
+//  SON toucher : `onConfirmer(colis)` est le geste existant (« Colis fait »
+//  différé 5 s avec « Annuler » ; « J'ai retiré » pour un achat). Aucun colis, ou
+//  deux ⇒ dit, aucun bouton. Scans en série : la caméra reste ouverte, une même
+//  lecture ne compte qu'une fois (2,5 s), la liste « Scannés » garde la série.
 //  Lecture : `BarcodeDetector` du navigateur quand il sait le Code 128, sinon
 //  ZXing (JavaScript pur, chargé de cdn.jsdelivr.net — autorisé par la CSP,
 //  `script-src`), qui lit l'image DANS la page : aucune image n'est envoyée.
-//  Le clavier reste toujours là (saisir le n°).
+//  Le clavier reste toujours là (saisir le n°) ; sans caméra, il prend la main.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -63,20 +67,67 @@ export async function creerLecteur() {
 }
 
 const vibrer = (motif) => { try { if (navigator.vibrate) navigator.vibrate(motif); } catch (_) {} };
+// Un bip discret (WebAudio, si le navigateur le permet) — jamais un fichier, rien n'est chargé.
+const creerBip = () => {
+  let ctx = null;
+  return (ok) => {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      if (!ctx) ctx = new AC();
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+      o.type = 'sine'; o.frequency.value = ok ? 1320 : 440;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + (ok ? 0.09 : 0.16));
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.18);
+    } catch (_) {}
+  };
+};
 
-export default function ScannerColis({ trouver, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null }) {
+// Les mots de chaque mode : le colis qu'il ENVOIE (bordereau), l'achat qu'il RETIRE.
+const MOTS = {
+  envoi: {
+    titre: 'Scanner un bordereau', saisie: 'N° de suivi du bordereau', tete: 'Dans ce colis',
+    geste: 'C’est la bonne paire · Colis fait', fait: 'Colis fait', deja: 'Déjà noté colis fait',
+    inconnu: 'Ce n° n’est relié à aucune vente', ambigu: (n) => `${n} ventes portent ce n° : vérifie`,
+    sansVente: 'Ce bordereau n’est relié à aucune vente', personne: 'acheteur',
+    sansCamera: 'Pas de caméra ici : tape le n° imprimé sur le bordereau.',
+  },
+  retrait: {
+    titre: 'Scanner un colis à retirer', saisie: 'N° de suivi ou code de retrait', tete: 'Ton achat',
+    geste: 'C’est mon colis · Retiré', fait: 'Retiré', deja: 'Déjà noté retiré',
+    inconnu: 'Aucun achat à retirer ne porte ce code', ambigu: (n) => `${n} achats portent ce code : vérifie`,
+    sansVente: 'Ce colis n’est relié à aucun achat', personne: 'vendeur',
+    sansCamera: 'Pas de caméra ici : tape le n° de suivi ou le code de retrait.',
+  },
+};
+const euros = (v) => (Number.isFinite(v) ? v.toFixed(2).replace('.', ',') + ' €' : '');
+
+export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null }) {
+  const M = MOTS[mode] || MOTS.envoi;
   const video = React.useRef(null);
+  const saisieRef = React.useRef(null);
   const [camera, setCamera] = React.useState('demarrage');   // demarrage · active · sans
-  const [res, setRes] = React.useState(null);                 // { etat, colis?, n }
+  const [res, setRes] = React.useState(null);                 // { etat, colis?, n, lu }
+  const [scannes, setScannes] = React.useState([]);           // la série : [{ n, cle, etat, num, titre, fait }]
   const [saisie, setSaisie] = React.useState('');
-  const ref = React.useRef({ trouver, onDeposer }); ref.current.trouver = trouver; ref.current.onDeposer = onDeposer;
+  const ref = React.useRef({}); ref.current.trouver = trouver; ref.current.confirmer = onConfirmer || onDeposer;
+  const bip = React.useRef(null); if (!bip.current) bip.current = creerBip();
   const compte = React.useRef(0);
+  const noter = React.useCallback((n, colis, etat, fait) => setScannes((L) => {
+    const un = colis && !Array.isArray(colis) ? colis : null;
+    const cle = un ? String(un.cle) : '';
+    const x = { n, cle, etat, fait: !!fait, num: un ? (un.num || '') : '', titre: un ? (un.titre || '') : '' };
+    const autres = cle ? L.filter((y) => y.cle !== cle) : L;
+    return [x, ...autres].slice(0, 40);
+  }), []);
   const traiter = React.useCallback((brut) => {
     const r = ref.current.trouver(brut) || { etat: 'inconnu' };
-    compte.current += 1;
-    if (r.etat === 'trouve') { try { ref.current.onDeposer(r.colis); } catch (_) {} vibrer(60); setRes({ etat: 'depose', colis: r.colis, n: compte.current, lu: String(brut) }); }
-    else { vibrer([30, 60, 30]); setRes({ etat: r.etat, colis: r.colis || null, n: compte.current, lu: String(brut) }); }
-  }, []);
+    compte.current += 1; const n = compte.current;
+    const bon = r.etat === 'trouve';
+    vibrer(bon ? 40 : [30, 60, 30]); bip.current(bon);
+    setRes({ etat: r.etat, colis: r.colis || null, n, lu: String(brut) });
+    noter(n, r.colis || null, r.etat, r.etat === 'deja');
+  }, [noter]);
   React.useEffect(() => {
     let vivant = true, flux = null, minuterie = null;
     const nouveau = filtreRepetition(2500);
@@ -102,39 +153,89 @@ export default function ScannerColis({ trouver, onDeposer, onFermer, attente = n
         tour();
       } catch (_) { if (vivant) setCamera('sans'); }
     })();
-    return () => { vivant = false; if (minuterie) clearTimeout(minuterie); if (flux) flux.getTracks().forEach((t) => t.stop()); };
+    // La caméra est COUPÉE en sortant (le flux est rendu au système).
+    const v0 = video.current;
+    return () => { vivant = false; if (minuterie) clearTimeout(minuterie); if (flux) flux.getTracks().forEach((t) => t.stop()); try { if (v0) v0.srcObject = null; } catch (_) {} };
   }, [traiter]);
   React.useEffect(() => {
     const f = (e) => { if (e.key === 'Escape') onFermer && onFermer(); };
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
   }, [onFermer]);
+  // Sans caméra (ordinateur sans webcam, refus) : le clavier prend la main.
+  React.useEffect(() => { if (camera === 'sans') { try { if (saisieRef.current) saisieRef.current.focus({ preventScroll: true }); } catch (_) {} } }, [camera]);
   const valider = (e) => { e.preventDefault(); const s = saisie.trim(); if (!s) return; traiter(s); setSaisie(''); };
   const c = res && res.colis && !Array.isArray(res.colis) ? res.colis : null;
-  const TXT = { depose: 'Déposé', deja: 'Déjà déposé', inconnu: 'Pas trouvé', ambigu: 'Plusieurs colis', vide: 'Pas trouvé' };
+  // SON toucher : le geste existant, une fois. Rien n'est écrit avant.
+  const confirmer = () => {
+    if (!res || res.etat !== 'trouve' || !c) return;
+    try { if (ref.current.confirmer) ref.current.confirmer(c); } catch (_) {}
+    vibrer(60); bip.current(true);
+    setRes({ ...res, etat: 'fait' });
+    noter(res.n, c, 'fait', true);
+  };
+  const enAttente = !!(c && attente && attente.cle === String(c.cle));
+  const annuler = () => {
+    if (!onAnnuler) return;
+    onAnnuler();
+    if (res && c) { setRes({ ...res, etat: 'trouve' }); noter(res.n, c, 'trouve', false); }
+  };
+  const montrePaire = !!(c && res && (res.etat === 'trouve' || res.etat === 'fait' || res.etat === 'deja'));
+  const nAmbigu = res && Array.isArray(res.colis) ? res.colis.length : 2;
+  const message = !res ? '' : res.etat === 'ambigu' ? M.ambigu(nAmbigu) : res.etat === 'sansVente' ? M.sansVente : M.inconnu;
   return createPortal(
-    <div className="vrm-scan" role="dialog" aria-modal="true" aria-label="Scanner" data-scan-sheet="" data-scan-camera={camera} style={{ zIndex }}>
+    <div className={'vrm-scan' + (montrePaire ? ' a-paire' : '')} role="dialog" aria-modal="true" aria-label={M.titre} data-scan-sheet="" data-scan-mode={mode} data-scan-camera={camera} style={{ zIndex }}>
       {children}
       <div className="vrm-scan-tete">
-        <h2>Scanner</h2>
+        <h2>{M.titre}</h2>
         <button type="button" className="vrm-scan-fermer" data-scan-fermer="" onClick={onFermer} aria-label="Fermer">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
       <div className={'vrm-scan-vue' + (res ? ' is-' + res.etat : '')} key={res ? res.n : 0}>
         <video ref={video} playsInline muted autoPlay aria-hidden="true"/>
-        <span className="vrm-scan-viseur" aria-hidden="true"/>
+        {camera === 'sans' ? <p className="vrm-scan-sans" data-scan-sans-camera="">{M.sansCamera}</p> : <span className="vrm-scan-viseur" aria-hidden="true"/>}
       </div>
-      <div className={'vrm-scan-res' + (res && res.etat === 'depose' && attente ? ' a-annuler' : '')} role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
-        {res ? <>
-          <span className={'vrm-scan-etat is-' + res.etat}>{res.etat === 'depose' && !(attente && c && attente.cle === String(c.cle)) ? 'Déposé ✓' : (TXT[res.etat] || 'Pas trouvé')}</span>
-          {c ? <span className="vrm-scan-quoi">{c.num ? <b>N°{c.num}</b> : null}<span>{c.titre}</span></span> : <span className="vrm-scan-quoi is-n">{res.lu}</span>}
-          {/* « Annuler » (5 s) du dernier « Déposé », DANS la feuille : la barre de l'écran est sous la caméra. */}
-          {res.etat === 'depose' && c && attente && attente.cle === String(c.cle) && onAnnuler
-            ? <button type="button" className="vrm-scan-annuler" data-depose-annuler={attente.cle} onClick={onAnnuler}>Annuler</button> : null}
-        </> : null}
+      <div className="vrm-scan-res" role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
+        {montrePaire ? (
+          <div className="vrm-scan-paire" data-scan-paire={String(c.cle)} data-scan-paire-num={c.num || ''}>
+            <div className="vrm-scan-photo">{c.photo ? <img src={c.photo} alt="" referrerPolicy="no-referrer" decoding="async"/> : <span aria-hidden="true"/>}</div>
+            <div className="vrm-scan-infos">
+              <span className={'vrm-scan-kicker is-' + res.etat}>{res.etat === 'deja' ? M.deja : res.etat === 'fait' ? M.fait + ' ✓' : M.tete}</span>
+              <span className="vrm-scan-ligne1">{c.num ? <b className="vrm-scan-num" data-scan-num={c.num}>N°{c.num}</b> : null}<span className="vrm-scan-titre" data-scan-titre="">{c.titre}</span></span>
+              <span className="vrm-scan-sous">
+                {c.taille ? <span data-scan-taille={c.taille}>{/^\d/.test(String(c.taille)) ? `Taille ${c.taille}` : c.taille}</span> : null}
+                {c.compte ? <span className="vrm-sensible" data-stream-type="compte" data-scan-compte="">{c.compte}</span> : null}
+                {c.personne ? <span className="vrm-sensible" data-stream-type="acheteur" data-scan-personne={M.personne}>{c.personne}</span> : null}
+                {Number.isFinite(c.prix) ? <span data-montant="" data-scan-prix={String(c.prix)}>{euros(c.prix)}</span> : null}
+              </span>
+            </div>
+          </div>
+        ) : res ? (
+          <div className="vrm-scan-msg">
+            <span className={'vrm-scan-etat is-' + res.etat} data-scan-message="">{message}</span>
+            <span className="vrm-scan-quoi is-n">{res.lu} · rien n’est coché</span>
+          </div>
+        ) : <span className="vrm-scan-attente">{camera === 'sans' ? '' : 'Vise le code-barres.'}</span>}
+        {montrePaire && res.etat === 'trouve'
+          ? <button type="button" className="vrm-scan-geste" data-scan-confirmer={String(c.cle)} onClick={confirmer}>{M.geste}</button> : null}
+        {montrePaire && res.etat === 'fait' && enAttente && onAnnuler
+          ? <button type="button" className="vrm-scan-annuler" data-depose-annuler={attente.cle} onClick={annuler}>Annuler</button> : null}
       </div>
+      {scannes.length ? (
+        <details className="vrm-scan-serie" data-scan-serie={scannes.length}>
+          <summary>Scannés · {scannes.length}</summary>
+          <ol>
+            {scannes.map((x) => (
+              <li key={x.n + ':' + x.cle} data-scan-serie-cle={x.cle} data-scan-serie-etat={x.fait ? 'fait' : x.etat}>
+                {x.num ? <b>N°{x.num}</b> : null}<span>{x.titre || (x.etat === 'ambigu' ? 'Plusieurs colis' : 'Pas trouvé')}</span>
+                <em className={x.fait ? 'is-fait' : (x.etat === 'trouve' ? 'is-attente' : 'is-non')}>{x.fait ? (x.etat === 'deja' ? 'déjà' : '✓') : x.etat === 'trouve' ? 'pas coché' : '—'}</em>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
       <form className="vrm-scan-saisie" onSubmit={valider}>
-        <input data-scan-saisie="" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder="N° de suivi" inputMode="text" autoCapitalize="characters" autoComplete="off" spellCheck={false} aria-label="N° de suivi"/>
+        <input ref={saisieRef} data-scan-saisie="" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={M.saisie} inputMode="text" autoCapitalize="characters" autoComplete="off" spellCheck={false} aria-label={M.saisie}/>
         <button type="submit" data-scan-ok="" disabled={!saisie.trim()}>OK</button>
       </form>
     </div>,

@@ -180,6 +180,7 @@ function base() {
     await mod.default({ method: 'GET', headers: { authorization: 'Bearer cle-banc-anciens' }, query: {} }, res);
     return res;
   };
+  const partAnciens = (d) => ({ parTx: (d && d.parTx) || {}, vus: (d && d.vus) || {} });
   const rangement = (owner = OWNER) => (LIGNES.find((l) => l.owner === owner && l.id === 'vrm_bord_transporteurs') || {}).data || null;
   const bilan = (res) => res && res.corps && Array.isArray(res.corps.bilans) ? (res.corps.bilans.find((b) => b && b.transporteursAnciens) || res.corps.bilans[0] || {}).transporteursAnciens : undefined;
 
@@ -204,10 +205,12 @@ function base() {
     // (9 nov.) La sonde du statut (`email_reception_*`, une ligne, limit=1, propriétaire neutre) n'est pas une liste de cette passe.
     dit(lus.filter((a) => /like\./.test(a.u) && !/email_reception_/.test(a.u)).every((a) => a.range && /owner=eq\./.test(a.u)), 'T2 listes paginées (Range) et au nom du vendeur', lus.map((a) => a.u + ' ' + a.range).join(' | '));
     // T3 — second passage.
-    const avant = ECRITS.filter((e) => e.id === 'vrm_bord_transporteurs').length;
+    // (9 nov.) La passe des ÉTIQUETTES (PDF, `passeTransporteursPdf`) écrit aussi dans cette ligne
+    // (`pdf`/`pdfVus`) : on juge ici ce que CETTE passe range (`parTx`/`vus`), qui ne doit pas bouger.
+    const avant = JSON.stringify(partAnciens(rangement()));
     const res2 = await lancer();
-    const apres = ECRITS.filter((e) => e.id === 'vrm_bord_transporteurs').length;
-    dit(apres === avant && bilan(res2) && bilan(res2).ranges === 0, 'T3 second passage : rien de neuf, aucune écriture', JSON.stringify(bilan(res2)));
+    const apres = JSON.stringify(partAnciens(rangement()));
+    dit(apres === avant && bilan(res2) && bilan(res2).ranges === 0, 'T3 second passage : rien de neuf, rien réécrit de cette passe', JSON.stringify(bilan(res2)));
   });
 
   await essaie('T4', async () => {
@@ -234,7 +237,7 @@ function base() {
       if (!mod) throw new Error('route absente');
       LIGNES = base(); APPELS = []; ECRITS = []; PANNE = panne;
       const b = bilan(await lancer());
-      dit(b && b.fait === false && !ECRITS.some((e) => e.id === 'vrm_bord_transporteurs'), `T5 lecture ratée (${nom}) ⇒ rien écrit, dit`, JSON.stringify(b));
+      dit(b && b.fait === false && !ECRITS.some((e) => e.id === 'vrm_bord_transporteurs' && (Object.keys((e.data && e.data.parTx) || {}).length || Object.keys((e.data && e.data.vus) || {}).length)), `T5 lecture ratée (${nom}) ⇒ rien écrit, dit`, JSON.stringify(b));
     });
   }
 
@@ -294,6 +297,27 @@ function base() {
     const c2 = await cron();
     dit(c2 && c2.has(TX[0]), 'T7 ligne relue illisible ⇒ rien fusionné : la vente reste « à envoyer » (pas su ≠ parti)', JSON.stringify(c2 && [...c2]));
     PANNE = () => false;
+  });
+
+  // (9 nov.) T8 — LE CRON EXÉCUTÉ RELIT L'ÉTIQUETTE des anciens bordereaux (`passeTransporteursPdf`) :
+  // un vrai PDF (fabriqué) qui nomme Mondial Relay, un autre (label capté par l'extension, sans e-mail)
+  // qui nomme Chronopost ; un PDF par requête (`data->>pdfB64`), jamais `select=data`.
+  await essaie('T8', async () => {
+    if (!mod) throw new Error('route absente');
+    const { PDFDocument, StandardFonts } = require(path.join(R, 'node_modules', 'pdf-lib'));
+    const fab = async (lignes) => { const d = await PDFDocument.create(); const f = await d.embedFont(StandardFonts.Helvetica); const p = d.addPage([283, 425]); lignes.forEach((l, i) => p.drawText(l, { x: 10, y: 400 - 16 * i, font: f, size: 10 })); return Buffer.from(await d.save()).toString('base64'); };
+    LIGNES = [{ owner: OWNER, id: 'main', data: {} },
+      sansTransporteur(bord('34000000001', { pdfB64: await fab(['Mondial Relay', 'N° de suivi : 87650001']) })),
+      { owner: OWNER, id: 'harvest_77_label_34000000002', data: { uid: '77', tx: '34000000002', capturedAt: '2026-11-05T10:00:00Z', pdfB64: await fab(['Chronopost', 'XW987654321TS']) } }];
+    APPELS = []; ECRITS = []; PANNE = () => false;
+    await lancer();
+    const r = rangement();
+    dit(r && r.pdf && r.pdf['34000000001'] && r.pdf['34000000001'].t === 'mondialrelay' && r.pdf['34000000001'].s === '87650001', 'T8 le cron relit l’étiquette d’un ancien bordereau e-mail ⇒ Mondial Relay + son n°', JSON.stringify(r && r.pdf));
+    dit(r && r.pdf && r.pdf['34000000002'] && r.pdf['34000000002'].t === 'chronopost' && r.pdf['34000000002'].s === 'XW987654321TS', 'T8 et celle d’un bordereau capté par l’extension (sans e-mail) ⇒ Chronopost', JSON.stringify(r && r.pdf));
+    const lusPdf = APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u));
+    dit(lusPdf.length === 2 && lusPdf.every((a) => /id=eq\./.test(a.u) && /select=pdf:data->>pdfB64/.test(a.u) && /owner=eq\./.test(a.u)), 'T8 un PDF par requête, au nom du vendeur, rien d’autre que le PDF', lusPdf.map((a) => a.u).join(' | '));
+    await lancer();
+    dit(APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u)).length === 2, 'T8 passage suivant : aucun PDF relu (idempotent)');
   });
 
   console.log(`\n${ko ? '❌' : '✅'} transporteur des anciens bordereaux : ${ok} vert(s), ${ko} rouge(s)`);

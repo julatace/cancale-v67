@@ -66,7 +66,7 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
-import { passeTransporteursAnciens, avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
+import { passeTransporteursAnciens, passeTransporteursPdf, reqPdf, avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
@@ -776,8 +776,17 @@ async function traiterVendeur() {
       lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup,
     });
   } catch (e) { transporteursAnciens = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (9 nov., transporteurs inconnus) Le transporteur écrit sur l'ÉTIQUETTE des anciens bordereaux
+  // (le PDF de CETTE transaction, api/_lib/transporteur-pdf.js) : 6 PDF par passage, un par requête.
+  let transporteursPdf = null;
+  try {
+    transporteursPdf = await passeTransporteursPdf({
+      lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup,
+      lirePdf: async (id) => { const r = await fetchPaginated(scoped(reqPdf(id))); if (!Array.isArray(r)) return null; return (r[0] && typeof r[0].pdf === 'string' && r[0].pdf !== 'None') ? r[0].pdf : ''; },
+    });
+  } catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens };
+  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
