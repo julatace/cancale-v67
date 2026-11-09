@@ -303,7 +303,7 @@ const lirePhotosAchatsHors = async () => {
 };
 // ⟦← App.jsx #5⟧
 
-function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null }) {
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null }) {
   const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', photo: null, photoAvant: false });
   const [form, setForm] = useState(null);       // null = fermé ; sinon le brouillon
   const [editId, setEditId] = useState(null);
@@ -315,6 +315,11 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   // (9 nov., lot F) « Tu as déjà N paires de ce modèle en stock » pendant la saisie : une
   // RESSEMBLANCE dite (src/dejaEnStock.js), jamais une liaison — rien n'est écrit.
   const titreForm = form ? form.title : '';
+  // Les annonces ne sont pas lues sur l'écran Achats : le formulaire ouvert les demande (lecture seule).
+  const formOuvert = !!form;
+  const stockAbsent = stock == null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (formOuvert && stockAbsent && chargerStock) chargerStock(); }, [formOuvert, stockAbsent]);
   const dejaStock = useMemo(() => (titreForm.trim().length >= 3 && Array.isArray(stock) ? pairesDuModele({ cible: { titre: titreForm }, stock, marqueDe: extractBrand, modeleDe: extractModel, couleursDe: extractColors }) : null), [titreForm, stock]);
   const total = liste.reduce((s, b) => s + (prixAchatHorsNombre(b) || 0), 0);
   const avecPhoto = liste.some(b => b && b.photo);

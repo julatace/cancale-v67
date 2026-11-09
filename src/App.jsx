@@ -42044,7 +42044,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
-          prochainNumero={nextNumero} stock={stockPourModele}
+          prochainNumero={nextNumero} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
+          chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
           onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
@@ -43554,7 +43555,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
-                          {messageFilter.startsWith('repondre')&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}{offre && offreFacePlancher(offre.prix, plancherDeItem(offre.item, paire&&paire.devise))?.niveau==='sous' && <span className="vrm-msg-etat" data-offre-sous-plancher="" title="Sous ton prix d’achat et tes frais connus" style={{color:C.warn,borderColor:C.border}}>à perte</span>}
+                          {messageFilter.startsWith('repondre')&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}{offre && offreFacePlancher(offre.prix, plancherDeItem(offre.item, paire&&paire.devise))?.niveau==='sous' && <span data-offre-sous-plancher="" title="Sous ton prix d’achat et tes frais connus" style={{color:C.warn,fontSize:13,fontWeight:500,marginLeft:6,whiteSpace:'nowrap'}}>à perte</span>}
                           {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
                               marquée « Offre » avec son montant, à SA conversation — plus jamais un
                               code ni un montant nu. L'offre EN ATTENTE garde sa pastille d'accent. */}
