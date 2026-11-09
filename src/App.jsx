@@ -27083,10 +27083,10 @@ const etatOrdersDuCache = (type, accounts) => {
 // onglet, l'iPhone qui la met de côté), ou au plus tard 20 s après, quand le navigateur est
 // libre (`requestIdleCallback`). Un effacement reste écrit tout de suite (ci-dessus).
 let _persistAcctTimer = null;
-const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof cancelIdleCallback==='function') cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
   _persistAcctTimer = { idle: false, id: setTimeout(()=>{
-    try { if (typeof requestIdleCallback === 'function') { _persistAcctTimer = { idle: true, id: requestIdleCallback(_persistAcctCache, { timeout: 5000 }) }; return; } } catch(_) {}
+    try { if (typeof window.requestIdleCallback === 'function') { _persistAcctTimer = { idle: true, id: window.requestIdleCallback(_persistAcctCache, { timeout: 5000 }) }; return; } } catch(_) {}
     _persistAcctCache(); }, 15000) }; };
 try { window.addEventListener('pagehide', ()=>{ if(_persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
 try { document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden' && _persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
