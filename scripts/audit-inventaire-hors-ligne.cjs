@@ -44,7 +44,7 @@ const MUTATIONS = {
   // `label_latest` gardé (la dernière capture du compte : une autre vente).
   'latest-garde': [F_PDF, "  if (/_label_latest$/.test(r)) return false;\n", ''],
   // Le bordereau d'un autre vendeur lu.
-  'pdf-autre': [F_PDF, "      const r = await c.match(adressePdf(uid, row));", "      const r = (await c.match(adressePdf(uid, row))) || (await c.match(adressePdf('autre', row)));"],
+  'pdf-autre': [F_PDF, "      const r = await c.match(adressePdf(uid, row));", "      const k2 = (await c.keys()).map(String).find((k) => k.endsWith('/' + encodeURIComponent(row))); const r = k2 ? await c.match(k2) : null;"],
   // La réserve sans borne.
   'pdf-sans-borne': [F_PDF, '    for (const k of cles.slice(0, Math.max(0, cles.length - PDF_MAX))) await c.delete(k);', ''],
 };
@@ -173,7 +173,9 @@ const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) 
     const fi = INV.fusionnerInventaire({ courant: null, anciens: [fin] }, { courant: INV.nouvelleSession({ maintenant: 500, id: 'inv3' }), anciens: [] });
     dit(fi.anciens[0] && fi.anciens[0].constat && fi.anciens[0].constat.trop.join() === '60', 'H3 un inventaire précédent garde son constat dans « anciens »');
     const cPasSu = INV.constatInventaire(INV.bilanInventaire({ session: s, stock: { ...stock, su: false }, cle }));
-    dit(cPasSu && cPasSu.su === false && cPasSu.manque.length === 0, 'H3 lecture pas faite : aucun « à chercher » figé (pas su ≠ manque)', JSON.stringify(cPasSu));
+    // Et même un bilan qui porterait des « manque » sans lecture (forgé) n'en fige aucun.
+    const cForge = INV.constatInventaire({ su: false, n: 1, attendus: [], manque: [{ numero: '1', cles: ['1'] }], aConfirmer: [], trop: [], vendus: [], doublons: [], passu: [], lectures: [] });
+    dit(cPasSu && cPasSu.su === false && cPasSu.manque.length === 0 && cForge && cForge.manque.length === 0, 'H3 lecture pas faite : aucun « à chercher » figé (pas su ≠ manque)', JSON.stringify([cPasSu, cForge]));
   });
 
   await essaie('H4 — rejouer ne double rien', async () => {
