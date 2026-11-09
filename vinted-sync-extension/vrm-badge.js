@@ -110,6 +110,10 @@
   .val { margin-top: 2px; word-break: break-word; }
   .val.alerte { color: var(--ambre); }
   .val.gris { color: var(--doux); }
+  /* 5.335 : Leboncoin en trois lignes ; « ✓ » discret (pas de couleur : §7), un seul geste. */
+  .val .coche { color: var(--doux); margin-left: 4px; }
+  .geste { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--remplir); font-size: 13px; }
+  .geste b { font-weight: 600; }
   .refus { margin-top: 4px; font-size: 11px; color: var(--doux); }
   .refus summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
   .refus ul { margin: 0; padding-left: 16px; }
@@ -278,6 +282,7 @@
     const f = e.flux;
     if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
     if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
+    if (e.plateforme === 'leboncoin' && e.lbc && e.lbc.compte && e.lbc.compte.ok === false) return true;   // 5.335 : le compte Leboncoin attend un geste (recharger, se connecter)
     return false;
   };
 
@@ -380,13 +385,22 @@
     else if (!e.capte) compteSite = '<div class="val gris">pas encore reconnu</div>';
     else if (e.site && e.site.nom && e.site.choix === 'non') compteSite = `<div class="val gris" data-compte-ignore>${esc(e.site.nom)} — ignoré dans ce navigateur (ton choix) : rien n'est capté pour lui.</div><button class="b sec" data-capter>Capter ce compte</button>`;
     else if (e.site && e.site.nom) compteSite = `<div class="val">${esc(e.site.nom)}${e.site.type === 'pro' ? ' · pro' : ''}</div>`;
-    else if (e.site && e.site.id) compteSite = e.plateforme==='leboncoin' ? '<div class="val">Identifiant détecté · identité à confirmer</div>' : `<div class="val">compte n° ${esc(e.site.id)}</div>`;
+    else if (e.site && e.site.id && e.plateforme !== 'leboncoin') compteSite = `<div class="val">compte n° ${esc(e.site.id)}</div>`;
     else if (e.plateforme === 'vestiaire') compteSite = (e.vcCapte && Object.keys(e.vcCapte).length)
       ? '<div class="val">connecté — VRM lit ton compte en passant</div>'
       : '<div class="val gris">pas encore lu — ouvre « Mon compte » sur Vestiaire (ventes, articles, messages)</div>';
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
     else compteSite = '<div class="val gris">pas encore reconnu</div>';
 
+    // 5.335 (9 nov.) — Julien : « le "à confirmer" je ne comprends pas, ça doit
+    // être beaucoup plus clair ». Sur Leboncoin : Compte · Annonces · Ventes, ce
+    // que le fond a résumé (`resumeCarteLbc`), et UN geste.
+    const lbcVal = (x) => {
+      if (!x) return '<div class="val gris">pas su pour l’instant</div>';
+      const t = esc(String(x.texte || '')).replace('{quand}', esc(depuis(x.at) || ''));
+      return `<div class="val${x.ok === true ? '' : x.ok === false ? ' alerte' : ' gris'}" data-lbc-etat="${x.ok === true ? 'ok' : x.ok === false ? 'geste' : 'attente'}">${t}${x.ok === true ? '<span class="coche" aria-label="vérifié">✓</span>' : ''}</div>`;
+    };
+    if (e.plateforme === 'leboncoin' && e.lbc && e.capte) compteSite = lbcVal(e.lbc.compte);
     let flux = '';
     const ignore = !!(e.site && e.site.choix === 'non' && e.plateforme === 'vinted');
     if (e.capte && ignore) flux = '<div class="val gris">Rien n’est capté pour ce compte — ton choix.</div>';
@@ -419,18 +433,13 @@
       });
       if (lignes.length) flux = lignes.join('') + flux.replace(/<div class="val gris">Rien envoyé[^<]*<\/div>/, '');
     }
-    if(e.plateforme==='leboncoin'){
-      const labels={annonces:'Annonces',transactions:'Transactions'};
-      for(const famille of ['annonces','transactions']){
-        const r=e.transport?.receptions?.[famille];
-        if(!r){flux+=`<div class="val gris">${labels[famille]} : nouvelle intégration non confirmée dans cet onglet</div>`;continue;}
-        // (1er nov., 5.296) Une liste rendue vide par Leboncoin n'est pas une erreur de lecture : pas en rouge.
-        const bon=r.etat==='enregistre'||r.etat==='liste-vide';
-        const texte=r.etat==='liste-vide'?'liste reçue vide, historique conservé':r.etat==='compte-non-confirme'?'compte non confirmé, aucune attribution faite':bon?`${r.nombre} ${r.nombre===1?'enregistrée':'enregistrées'}${famille==='annonces'?` · ${r.photos} avec photo`:''} ${depuis(r.at)}`:r.etat==='aucune-annonce-reconnue'||r.etat==='format-non-reconnu'?'réponse reçue, format non reconnu':r.etat==='partiel'?'réponse trop volumineuse, non intégrée':r.etat==='lecture-refusee'?'VRM n’a pas répondu (relu une fois) : rien n’est perdu, la prochaine page réessaie':'enregistrement refusé, données précédentes conservées';
-        flux+=`<div class="val ${bon?'':'alerte'}">${labels[famille]} : ${esc(texte)}</div>`;
-      }
-    }
-    const diagnosticLbc=e.plateforme==='leboncoin'&&(e.transport?.erreurCapture||!e.site?.id||e.transport?.capteurVersion!==e.code)?`<div class="pied">${e.transport?.capteur===true&&e.transport?.capteurVersion!==e.code?'Le capteur de cet onglet n’a pas confirmé la dernière version. Recharge cet onglet Leboncoin après la mise à jour.':e.transport?.erreurCapture==='identite'?'VRM n’a pas confirmé l’enregistrement du compte. Les annonces restent bloquées pour éviter une mauvaise attribution.':e.transport?.erreurCapture==='taille'?'La capture dépasse la taille autorisée. Aucun gros message n’a été envoyé.':e.transport?.ambigue===true?'Plusieurs comptes ont répondu dans cet onglet. Aucune session courante n’est choisie. Recharge Leboncoin sur le compte voulu.':e.transport?.capteur===true?'Capteur actif. Ouvre ton espace compte Leboncoin, puis « Mes annonces », pour lire ton identité et tes annonces.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
+    // 5.335 : plus de « nouvelle intégration non confirmée » ni de diagnostic
+    // technique : les lignes Annonces et Ventes, puis le geste (un seul).
+    const lbcLignes = e.plateforme === 'leboncoin' && e.lbc && e.capte && !(v && v.connecte === false)
+      ? `<div class="ligne"><div class="lib">Annonces</div>${lbcVal(e.lbc.annonces)}</div><div class="ligne"><div class="lib">Ventes</div>${lbcVal(e.lbc.ventes)}</div>` : '';
+    const RECHARGER = /^Recharge/.test(String((e.lbc && e.lbc.geste) || ''));
+    const diagnosticLbc = e.plateforme === 'leboncoin' && e.lbc && e.lbc.geste && !(v && v.connecte === false)
+      ? `<div class="geste" data-lbc-geste>${esc(e.lbc.geste)}${RECHARGER ? '<button class="b sec" data-lbc-recharger>Recharger la page</button>' : ''}</div>` : '';
     // (29 oct.) Les paires vendues sur Vinted, encore en ligne sur Leboncoin — ce
     // que VRM a calculé (une règle, dans l'app) ; la carte ne recalcule rien.
     let aRetirerLbc = '';
@@ -439,11 +448,11 @@
       const lignes = e.aRetirer.liste.slice(0, 6).map((r) => {
         const cette = r.lbcId && ici.includes(String(r.lbcId));
         const nom = (r.numero ? 'N°' + r.numero + ' · ' : '') + (r.titre || 'une paire');
-        return `<div class="val alerte" data-a-retirer="${esc(r.lbcId || r.numero || '')}">${cette ? '<b>C’est cette annonce</b> — ' : ''}${esc(nom)} — vendue sur Vinted${r.url && !cette ? ` · <a href="${esc(r.url)}" target="_top">voir l’annonce</a>` : ''}</div>`;
+        return `<div class="val alerte" data-a-retirer="${esc(r.lbcId || r.numero || '')}">${cette ? '<b>C’est cette annonce</b> — ' : ''}${esc(nom)} — vendue sur Vinted, encore en ligne ici${r.lu ? ' (vu ' + esc(depuis(r.lu)) + ')' : ''}${r.url && !cette ? ` · <a href="${esc(r.url)}" target="_top">voir l’annonce</a>` : ''}</div>`;
       }).join('');
       const plus = e.aRetirer.liste.length > 6 ? `<div class="val gris">et ${e.aRetirer.liste.length - 6} autre(s) — la liste complète est dans VRM → Leboncoin → Annonces</div>` : '';
-      const quand = e.aRetirer.at ? ` (relevé par VRM ${esc(depuis(e.aRetirer.at))})` : '';
-      aRetirerLbc = `<div class="ligne"><div class="lib">À retirer de Leboncoin${quand}</div>${lignes}${plus}<div class="val gris">Supprime-la ici (« Mes annonces »), ou depuis VRM → Leboncoin → Annonces.</div></div>`;
+      const n = e.aRetirer.liste.length;
+      aRetirerLbc = `<div class="ligne"><div class="lib">À retirer de Leboncoin</div>${lignes}${plus}<div class="val gris">Supprime-la${n > 1 ? 's' : ''} dans « Mes annonces », ou depuis VRM → Leboncoin → Annonces.</div></div>`;
     }
     let bascule = '';
     if (e.bascule) {
@@ -469,7 +478,8 @@
       ${lignePerime}
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
-      ${e.capte ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
+      ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
+      ${lbcLignes}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${aRetirerLbc}
       ${diagnosticLbc}
@@ -486,6 +496,8 @@
     const montrer = carte.querySelector('[data-montrer-connexion]');
     if (montrer) montrer.addEventListener('click', () => { formulaireDemande = true; rendre(); });
     poserFormulaire(formulaire);
+    const recharger = carte.querySelector('[data-lbc-recharger]');
+    if (recharger) recharger.addEventListener('click', () => { try { location.reload(); } catch (_) {} });
     const capter = carte.querySelector('[data-capter]');
     if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
   }

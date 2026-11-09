@@ -31,9 +31,20 @@ export const SEUILS_MICRO = {
     tvaMajore: 93500,
     rfrLiberatoire: 29579,
     verifie: '29 octobre 2026 (service-public.gouv.fr)',
+    // (9 nov.) Les PRESTATIONS DE SERVICES (BIC), lues le 9 nov. 2026 :
+    // F32353 (« vérifié le 21 février 2026 ») plafond 83 600 € ; F21746
+    // (« vérifié le 1er janvier 2026 ») franchise de TVA 37 500 € / 41 250 €.
+    services: { plafondVente: 83600, tvaBase: 37500, tvaMajore: 41250 },
   },
 };
-export const seuilsDe = (annee) => SEUILS_MICRO[annee] || null;
+// `activite` : 'vente' (défaut, l'achat-revente) · 'services'. Les seuils des
+// services remplacent ceux de la vente ; le reste (RFR du versement libératoire) est commun.
+export const seuilsDe = (annee, activite = 'vente') => {
+  const s = SEUILS_MICRO[annee];
+  if (!s) return null;
+  if (activite !== 'services') return s;
+  return s.services ? { ...s, ...s.services } : null;
+};
 export const PROCHE_PCT = 80;
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -94,9 +105,9 @@ const position = (ca, seuil) => ({ seuil, pct: seuil > 0 ? Math.min(999, Math.ro
 // ou sans seuils vérifiés pour l'année. `projection` : le CA de fin d'année
 // au rythme actuel, seulement après 60 jours (avant, il ne dit rien) et jamais
 // sur un total partiel.
-export const jaugeSeuils = ({ ligne, now = new Date() } = {}) => {
+export const jaugeSeuils = ({ ligne, now = new Date(), activite = 'vente' } = {}) => {
   const annee = now.getFullYear();
-  const s = seuilsDe(annee);
+  const s = seuilsDe(annee, activite);
   if (!s) return null;
   const cur = caAnnee(ligne, annee);
   if (!cur) return null;
@@ -139,7 +150,9 @@ export const optionsMicro = (v) => {
   const lib = o.liberatoire === 'oui' || o.liberatoire === 'non' ? o.liberatoire : null;
   // (2 nov.) ACRE : false · 'avant' (début avant le 1er juillet 2026, ou l'ancien « oui ») · 'apres'.
   const acre = o.acre === 'apres' ? 'apres' : (o.acre === true || o.acre === 'avant') ? 'avant' : false;
-  return { liberatoire: lib, acre, at: Number(o.at) || 0 };
+  // (9 nov.) L'activité (src/profilFiscal.js) : gardée telle quelle, jamais déduite.
+  const activite = o.activite === 'services' || o.activite === 'vente' ? o.activite : null;
+  return { liberatoire: lib, acre, activite, at: Number(o.at) || 0 };
 };
 
 // Le calendrier de paiement. Mensuel : le CA du mois M se déclare ET se paie

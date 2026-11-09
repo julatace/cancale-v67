@@ -51,6 +51,8 @@ import { actionsReglages } from '../reglagesActions.js';
 // ⟦← App.jsx #3⟧
 import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // ⟦← App.jsx #4⟧
+// (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
+import { useProfilFiscal } from '../App.jsx';
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
@@ -1449,6 +1451,14 @@ function groupesFamillesNotif(familles) {
 }
 function LigneFamilleNotif({ c, on, disabled, onBascule }) {
   const ap = apercuFamilleNotif(c.id);
+  const pf = useProfilFiscal();
+  // Le rappel URSSAF n'existe que pour un micro-entrepreneur (le serveur le même :
+  // api/_lib/rappel-urssaf.js) — la ligne le dit, selon SON statut.
+  const noteRappels = c.id !== 'rappels' || pf.etat === 'encours' ? null
+    : pf.urssaf ? `Dont ta déclaration URSSAF, ${pf.rythme === 'mensuel' ? 'chaque mois' : pf.rythme === 'trimestriel' ? 'chaque trimestre' : 'à ton rythme'}.`
+    : pf.etat === 'particulier' ? 'Aucun rappel URSSAF : tu vends en particulier.'
+    : pf.etat === 'societe' || pf.etat === 'marge' ? 'Aucun rappel URSSAF : ta société ne déclare pas en micro-entreprise.'
+    : 'Aucun rappel URSSAF tant que ton statut n’est pas choisi.';
   const [vue, setVue] = useState(false);
   const idAp = React.useId();
   return (
@@ -1458,6 +1468,7 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
         <span className="vrm-notif-famille-txt">
           <b>{c.titre}</b>
           {ap ? <span className="vrm-notif-famille-quoi">{ap.quoi}</span> : null}
+          {noteRappels ? <span className="vrm-notif-famille-quoi" data-rappels-urssaf={pf.urssaf ? 'oui' : 'non'}>{noteRappels}</span> : null}
         </span>
         <Interrupteur on={on} onClick={onBascule} disabled={disabled} label={`${c.titre} : ${on?'activé':'désactivé'}`}/>
       </div>
@@ -1821,6 +1832,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
+      // (9 nov.) « Ma configuration » EN TÊTE du groupe : la configuration de départ, plein écran,
+      // rejouable (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
+      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Tout en une fois : ce que tu vends, tes plateformes, ton statut, ton numéro, l’affichage, les notifications.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
       { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
       { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
@@ -1870,7 +1884,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (le serveur refuse tout autre compte).
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
       // voit l'entrée, et la route refuse tout autre compte (403).
-      proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'pulse', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
+      proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>VRM semble en panne</summary><p>La page d’état dit, minute par minute, si la base, la réception des e-mails et les notifications fonctionnent, et les incidents connus. Si tout y fonctionne, le souci vient sans doute de cet appareil : recharge la page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>

@@ -1,0 +1,122 @@
+/* ── MA CONFIGURATION (9 nov.) : plein écran, centré, au doigt ──────────────────
+   Jetons de la coque (Vitrine + Apple) avec repli ; clair et sombre par les jetons.
+   UNE couleur d'accent, rare : la barre, la carte choisie, le bouton principal. */
+.vrm-cfg {
+  --cfg-fond: var(--d-fond, var(--vrm-bg, #F5F5F7));
+  --cfg-carte: var(--d-carte, var(--vrm-surface, #fff));
+  --cfg-encre: var(--d-encre, var(--vrm-ink, #1D1D1F));
+  --cfg-gris: var(--d-gris, var(--vrm-muted, #6E6E73));
+  --cfg-filet: var(--d-filet, var(--vrm-line, rgba(60,60,67,.18)));
+  --cfg-remplir: var(--d-remplir, rgba(118,118,128,.12));
+  --cfg-accent: var(--d-accent, var(--vrm-accent, #0071E3));
+  --cfg-accent-texte: var(--d-accent-texte, #0066CC);
+  position: fixed; inset: 0; z-index: 19000;
+  background: var(--cfg-fond); color: var(--cfg-encre);
+  display: flex; justify-content: center;
+  overflow-y: auto; overscroll-behavior: contain;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+:root[data-theme="dark"] .vrm-cfg { --cfg-accent-texte: var(--d-accent-texte, #4DA3FF); }
+.vrm-cfg-panneau {
+  box-sizing: border-box; width: 100%; max-width: 640px; min-height: 100%;
+  display: flex; flex-direction: column;
+  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+.vrm-cfg-panneau:focus { outline: none; }
+.vrm-cfg-tete { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; position: sticky; top: 0; background: var(--cfg-fond); z-index: 1; }
+.vrm-cfg-lien {
+  appearance: none; border: 0; background: transparent; color: var(--cfg-accent-texte);
+  font: inherit; font-size: 17px; font-weight: 500; min-height: 44px; min-width: 44px; padding: 0 4px; cursor: pointer;
+}
+.vrm-cfg-lien:disabled { opacity: .4; cursor: default; }
+.vrm-cfg-lien:focus-visible, .vrm-cfg-principal:focus-visible, .vrm-cfg-carte:focus-visible { outline: 2px solid var(--cfg-accent); outline-offset: 3px; }
+.vrm-cfg-barre { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; height: 4px; }
+.vrm-cfg-barre > span { display: block; border-radius: 999px; background: var(--cfg-remplir); transition: background-color .4s cubic-bezier(.23,1,.32,1); }
+.vrm-cfg-barre > span[data-ici="1"] { background: color-mix(in srgb, var(--cfg-accent) 40%, transparent); }
+.vrm-cfg-barre > span[data-fait="1"] { background: var(--cfg-accent); }
+
+.vrm-cfg-corps {
+  /* En haut, jamais centré verticalement : une réponse qui fait apparaître une question
+     (micro, « je numérote ») ne fait pas sauter les cartes sous le doigt. */
+  flex: 1; display: flex; flex-direction: column; justify-content: flex-start;
+  padding: clamp(24px, 9vh, 120px) 0 16px; animation: vrmCfgEntre .32s cubic-bezier(.23,1,.32,1) both;
+}
+@keyframes vrmCfgEntre { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.vrm-cfg-sur { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--cfg-gris); font-variant-numeric: tabular-nums; text-align: center; }
+.vrm-cfg-titre { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.022em; line-height: 1.12; text-align: center; text-wrap: balance; }
+/* Le titre reçoit le focus à chaque étape (lecteur d'écran) : pas d'anneau, ce n'est pas une commande. */
+.vrm-cfg .vrm-cfg-titre:focus, .vrm-cfg .vrm-cfg-titre:focus-visible { outline: none !important; box-shadow: none !important; }
+.vrm-cfg-sous { margin: 10px auto 24px; max-width: 46ch; font-size: 17px; line-height: 1.45; color: var(--cfg-gris); text-align: center; text-wrap: pretty; }
+.vrm-cfg-question { margin: 20px 0 10px; font-size: 15px; font-weight: 600; color: var(--cfg-encre); letter-spacing: -.01em; }
+
+.vrm-cfg-grille { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+@media (min-width: 560px) { .vrm-cfg-grille[data-colonnes="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Deux réponses courtes (mois / trimestre, oui / non) : côte à côte même au téléphone. */
+.vrm-cfg-grille[data-colonnes="duo"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vrm-cfg-grille[data-colonnes="duo"] .vrm-cfg-carte { align-items: flex-start; padding: 14px; gap: 10px; }
+.vrm-cfg-carte {
+  appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%;
+  min-height: 64px; padding: 14px 16px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--cfg-encre); background: var(--cfg-carte);
+  border: 0; border-radius: 16px;
+  box-shadow: inset 0 0 0 1px var(--cfg-filet);
+  transition: box-shadow .2s ease, transform .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-cfg-carte:active:not(:disabled) { transform: scale(.985); }
+.vrm-cfg-carte[data-choisi="1"] { box-shadow: inset 0 0 0 2px var(--cfg-accent); }
+.vrm-cfg-carte:disabled { cursor: default; }
+.vrm-cfg-carte-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.vrm-cfg-carte b { font-size: 17px; font-weight: 600; letter-spacing: -.012em; line-height: 1.25; }
+.vrm-cfg-carte small { font-size: 14px; line-height: 1.35; color: var(--cfg-gris); }
+.vrm-cfg-carte .vrm-cfg-effet { font-size: 13px; }
+.vrm-cfg-coche {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 1.5px var(--cfg-filet);
+}
+.vrm-cfg-carte[data-choisi="1"] .vrm-cfg-coche { background: var(--cfg-accent); box-shadow: none; }
+.vrm-cfg-coche svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.vrm-cfg-logo { display: block; width: 32px; height: 26px; flex-shrink: 0; background: currentColor; mask: var(--vrm-cfg-logo) center/contain no-repeat; -webkit-mask: var(--vrm-cfg-logo) center/contain no-repeat; }
+
+.vrm-cfg-note { margin: 14px 0 0; font-size: 14px; line-height: 1.45; color: var(--cfg-gris); text-align: center; text-wrap: pretty; }
+.vrm-cfg-taux { margin-top: 20px; padding: 14px 16px; border-radius: 16px; background: var(--cfg-carte); box-shadow: inset 0 0 0 1px var(--cfg-filet); }
+.vrm-cfg-taux .vrm-cfg-note { text-align: left; }
+.vrm-cfg-taux-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 17px; font-weight: 600; }
+.vrm-cfg-taux-ligne b { font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.vrm-cfg-taux-detail { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; font-size: 14px; color: var(--cfg-gris); }
+.vrm-cfg-taux-detail span:last-child { color: var(--cfg-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-cfg-aide { margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: var(--cfg-carte); box-shadow: inset 0 0 0 1px var(--cfg-filet); font-size: 15px; line-height: 1.45; }
+.vrm-cfg-aide p { margin: 0 0 8px; }
+.vrm-cfg-aide ul { margin: 6px 0 0; padding-left: 18px; }
+.vrm-cfg-aide li { margin: 6px 0; }
+.vrm-cfg-aide a { color: var(--cfg-accent-texte); font-weight: 600; text-decoration: none; display: inline-block; min-height: 32px; line-height: 32px; }
+
+.vrm-cfg-recap { list-style: none; margin: 0; padding: 4px 16px; border-radius: 16px; background: var(--cfg-carte); box-shadow: inset 0 0 0 1px var(--cfg-filet); }
+.vrm-cfg-recap li { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "t b" "v b"; align-items: center; column-gap: 12px; padding: 10px 0; }
+.vrm-cfg-recap li + li { border-top: .5px solid var(--cfg-filet); }
+.vrm-cfg-recap-t { grid-area: t; font-size: 13px; color: var(--cfg-gris); }
+.vrm-cfg-recap-v { grid-area: v; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.vrm-cfg-recap-v[data-vide="1"] { font-weight: 500; color: var(--cfg-gris); }
+.vrm-cfg-recap .vrm-cfg-lien { grid-area: b; font-size: 15px; }
+
+.vrm-cfg-pied { position: sticky; bottom: 0; padding: 12px 0 0; background: linear-gradient(to bottom, transparent, var(--cfg-fond) 12px); }
+.vrm-cfg-principal {
+  appearance: none; display: block; width: 100%; max-width: 420px; margin: 0 auto; min-height: 52px;
+  border: 0; border-radius: 14px; cursor: pointer;
+  font: inherit; font-size: 17px; font-weight: 600;
+  background: var(--cfg-accent); color: #fff;
+}
+.vrm-cfg-principal[data-repondu="0"] { background: var(--cfg-remplir); color: var(--cfg-encre); }
+.vrm-cfg-principal:disabled { opacity: .6; cursor: default; }
+.vrm-cfg-erreur { margin: 0 auto 10px; max-width: 420px; font-size: 14px; line-height: 1.4; color: var(--d-warn, #B25000); text-align: center; }
+
+@media (min-width: 900px) {
+  .vrm-cfg-panneau { padding-top: 24px; }
+  .vrm-cfg-titre { font-size: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrm-cfg-corps { animation: none; }
+  .vrm-cfg-carte, .vrm-cfg-barre > span { transition: none; }
+}
+@media (prefers-contrast: more) { .vrm-cfg-carte { box-shadow: inset 0 0 0 1px var(--cfg-encre); } }
