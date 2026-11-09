@@ -247,7 +247,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   frappe.length
     ? nok('aucun champ N°/prix n\'écrit à chaque frappe', frappe.length + ' champ(s) écrivent encore lettre par lettre')
     : ok('aucun champ N°/prix n\'écrit à chaque frappe');
-  /function ChampSaisie\(/.test(SRC) && /onKeyDown=\{ev => \{[\s\S]{0,400}?ev\.key === 'Enter'[\s\S]{0,120}?blur\(\)/.test(SRC)
+  const champ = fs.readFileSync(path.join(__dirname, '..', 'src/composants/ChampSaisie.jsx'), 'utf8');
+  /import ChampSaisie from '.\/composants\/ChampSaisie\.jsx'/.test(SRC) && /onBlur=\{e => sortir\(e\.target\.value\)\}/.test(champ) && /e\.key === 'Enter'[\s\S]{0,120}?blur\(\)/.test(champ) && /onChange=\{e => setTxt\(e\.target\.value\)\}/.test(champ)
     ? ok('la saisie se valide sur Entrée ou à la sortie du champ')
     : nok('la saisie se valide sur Entrée ou à la sortie du champ');
   // Et c'est `poserNumero` — donc après les contrôles — qui écrit le numéro.
