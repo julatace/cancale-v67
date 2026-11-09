@@ -124,6 +124,11 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   const tete = ecran.querySelector('.vrm-fu-tete');
   const sem = ecran.querySelector('[data-journal-semaine]');
   out.tete = tete ? R(tete) : null;
+  // (9 nov., DA 6 « Widgets ») Le fond sombre de la tête est peint par son `::before` sur les rangées du
+  // haut ; les cases sont des widgets posés SOUS lui. Le « bas de la tête sombre » est donc le bas de ce
+  // fond peint (sinon on mesurerait un widget). La règle E4 ne change pas : c'est l'endroit mesuré.
+  if (out.tete && tete) { const av = getComputedStyle(tete, '::before'); const h = parseFloat(av.height);
+    if (av.content !== 'none' && av.position === 'absolute' && /gradient/.test(av.backgroundImage) && h > 40) out.tete.b = Math.round(tete.getBoundingClientRect().top + scrollY + h); }
   out.sem = sem && vis(sem) ? R(sem) : null;
   const semB = ecran.querySelector('[data-jv2-semaine]');
   out.semBouton = semB && vis(semB) ? { h: Math.round(semB.getBoundingClientRect().height), dansTete: !!(tete && tete.contains(semB)) } : null;

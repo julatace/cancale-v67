@@ -104,6 +104,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   height: 20px !important; width: auto !important; background: none !important; pointer-events: none !important;
 }
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) > :not(.vrm-fu-cases):not(.vrm-fu-carte-nu) { grid-column: 1 !important; margin-left: 20px !important; margin-right: 20px !important; min-width: 0 !important; }
+:root:root body .vrm-main .vrm-fu-carte > .vrm-fu-carte-haut { margin-bottom: 12px !important; position: relative !important; z-index: 1 !important; }
 /* Ma journée : la carte réglable est posée nue dans la tête ; ses enfants (Modifier, les cases)
    deviennent ceux de la grille de la tête (« Modifier » reste placé par rapport à la tête). */
 :root:root body .vrm-main :is(.vrm-fu-tete, .vrm-compta-carte) > .vrm-fu-carte-nu { display: contents !important; }
