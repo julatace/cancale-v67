@@ -470,11 +470,13 @@ export const RAISON_COURTE = {
 const nFr = (n) => Number(n).toLocaleString('fr-FR');
 export const raisonCourte = (x) => {
   if (!x) return '';
-  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} à dater` : '';
+  // (9 nov., capture de Julien : « + 1756 » sans unité, € ou ventes ?) Le manque dit son UNITÉ :
+  // un nombre de VENTES sans date de versement, jamais un montant.
+  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater` : '';
   if (x.hors) return x.hors;
   // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
   if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;
-  if (x.raison === 'a-dater') return `${nFr(x.aDater)} à dater`;
+  if (x.raison === 'a-dater') return `${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater`;
   if (x.raison === 'partiel') return x.manque && x.manque.length ? `sans ${x.manque[0]}` : 'pas tout lu';
   return RAISON_COURTE[x.raison] || 'pas lu';
 };

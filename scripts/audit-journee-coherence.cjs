@@ -81,9 +81,9 @@ async function passe(mut) {
   const REGLES = { debutPeriode: (t, p) => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(1); return d; }, decalerPeriode: (d, p, k) => { const e = new Date(d); e.setMonth(e.getMonth() + k); return e; } };
   const RC = CC.raisonCourte || (() => '');
   let x = V(pub({}, 2));
-  dit(!!x && x.valeur === null && x.raison === 'a-dater' && RC(x) === '2 à dater', 'A2 rien de daté ce mois, 2 ventes à dater : « — » et « 2 à dater » (jamais 0 €)', JSON.stringify(x) + ' ' + RC(x));
+  dit(!!x && x.valeur === null && x.raison === 'a-dater' && RC(x) === '2 ventes à dater', 'A2 rien de daté ce mois, 2 ventes à dater : « — » et « 2 ventes à dater » (jamais 0 €, l’unité dite — 9 nov.)', JSON.stringify(x) + ' ' + RC(x));
   x = V(pub({ [ym]: 40 }, 2));
-  dit(!!x && x.valeur === 40 && RC(x) === '+ 2 à dater', 'A2 40 € datés ce mois et 2 à dater : le montant, le manque nommé', JSON.stringify(x) + ' ' + RC(x));
+  dit(!!x && x.valeur === 40 && RC(x) === '+ 2 ventes à dater', 'A2 40 € datés ce mois et 2 à dater : le montant, le manque nommé AVEC son unité (« ventes », jamais un « + 2 » qui se lit en euros)', JSON.stringify(x) + ' ' + RC(x));
   x = V(pub({}, 0));
   dit(!!x && x.valeur === 0 && RC(x) === '', 'A2 rien à dater et rien de reçu : 0 lu (pas de raison inventée)', JSON.stringify(x));
   for (const r of ['pasSu', 'encours', 'publication', 'achats', 'frais', 'cotisations', 'rien', 'absente', 'ancienne', 'illisible', 'inconnue-demain']) {

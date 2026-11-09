@@ -31420,7 +31420,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (pairsLost[raw]) continue;                                 // déjà déclarée perdue
       // (3 nov.) Il a répondu « Toujours chez moi » à « N°x supprimé de Vinted »
       // (Ma journée, src/cycleArticle.js) : une seule voix, la sienne.
-      if ((decisionsCycle[String(k)] || {}).choix === CHOIX_CYCLE.CHEZ_MOI) continue;
+      { const ch = (decisionsCycle[String(k)] || {}).choix; if (ch === CHOIX_CYCLE.CHEZ_MOI || ch === CHOIX_CYCLE.REMISE) continue; }   // (9 nov.) « Remise en ligne » : chez lui aussi
       out.push({ id: String(k), e, numero: raw });
     }
     out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));

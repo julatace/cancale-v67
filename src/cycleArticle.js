@@ -41,12 +41,22 @@ export const LECTURE_FRAICHE_MS = 24 * 60 * 60 * 1000;  // la même borne que «
 export const VU_RAFRAICHIR_MS = 6 * 60 * 60 * 1000;     // le registre ne se réécrit pas à chaque ouverture
 export const CARTES_MAX = 5;                             // Ma journée : au plus 5 cartes, le reste compté
 
-export const CHOIX = Object.freeze({ CHEZ_MOI: 'chez-moi', VENDU_MAIN: 'vendu-main', SEPARE: 'separe' });
+// (9 nov., Julien : « l'app détecte quand je supprime un article, mets aussi que je le
+// remets en ligne ») « REMISE EN LIGNE » : SA réponse dit que l'article est chez lui et
+// qu'il le republie lui-même. Pour le stock c'est « toujours chez moi » (rien ne sort) ;
+// la NOUVELLE annonce n'est jamais devinée ici : elle reprend le N° par identité
+// (`republiee` : même N°, même fichier photo, table de recréation — étape 4), et la
+// suggestion « c'est la même paire que N°x » appartient à son propre chantier
+// (`claude/numero-etiquette`), qui lit `vrm_cycle_decisions[id].choix === 'remise'`.
+export const CHOIX = Object.freeze({ CHEZ_MOI: 'chez-moi', REMISE: 'remise', VENDU_MAIN: 'vendu-main', SEPARE: 'separe' });
 export const LIBELLE_CHOIX = Object.freeze({
   'chez-moi': 'Toujours chez moi',
+  'remise': 'Remise en ligne',
   'vendu-main': 'Vendu en main propre',
   'separe': "Je m'en sépare",
 });
+// L'ordre des réponses à l'écran (Ma journée) : les deux qui GARDENT l'article d'abord.
+export const ORDRE_CHOIX = Object.freeze(['chez-moi', 'remise', 'vendu-main', 'separe']);
 
 const cleDefaut = (n) => {
   const s = String(n == null ? '' : n).toUpperCase().replace(/\s+/g, '').replace(/^N[°O]?(?=\d)/, '');
@@ -124,6 +134,7 @@ export function etatCycle(id0, x) {
   if (estSet(v.revenues) && v.revenues.has(id)) return { etat: 'revenue' };
   // 6. SA réponse « toujours chez moi ».
   if (dec && dec.choix === CHOIX.CHEZ_MOI) return { etat: 'chez-moi' };
+  if (dec && dec.choix === CHOIX.REMISE) return { etat: 'chez-moi', preuve: 'remise' };
   // 7. Retirée PAR VRM (Republier : coffre → supprimer → brouillon → en ligne) :
   //    jamais de question, l'article est chez lui, sa nouvelle annonce arrive.
   if (o.viaVrm === null || o.viaVrm === undefined) return { etat: 'pas-su', preuve: 'republier' };
