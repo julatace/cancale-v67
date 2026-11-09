@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  MODE AUTOMATIQUE DES MESSAGES AUX FAVORIS (2 novembre 2026, extension 5.309)
 //

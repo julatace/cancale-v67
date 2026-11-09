@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  UNE FACTURE N'EXÉCUTE RIEN — le nom de l'acheteur est écrit par l'acheteur.
 //        node scripts/audit-xss-facture.cjs [--src dossier] [--mutation sanscsp]

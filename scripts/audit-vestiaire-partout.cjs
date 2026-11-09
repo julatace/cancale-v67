@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ⚠️⚠️ VESTIAIRE PARTOUT — L'ANTI DOUBLE VENTE, L'ARGENT ET LES COLIS (1er novembre)
 //
 // Julien : « fais tout comme un pro, il ne doit y avoir aucune erreur

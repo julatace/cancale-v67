@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ── BANC : LE STATUT LU CHEZ LE TRANSPORTEUR, À L'ÉCRAN (24 oct.) ────────────
 // Julien : « tu as juste à regarder sur le site du transporteur, je ne te
 // demande pas le code de retrait mais juste de regarder le statut ».

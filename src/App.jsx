@@ -11997,6 +11997,22 @@ function pushNotif(title, body, vers){
   }catch(_){/* ignore */}
   return false;
 }
+// (8 nov., Julien : « des infos qui servent à rien ») Une alerte LOCALE ne double
+// jamais une notification du serveur (api/_lib/push.js) : l'app au premier plan
+// montre déjà le bandeau ; un appareil abonné aux notifications de VRM reçoit la
+// vente par le serveur — et « pas su » (abonnement illisible) ne sonne pas non
+// plus. Reste : l'app ouverte en arrière-plan sur un appareil NON abonné.
+async function alerteLocale(title, body, vers){
+  try{
+    if(typeof document!=='undefined' && document.visibilityState==='visible') return false;
+    if(typeof navigator!=='undefined' && navigator.serviceWorker){
+      const reg=await Promise.race([navigator.serviceWorker.ready, new Promise(r=>setTimeout(()=>r(null),1500))]);
+      const sub=reg&&reg.pushManager ? await reg.pushManager.getSubscription().catch(()=>undefined) : undefined;
+      if(sub!==null) return false;
+    }
+  }catch(_){ return false; }
+  return pushNotif(title, body, vers);
+}
 
 
 // Garage : une seule zone neutre. L'utilisateur ajoute lui-même ses colonnes
@@ -50108,14 +50124,10 @@ function AppCoeur() {
       setNotifBanner({ventes:newV, factures:newF});
 
       // Notification navigateur si activée
-      if(notifEnabled){
-        if(newV>0&&newF>0){
-          pushNotif('VRM', `${newV} vente${newV>1?'s':''} comptabilisée${newV>1?'s':''} et ${newF} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`, '?tab=compta');
-        } else if(newV>0){
-          pushNotif('Vente comptabilisée', `${newV} nouvelle${newV>1?'s':''} vente${newV>1?'s':''} en comptabilité.`, '?tab=compta');
-        } else if(newF>0){
-          pushNotif('Nouvelle facture', `${newF} nouvelle${newF>1?'s':''} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`, '?tab=compta&section=factures');
-        }
+      // (8 nov.) La facture reçue ne sonne plus (aucun geste : le bandeau la dit) ; la
+      // vente seulement par `alerteLocale` (jamais en double du serveur).
+      if(notifEnabled && newV>0){
+        alerteLocale(newV>1?`${newV} nouvelles ventes`:'Nouvelle vente', 'Prépare le colis dans Ventes.', '?tab=ventes');
       }
     }
 
@@ -51248,7 +51260,7 @@ function AppCoeur() {
           const parts=[];
           if(newSales>0) parts.push(`${newSales} nouvelle${newSales>1?'s':''} vente${newSales>1?'s':''}`);
           if(newMsgs>0) parts.push(`${newMsgs} nouveau${newMsgs>1?'x':''} message${newMsgs>1?'s':''}`);
-          if(parts.length) pushNotif('Vinted', parts.join(' · '), newSales>0 ? '?tab=ventes&site=vinted' : '?tab=messages&site=vinted');
+          if(parts.length) alerteLocale(newSales>0 ? (newSales>1?`${newSales} nouvelles ventes`:'Nouvelle vente') : (newMsgs>1?`${newMsgs} nouveaux messages`:'Nouveau message'), parts.join(' · '), newSales>0 ? '?tab=ventes&site=vinted' : '?tab=messages&site=vinted');
         }
       }
     })();
@@ -51981,7 +51993,7 @@ function AppCoeur() {
               const res=await askNotifPermission();
               if(res==='granted'){
                 setNotifEnabled(true); save('vinted_notif_enabled',true);
-                pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
+                pushNotif('Alertes activées','Une nouvelle vente s’affichera ici quand VRM est ouvert.');
               } else if(res==='denied'){
                 toast("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
               } else if(res==='unsupported'){

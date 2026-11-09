@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT DE LA CARTE DES POINTS RELAIS   —   node scripts/audit-carte-relais.cjs
 // ═══════════════════════════════════════════════════════════════════════════

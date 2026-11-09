@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : LE REÇU D'ACHAT VINTED (23 octobre)
 //         node scripts/audit-recu-achat.cjs [--mutation=…]

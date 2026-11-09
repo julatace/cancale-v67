@@ -17,6 +17,7 @@
 // exige que l'audit devienne ROUGE (puis remet les fichiers à l'identique).
 // Données INVENTÉES. Aucune donnée réelle, aucun réseau.
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs');
 const { spawnSync } = require('child_process');
@@ -104,9 +105,10 @@ const iso = (ms) => new Date(ms).toISOString();
     dit(groupes.length === 1 && groupes[0].n === 2, 'A10 regroupées par type : deux fois la même erreur = un groupe ; bruit, hors fenêtre et sans date écartés', JSON.stringify(groupes.map((g) => [g.message, g.n])));
     const t1 = L.texteVeille([L.regrouper([l("Cannot access 'xe' before initialization")], 0)[0]]);
     console.log('     téléphone : « ' + t1.body + ' »');
-    dit(t1.body === 'VRM : un écran a planté (Colis, iPhone) — c’est noté, on corrige.', 'A11 le texte dit l’écran et l’appareil, en clair', t1.body);
+    // (8 nov.) Le titre dit le fait, le corps où regarder (api/_lib/notif-belle.js).
+    dit(t1.title === 'Un écran a planté' && t1.body === 'Colis, iPhone · détail dans Réglages → Sécurité des données.', 'A11 le texte dit l’écran et l’appareil, en clair', `${t1.title} / ${t1.body}`);
     const t2 = L.texteVeille(L.regrouper([l('a is not defined'), l("Cannot read properties of undefined (reading 'title')", { ecran: 'ventes', navigateur: 'Windows Edge' })], 0));
-    dit(/^VRM : 2 nouveaux plantages \(Colis, iPhone · Ventes, Windows\)/.test(t2.body), 'A12 plusieurs types : un seul message qui les compte', t2.body);
+    dit(t2.title === '2 nouveaux plantages' && /^Colis, iPhone · Ventes, Windows · /.test(t2.body), 'A12 plusieurs types : un seul message qui les compte', `${t2.title} / ${t2.body}`);
     dit(!/\d{6,}|@/.test(t1.body + t2.body) && !/[0-9a-f]{8}-/.test(t1.body + t2.body), 'A13 aucune donnée de vendeur dans le texte (ni identifiant, ni e-mail)');
     const memo = L.memoApres({ vus: { ancien: { at: iso(now - 9 * 864e5) } } }, groupes, now);
     dit(memo.vus.ancien && memo.vus[groupes[0].cle] && memo.derniere === iso(now), 'A14 le mémo garde les types connus et ajoute les nouveaux');
@@ -171,7 +173,7 @@ const iso = (ms) => new Date(ms).toISOString();
     await mod.default({ method: 'GET', headers: { authorization: 'Bearer cle-banc-veille' }, query }, res);
     return res;
   };
-  const veilles = () => pushes.filter((p) => /plant/.test(p.body || ''));
+  const veilles = () => pushes.filter((p) => /plant/.test((p.title || '') + (p.body || '')));
 
   await essaie('B1', async () => {
     if (!mod) throw new Error('route absente');
@@ -181,8 +183,8 @@ const iso = (ms) => new Date(ms).toISOString();
     console.log('     téléphone : « ' + ((v[0] || {}).body) + ' » → ' + ((v[0] || {}).endpoint));
     dit(v.length === 1, 'B1 un type nouveau ⇒ UNE notification', String(v.length));
     dit(v.length && v.every((p) => /appareil-proprio/.test(p.endpoint)), 'B2 au propriétaire de l’installation seulement (jamais aux appareils d’un vendeur)', v.map((p) => p.endpoint).join(', '));
-    dit(v[0] && v[0].body === 'VRM : un écran a planté (Colis, iPhone) — c’est noté, on corrige.', 'B3 le texte clair, le bruit écarté', v[0] && v[0].body);
-    const iMemo = journal.findIndex((x) => x.startsWith('memo:')), iPush = journal.findIndex((x) => x.startsWith('push:') && /plant/.test(x));
+    dit(v[0] && v[0].title === 'Un écran a planté' && v[0].body === 'Colis, iPhone · détail dans Réglages → Sécurité des données.', 'B3 le texte clair, le bruit écarté', v[0] && v[0].body);
+    const iMemo = journal.findIndex((x) => x.startsWith('memo:')), iPush = journal.findIndex((x) => x.startsWith('push:') && /Sécurité des données/.test(x));
     dit(iMemo >= 0 && iPush > iMemo && journal[iMemo].startsWith('memo:' + PROPRIO + ':'), 'B4 le mémo (au nom du propriétaire) est écrit AVANT l’envoi', journal.join(' | '));
     const lp = lectures.filter((x) => x.u);
     dit(lp.length >= 1 && lp.every((x) => !/select=[^&]*\bdata(,|&|$)/.test(x.u) && /meta->>at=gte\./.test(x.u) && x.range), 'B5 la lecture projette (jamais `select=data`), filtre par date côté base et pagine (`Range`)', lp.map((x) => x.u + ' ' + x.range).join(' | '));

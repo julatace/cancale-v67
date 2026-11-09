@@ -115,14 +115,17 @@ export function familleActive(prefs, fam) {
 // perdue. Les heures sont celles de PARIS (VRM reste en France, §3), quelle que
 // soit l'horloge du serveur. Par défaut la double vente sonne quand même (le
 // seul cas où attendre le matin coûte une paire).
-export const CALME_DEFAUT = { actif: false, debut: '22:00', fin: '08:00', sauf: ['doublevente'] };
+// (8 nov., Julien : « de belles notifications ») ALLUMÉES PAR DÉFAUT, 22 h → 8 h :
+// rien ne réveille la nuit, sauf la double vente et ce qui expire avant 10 h
+// (`echeancePressante`). Un réglage posé à la main (`actif: false`) est gardé.
+export const CALME_DEFAUT = { actif: true, debut: '22:00', fin: '08:00', sauf: ['doublevente'] };
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export const heureValide = (h) => HHMM.test(String(h || ''));
 const minutesDe = (h) => { const m = HHMM.exec(String(h || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
 export function reglageCalme(prefs) {
   const c = prefs && prefs.calme && typeof prefs.calme === 'object' ? prefs.calme : {};
   return {
-    actif: c.actif === true,
+    actif: typeof c.actif === 'boolean' ? c.actif : CALME_DEFAUT.actif,
     debut: heureValide(c.debut) ? c.debut : CALME_DEFAUT.debut,
     fin: heureValide(c.fin) ? c.fin : CALME_DEFAUT.fin,
     sauf: Array.isArray(c.sauf) ? c.sauf.filter((x) => FAMILLES.some((f) => f.id === x)) : CALME_DEFAUT.sauf.slice(),
@@ -136,19 +139,34 @@ export function minutesParis(t = Date.now()) {
     return Number.isFinite(h) && Number.isFinite(m) ? (h % 24) * 60 + m : null;
   } catch (_) { return null; }
 }
+// Une échéance qui tombe avant 10 h (heure de Paris) au prochain matin : elle
+// expire avant qu'on puisse agir après les heures calmes ⇒ elle sonne quand même.
+// `echeance` : ISO ou millisecondes. Passée ou illisible ⇒ non.
+export function echeancePressante(echeance, t = Date.now()) {
+  const e = typeof echeance === 'number' ? echeance : Date.parse(String(echeance || ''));
+  if (!Number.isFinite(e) || e <= t) return false;
+  const m = minutesParis(t);
+  if (m == null) return false;
+  const jusqua = (m < 600 ? 600 - m : 1440 - m + 600) * 60e3;
+  return e - t <= jusqua;
+}
+
 // Vrai si `t` tombe dans les heures calmes (une plage qui passe minuit compte,
-// 22:00 → 08:00 ; début = fin ne fait rien). Une famille exemptée ⇒ non.
-export function dansHeuresCalmes(prefs, cat, t = Date.now()) {
+// 22:00 → 08:00 ; début = fin ne fait rien). Une famille exemptée ⇒ non. Une
+// échéance qui tombe avant 10 h (`echeance`, ISO ou ms) ⇒ non : elle sonne.
+export function dansHeuresCalmes(prefs, cat, t = Date.now(), echeance = null) {
   const c = reglageCalme(prefs);
   if (!c.actif || !cat || cat === 'test') return false;
   if (c.sauf.includes(familleDe(cat))) return false;
+  if (echeance != null && echeancePressante(echeance, t)) return false;
   const d = minutesDe(c.debut), f = minutesDe(c.fin), m = minutesParis(t);
   if (d == null || f == null || m == null || d === f) return false;
   return d < f ? (m >= d && m < f) : (m >= d || m < f);
 }
-// Regrouper : sur le téléphone, une seule notification PAR TYPE (la nouvelle
-// remplace l'ancienne et dit combien attendent dans le centre).
-export const regrouper = (prefs) => !!(prefs && prefs.regrouper === true);
+// Regrouper : sur le téléphone, une seule notification PAR GENRE (« 3 bordereaux
+// prêts à imprimer », api/_lib/notif-belle.js). (8 nov.) Allumé par défaut ; un
+// `regrouper: false` posé à la main est gardé.
+export const regrouper = (prefs) => !(prefs && prefs.regrouper === false);
 // Le texte d'une notification regroupée : `k` notifications de ce type non lues
 // dans le centre (celle-ci comprise). k ≤ 1 ⇒ inchangé.
 export function texteRegroupe({ title, body }, k) {
@@ -205,5 +223,12 @@ export function texteArrivee({ article = '', transporteur = '', lieu = '', code 
     c ? `code ${c}${c2 ? ' + ' + c2 : ''}` : '',
     lim ? `${vers ? 'vers le' : "jusqu'au"} ${lim}${limiteHeure ? ` à ${limiteHeure}` : ''}` : '',
   ].filter(Boolean);
-  return { title: `📍 ${sujet} t'attend`, body: morceaux.length ? morceaux.join(' · ') : (transporteur && a ? transporteur : 'Au point de retrait') };
+  const corps = morceaux.length ? morceaux.join(' · ') : (transporteur && a ? transporteur : 'Au point de retrait');
+  // (8 nov.) Le titre tient en 40 caractères : un article trop long descend dans le
+  // corps (rien n'est coupé) et le titre dit « Ton colis <transporteur> t'attend ».
+  if (`${sujet} t'attend`.length > 40 && a) {
+    const t = transporteur && `Ton colis ${transporteur} t'attend`.length <= 40 ? `Ton colis ${transporteur} t'attend` : "Ton colis t'attend";
+    return { title: t, body: [a, ...morceaux].join(' · ') };
+  }
+  return { title: `${sujet} t'attend`, body: corps };
 }

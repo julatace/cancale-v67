@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT (17 oct.) — « Un colis au point relais SANS le code », « des colis à
 // Vinted Go et d'autres à Kusmi Tea (aussi Vinted Go) ». Julien veut une
 // interface FIABLE : lieu, transporteur, code et QR toujours cohérents.

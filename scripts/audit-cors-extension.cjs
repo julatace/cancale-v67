@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // (8 nov.) Les routes que l'extension appelle (compte?mode=commandes|favoris,
 // relais, push) répondent au préalable CORS d'Orion (OPTIONS ⇒ 204 + en-têtes)
 // pour une origine d'EXTENSION, et refusent toute autre origine (403, aucun

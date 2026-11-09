@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LA NOTIFICATION TOUCHÉE MET SON OBJET EN ÉVIDENCE (5 novembre)
 //        (node scripts/bancs/cible-evidence.cjs — après `npm run build`)

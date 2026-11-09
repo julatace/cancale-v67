@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // Vérifie que l'email Vinted Go (mesuré sur un vrai mail de Julien, 2 oct. 2026)
 // est bien analysé : code ALPHANUMÉRIQUE, suivi « VGS… », date « à retirer avant
 // le … », lieu « Adresse » → consigne, et statut « à retirer » (sans quoi le

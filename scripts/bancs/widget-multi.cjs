@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE WIDGET D'ÉCRAN D'ACCUEIL, PAR VENDEUR (node scripts/bancs/widget-multi.cjs)
 // ═══════════════════════════════════════════════════════════════════════════

@@ -20,6 +20,7 @@
 //   R  relecture des e-mails déjà gardés (`email_inconnu_*`, corps coupé à
 //      2 000) : même ligne que le serveur, idempotente, lecture ratée ⇒ rien.
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const R = path.join(__dirname, '..');

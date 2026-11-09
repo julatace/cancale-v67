@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  « TES EMAILS, CE QUE VRM EN A FAIT » — la règle EXÉCUTÉE (31 oct.)
 //

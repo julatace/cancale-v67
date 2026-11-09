@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // scripts/audit-mondialrelay-serveur.cjs
 // ─────────────────────────────────────────────────────────────────────────────
 // (24 oct.) MONDIAL RELAY LU PAR LE SERVEUR, PAR LA ROUTE `_mvc` DE

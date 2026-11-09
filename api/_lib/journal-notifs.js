@@ -36,7 +36,8 @@ export const ID_JOURNAL = 'push_journal';
 export const ID_LU = 'push_journal_lu';
 export const MAX_ENTREES = 150;
 export const DUREE_MS = 30 * 86400e3;
-export const ETATS = ['envoyee', 'calme', 'sans-appareil', 'serveur', 'echec'];
+// (8 nov.) `discret` : rangée dans la cloche sans sonner (une information sans geste).
+export const ETATS = ['envoyee', 'calme', 'sans-appareil', 'serveur', 'echec', 'discret'];
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const cle = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -63,6 +64,7 @@ export function ajouterEntree(journal, e, maintenant = Date.now()) {
     titre: propre(e.titre, 120),
     texte: propre(e.texte, 240),
     url: urlSure(e.url),
+    ...(e.genre && /^[a-z]{1,20}$/.test(e.genre) ? { genre: e.genre } : {}),
     etat: ETATS.includes(e.etat) ? e.etat : 'envoyee',
   };
   const garde = [entree, ...avant].filter((x) => !(Date.parse(x.at) < maintenant - DUREE_MS)).slice(0, MAX_ENTREES);
@@ -84,6 +86,15 @@ export function nonLuesDeFamille(entrees, famille, lu, maintenant = Date.now()) 
 }
 
 // ── LECTURE / ÉCRITURE, AU NOM DU VENDEUR DE LA REQUÊTE ────────────────────
+// (8 nov.) Les non-lues d'un même GENRE (api/_lib/notif-belle.js) des dernières
+// 24 h, celle-ci comprise. `lu` pas su ⇒ 1 : aucun nombre inventé.
+export function nonLuesDeGenre(entrees, genre, lu, maintenant = Date.now()) {
+  if (!genre || !lu || typeof lu !== 'object') return 1;
+  const jusqua = Number.isSafeInteger(lu.luJusqua) ? lu.luJusqua : 0;
+  const lus = new Set(Array.isArray(lu.lus) ? lu.lus.filter(Number.isSafeInteger) : []);
+  return Math.max(1, (entrees || []).filter((x) => x && x.genre === genre && x.seq > jusqua && !lus.has(x.seq) && Date.parse(x.at) >= maintenant - 86400e3).length);
+}
+
 async function lireLigne(id, select = 'data') {
   const o = proprietaireCourant();
   if (!o || !cle()) return null;
@@ -148,8 +159,8 @@ async function modifierJournal(modifier, essais = 5) {
   return null;
 }
 // Range une notification. Rend `{ seq, entrees }` ou `null` (pas su : rien rangé).
-export async function rangerNotif({ cat, titre, texte, url, etat }) {
-  const r = await modifierJournal((d) => ajouterEntree(d, { cat, titre, texte, url, etat }));
+export async function rangerNotif({ cat, titre, texte, url, etat, genre = null }) {
+  const r = await modifierJournal((d) => ajouterEntree(d, { cat, titre, texte, url, etat, genre }));
   return r ? { seq: r.seq, entrees: r.journal.entrees } : null;
 }
 // Corrige l'état d'une entrée déjà rangée (l'envoi a échoué sur tous les appareils).

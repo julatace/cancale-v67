@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : CHAQUE NOTIFICATION A SA CIBLE, ET CHAQUE CIBLE SON CROCHET (5 nov.)
 //         (node scripts/audit-cibles-notif.cjs)
@@ -111,9 +112,11 @@ const APP = ['src/App.jsx', 'src/CarteRelais.jsx'].map((f) => sansCommentaires(l
   }
   if (A.texteVendu && A.texteMessage) {
     const v = A.texteVendu({ article: 'X', prix: '10', compte: 'c' });
-    dit(v.title === '💸 Vendu !' && v.body === 'X — 10 € (c)', 'texte « Vendu » identique à celui d’avant', JSON.stringify(v));
+    // (8 nov., « de belles notifications ») Les textes ont été refaits : le titre dit le
+    // fait, le corps l'objet et le geste (docs/passation/2026-11-08-notifications.md).
+    dit(v.title === 'Vendu · 10 €' && v.body === 'X · c · Prépare le colis, le bordereau suit par e-mail', 'texte « Vendu » : le fait (le prix), l’objet, le geste', JSON.stringify(v));
     const m = A.texteMessage({ paire: 'P', qui: 'q', compte: 'c', extrait: '' });
-    dit(m.title === '💬 P' && m.body === 'q · Nouveau message sur c — ouvre Vinted pour répondre.', 'texte « Message » identique à celui d’avant', JSON.stringify(m));
+    dit(m.title === 'Message de q' && m.body === 'P · Nouveau message sur c · réponds dans Messages', 'texte « Message » : qui écrit, la paire, le geste', JSON.stringify(m));
   }
 
   // (revue du 5 nov.) Aucun aperçu rédigé à la main : chacun sort de la fabrique du vrai texte.

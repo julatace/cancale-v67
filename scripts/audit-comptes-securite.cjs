@@ -15,6 +15,7 @@
 //  réaffaiblit une règle) et exige qu'il passe au ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = path.join(__dirname, '..');

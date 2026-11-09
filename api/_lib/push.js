@@ -18,8 +18,9 @@ import {endpointPushPermis} from './abonnement-push.js';
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { accesVendeur } from './abonnement.js';
-import { decisionNotif, CATEGORIES_RETIREES, dansHeuresCalmes, regrouper, familleDe, texteRegroupe } from './notif-textes.js';
-import { rangerNotif, corrigerEtat, lireLu, nonLuesDeFamille } from './journal-notifs.js';
+import { decisionNotif, CATEGORIES_RETIREES, dansHeuresCalmes, regrouper } from './notif-textes.js';
+import { rangerNotif, corrigerEtat, lireLu, nonLuesDeGenre } from './journal-notifs.js';
+import { embellir, genreDe, etiquette, etiquetteGroupe, texteGroupe, imageSure, actionDe, ICONE_NOTIF, BADGE_NOTIF } from './notif-belle.js';
 
 // La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
 // 200 → oui · 400 (colonne inconnue) → non · le reste (522, délai) → PAS SU.
@@ -334,6 +335,15 @@ const cleSansRapport = (e) => {
 // Envoie la notification à tous les appareils abonnés.
 // Les abonnements morts (appli désinstallée, permission retirée) sont purgés,
 // ainsi que ceux scellés sur une clé qui n'est plus la nôtre (voir ci-dessus).
+// (8 nov.) L'instant qui décide des heures calmes. Les bancs le fixent
+// (`VRM_NOTIF_HORLOGE`, ISO — scripts/_horloge-notif.cjs) : une heure calme
+// allumée par défaut ne doit pas rendre un banc vert le jour et rouge la nuit.
+// Jamais posée en production : l'heure réelle décide.
+const instantCalme = () => {
+  const v = typeof process !== 'undefined' && process.env ? process.env.VRM_NOTIF_HORLOGE : '';
+  const t = v ? Date.parse(v) : NaN;
+  return Number.isFinite(t) ? t : Date.now();
+};
 export async function sendPushToAll(payload) {
   // ⚠️ QUI NE PAIE PLUS NE REÇOIT PLUS RIEN (Julien, 4 octobre). La règle est
   //    celle de la base (`vrm_acces_pour`), la même qui ferme ses données. On
@@ -352,8 +362,17 @@ export async function sendPushToAll(payload) {
   //      combien d'autres attendent.
   // La notification porte `notif: <n°>` (le service worker l'ajoute à l'adresse
   // au toucher) : l'app marque lue l'entrée du centre.
-  const { cat: catBrute = null, _cat, ...notif } = payload || {};
+  // (8 nov.) LA FORME (api/_lib/notif-belle.js) : texte propre et court, sans
+  // emoji — appliquée ICI, donc à tout ce qui sonne ET à ce que la cloche range.
+  //   `echeance` : l'heure où l'objet expire (ISO/ms) — avant 10 h, il sonne même
+  //                pendant les heures calmes ;
+  //   `discret`  : une information sans geste — rangée dans la cloche, ne sonne pas ;
+  //   `photo`    : `{ url, preuve: 'meme-email' }` — seule une photo prouvée part ;
+  //   `maj`      : la mise à jour d'un objet déjà annoncé — remplace sans re-sonner.
+  const { cat: catBrute = null, _cat, echeance = null, discret = false, photo = null, maj = false, image: _imageNue, ...brut } = payload || {};
   const cat = catBrute || _cat || null;
+  const notif = { ...brut, ...embellir({ title: brut.title, body: brut.body }, cat) };
+  const genre = genreDe(brut.tag);
   let prefs = null, rangee = null;
   if (cat) {
     prefs = (await prefsDuVendeur()) || {};
@@ -361,9 +380,13 @@ export async function sendPushToAll(payload) {
   }
   const ranger = async (etat) => {
     if (!cat || !owner) return null;
-    try { return await rangerNotif({ cat, titre: notif.title, texte: notif.body, url: notif.url, etat }); } catch (_) { return null; }
+    try { return await rangerNotif({ cat, titre: notif.title, texte: notif.body, url: notif.url, etat, genre: genre ? genre.id : null }); } catch (_) { return null; }
   };
-  if (cat && dansHeuresCalmes(prefs, cat)) {
+  if (discret) {
+    rangee = await ranger('discret');
+    return { sent: 0, total: null, discret: true, ...(rangee ? { seq: rangee.seq } : {}) };
+  }
+  if (cat && dansHeuresCalmes(prefs, cat, instantCalme(), echeance)) {
     rangee = await ranger('calme');
     return { sent: 0, total: null, calme: true, ...(rangee ? { seq: rangee.seq } : {}) };
   }
@@ -389,19 +412,32 @@ export async function sendPushToAll(payload) {
   if (subs === null) return { sent: 0, total: null, erreur: 'base-injoignable' };
   if (!subs.length) { await ranger('sans-appareil'); return { sent: 0, total: 0 }; }
   rangee = await ranger('envoyee');
-  const aEnvoyer = { ...notif };
+  const regroupe = !cat || cat === 'test' ? false : regrouper(prefs);
+  const aEnvoyer = {
+    ...notif,
+    tag: etiquette({ tag: brut.tag, cat }),
+    renotify: !maj,
+    icon: ICONE_NOTIF, badge: BADGE_NOTIF,
+  };
+  const img = imageSure(photo);
+  if (img) aEnvoyer.image = img;
   // Le numéro de l'entrée du centre voyage À CÔTÉ de l'adresse (le service
   // worker l'ajoute au toucher, public/sw.js) : l'adresse reste celle de l'objet.
   if (rangee) aEnvoyer.notif = rangee.seq;
-  const fam = cat ? familleDe(cat) : null;
-  if (fam && regrouper(prefs)) {
-    // Une notification par type : la nouvelle remplace l'ancienne sur le
-    // téléphone. « +N » seulement si ce qu'il a lu a pu être relu (`lireLu`).
-    aEnvoyer.tag = `vrm-groupe-${fam}`;
+  if (regroupe && genre) {
+    // Une notification par genre : la nouvelle remplace l'ancienne et dit
+    // combien attendent (non lues du centre). Pas su ⇒ elle reste seule.
     const lu = rangee ? await lireLu().catch(() => null) : null;
-    const k = rangee && lu ? nonLuesDeFamille(rangee.entrees, fam, lu) : 1;
-    Object.assign(aEnvoyer, texteRegroupe({ title: aEnvoyer.title, body: aEnvoyer.body }, k));
+    const k = rangee && lu ? nonLuesDeGenre(rangee.entrees, genre.id, lu) : 1;
+    aEnvoyer.genre = genre.id;
+    if (k > 1) {
+      Object.assign(aEnvoyer, texteGroupe(aEnvoyer, genre, k));
+      aEnvoyer.tagGroupe = etiquetteGroupe(genre);
+      delete aEnvoyer.image;                    // la photo d'UNE vente ne coiffe pas trois ventes
+    }
   }
+  const act = actionDe(cat, brut.tag);
+  if (act) aEnvoyer.actions = [{ action: act.action, title: act.title, url: aEnvoyer.url || '/' }];
   const body = JSON.stringify(aEnvoyer);
   const alive = [];
   let sent = 0, perimes = 0;

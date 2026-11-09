@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT — VRM VENDU À D'AUTRES : AUCUN VENDEUR NE LIT CE QUI EST À JULIEN
 // (1er novembre 2026, audit « un autre vendeur que Julien », 19 défauts)

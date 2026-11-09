@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT : l'app doit savoir LIRE un email entrant, quelle que soit sa forme.
 // ⚠️ Posé le 23 août 2026 après un email arrivé à 06:36 avec expéditeur ET
 // sujet VIDES, classé « ignoré », dont il ne reste aucune trace — pendant que

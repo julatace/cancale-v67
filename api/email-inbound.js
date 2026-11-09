@@ -2638,7 +2638,7 @@ export async function traiterEmail(req, res) {
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', compteSource: acc.source || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
+      try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }), ...(data.photo ? { photo: { url: data.photo, preuve: 'meme-email' } } : {}) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
       // Vente PRO (la mention de Vinted) avec l'e-mail de l'acheteur et sa
       // transaction : on garde le formulaire de retour pour la facture que le

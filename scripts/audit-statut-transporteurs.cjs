@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT (24 oct.) — LE STATUT PUBLIC D'UN COLIS, LU CHEZ SON TRANSPORTEUR.
 // Julien : « tu as juste à regarder sur le site du transporteur, je ne te
 // demande pas le code de retrait mais juste de regarder le statut ».

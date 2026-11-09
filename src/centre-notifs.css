@@ -49,6 +49,13 @@ button.vrm-cn-ligne:active { background: var(--fu-remplir); }
 .vrm-cn-ligne:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: -2px; }
 .vrm-cn-point { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: transparent; }
 .vrm-cn-ligne.is-non-lue .vrm-cn-point { background: var(--fu-bleu, #0071e3); }
+/* (8 nov.) L'icône de la famille, neutre ; le point bleu du « non lu » posé dessus. */
+.vrm-cn-ic { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--fu-remplir); color: var(--fu-encre, #1d1d1f); }
+.vrm-cn-ic .vrm-cn-point { position: absolute; top: -3px; right: -3px; margin: 0; width: 10px; height: 10px; border: 2px solid var(--fu-carte, #fff); box-sizing: content-box; }
+.vrm-cn-ligne.is-retrait { padding-left: 54px; background: color-mix(in srgb, var(--fu-remplir) 35%, transparent); }
+.vrm-cn-ligne.is-retrait .vrm-cn-ic { display: none; }
+.vrm-cn-geste { margin-top: 2px; font: 600 13px/1.3 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); }
+.vrm-cn-chevron.is-ouvert { transform: rotate(90deg); }
 .vrm-cn-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-cn-meta { display: flex; align-items: center; gap: 6px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-gris2); }
 .vrm-cn-meta time { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -8,6 +8,7 @@
 //   · un numéro de la mauvaise longueur ⇒ 400, aucun appel ;
 //   · la route exige une session (pas un relais ouvert).
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path'), fs = require('fs');
 let ko = 0;
 const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK ' : 'KO '} ${quoi}${!bon && det ? ' — ' + det : ''}`); };

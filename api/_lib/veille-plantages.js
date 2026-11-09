@@ -123,10 +123,10 @@ export function texteVeille(nouveaux) {
   if (nouveaux.length === 1) {
     const g = nouveaux[0];
     const quoi = g.ecrans.size ? 'un écran a planté' : 'l’app a planté';
-    return { title: 'VRM', body: `VRM : ${quoi}${entreParentheses(g)} — c’est noté, on corrige.` };
+    return { title: quoi.charAt(0).toUpperCase() + quoi.slice(1), body: `${entreParentheses(g).replace(/^ \(|\)$/g, '') || 'Chez un vendeur'} · détail dans Réglages → Sécurité des données.` };
   }
   const detail = nouveaux.slice(0, 3).map((g) => entreParentheses(g).replace(/^ \(|\)$/g, '')).filter(Boolean).join(' · ');
-  return { title: 'VRM', body: `VRM : ${nouveaux.length} nouveaux plantages${detail ? ` (${detail})` : ''} — c’est noté, on corrige.` };
+  return { title: `${nouveaux.length} nouveaux plantages`, body: `${detail ? detail + ' · ' : ''}détail dans Réglages → Sécurité des données.` };
 }
 
 // Le mémo après cette veille : les types déjà connus, plus les nouveaux, bornés.

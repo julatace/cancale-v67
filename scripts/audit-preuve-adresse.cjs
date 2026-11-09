@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  UNE ADRESSE DE RÉCEPTION PROUVÉE — les vraies routes, exécutées (§4.10).
 //        node scripts/audit-preuve-adresse.cjs [--src dossier] [--mutation nom]

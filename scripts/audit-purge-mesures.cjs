@@ -22,6 +22,7 @@
 //  Lancer : node scripts/audit-purge-mesures.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path'), fs = require('fs');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver, sansCommentaires } = require('./_mutations-audit.cjs');

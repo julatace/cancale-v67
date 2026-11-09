@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ────────────────────────────────────────────────────────────────────────────
 // LA CHAÎNE PUSH NE PEUT PLUS CASSER EN SILENCE.
 //

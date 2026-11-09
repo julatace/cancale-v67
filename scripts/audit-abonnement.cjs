@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // Audit : l'abonnement Stripe ne se contourne pas, ne se perd pas, et ne fait
 // jamais payer le propriétaire (api/compte.js, demande du 4 octobre :
 // « 9,99 € par mois pour tout le monde sauf moi » — 12,99 € depuis le

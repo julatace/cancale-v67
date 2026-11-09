@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LES COLIS LEBONCOIN ET VESTIAIRE À POSTER, CÔTÉ SERVEUR (1er novembre)
 //        (node scripts/bancs/colis-tous-sites.cjs)
