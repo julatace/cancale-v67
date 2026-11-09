@@ -1,0 +1,51 @@
+/* ── La recherche d'entreprise (9 nov., soir) : Ma facture et Ma configuration ──
+   Les jetons de l'écran qui l'accueille (configuration : --cfg-* ; app : --vrm-*),
+   avec repli. Neutre ; l'accent seulement sur « C'est bon ». */
+.vrm-ent {
+  --ent-carte: var(--cfg-carte, var(--vrm-card, #fff));
+  --ent-fond: var(--cfg-fond, var(--vrm-bg, #F5F5F7));
+  --ent-encre: var(--cfg-encre, var(--vrm-ink, #1D1D1F));
+  --ent-gris: var(--cfg-gris, var(--vrm-muted, #6E6E73));
+  --ent-filet: var(--cfg-filet, var(--vrm-line, rgba(60,60,67,.18)));
+  --ent-accent: var(--cfg-accent, var(--vrm-accent, #0071E3));
+  box-sizing: border-box; min-width: 0; color: var(--ent-encre);
+  border-radius: 14px; background: var(--ent-carte); box-shadow: inset 0 0 0 1px var(--ent-filet);
+  padding: 12px 14px; font-size: 15px; line-height: 1.4; text-align: left;
+}
+.vrm-ent-cherche { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.vrm-ent-cherche-t { display: grid; gap: 2px; min-width: 0; }
+.vrm-ent-cherche-t b { font-weight: 600; }
+.vrm-ent-cherche-t small, .vrm-ent-tete small { font-size: 13px; color: var(--ent-gris); overflow-wrap: anywhere; }
+.vrm-ent-pulse { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.vrm-ent-pulse i { width: 7px; height: 7px; border-radius: 50%; background: var(--ent-gris); opacity: .3; animation: vrmEntPulse 1s ease-in-out infinite; }
+.vrm-ent-pulse i:nth-child(2) { animation-delay: .15s; }
+.vrm-ent-pulse i:nth-child(3) { animation-delay: .3s; }
+@keyframes vrmEntPulse { 0%, 100% { opacity: .25; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .vrm-ent-pulse i { animation: none; opacity: .6; } }
+
+.vrm-ent-rien p { margin: 0; font-size: 14px; color: var(--ent-gris); }
+.vrm-ent-rien .vrm-ent-b { margin-top: 10px; }
+.vrm-ent-refus { margin: 6px 0 0; font-size: 13px; line-height: 1.4; color: var(--d-warn, var(--vrm-warn, #B25000)); }
+
+.vrm-ent-trouve { display: grid; gap: 10px; }
+.vrm-ent-tete { display: grid; gap: 2px; }
+.vrm-ent-tete b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.vrm-ent-lignes { display: grid; }
+.vrm-ent-ligne { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px 0; border-top: .5px solid var(--ent-filet); }
+@media (min-width: 560px) { .vrm-ent-ligne { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } }
+.vrm-ent-ligne-t { display: grid; gap: 1px; min-width: 0; }
+.vrm-ent-ligne-t small { font-size: 12px; color: var(--ent-gris); }
+.vrm-ent-ligne-t b { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.vrm-ent-ecart { font-size: 13px; color: var(--d-warn, var(--vrm-warn, #B25000)); overflow-wrap: anywhere; }
+.vrm-ent-gestes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 560px) { .vrm-ent-gestes { display: flex; } }
+.vrm-ent-b {
+  appearance: none; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 0; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 600; white-space: nowrap;
+  background: rgba(118,118,128,.12); color: var(--ent-encre);
+}
+.vrm-ent-b.is-ok { background: var(--ent-accent); color: #fff; }
+.vrm-ent-b:focus-visible { outline: 2px solid var(--ent-accent); outline-offset: 2px; }
+.vrm-ent-tout { width: 100%; }
+.vrm-ent-erreur { margin: 0; font-size: 13px; color: var(--d-warn, var(--vrm-warn, #B25000)); }
+.vrm-ent-notes { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; line-height: 1.45; color: var(--ent-gris); }

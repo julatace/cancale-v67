@@ -18521,7 +18521,7 @@ function ConfigurationDepartApp({ onFin }) {
     ? ecrirePushPrefs(w.valeur)
     : new Promise((res) => save(w.cle, w.valeur, (ok) => res(ok !== false))))).then((r) => r.every(Boolean)), []);
   const fermer = () => { if (!lireConfiguration(load(CLE_CONFIGURATION, null))) save(CLE_CONFIGURATION, { etat: 'plusTard', at: new Date().toISOString(), statut: null, version: 1 }); onFin && onFin('plusTard'); };
-  return <><FermeAuRetour fermer={fermer}/><ConfigurationDepart lus={lus} relies={p.relies || {}} lirePushPrefs={() => lireReglage('push_prefs')} ecrire={ecrire} onFin={(etat) => { toast(etat === 'fait' ? 'Ta configuration est enregistrée.' : 'Tes choix sont gardés. Tu peux reprendre dans Réglages → Ma configuration.'); onFin && onFin(etat); }}/></>;
+  return <><FermeAuRetour fermer={fermer}/><ConfigurationDepart lus={lus} relies={p.relies || {}} contexte={p.contexte || null} entreprise={{ lireReglage, ecrireReglage, chercherEntreprise }} lirePushPrefs={() => lireReglage('push_prefs')} ecrire={ecrire} onFin={(etat) => { toast(etat === 'fait' ? 'Ta configuration est enregistrée.' : 'Tes choix sont gardés. Tu peux reprendre dans Réglages → Ma configuration.'); onFin && onFin(etat); }}/></>;
 }
 // La carte de Ma journée qui RAMÈNE à la configuration (elle remplace la question
 // « Où vends-tu ? » posée ici avant le 9 nov.) : seulement si elle a été mise de côté,

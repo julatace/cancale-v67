@@ -32,7 +32,76 @@ const choixDe = (r, permis) => {
   return permis.includes(c) ? c : 'auto';
 };
 export const lireReglageAffichage = (r) => ({ choix: choixDe(r, ['auto', 'simple', 'complet']), at: (r && r.at) || null });
-export const lireReglageJeVends = (r) => ({ choix: choixDe(r, ['auto', 'sneakers', 'autre']), at: (r && r.at) || null });
+export const lireReglageJeVends = (r) => ({ choix: choixDe(r, ['auto', 'sneakers', 'autre']), at: (r && r.at) || null, categories: categoriesDe(r), autre: autreDe(r) });
+
+// ── CE QU'IL VEND, EN DÉTAIL (9 nov., soir) ─────────────────────────────────
+// Julien : « tout le monde ne vend pas des sneakers ; la première question c'est
+// sneakers ou autre chose, fais plein de propositions. » « Ma configuration » pose la
+// question en tuiles à choix MULTIPLE ; la réponse est rangée DANS `vrm_je_vends`,
+// sans casser ses lecteurs : `choix` reste 'sneakers' | 'autre' | 'auto' (tout ce qui
+// lit le mot et les champs obligatoires ne lit que lui) et s'en DÉDUIT :
+//   `categories` = ['sneakers'] seul ⇒ 'sneakers' (« paire », taille et marque jugées) ;
+//   n'importe quoi d'autre (sneakers + vêtements, livres…) ⇒ 'autre' (« article »,
+//   taille et marque facultatives).
+// `autre` : le texte libre de la tuile « Autre chose » (80 caractères, jamais lu par une règle).
+export const CATEGORIES_VENDS = [
+  { v: 'sneakers', titre: 'Sneakers' },
+  { v: 'vetements', titre: 'Vêtements' },
+  { v: 'luxe', titre: 'Luxe & créateurs' },
+  { v: 'sacs', titre: 'Sacs & maroquinerie' },
+  { v: 'montres', titre: 'Montres & bijoux' },
+  { v: 'accessoires', titre: 'Accessoires' },
+  { v: 'vintage', titre: 'Vintage' },
+  { v: 'enfants', titre: 'Enfants & puériculture' },
+  { v: 'livres', titre: 'Livres & BD' },
+  { v: 'jeux', titre: 'Jeux vidéo & consoles' },
+  { v: 'hightech', titre: 'High-tech' },
+  { v: 'cartes', titre: 'Cartes à collectionner' },
+  { v: 'jouets', titre: 'Jouets & figurines' },
+  { v: 'maison', titre: 'Maison & déco' },
+  { v: 'sport', titre: 'Sport & outdoor' },
+  { v: 'beaute', titre: 'Beauté' },
+  { v: 'musique', titre: 'Vinyles & musique' },
+  { v: 'autre', titre: 'Autre chose' },
+];
+const IDS_CATEGORIES = CATEGORIES_VENDS.map((c) => c.v);
+export const AUTRE_MAX = 80;
+function categoriesDe(r) {
+  const c = r && typeof r === 'object' && Array.isArray(r.categories) ? r.categories : null;
+  if (!c) return null;
+  const v = IDS_CATEGORIES.filter((id) => c.includes(id));
+  return v.length ? v : null;
+}
+const autreDe = (r) => (r && typeof r === 'object' && typeof r.autre === 'string' ? r.autre.replace(/\s+/g, ' ').trim().slice(0, AUTRE_MAX) : '');
+// Le `choix` que des catégories imposent : sneakers SEUL ⇒ 'sneakers', sinon 'autre'.
+export const choixDeCategories = (cats) => (Array.isArray(cats) && cats.length === 1 && cats[0] === 'sneakers' ? 'sneakers' : 'autre');
+// Les catégories à PRÉ-COCHER d'après ce qui est enregistré (rien de deviné) :
+//  · catégories rangées ET cohérentes avec `choix` ⇒ elles ;
+//  · ancien réglage « sneakers » ⇒ ['sneakers'] ; ancien « autre » ⇒ ['autre'] (« Autre chose ») ;
+//  · rien choisi (ou automatique) ⇒ [].
+export function categoriesAPreCocher(r) {
+  const l = lireReglageJeVends(r);
+  if (l.categories && (l.choix === 'auto' || choixDeCategories(l.categories) === l.choix)) return l.choix === 'auto' ? [] : l.categories;
+  if (l.choix === 'sneakers') return ['sneakers'];
+  if (l.choix === 'autre') return ['autre'];
+  return [];
+}
+// La valeur à ranger pour des catégories cochées (jamais vide : rien coché ⇒ null, on n'écrit rien).
+export function reglageJeVendsDe(categories, autre, at = new Date().toISOString()) {
+  const cats = IDS_CATEGORIES.filter((id) => (categories || []).includes(id));
+  if (!cats.length) return null;
+  const txt = cats.includes('autre') ? String(autre || '').replace(/\s+/g, ' ').trim().slice(0, AUTRE_MAX) : '';
+  return { choix: choixDeCategories(cats), categories: cats, ...(txt ? { autre: txt } : {}), at };
+}
+// Réglages → Je vends (Automatique / Sneakers / Autre) : garde les catégories si elles
+// disent la même chose, sinon les met en accord (jamais un `choix` qui les contredit).
+export function reglageJeVendsDepuisChoix(avant, choix, at = new Date().toISOString()) {
+  const l = lireReglageJeVends(avant);
+  if (choix === 'sneakers') return { choix, categories: ['sneakers'], at };
+  if (choix === 'autre' && l.categories && choixDeCategories(l.categories) === 'autre') return { choix, categories: l.categories, ...(l.autre ? { autre: l.autre } : {}), at };
+  return { choix: choix === 'autre' ? 'autre' : 'auto', at };
+}
+export const nomsCategories = (cats, autre = '') => (cats || []).map((v) => (v === 'autre' && autre ? autre : (CATEGORIES_VENDS.find((c) => c.v === v) || {}).titre)).filter(Boolean);
 
 // Le défaut automatique. `proprietaire` : true · false · null (pas su).
 // `nComptesVinted` : nombre de comptes Vinted reliés (null = pas su).
