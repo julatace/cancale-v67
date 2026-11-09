@@ -55,7 +55,9 @@ export function embellir({ title = '', body = '' } = {}, cat = null) {
   let b = sansEmoji(body);
   if (t.length > TITRE_MAX) {
     // Couper sur un séparateur : la suite descend dans le corps, rien ne se perd.
-    const m = /^(.{6,}?)\s+(?:·|—|–|-|:)\s+(.+)$/.exec(t);
+    // « : » ne coupe que si ce qui précède dit déjà un fait (3 mots au moins) :
+    // « Chronopost : ton colis… » ne doit pas devenir le titre « Chronopost ».
+    const m = /^(.{6,}?)\s+(?:·|—|–|-)\s+(.+)$/.exec(t) || ((x) => (x && x[1].trim().split(/\s+/).length >= 3 ? x : null))(/^(.{6,}?)\s*:\s+(.+)$/.exec(t));
     const tete = m && m[1].length <= TITRE_MAX ? m[1] : null;
     if (tete) { b = [majuscule(m[2]), b].filter(Boolean).join(' · '); t = tete; }
     else { if (!b) b = t; t = couper(t, TITRE_MAX); }
@@ -74,7 +76,7 @@ export const GENRES = [
   { id: 'bordereau', re: /^bord-/, titre: (k) => `${k} bordereaux prêts à imprimer`, url: DESTINATIONS.colis({}), action: { action: 'voir', title: 'Imprimer' } },
   { id: 'vente', re: /^(sale|vc-vente)-/, titre: (k) => `${k} ventes`, url: lienNotif('ventes'), action: { action: 'voir', title: 'Voir la vente' } },
   { id: 'argent', re: /^final-/, titre: (k) => `${k} versements reçus`, url: lienNotif('ventes', { site: 'vinted' }), action: null },
-  { id: 'arrivee', re: /^(relais|retrait-code)-/, titre: (k) => `${k} colis t’attendent`, url: DESTINATIONS.retrait({}), action: { action: 'voir', title: 'Voir le code' } },
+  { id: 'arrivee', re: /^(relais|retrait-code)-/, titre: (k) => `${k} colis t'attendent`, url: DESTINATIONS.retrait({}), action: { action: 'voir', title: 'Voir le code' } },
   { id: 'offre', re: /^offer-/, titre: (k) => `${k} offres à trancher`, url: DESTINATIONS.offres(), action: { action: 'voir', title: 'Répondre' } },
   { id: 'message', re: /^msg-/, titre: (k) => `${k} nouveaux messages`, url: lienNotif('messages', { site: 'vinted' }), action: { action: 'voir', title: 'Répondre' } },
 ];

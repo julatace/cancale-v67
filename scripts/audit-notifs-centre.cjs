@@ -137,7 +137,8 @@ const hhmm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Mat
     const e = journal().entrees[0] || {};
     const p = pushes[0] || {};
     dit(pushes.length === 1 && e.seq === 1 && e.etat === 'envoyee' && e.famille === 'ventes' && e.cat === 'vente', 'J1 rangée : n°1, type « ventes », état « envoyée »', JSON.stringify(e));
-    dit(e.url === VENTE.url && e.titre === VENTE.title && e.texte === VENTE.body, 'J2 l’entrée garde l’adresse de l’OBJET (la vente, par son n° de transaction) et le texte envoyé');
+    // (8 nov.) Le texte rangé est celui ENVOYÉ, mis en forme (api/_lib/notif-belle.js : sans emoji).
+    dit(e.url === VENTE.url && e.titre === 'Vendu !' && e.texte === VENTE.body && e.titre === p.title, 'J2 l’entrée garde l’adresse de l’OBJET (la vente, par son n° de transaction) et le texte envoyé');
     dit(p.notif === 1 && p.url === VENTE.url && !('cat' in p) && !('_cat' in p), 'J3 le téléphone reçoit le n° de l’entrée à côté de l’adresse ; la catégorie ne part pas', JSON.stringify(p));
     await comme(J, () => P.sendPushToAll({ ...VENTE, tag: 'sale-30000002', url: '/?tab=ventes&cible=vente&tx=30000002' }));
     dit(journal().n === 2 && journal().entrees[0].seq === 2 && journal().entrees[1].seq === 1, 'J4 la plus récente en tête, le numéro ne redescend jamais');
@@ -168,6 +169,10 @@ const hhmm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Mat
   });
 
   await essaie('C — heures calmes', async () => {
+    // Ces contrôles posent une plage autour de l'heure RÉELLE : l'instant qui décide
+    // est donc l'heure réelle (scripts/_horloge-notif.cjs l'avait fixé à midi).
+    const horlogeAvant = process.env.VRM_NOTIF_HORLOGE; delete process.env.VRM_NOTIF_HORLOGE;
+    try {
     const dedans = { actif: true, debut: hhmm(mParis - 60), fin: hhmm(mParis + 60) };
     prepare({ calme: dedans });
     const r = await comme(J, () => P.sendPushToAll(VENTE));
@@ -186,6 +191,7 @@ const hhmm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Mat
     dit(pushes.length === 1, 'C6 heures calmes éteintes : elle sonne');
     dit(typeof T.dansHeuresCalmes === 'function' && T.dansHeuresCalmes({ calme: { actif: true, debut: '22:00', fin: '08:00' } }, 'vente', Date.parse('2026-11-05T22:30:00Z')) === true
       && T.dansHeuresCalmes({ calme: { actif: true, debut: '22:00', fin: '08:00' } }, 'vente', Date.parse('2026-11-05T12:00:00Z')) === false, 'C7 une plage qui passe minuit (22:00 → 08:00, heure de Paris)');
+    } finally { process.env.VRM_NOTIF_HORLOGE = horlogeAvant; }
   });
 
   await essaie('R — regroupement', async () => {
@@ -193,17 +199,18 @@ const hhmm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Mat
     base.set(k(J, 'push_journal_lu'), { luJusqua: 0, lus: [] });
     await comme(J, () => P.sendPushToAll(VENTE));
     await comme(J, () => P.sendPushToAll({ ...VENTE, tag: 'sale-30000002' }));
-    dit(pushes.length === 2 && pushes.every((x) => x.tag === 'vrm-groupe-ventes'), 'R1 une notification PAR TYPE sur le téléphone (la seconde remplace la première)', pushes.map((x) => x.tag).join(' '));
-    dit(!/autre/.test(pushes[0].body) && /\+1 autre dans VRM$/.test(pushes[1].body), 'R2 la seconde dit « +1 autre dans VRM »', pushes[1] && pushes[1].body);
+    // (8 nov.) Regroupement PAR GENRE (api/_lib/notif-belle.js) : « 2 ventes ».
+    dit(pushes.length === 2 && pushes.every((x) => x.tag === 'vrm-vente'), 'R1 une notification PAR GENRE sur le téléphone (la seconde remplace la première)', pushes.map((x) => x.tag).join(' '));
+    dit(pushes[0].title === 'Vendu !' && pushes[1].title === '2 ventes', 'R2 la seconde dit « 2 ventes »', pushes[1] && pushes[1].title);
     base.set(k(J, 'push_journal_lu'), { luJusqua: 2, lus: [] });
     await comme(J, () => P.sendPushToAll({ ...VENTE, tag: 'sale-30000003' }));
-    dit(!/autre/.test(pushes[2].body), 'R3 ce qu’il a déjà lu ne compte plus');
+    dit(pushes[2].title === 'Vendu !', 'R3 ce qu’il a déjà lu ne compte plus');
     panne.add('push_journal_lu');
     await comme(J, () => P.sendPushToAll({ ...VENTE, tag: 'sale-30000004' }));
-    dit(pushes.length === 4 && !/autre/.test(pushes[3].body), 'R4 « lu » illisible : pas de « +N » inventé, la notification part');
-    prepare();
+    dit(pushes.length === 4 && pushes[3].title === 'Vendu !', 'R4 « lu » illisible : aucun nombre inventé, la notification part');
+    prepare({ regrouper: false });
     await comme(J, () => P.sendPushToAll(VENTE));
-    dit(pushes[0].tag === VENTE.tag, 'R5 sans regroupement, chaque notification garde son propre tag');
+    dit(pushes[0].tag === 'vrm-' + VENTE.tag, 'R5 regroupement coupé : chaque notification garde son propre tag (celui de l’objet)', pushes[0].tag);
   });
 
   await essaie('P — pas su, pas d’appareil', async () => {

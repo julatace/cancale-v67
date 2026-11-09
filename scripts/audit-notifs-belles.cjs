@@ -206,7 +206,7 @@ const EMOJI = /\p{Extended_Pictographic}/u;
     dit(pushes.length === 0 && r.discret && e.etat === 'discret', 'D1 « discret » : rangée dans la cloche, ne sonne pas', JSON.stringify(r));
     void fin;
     const sr = fs.readFileSync(path.join(R, 'api', 'ship-reminders.js'), 'utf8').replace(/\/\/.*$/gm, '');
-    dit((sr.match(/envoyer:\s*\(notif\)\s*=>\s*sendPushToAll\(\{\s*\.\.\.notif,\s*cat:\s*'signalement',\s*discret:\s*true\s*\}\)/g) || []).length === 2, 'D2 la veille des plantages et des lenteurs (doublon de l’alerte de l’heure) ne sonne plus');
+    dit((sr.match(/envoyer:\s*\(notif\)\s*=>\s*sendPushToAll\(\{\s*\.\.\.notif,\s*cat:\s*'signalement'\s*\}\)/g) || []).length === 2, 'D2 la veille des plantages et des lenteurs porte une catégorie : rangée dans la cloche, soumise aux heures calmes (plus de « VRM » à 6 h)');
   }));
 
   await essaie('X — retirées et refusées', () => aHeure(midi, async () => {

@@ -1168,10 +1168,12 @@ export function texteNotifTransp(t, ch) {
     const a = texteArrivee({ transporteur: nom, lieu: lieuLong || lieu, limite: t.limite, limiteHeure: t.limiteSure ? heureParis(t.limiteAt) : '', vers: !t.limiteSure });
     return { title: a.title, body: `${a.body}${t.detail === 'autre_point' ? ' · un autre point relais que prévu' : ''}` };
   }
-  if (ch.etat === 'incident' && t.detail === 'quitte_relais') return { title: `⚠️ ${nom} : ton colis a quitté le point relais sans être retiré`, body: `Ne te déplace pas : ${n}${lieu ? ` (${lieu})` : ''}.` };
-  if (ch.etat === 'incident') return { title: `⚠️ ${nom} : un problème sur ton colis`, body: `« ${propre(t.libelle, 120)} » — vérifie avant de te déplacer · ${n}` };
-  if (ch.etat === 'retour_expediteur') return { title: `↩️ ${nom} : ton colis repart chez l'expéditeur`, body: `Ne te déplace pas : ${n}. La conversation Vinted dit si tu es remboursé.` };
-  if (ch.etat === 'inconnu') return { title: `⚠️ ${nom} : « ${propre(t.libelle, 80)} »`, body: `VRM ne connaît pas encore ce statut — vérifie avant de te déplacer · ${n}` };
+  // (8 nov.) Le titre dit le fait (≤ 40 caractères, sans emoji), le corps le
+  // transporteur, le n° et le geste (api/_lib/notif-belle.js).
+  if (ch.etat === 'incident' && t.detail === 'quitte_relais') return { title: 'Ton colis a quitté le point relais', body: `Pas retiré · ${nom} ${n}${lieu ? ` (${lieu})` : ''} · ne te déplace pas.` };
+  if (ch.etat === 'incident') return { title: `Problème sur ton colis ${nom}`.length <= 40 ? `Problème sur ton colis ${nom}` : 'Problème sur ton colis', body: `« ${propre(t.libelle, 120)} » — vérifie avant de te déplacer · ${nom} ${n}` };
+  if (ch.etat === 'retour_expediteur') return { title: 'Ton colis repart chez l’expéditeur', body: `${nom} ${n} · ne te déplace pas. La conversation Vinted dit si tu es remboursé.` };
+  if (ch.etat === 'inconnu') return { title: `Statut inconnu chez ${nom}`.length <= 40 ? `Statut inconnu chez ${nom}` : 'Statut de colis inconnu', body: `« ${propre(t.libelle, 80)} » — VRM ne connaît pas encore ce statut, vérifie avant de te déplacer · ${n}` };
   if (ch.etat === 'retire') return { title: `✅ ${nom} : retiré${jjmmDe(t.etatAt) ? ` le ${jjmmDe(t.etatAt)}` : ''}`, body: `${lieu ? `Au point ${lieu} · ` : ''}${n}` };
   if (ch.etat === 'livre') return { title: `✅ ${nom} : livré${jjmmDe(t.etatAt) ? ` le ${jjmmDe(t.etatAt)}` : ''}`, body: n };
   return { title: `🚚 ${nom} : ton colis est en route`, body: `« ${propre(t.libelle, 120)} » · ${n}` };

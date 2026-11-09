@@ -49,7 +49,7 @@ const hhmm = (t) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris',
     dit(resumeReveil({ prefs, journal, lu: {}, dejaJour: null, maintenant: t0 - 2 * H }).raison === 'pas-l-heure', 'pendant les heures calmes : rien');
     dit(resumeReveil({ prefs, journal, lu: {}, dejaJour: null, maintenant: t0 + 4 * H }).raison === 'pas-l-heure', 'plus de 3 h après la fin : rien');
     dit(resumeReveil({ prefs, journal, lu: null, dejaJour: null, maintenant: t0 }).raison === 'pas-su', 'ce qu\'il a lu illisible : rien (pas su)');
-    dit(resumeReveil({ prefs: {}, journal, lu: {}, dejaJour: null, maintenant: t0 }).raison === 'calme-eteint', 'heures calmes éteintes : rien');
+    dit(resumeReveil({ prefs: { calme: { actif: false } }, journal, lu: {}, dejaJour: null, maintenant: t0 }).raison === 'calme-eteint', 'heures calmes coupées à la main : rien (8 nov. : allumées par défaut)');
     dit(resumeReveil({ prefs, journal, lu: { luJusqua: 9 }, dejaJour: null, maintenant: t0 }).raison === 'rien', 'tout déjà lu : rien');
   }
 

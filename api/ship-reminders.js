@@ -1081,10 +1081,9 @@ async function veilleDesPlantages(maintenant = Date.now()) {
     lireMemo: () => getRow(ID_MEMO_VEILLE),
     lireLignes: (depuisIso) => fetchPaginated(`app_data?id=like.plantage_*&meta->>at=gte.${encodeURIComponent(depuisIso)}&select=${SELECT_VEILLE}`),
     ecrireMemo: (memo) => ecrireDedup(ID_MEMO_VEILLE, memo),
-    // (8 nov.) Rangée dans la cloche SANS sonner : l'alerte groupée de l'heure
-    // (api/_lib/alertes-plantages.js) sonne déjà pour ce qui se répète — la veille du
-    // matin en était le doublon, sans geste (« c'est noté, on corrige »).
-    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement', discret: true }),
+    // (8 nov.) Au propriétaire seul ; une catégorie (`signalement`) : rangée dans sa
+    // cloche et soumise à ses heures calmes (la veille tourne vers 6 h — elle attend 8 h).
+    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement' }),
   }));
 }
 
@@ -1099,10 +1098,9 @@ async function veilleDesLenteurs(maintenant = Date.now()) {
     // (7 nov.) Les éclats du jour additionnés (et l'ancienne ligne d'avant les éclats).
     lireJours: (jours) => histosDesJours({ lire: fetchPaginated, proprio: proprietaire, jours }),
     ecrireMemo: (memo) => ecrireDedup(ID_MEMO_LENTEURS, memo),
-    // (8 nov.) Rangée dans la cloche SANS sonner : l'alerte groupée de l'heure
-    // (api/_lib/alertes-plantages.js) sonne déjà pour ce qui se répète — la veille du
-    // matin en était le doublon, sans geste (« c'est noté, on corrige »).
-    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement', discret: true }),
+    // (8 nov.) Au propriétaire seul ; une catégorie (`signalement`) : rangée dans sa
+    // cloche et soumise à ses heures calmes (la veille tourne vers 6 h — elle attend 8 h).
+    envoyer: (notif) => sendPushToAll({ ...notif, cat: 'signalement' }),
   }));
 }
 

@@ -239,7 +239,7 @@ const iso = (ms) => new Date(ms).toISOString();
     dit(/2 comptes/.test(p.title || '') && /boutique_banc/.test(p.body || '') && /atelier_banc/.test(p.body || '') && !/frais_banc/.test(p.body || ''), 'B2 elle nomme les deux comptes, pas le compte frais', p.body);
     dit(/vinted\.fr/.test(p.body || '') && /navigateur où est l’extension VRM/.test(p.body || ''), 'B3 elle dit le geste : ouvrir vinted.fr sur ce compte, dans le navigateur où est l’extension', p.body);
     dit(p.url && /^\/\?tab=vintedaccounts/.test(p.url), 'B4 le toucher mène à Paramètres → Comptes liés', p.url);
-    const iMemo = journal.findIndex((x) => x.startsWith('memo:')), iPush = journal.findIndex((x) => x.startsWith('push:🔄'));
+    const iMemo = journal.findIndex((x) => x.startsWith('memo:')), iPush = journal.findIndex((x) => /^push:.*pas relus?$/.test(x)); // (8 nov.) titres sans emoji
     dit(iMemo >= 0 && iPush > iMemo && journal[iMemo].includes(`"jour":"${jour}"`), 'B5 le mémo du jour (Paris) est écrit AVANT l’envoi', journal.join(' | '));
     const b = res.corps && res.corps.bilans && res.corps.bilans[0];
     dit(b && b.relecture && b.relecture.relecture === 'envoyé' && b.relecture.n === 2 && !/boutique_banc|atelier_banc/.test(JSON.stringify(b.relecture)), 'B6 la réponse du cron dit « envoyé » et un nombre, aucun pseudo', JSON.stringify(b && b.relecture));
