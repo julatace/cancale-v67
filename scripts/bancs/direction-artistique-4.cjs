@@ -328,6 +328,9 @@ const bleu = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return
         dit(r1.blocs.length >= 4 && r1.blocs.every((x) => x.opaque && x.ecart >= 8 && x.bord === 0), `${nomV} R chaque réglage est un groupe plein sans cadre, détaché du sol`, JSON.stringify(r1.blocs.map((x) => x.ecart + '/' + x.bord)));
         dit(r1.petits.length === 0, `${nomV} R cibles ≥ 44`, r1.petits.join(' · '));
         dit(r1.rouges.length === 0, `${nomV} R aucun rouge`, r1.rouges.join(','));
+        // (9 nov.) Un repli de l'atelier garde sa flèche « › » (la règle des replis vivait sous .vrm-main ; le portail l'avait perdue).
+        const fl = await pg.evaluate(() => [...document.querySelectorAll('.vrm-atelier-voile details.vrm-repli > summary')].map((s) => parseFloat(getComputedStyle(s, '::after').borderRightWidth) || 0));
+        dit(fl.length > 0 && fl.every((w) => w > 0), `${nomV} R chaque repli de l'atelier a sa flèche ›`, JSON.stringify(fl));
         await pg.locator('[data-republier] button', { hasText: /^Retour$/ }).first().click();
         await pg.waitForTimeout(400);
         await cap(pg, `${nomV}-republier-choix`);
