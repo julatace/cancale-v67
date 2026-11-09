@@ -148,7 +148,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const p = a[0] || {};
     console.log(`     sur le téléphone de A : « ${p.title} » / « ${p.body} »`);
     dit(a.length === 1, 'A reçoit UN rappel du soir sur son appareil', `A=${a.length} · HTTP ${r.code}`);
-    dit(/^⏰ Demain : 3 colis à poster/.test(p.title || ''), 'le titre dit « ⏰ Demain : 3 colis à poster » (2 Vinted + 1 eBay ; le colis coché « posté » exclu)', p.title);
+    dit(/^Demain : 3 colis à poster/.test(p.title || '') && /déjà en retard/.test(p.body || ''), 'le titre dit « ⏰ Demain : 3 colis à poster » (2 Vinted + 1 eBay ; le colis coché « posté » exclu)', p.title);
     dit(/1 déjà en retard/.test(p.body || '') && /1 avec la date limite demain/.test(p.body || '') && !/2 déjà en retard/.test(p.body || ''), 'le « dont » : 1 en retard (limite ce soir), 1 avec la date limite demain — le bordereau du colis coché « posté » n’est pas compté', p.body);
     dit(p.url === '/?tab=cat_bord&cible=colonne&colonne=prets', 'le clic ouvre Colis, sur la colonne « Prêts à imprimer » (31 oct.)', p.url);
     dit(b.length === 0, 'B n’a rien à poster ⇒ rien pour B', `B=${b.length}`);

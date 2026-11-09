@@ -162,7 +162,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(b.total === 3, 'le matin compte 3 colis pressés : l’imprimé non parti, la vente sans email, celui de 7 h', `total=${b.total} · ${JSON.stringify({ o: b.overdue, a: b.dueToday, d: b.dueTomorrow, skip: b.skipped || b.vintedSkip })}`);
     dit(b.dueTomorrow === 1 && /1 demain avant 10 h/.test(p.body || ''), 'le colis IMPRIMÉ mais pas parti est compté — « 1 demain avant 10 h » (l’heure lue dans l’email)', p.body);
     dit(b.dueToday === 1 && /Date estimée pour 1/.test(p.body || ''), 'la vente SANS email de bordereau est comptée (vente + 7 j), et dite estimée', p.body);
-    dit(b.overdue === 1 && /1 en retard/.test(p.body || '') && /^⏰/.test(p.title || ''), 'la limite « aujourd’hui 7 h 00 » est EN RETARD à 7 h 10 (le retard compte à partir de l’heure)', `${p.title} / overdue=${b.overdue}`);
+    dit(b.overdue === 1 && /1 en retard/.test(p.body || '') && /retard/i.test(p.title || ''), 'la limite « aujourd’hui 7 h 00 » est EN RETARD à 7 h 10 (le retard compte à partir de l’heure)', `${p.title} / overdue=${b.overdue}`);
     dit(matinDe().length === 1 && p.url === '/?tab=cat_bord&cible=colonne&colonne=prets', 'UNE notification, qui ouvre Colis (colonne « Prêts », 31 oct.)', `${matinDe().length} · ${p.url}`);
   });
 
@@ -253,7 +253,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const b = bilanA(r), p = matinDe()[0] || {};
     console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(b.overdue === 0 && b.aVerifier === 1 && b.total === 3, 'le matin : la vente sans email vendue il y a 8 jours n’est PAS « en retard » — comptée à part (à vérifier), toujours dans le total', JSON.stringify({ o: b.overdue, v: b.aVerifier, t: b.total }));
-    dit(!/retard/i.test(p.title || '') && !/^⏰/.test(p.title || ''), 'le titre du matin ne dit pas « du retard ! » sur une date estimée', p.title);
+    dit(!/retard/i.test(p.title || ''), 'le titre du matin ne dit pas « du retard ! » sur une date estimée', p.title);
     dit(!/en retard/.test(p.body || '') && /1 à vérifier sur Vinted — date estimée dépassée/.test(p.body || ''), 'le corps dit « 1 à vérifier sur Vinted — date estimée dépassée », jamais « en retard »', p.body);
   });
   await essaie('widget, estimée dépassée', async () => {
@@ -267,7 +267,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     await lancer(SOIR, { moment: 'soir' });
     const p = pushes.find((x) => /^soir-/.test(x.tag || '')) || {};
     console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
-    dit(!/déjà en retard/.test(p.body || '') && /^📮/.test(p.title || '') && /2 à vérifier sur Vinted/.test(p.body || ''), 'le soir : ni « déjà en retard » ni ⏰ — « 2 à vérifier sur Vinted » (la vente du 14 et celle du 15, estimées)', `${p.title} / ${p.body}`);
+    dit(!/déjà en retard/.test(p.body || '') && /^Demain : /.test(p.title || '') && !/retard/i.test(p.title || '') && /2 à vérifier sur Vinted/.test(p.body || ''), 'le soir : ni « déjà en retard » ni ⏰ — « 2 à vérifier sur Vinted » (la vente du 14 et celle du 15, estimées)', `${p.title} / ${p.body}`);
   });
   await essaie('module, estimée dépassée', async () => {
     if (!L) throw new Error('module absent');

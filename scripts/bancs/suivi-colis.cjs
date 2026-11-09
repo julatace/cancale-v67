@@ -559,7 +559,7 @@ async function cronDuMatin() {
     const cron = (await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'))).default;
     const lancer = async () => { const r = { code: 0 }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.setHeader = () => {}; r.end = () => r; r.send = () => r; await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r); return r; };
     await lancer();
-    const d1 = pushes.filter((p) => /^📍 Dernier jour · /.test(p.title || ''));
+    const d1 = pushes.filter((p) => /^Dernier jour · /.test(p.title || ''));
     dit(d1.length === 1 && /30000081/.test(d1[0].body || ''), 'cron du matin : « 📍 Dernier jour pour retirer » part pour le colis dont la limite LUE est aujourd\'hui', JSON.stringify(d1.map((p) => p.body)));
     dit(!pushes.some((p) => /30000082/.test(`${p.title} ${p.body}`)), 'cron du matin : rien pour le colis retiré sous une autre clé (n° du sujet)');
     const n = pushes.length; await lancer();

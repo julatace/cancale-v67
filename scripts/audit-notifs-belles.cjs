@@ -238,6 +238,21 @@ const EMOJI = /\p{Extended_Pictographic}/u;
     dit(r2.envoyer && /^Cette nuit : 2 notifications$/.test(r2.title) && r2.title.length <= 40, 'W2 plusieurs : « Cette nuit : 2 notifications »', r2.title);
   });
 
+  await essaie('K — la cloche dit la même chose, regroupée pareil', async () => {
+    const SN = await import('file://' + path.join(R, 'src', 'journalNotifs.js'));
+    const t0 = Date.parse('2026-11-08T10:00:00Z');
+    const brut = { entrees: [
+      { seq: 3, at: new Date(t0).toISOString(), famille: 'poster', cat: 'expedier', genre: 'bordereau', titre: '📦 Bordereau prêt à imprimer', texte: 'A', url: '/?tab=cat_bord', etat: 'envoyee' },
+      { seq: 2, at: new Date(t0 - 6e5).toISOString(), famille: 'ventes', cat: 'vente', genre: 'vente', titre: '💸 Vendu !', texte: 'B', url: '/?tab=ventes', etat: 'envoyee' },
+      { seq: 1, at: new Date(t0 - 9e5).toISOString(), famille: 'poster', cat: 'expedier', genre: 'bordereau', titre: '📦 Bordereau prêt à imprimer', texte: 'C', url: '/?tab=cat_bord', etat: 'envoyee' },
+    ] };
+    const l = SN.entreesDuJournal(brut);
+    dit(l.every((e) => !EMOJI.test(e.titre)), 'K1 une entrée rangée avant le 8 nov. perd ses emoji dans la cloche', l.map((e) => e.titre).join(' | '));
+    const g = SN.regrouperLignes(l);
+    dit(g.length === 2 && g[0].groupe && g[0].titre === '2 bordereaux prêts à imprimer' && g[0].items.length === 2 && g[1].seq === 2, 'K2 deux bordereaux du jour : UNE ligne « 2 bordereaux prêts à imprimer », dépliable ; la vente reste seule', JSON.stringify(g.map((x) => x.titre || x.seq)));
+    dit(SN.quandRelatif(t0 - 5 * 60e3, t0) === 'Il y a 5 min' && SN.quandRelatif(t0 - 30e3, t0) === 'À l’instant', 'K3 l’heure dite comme un téléphone');
+  });
+
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })();

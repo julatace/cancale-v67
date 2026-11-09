@@ -218,8 +218,10 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     const n = dv('A');
     dit(n.length === 1, 'E1 UNE notification', `${n.length}`);
     const p = n[0] || {};
-    dit(p.title === '⚠️ N°231 vendu sur Vinted · encore en ligne sur Leboncoin', 'E1 texte exact « ⚠️ N°231 vendu sur Vinted · encore en ligne sur Leboncoin »', JSON.stringify(p.title));
-    dit(p.body === 'Adidas Samba noire', 'E1 le corps = l’article seul, aucun texte explicatif', JSON.stringify(p.body));
+// (8 nov.) Mise en forme commune (api/_lib/notif-belle.js) : le fait en titre (≤ 40, sans emoji),
+    // « encore en ligne sur … » en tête du corps, puis l'article — rien n'est perdu.
+    dit(p.title === 'N°231 vendu sur Vinted', 'E1 titre exact « N°231 vendu sur Vinted »', JSON.stringify(p.title));
+    dit(p.body === 'Encore en ligne sur Leboncoin · Adidas Samba noire', 'E1 le corps = où elle est encore en ligne, puis l’article — aucun texte explicatif', JSON.stringify(p.body));
     dit(p.url === '/?tab=annonces&site=leboncoin&cible=doublon&num=231&plat=leboncoin', 'E1 ouvre « à retirer de Leboncoin » sur le N°231', p.url);
     dit(dv('B').length === 0, 'E1 rien chez l’autre vendeur');
   });
@@ -238,7 +240,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     dit(r.code === 200 && r.corps && r.corps.type === 'vente-vestiaire', 'E2 l’e-mail Vestiaire est rangé', JSON.stringify(r.corps).slice(0, 120));
     const n = dv('A'); const p = n[0] || {};
     dit(n.length === 1, 'E2 UNE notification double vente', `${n.length}`);
-    dit(p.title === '⚠️ N°45 vendu sur Vestiaire · encore en ligne sur Vinted', 'E2 texte exact « ⚠️ N°45 vendu sur Vestiaire · encore en ligne sur Vinted »', JSON.stringify(p.title));
+    dit(p.title === 'N°45 vendu sur Vestiaire' && /^Encore en ligne sur Vinted · /.test(p.body), 'E2 « N°45 vendu sur Vestiaire » / « Encore en ligne sur Vinted · … »', JSON.stringify([p.title, p.body]));
     dit(p.url === '/?tab=journee', 'E2 ouvre Ma journée (la carte « à retirer de Vinted »)', p.url);
     dit(!/vestiaire:/.test(p.tag || ''), 'E7 l’annonce Vestiaire vendue n’est pas « ailleurs »', p.tag);
   });
@@ -282,7 +284,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     dressing(A, '111', items);
     await recoit(vcVente('a@vrm.test'));
     const n = dv('A'); const p = n[0] || {};
-    dit(n.length === 1 && p.title === '⚠️ N°145 vendu sur Vestiaire · encore en ligne sur Vinted', 'E4a seul le N°145 identifié est nommé', JSON.stringify(n.map((x) => x.title)));
+    dit(n.length === 1 && p.title === 'N°145 vendu sur Vestiaire' && /^Encore en ligne sur Vinted/.test(p.body), 'E4a seul le N°145 identifié est nommé', JSON.stringify(n.map((x) => [x.title, x.body])));
     dit(/vinted:8045(?!\d)/.test(p.tag || '') && !/vinted:80(?!45)\d\d/.test(p.tag || ''), 'E4b la clé ne porte QUE l’annonce 8045', p.tag);
     reset();
     pose(A, 'main', { vinted_annonce_numeros: fiches, vrm_vc_numeros: {} });
@@ -323,7 +325,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     pose(A, 'ebay_retraits_auto', { items: [{ itemId: '1111', sku: 'VRM-231', titre: 'Adidas Samba', at: MAINT - 60e3, ou: 'Vinted' }] });
     await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
     const p = dv('A')[0] || {};
-    dit(p.title === "⚠️ N°231 vendu sur Vinted · encore en ligne sur Leboncoin · retiré d'eBay", 'E6a « … · retiré d’eBay » quand le journal le dit', JSON.stringify(p.title));
+    dit(p.title === 'N°231 vendu sur Vinted' && /^Encore en ligne sur Leboncoin · retiré d'eBay · /.test(p.body), 'E6a « … · retiré d’eBay » quand le journal le dit', JSON.stringify([p.title, p.body]));
     dit(appelsEbay.length === 0, 'E6b le serveur n’appelle JAMAIS eBay (le retrait automatique n’est pas dupliqué)', `${appelsEbay.length}`);
     reset();
     pose(A, 'ebay_retraits_auto', { items: [{ itemId: '1111', sku: 'VRM-231', at: MAINT - 10 * 86400e3 }] });
