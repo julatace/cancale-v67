@@ -75,3 +75,23 @@
 .vrm-inv-resume > div[data-inv-ton="geste"] b { color: var(--vrm-warn); }
 .vrm-inv-section { display: flex; flex-direction: column; gap: 6px; }
 .vrm-inv-section h3 { margin: 4px 0 0; font-size: 15px; font-weight: 700; }
+
+/* (9 nov.) LE PAVÉ GÉANT — au doigt, VRM dessine son pavé (touches de 64 px, bien
+   au-delà des 44 px), sous le pouce ; « B » pour un ancien N° (archive), ⌫ efface.
+   Jetons de la coque seulement : touches neutres, aucune couleur propre. */
+.vrm-inv-pave { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.vrm-inv-touche { min-height: 64px; border: 1px solid var(--vrm-line); border-radius: 14px; background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.vrm-inv-touche:active { background: var(--vrm-card2); }
+.vrm-inv-touche-lettre, .vrm-inv-touche-efface { background: var(--vrm-card2); font-size: 22px; }
+.vrm-inv-touche:disabled { opacity: .4; cursor: default; }
+@media (prefers-reduced-motion: no-preference) { .vrm-inv-touche { transition: background-color .12s ease-out; } }
+
+/* (9 nov.) Hors connexion : la ligne d'en tête (neutre), et l'ambre seulement pour
+   une liste de plus d'un jour (un geste : refaire le bilan avec du réseau). */
+.vrm-inv-hl { margin: 0; padding: 10px 12px; border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-surface); font-size: 13px; font-weight: 600; line-height: 1.4; }
+.vrm-inv-hl-vieux { margin: -4px 0 0; padding: 10px 12px; border: 1px solid var(--vrm-warn); border-radius: 12px; background: var(--vrm-warn-soft); font-size: 13px; line-height: 1.4; }
+
+/* (9 nov.) Le constat d'un inventaire précédent : des N°, en rangée. */
+.vrm-inv-numeros { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 10px 12px; border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-surface); }
+.vrm-inv-numeros.vrm-inv-double { border-color: var(--vrm-doublon); }
+.vrm-inv-precedents h3 { margin-top: 6px; }

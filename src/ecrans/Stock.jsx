@@ -11,12 +11,13 @@ import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees } from '../stockAnnonces.js';
 import { LIGNE_INVENTAIRE } from '../inventaire.js';
-import { AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
 // ⟦← App.jsx #2⟧
 import { InventaireStock } from "../InventaireStock.jsx";
+import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
 
 // ⟦← App.jsx #3⟧
 
@@ -66,7 +67,9 @@ function tasserMeuble(slots, m, presents) {
   return { slots: out, bouges };
 }
 // ⟦← App.jsx #5⟧
-const lireLigneInventaire = async () => {
+// (9 nov.) Exportées : l'app les rejoue au retour du réseau quand un inventaire fait
+// hors connexion attend encore (`rejouerInventaireLocal`, App.jsx).
+export const lireLigneInventaire = async () => {
   if (!AUTH.user) return null;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_INVENTAIRE}${filtreInventaire()}&select=data`, { headers: sbAuth(), cache: 'no-store' });
@@ -78,7 +81,7 @@ const lireLigneInventaire = async () => {
     return { existe: true, data: d && typeof d === 'object' && !Array.isArray(d) ? d : {} };
   } catch (_) { return null; }
 };
-const ecrireLigneInventaire = async ({ existe, rev, data }) => {
+export const ecrireLigneInventaire = async ({ existe, rev, data }) => {
   if (!AUTH.user) return 'ko';
   try {
     if (!existe) {
@@ -229,6 +232,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // du titre (`vrm:inventaire-ouvrir`) ou par Ma journée (`DEMANDE_STOCK_INVENTAIRE`).
   const [inventaire, setInventaire] = React.useState(() => { if (Date.now() - DEMANDE_STOCK_INVENTAIRE.at < 120000) { DEMANDE_STOCK_INVENTAIRE.at = 0; return true; } return false; });
   React.useEffect(() => { const f = () => setInventaire(true); window.addEventListener('vrm:inventaire-ouvrir', f); return () => window.removeEventListener('vrm:inventaire-ouvrir', f); }, []);
+  // (9 nov.) La feuille ouverte est dite à la coque : si le réseau coupe pendant le tour,
+  // l'inventaire hors connexion la rouvre (les saisies sont sur l'appareil). Démontée AVEC
+  // le réseau (changement d'écran), elle ne se rouvrira pas toute seule.
+  React.useEffect(() => { INVENTAIRE_FEUILLE.ouverte = !!inventaire; }, [inventaire]);
+  React.useEffect(() => () => { try { if (typeof navigator === 'undefined' || navigator.onLine !== false) INVENTAIRE_FEUILLE.ouverte = false; } catch (_) {} }, []);
   // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
   // un meuble créé ou une case posée pendant le chargement.
   React.useEffect(() => onCloudReady(() => {
@@ -782,7 +790,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // là », et `jugeable` (la même question que « Plus en ligne »). Les jugements, le
   // bilan, la fusion et l'écriture sont dans src/inventaire.js. AUCUN N° n'est changé :
   // l'écran n'écrit que `vrm_inventaire` ; « Je l'ai sortie » est `sortir` d'ici.
-  const elInventaire = inventaire ? (() => {
+  const fabriquerStockInv = () => {
     let stockInv;
     if (lecture === undefined) stockInv = undefined;
     else if (!aa) stockInv = null;
@@ -801,6 +809,28 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         garder, gardees, jugeable, connues, archive: archiveNumeros(),
         doublons: dblSig && Array.isArray(dblSig.nums) ? new Set(dblSig.nums.map((x) => cleNum(x)).filter(Boolean)) : null, slots };
     }
+    return stockInv;
+  };
+  // (9 nov.) L'INVENTAIRE HORS CONNEXION : la liste des paires attendues, FIGÉE sur cet
+  // appareil au nom de CE vendeur (src/inventaireHorsLigne.js), chaque fois que le Stock
+  // l'a LUE (`aa.su`) — jamais une liste « pas su ». Les réponses de `jugeable` sont
+  // rejouées pour chaque N° qui a une fiche ; aucune écriture de N° (sa seule clé).
+  const sigAttendu = aa && aa.su ? [aa.articles.length, aa.manque.length, lecture && lecture.at, Object.keys(slots || {}).length, Object.keys(garder).length, meubles.length, venduSig && Array.isArray(venduSig.nums) ? venduSig.nums.length : -1].join('|') : '';
+  React.useEffect(() => {
+    if (!sigAttendu) return;
+    const uidV = AUTH.user && AUTH.user.id; if (!uidV) return;
+    const t = setTimeout(() => {
+      try {
+        const st = fabriquerStockInv(); if (!st || !st.su) return;
+        const f = figerAttendu({ uid: uidV, at: Date.now(), stock: st, fichesCles: Object.keys(fichesParCle), meubles, noms: Object.fromEntries(comptesNoms) });
+        if (f) ecrireAttendu(uidV, f, localStorage);
+      } catch (_) {}
+    }, 800);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sigAttendu]);
+  const elInventaire = inventaire ? (() => {
+    const stockInv = fabriquerStockInv();
     const ficheDe = (k) => ficheParCle[k] || (fichesParCle[k] || [])[0] || null;
     return <InventaireStock stock={stockInv} meubles={meubles} slots={slots} owner={AUTH.user?.id || ''} cle={cleNum}
       lire={lireLigneInventaire} ecrire={ecrireLigneInventaire} Feuille={SheetShell} Micro={MicDictee} confirmer={askConfirm} nomsComptes={comptesNoms}

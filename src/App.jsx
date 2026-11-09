@@ -446,7 +446,9 @@ import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stoc
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
 // ⟦→ ecrans/Stock.jsx #2⟧
 import './styles-inventaire.css'; // (8 nov.) style de ./InventaireStock.jsx, gardé à sa place (son écran est chargé à la demande)
-import { LIGNE_INVENTAIRE, enCours as inventaireEnCours } from "./inventaire.js";
+import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, fusionnerInventaire, normaliserInventaire, saisiesVivantes as inventaireSaisies } from "./inventaire.js";
+import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
+import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
 import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
 import { carteArgentJournee } from "./journeeArgent.js";
@@ -2006,6 +2008,8 @@ const wipeLocalData = () => {
   } catch (_) {}
   // La réserve des QR de Ma journée hors ligne part avec les photos (`vrm_hl_photo_*`).
   try { if (typeof caches !== 'undefined') caches.delete(CACHE_QR).catch(() => {}); } catch (_) {}
+  // (9 nov.) Et les bordereaux gardés pour le hors connexion (src/bordereauxHorsLigne.js).
+  try { if (typeof caches !== 'undefined') caches.delete(CACHE_PDF).catch(() => {}); } catch (_) {}
 };
 // Mémorise à qui appartiennent les données présentes dans ce navigateur.
 const OWNER_MARK = 'vrm_local_owner';
@@ -4972,7 +4976,11 @@ const lirePdfLigne = async (rowId, avec = '', entetes) => {
     const { b: v, ...scalaires } = ligne;
     if (!v || v === 'None') return { absent: true, ...scalaires };
     const octets = b64ToBytes(v);
-    return estOctetsPdf(octets) ? { octets, ...scalaires } : { absent: true, ...scalaires };
+    if (!estOctetsPdf(octets)) return { absent: true, ...scalaires };
+    // (9 nov.) Un bordereau déjà ouvert est gardé pour le hors connexion (src/bordereauxHorsLigne.js) :
+    // au nom de CE vendeur, jamais pour l'équipe (`entetes` : la ligne d'un autre), jamais `label_latest`.
+    if (!entetes && AUTH.user && AUTH.user.id && estLigneBordereau(rowId)) { try { garderPdf(AUTH.user.id, rowId, octets).catch(() => {}); } catch (_) {} }
+    return { octets, ...scalaires };
   } catch (_) { return null; }
 };
 // La règle « le PDF capté par l'extension d'abord, l'email en secours », UNE
@@ -16743,7 +16751,105 @@ function EnGrandHorsLigne({ r, at, onClose }) {
   );
 }
 // Ce qui ne part PAS en file : dit une fois, là où on le chercherait.
-const RefusHorsLigne = () => <p data-hl-refuse="" style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'-4px 2px 14px'}}>Imprimer un bordereau ou répondre à un acheteur demande le réseau : rien n’est mis en file pour ça.</p>;
+const RefusHorsLigne = () => <p data-hl-refuse="" style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'-4px 2px 14px'}}>Générer un bordereau, imprimer avec le N° tamponné ou répondre à un acheteur demande le réseau : rien n’est mis en file pour ça. Un bordereau déjà ouvert sur cet appareil se rouvre ici, tel quel.</p>;
+// (9 nov.) LES BORDEREAUX DÉJÀ OUVERTS, hors connexion (src/bordereauxHorsLigne.js) : pour
+// chaque colis à déposer qui porte ses lignes de bordereau (son identité), le PDF gardé
+// ici devient un vrai lien (un `<a>` : il s'ouvre aussi sur iPhone, sans fenêtre réservée).
+// Pas gardé ⇒ dit, jamais un faux bouton. Rien n'est téléchargé.
+function usePdfsHorsLigne(uid, lignes) {
+  const [urls, setUrls] = React.useState({});
+  const sig = (lignes || []).map((e) => (e && e.tx ? e.tx + ':' + (e.pdf || []).join(',') : '')).join('|');
+  React.useEffect(() => {
+    let vivant = true; const faites = [];
+    (async () => {
+      const out = {};
+      for (const e of lignes || []) {
+        if (!e || !e.tx || !Array.isArray(e.pdf) || !e.pdf.length) continue;
+        const b = await lirePdfGarde(uid, e.pdf);
+        if (b) { try { const u = URL.createObjectURL(b); faites.push(u); out[e.tx] = u; } catch (_) {} } else out[e.tx] = '';
+      }
+      if (vivant) setUrls(out); else faites.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} });
+    })();
+    return () => { vivant = false; setTimeout(() => faites.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }), 60000); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, sig]);
+  return urls;
+}
+// (9 nov.) L'INVENTAIRE HORS CONNEXION : la feuille de l'inventaire (src/InventaireStock.jsx,
+// chargée à la demande — son morceau est déjà sur l'appareil si le Stock a été ouvert) jugée
+// contre la DERNIÈRE liste des paires que le Stock a lue (src/inventaireHorsLigne.js), avec
+// son heure. Les saisies restent sur l'appareil et partent au retour du réseau
+// (`useRejouerInventaire`). AUCUN numéro n'est changé : ni lecture ni écriture de la base ici.
+const InventaireStockParesseux = lazy(() => import('./InventaireStock.jsx').then((m) => ({ default: m.InventaireStock })));
+const lireInventaireHl = async () => null;          // hors connexion : rien n'est lu, donc rien n'est écrit
+const ecrireInventaireHl = async () => 'ko';
+function BlocInventaireHorsLigne({ uid, ouvrirAuto = false }) {
+  const figee = React.useMemo(() => { try { return lireAttendu(uid, localStorage); } catch (_) { return null; } }, [uid]);
+  const stock = React.useMemo(() => degelerAttendu(figee), [figee]);
+  const [ouvert, setOuvert] = React.useState(() => !!figee && (ouvrirAuto || INVENTAIRE_FEUILLE.ouverte));
+  const ouvertRef = React.useRef(ouvert); ouvertRef.current = ouvert;
+  // Le réseau revient pendant le tour : le Stock rouvre la feuille, au même endroit.
+  React.useEffect(() => () => { if (ouvertRef.current && typeof navigator !== 'undefined' && navigator.onLine !== false) { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } }, []);
+  const noms = React.useMemo(() => new Map(Object.entries((figee && figee.noms) || {})), [figee]);
+  const carte = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'12px 14px', marginBottom:14 };
+  if (!figee) return (
+    <div data-hl-inventaire="sans-liste" style={carte}>
+      <div style={{fontSize:15,fontWeight:700,color:C.text}}>Inventaire</div>
+      <div style={{fontSize:13,color:C.muted,marginTop:2,lineHeight:1.45}}>Aucune liste de tes paires n’est gardée sur cet appareil : ouvre le Stock une fois avec du réseau, et l’inventaire marchera ensuite sans connexion.</div>
+    </div>);
+  const nA = figee.nArticles || figee.articles.length;
+  return (<>
+    <div data-hl-inventaire="liste" data-hl-inventaire-at={new Date(figee.at).toISOString()} style={{...carte,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+      <div style={{flex:1,minWidth:180}}>
+        <div style={{fontSize:15,fontWeight:700,color:C.text}}>Inventaire</div>
+        <div style={{fontSize:13,color:C.muted,marginTop:2,lineHeight:1.45}}>Fais le tour de tes cartons sans réseau : {nA} paire{nA > 1 ? 's' : ''} attendue{nA > 1 ? 's' : ''} selon la liste du {quandEtat(figee.at)}.</div>
+      </div>
+      <Bouton variante="secondaire" data-hl-inventaire-ouvrir="" onClick={() => setOuvert(true)} style={{minHeight:44}}>Faire l’inventaire</Bouton>
+    </div>
+    {ouvert ? <Suspense fallback={null}><InventaireStockParesseux stock={stock} meubles={figee.meubles || []} slots={(stock && stock.slots) || {}} owner={uid} cle={cleNum}
+      lire={lireInventaireHl} ecrire={ecrireInventaireHl} Feuille={SheetShell} Micro={null} confirmer={askConfirm} nomsComptes={noms}
+      horsLigne={{ at: figee.at }} onFermer={() => setOuvert(false)}
+      onFiche={null} onVoirCase={null} onSortir={null} peutSortir={null}/></Suspense> : null}
+  </>);
+}
+// (9 nov.) AU RETOUR DU RÉSEAU, l'inventaire fait hors connexion part tout seul, même
+// feuille fermée : la RÈGLE normale (lire-fusionner-réécrire sur `rev`, src/inventaire.js) —
+// union par saisie, donc rejouer deux fois ne double rien. Seulement si des saisies
+// attendent (`vrm_inventaire_attente_{uid}`) ; une lecture ratée n'écrit rien (on réessaie
+// au prochain retour). Le morceau du Stock n'est chargé que dans ce cas.
+let _rejeuInventaire = null;
+const rejouerInventaireLocal = () => {
+  if (_rejeuInventaire) return _rejeuInventaire;
+  _rejeuInventaire = (async () => {
+    try {
+      const uidV = AUTH.user && AUTH.user.id; if (!uidV) return 'sans';
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'hors';
+      if (!localStorage.getItem(cleAttenteInventaire(uidV))) return 'rien';
+      const cle = 'vrm_inventaire_local_' + uidV;
+      const brut = localStorage.getItem(cle); if (!brut) { localStorage.removeItem(cleAttenteInventaire(uidV)); return 'rien'; }
+      const local = normaliserInventaire(JSON.parse(brut));
+      const m = await import('./ecrans/Stock.jsx');
+      const r = await enregistrerInventaire({ lire: m.lireLigneInventaire, ecrire: m.ecrireLigneInventaire, local });
+      if (!r.ok) return 'ko';
+      // Ce que l'appareil a noté PENDANT l'envoi reste : on refusionne avec la copie du moment.
+      const maintenant = localStorage.getItem(cle);
+      const fus = fusionnerInventaire(r.data, maintenant ? JSON.parse(maintenant) : local);
+      localStorage.setItem(cle, JSON.stringify(fus));
+      if (maintenant === brut) localStorage.removeItem(cleAttenteInventaire(uidV));
+      return 'ok';
+    } catch (_) { return 'ko'; }
+  })().finally(() => { setTimeout(() => { _rejeuInventaire = null; }, 0); });
+  return _rejeuInventaire;
+};
+function useRejouerInventaire(pret) {
+  React.useEffect(() => {
+    if (!pret) return undefined;
+    const f = () => { rejouerInventaireLocal(); };
+    const t = setTimeout(f, 1500);
+    window.addEventListener('online', f);
+    return () => { clearTimeout(t); window.removeEventListener('online', f); };
+  }, [pret]);
+}
 // Les onglets qui montrent COLIS hors réseau (`cat_bord`, et ceux qui y mènent).
 const ONGLETS_COLIS_HL = ['cat_bord', 'retraits', 'cat_achats', 'cat_expedition'];
 function JourneeHorsLigne({ uid, tab }) {
@@ -16753,6 +16859,15 @@ function JourneeHorsLigne({ uid, tab }) {
   const gestes = useGestesHorsLigne();
   const [enGrand, setEnGrand] = React.useState(null);
   const colis = ONGLETS_COLIS_HL.includes(tab);
+  const pdfs = usePdfsHorsLigne(uid, photo ? photo.envoyer : []);
+  // (9 nov.) Le Stock hors connexion : l'inventaire contre la dernière liste gardée.
+  if (tab === 'garage') return (
+    <div data-hors-ligne="stock" style={{padding:'16px 14px 40px'}}>
+      <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>Stock</h2>
+      <LigneHorsLigne>Hors connexion — tes meubles et tes annonces ne peuvent pas être relus. L’inventaire, lui, marche avec la dernière liste gardée ici.</LigneHorsLigne>
+      <BlocInventaireHorsLigne uid={uid}/>
+    </div>
+  );
   // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
   // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
   const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? 'Colis' : 'Ma journée'}</h2>;
@@ -16761,6 +16876,7 @@ function JourneeHorsLigne({ uid, tab }) {
       {titre}
       <LigneHorsLigne>Hors connexion — aucune copie {colis ? 'de tes colis' : 'de ta journée'} n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
       <BlocCodesHorsLigne/>
+      {!colis ? <div style={{marginTop:12}}><BlocInventaireHorsLigne uid={uid}/></div> : null}
     </div>
   );
   const maintenant = Date.now();
@@ -16780,7 +16896,7 @@ function JourneeHorsLigne({ uid, tab }) {
     return 'à poster avant le ' + new Date(e.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
   };
   const blocEnvoyer = (<>
-    {tete('À envoyer', photo.nEnvoyer)}
+    {tete('À déposer', photo.nEnvoyer)}
     <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
       {photo.envoyer.length === 0
         ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à envoyer à {quand}.</div>
@@ -16790,7 +16906,11 @@ function JourneeHorsLigne({ uid, tab }) {
               <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
               <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
             </div>
-            <GesteHorsLigne etat={ef} libelle="Colis fait" fait="Noté fait" peut={!!e.tx} onOui={() => gestes.faire(e, true)} onNon={() => gestes.faire(e, false)} attrs={{ 'data-hl-fait-btn': '' }}/>
+            {e.tx && Array.isArray(e.pdf) && e.pdf.length ? (pdfs[e.tx]
+              ? <a className="vrm-b vrm-b-secondaire vrm-b-petit" data-hl-pdf={e.tx} href={pdfs[e.tx]} target="_blank" rel="noopener" download={`bordereau${e.numero ? '-N' + e.numero : ''}.pdf`} style={{flexShrink:0}}>Bordereau</a>
+              : (pdfs[e.tx] === '' ? <span data-hl-pdf-absent={e.tx} style={{fontSize:12,color:C.muted,flexShrink:0}}>Bordereau pas gardé ici</span> : null)) : null}
+            <GesteHorsLigne etat={ef} libelle="Déposé" fait="Noté déposé" peut={!!e.tx} onOui={() => gestes.faire(e, true)} onNon={() => gestes.faire(e, false)} attrs={{ 'data-hl-fait-btn': '' }}/>
+            {!e.tx ? <span data-hl-sans-geste="" style={{flexBasis:'100%',fontSize:12,color:C.muted}}>{e.plateforme === 'ebay' ? 'eBay : le dépôt se suit dans eBay, au retour du réseau.' : 'Colis gardé sans son identité : « Déposé » attend le réseau.'}</span> : null}
           </div>); })}
       {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
     </div>
@@ -16866,6 +16986,7 @@ function JourneeHorsLigne({ uid, tab }) {
         {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
       </div>
       {blocAVerifier}
+      <BlocInventaireHorsLigne uid={uid}/>
       {feuille}
     </div>
   );
@@ -22121,6 +22242,10 @@ const DEMANDE_STOCK_CASE = { m: null, i: null, at: 0 };
 // l'ouvre en montant, une fois (valable 2 min). Le bouton du titre du Stock, lui, parle
 // à l'écran déjà monté (`vrm:inventaire-ouvrir`).
 const DEMANDE_STOCK_INVENTAIRE = { at: 0 };
+// (9 nov.) La feuille de l'inventaire est-elle ouverte ? Le Stock la tient ; si le réseau
+// coupe pendant le tour, l'inventaire HORS CONNEXION (Ma journée hors ligne) la rouvre là
+// où il en était (les saisies sont sur l'appareil, `vrm_inventaire_local_{uid}`).
+const INVENTAIRE_FEUILLE = { ouverte: false };
 // (19 oct.) Colis → « Suivi et message à l'acheteur » d'une vente eBay : la
 // commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
 // monté au moment du clic) ; lue une fois, valable 30 s.
@@ -34943,7 +35068,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const envoyer = toShip.map((t) => {
         const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
-        return { titre: o.title, numero: (o && o._venteEmail) ? ((effEntry(o) || {}).numero || '') : (((saleOv[tid] || {}).numero) || (b && b.numero) || ''), compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee', tx: tid };
+        // (9 nov.) `pdf` : les lignes de bordereau de CETTE vente (par sa transaction : le capté,
+        // puis l'e-mail) — hors connexion, celui déjà ouvert ici s'affiche (src/bordereauxHorsLigne.js).
+        const cap = tid ? labelsCaptes[tid] : null;
+        return { titre: o.title, numero: (o && o._venteEmail) ? ((effEntry(o) || {}).numero || '') : (((saleOv[tid] || {}).numero) || (b && b.numero) || ''), compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee', tx: tid,
+          pdf: lignesPdfPhoto([cap && cap.row, b && b.hasPdf ? b._row : null]) };
       }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
       // ⚠️ (revue du 23 oct.) « À RETIRER » = EXACTEMENT ce que la tuile compte
       // en ligne (`pickupUnion.emailList` + `extra`, §11). Les colis « à
@@ -34968,7 +35097,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (photo && ecrirePhoto(uid, photo, localStorage)) rechaufferQr(photo);
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseKO, accountsReady, cleComptes, sales, buys, tracking, emailBords, colisRelaisLu, colisEb, toShip, pickupUnion]);
+  }, [baseKO, accountsReady, cleComptes, sales, buys, tracking, emailBords, colisRelaisLu, colisEb, toShip, pickupUnion, labelsCaptes]);
 
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
@@ -50148,6 +50277,8 @@ function AppCoeur() {
   // réglages SYNCHRONISÉS, pas des réglages d'appareil (§5.49).
   const [nuagePret, setNuagePret] = useState(() => isCloudReady());
   useEffect(() => onCloudReady(() => setNuagePret(true)), []);
+  // (9 nov.) Un inventaire fait HORS CONNEXION part au retour du réseau, feuille fermée ou non.
+  useRejouerInventaire(nuagePret && !exempleActif());
   // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou un dressing relu) — le tableau
   // de bord recompte, comme l'écran Annonces (la même règle, §11).
   // ⚠️⚠️ Revue de la 5.165 : ce signal relançait TOUT le calcul — ventes, annonces
@@ -52307,4 +52438,4 @@ function AppCoeur() {
   );
 }
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
-export { ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
+export { ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
