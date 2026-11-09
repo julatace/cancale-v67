@@ -273,9 +273,12 @@ async function main() {
       });
 
       // ── E. (9 nov.) le bordereau déjà ouvert, « À déposer », « Déposé » en file ──
-      console.log(`\n── ${T} · E. au comptoir sans réseau : bordereau déjà ouvert, « Déposé » en file`);
+      // E se joue en clair puis en sombre (le thème choisi : `vinted_dark`).
+      for (const sombre of [false, true]) {
+      console.log(`\n── ${T} · E. au comptoir sans réseau (${sombre ? 'sombre' : 'clair'}) : bordereau déjà ouvert, « Déposé » en file`);
       await essaie(`${T} E`, async () => {
-        const ctx = await nav.newContext(opts);
+        const ctx = await nav.newContext({ ...opts, colorScheme: sombre ? 'dark' : 'light' });
+        await ctx.addInitScript((d) => { try { localStorage.setItem('vinted_dark', JSON.stringify(d)); } catch (_) {} }, sombre);
         await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
         const etat = { hors: false, rows: ROWS_E };
         await brancher(ctx, etat);
@@ -314,7 +317,7 @@ async function main() {
         dit(r.absent && !r.lien2, 'la 70002 (bordereau jamais ouvert ici) : « pas gardé ici », aucun faux bouton', JSON.stringify({ absent: r.absent, lien2: r.lien2 }));
         dit(r.titres.length === 1 && r.titres[0] === 'À déposer · 2' && r.deposer.length === 2 && r.deposer.every((x) => x === 'Déposé'), 'la liste dit « À déposer · 2 », chaque colis a « Déposé »', JSON.stringify({ t: r.titres, d: r.deposer }));
         dit(/^Hors connexion — dernier état du \d{1,2} \S+ à \d{2}:\d{2}\./.test(r.ligne.trim()), 'le bandeau dit l\'heure du dernier état', r.ligne);
-        if (process.env.SHOT_HL) await pg.screenshot({ path: `${process.env.SHOT_HL}-${vp.width}-comptoir.png`, fullPage: true }).catch(() => {});
+        if (process.env.SHOT_HL) await pg.screenshot({ path: `${process.env.SHOT_HL}-${vp.width}-${sombre ? 'sombre' : 'clair'}-comptoir.png`, fullPage: true }).catch(() => {});
         // « Déposé » : noté, annulé, renoté — UNE marque, qui part au retour du réseau.
         const nAvant = (etat.ecrits || []).length;
         const btn = '[data-hl-colis]:has-text("Nike Air Max 1 banc") [data-hl-fait-btn]';
@@ -334,6 +337,7 @@ async function main() {
         dit(erreurs.length === 0, 'aucune erreur d\'app (E)', erreurs.join(' | '));
         await ctx.close();
       });
+      }
 
       // ── C. la photo d'un autre vendeur n'est jamais servie ────────────────
       console.log(`\n── ${T} · C. la photo d'un autre vendeur reste à lui`);
