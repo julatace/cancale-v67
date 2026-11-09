@@ -28,6 +28,10 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
+// (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
+import { OffresSoloPro, ouvrirQuelCompte } from '../abonnement/PlansSoloPro.jsx';
+import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
+import { publierAbonnement } from '../abonnement/etatAbonnement.js';
 
 // (8 nov.) « Vérifier mon installation » : le même contrôle que le guide de démarrage (src/guideDemarrage.js).
 import { VerifierInstallationApp } from '../App.jsx';
@@ -2706,6 +2710,46 @@ function MonAbonnement() {
     toast(r.annuleFinPeriode ? `✓ Abonnement résilié — VRM reste ouvert jusqu'au ${dateLisible(r.finPeriode || e.finPeriode)}` : '✓ Abonnement repris — rien ne change pour toi');
   };
   const et = etatAbonnement(e);
+  // (9 nov.) SOLO ⇄ PRO : le prix change chez Stripe (prorata), CGV cochées avant.
+  const changerOffre = async (plan) => {
+    if (!cgv) { setMsg("Coche les deux cases (conditions de vente et accès immédiat) avant de changer d'offre."); return; }
+    const oui = await askConfirm({ title: plan === 'pro' ? 'Passer à Pro ?' : 'Revenir à Solo ?',
+      desc: plan === 'pro'
+        ? 'Les ventes de tous tes comptes reviennent tout de suite, dans tes listes et tes totaux. Stripe calcule la différence au prorata sur ta prochaine facture.'
+        : 'Un seul compte vendra : tu le choisiras ensuite. Les ventes de tes autres comptes sortent de tes totaux, rien n’est supprimé. Stripe calcule la différence au prorata.',
+      ok: plan === 'pro' ? 'Passer à Pro' : 'Revenir à Solo', cancel: 'Annuler' });
+    if (!oui) return;
+    setOccupe(plan); setMsg('');
+    try {
+      const r = await fetch('/api/compte?mode=changer-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ plan, cgv: true, accesImmediat: true }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j && j.ok) {
+        const x = await lireAbonnement();
+        if (x) { setE(x); publierAbonnement(x); }
+        toast(plan === 'pro' ? '✓ Tu es en Pro : tous tes comptes vendent' : '✓ Tu es en Solo : choisis le compte qui vend');
+        if (plan === 'solo') ouvrirQuelCompte();
+      } else setMsg((j && j.message) || "Ton offre n'a pas changé. Réessaie dans un instant.");
+    } catch (_) { setMsg('Pas de connexion : ton offre n’a pas changé.'); }
+    setOccupe('');
+  };
+  const PRO_AFFICHE = `${PRIX_PRO_MOIS} € / mois`;
+  const groupeOffres = (
+    <div data-groupe-offres="">
+      {/* Les offres ne se montrent qu'à un plan SÛR : un ancien prix (9,99 €…) ou un prix pas lu n'affiche jamais le prix du moment à côté du sien. */}
+      {e && (e.plan === 'solo' || e.plan === 'pro') && <OffresSoloPro x={e} prixSolo={prixLisible(e && e.prix)} prixActuel={et.prixAbonnement} prixProAffiche={PRO_AFFICHE} occupe={occupe}
+        onChoisirPro={e && e.plan === 'solo' ? () => changerOffre('pro') : null}
+        onChoisirSolo={e && e.plan === 'pro' && !e.proprietaire ? () => changerOffre('solo') : null}/>}
+      {e && e.plan === 'solo' && (
+        <GroupeIos titre="Le compte qui vend" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Tes autres comptes restent des comptes d’achat. Changement possible une fois tous les 30 jours.'}>
+          <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Pas encore choisi</span>}
+            detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
+            onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
+        </GroupeIos>
+      )}
+      {e && e.plan === 'solo' && e.offres && e.offres.pro && e.offres.pro.ouvert && <CaseCgv cases={cases} onChange={setCases}/>}
+      {e && e.plan == null && e.planRaison === 'cgv-anterieures' && <div className="vrm-ios-groupe-pied" data-plan-raison="cgv-anterieures" style={{ margin: '8px 16px 0' }}>Ton abonnement a été pris avant les offres Solo et Pro : tous tes comptes vendent, comme le disaient tes conditions.</div>}
+    </div>
+  );
   const pied = <div className="vrm-ios-groupe-pied" style={{ margin: '12px 16px 0' }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>;
   if (e === undefined) return <div data-abonnement="chargement" data-abonnement-etat="chargement"><Tete etat="Ton abonnement" phrase="Je regarde…"/></div>;
   if (e === null) return <div data-abonnement="pas-su" data-abonnement-etat="pas-su"><Tete etat="Ton abonnement" phrase="Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé."/></div>;
@@ -2734,7 +2778,17 @@ function MonAbonnement() {
             Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
           </div>
         )}
+        {e.offres && e.offres.pro && !e.offres.pro.ouvert && (
+          <div data-pro-geste={e.offres.pro.raison || 'pas-su'} style={note}>
+            {e.offres.pro.raison === 'prix-different'
+              ? <>L'offre Pro reste <b>fermée</b> : le prix réglé chez Stripe (<b data-pro-prix-stripe="">{e.offres.pro.texteStripe || 'un autre montant'}</b>) n'est pas celui des conditions de vente ({PRIX_PRO_MOIS} € / mois). Corrige le prix « VRM Pro » dans Stripe.</>
+              : e.offres.pro.raison === 'prix-illisible'
+                ? <>L'offre Pro reste <b>fermée</b> : le prix posé dans <b>STRIPE_PRIX_PRO</b> est introuvable (ou archivé) chez Stripe.</>
+                : <>L'offre Pro ({PRIX_PRO_MOIS} € / mois) s'affiche « bientôt », sans paiement. Pour l'ouvrir : Stripe → Produits → « VRM Pro » → prix récurrent {PRIX_PRO_MOIS} € EUR mensuel, clé de recherche « vrm_pro_mensuel » → copie l'identifiant price_… dans Vercel, variable <b>STRIPE_PRIX_PRO</b>.</>}
+          </div>
+        )}
       </Tete>
+      {groupeOffres}
     </div>
   );
   // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
@@ -2774,6 +2828,7 @@ function MonAbonnement() {
     return (<>
       <div data-abonnement="actif" data-abonnement-etat={et.etat} data-resilie={annule ? '' : undefined} data-essai-jours={enEssai && Number.isInteger(et.jours) ? et.jours : undefined}>
         {tete}
+        {groupeOffres}
         {annule && (
           <div className="vrm-abo-actions" style={{ padding: '0 0' }}>
             <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
@@ -2849,6 +2904,7 @@ function MonAbonnement() {
           {!e.obligatoire && <> Pour l'instant VRM reste gratuit pour toi.</>}
         </span>}>
         {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+        <OffresSoloPro x={e} prixSolo={prixLisible(e.prix)} prixProAffiche={`${PRIX_PRO_MOIS} € / mois`}/>
         <CaseCgv cases={cases} onChange={setCases}/>
         <div className="vrm-abo-actions">
           <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>

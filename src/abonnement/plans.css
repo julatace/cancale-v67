@@ -1,0 +1,34 @@
+/* Solo et Pro (9 nov.) — portée limitée à ces blocs (aucun style global). */
+.vrm-plan-hors { display: grid; gap: var(--d-e-3, 12px); margin: var(--d-e-3, 12px) 0; }
+.vrm-plan-bloc { padding: var(--d-e-4, 16px); border-radius: var(--d-r-carte, 14px); background: var(--d-carte, #fff); box-shadow: var(--d-ombre-carte, none); color: var(--d-encre, #1d1d1f); }
+.vrm-plan-bloc-titre { margin: 0; font-size: var(--d-t-15, 15px); font-weight: 600; }
+.vrm-plan-phrase { font-size: var(--d-t-13, 13px); line-height: 1.45; color: var(--d-gris, #6e6e73); margin-top: 4px; }
+.vrm-plan-lignes { list-style: none; margin: 10px 0 12px; padding: 0; }
+.vrm-plan-ligne { display: flex; justify-content: space-between; gap: 12px; min-height: 44px; align-items: center; border-top: 1px solid var(--d-filet, rgba(0,0,0,.08)); font-size: var(--d-t-15, 15px); }
+.vrm-plan-ligne-titre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-plan-ligne-prix { font-variant-numeric: tabular-nums; flex: none; }
+.vrm-plan-hors [data-apercu-floute] { filter: blur(7px) saturate(.7); opacity: .45; -webkit-user-select: none; user-select: none; pointer-events: none; }
+.vrm-plan-hors .vrm-b, .vrm-plan-feuille .vrm-b, .vrm-plan-offre .vrm-b { min-height: 44px; }
+.vrm-plan-voile { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.32); }
+@media (min-width: 768px) { .vrm-plan-voile { align-items: center; } }
+.vrm-plan-feuille { box-sizing: border-box; width: min(480px, 100vw); max-height: 88vh; overflow: auto; padding: var(--d-e-5, 20px) 16px calc(16px + env(safe-area-inset-bottom, 0px)); border-radius: var(--d-r-carte, 14px) var(--d-r-carte, 14px) 0 0; background: var(--d-fond, #f5f5f7); color: var(--d-encre, #1d1d1f); }
+@media (min-width: 768px) { .vrm-plan-feuille { border-radius: var(--d-r-carte, 14px); } }
+.vrm-plan-feuille-titre { font-size: var(--d-t-20, 20px); font-weight: 700; }
+.vrm-plan-comptes { display: grid; gap: 8px; margin: 14px 0; }
+.vrm-plan-compte { display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; align-items: center; text-align: left; min-height: 56px; padding: 10px 12px; border: 0; border-radius: var(--d-r-case, 10px); background: var(--d-carte, #fff); color: inherit; font: inherit; cursor: pointer; }
+.vrm-plan-compte:disabled { opacity: .55; cursor: default; }
+.vrm-plan-rond { grid-row: span 2; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--d-gris, #8e8e93); box-sizing: border-box; }
+.vrm-plan-rond[data-coche] { border: 6px solid var(--d-accent, #0071E3); }
+.vrm-plan-compte-nom { font-size: var(--d-t-15, 15px); font-weight: 600; overflow-wrap: anywhere; }
+.vrm-plan-compte-id { font-weight: 400; color: var(--d-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-plan-compte-detail { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6e6e73); }
+.vrm-plan-alerte { font-size: var(--d-t-13, 13px); color: var(--d-ambre, #b25000); margin-bottom: 8px; }
+.vrm-plan-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.vrm-plan-offres { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+@media (max-width: 520px) { .vrm-plan-offres { grid-template-columns: 1fr; } }
+.vrm-plan-offre { display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: var(--d-r-carte, 14px); background: var(--d-carte, #fff); box-shadow: var(--d-ombre-carte, none); color: var(--d-encre, #1d1d1f); }
+.vrm-plan-offre[data-offre-actuelle] { box-shadow: 0 0 0 2px var(--d-accent, #0071E3); }
+.vrm-plan-offre-nom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--d-t-17, 17px); font-weight: 700; }
+.vrm-plan-offre-prix { font-size: var(--d-t-15, 15px); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-plan-pastille { font-size: var(--d-t-11, 11px); font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--d-remplir, rgba(0,0,0,.06)); color: var(--d-gris, #6e6e73); }
+.vrm-plan-offre .vrm-b { margin-top: auto; }
