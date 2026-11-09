@@ -45,9 +45,16 @@ const PARTIS = [
   [7104, 12, null],
   [7105, 2, { suivi: '', transporteur: '' }],
   [7106, 5, { suivi: 'XA200000006FR', transporteur: '' }],
+  // (9 nov., transporteurs inconnus) L'ÉTIQUETTE : 7107 — l'e-mail ne nomme personne, le PDF de SON
+  // bordereau nomme Mondial Relay (rangé à la réception, `transporteurPdf`) ; 7108 — aucun bordereau
+  // e-mail, l'étiquette captée par l'extension relue au cron (`vrm_bord_transporteurs.pdf`) nomme Chronopost.
+  // Les 8 ventes portent le MÊME titre : rien ne passe d'une vente à l'autre.
+  [7107, 4, { suivi: '', transporteur: '', transporteurPdf: 'mondialrelay', pdfLu: 'ok' }],
+  [7108, 6, null],
 ];
-const ATTENDU_ORDRE = ['v:7102', 'v:7105', 'v:7101', 'v:7106', 'v:7103', 'v:7104'];
-const ATTENDU_TR = { 'v:7101': 'chronopost', 'v:7102': 'mondialrelay', 'v:7103': 'chronopost', 'v:7104': 'inconnu', 'v:7105': 'inconnu', 'v:7106': 'inconnu' };
+const ATTENDU_ORDRE = ['v:7102', 'v:7105', 'v:7101', 'v:7107', 'v:7106', 'v:7108', 'v:7103', 'v:7104'];
+const ATTENDU_TR = { 'v:7101': 'chronopost', 'v:7102': 'mondialrelay', 'v:7103': 'chronopost', 'v:7104': 'inconnu', 'v:7105': 'inconnu', 'v:7106': 'inconnu', 'v:7107': 'mondialrelay', 'v:7108': 'chronopost' };
+const N_ENV = ATTENDU_ORDRE.length;
 // À envoyer : 7201 (limite dans 4 j, vendue il y a 1 j), 7202 (limite demain, vendue il y a 5 j).
 const AENV = [[7201, 1, 4], [7202, 5, 1]];
 const fmtLimite = (j) => { const d = new Date(MS + j * J); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} 23:59`; };
@@ -58,7 +65,10 @@ const lignes = () => [
     ...AENV.map(([tx, j]) => ({ transaction_id: tx, title: TITRE, price: { amount: '80.0', currency_code: 'EUR' }, status: 'Bordereau d’envoi envoyé au vendeur', transaction_user_status: 'needs_action', date: ilYa(j) })),
   ] } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [] } } },
-  ...PARTIS.filter((p) => p[2]).map(([tx, j, b]) => ({ id: 'email_bord_' + tx, data: { type: 'bordereau', transaction: String(tx), uid: '111', account: 'compte_a', filename: `Bordereau-Vinted-${tx}.pdf`, modele: TITRE, article: TITRE, receivedAt: ilYa(j - 0.1), pdfB64: PDF_B64, suivi: b.suivi, transporteur: b.transporteur, dateLimite: '' } })),
+  ...PARTIS.filter((p) => p[2]).map(([tx, j, b]) => ({ id: 'email_bord_' + tx, data: { type: 'bordereau', transaction: String(tx), uid: '111', account: 'compte_a', filename: `Bordereau-Vinted-${tx}.pdf`, modele: TITRE, article: TITRE, receivedAt: ilYa(j - 0.1), pdfB64: PDF_B64, suivi: b.suivi, transporteur: b.transporteur, dateLimite: '', ...(b.transporteurPdf ? { transporteurPdf: b.transporteurPdf, pdfLu: b.pdfLu } : {}) } })),
+  { id: 'vrm_bord_transporteurs', data: { v: 1, parTx: {}, vus: {}, pdf: { 7108: { t: 'chronopost' } }, pdfVus: {} } },
+  // (9 nov.) Une information reçue par SMS de VestiaireCo (sans identité) : DITE dans « À envoyer », jamais un colis.
+  { id: 'vrm_sms_infos', data: { v: 1, infos: { 'vc|prada|2026-11-12': { source: 'vestiaire', marque: 'Prada', jour: '2026-11-12', limite: '2026-11-12T23:59:59+01:00', premiere: ilYa(1), derniere: ilYa(1), n: 1, formes: ['vendu'] } } } },
   ...AENV.map(([tx, j, lim]) => ({ id: 'email_bord_' + tx, data: { type: 'bordereau', transaction: String(tx), uid: '111', account: 'compte_a', filename: `Bordereau-Vinted-${tx}.pdf`, modele: TITRE, article: TITRE, receivedAt: ilYa(j - 0.1), pdfB64: PDF_B64, suivi: '', transporteur: '', dateLimite: fmtLimite(lim) } })),
   // L'e-mail de Chronopost pour le MÊME n° que le bordereau de 7103 (forme `email_track_*`, scalaires).
   { id: 'email_track_chronopost_XA200000003FR', data: { type: 'suivi', carrier: 'chronopost', suivi: 'XA200000003FR', status: 'transit', label: 'En cours d’acheminement', subject: 'Votre colis XA200000003FR est en cours d’acheminement', receivedAt: ilYa(7), sens: 'sortant' } },
@@ -220,19 +230,27 @@ async function regle() {
         await pg.waitForTimeout(1200);
         const A = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card]')].map((x) => x.getAttribute('data-colis-ident')));
         dit(A.join() === 'v:7202,v:7201', 'A. « À envoyer » : la limite la plus proche d’abord (7202 demain, puis 7201)', A.join());
+        const IS = await pg.evaluate(() => { const e = document.querySelector('[data-infos-sms="vestiaire"]'); return e ? { n: e.getAttribute('data-infos-sms-n'), t: e.innerText } : null; });
+        dit(IS && IS.n === '1' && /Prada/.test(IS.t) && /12 nov/.test(IS.t) && !/peut-être «/.test(IS.t), 'I. « À envoyer » dit l’information SMS Vestiaire (marque, date limite), sans la relier à rien', JSON.stringify(IS));
+        dit(A.length === 2, 'I. l’information SMS n’est pas comptée comme un colis');
         await shot(pg, `envoyer-${k}`);
         await onglet(pg, 'envoyes');
-        await pg.waitForFunction(() => document.querySelectorAll('[data-colis-envoye]').length >= 6, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction(() => document.querySelectorAll('[data-colis-envoye]').length >= 8, null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
         const E = await lireEnvoyes(pg);
         dit(E.map((x) => x.id).join() === ATTENDU_ORDRE.join(), 'O. le plus récent en haut', E.map((x) => x.id).join());
         const mauvais = E.filter((x) => ATTENDU_TR[x.id] !== x.tr);
-        dit(E.length === 6 && !mauvais.length, 'T. chaque carte a SON transporteur (bordereau, e-mail du même n°, forme) ou « inconnu »', JSON.stringify(E.map((x) => [x.id, x.tr])));
+        dit(E.length === N_ENV && !mauvais.length, 'T. chaque carte a SON transporteur (bordereau, e-mail du même n°, forme) ou « inconnu »', JSON.stringify(E.map((x) => [x.id, x.tr])));
         const g = await pg.evaluate(() => ({ autres: [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')), txt: (document.querySelector('.vrm-colis-envoyes') || document.body).innerText }));
         dit(!g.autres.includes('Autres') && !/\bAutres\b/.test(g.txt), 'T. aucun groupe fourre-tout « Autres »', g.autres.join(','));
         dit(E.filter((x) => /Transporteur inconnu/.test(x.t)).length === 3, 'T. les 3 sans source disent « Transporteur inconnu »', E.map((x) => x.t.slice(0, 60)).join(' | '));
         const P = await pg.evaluate(() => [...document.querySelectorAll('[data-envoyes-filtre-choix]')].map((x) => x.getAttribute('data-envoyes-filtre-choix') + ':' + x.getAttribute('data-envoyes-filtre-n')));
-        dit(P.join('|') === 'tous:6|Chronopost:2|Transporteur inconnu:3'.replace('Chronopost:2|', 'Chronopost:2|Mondial Relay:1|'), 'F. pastilles « Tous 6 · Chronopost 2 · Mondial Relay 1 · Transporteur inconnu 3 »', P.join('|'));
+        dit(P.join('|') === 'tous:8|Chronopost:3|Mondial Relay:2|Transporteur inconnu:3', 'F. pastilles « Tous 8 · Chronopost 3 · Mondial Relay 2 · Transporteur inconnu 3 »', P.join('|'));
+        // (9 nov.) L'étiquette nomme : 7107 (bordereau e-mail) et 7108 (étiquette relue) — source `pdf` ;
+        // les 3 inconnus restent inconnus (même titre que 7107/7108 : jamais par titre).
+        const src = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-colis-envoye]')].map((x) => [x.getAttribute('data-colis-envoye'), x.getAttribute('data-envoye-transp-source')])));
+        dit(src['v:7107'] === 'pdf' && src['v:7108'] === 'pdf', 'P. l’étiquette (PDF du bordereau, puis celle relue au cron) nomme le transporteur — source « pdf »', JSON.stringify(src));
+        dit(['v:7104', 'v:7105', 'v:7106'].every((k) => !src[k] || src[k] === 'aucune' || src[k] === 'null' || src[k] === ''), 'P. 8 ventes au même titre : aucune autre ne prend le transporteur d’une étiquette', JSON.stringify(src));
         const S = await pg.evaluate(() => { const e = document.querySelector('[data-colis-envoye-suivre="v:7101"]'); return e ? (e.getAttribute('href') || '') + ' ' + e.innerText : ''; });
         dit(/chronopost/i.test(S) && /Suivre/.test(S), 'S. 7101 : « Suivre » chez Chronopost', S.slice(0, 120));
         await shot(pg, `envoyes-${k}`);
@@ -240,11 +258,11 @@ async function regle() {
         await pg.click('[data-envoyes-filtre-choix="Mondial Relay"]').catch(() => {});
         await pg.waitForTimeout(500);
         const F1 = await lireEnvoyes(pg);
-        dit(F1.map((x) => x.id).join() === 'v:7102', 'F. la pastille Mondial Relay ne montre que 7102', F1.map((x) => x.id).join());
+        dit(F1.map((x) => x.id).join() === 'v:7102,v:7107', 'F. la pastille Mondial Relay ne montre que 7102 et 7107', F1.map((x) => x.id).join());
         await shot(pg, `envoyes-filtre-${k}`);
         await pg.click('[data-envoyes-filtre-choix="tous"]').catch(() => {});
         await pg.waitForTimeout(500);
-        dit((await lireEnvoyes(pg)).length === 6, 'F. « Tous » remontre les 6');
+        dit((await lireEnvoyes(pg)).length === N_ENV, 'F. « Tous » remontre les 8');
       });
       dit(errs.length === 0, 'Z. aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();

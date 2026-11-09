@@ -13,7 +13,8 @@
 //   · `transporteurDeVente` : le transporteur d'une vente Vinted, par SON
 //     bordereau (le MÊME n° de transaction) et le n° EXACT de ce bordereau,
 //     dans l'ordre : la ligne `depart_{c}_{n°}` lue chez le transporteur (il a
-//     répondu pour ce n° : prise en charge datée) ; puis la règle commune `transporteurDuColis` (ligne
+//     répondu pour ce n° : prise en charge datée) ; puis (9 nov.) le transporteur NOMMÉ sur
+//     l'étiquette (le PDF du bordereau, source `pdf`) ; puis la règle commune `transporteurDuColis` (ligne
 //     `transp_`, transporteur NOMMÉ dans l'e-mail du bordereau, e-mails du même
 //     n°, forme propre du n°). Jamais par titre, jamais par ressemblance ;
 //     rien ⇒ « Transporteur inconnu » (pas « Autres »).
@@ -48,13 +49,22 @@ const ligneDepart = (departs, n) => {
 // Le transporteur d'une vente Vinted. `bord` : SON bordereau (`bordsParTx[tx]`,
 // { suivi, transporteur }) ; `departs` : Map n° → `depart_*` ; `transp`,
 // `suivisEmail` : ceux de `transporteurDuColis`. Rend { cle, nom, source }.
-export function transporteurDeVente({ bord = null, departs = null, transp = null, suivisEmail = null } = {}) {
-  const n = normaliserSuivi(bord && bord.suivi);
+// (9 nov., transporteurs inconnus) `pdf` : ce que l'ÉTIQUETTE de CETTE transaction nomme
+// ({ t, s }), pour une vente dont le bordereau n'est pas venu par e-mail (PDF capté par
+// l'extension, relu au cron) ; le bordereau e-mail porte le sien (`transporteurPdf`, `suiviPdf`).
+export function transporteurDeVente({ bord = null, pdf = null, departs = null, transp = null, suivisEmail = null } = {}) {
+  const tPdf = (bord && bord.transporteurPdf) || (pdf && pdf.t) || '';
+  const sPdf = (bord && bord.suiviPdf) || (pdf && pdf.s) || '';
+  const n = normaliserSuivi((bord && bord.suivi) || sPdf);
   const d = ligneDepart(departs, n);
   // Le transporteur a RÉPONDU pour ce n° : une prise en charge datée (`priseAt`, posée
   // seulement par une lecture réussie). Un essai sans réponse ne nomme personne.
   const cD = d && normaliserSuivi(d.suivi) === n && msDe(d.priseAt) != null ? cleTransporteur(d.carrier) : null;
   if (cD) return { cle: cD, nom: nomDuTransporteur(cD), source: 'transporteur' };
+  // (9 nov.) Puis l'étiquette elle-même : UN seul transporteur nommé dans le PDF du bordereau
+  // (api/_lib/transporteur-pdf.js — deux noms ⇒ rien posé, jamais deviné).
+  const cP = tPdf ? cleTransporteur(tPdf) : null;
+  if (cP) return { cle: cP, nom: nomDuTransporteur(cP), source: 'pdf' };
   return transporteurDuColis({ declare: (bord && bord.transporteur) || '', suivi: n, transp, suivisEmail });
 }
 
