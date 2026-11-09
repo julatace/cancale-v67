@@ -511,6 +511,7 @@ sans la fonction.
 | `secoursenvoi` | `commandesSecours` | **5.327.0** (8 nov.) | 3 échecs réseau/5xx de suite vers vrm.center ⇒ voie directe bornée (< 256 Ko, fusion par n°) ; trop lourd ⇒ rien écrit, dit sur la carte |
 | `connexioncarte` | `sessionDepuis` | **5.328.0** (8 nov.) | la fenêtre et la carte du logo commencent par « Me connecter » (email + mot de passe VRM), sans ouvrir VRM |
 | `cartesansonglet` | `prendreVerrouRenouv` | **5.329.0** (8 nov.) | la carte du logo porte elle-même e-mail + mot de passe (shadow root fermée, aucun onglet, plus d'iframe) ; un seul renouvellement de session pour toute l'extension |
+| `cartecode` | `authCodeVerif` | **5.330.0** (9 nov.) | la carte du logo : « Me connecter avec un code » (e-mail, tout compte, jamais de compte créé), mot de passe replié, Google/Discord dans le MÊME onglet sur Orion (retour sur la page Vinted) |
 
 ---
 
@@ -537,7 +538,6 @@ sans la fonction.
 - **8 nov. · Garde-fous de la capture (5.327)** : appareil publié par l'extension, alerte « compte pas relu » (ligne ambre + notification une fois par panne, `api/_lib/garde-capture.js`), Paramètres → « Tout va bien ? », voie de secours bornée, test « comme Orion » (CI). `docs/passation/2026-11-08-garde-fous-capture.md`. Geste : installer la 5.327 (Chrome ET Orion).
 - **8 nov. · Extension dans les boutiques** : fiches Chrome/Edge/Firefox prêtes à coller, visuels (mode exemple), paquets `scripts/paquets-boutiques.cjs` + audit (= code servi), politique `/legal/extension.html`, `installerExtensionIci` (lien boutique si `LIENS_BOUTIQUES`, sinon zip). `docs/passation/2026-11-08-extension-boutiques.md`. Geste : `docs/boutiques/README.md` (5 lignes).
 - **8 nov. · Premières minutes** : parcours en 5 étapes cochées sur preuve lue (compte, extension, Vinted, boîte, 1re vente), « Plus tard » 7 j (`vrm_parcours_plus_tard`), choix de la numérotation au départ (jamais à un vendeur qui a des N°), « Voir VRM avec des exemples », « Vérifier mon installation » (guide + Paramètres → Aide) ; `src/guideDemarrage.js`, `audit-premieres-minutes` (--prouve 9), banc `premieres-minutes`. `docs/passation/2026-11-08-premieres-minutes.md`. Geste : aucun.
-- **8 nov. · CI verte** : les 2 workflows qui envoyaient « run failed » (Parcours critiques, Reprise des chantiers) rejoués étape par étape, verts ; 3 vrais défauts corrigés (lien de récupération en Referer, `?vue=compte`/`?abonnement=` perdus par le découpage, menu ⋯ d'un achat recouvert) ; tests périmés remis à la même règle (mutations) ; jamais « /* » dans un commentaire d'App.jsx. `docs/passation/2026-11-08-ci-verte.md`. Geste : aucun.
 
 
 
