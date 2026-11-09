@@ -233,6 +233,33 @@ export function histoireArticle(rn, d = {}, o = {}) {
   return { ...p, etapes, histoire: true };
 }
 
+// (9 nov.) LE COLIS DE CHAQUE VENTE, assemblé par IDENTITÉ (pur : l'app lit, ceci
+// relie). txs : les transactions des ventes de la paire · bords : les bordereaux lus
+// ({ tx, suivi, at }, le plus ancien par transaction) · track : les e-mails du
+// transporteur lus ({ suivi, status, at, emailAt, retire }) ou `null` (pas lus) ·
+// shipDone : `vinted_ship_done` ({ [tx]: date du clic « Colis fait » }).
+// Un e-mail du transporteur ne rejoint une vente que par le n° de suivi EXACT écrit
+// sur le bordereau de CETTE transaction (lettres et chiffres, sans espace) — jamais
+// par le titre, la date ou le transporteur.
+export function colisDesVentes({ txs = [], bords = [], track = [], shipDone = {} } = {}) {
+  const k = (v) => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const parTx = {};
+  for (const b of Array.isArray(bords) ? bords : []) {
+    const tx = String((b && b.tx) || ''); if (!tx || !txs.includes(tx)) continue;
+    const prev = parTx[tx];
+    if (!prev || (b.at && (!prev.at || String(b.at) < String(prev.at)))) parTx[tx] = { at: b.at || null, suivi: String(b.suivi || '').trim() };
+  }
+  const out = {};
+  for (const tx of txs) {
+    const b = parTx[tx] || null;
+    const s = b && k(b.suivi).length >= 6 ? (track === null ? null : (Array.isArray(track) ? track : []).filter((t) => t && k(t.suivi) === k(b.suivi))
+      .map((t) => ({ status: String(t.status || ''), at: t.status === 'delivered' ? (t.retire || t.emailAt || t.at || null) : (t.emailAt || t.at || null) }))) : [];
+    const dep = shipDone ? shipDone[tx] : undefined;
+    out[tx] = { bord: b, depose: dep === undefined || dep === null || dep === false ? null : dep, suivis: s };
+  }
+  return out;
+}
+
 // Les offres d'une conversation Vinted (forme lue : `payload.conversation`),
 // pour les annonces demandées. `moi` : l'uid du compte (sens de l'offre).
 export function offresDeConversation(conv, moi) {

@@ -438,7 +438,7 @@ import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichi
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
-import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
+import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
 import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
@@ -14474,15 +14474,7 @@ async function lireColisDesVentes(rn) {
   const suivis = [...new Set(Object.values(parTx).map((b) => b.suivi).filter((x) => /^[A-Za-z0-9 -]{6,40}$/.test(x)).flatMap((x) => [x, k(x)]))];
   let track = [];
   if (suivis.length) track = await lireTout(`id=like.email_track_*&meta->>suivi=in.(${suivis.map((x) => encodeURIComponent(x)).join(',')})&select=suivi:meta->>suivi,status:meta->>status,at:meta->>receivedAt,emailAt:meta->>emailAt,retire:meta->>retireLe`, { strict: true }).catch(() => null);
-  const shipDone = load('vinted_ship_done', {}) || {};
-  const out = {};
-  for (const tx of txs) {
-    const b = parTx[tx] || null;
-    const s = b && b.suivi ? (track === null ? null : (track || []).filter((t) => t && k(t.suivi) === k(b.suivi)).map((t) => ({ status: String(t.status || ''), at: t.status === 'delivered' ? (t.retire || t.emailAt || t.at) : (t.emailAt || t.at) }))) : [];
-    const dep = shipDone[tx];
-    out[tx] = { bord: b, depose: dep === undefined || dep === null || dep === false ? null : dep, suivis: s };
-  }
-  return out;
+  return colisDesVentes({ txs, bords: bords || [], track, shipDone: load('vinted_ship_done', {}) || {} });
 }
 // Le N° d'une annonce Vestiaire, par identité : le lien posé par VRM, la
 // référence « VRM-{n°} », le N° donné au produit — deux qui se contredisent ⇒ personne.
