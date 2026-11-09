@@ -378,6 +378,7 @@ import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivr
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
+import { venteHorsPlan } from "../api/_lib/plan-regle.js";
 import { VentesHorsPlan, BandeauCompteVendeur } from "./abonnement/PlansSoloPro.jsx";
 import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
@@ -420,6 +421,7 @@ import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACH
 import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
+import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche } from "./design/carteChiffres.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
@@ -7510,7 +7512,13 @@ const compteEcarteChoix = (uid, masques, panneau) => {
 // `compteEcarte` est la règle des VENTES et des totaux ; ce qui concerne le
 // compte ENTIER (ses achats, ses retraits, la liste « Compte ») lit
 // `compteEcarteChoix` — un compte d'achat garde tous ses achats.
-const compteEcarte = (uid, masques, panneau) => compteEcarteChoix(uid, masques, panneau) || venteHorsPlanUid(uid);
+// (9 nov., suites serveur) LA RÈGLE, PURE : la règle de l'offre (`regle`,
+// `regleVentes` d'api/_lib/plan-regle.js) passée en argument. Le serveur (bilans,
+// widget, rappels) en porte la copie EXACTE, refabriquée par script
+// (`node scripts/audit-bilan-semaine.cjs --recopie` → api/_lib/ventes-regle.js) ;
+// `regle` absente ou « pas su » ⇒ le choix seul (rien n'est bridé).
+const compteEcarteRegle = (uid, masques, panneau, regle) => compteEcarteChoix(uid, masques, panneau) || venteHorsPlan(regle, uid);
+const compteEcarte = (uid, masques, panneau) => compteEcarteRegle(uid, masques, panneau, reglePlanCourante());
 // ⟦→ ecrans/Stats.jsx #7⟧
 // (3 nov.) LES COMPTES LEBONCOIN, VESTIAIRE ET eBAY ÉCARTÉS DES TOTAUX — le même
 // choix que les comptes Vinted sélectionnés, rangé dans `vrm_comptes_exclus`
@@ -50527,6 +50535,9 @@ function AppCoeur() {
   useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && (e.detail.k==='vrm_colis_aposter'||e.detail.k==='vrm_colis_retirer'))) return; setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); };
     window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>{ setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); });
     return ()=>{ window.removeEventListener('vrm:colis',f); window.removeEventListener('vrm:save',f); if(typeof stop==='function') stop(); }; },[]);
+  // (9 nov., lot Z) La pastille de l'icône de VRM = le badge de Colis (src/pastilleIcone.js) ; effacée en partant.
+  useEffect(()=>{ poserPastilleIcone(colisBadge); },[colisBadge]);
+  useEffect(()=>()=>{ poserPastilleIcone(null); },[]);
   // (17 oct., 5 nov.) LE MODE STREAM CACHE PARTOUT (src/modeStream.js) : on lui donne
   // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
   // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui

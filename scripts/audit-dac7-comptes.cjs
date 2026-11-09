@@ -136,8 +136,10 @@ async function texteDuPdf(octets) {
 
   // ── La chaîne de l'app : `declarablesCompta` → `ventesDeclarables` ──
   const NOMS = ['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'montantCommandeLu', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'lbcAnnulee', 'lbcFinalisee',
-    'commandeEbayEngagee', 'montantRecuEbay', 'compteEcarte', 'phraseNonComptees', 'ventesDeclarables', 'declarablesCompta'];
-  const ctx = { Date, Math, Number, String, Object, Array, JSON, Map, Set, isFinite, parseFloat, isNaN, console, RAISON_NON_COMPTEE: {} };
+    'commandeEbayEngagee', 'montantRecuEbay', 'compteEcarteChoix', 'compteEcarteRegle', 'compteEcarte', 'phraseNonComptees', 'ventesDeclarables', 'declarablesCompta'];
+  const ctx = { Date, Math, Number, String, Object, Array, JSON, Map, Set, isFinite, parseFloat, isNaN, console, RAISON_NON_COMPTEE: {},
+    // (9 nov.) `compteEcarte` = `compteEcarteRegle(…, reglePlanCourante())` (offre Solo) : règle « pas sue » ⇒ rien bridé.
+    venteHorsPlan: () => false, reglePlanCourante: () => null };
   Object.assign(ctx, { vcVenteAnnulee: V.vcVenteAnnulee, montantRecuVc: V.montantRecuVc, dateVersementVc: V.dateVersementVc, etapeMotVc: V.etapeMotVc, dateVenteVc: V.dateVenteVc });
   vm.createContext(ctx);
   const absents = [];

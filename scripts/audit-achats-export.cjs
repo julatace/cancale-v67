@@ -162,9 +162,11 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
 
   // ── La chaîne des ventes de l'app ───────────────────────────────────────────
   const NOMS = ['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'montantCommandeLu', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'lbcAnnulee', 'lbcFinalisee',
-    'commandeEbayEngagee', 'montantRecuEbay', 'compteEcarte', 'phraseNonComptees', 'ventesDeclarables', 'declarablesCompta', 'caDeclarableParMois',
+    'commandeEbayEngagee', 'montantRecuEbay', 'compteEcarteChoix', 'compteEcarteRegle', 'compteEcarte', 'phraseNonComptees', 'ventesDeclarables', 'declarablesCompta', 'caDeclarableParMois',
     'moisPeriodeUrssaf', 'minuitParisMs', 'montantPeriodeUrssaf', 'tauxDe', 'aPayerUrssaf', 'regimeValide', 'REGIMES_FISCAUX', 'libelleRegime', 'TAUX_URSSAF_DEFAUT'];
-  const ctx = { Date, Math, Number, String, Object, Array, JSON, Map, Set, Intl, isFinite, parseFloat, isNaN, console, RAISON_NON_COMPTEE: {} };
+  const ctx = { Date, Math, Number, String, Object, Array, JSON, Map, Set, Intl, isFinite, parseFloat, isNaN, console, RAISON_NON_COMPTEE: {},
+    // (9 nov.) `compteEcarte` = `compteEcarteRegle(…, reglePlanCourante())` (offre Solo) : règle « pas sue » ⇒ rien bridé.
+    venteHorsPlan: () => false, reglePlanCourante: () => null };
   if (V) Object.assign(ctx, { vcVenteAnnulee: V.vcVenteAnnulee, montantRecuVc: V.montantRecuVc, dateVersementVc: V.dateVersementVc, etapeMotVc: V.etapeMotVc, dateVenteVc: V.dateVenteVc });
   vm.createContext(ctx);
   const absents = [];

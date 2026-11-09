@@ -18,7 +18,8 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 // --mutation=… réaffaiblit la route dans une copie temporaire d'`api/` :
 //   titre : le N° retrouvé par ressemblance de TITRE compte comme une preuve ;
 //   passu : une lecture ratée des annonces vaut « liste vide » ;
-//   dedup : l'anti-doublon est retiré (envoi direct).
+//   dedup : l'anti-doublon est retiré (envoi direct) ;
+//   lecture : (9 nov.) Leboncoin redevient « en vente » sans lecture complète de < 24 h.
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -31,11 +32,15 @@ if (MUT) {
     passu: ['api/email-inbound.js', "    if (!r.ok) return null;\n    let j; try { j = await r.json(); } catch (_) { return null; }\n    if (!Array.isArray(j)) return null;\n    out.push(...j);",
       "    if (!r.ok) return [];\n    let j; try { j = await r.json(); } catch (_) { return null; }\n    if (!Array.isArray(j)) return null;\n    out.push(...j);"],
     dedup: ['api/email-inbound.js', "if (notif) await pushOnce(notif, 'doublevente');", 'if (notif) await sendPushToAll(notif);'],
+    lecture: ['api/_lib/double-vente.js', "lectures: lectures || null, maintenant }).etat !== 'enligne') continue;", "lectures: lectures || null, maintenant }).etat === 'sortie') continue;"],
   };
   const m = MUTS[MUT];
   if (!m) { console.log('mutation inconnue : ' + MUT); process.exit(2); }
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-dv-'));
   fs.cpSync(path.join(RACINE, 'api'), path.join(dest, 'api'), { recursive: true });
+  // (9 nov.) `api/` importe des modules purs de `src/` (compteRelie, enLigneLbc…) : copiés aussi,
+  // sinon la copie mutée ne se charge pas (et une mutation « rouge » ne prouverait rien).
+  fs.cpSync(path.join(RACINE, 'src'), path.join(dest, 'src'), { recursive: true });
   fs.copyFileSync(path.join(RACINE, 'package.json'), path.join(dest, 'package.json'));
   fs.symlinkSync(path.join(RACINE, 'node_modules'), path.join(dest, 'node_modules'));
   const f = path.join(dest, m[0]);
@@ -197,17 +202,36 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
 
   // ══ 2. Leboncoin : la référence VRM sur une annonce à lui ═══════════════════
   console.log('\n── 2. Vendue sur Vinted, N°231 encore en vente sur Leboncoin');
+  // (9 nov., suites serveur) « En ligne » se PROUVE aussi côté Leboncoin (src/enLigneLbc.js,
+  // la règle de l'app et de l'extension 5.335) : la lecture COMPLÈTE de « Mes annonces » de
+  // SON compte, de moins de 24 h, la montre. Forme réelle : `lbc_listings.lectures[compte]
+  // = { at, total, n, ids }`, compte de l'annonce dans `account` (« lbc-account:X » = « X »).
+  const L5 = { id: 'L5', subject: 'Adidas Samba noire', customRef: 'VRM-231', status: 'active', account: 'lbc-account:84420' };
+  const L6 = { id: 'L6', subject: 'Chalet à louer n231', status: 'active', account: 'inconnu' };
+  const lecture = (heures, ids = ['L5', 'L6']) => ({ 84420: { at: new Date(Date.now() - heures * 3600e3).toISOString(), total: ids.length, n: ids.length, ids } });
   await essaie('lbc', async () => {
     reset();
-    pose(A, 'lbc_listings', { items: { L5: { id: 'L5', subject: 'Adidas Samba noire', customRef: 'VRM-231', status: 'active' },
-      L6: { id: 'L6', subject: 'Chalet à louer n231', status: 'active', account: 'inconnu' } } });
+    pose(A, 'lbc_listings', { items: { L5, L6 }, lectures: lecture(2) });
     pose(A, 'lbc_ventes', { ventes: {} });
     await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
     const n = dv('A');
-    dit(n.length === 1, 'UNE notification « double vente »', `${n.length}`);
+    dit(n.length === 1, 'lue en entier il y a 2 h et montrée : UNE notification « double vente »', `${n.length}`);
     dit(/N°231/.test((n[0] || {}).title || '') && /Leboncoin/.test(`${(n[0] || {}).title} ${(n[0] || {}).body}`), 'elle nomme N°231 et Leboncoin', JSON.stringify((n[0] || {}).title));
     dit((n[0] || {}).url === '/?tab=annonces&site=leboncoin&cible=doublon&num=231&plat=leboncoin', 'elle ouvre Annonces · Leboncoin, sur « à retirer » (31 oct.)', (n[0] || {}).url);
   });
+  console.log('\n── 2 bis. Leboncoin pas prouvé en ligne (< 24 h, lecture complète) ⇒ rien');
+  const lbcSans = async (nom, listing) => {
+    reset();
+    pose(A, 'lbc_listings', listing);
+    pose(A, 'lbc_ventes', { ventes: {} });
+    await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
+    dit(dv('A').length === 0, nom, `${dv('A').length}`);
+  };
+  await essaie('lbc-vieille', () => lbcSans('dernière lecture complète il y a 25 h : aucune notification (« à confirmer »)', { items: { L5, L6 }, lectures: lecture(25) }));
+  await essaie('lbc-jamais', () => lbcSans('« Mes annonces » jamais lue en entier : aucune notification', { items: { L5, L6 } }));
+  await essaie('lbc-absente', () => lbcSans('lue en entier il y a 1 h SANS elle (supprimée depuis) : aucune notification', { items: { L5, L6 }, lectures: lecture(1, ['L6']) }));
+  await essaie('lbc-partielle', () => lbcSans('lecture partielle (1 page sur 2) : aucune notification', { items: { L5, L6 }, lectures: { 84420: { at: new Date(Date.now() - 3600e3).toISOString(), total: 40, n: 35 } } }));
+  await essaie('lbc-illisible', () => lbcSans('lectures de forme inconnue (pas su) : aucune notification', { items: { L5, L6 }, lectures: 'pas-un-objet' }));
 
   // ══ 3. Rien ailleurs ⇒ rien ═════════════════════════════════════════════════
   console.log('\n── 3. Le N° n’est en vente nulle part ailleurs');

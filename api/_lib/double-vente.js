@@ -32,6 +32,11 @@ import { DESTINATIONS, lienNotif } from './lien-notif.js';
 // l'app (api/_lib/vestiaire-regle.js, un propriétaire, importée).
 import { annoncesVcEnLigne } from './vestiaire-regle.js';
 import { enLigneDesLignes } from './enligne-regle.js';
+// (9 nov., suites serveur) « En ligne » sur Leboncoin : LA règle de l'app et de
+// l'extension 5.335 (src/enLigneLbc.js, module pur importé tel quel des deux côtés,
+// jamais recopié) — vue en ligne par la lecture COMPLÈTE de « Mes annonces » de
+// SON compte, de moins de 24 h.
+import { etatEnLigneLbc } from '../../src/enLigneLbc.js';
 export { annoncesVcEnLigne };
 
 const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
@@ -157,7 +162,17 @@ function annonceLbcEnVente(ad, vendues) {
   return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !lbcSortieDe(ad) && !(vendues && vendues.has(String(ad.id))));
 }
 // </lbc-en-vente-regle>
-export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}) {
+// ⚠️⚠️ (9 nov., suites serveur — Julien : « elle propose de supprimer des annonces
+// vendues sur Vinted qui ne sont plus sur Leboncoin ») LA NOTIFICATION SE PROUVE
+// AUSSI CÔTÉ LEBONCOIN, comme « à retirer » dans l'app (`aRetirerDeLbcVinted`) :
+// une annonce ne compte que si `etatEnLigneLbc` la dit 'enligne' — la DERNIÈRE
+// lecture COMPLÈTE de « Mes annonces » de son compte (`lbc_listings.lectures`,
+// posée par l'extension) a moins de 24 h et la montre. Lecture plus vieille,
+// jamais faite, partielle, compte inconnu, `lectures` illisible (`null`) ⇒ « à
+// confirmer » : AUCUNE notification (pas su ≠ en ligne ; l'app le dit, avec le
+// geste « ouvre Mes annonces »). La règle `<lbc-en-vente-regle>` reste la
+// première porte (état mort, vendue, plus vue, en pause).
+export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}, lectures = null, maintenant = Date.now()) {
   const out = new Map();
   const prouves = new Set(), vendues = annoncesLbcVendues(ventes);
   for (const v of Object.values(ventes || {})) {
@@ -169,6 +184,7 @@ export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}) {
   const aLui = (ad) => !!(ad.ref || ad.customRef || (ad.lbcUser && prouves.has(String(ad.lbcUser))) || (ad.account && prouves.has(String(ad.account))));
   for (const ad of Object.values(items || {})) {
     if (!annonceLbcEnVente(ad, vendues) || !aLui(ad)) continue;
+    if (etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: lectures || null, maintenant }).etat !== 'enligne') continue;
     const ks = [];
     const push = (v) => { const k = cleNum(v); if (k && NUM_OK.test(k) && !ks.includes(k)) ks.push(k); };
     const ext = (v) => { const k = cleNum(v); if (k) push(numeroExterne(k, ad.id, 'lbcAnnonces', null, mk)); };

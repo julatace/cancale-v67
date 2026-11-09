@@ -299,11 +299,13 @@ const bleu = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return
         dit(a.paires.every((p) => p.trait === 0 && p.ecart >= 8), `${nomV} F « Avant de lancer » : groupes pleins, plus de trait coloré à gauche`, JSON.stringify(a.paires));
         dit(a.rouges.length === 0, `${nomV} F aucun rouge dans la feuille`, a.rouges.join(','));
         // T. Un toast : la tuile « Mettre en ligne », pas permise, dit pourquoi.
-        await pg.locator('[data-action-sel="enLigne"]').click({ force: true });
-        await pg.waitForSelector('.vrm-toast', { timeout: 3000 });
-        await pg.waitForTimeout(350);
-        await cap(pg, `${nomV}-toast`);
+        // Un toast vit quelques secondes : on le (re)fait dire juste avant chaque lecture.
+        const direToast = async () => { if (await pg.locator('.vrm-toast').count() === 0) await pg.locator('[data-action-sel="enLigne"]').click({ force: true }); await pg.waitForSelector('.vrm-toast', { timeout: 3000 }); };
+        await direToast();
         const t = await lire(pg, 'toast');
+        await direToast(); await pg.waitForTimeout(300);
+        await cap(pg, `${nomV}-toast`);
+        await direToast();
         dit(!!t && t.rayon >= 12 && t.rayon <= 16, `${nomV} T toast rayon 12–16 (une carte, pas une pilule)`, t && String(t.rayon));
         dit(!!t && t.opaque && t.bord === 0, `${nomV} T toast fond plein, sans cadre`, t && JSON.stringify(t));
         dit(!!t && t.texte === 15 && t.h >= 44, `${nomV} T toast texte 15, ≥ 44 de haut`, t && `${t.texte} · ${t.h}`);

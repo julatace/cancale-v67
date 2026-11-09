@@ -48,8 +48,10 @@ captures seules : `…/scratchpad/avant/` et `…/scratchpad/apres/`. Pour les r
 `SHOTS=<dossier> node scripts/bancs/direction-artistique-4.cjs [dist]`.
 
 `npm run build` vert ; audits `variables`, `tdz`, `coherence`, `icones`, `violet`, `boutons`,
-`rouge-doublon` verts. Bancs existants touchés : voir le rapport de session (republier,
-feuilles-coque, beaute, journee-premium, ventes-colis-premium).
+`rouge-doublon` verts. Bancs existants (un à la fois) : `republier` 235 verts · `beaute` vert ·
+`journee-premium` 15 verts · `ventes-colis-premium` 32 verts · `feuilles-coque` 23 rouges, **les
+mêmes 23 sur le build d'avant** (déclencheurs « la feuille s'ouvre » introuvables sur sa base
+inventée, « Tout imprimer sans PDF », « Supprimer des données ») — pas de cette branche.
 
 ## Ce qui reste
 
