@@ -3,11 +3,20 @@
 import { problemesLot } from '../verifAnnonce.js';
 import { centimes } from '../beneficePaire.js';
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 import { ACTIONS_REPUB, AUTH, Avancement, Bouton, C, ChipsModeles, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FermeAuRetour, Icon, NAV, PhotoVinted, Pourquoi, SUPABASE_URL, Segmente, SheetShell, askConfirm, chargerPhotoBoite, demanderQuestionRepub, ecrireJournalRepub, extSait, ilYaBr, load, onCloudReady, poserRepubVivant, prixCourt, questionRepubOk, save, sbAuth, toast, verifierAvantPublication } from '../App.jsx';
+
+// (9 nov., direction artistique 4) LE VOILE DES ATELIERS : un PORTAIL sur <body> (§7 :
+// une feuille posée dans un conteneur qui crée un contexte d'empilement passe SOUS la
+// barre du bas sur iPhone), la même forme que la feuille unique (styles-premium.css §12).
+const VoileAtelier = ({ onClick, children }) => {
+  const voile = <div className="vrm-atelier-voile" onClick={onClick} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>{children}</div>;
+  return typeof document !== 'undefined' && document.body ? createPortal(voile, document.body) : voile;
+};
 
 // ⟦← App.jsx #1⟧
 // (6 nov.) LES réglages de Republier — atelier ET « à la main » : une source, une règle par notion.
@@ -93,7 +102,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
   const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 4 };
   return (
-    <div onClick={fermer} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <VoileAtelier onClick={fermer}>
       <FermeAuRetour fermer={fermer}/>
       <div onClick={ev => ev.stopPropagation()} data-atelier-brouillon={k} style={{ background: C.bg, width: '100%', maxWidth: 560, maxHeight: '92vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
@@ -169,7 +178,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
             {done ? '✓ Brouillon enregistré' : '💾 Enregistrer le brouillon'}</button>
         </div>
       </div>
-    </div>
+    </VoileAtelier>
   );
 }
 // ══ ATELIER DE REPUBLICATION — TRANCHE 3 : lots titres + prix (non destructif) ══
@@ -230,7 +239,8 @@ function AtelierLots({ candidats, onSave, onClose }) {
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 5 };
   const selStyle = { ...champ, padding: '6px 8px' };
   return (
-    <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <VoileAtelier onClick={onClose}>
+      <FermeAuRetour fermer={onClose}/>
       <div onClick={ev => ev.stopPropagation()} data-lots-modal style={{ background: C.bg, width: '100%', maxWidth: 620, maxHeight: '94vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -322,7 +332,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
             {done ? '✓ Brouillons enregistrés' : `💾 Enregistrer dans les brouillons (${nAppliquables})`}</button>
         </div>
       </div>
-    </div>
+    </VoileAtelier>
   );
 }
 // ══ ATELIER DE REPUBLICATION — TRANCHE 4 : file de publication (non destructif) ══
@@ -425,7 +435,8 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
   const btn = (extra) => ({ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...extra });
   const stLabel = { attente: 'en attente', fait: reel ? 'publiée ✓' : 'prête ✓', saute: 'sautée', echec: 'échec', encours: 'en cours…' };
   return (
-    <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <VoileAtelier onClick={onClose}>
+      <FermeAuRetour fermer={onClose}/>
       <div onClick={ev => ev.stopPropagation()} data-file-modal data-file-mode={q.mode} style={{ background: C.bg, width: '100%', maxWidth: 620, maxHeight: '94vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -519,7 +530,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
           {q.mode === 'pause' && <div style={{ fontSize: 12, color: C.muted }}>En pause — reprise manuelle. Après un rechargement, la file revient toujours EN PAUSE (jamais relancée toute seule).</div>}
         </div>
       </div>
-    </div>
+    </VoileAtelier>
   );
 }
 // ⟦← App.jsx #3⟧
@@ -1465,7 +1476,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               </Avancement>;
   })() : null;
   return (
-    <div onClick={fermer} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <VoileAtelier onClick={fermer}>
       <FermeAuRetour fermer={fermer} />
       <div onClick={(ev) => ev.stopPropagation()} data-republier data-republier-action={action} data-republier-etape={etape} data-republier-mode={mode} style={{ background: C.bg, width: '100%', maxWidth: 640, maxHeight: '94dvh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
@@ -1741,7 +1752,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           </>; })()}
         </div>
       </div>
-    </div>
+    </VoileAtelier>
   );
 }
 export { RepublierVinted, AtelierFile, AtelierLots, AtelierBrouillon, RepublierALaMain, BrouillonsVinted, BrouillonsARefaire };
