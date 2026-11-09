@@ -286,9 +286,11 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre 
   return { lignes, sansDate, ecartees, nonComptees };
 };
 
-export const compteEcarte = (uid, masques, panneau) => {
+export const compteEcarteChoix = (uid, masques, panneau) => {
   const k = String(uid ?? '');
   const pa = panneau || {};
   if (pa[k] === false) return false;
   return (masques && masques.has(k)) || pa[k] === true;
 };
+
+export const compteEcarte = compteEcarteChoix;
