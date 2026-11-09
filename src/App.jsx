@@ -491,6 +491,7 @@ import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos,
 // CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
 import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
+import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
@@ -2902,7 +2903,7 @@ function AskTextSheet({ q, close }) {
   React.useEffect(() => { const t = setTimeout(() => { try { ref.current.focus(); ref.current.select(); } catch (_) {} }, 60); return () => clearTimeout(t); }, []);
   const { titre, corps } = sheetTexte(q, 'Saisir');
   return (
-    <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
+    <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION} className="vrm-confirmation">
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -2946,7 +2947,7 @@ function ConfirmHost() {
   // (3 nov.) VÉRIFIER AVANT DE PUBLIER (`src/verifAnnonce.js`) : une ligne par
   // problème + son geste ; « Corriger » ferme, « Publier quand même » continue.
   if (q.kind === 'verif') return createPortal(
-    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation">
       <div data-verif-sheet={q.site || ''} data-verif-n={(q.lignes || []).length}>
         <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{q.title}</div>
         <div className="vrm-verif-liste" style={{marginTop:12,display:'flex',flexDirection:'column',borderTop:`1px solid ${C.border}`}}>
@@ -2966,7 +2967,7 @@ function ConfirmHost() {
   if (q.kind === 'choix') {
     const { titre: tc, corps: cc } = sheetTexte(q, 'Choisis');
     return createPortal(
-      <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
+      <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION} className="vrm-confirmation">
         <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{tc}</div>
         {cc.length > 0 && <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{cc.join('\n')}</div>}
         {/* (1er nov.) Des choix en PHRASES (la case occupée du Stock) : une par ligne, jamais coupées dans une grille de 120 px. */}
@@ -2982,7 +2983,7 @@ function ConfirmHost() {
   // étaient écrits d'un bloc avec des retours à la ligne.
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
   return createPortal(
-    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation">
       {/* (29 oct.) Plus de rouge sur une confirmation (§7 : le rouge, c'est deux
           paires sous un même N°) : la conséquence est dite par le texte. */}
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
@@ -15137,16 +15138,64 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
     const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
     try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
   }, [tab]);
-  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <div className="vrm-sidebar-brand"><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
+  // (9 nov., direction artistique 5) L'INDICATEUR QUI GLISSE : une seule pastille
+  // (`data-nav-indicateur`) posée sous l'entrée de l'écran ouvert, qui glisse
+  // d'une entrée à l'autre (transform, styles-nav-v2.css ; immobile sous
+  // `prefers-reduced-motion`). Purement décoratif (`aria-hidden`) : l'état reste
+  // `aria-current`, et sans mesure (pas d'entrée allumée, entrée hors de la zone
+  // visible) la pastille se cache et l'entrée garde son propre fond.
+  const indRef = React.useRef(null), indPose = React.useRef(false);
+  React.useLayoutEffect(() => {
+    const nav = railRef.current, ind = indRef.current, zone = zoneRef.current; if (!nav || !ind) return undefined;
+    let raf = 0;
+    const placer = (anime) => {
+      const b = nav.querySelector('.vrm-rail-button[aria-current="page"]');
+      const cacher = () => { ind.style.opacity = '0'; nav.removeAttribute('data-indicateur'); };
+      if (!b || !b.getClientRects().length) return cacher();
+      const nr = nav.getBoundingClientRect(), br = b.getBoundingClientRect();
+      if (zone && zone.contains(b)) { const zr = zone.getBoundingClientRect(); if (br.top < zr.top - 1 || br.bottom > zr.bottom + 1) return cacher(); }
+      ind.style.transition = anime && indPose.current ? '' : 'none';
+      ind.style.width = br.width + 'px'; ind.style.height = br.height + 'px';
+      ind.style.transform = `translate3d(${Math.round(br.left - nr.left + nav.scrollLeft)}px, ${Math.round(br.top - nr.top + nav.scrollTop)}px, 0)`;
+      ind.style.opacity = '1'; nav.setAttribute('data-indicateur', '1'); indPose.current = true;
+    };
+    placer(true);
+    const suivre = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => placer(false)); };
+    const cibles = [zone, nav].filter(Boolean);
+    cibles.forEach((c) => c.addEventListener('scroll', suivre, { passive: true }));
+    window.addEventListener('resize', suivre);
+    return () => { cancelAnimationFrame(raf); cibles.forEach((c) => c.removeEventListener('scroll', suivre)); window.removeEventListener('resize', suivre); };
+  }, [tab, nEntrees, badges]);
+  // (9 nov., DA 5) LA CARTE DU COMPTE, au pied : l'initiale, le nom de
+  // l'entreprise s'il est connu (sinon l'e-mail du compte VRM), et l'offre
+  // SEULEMENT si le serveur l'a dite (`reglePlanCourante`, Solo / Pro) — rien
+  // n'est inventé (§5). Floutée en mode stream (`vrm-sensible`).
+  const [, rafraichir] = React.useState(0);
+  React.useEffect(() => suivreAbonnement(() => rafraichir((n) => n + 1)), []);
+  const mail = String((AUTH.user && AUTH.user.email) || '').trim();
+  const nomCompte = (entreprise && entreprise.nom) || '';
+  const planLu = (reglePlanCourante() || {}).plan;
+  const offre = planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : '';
+  const initiale = (nomCompte || mail).trim().charAt(0).toUpperCase();
+  const carteCompte = (nomCompte || mail) ? <div className="vrm-nav-compte" data-nav-compte="">
+    <span className="vrm-nav-avatar vrm-sensible" aria-hidden="true">{initiale}</span>
+    <span className="vrm-nav-compte-txt">
+      {nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
+      {(offre || (nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
+    </span>
+  </div> : null;
+  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+    <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
+    <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
       {groupes.filter(g => g.titre !== 'Moi').map(groupe)}
     </div>
     {/* (1er nov., finition) « Moi » (Communauté, Paramètres) reste posé au pied
         de la colonne : une fenêtre basse fait défiler le reste, jamais
-        Paramètres coupé par le bas. Même ordre, mêmes entrées. */}
-    <div className="vrm-rail-pied">{groupes.filter(g => g.titre === 'Moi').map(groupe)}</div>
+        Paramètres coupé par le bas. Même ordre, mêmes entrées. (9 nov., DA 5)
+        Le pied est une carte : le compte, puis Communauté et Paramètres. */}
+    <div className="vrm-rail-pied">{carteCompte}{groupes.filter(g => g.titre === 'Moi').map(groupe)}</div>
   </nav>;
 }
 
@@ -27271,11 +27320,11 @@ function Skeleton({ variant='row', count=6 }) {
 
 // État d'erreur de chargement, avec un bouton « Réessayer ».
 function LoadError({ onRetry }) {
-  return <div style={{textAlign:'center',padding:'28px 16px'}}>
+  return <div className="vrm-erreur-chargement" style={{textAlign:'center',padding:'28px 16px'}}>
     <div aria-hidden="true" style={{width:44,height:44,margin:'0 auto 10px',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:C.card2,color:C.muted}}><Icon name="cloudOff" size={20}/></div>
     <div style={{fontSize:15,fontWeight:500,color:C.text,marginBottom:4}}>Impossible de charger ces données</div>
     <div style={{marginBottom:12}}/>
-    <button type="button" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'0 22px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600}}>Réessayer</button>
+    <button type="button" className="vrm-erreur-chargement-bouton" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'0 22px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600}}>Réessayer</button>
   </div>;
 }
 

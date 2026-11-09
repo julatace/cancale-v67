@@ -13,7 +13,7 @@ libère son numéro (le dire ici).
 |---|---|---|---|
 | — | intégration journee-v2 + zero-banc-rouge (1re partie) | PR #1069 | **en ligne** |
 | — | suites serveur (Solo côté serveur, double vente LBC < 24 h) | PR #1070 | **en ligne** |
-| — | direction artistique 4 (feuilles, confirmations, toasts, états vides, barre du bas) | `claude/direction-artistique-4` | en cours |
+| — | direction artistique 4 (feuilles, confirmations, toasts, états vides, barre du bas) | PR #1072 | **en ligne** |
 | — | zéro banc rouge (suite) | `claude/zero-banc-rouge` | en cours |
 | — | direction artistique 5 : colonne de gauche refaite + boutons (demande de Julien) | `claude/direction-artistique-5` | en cours |
 | A | Ma journée instantanée + objectif du mois | `claude/journee-instantanee` | en cours |
@@ -38,12 +38,14 @@ libère son numéro (le dire ici).
 | T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | à lancer |
 
 | U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
-| V | scanner au dépôt (Colis) ET au retrait (Achats) | `claude/scanner-colis-achats` | à lancer |
+| V | scanner au dépôt (Colis) ET au retrait (Achats) | `claude/scanner-colis-achats` | en cours |
 | W | inventaire de fin d'année | `claude/inventaire-annuel` | à lancer |
 | X | sélection multiple + filtres enregistrés + fiche à côté de la liste | `claude/lots-vues-panneau` | à lancer |
 | Y | corbeille 30 jours | `claude/corbeille` | à lancer |
 | Z | pastille sur l'icône (colis à envoyer) | `claude/pastille-icone` | fait (session principale) |
 | AA | sur vinted.fr : infos sous SES annonces + calculette pendant un achat (ext. 5.339) | `claude/extension-infos` | à lancer |
 | AB | un seul fil par acheteur et par paire, toutes plateformes | `claude/fil-unique` | à lancer |
+
+| — | transporteurs inconnus (PDF du bordereau, identité) + e-mails Vestiaire et Chronopost mieux lus (demandes de Julien) | `claude/transporteurs-emails` | en cours |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
