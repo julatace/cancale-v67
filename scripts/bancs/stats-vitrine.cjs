@@ -233,7 +233,11 @@ const capture=async(pg,nom)=>{
           const v=r.vendu||{};
           dit(v.etat==='lu' && v.n===String(a.vendu.n) && v.eur===String(a.vendu.eur) && v.prec===String(a.vendu.prec) && v.ecart===String(a.vendu.ecart) && v.partiel==='0',
             `${p} : Vendu ${a.vendu.eur/100} € (${a.vendu.n}), avant ${a.vendu.prec/100} € au même point ⇒ ${a.vendu.ecart>0?'+':''}${a.vendu.ecart} %`,JSON.stringify(v));
-          dit(new RegExp(`\\+${a.vendu.ecart} %`).test(v.texte||'') && /(^|\s)\d+,\d\d €/.test(v.texte||'') && !/au moins/.test(v.texte||''),`${p} : la tuile écrit le montant et « +${a.vendu.ecart} % », sans « au moins » (tout est lu)`,v.texte);
+          // (9 nov.) Le montant écrit à la règle du 5 nov. (`montant`, src/format.js) : les centimes
+          // seulement s'ils existent (« 250 € », « 65,50 € »), espaces normalisées.
+          const eurTxt=(c)=>(c%100 ? (c/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) : (c/100).toLocaleString('fr-FR'))+' €';
+          const vt=(v.texte||'').replace(/[\u00a0\u202f]/g,' ');
+          dit(new RegExp(`\\+${a.vendu.ecart} %`).test(vt) && new RegExp('(^|[^\\d,])'+eurTxt(a.vendu.eur).replace(/[\u00a0\u202f]/g,' ').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).test(vt) && !/au moins/.test(vt),`${p} : la tuile écrit le montant (${eurTxt(a.vendu.eur)}) et « +${a.vendu.ecart} % », sans « au moins » (tout est lu)`,v.texte);
           const bn=r.benef||{};
           dit(bn.etat==='lu' && bn.n===String(a.benef.n) && bn.ncout===String(a.benef.ncout) && bn.brut===String(a.benef.brut),`${p} : Bénéfice ${a.benef.brut/100} € sur ${a.benef.ncout} ventes sur ${a.benef.n}`,JSON.stringify(bn));
           // (3 nov., banc benefice-unique) Un brut partiel n'est pas un plancher (une
