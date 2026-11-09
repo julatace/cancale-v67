@@ -27,6 +27,7 @@ import { notificationUrssaf } from './rappel-urssaf.js';
 import { texteBilan } from './bilan-semaine.js';
 import { notificationDoubleVente } from './double-vente.js';
 import { texteComptesARelire } from './comptes-a-relire.js';
+import { texteCompteRelie } from '../../src/compteRelie.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -150,6 +151,13 @@ export const APERCUS_NOTIF = {
       ...(URSSAF && URSSAF.envoyer ? [{ ...deux(URSSAF), mene: 'Comptabilité · ta déclaration' }] : []),
       { ...deux(BILAN), mene: 'Ma journée' },
       { ...texteComptesARelire([{ nom: EX.compte, age: 'il y a 2 j' }]), mene: 'Paramètres · Comptes liés' },
+    ],
+  },
+  // (8 nov.) Un compte relié pour la première fois (src/compteRelie.js, le vrai texte).
+  comptes: {
+    quoi: 'Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois.',
+    exemples: [
+      { ...texteCompteRelie([{ plateforme: 'vinted', id: '123', nom: EX.compte }]), mene: 'Paramètres · Comptes liés' },
     ],
   },
 };
