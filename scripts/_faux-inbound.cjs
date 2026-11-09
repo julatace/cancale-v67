@@ -10,6 +10,7 @@
 //  réelle (le dépôt est public). `panne(id)` : une écriture qui RATE sur ces lignes.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path');
 
 const A = '11111111-2222-3333-4444-555555555555';

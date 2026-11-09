@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT (1er nov.) — LES CODES DE RETRAIT, DE BOUT EN BOUT.
 // Julien : « la fiabilité des codes de retrait, c'est super important ». Un code
 // faux ou manquant : il se déplace au relais pour rien, ou ne peut pas retirer.

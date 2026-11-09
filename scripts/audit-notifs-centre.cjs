@@ -20,6 +20,7 @@
 //   S  le rappel du soir (route exécutée) passe par la même porte
 // Données inventées (le dépôt est public).
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 const R = path.join(__dirname, '..');

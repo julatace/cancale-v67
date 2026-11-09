@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « LES NOTIFICATIONS DES MESSAGES VINTED NE SONT PAS TOUJOURS ENVOYÉES »
 //        node scripts/bancs/notif-messages.cjs

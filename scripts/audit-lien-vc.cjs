@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  UN SEUL N° POUR UN ARTICLE SUR VINTED ET VESTIAIRE (3 nov.)
 //  node scripts/audit-lien-vc.cjs              (le contrôle)

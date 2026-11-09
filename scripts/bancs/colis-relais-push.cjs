@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « UN COLIS ACHETÉ ARRIVE AU POINT RELAIS » → UNE NOTIFICATION, AVEC LE
 //        CODE ET LE LIEU (node scripts/bancs/colis-relais-push.cjs)

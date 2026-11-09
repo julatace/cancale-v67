@@ -26,6 +26,7 @@
 // `--prouve` : réaffaiblit le code, une mutation à la fois ⇒ ROUGE exigé.
 // Données inventées (le dépôt est public).
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path'), fs = require('fs');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');

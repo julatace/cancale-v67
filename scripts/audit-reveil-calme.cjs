@@ -11,6 +11,7 @@
 // Données inventées (le dépôt est public). Mutation : `--muter` (le mémo du jour
 // ignoré) doit finir en rouge.
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const R = path.join(__dirname, '..');
 const MUTER = process.argv.includes('--muter');

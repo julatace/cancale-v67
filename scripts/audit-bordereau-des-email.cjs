@@ -19,6 +19,7 @@
 //  `--prouve` : chaque mutation de la règle doit rendre l'audit rouge.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const { sourceApp } = require('./_source-app.cjs');

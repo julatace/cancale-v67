@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // Audit « abonnement propre » (8 nov.) — Julien : « des vendeurs vont payer,
 // fais tout ». Exécute le VRAI api/compte.js (faux Stripe, fausse base) et le
 // VRAI src/abonnement/etatAbonnement.js, et lit la migration 027 :

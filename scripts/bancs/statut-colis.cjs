@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // Banc : LE STATUT DE CHAQUE COLIS, SON POINT, SON TRANSPORTEUR, SON CODE, SA DATE (6 nov.)
 // Julien : « Améliore la fiabilité sur le statut de chaque colis, le point de retrait, etc. »
 // (docs/passation/2026-11-06-statut-colis.md). Colis → À retirer, sur des données INVENTÉES de

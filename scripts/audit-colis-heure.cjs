@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : TES COLIS À L'HEURE — LE RAPPEL DU MATIN, LE SOIR ET LE WIDGET
 //         EXÉCUTÉS (node scripts/audit-colis-heure.cjs)

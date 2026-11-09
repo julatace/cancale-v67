@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  LES LECTEURS DE LA REMISE À ZÉRO DES NUMÉROS (migration 013)
 //  node scripts/audit-numerotation-lecteurs.cjs           (le contrôle)

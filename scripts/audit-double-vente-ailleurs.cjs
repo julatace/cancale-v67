@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT — DOUBLE VENTE, APP FERMÉE, DANS TOUS LES SENS (3 nov.)
 //        node scripts/audit-double-vente-ailleurs.cjs [--mutation=…] [--prouve]

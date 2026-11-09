@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ────────────────────────────────────────────────────────────────────────────
 // UN COLIS QUE TU ENVOIES N'EST JAMAIS UN COLIS À RETIRER.
 // Mesuré le 31 août sur les 128 lignes de suivi réelles : 76 concernent des

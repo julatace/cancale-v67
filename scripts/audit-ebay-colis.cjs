@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : LES VENTES eBAY À POSTER — UNE RÈGLE, LES ROUTES QUI LA LISENT
 //         (node scripts/audit-ebay-colis.cjs)

@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ⚠️⚠️ OUVRIR VRM À D'AUTRES REVENDEURS — CE QU'UNE NOUVELLE PERSONNE RENCONTRE EN PREMIER
 //
 // Mesuré le 5 octobre, avant d'ouvrir l'app à d'autres revendeurs :

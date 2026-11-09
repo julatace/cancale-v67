@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : les comptes Leboncoin, Vestiaire et eBay écartés des totaux (3 nov.)
 //   node scripts/audit-comptes-exclus.cjs            (les règles telles qu'elles sont)

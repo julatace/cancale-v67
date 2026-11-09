@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LES ROUTES QUI ÉCRIVENT LES JETONS VINTED, EXÉCUTÉES POUR DE VRAI
 //        node scripts/bancs/routes-ecriture.cjs

@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « VINTED ATTEND UNE RÉPONSE AVANT UNE ÉCHÉANCE » (18 octobre)
 //        node scripts/bancs/emails-action.cjs

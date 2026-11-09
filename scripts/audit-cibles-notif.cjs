@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : CHAQUE NOTIFICATION A SA CIBLE, ET CHAQUE CIBLE SON CROCHET (5 nov.)
 //         (node scripts/audit-cibles-notif.cjs)

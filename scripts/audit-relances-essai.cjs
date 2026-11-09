@@ -24,6 +24,7 @@
 //      message ⇒ l'étape est libérée ; aucune donnée du vendeur dans le texte
 // Données inventées (le dépôt est public).
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const path = require('path');
 const net = require('net');
 const R = path.join(__dirname, '..');

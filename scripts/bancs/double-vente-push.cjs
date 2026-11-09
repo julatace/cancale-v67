@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « DOUBLE VENTE, APP FERMÉE » (fonction n°2 retenue le 11 octobre)
 //        node scripts/bancs/double-vente-push.cjs [--mutation=titre|passu|dedup]

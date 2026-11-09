@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ⚠️⚠️ CONTRÔLE PERMANENT — LA ROUTE DES EMAILS ET SA CLÉ (4 octobre).
 //
 // Deux trous, mesurés le même jour :

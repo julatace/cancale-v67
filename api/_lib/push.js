@@ -335,6 +335,15 @@ const cleSansRapport = (e) => {
 // Envoie la notification à tous les appareils abonnés.
 // Les abonnements morts (appli désinstallée, permission retirée) sont purgés,
 // ainsi que ceux scellés sur une clé qui n'est plus la nôtre (voir ci-dessus).
+// (8 nov.) L'instant qui décide des heures calmes. Les bancs le fixent
+// (`VRM_NOTIF_HORLOGE`, ISO — scripts/_horloge-notif.cjs) : une heure calme
+// allumée par défaut ne doit pas rendre un banc vert le jour et rouge la nuit.
+// Jamais posée en production : l'heure réelle décide.
+const instantCalme = () => {
+  const v = typeof process !== 'undefined' && process.env ? process.env.VRM_NOTIF_HORLOGE : '';
+  const t = v ? Date.parse(v) : NaN;
+  return Number.isFinite(t) ? t : Date.now();
+};
 export async function sendPushToAll(payload) {
   // ⚠️ QUI NE PAIE PLUS NE REÇOIT PLUS RIEN (Julien, 4 octobre). La règle est
   //    celle de la base (`vrm_acces_pour`), la même qui ferme ses données. On
@@ -377,7 +386,7 @@ export async function sendPushToAll(payload) {
     rangee = await ranger('discret');
     return { sent: 0, total: null, discret: true, ...(rangee ? { seq: rangee.seq } : {}) };
   }
-  if (cat && dansHeuresCalmes(prefs, cat, Date.now(), echeance)) {
+  if (cat && dansHeuresCalmes(prefs, cat, instantCalme(), echeance)) {
     rangee = await ranger('calme');
     return { sent: 0, total: null, calme: true, ...(rangee ? { seq: rangee.seq } : {}) };
   }

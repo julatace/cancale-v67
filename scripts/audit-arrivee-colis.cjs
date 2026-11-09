@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT (21 oct.) — LA DATE D'ARRIVÉE D'UN COLIS À RETIRER.
 // Julien : « je veux que l'on voie la date à laquelle il est arrivé ».
 // MESURÉ (lecture seule) : la ligne `email_track_*` est réécrite par CHAQUE

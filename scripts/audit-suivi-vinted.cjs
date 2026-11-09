@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT — 5.215 : LE SUIVI QUE VINTED MONTRE DE SES ACHATS, ET LA NOTIFICATION
 //  D'UNE ÉTAPE DE PLUS (node scripts/audit-suivi-vinted.cjs [--mutation nom])

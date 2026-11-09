@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ── BANC : LE SUIVI DES COLIS PAR N° ET PAR VINTED (23 oct.) ─────────────────
 // Julien : « quand on reçoit un mail comme quoi on a retiré un colis, le numéro
 // de suivi est comparé à ceux dans les colis à retirer et ça retire les

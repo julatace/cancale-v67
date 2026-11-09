@@ -17,6 +17,7 @@
 // exige que l'audit devienne ROUGE (puis remet les fichiers à l'identique).
 // Données INVENTÉES. Aucune donnée réelle, aucun réseau.
 'use strict';
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs');
 const { spawnSync } = require('child_process');

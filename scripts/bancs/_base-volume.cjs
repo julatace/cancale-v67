@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  UNE BASE INVENTÉE, AU VOLUME DE LA SIENNE — pour mesurer la VITESSE.
 //

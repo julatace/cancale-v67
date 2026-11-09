@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT DES PARCOURS — LES DÉFAUTS A5 À A9, A11 À A14 (1er novembre 2026)
 //  (node scripts/audit-flux-divers.cjs · --prouve : chaque mutation doit rougir)

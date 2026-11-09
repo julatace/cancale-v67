@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // AUDIT : un email de colis ne doit JAMAIS passer à travers, et un email de
 // vente ne doit JAMAIS être pris pour un colis.
 // « Je veux qu'il n'y ait aucune erreur du côté Chronopost, Mondial Relay,
