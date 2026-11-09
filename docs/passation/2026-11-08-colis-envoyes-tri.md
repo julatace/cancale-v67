@@ -85,13 +85,28 @@ donné honnêtement.** Ce qui est su (passations précédentes, lecture seule, s
   forme servie : `meta->>` projetés, `email_bord_*` avec PDF, `email_track_*`) : **60 verts**.
   Règle pure (12) + par vue : A « À envoyer » par urgence, O ordre, T transporteur par carte, aucun
   « Autres », 3 « Transporteur inconnu », F pastilles et filtre, S « Suivre » chez Chronopost, Z.
-- Sur `origin/main` (arbre `git archive`, banc copié dedans, dist reconstruit) : voir le résultat
-  ci-dessous (RESULTAT_AVANT).
-- Mutation : voir RESULTAT_MUTATION.
+- Sur `origin/main` (7acdfc36, arbre `git archive`, banc copié dedans, dist reconstruit) : **26 rouges
+  sur 50** — exactement la capture de Julien : groupes « Autres, Chronopost », cartes sans
+  transporteur, ordre par étape. « À envoyer » (A) reste VERT sur main et sur la branche : inchangé.
+- Mutations (dist reconstruit) : tri remis à l'ancienne (plus ancien en haut) + transporteur de
+  l'e-mail du bordereau ignoré ⇒ **21 rouges sur 60** (O, F, T et la règle pure).
+- `scripts/audit-transporteur-bordereau.cjs` (la VRAIE route `api/email-inbound.js` exécutée) :
+  **6 verts** ; sur `origin/main` **6 rouges sur 6** ; mutation « deux noms ⇒ le premier » ⇒ 1 rouge.
 - Audits verts : `npm run build`, `audit-identite`, `-statuts`, `-variables`, `-tdz`, `-coherence`,
   `-colis-envoi` (53), `-colis-trois` (31), `-transporteur-lu` (12), `-fonctions-api`.
-- Bancs `colis-*` existants comparés à `origin/main` : voir RESULTAT_BANCS.
+- Audits e-mails verts : `journal-emails` (58), `email-formes`, `bordereau-des-email` (41),
+  `colis-ventes-email`, `vente-email-fraiche`.
+- Bancs existants sur la branche : `colis-sortants` 30, `colis-envoi` 118, `colis-villes` 46,
+  `poste-sans-depart`, `postes`, `a-envoyer-preuves` 34 — verts. Rouges IDENTIQUES sur `origin/main`
+  (préexistants, pas touchés) : `colis-colonnes` (2), `colis-tous-sites` (12), `colis-fiables` (58).
 - Captures regardées (390 clair, 1512 sombre, filtre) : scratchpad de la session, pas dans le dépôt.
+
+## Piste pour les bordereaux déjà reçus
+La route garde le texte lisible de chaque e-mail dans `email_texte_*` (audit-journal-emails). Une
+session qui a la base VRM peut mesurer depuis quand, puis relire CES textes (lecture seule, par n° de
+transaction, la même règle `transporteurDeTexteBordereau`) pour poser `transporteur` sur les anciens
+bordereaux — une écriture serveur, une fois, avec sauvegarde (§5 : jamais une migration armée côté
+navigateur). Pas fait ici (rien mesuré).
 
 ## Geste de Julien
 Aucun. Les bordereaux déjà reçus sans n° restent « Transporteur inconnu » (rien à relire : le corps
