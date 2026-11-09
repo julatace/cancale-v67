@@ -31,6 +31,7 @@ import {
   adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes,
 } from './facturePro/regle.js';
 import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/rattachement.js';
+import { useRechercheEntreprise, CarteVerifEntreprise } from './RechercheEntreprise.jsx';
 
 const ID_CFG = 'vrm_pro_facture';
 const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true };
@@ -38,6 +39,12 @@ const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville
 // ── Une seule lecture de la fiche pour tout l'écran (trois états) ────────────
 const _ecoutesCfg = new Set(); let _cfg; // undefined en cours · null pas su · objet
 function poserCfg(v) { _cfg = v; _ecoutesCfg.forEach((f) => { try { f(v); } catch (_) {} }); }
+// (9 nov., soir) « Ma configuration » écrit aussi cette fiche (SIRET et ce que le registre
+// propose, sur son « C'est bon ») : elle annonce la ligne ENTIÈRE qu'elle vient d'écrire,
+// la lecture partagée la reprend (sinon « Ma facture » montrerait l'ancienne).
+if (typeof window !== 'undefined') {
+  try { window.addEventListener('vrm:fiche-facturation', (e) => { const d = e && e.detail; if (d && typeof d === 'object') poserCfg({ ...VIDE, ...migrerAncienne(d) }); }); } catch (_) {}
+}
 export function useFicheFacturation(deps) {
   const [cfg, setCfg] = React.useState(_cfg);
   React.useEffect(() => {
@@ -194,7 +201,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   const [statut, setStatut] = React.useState('');
   const minuteur = React.useRef(null);
   React.useEffect(() => { if (lu && !cfg) setCfg(lu); }, [lu, cfg]);
-  const [registre, setRegistre] = React.useState(null);
+
   const champsRef = React.useRef({});
   const apercuRef = React.useRef(null);
 
@@ -217,24 +224,13 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   const upd = (k, v) => ecrire({ ...cfg, [k]: v }, [k]);
   const updPlusieurs = (o) => ecrire({ ...cfg, ...o }, Object.keys(o));
 
-  // Le SIRET retrouve le nom et l'adresse au registre public (par le SIREN EXACT).
-  const sir = verifierSiret(cfg && cfg.siret);
-  const chiffres = String((cfg && cfg.siret) || '').replace(/\D/g, '');
-  React.useEffect(() => {
-    if (!cfg || sir.etat !== 'ok' || !deps.chercherEntreprise) { setRegistre(null); return undefined; }
-    let mort = false; setRegistre({ etat: 'encours' });
-    deps.chercherEntreprise(chiffres).then((j) => {
-      if (mort) return; setRegistre(j);
-      if (j && j.etat === 'trouve') {
-        const pose = {};
-        if (!String(cfg.nom || '').trim()) pose.nom = j.nom;
-        if (!String(cfg.adresse || '').trim() && j.adresse) { pose.adresse = j.adresse.replace(new RegExp(`\\s*${j.codePostal || '#'}.*$`), '').trim() || j.adresse; if (j.codePostal) pose.codePostal = j.codePostal; if (j.ville) pose.ville = j.ville; }
-        if (Object.keys(pose).length) updPlusieurs(pose);
-      }
-    });
-    return () => { mort = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chiffres, !!cfg]);
+  // (9 nov., soir) Le SIRET fait chercher l'entreprise au registre public (SIREN EXACT) ;
+  // ce qui est trouvé est PROPOSÉ dans « Vérifie ces informations » : rien n'est écrit
+  // sans son « C'est bon », un champ qu'il a rempli n'est jamais écrasé sans son accord
+  // (src/RechercheEntreprise.jsx, la même règle que « Ma configuration »). Avant, le nom
+  // et l'adresse se posaient seuls dans les champs vides.
+  const recherche = useRechercheEntreprise(deps.chercherEntreprise, cfg ? cfg.siret : '');
+  const allerAuChamp = (k) => { const el = document.querySelector(`[data-fp-champ="${k}"] input, [data-fp-champ="${k}"] select`); if (el) { try { el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'center' }); } catch (_) {} } };
 
   React.useEffect(() => { if (focus && cfg) { const el = document.querySelector(`[data-fp-champ="${focus}"] input, [data-fp-champ="${focus}"] select, [data-fp-champ="${focus}"] button`); if (el) { try { el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'center' }); } catch (_) {} } } }, [focus, !!cfg]);
 
@@ -270,7 +266,8 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
 
         <section className="vrm-fp-section">
           <h3>Ton entreprise</h3>
-          {champ({ k: 'siret', label: 'SIRET', mode: 'numeric', placeholder: '14 chiffres', aide: sir.etat === 'invalide' ? `Ce numéro ne semble pas valide : ${sir.raison}.` : registre && registre.etat === 'trouve' ? `Trouvé au registre : ${registre.nom}${registre.ferme ? ' — ⚠ entreprise fermée' : ''}` : registre && registre.etat === 'inconnu' ? 'Ce numéro n’est pas au registre public des entreprises.' : 'Sur ton avis de situation INSEE. Le nom et l’adresse se remplissent seuls.' })}
+          {champ({ k: 'siret', label: 'SIRET', mode: 'numeric', placeholder: '14 chiffres', aide: 'Sur ton avis de situation INSEE. VRM cherche ton entreprise au registre public, puis te demande de vérifier.' })}
+          <CarteVerifEntreprise recherche={recherche} actuel={cfg} onModifier={allerAuChamp} onEcrire={(patch) => { updPlusieurs(patch); return true; }} data={{ 'data-fp-registre': '' }}/>
           <div className="vrm-fp-champ" data-fp-champ="forme" data-fp-manque={champManque.has('forme') ? '1' : undefined}>
             <span>Forme de l'entreprise</span>
             <select value={cfg.forme || ''} onChange={(e) => upd('forme', e.target.value)} aria-label="Forme de l'entreprise">

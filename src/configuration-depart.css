@@ -79,6 +79,40 @@
 .vrm-cfg-coche svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .vrm-cfg-logo { display: block; width: 32px; height: 26px; flex-shrink: 0; background: currentColor; mask: var(--vrm-cfg-logo) center/contain no-repeat; -webkit-mask: var(--vrm-cfg-logo) center/contain no-repeat; }
 
+/* (9 nov., soir) « Qu'est-ce que tu vends ? » : des tuiles à choix multiple, icône au trait. */
+.vrm-cfg-tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 560px) { .vrm-cfg-tuiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } }
+.vrm-cfg-tuile {
+  appearance: none; box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 10px;
+  min-height: 92px; padding: 12px 12px 12px 14px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--cfg-encre); background: var(--cfg-carte); border: 0; border-radius: 16px;
+  box-shadow: inset 0 0 0 1px var(--cfg-filet); transition: box-shadow .2s ease, transform .12s ease; -webkit-tap-highlight-color: transparent;
+}
+.vrm-cfg-tuile:active { transform: scale(.98); }
+.vrm-cfg-tuile[data-choisi="1"] { box-shadow: inset 0 0 0 2px var(--cfg-accent); }
+.vrm-cfg-tuile:focus-visible { outline: 2px solid var(--cfg-accent); outline-offset: 3px; }
+.vrm-cfg-tuile-icone { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: var(--cfg-gris); }
+.vrm-cfg-tuile[data-choisi="1"] .vrm-cfg-tuile-icone { color: var(--cfg-encre); }
+.vrm-cfg-tuile-t { font-size: 15px; font-weight: 600; letter-spacing: -.01em; line-height: 1.25; padding-right: 22px; overflow-wrap: anywhere; }
+.vrm-cfg-tuile .vrm-cfg-coche { position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; }
+.vrm-cfg-tuile[data-choisi="1"] .vrm-cfg-coche { background: var(--cfg-accent); box-shadow: none; }
+.vrm-cfg-libre { display: grid; gap: 6px; margin-top: 14px; font-size: 14px; line-height: 1.4; color: var(--cfg-gris); }
+.vrm-cfg-libre input {
+  box-sizing: border-box; width: 100%; min-height: 48px; padding: 10px 14px; border-radius: 12px; border: 0;
+  box-shadow: inset 0 0 0 1px var(--cfg-filet); background: var(--cfg-carte); color: var(--cfg-encre);
+  font: inherit; font-size: 17px; outline: none;
+}
+.vrm-cfg-libre input:focus { box-shadow: inset 0 0 0 2px var(--cfg-accent); }
+/* L'étape d'affichage : ce que chaque carte montre ou cache, et la recommandation. */
+.vrm-cfg-puces { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; line-height: 1.4; color: var(--cfg-encre); }
+.vrm-cfg-badge { align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--cfg-accent-texte); background: color-mix(in srgb, var(--cfg-accent) 12%, transparent); border-radius: 999px; padding: 2px 9px; margin-bottom: 2px; }
+/* Le SIRET à l'étape statut (la carte vient de recherche-entreprise.css). */
+.vrm-cfg-siret { margin-top: 22px; display: grid; gap: 10px; }
+.vrm-cfg-siret .vrm-cfg-question { margin: 0; }
+.vrm-cfg-siret .vrm-cfg-libre { margin-top: 0; }
+.vrm-cfg-statut-propose { margin: 0; display: grid; gap: 8px; padding: 10px 0 0; border-top: .5px solid var(--cfg-filet); font-size: 15px; }
+.vrm-cfg-statut-propose p { margin: 0; }
+
 .vrm-cfg-note { margin: 14px 0 0; font-size: 14px; line-height: 1.45; color: var(--cfg-gris); text-align: center; text-wrap: pretty; }
 .vrm-cfg-taux { margin-top: 20px; padding: 14px 16px; border-radius: 16px; background: var(--cfg-carte); box-shadow: inset 0 0 0 1px var(--cfg-filet); }
 .vrm-cfg-taux .vrm-cfg-note { text-align: left; }
@@ -117,6 +151,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .vrm-cfg-corps { animation: none; }
-  .vrm-cfg-carte, .vrm-cfg-barre > span { transition: none; }
+  .vrm-cfg-carte, .vrm-cfg-tuile, .vrm-cfg-barre > span { transition: none; }
 }
 @media (prefers-contrast: more) { .vrm-cfg-carte { box-shadow: inset 0 0 0 1px var(--cfg-encre); } }

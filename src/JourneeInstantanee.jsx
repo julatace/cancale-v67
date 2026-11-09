@@ -9,11 +9,12 @@
 //  rien ne peut lire un chiffre de l'instantané comme un chiffre frais (`data-ji-*`).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { ageTexte, instantaneMontrable } from './journeeInstantanee.js';
+import { instantaneMontrable } from './journeeInstantanee.js';
 import { PileVignettes } from './design/PileVignettes.jsx';
 import { BarreObjectif } from './design/CarteStats.jsx';
 import { SqLignes } from './Squelette.jsx';
-import './styles-journee-instantanee.css';
+// (9 nov., soir) Le rendu commun des instantanés (Ma journée, Colis, Ventes).
+import { useInerte, useMaintenant, MentionInstantane, CasesInstantanees, progObjectif } from './InstantaneCommun.jsx';
 
 const LETTRES = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const majuscule = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -26,16 +27,13 @@ const nomJour = (d) => {
 
 export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null, Icon = null, fmt = null }) {
   const ref = React.useRef(null);
-  const [now, setNow] = React.useState(() => maintenant || Date.now());
-  // L'âge avance pendant qu'on attend (une minute à la fois).
-  React.useEffect(() => { if (maintenant) return undefined; const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, [maintenant]);
-  // `inert` posé sur le DOM (React 18 ne connaît pas l'attribut) : ni focus, ni clic.
-  React.useLayoutEffect(() => { const r = ref.current; if (r) { try { r.inert = true; } catch (_) {} r.setAttribute('inert', ''); } });
+  // L'âge avance pendant qu'on attend ; `inert` : ni focus, ni clic (src/InstantaneCommun.jsx).
+  const now = useMaintenant(maintenant);
+  useInerte(ref);
   const M = instantaneMontrable(snap, now);
   if (!M) return null;
   const h = new Date(now).getHours();
   const hello = h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir';
-  const age = ageTexte(M.age);
   const largeurOk = typeof window !== 'undefined' && M.largeur && Math.abs((window.innerWidth || 0) - M.largeur) < 2;
   const F = M.frise;
   const max = F ? Math.max(0, ...F.jours.map((j) => j.v || 0)) : 0;
@@ -47,20 +45,10 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
     P = vendu ? { choisi: vendu.iso, nom: vendu.k === 1 ? 'Hier' : nomJour(vendu.d), vendu: String(vendu.v), grand: fmt ? fmt(vendu.v / 100) : `${(vendu.v / 100).toLocaleString('fr-FR')} €`, faits: vendu.n != null ? [`${vendu.n.toLocaleString('fr-FR')} vente${vendu.n > 1 ? 's' : ''}`] : [], semaine: '' }
       : { choisi: F.jours[6].iso, nom: 'Aujourd’hui', vendu: '', grand: '—', faits: ['lecture…'], semaine: '' };
   }
-  const O = M.objectif;
-  const prog = O && fmt ? (() => {
-    const eur = O.type === 'ca';
-    const cible = Number(O.cible); const val = O.valeur === '' ? null : Number(O.valeur);
-    if (!Number.isFinite(cible) || cible <= 0) return null;
-    return { type: O.type, objectif: eur ? cible / 100 : cible, valeur: val == null || !Number.isFinite(val) ? null : (eur ? val / 100 : val), pct: O.pct === '' ? null : Number(O.pct), partiel: !!O.partiel, atteint: !!O.atteint, manque: [] };
-  })() : null;
+  const prog = fmt ? progObjectif(M.objectif) : null;
   const pr = M.prochain;
   // « Mis à jour il y a N min » : à la place (et à la taille) de « Modifier ».
-  const mention = (cls) => (
-    <span className={cls} data-ji-mention="" role="status" title="Les chiffres de ta dernière visite sur cet appareil. Ils se vérifient : ils seront remplacés dans un instant.">
-      <span className="vrm-ji-point" aria-hidden="true"/>Mis à jour {age}
-    </span>
-  );
+  const mention = (cls) => <MentionInstantane age={M.age} className={cls}/>;
   return (
     // Le cadre de l'écran vrai (la racine de `Comptabilite` : 16 px en haut), puis sa mise en page.
     <div ref={ref} style={{ padding: '16px 14px 40px' }} data-journee-instantane="" data-ji-t={String(M.t)} data-ji-age={String(Math.floor(M.age / 60000))} aria-busy="true">
@@ -120,15 +108,7 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
         {M.cases ? (
           <section className="vrm-fu-carte-nu a-action vrm-carte-stats vrm-ji-chiffres" data-ji-cases="">
             {mention('vrm-fu-modifier vrm-ji-age')}
-            <div className="vrm-fu-cases" style={{ '--n': M.cases.length }}>
-              {M.cases.map((c) => (
-                <div key={c.cle} className="vrm-fu-case" data-ji-case={c.cle} data-ji-valeur={c.valeur}>
-                  <b className={c.vide ? 'is-vide' : undefined}>{c.b}</b>
-                  <span>{c.l}</span>
-                  <small className="vrm-fu-case-raison" aria-hidden={c.raison ? undefined : 'true'}>{c.raison || ' '}</small>
-                </div>
-              ))}
-            </div>
+            <CasesInstantanees cases={M.cases}/>
             {prog ? <BarreObjectif prog={prog} fmt={fmt} maintenant={now} prefixe="data-ji-objectif"/> : null}
           </section>
         ) : null}

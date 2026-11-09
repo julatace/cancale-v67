@@ -1139,8 +1139,8 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
       </>)}
 
       {section('relier', <>
-        {paire.numero && etatSuivi !== 'fait' ? <p className="vrm-rm-muet" data-main-but="">Le N°{paire.numero} passera sur la nouvelle annonce : le même carton.</p> : null}
-        {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire sur son carton.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
+        {paire.numero && etatSuivi !== 'fait' ? <p className="vrm-rm-muet" data-main-but="">Le N°{paire.numero} passera sur la nouvelle annonce : le même rangement.</p> : null}
+        {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire là où l’article est rangé.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
         {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
           : !paire.numero && !paire.annulee ? <div className="vrm-rm-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
           : etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> La nouvelle annonce porte le N°{paire.numero}.</div>

@@ -291,7 +291,7 @@ export function EcranColis({ s, etat = 'joue', compact, libelle, cible }) {
         })}
         <div className="sc-etiq" style={{ opacity: sortie(seg(s, 3.1, 3.3)),
           ...(compact ? { right: 0, top: sY + cH + 6, textAlign: 'right' } : { left: sX, top: sY + 2 * cH + cG + 10 }) }}>
-          {compact ? `Carton ${V.n}` : `Carton ${V.n} · ${V.titre} · ${V.taille}`}
+          {compact ? `N°${V.n}` : `N°${V.n} · ${V.titre} · ${V.taille}`}
         </div>
         {vol}
         {curseur}

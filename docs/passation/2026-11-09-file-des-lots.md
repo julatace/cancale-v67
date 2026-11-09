@@ -53,13 +53,13 @@ libère son numéro (le dire ici).
 | — | plus de balayage entre onglets ; vues Vinted à 0 = pas su | PR #1074 | **en ligne** |
 
 | AC | « À trancher » : un seul endroit pour tous les doutes, un geste par ligne | `claude/a-trancher` | en cours |
-| AD | « Préparer mes colis » pas à pas + mode relais (codes plein écran) | `claude/preparer-relais` | en cours |
+| AD | « Préparer mes colis » pas à pas + mode relais (codes plein écran) | PR #1083 | **en ligne** |
 | AE | Colis et Ventes instantanés | `claude/colis-ventes-instantanes` | en cours |
 | AF | même annonce sur deux comptes Vinted + historique d'un N° | `claude/doublons-historique` | en cours |
 | AG | ligne de fraîcheur unique | `claude/fraicheur-unique` | en cours |
 | AH | Siri / Raccourcis (ajouter un achat, où est le N°) | `claude/siri-raccourcis` | à lancer |
 
-| AI | textes d'explication ⇒ pop-ups ; bouton « Imprimer » en double ; carte du compte ⇒ Paramètres ; point du compte Vinted refait (demandes 1, 2, 13, 14 du 9 nov. 21 h) | `claude/popups-propre` | à lancer (priorité) |
+| AI | textes d'explication ⇒ pop-ups ; bouton « Imprimer » en double ; carte du compte ⇒ Paramètres ; point du compte Vinted refait (demandes 1, 2, 13, 14 du 9 nov. 21 h) | `claude/popups-propre` | en cours |
 | AJ | ordre partout : plus récent en haut, tous comptes (3) | `claude/ordre-recent` | à lancer (priorité) |
 | AK | zéro « Transporteur inconnu » (tous les PDF), logos des transporteurs, carte des relais parfaite, suivi irréprochable (4, 5, 11) | `claude/transporteurs-parfaits` | à lancer (priorité) |
 | AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | à lancer |

@@ -1,0 +1,56 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   COLIS ET VENTES TOUT DE SUITE (9 nov., soir) — l'instantané.
+   Il reprend les classes de l'écran vrai (la place ne bouge pas au remplacement) et
+   celles de l'instantané de Ma journée (`vrm-ji` : la mention, le ton doux) ; ce
+   fichier n'ajoute que ce qui le DIT ancien et ce que les styles en ligne de l'écran
+   vrai portaient : une photo neutre (aucune photo rangée), le geste « Vérification… »
+   sans accent, « À venir », les cartes de colis. Couleurs : les jetons du thème
+   (clair et sombre). Détail : docs/passation/2026-11-09-colis-ventes-instantanes.md.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Un geste gardé : visible, sans accent, sans clic. */
+html body .vrm-app-shell .vrm-inst .vrm-inst-geste {
+  display: inline-block; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 999px;
+  font: 600 14px/44px var(--vrm-police); white-space: nowrap; cursor: default;
+  background: rgba(118,118,128,.12); color: var(--vrm-muted); box-shadow: none;
+}
+:root[data-theme="dark"] body .vrm-app-shell .vrm-inst .vrm-inst-geste { background: rgba(118,118,128,.24); }
+html body .vrm-app-shell .vrm-inst .vrm-colis-actions .vrm-inst-geste { min-height: 36px; line-height: 36px; font-size: 13px; }
+html body .vrm-app-shell .vrm-inst .vrm-colis-prochain .vrm-inst-geste { flex: none; }
+
+/* La mention seule (aucune carte à montrer ce jour-là) : sur le fond de la page. */
+html body .vrm-app-shell .vrm-inst > .vrm-ji-age-seule,
+html body .vrm-app-shell .vrm-inst .vrm-tache > .vrm-ji-age-seule { color: var(--vrm-muted); }
+
+/* Les chiffres anciens : un ton plus doux (la règle de Ma journée, pour la carte de Colis et Ventes). */
+html body .vrm-app-shell .vrm-ji .vrm-ji-chiffres .vrm-fu-grand { opacity: .78; }
+html body .vrm-app-shell .vrm-inst .vrm-inst-courbe { display: block; flex: none; }
+
+/* Aucune photo rangée : sa place, neutre. */
+html body .vrm-app-shell .vrm-inst .vrm-inst-photo { display: block; background: var(--vrm-card2, rgba(127,127,127,.12)); border: 1px solid var(--vrm-line); }
+
+/* Les cartes de colis et les ventes : les styles en ligne de l'écran vrai, en jetons du thème. */
+html body .vrm-app-shell .vrm-inst .vrm-inst-carte { border: 1px solid var(--vrm-line); background: var(--vrm-surface); }
+html body .vrm-app-shell .vrm-inst .vrm-inst-carte :is(.vrm-colis-titre, .vrm-colis-prix) { color: var(--vrm-ink); }
+html body .vrm-app-shell .vrm-inst .vrm-inst-carte [data-colis-dates] { color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-inst .vrm-toutes-ligne { cursor: default; }
+html body .vrm-app-shell .vrm-inst .vrm-toutes-meta { color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-inst .vrm-seg-btn { cursor: default; }
+
+/* « À venir » (src/App.jsx `ArgentAVenirCarte`) : la même boîte. */
+html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir { border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 20px; padding: 12px 16px; }
+html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir-titre { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir-ligne { font-size: 13px; color: var(--vrm-muted); margin-top: 2px; overflow-wrap: anywhere; }
+html body .vrm-app-shell .vrm-inst .vrm-inst-a-venir-total { font-size: 22px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; opacity: .78; }
+
+/* À partir de 768 px, les colis sont des LIGNES (styles-mineral.css, `data-colis-lignes`) : une
+   ligne basse, la photo petite, le geste à droite ; le transporteur est dit par l'en-tête du groupe. */
+@media (min-width: 768px) {
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte { display: flex !important; align-items: center !important; gap: 14px !important; padding: 8px 12px !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte > :first-child { flex: 1 1 auto !important; min-width: 0 !important; align-items: center !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-inst-photo { width: 44px !important; height: 52px !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-colis-titre { -webkit-line-clamp: 1 !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-colis-actions { display: flex !important; flex: none !important; margin-top: 0 !important; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-rangee-bord { display: flex; align-items: center; }
+  html body .vrm-app-shell .vrm-inst .vrm-colis-grille[data-colis-lignes] .vrm-inst-carte .vrm-transporteur { display: none !important; }
+}
