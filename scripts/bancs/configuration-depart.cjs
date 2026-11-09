@@ -188,8 +188,8 @@ async function neuf(nav, W, theme) {
   dit(e && e.etape === 'numero' && e.cartes.length === 2 && e.cartes.every((c) => !c.coche), `${T} étape « Où est ton numéro ? » : VRM numérote / je numérote, rien de coché`, JSON.stringify(e));
   await choisir(o.pg, 'numero:moi');
   e = await etat(o.pg);
-  dit(e && e.cartes.filter((c) => c.cle.startsWith('ou:')).length === 3 && e.cartes.find((c) => c.cle === 'ou:description').coche, `${T} « je numérote » ⇒ où : fin de description (cochée), titre, référence`, JSON.stringify(e && e.cartes));
-  await choisir(o.pg, 'ou:titre');
+  dit(e && e.cartes.filter((c) => c.cle.startsWith('ou:')).length === 3 && e.cartes.filter((c) => c.cle.startsWith('ou:')).every((c) => c.coche), `${T} « je numérote » ⇒ où : fin de description, titre, référence — tous cochés (le défaut de numeroEcrit)`, JSON.stringify(e && e.cartes));
+  await choisir(o.pg, 'ou:ref');
   await capture(o.pg, `cfg-${W}-${theme}-4b-numero`, true);
   e = await continuer(o.pg);
   dit(await attendre(o.pg, async () => { const d = ligneMain(base).vrm_numero_ecrit; return d && d.actif === true && (d.ou || []).join() === 'description,titre'; }), `${T} « fin de description + titre » ⇒ vrm_numero_ecrit { actif, ou } (le réglage de numeroEcrit)`, JSON.stringify(ligneMain(base).vrm_numero_ecrit));

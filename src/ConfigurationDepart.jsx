@@ -213,7 +213,7 @@ function corpsEtape(cle, { choix: c, poser, lus, aller }) {
     const ou = c.numeroOu || [];
     const basculer = (k) => { const n = ou.includes(k) ? ou.filter((x) => x !== k) : [...ou, k]; if (n.length) poser({ numero: 'moi', numeroOu: n }); };
     return (<>
-      <Groupe label="Qui numérote" colonnes="duo">
+      <Groupe label="Qui numérote" colonnes="2">
         {CHOIX_NUMERO.map((x) => <Carte key={x.v} choisi={c.numero === x.v} onClick={() => poser({ numero: x.v, ...(x.v === 'moi' && !ou.length ? { numeroOu: ['description'] } : {}) })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `numero:${x.v}` }} />)}
       </Groupe>
       {c.numero === 'moi' ? <>

@@ -36,8 +36,10 @@
 .vrm-cfg-barre > span[data-fait="1"] { background: var(--cfg-accent); }
 
 .vrm-cfg-corps {
-  flex: 1; display: flex; flex-direction: column; justify-content: center;
-  padding: 24px 0 16px; animation: vrmCfgEntre .32s cubic-bezier(.23,1,.32,1) both;
+  /* En haut, jamais centré verticalement : une réponse qui fait apparaître une question
+     (micro, « je numérote ») ne fait pas sauter les cartes sous le doigt. */
+  flex: 1; display: flex; flex-direction: column; justify-content: flex-start;
+  padding: clamp(24px, 9vh, 120px) 0 16px; animation: vrmCfgEntre .32s cubic-bezier(.23,1,.32,1) both;
 }
 @keyframes vrmCfgEntre { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .vrm-cfg-sur { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--cfg-gris); font-variant-numeric: tabular-nums; text-align: center; }
@@ -46,7 +48,6 @@
 .vrm-cfg .vrm-cfg-titre:focus, .vrm-cfg .vrm-cfg-titre:focus-visible { outline: none !important; box-shadow: none !important; }
 .vrm-cfg-sous { margin: 10px auto 24px; max-width: 46ch; font-size: 17px; line-height: 1.45; color: var(--cfg-gris); text-align: center; text-wrap: pretty; }
 .vrm-cfg-question { margin: 20px 0 10px; font-size: 15px; font-weight: 600; color: var(--cfg-encre); letter-spacing: -.01em; }
-.vrm-cfg-question:first-of-type { margin-top: 0; }
 
 .vrm-cfg-grille { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 @media (min-width: 560px) { .vrm-cfg-grille[data-colonnes="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
