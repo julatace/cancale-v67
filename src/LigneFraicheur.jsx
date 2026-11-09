@@ -104,6 +104,9 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
     return null;
   };
   const premier = f.retards[0] || null;
+  // Les comptes nommés (pas relus, ventes ou achats en retard, en panne) : leur nombre et leurs noms en
+  // attributs (les bancs, comme la puce de Colis avant le lot AG) ; toutes les phrases en `title`.
+  const nommes = [...new Map(f.retards.filter((r) => r.source === 'compte' || r.source === 'panne').map((r) => [`${r.plateforme}:${r.id}`, r.nom])).values()];
   const autres = f.retards.length - 1;
   const panne = premier && premier.source === 'panne';
   const g = premier ? geste(premier) : null;
@@ -120,6 +123,8 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
         data-fraicheur-source={premier ? premier.source : undefined} data-fraicheur-cle={premier ? premier.cle : undefined}
         data-fraicheur-n={f.retards.length} data-fraicheur-passu={f.passu.length ? f.passu.join(',') : undefined}
         data-fraicheur-verifie={f.etat === 'a-jour' && f.verifieAt ? Math.max(0, Math.round((maintenant - f.verifieAt) / 60000)) : undefined}
+        data-fraicheur-a-relire={nommes.length || undefined} data-fraicheur-a-relire-noms={nommes.length ? nommes.join(',') : undefined}
+        title={f.etat === 'retard' ? f.retards.map(phraseRetard).join(' · ') : undefined}
         data-alerte-capture={panne ? f.retards.filter((r) => r.source === 'panne').length : undefined} data-alerte-cle={panne ? premier.cleAlerte : undefined}>
         <span className="vrm-bandeau-abo-point vrm-fraicheur-point" data-ton={ton} aria-hidden="true"/>
         {depliable
