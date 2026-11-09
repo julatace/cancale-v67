@@ -39267,7 +39267,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (la somme SUE des sources, src/aTrancher.js — « au moins » s'il en manque une).
         if (aTrancher && aTrancher.total > 0) {
           const t = phraseATrancher(aTrancher);
-          jobs.push({ id: 'a-trancher', n: aTrancher.total, icon: 'help', color: C.text, court: t, detail: 'Ce que VRM n’a pas pu décider : un geste par ligne', title: t, tab: 'trancher', prio: 0.9 });
+          jobs.push({ id: 'a-trancher', n: aTrancher.total, icon: 'help', color: C.text, court: t, detail: 'Ce que VRM n’a pas pu décider : un geste par ligne', title: t, tab: 'trancher', prio: 1.9 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,

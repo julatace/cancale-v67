@@ -45,7 +45,7 @@ export const SOURCES = [
   { cle: 'colis-retirer', ecran: 'Colis', quoi: (n) => `${n} colis à retirer à vérifier`,
     pourquoi: 'délai dépassé, incident ou achat pas encore relié', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'retirer' } },
   { cle: 'numeros-a-ecrire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'nouveau N°', 'nouveaux N°')} à écrire sur ${pl(n, 'son carton', 'leurs cartons')}`,
-    pourquoi: 'le carton porte encore l’ancien numéro', geste: { libelle: 'C’est écrit ?', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-numeros-a-ecrire]' } },
+    pourquoi: 'le carton porte encore l’ancien numéro', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-numeros-a-ecrire]' } },
   { cle: 'numeros-a-verifier', ecran: 'Annonces', quoi: (n) => `${n} N° à vérifier sur ${pl(n, 'son carton', 'leurs cartons')}`,
     pourquoi: 'numéroté pendant une panne de synchro : il peut désigner une autre paire', geste: { libelle: 'Vérifier', tab: 'cat_annonces', cible: '[data-numeros-a-verifier]' } },
   { cle: 'sms-vestiaire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'vente Vestiaire reçue', 'ventes Vestiaire reçues')} par SMS, pas ${pl(n, 'reliée', 'reliées')}`,
