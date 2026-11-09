@@ -460,7 +460,8 @@ import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
-import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEcrit, apercuNumeroEcrit, decisionEcrite, PHRASE_ETAT as PHRASE_NUMERO_ECRIT, NOM_SOURCE as NOM_SOURCE_NUMERO } from "./numeroEcrit.js";
+import { suggestionsRemiseEnLigne, PHRASE_FORCE as PHRASE_REMISE } from "./remiseEnLigne.js";
+import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEcrit as lireNumeroEcritRegle, lectureRecue, apercuNumeroEcrit, decisionEcrite, PHRASE_ETAT as PHRASE_NUMERO_ECRIT, NOM_SOURCE as NOM_SOURCE_NUMERO } from "./numeroEcrit.js";
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
@@ -2380,6 +2381,9 @@ const SYNC_KEYS = [
   // (7 nov.) « Je numérote moi-même dans mes annonces » (src/numeroEcrit.js) : { actif, depuis }.
   // Allumé, VRM ne donne plus aucun N° tout seul ; il lit celui écrit dans l'annonce.
   'vrm_numero_ecrit',
+  // (9 nov.) « Non, une autre paire » sur une remise en ligne (src/remiseEnLigne.js) :
+  // { [id nouvelle annonce]: [ids anciennes écartées] } — plus reproposé, sur tous ses appareils.
+  'vrm_remise_refus',
   // (8 nov.) Affichage Simple / Complet et « Je vends : Sneakers / Autre » (src/profilVendeur.js) : { choix, at }.
   'vrm_affichage','vrm_je_vends',CLE_PLATEFORMES,
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
@@ -9698,6 +9702,10 @@ const mapWardrobeItem = (it) => ({
   // jamais juger la description.
   descLen: Number.isFinite(it.descLen) ? it.descLen
          : (typeof it.description === 'string' ? it.description.trim().length : null),
+  // (9 nov., extension 5.334) Le N° écrit à la fin de la description, LU par
+  // l'extension dans le dressing (`numEcrit`, jamais le texte). Une forme inconnue
+  // vaut « pas lue » ; un dressing non allégé porte encore le texte : lu ici.
+  numEcritDesc: lectureRecue(it.numEcrit) || (typeof it.description === 'string' && it.description.trim() ? lectureRecue(lireNumeroTexte(it.description, 'description')) : null) || undefined,
   // (5 nov., `src/annoncesActions.js`) « En vérification par Vinted » : Vinted
   // envoie `is_processing` et `item_alert_type` dans le dressing (mesuré le 5 nov.
   // sur 2 annonces non allégées). L'extension ne les garde pas encore : absents ⇒
@@ -9872,6 +9880,11 @@ const triNum = (a, b) => {
 // allumé, aucun N° n'est DONNÉ tout seul nulle part (annonce sans N°, vente à
 // expédier, doublon, Vestiaire) ; VRM lit celui qu'il a écrit. Éteint par défaut.
 const numeroEcritActif = () => { try { return lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).actif; } catch (_) { return false; } };
+// (9 nov.) « Où est ton numéro ? » : les sources qu'il a cochées (fin de la description ·
+// titre · champ référence de la plateforme). Chaque lecture de l'app les passe : une
+// source décochée n'est plus lue, ni pour poser un N°, ni pour se dire « ambigu ».
+const ouNumeroEcrit = () => { try { return lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou; } catch (_) { return undefined; } };
+const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: ouNumeroEcrit(), ...o });
 // L'aperçu « ce que VRM lit » publié par l'écran qui a les annonces (Annonces : Vinted)
 // et lu par Réglages (§11). En mémoire seulement : rien n'est écrit en base.
 const _apercuEcrit = {}; const _ecoutesApercuEcrit = new Set();
@@ -31074,7 +31087,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    vente) a déjà été écrit sur un carton : avant, on le reprenait sans un
     //    mot. On demande — c'est la même paire qui revient, ou un autre numéro.
     if (!autres.length && takenCles.has(cle) && !(porteursNum[cle] || []).some(p => String(p.id) !== moi)) {
-      const meme = await askConfirm({
+      // (9 nov.) « C'est la même paire » déjà dit (remise en ligne) : pas redemandé.
+      const meme = opts.memePaire ? true : await askConfirm({
         title: `Le N°${n} a déjà servi`,
         desc: `Ce numéro a déjà été donné à un article (il est peut-être écrit sur un carton).\n\nEst-ce bien le MÊME article qui revient ? Sinon, prends un numéro neuf.`,
         ok: 'Oui, le même article', cancel: `Non — N°${nextNumero}`,
@@ -31109,7 +31123,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return;
     }
     const anc = numeros[autres[0]] || {};
-    const meme = await askConfirm({
+    const meme = opts.memePaire ? true : await askConfirm({
       title: `Le N°${n} a déjà servi`,
       desc: `Il était sur « ${anc.title || 'un autre article'} », qui n'est plus en ligne.\n\nEst-ce bien le MÊME article qui te revient (litige, retour, annulation) ?\n\nSi oui, il reprend son prix d'achat et ses infos. Si c'est un autre article, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
       ok: 'Oui, le même article revient', cancel: `Non — N°${nextNumero}`,
@@ -33369,7 +33383,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Combien de photos on a VRAIMENT captées de la page (pour « X/Y captées »).
         if (info.ph) it.captPhotos = info.ph;
         if (info.photos && info.photos.length && !(Array.isArray(it.photos) && it.photos.length)) it.photosDetail = info.photos;
-        if (info.ecrit) it.numEcritDesc = info.ecrit;
+        if (info.ecrit && !it.numEcritDesc) it.numEcritDesc = info.ecrit;   // le dressing (plus frais) d'abord
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
     if(!courante())return;
@@ -34203,6 +34217,63 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       updatePair(it, { ecritRefuse: l.lu });
       toast(`« ${it.title} » garde le N°${l.connu}. Corrige son annonce pour qu'elle dise « N° ${l.connu} ».`);
     }
+  };
+  // ── (9 nov.) « JE L'AI REMISE EN LIGNE » (src/remiseEnLigne.js) ──────────────────
+  // Une annonce supprimée (prouvée par l'extension, `harvest_{uid}_supprimees`) et une
+  // NOUVELLE du même compte : VRM PROPOSE le N° de l'ancienne. Rien n'est écrit sans
+  // SON clic ; « Oui » passe par `poserNumero` (ses garde-fous, la reprise des infos de
+  // l'ancienne) ; le carton porte déjà ce N° (`carton`) : rien à barrer.
+  const [supprTous, setSupprTous] = useState(null);
+  useEffect(() => { let stop = false; lireSupprimeesTous().then((m) => { if (!stop) setSupprTous(m || null); }).catch(() => {}); return () => { stop = true; }; }, [listings.items]);
+  const [remiseRefus, setRemiseRefus] = useState(() => { const v = load('vrm_remise_refus', {}); return v && typeof v === 'object' ? v : {}; });
+  useEffect(() => onCloudReady(() => { const v = load('vrm_remise_refus', {}); if (v && typeof v === 'object') setRemiseRefus((p) => (Object.keys(p).length ? p : v)); }), []);
+  const remises = useMemo(() => {
+    if (!Array.isArray(listings.items) || !(supprTous instanceof Map) || !supprTous.size) return [];
+    const supprimees = [];
+    for (const [uid, ids] of supprTous) for (const [id, at] of Object.entries(ids || {})) {
+      const f = numeros[id]; if (!f || f.numero == null || String(f.numero).trim() === '') continue;
+      supprimees.push({ id: String(id), compte: String(uid), titre: f.title || '', taille: f.size || '', photoK: f.photoK || photoKey(f.photo) || '', supprimeeAt: at, numero: String(f.numero) });
+    }
+    if (!supprimees.length) return [];
+    const nouvelles = listings.items.map((it) => {
+      const f = numeros[it.id] || {};
+      const l = ecritOnUi ? lectureEcriteVinted(it) : null;
+      return { id: String(it.id), compte: String((it._acc && it._acc.vinted_user_id) || ''), titre: it.title || '', taille: it.size || '', photoK: photoKey(it.photo) || '',
+        createdTs: it.createdTs, numero: f.numero != null ? String(f.numero) : '', manuel: !!f.manuelAt, ecrit: l && l.etat === 'lu' ? l.cle : '' };
+    });
+    return suggestionsRemiseEnLigne({ nouvelles, supprimees, portesPresents: Object.keys(porteursNum || {}), refus: remiseRefus,
+      reprenable: (k) => !!numeroReprenable(k), marqueDe: extractBrand, modeleDe: extractModel });
+  }, [listings.items, supprTous, numeros, porteursNum, remiseRefus, ecritOnUi]);
+  const repondreRemise = async (r, o) => {
+    const it = (listings.items || []).find((x) => String(x.id) === r.nouvelle); if (!it) return;
+    if (o) { await poserNumero(it, o.numero, (numeros[it.id] || {}).numero, { carton: true, memePaire: true }); return; }
+    const n = { ...remiseRefus, [r.nouvelle]: [...new Set([...(remiseRefus[r.nouvelle] || []), ...r.options.map((x) => x.ancienne)])] };
+    setRemiseRefus(n); save('vrm_remise_refus', n);
+    toast('C’est noté : VRM ne le propose plus pour cette annonce.');
+  };
+  const blocRemiseEnLigne = () => {
+    if (!remises.length) return null;
+    return (
+      <div data-remise-bloc={remises.length} style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px'}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>{remises.length > 1 ? `${remises.length} annonces remises en ligne ?` : 'Une annonce remise en ligne ?'}</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.5}}>Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire sur le carton.</div>
+        {remises.slice(0, 20).map((r) => (
+          <div key={r.nouvelle} data-remise-ligne={r.nouvelle} data-remise-force={r.options[0].force} style={{padding:'9px 0',borderTop:`1px solid ${C.border}`,marginTop:6}}>
+            <div style={{fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || 'Nouvelle annonce'}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.5}}>
+              {r.options.length === 1 ? <>C’est la même paire que <b style={{color:C.text}}>N°{r.options[0].numero}</b> « {r.options[0].titre || 'ancienne annonce'} » ?</> : 'C’est la même paire qu’une de celles-ci ?'}
+              {' '}{PHRASE_REMISE[r.options[0].force]}
+              {r.plusieurs && r.options.length > 1 ? ' Plusieurs anciennes lui ressemblent : seule l’étiquette dit laquelle.' : ''}
+              {r.concurrence ? ' Une autre nouvelle annonce lui ressemble aussi.' : ''}
+            </div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>
+              {r.options.map((o) => <Bouton key={o.ancienne} variante="secondaire" data-remise-oui={o.numero} title={o.titre} onClick={() => repondreRemise(r, o)}>Oui, N°{o.numero}</Bouton>)}
+              <Bouton variante="secondaire" data-remise-non={r.nouvelle} onClick={() => repondreRemise(r, null)}>Non, une autre paire</Bouton>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
   const blocNumeroEcrit = () => {
     if (!ecritOnUi || !apercuEcrit) return null;
@@ -42014,6 +42085,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </>);
           })()}
           {blocNumeroEcrit()}
+          {blocRemiseEnLigne()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
@@ -46488,7 +46560,9 @@ const numeroLbcIdentite = (v, items, liens) => {
 // Éteint, ou ambigu ⇒ ''. La même lecture pour l'écran et les identités (§11).
 function lectureEcriteLbc(ad) {
   const body = typeof ad.body === 'string' && ad.body ? ad.body : undefined;
-  return lireNumeroEcrit({ ref: ad.customRef, titre: ad.subject || ad.title || '', description: body, descriptionCoupee: !!body && body.length >= 400 });
+  // (9 nov., 5.334) L'extension lit la description ENTIÈRE avant de la couper : sa
+  // lecture (`numEcrit`) fait foi quand elle est là.
+  return lireNumeroEcrit({ ref: ad.customRef, titre: ad.subject || ad.title || '', description: body, descriptionCoupee: !!body && body.length >= 400, descriptionLue: ad.numEcrit });
 }
 function numeroEcritLbc(ad) {
   if (!ad || !numeroEcritActif()) return '';
@@ -47039,7 +47113,7 @@ const numEbayLu = (sku, itemId, dateMs, depuis) => {
   // (7 nov.) Il numérote lui-même : un SKU qui est SON numéro (« 123 », « B125 »,
   // « N° 123 ») compte comme « VRM-123 » — avec les mêmes gardes (une seule fiche le
   // porte, déjà avant la publication). Éteint : le SKU strict « VRM-… » seul.
-  const skuEcrit = () => { if (!numeroEcritActif()) return ''; const l = lireNumeroTexte(sku, 'ref'); return l.etat === 'lu' ? l.cle : ''; };
+  const skuEcrit = () => { if (!numeroEcritActif() || !(ouNumeroEcrit() || ['ref']).includes('ref')) return ''; const l = lireNumeroTexte(sku, 'ref'); return l.etat === 'lu' ? l.cle : ''; };
   const k = numeroExterne(numDeSkuEbay(sku) || skuEcrit(), itemId, 'ebayAnnonces', dateMs);
   if (!k) return k;
   const porteurs = Object.values(fiches).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
