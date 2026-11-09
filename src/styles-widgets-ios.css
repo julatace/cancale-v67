@@ -230,6 +230,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   border-radius: 999px !important; min-width: 44px !important; min-height: 44px !important; padding-left: 0 !important; padding-right: 0 !important;
 }
 :root:root body .vrm-app-shell :is(.vrm-b.vrm-b-icone, .vrm-colis-scanner, .vrm-icon-control, .vrm-cal-declencheur, .vrm-annbar-bouton) { background: var(--w-remplir) !important; border: 0 !important; box-shadow: none !important; }
+@media (max-width: 767px) { :root:root body .vrm-app-shell .vrm-colis-scanner { width: 44px !important; max-width: 44px !important; flex: 0 0 44px !important; } }
 :root:root body .vrm-app-shell .vrm-annbar-bouton { border-radius: 999px !important; min-height: 44px !important; min-width: 44px !important; }
 /* Le geste de « À faire » (pilule bleue) et les filtres en puces : pilules. */
 :root:root body .vrm-main :is(.vrm-stock-views, .vrm-inbox-filters) > button, :root:root body .vrm-main .vrm-compte-puce { border-radius: 999px !important; font-weight: 600 !important; }
