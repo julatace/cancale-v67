@@ -37855,7 +37855,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const capte = x.txn ? labelsCaptes[x.txn] : null;
       const pdf = !!(b && b.hasPdf) || !!capte;
       const titre = o ? (o.title || 'Vente') : ((b && (b.modele || b.article)) || 'Bordereau');
-      L.push({ cle: 'v:' + (x.txn || x.key), site: 'vinted', num, etatNum: etatN(num), titre,
+      // L'e-mail du bordereau dit un autre N° que la vente (`numLitige`, « le seul cas où la paire peut être
+      // fausse ») : la photo reste celle de la VENTE (identité), le N° est à vérifier, dit en clair.
+      const litige = b && !x.venteEmail ? numLitige(b) : null;
+      L.push({ cle: 'v:' + (x.txn || x.key), site: 'vinted', num, etatNum: litige && etatN(num) === 'ok' ? 'litige' : etatN(num), litige, titre,
         taille: (e && e.taille ? String(e.taille) : '') || (o ? String(o.size_title || o.size || '') : ''), compte: o && o._acc ? accNameOf(o._acc) : '', transporteur: nomTr(x),
         limite: texteEnvoiColis(texteLimiteEnvoi(x.lim) || ''), limiteAmbre: x.dl != null && x.dl <= 1,
         photo: sure ? (orderPhoto(o) || null) : null, paire: sure ? 'sure' : 'a-verifier',
@@ -44309,10 +44312,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
             {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} /> : null}
             {/* (9 nov., lot AD) « Préparer mes colis » : un colis à la fois, plein écran, dans l'ordre de cette liste. */}
-            {onglet === 'envoyer' && (nPretsVue > 0 || (nEnv || 0) > 0) && (
+            {/* Une rangée À ELLE (pas `.vrm-colis-outils`, rangée derrière « … ») : le geste du moment. */}
+            {onglet === 'envoyer' && (nEnv || 0) > 0 ? (
+              <div className="vrm-pas-a-pas-rangee" data-preparer-rangee="">
+                <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton>
+              </div>) : null}
+            {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
-                {(nEnv || 0) > 0 ? <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton> : null}
-                {nPretsVue > 0 ? <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton> : null}
+                <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton>
               </div>
             )}
             {onglet === 'retirer' && (
@@ -44320,7 +44327,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
                 {/* (9 nov., lot AD) Le MODE RELAIS : au comptoir, chaque code en très grand, un par écran. */}
-                {pickupUnion.total > 0 ? <div className="vrm-colis-outils" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
+                {pickupUnion.total > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
                 {(() => { // (9 nov., Julien : « le statut doit être regardé très souvent ») QUAND le suivi a été lu chez
                   // le transporteur pour la dernière fois (la plus récente lecture réussie, `lu` des lignes `transp_`) —
                   // discret, une ligne ; rien lu ⇒ rien dit (jamais « à l'instant » inventé).

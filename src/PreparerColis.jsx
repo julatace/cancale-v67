@@ -19,6 +19,7 @@ import { ordreDeSeance, indexDeReprise, progression, lireSeancePreparer, ecrireS
 const PHRASE_NUM = {
   double: (n) => `Deux paires portent le N°${n} : vérifie le carton avant de fermer le colis.`,
   'a-verifier': (n) => `Le N°${n} est à vérifier sur son carton.`,
+  litige: (n, c) => `L’e-mail du bordereau disait N°${c.litige ? c.litige.mail : '?'}, la vente dit N°${n} : on garde celui de la vente. Vérifie le carton.`,
 };
 
 export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex }) {
@@ -130,7 +131,7 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
             : <span className="vrm-prep-verif" data-preparer-verif="" role="note"><b>Paire à vérifier</b><span>{c.raisonPaire || 'Ce colis n’est relié à aucune vente par son n° : VRM ne montre pas de photo devinée. Regarde le bordereau et le carton.'}</span></span>}
           {c.num ? <span className={'vrm-prep-num is-' + (c.etatNum || 'ok')} data-preparer-grand-num={c.num}>N°{c.num}</span> : <span className="vrm-prep-num is-sans" data-preparer-grand-num="">Sans N°</span>}
         </div>
-        {PHRASE_NUM[c.etatNum] ? <p className={'vrm-emb-alerte is-' + c.etatNum} role={c.etatNum === 'double' ? 'alert' : undefined} data-preparer-alerte={c.etatNum}>{PHRASE_NUM[c.etatNum](c.num)}</p> : null}
+        {PHRASE_NUM[c.etatNum] ? <p className={'vrm-emb-alerte is-' + c.etatNum} role={c.etatNum === 'double' ? 'alert' : undefined} data-preparer-alerte={c.etatNum}>{PHRASE_NUM[c.etatNum](c.num, c)}</p> : null}
         <h2 className="vrm-prep-titre" data-preparer-titre="">{c.titre}</h2>
         {puces.length ? <p className="vrm-prep-puces">{puces.map((p, k) => <span key={k} className={k === 1 && c.compte ? 'vrm-sensible' : undefined} data-stream-type={k === 1 && c.compte ? 'compte' : undefined}>{p}</span>)}</p> : null}
         {c.limite ? <p className={'vrm-prep-limite' + (c.limiteAmbre ? ' is-ambre' : '')} data-preparer-limite="">{c.limite}</p> : null}
