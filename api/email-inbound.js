@@ -55,6 +55,8 @@ import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
 import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
+// (9 nov.) Les autres e-mails Vestiaire (rappel d'envoi, annonce en attente / en ligne, offres, marketing).
+import { lireEmailVcAutre, fusionAnnonceVc, fusionOffreVc } from './_lib/vestiaire-email-autres.js';
 import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
@@ -2243,6 +2245,49 @@ export async function traiterEmail(req, res) {
         }
         await logEmail({ type: 'vente-vestiaire', subject, from: mail.from, productId: v.productId, nouvelle });
         await repondre(res, 200, { ok: true, type: 'vente-vestiaire', productId: v.productId, nouvelle, gain: v.montant ? v.montant.valeur.toFixed(2) : '', prixVente: v.prixVente ? v.prixVente.valeur.toFixed(2) : '', limite: v.limite, date: v.date });
+        return;
+      }
+      // (9 nov.) LES AUTRES FORMES APPRISES (captures de Julien) : api/_lib/vestiaire-email-autres.js.
+      // Identité = la réf (#N du sujet = Ref du corps) ; les offres n'en ont pas : jamais rattachées,
+      // et ni le pseudo de l'acheteur ni le prénom du vendeur ne sont rangés.
+      const au = lireEmailVcAutre(mail, corpsTexte, emailAt);
+      if (au && !au.ok) {
+        await garderInconnu(corpsBrut, mail, 'Vestiaire : ' + au.raison, '');
+        await repondre(res, 200, { ok: false, type: 'vestiaire', garde: true, raison: au.raison });
+        return;
+      }
+      if (au && au.ok) {
+        const ko503 = async () => { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cet e-mail Vestiaire : renvoie-le." }); };
+        if (au.type === 'marketing') {
+          // Conservé (le journal garde son texte) ; rien n'en est tiré (pas de prix conseillé, refus du 11 oct.).
+          await logEmail({ type: 'vestiaire-info', subject, from: mail.from });
+          await repondre(res, 200, { ok: true, type: 'information', vestiaire: 'marketing' });
+          return;
+        }
+        if (au.type === 'rappel') {
+          // La date limite d'envoi de CETTE vente (sa réf) ; rien d'autre n'est touché (ni l'état, ni « à expédier »
+          // d'une vente connue). « ou votre vente sera automatiquement annulée » est une condition : rien d'annulé.
+          const v = { productId: au.productId, date: '', limite: au.limite, montant: null, prixVente: null, titre: au.titre, photo: '', etiquette: null };
+          let nouvelle = false;
+          const r = await modifierCas('vc_ventes', (cur) => { const f = fusionnerVenteEmailVc(cur, v, now); nouvelle = f.nouvelle; return f.change ? f.data : undefined; });
+          if (r === null) { await ko503(); return; }
+          await logEmail({ type: 'rappel-vestiaire', subject, from: mail.from, productId: au.productId });
+          await repondre(res, 200, { ok: true, type: 'rappel-vestiaire', productId: au.productId, limite: au.limite, nouvelle });
+          return;
+        }
+        if (au.type === 'attente' || au.type === 'en_ligne') {
+          const r = await modifierCas('vc_email_annonces', (cur) => fusionAnnonceVc(cur, au, emailAt));
+          if (r === null) { await ko503(); return; }
+          await logEmail({ type: 'annonce-vestiaire', subject, from: mail.from, productId: au.productId, etat: au.type });
+          await repondre(res, 200, { ok: true, type: 'annonce-vestiaire', productId: au.productId, etat: au.type });
+          return;
+        }
+        // Les offres : montant + échéance ; le sujet (qui porte le pseudo) n'est pas recopié dans le journal des types.
+        const cle = shortHash(String(mail.messageId || '') + '|' + au.type + '|' + au.montant + '|' + emailAt);
+        const r = await modifierCas('vc_email_offres', (cur) => fusionOffreVc(cur, cle, au, emailAt));
+        if (r === null) { await ko503(); return; }
+        await logEmail({ type: 'offre-vestiaire', subject: au.type === 'contre_offre' ? 'Contre-offre reçue (Vestiaire)' : 'Offre acceptée (Vestiaire)', from: mail.from, montant: au.montant });
+        await repondre(res, 200, { ok: true, type: 'offre-vestiaire', offre: au.type, montant: au.montant, echeance: au.echeance });
         return;
       }
       // Un AUTRE email de Vestiaire (expédition, paiement, annulation…) : sa
