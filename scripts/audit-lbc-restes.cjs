@@ -196,7 +196,12 @@ const DETAIL = { id: 77, updated_at: '2026-10-02T10:00:00.000Z', sent_at: '2026-
   });
   await essaie('serveur', async () => {
     const m2 = await import(require('url').pathToFileURL(arg('--serveur', path.join(racine, 'api/_lib/double-vente.js'))).href);
-    const map = m2.annoncesLbcParNumero(ads, ventes, {}, null);
+    // (9 nov., suites serveur) Le serveur exige aussi que l'annonce soit VUE en ligne par une
+    // lecture complète de son compte de moins de 24 h (src/enLigneLbc.js) : on la lui donne
+    // (compte C1, lu il y a une heure, toutes les annonces) pour juger ici la seule règle « en vente ».
+    const adsC = Object.fromEntries(Object.entries(ads).map(([k, a]) => [k, { ...a, account: 'C1' }]));
+    const lectures = { C1: { at: new Date(Date.now() - 3600e3).toISOString(), total: Object.keys(ads).length, n: Object.keys(ads).length, ids: Object.keys(ads) } };
+    const map = m2.annoncesLbcParNumero(adsC, ventes, {}, null, {}, lectures, Date.now());
     dit(!map.has('12') && map.has('13'), 'le serveur (double vente) : la paire vendue sur Leboncoin n’y est plus « en vente »', JSON.stringify([...map.keys()]));
   });
 

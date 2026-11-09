@@ -112,6 +112,10 @@ const dansSemaine = (ts, debut, fin) => ts >= debut && ts < fin;
 //   comptes   [{ uid, login }]                — les comptes Vinted liés
 //   commandes { uid: { orders, cap } }        — `harvest_{uid}_orders_sold`
 //   masquesTx, masquesComptes (Set), panneau  — ce que l'app écarte (son choix)
+//   regle                                     — (9 nov.) l'offre du vendeur (`regleDuVendeur`,
+//                                               api/_lib/plan-vendeur.js) : en Solo, les ventes
+//                                               des comptes d'achat n'entrent dans aucun total,
+//                                               ni ne sont réclamées. `null` (pas su) ⇒ rien bridé.
 //   exclusAutres {leboncoin,vestiaire,ebay}  — les comptes des autres sites écartés (son choix, 3 nov.)
 //   lbc [], ebay [], versements {}            — comme l'écran Ventes
 //   colis (nombre, ventes eBay comprises), colisAuMoins (eBay illisible), dorment ({ n, total, datesKnown, at })
@@ -129,7 +133,7 @@ export function calculerBilan(e) {
   const manque = [];
   let vinted = [];
   if (vintedLisible) {
-    const ecarte = (uid) => compteEcarte(uid, e.masquesComptes, e.panneau);
+    const ecarte = (uid) => compteEcarte(uid, e.masquesComptes, e.panneau, e.regle);
     const vusTx = new Set();
     for (const c of e.comptes) {
       const uid = String(c.uid);
@@ -162,7 +166,7 @@ export function calculerBilan(e) {
   // l'app, ce n'est qu'un tri sur la date de capture.
   const lbc = (e.lbc || []).filter((v) => !(Date.parse((v && v.at) || '') < debut));
   const ebay = e.ebay || [];
-  const cachee = vintedLisible ? (o) => e.masquesTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : () => false;
+  const cachee = vintedLisible ? (o) => e.masquesTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : () => false;
 
   // ── VENDU : `ventesFaites`, au jour de la VENTE ──
   const excluAutre = excluAutreDe(e.exclusAutres);
@@ -180,7 +184,7 @@ export function calculerBilan(e) {
   if (e.versements == null && vintedLisible) {
     out.recu = { etat: 'pas-su', eur: 0, manque: ['dates de versement illisibles'] };
   } else {
-    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau) : undefined, excluAutre, versements: e.versements || {} });
+    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : undefined, excluAutre, versements: e.versements || {} });
     let r = 0;
     for (const l of vd.lignes) if (dansSemaine(l.ts, debut, fin)) r += l.eur;
     const manqueRecu = [...manque];
