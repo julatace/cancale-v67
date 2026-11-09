@@ -46491,7 +46491,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // de l'annonce : c'est LUI qui choisit et envoie.
           favoris: ()=>{ if (uidIt && typeof setCompteSel === 'function') setCompteSel(uidIt); demanderVue('favoris'); onNav && onNav('messages'); setTimeout(()=>setDortAgir(null), 400); },
         };
-        const choix = gestesDormeuse({ numero: a.numero, favoris: a.favoris, url: urlFiche, cap: (c)=>extSait(c), version: (c)=>EXT_CAPACITES[c] || '' })
+        // (9 nov.) Seulement les sites qu'il AFFICHE (« Mes plateformes ») : un site masqué ramenait sur Vinted, le clic ne menait nulle part.
+        const sitesAffiches = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
+        const choix = gestesDormeuse({ numero: a.numero, favoris: a.favoris, url: urlFiche, cap: (c)=>extSait(c), version: (c)=>EXT_CAPACITES[c] || '', sites: sitesAffiches })
           .map((g)=>({ ...g, go: aller[g.k] }));
         return (
           <SheetShell onClose={()=>setDortAgir(null)} maxWidth={420}>
