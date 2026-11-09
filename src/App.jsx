@@ -435,7 +435,7 @@ import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, so
 import { lireCible, selecteursCible, phraseAbsente, attrCible } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
-import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition } from "./prixAchatPropose.js";
+import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition, texteProposition } from "./prixAchatPropose.js";
 // ⟦→ ecrans/Compta.jsx #7⟧
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre, achatAnnule } from "./registres.js";
 // ⟦→ ecrans/Compta.jsx #8⟧
@@ -44927,7 +44927,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
               {(()=>{ const cles=fillBuyRows.map(r=>'f:'+r.key).filter(c=>propositionsPrix.m.has(c)); if(cles.length<2) return null;
-                return <div data-prix-proposes={cles.length} style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}><Bouton variante="secondaire" icone="check" data-prix-proposes-valider="" onClick={()=>validerPropositions(cles)}>Valider les {cles.length} prix proposés</Bouton></div>; })()}
+                // (9 nov.) « Tout garder » : SON clic, puis la confirmation qui liste chaque N° et son montant.
+                return <div data-prix-proposes={cles.length} style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}><Bouton variante="secondaire" icone="check" data-prix-proposes-valider="" data-tout-garder="" onClick={()=>validerPropositions(cles)}>Tout garder ({cles.length})</Bouton></div>; })()}
               {fillBuyRows.length===0 && (
                 <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Tous tes articles ont un prix d'achat.</div>
               )}
@@ -44963,10 +44964,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                  </div>
-                 {(()=>{ const pp=propositionFiche(r.key); if(!pp) return null;
-                   return <div className="vrm-prix-propose" data-prix-propose-fiche={r.key} style={{marginTop:6,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                     <Bouton variante="primaire" data-prix-propose={pp.centimes} data-prix-propose-par={pp.par} onClick={()=>appliquerProposition('f:'+r.key, pp)}>Utiliser {pp.texte}</Bouton>
-                     <span data-prix-propose-detail="" style={{fontSize:12,color:C.muted,minWidth:0,flex:'1 1 140px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pp.detail}</span>
+                 {(()=>{ const pp=propositionFiche(r.key); const tp=texteProposition(pp); if(!pp||!tp) return null;
+                   // (9 nov.) Le montant LU (reçu Vinted, sinon l'article seul — dit) en PROPOSITION :
+                   // « Garder » l'écrit (SON tap) ; « Corriger » met le curseur dans le champ, vide.
+                   return <div className="vrm-prix-propose" data-prix-propose-fiche={r.key} data-prix-propose-source={pp.source} style={{marginTop:6}}>
+                     <div style={{fontSize:13,color:C.text}}><span data-prix-propose-libelle="">{tp.libelle}</span> : <b className="vrm-display" style={{fontVariantNumeric:'tabular-nums'}}>{tp.montant}</b></div>
+                     {tp.detail && <div data-prix-propose-detail="" style={{fontSize:12,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{tp.detail}</div>}
+                     <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>
+                       <Bouton variante="primaire" data-prix-propose={pp.centimes} data-prix-propose-par={pp.par} data-prix-garder="" onClick={()=>appliquerProposition('f:'+r.key, pp)}>{tp.garder}</Bouton>
+                       <Bouton variante="secondaire" data-prix-corriger="" onClick={()=>{ const n=document.querySelector(`[data-fillbuy="${i}"]`); if(n) n.focus(); }}>{tp.corriger}</Bouton>
+                     </div>
                    </div>; })()}
                  {(()=>{ const cs=propositionFiche(r.key) ? null : fillBuySugg[r.key]; if(!cs||!cs.length) return null;
                    // (30 oct.) Seules les pistes sûres (« C'est ça ») restent en clair ; les

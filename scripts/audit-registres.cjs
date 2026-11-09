@@ -368,12 +368,16 @@ let pdfTexte = '';
     const pg = pdfG.replace(/[\u00a0\u202f]/g, ' ');
     dit(!!pdfG && /Grossiste invent/.test(pg) && /Dont frais/.test(pg) && /325,00/.test(pg) && pg.includes(M.eurosTexte(AG.total).replace(/[\u00a0\u202f]/g, ' ').replace('−', '-')), 'G5 · le PDF : le grossiste, « Dont frais », 325,00 et le total');
     // G6 — la carte passe le registre des fournisseurs, lu par LA règle.
-    const carteG = sansCommentaires(extraire(APP, 'RegistresCarte'));
+    // (9 nov.) L'écriture du registre vit dans `registreAchatsDe`, partagée avec l'export comptable :
+    // la carte doit l'appeler, et l'helper doit passer les achats en gros.
+    const carteG = sansCommentaires(extraire(APP, 'RegistresCarte')).includes('registreAchatsDe(') ? sansCommentaires(extraire(APP, 'registreAchatsDe')) : '';
     dit(/gros: lireRegistre\(load\(CLE_FOURNISSEURS, null\)\)/.test(carteG), 'G6 · la carte Registres passe les achats en gros (lireRegistre de vrm_fournisseurs)');
   }
 
   // ── A4. La carte : les dépenses ne vont pas dans le registre des achats ─────
-  const carte = sansCommentaires(extraire(APP, 'RegistresCarte'));
+  const carte0 = sansCommentaires(extraire(APP, 'RegistresCarte'));
+  // (9 nov.) Les deux écritures partagées avec « Exporter pour mon comptable » : jugées seulement si la carte les APPELLE.
+  const carte = carte0 + (carte0.includes('registreAchatsDe(') ? sansCommentaires(extraire(APP, 'registreAchatsDe')) : '') + (carte0.includes('recettesDe(') ? sansCommentaires(extraire(APP, 'recettesDe')) : '');
   const appel = (carte.match(/registreDesAchats\(\{[\s\S]*?\}\);/) || [''])[0];
   dit(!!appel && !/compta|depense|charges/i.test(appel), 'A4 · la carte ne passe aucune dépense au registre des achats');
   dit(/useDeclarablesCompta\(/.test(carte) && /livreDesRecettes\(\{ decl: calc\.decl/.test(carte), 'la carte lit les recettes par la lecture partagée (la même que Factur-X)');
