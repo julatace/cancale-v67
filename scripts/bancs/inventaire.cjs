@@ -17,11 +17,25 @@
 //   E  lecture de `vrm_inventaire` en panne : la saisie reste sur l'appareil, AUCUNE
 //      écriture n'est envoyée (« lecture KO, écriture OK » est le cas qui détruit, §5) ;
 //   F  aucune erreur de page, aucun défilement horizontal.
+//   (9 nov.) G  au doigt, le PAVÉ GÉANT (12 touches, ≥ 56 px, « B », ⌫) ; le clavier du
+//      téléphone ne s'ouvre pas (inputmode=none) ; chaque jugement VIBRE (Android) avec
+//      sa forme (courte = attendu, longue = doublon) ;
+//   H  HORS CONNEXION (`context.setOffline(true)`) pendant le tour : la feuille revient
+//      (inventaire hors connexion, liste des paires FIGÉE sur l'appareil, son heure dite),
+//      les N° se jugent comme en ligne (60 « à vérifier », 125 « pas su », 40 attendu),
+//      rouverte après un rechargement SANS réseau, « Terminer » donne le bilan ; AUCUNE
+//      requête vers la base pendant ce temps ; au retour du réseau, les saisies faites hors
+//      connexion arrivent dans `vrm_inventaire` (une fois : rejouer ne double rien) ;
+//   I  le CONSTAT figé se relit : « Inventaires précédents » → « Revoir » dit ce qui était
+//      à chercher / à vérifier CE jour-là, fait hors connexion ;
+//   J  AUCUNE écriture de N° sur tout le banc (les requêtes envoyées sont relues : ni
+//      `vinted_annonce_numeros`, ni le pool, ni les cases ne changent).
 // Lancer : npm run build ; BANC_PORT=103xx SHOT=/chemin/prefixe node scripts/bancs/inventaire.cjs
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+// BANC_DIST=<dist d'avant> : le même banc sur l'arbre d'avant (§6.1, il doit rougir).
+const DIST = process.env.BANC_DIST ? path.resolve(process.env.BANC_DIST) : path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 10310;
 const CHROMIUM = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const AUJ = Date.now();
@@ -83,9 +97,9 @@ const projette = (row, sel) => {
 // LA LIGNE `vrm_inventaire`, servie comme PostgREST : GET (select=data ou projeté),
 // POST (création ; 409 si elle existe), PATCH gardé par `data->>rev=eq.N` / `is.null`
 // (0 ligne rendue = conflit). `panne` : la LECTURE répond 500.
-function nouvelleBase() { return { ligne: null, ecritures: 0, lectures: 0, panne: false }; }
+function nouvelleBase() { return { ligne: null, ecritures: 0, lectures: 0, panne: false, autres: [], horsLigne: false, pendantHl: 0 }; }
 
-async function rendre(b, { tel, sombre, tab, base, vide = false }) {
+async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) {
   const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -95,6 +109,11 @@ async function rendre(b, { tel, sombre, tab, base, vide = false }) {
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    // (9 nov.) Hors connexion : tout échoue comme sans réseau ; une tentative vers la ligne
+    // de l'inventaire, ou une écriture, est comptée (il ne doit y en avoir aucune).
+    // (Une écriture d'un AUTRE geste de l'app, rejouée par la file d'envoi, n'est pas de
+    // l'inventaire : elle est relevée à part, et jugée par J — aucun N° changé.)
+    if (base.horsLigne) { const corps = req.postData() || ''; if (req.method() === 'GET') { if (/vrm_inventaire/.test(u)) base.lecturesHl = (base.lecturesHl || 0) + 1; } else if (/vrm_inventaire/.test(u + corps) || /vinted_annonce_numeros|vinted_used_numeros|vrm_slots/.test(corps)) { base.pendantHl++; base.pendantHlQui = (base.pendantHlQui || []).concat(req.method() + ' ' + u.slice(0, 90)); } else if (req.method() !== 'GET') base.autres.push({ m: req.method(), u, corps }); return route.abort('internetdisconnected'); }
     if (/id=eq\.vrm_inventaire/.test(u) || (req.method() === 'POST' && /vrm_inventaire/.test(req.postData() || ''))) {
       if (req.method() === 'GET') {
         base.lectures++;
@@ -114,7 +133,7 @@ async function rendre(b, { tel, sombre, tab, base, vide = false }) {
         base.ligne = JSON.parse(req.postData() || '{}').data; return j([{ id: 'vrm_inventaire' }]);
       }
     }
-    if (req.method() !== 'GET') return j([]);
+    if (req.method() !== 'GET') { base.autres.push({ m: req.method(), u, corps: req.postData() || '' }); return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([
       { id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -130,6 +149,8 @@ async function rendre(b, { tel, sombre, tab, base, vide = false }) {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  // (9 nov.) La vibration relevée (le banc n'a pas de moteur) : la forme de chaque appel.
+  if (vib) await pg.addInitScript(() => { try { Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, value: function (p) { (window.__vib = window.__vib || []).push(p); return true; } }); } catch (_) {} });
   await pg.addInitScript(({ m, sombre, vide }) => {
     try {
       if (sessionStorage.getItem('banc_pose')) return;          // un rechargement garde CE stockage
@@ -212,11 +233,14 @@ async function ouvrirInventaire(pg, tel) {
     b = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     // BANC_SEUL=390|1512 : une seule largeur (pour chercher un défaut).
     const tailles = process.env.BANC_SEUL === '390' ? [true] : (process.env.BANC_SEUL === '1512' ? [false] : [true, false]);
-    for (const tel of tailles) for (const sombre of [false, true]) {
+    // BANC_THEME=clair|sombre : un seul thème.
+    for (const tel of tailles) for (const sombre of [false, true].filter((x) => !process.env.BANC_THEME || (process.env.BANC_THEME === 'sombre') === x)) {
       const t = `${tel ? '390 tactile' : '1512 souris'} ${sombre ? 'sombre' : 'clair'}`;
       const nomShot = (x) => (tel ? '390' : '1512') + (sombre ? '-sombre' : '-clair') + '-' + x;
       const base = nouvelleBase();
-      await essaie(t + ' A-B-C-D', async () => {
+      // BANC_PHASES=GHIJ : seulement les phases du 9 nov. (pour chercher un défaut).
+      const seulNeuf = process.env.BANC_PHASES === 'GHIJ';
+      if (!seulNeuf) await essaie(t + ' A-B-C-D', async () => {
         let { ctx, pg, errs } = await rendre(b, { tel, sombre, tab: 'garage', base });
         await ouvrirInventaire(pg, tel);
         await pg.waitForSelector('[data-inv-commencer]:not([disabled])', { timeout: 25000 });
@@ -227,7 +251,9 @@ async function ouvrirInventaire(pg, tel) {
         await pg.waitForSelector('[data-inv-champ]', { timeout: 8000 });
         const focus = await pg.evaluate(() => document.activeElement && document.activeElement.hasAttribute('data-inv-champ'));
         const im = await pg.getAttribute('[data-inv-champ]', 'inputmode');
-        dit(im === 'numeric', `${t} : A — clavier numérique (inputmode=numeric)${focus ? ', champ prêt' : ''}`, im);
+        // (9 nov.) Au doigt : le pavé GÉANT de VRM, et le clavier du téléphone ne s'ouvre pas par-dessus.
+        if (tel) dit(im === 'none' && !!(await pg.$('[data-inv-pave]')), `${t} : A — au doigt, le pavé géant de VRM (inputmode=none : le clavier du téléphone ne le couvre pas)${focus ? ', champ prêt' : ''}`, im);
+        else dit(im === 'numeric' && !(await pg.$('[data-inv-pave]')), `${t} : A — à la souris, clavier numérique (inputmode=numeric), pas de pavé dessiné${focus ? ', champ prêt' : ''}`, im);
         await taper(pg, tel, '1');
         let r = await lireRetour(pg);
         const encre = await pg.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--vrm-ink)'; document.querySelector('[data-inventaire]').appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; });
@@ -325,8 +351,131 @@ async function ouvrirInventaire(pg, tel) {
         dit(numsApres === numsAvant, `${t} : C — aucun numéro changé par l'inventaire`);
         await ctx.close();
       });
+      // ── (9 nov.) G · H · I · J — pavé géant, vibration, HORS CONNEXION, constat figé ──
+      await essaie(t + ' G-H-I-J', async () => {
+        const bh = nouvelleBase();
+        const { ctx, pg, errs } = await rendre(b, { tel, sombre, tab: 'garage', base: bh, vib: true });
+        // Le service worker doit tenir la page (et ses morceaux) pour la rouvrir sans réseau.
+        await pg.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready).catch(() => {});
+        // Une ouverture EN LIGNE sous son contrôle : il range la page (« / ») pour plus tard.
+        await pg.reload({ waitUntil: 'domcontentloaded' });
+        await pg.waitForFunction(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller), null, { timeout: 15000 }).catch(() => {});
+        await ouvrirInventaire(pg, tel);
+        await pg.waitForSelector('[data-inv-commencer]:not([disabled])', { timeout: 25000 });
+        // La liste FIGÉE de ce vendeur (src/inventaireHorsLigne.js), écrite par le Stock qui l'a lue.
+        let fig = null;
+        for (let i = 0; i < 30 && !fig; i++) { fig = await pg.evaluate(() => { const k = Object.keys(localStorage).find((x) => /^vrm_hl_inventaire_/.test(x)); if (!k) return null; const f = JSON.parse(localStorage.getItem(k)); return { k, uidOk: k === 'vrm_hl_inventaire_' + (JSON.parse(localStorage.getItem('vrm_session') || '{}').user || {}).id && f.uid === (JSON.parse(localStorage.getItem('vrm_session') || '{}').user || {}).id, n: f.articles.length, cles: f.articles.map((a) => a.cle).sort().join(','), manque: f.manque.map((m) => m.nom).join(','), photo: f.articles.some((a) => 'photo' in a) }; }); if (!fig) await pg.waitForTimeout(400); }
+        dit(fig && fig.uidOk && fig.cles === '1,2,3,40,B125' && /compte_pas_lu/.test(fig.manque) && !fig.photo, `${t} : H — la liste des paires est FIGÉE sur l'appareil, au nom de CE vendeur (5 attendues, le compte pas lu NOMMÉ, sans photo)`, JSON.stringify(fig));
+        await toucher(pg, tel, '[data-inv-commencer]');
+        await pg.waitForSelector('[data-inv-champ]', { timeout: 8000 });
+        const vibs = () => pg.evaluate(() => JSON.stringify(window.__vib || []));
+        if (tel) {
+          const pave = await pg.evaluate(() => [...document.querySelectorAll('[data-inv-touche]')].map((x) => { const r = x.getBoundingClientRect(); const cs = getComputedStyle(x); return { t: x.getAttribute('data-inv-touche'), h: Math.round(r.height), w: Math.round(r.width), mh: cs.minHeight, hh: cs.height, gp: Math.round(x.parentElement.getBoundingClientRect().height), gr: getComputedStyle(x.parentElement).gridTemplateRows }; }));
+          // Trop petites : le banc dit QUELLE règle fixe la hauteur (CDP, règles appliquées).
+          let qui = '';
+          if (!pave.every((x) => x.h >= 56)) { try { const cdp = await ctx.newCDPSession(pg); await cdp.send('DOM.enable'); await cdp.send('CSS.enable'); const d = await cdp.send('DOM.getDocument'); const nd = await cdp.send('DOM.querySelector', { nodeId: d.root.nodeId, selector: '[data-inv-touche="1"]' }); const m = await cdp.send('CSS.getMatchedStylesForNode', { nodeId: nd.nodeId }); qui = m.matchedCSSRules.filter((r) => r.rule.style.cssProperties.some((c) => /height/.test(c.name))).map((r) => r.rule.selectorList.text + ' {' + r.rule.style.cssProperties.filter((c) => /height/.test(c.name)).map((c) => c.name + ':' + c.value).join(';') + '}').join(' | '); } catch (e) { qui = 'cdp: ' + e.message; } }
+          dit(pave.length === 12 && pave.every((x) => x.h >= 56 && x.w >= 56) && pave.map((x) => x.t).join('') === '123456789B0⌫', `${t} : G — le pavé géant : 12 touches (1-9, B, 0, ⌫), toutes ≥ 56 px`, JSON.stringify(pave.slice(0, 2)) + '… ' + qui.slice(0, 600));
+          await toucher(pg, tel, '[data-inv-touche="3"]'); await toucher(pg, tel, '[data-inv-touche="9"]'); await toucher(pg, tel, '[data-inv-touche="⌫"]');
+          const v1 = await pg.inputValue('[data-inv-champ]');
+          await toucher(pg, tel, '[data-inv-valider]'); await pg.waitForTimeout(250);
+          const r3 = await lireRetour(pg);
+          dit(v1 === '3' && r3 && r3.etat === 'attendu' && /N°3/.test(r3.texte), `${t} : G — « 3 », « 9 », ⌫ puis OK au pavé ⇒ N°3 attendue`, JSON.stringify({ v1, r3 }));
+          await toucher(pg, tel, '[data-inv-touche="2"]'); await toucher(pg, tel, '[data-inv-valider]'); await pg.waitForTimeout(250);
+        } else {
+          await taper(pg, tel, '3'); await taper(pg, tel, '2');
+        }
+        const r2 = await lireRetour(pg);
+        const vb = JSON.parse(await vibs());
+        dit(r2 && r2.etat === 'doublon' && vb.length >= 2 && vb[0] === 18 && Array.isArray(vb[1]) && vb[1].length === 5, `${t} : G — chaque jugement vibre avec SA forme : courte (attendu), longue (deux paires sous un N°)`, JSON.stringify(vb));
+        await shot(pg, nomShot('pave'));
+        await pg.waitForFunction(() => { const el = document.querySelector('[data-inv-sync]'); return el && el.getAttribute('data-inv-sync') === 'ok'; }, null, { timeout: 10000 }).catch(() => {});
+        const ecrEnLigne = bh.ecritures;
+        // H — le réseau coupe PENDANT le tour.
+        bh.horsLigne = true; await ctx.setOffline(true);
+        await pg.waitForSelector('[data-inventaire-hl] [data-inv-vue="saisie"]', { timeout: 20000 }).catch(() => {});
+        const hl = await pg.evaluate(() => { const el = document.querySelector('[data-inventaire-hl]'); const v = el && el.querySelector('[data-inv-vue="saisie"]'); const h = el && el.querySelector('[data-inv-hors-ligne]'); return { feuille: !!el, n: v ? v.getAttribute('data-inv-n') : null, tete: h ? h.innerText : '', vue: (document.querySelector('[data-hors-ligne]') || { getAttribute: () => '' }).getAttribute('data-hors-ligne') }; });
+        dit(hl.feuille && hl.n === '2' && /^Hors connexion · liste des paires du \d{1,2} \S+ à \d{2}:\d{2}\./.test(hl.tete) && hl.vue === 'stock', `${t} : H — réseau coupé pendant le tour : la feuille revient hors connexion, au même point (2 N° vus), l'heure de la liste DITE`, JSON.stringify(hl));
+        await shot(pg, nomShot('hors-ligne'));
+        for (const [n, attendu] of [['60', 'trop'], ['125', 'passu'], ['40', 'attendu']]) {
+          await taper(pg, tel, n);
+          const r = await lireRetour(pg);
+          dit(r && r.etat === attendu, `${t} : H — hors connexion, « ${n} » se juge comme en ligne : ${attendu}`, JSON.stringify(r));
+        }
+        await pg.waitForTimeout(1200);
+        const syHl = await pg.evaluate(() => { const el = document.querySelector('[data-inv-sync]'); return el ? { s: el.getAttribute('data-inv-sync'), hl: el.hasAttribute('data-inv-sync-hl'), t: el.innerText } : null; });
+        const att = await pg.evaluate(() => Object.keys(localStorage).some((k) => /^vrm_inventaire_attente_/.test(k)));
+        dit(syHl && syHl.s === 'ko' && syHl.hl && att, `${t} : H — « Hors connexion : N saisies gardées sur cet appareil — envoyées au retour du réseau » (jamais « enregistré »)`, JSON.stringify({ syHl, att }));
+        // Rechargement SANS réseau (le service worker sert l'app) : la feuille se rouvre au même point.
+        const sw = await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller));
+        if (sw) {
+          await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+          await pg.waitForSelector('[data-hl-inventaire-ouvrir]', { timeout: 20000 }).catch(() => {});
+          await shot(pg, nomShot('recharge-hors-ligne'));
+          await cliquer(pg, tel, '[data-hl-inventaire-ouvrir]', 10000).catch(() => {});
+          await pg.waitForSelector('[data-inventaire-hl] [data-inv-vue="saisie"]', { timeout: 15000 }).catch(() => {});
+          const n5 = await pg.getAttribute('[data-inventaire-hl] [data-inv-vue="saisie"]', 'data-inv-n').catch(() => null);
+          dit(n5 === '5', `${t} : H — rechargé SANS réseau : Stock → « Faire l'inventaire » reprend au même point (5 N° vus)`, String(n5));
+        } else dit(false, `${t} : H — rechargé sans réseau : le service worker ne contrôle pas la page (le banc ne peut pas le jouer)`);
+        await cliquer(pg, tel, '[data-inv-terminer]');
+        await pg.waitForSelector('button:has-text("Voir le bilan")', { timeout: 8000 });
+        await pg.waitForTimeout(500);
+        await cliquer(pg, tel, 'button:has-text("Voir le bilan")');
+        await pg.waitForSelector('[data-inventaire-hl] [data-inv-vue="bilan"]', { timeout: 8000 }).catch(() => {});
+        const bilHl = await pg.evaluate(() => { const el = document.querySelector('[data-inv-vue="bilan"]'); if (!el) return null; const l = (s) => [...el.querySelectorAll(`[data-inv-section="${s}"] [data-inv-bilan]`)].map((x) => x.getAttribute('data-inv-bilan')); return { manque: l('manque'), trop: l('trop'), doublons: l('doublons'), passu: l('passu'), titres: [...el.querySelectorAll('[data-inv-section] h3')].map((h) => h.innerText) }; });
+        dit(bilHl && bilHl.manque.join(',') === '1,B125' && bilHl.trop.join(',') === '60' && bilHl.doublons.join(',') === '2' && bilHl.passu.join(',') === '125', `${t} : H — le bilan HORS CONNEXION : à chercher N°1 et B125 · à vérifier N°60 · deux paires N°2 · pas su 125`, JSON.stringify(bilHl));
+        dit(bilHl && bilHl.titres.some((x) => /^À chercher/.test(x)) && bilHl.titres.some((x) => /^À vérifier ·/.test(x)), `${t} : H — le bilan dit « À chercher » et « À vérifier »`, JSON.stringify(bilHl && bilHl.titres));
+        const fautesH = await horsJetons(pg);
+        dit(fautesH.length === 0, `${t} : H — aucune teinte hors des jetons hors connexion`, fautesH.slice(0, 4).join(' | '));
+        await shot(pg, nomShot('bilan-hors-ligne'));
+        dit(bh.pendantHl === 0, `${t} : H — hors connexion : l'inventaire ne lit ni n'écrit sa ligne, et rien qui touche un N° n'est envoyé (${bh.pendantHl}) — une lecture tentée (${bh.lecturesHl || 0}, l'écran resté en ligne une seconde) échoue sans rien écrire`, (bh.pendantHlQui || []).join(' | '));
+        // Le réseau revient : les saisies faites hors connexion partent, une fois.
+        bh.horsLigne = false; await ctx.setOffline(false);
+        let arrive = false;
+        for (let i = 0; i < 40 && !arrive; i++) { await pg.waitForTimeout(500); const lg = JSON.stringify(bh.ligne || {}); arrive = /"k":"60"/.test(lg) && /"k":"40"/.test(lg) && /"k":"125"/.test(lg) && /"finAt":[1-9]/.test(lg); }
+        const saisiesK = bh.ligne && bh.ligne.courant ? Object.values(bh.ligne.courant.saisies || {}).map((x) => x.k).sort().join(',') : '';
+        dit(arrive && saisiesK === '125,2,3,40,60' && bh.ecritures > ecrEnLigne, `${t} : H — le réseau revient : l'inventaire fait hors connexion arrive dans vrm_inventaire (rev ${bh.ligne && bh.ligne.rev}), chaque saisie UNE fois`, saisiesK);
+        let attApres = true;
+        for (let i = 0; i < 20 && attApres; i++) { attApres = await pg.evaluate(() => Object.keys(localStorage).some((k) => /^vrm_inventaire_attente_/.test(k))).catch(() => true); if (attApres) await pg.waitForTimeout(400); }
+        dit(!attApres, `${t} : H — plus rien « en attente d'envoi » une fois la ligne acceptée`);
+        // Rejouer une 2ᵉ fois ne double rien.
+        const revAvant = bh.ligne && bh.ligne.rev;
+        await pg.evaluate(() => { const u = (JSON.parse(localStorage.getItem('vrm_session') || '{}').user || {}).id; localStorage.setItem('vrm_inventaire_attente_' + u, '1'); window.dispatchEvent(new Event('online')); });
+        await pg.waitForTimeout(2500);
+        const saisiesK2 = bh.ligne && bh.ligne.courant ? Object.values(bh.ligne.courant.saisies || {}).map((x) => x.k).sort().join(',') : '';
+        dit(saisiesK2 === saisiesK && bh.ligne.rev === revAvant, `${t} : H — rejoué une 2ᵉ fois : rien de doublé, rien de réécrit (rev ${revAvant} → ${bh.ligne && bh.ligne.rev})`, saisiesK2);
+        // I — le constat figé se relit.
+        await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
+        await ouvrirInventaire(pg, tel);
+        await pg.waitForSelector('[data-inv-nouveau]', { timeout: 20000 });
+        await cliquer(pg, tel, '[data-inv-nouveau]');
+        await pg.waitForSelector('button:has-text("Commencer")', { timeout: 8000 }); await pg.waitForTimeout(500);
+        await cliquer(pg, tel, '.vrm-fs button:has-text("Commencer"), [role="dialog"] button:has-text("Commencer")');
+        await pg.waitForSelector('[data-inv-terminer]', { timeout: 8000 });
+        await cliquer(pg, tel, '[data-inv-terminer]');
+        await pg.waitForSelector('button:has-text("Voir le bilan")', { timeout: 8000 }); await pg.waitForTimeout(500);
+        await cliquer(pg, tel, 'button:has-text("Voir le bilan")');
+        await pg.waitForSelector('[data-inv-precedents]', { timeout: 8000 }).catch(() => {});
+        const prec = await pg.evaluate(() => [...document.querySelectorAll('[data-inv-precedent]')].map((x) => ({ id: x.getAttribute('data-inv-precedent'), c: x.getAttribute('data-inv-precedent-constat'), t: x.innerText.replace(/\s+/g, ' ') })));
+        dit(prec.length === 1 && prec[0].c === '1' && /5 N° vus · 2 à chercher · 1 à vérifier · 1 doublon/.test(prec[0].t), `${t} : I — « Inventaires précédents » : celui d'avant, avec SON constat (5 vus · 2 à chercher · 1 à vérifier · 1 doublon)`, JSON.stringify(prec));
+        if (prec[0]) await cliquer(pg, tel, `[data-inv-revoir="${prec[0].id}"]`);
+        await pg.waitForSelector('[data-inv-vue="revoir"]', { timeout: 8000 }).catch(() => {});
+        const rv = await pg.evaluate(() => { const el = document.querySelector('[data-inv-vue="revoir"]'); if (!el) return null; const l = (s) => [...el.querySelectorAll(`[data-inv-constat-section="${s}"] [data-inv-constat-n]`)].map((x) => x.getAttribute('data-inv-constat-n')); return { manque: l('manque'), trop: l('trop'), doublons: l('doublons'), passu: l('passu'), texte: el.innerText.replace(/\s+/g, ' ') }; });
+        dit(rv && rv.manque.join(',') === '1,B125' && rv.trop.join(',') === '60' && rv.doublons.join(',') === '2' && rv.passu.join(',') === '125' && /fait hors connexion, avec la liste des paires du/.test(rv.texte), `${t} : I — « Revoir » : le constat TEL QU'IL ÉTAIT (à chercher 1, B125 · à vérifier 60 · doublon 2), fait hors connexion`, JSON.stringify(rv && { ...rv, texte: rv.texte.slice(0, 120) }));
+        const fautesI = await horsJetons(pg);
+        dit(fautesI.length === 0, `${t} : I — aucune teinte hors des jetons dans le constat`, fautesI.slice(0, 4).join(' | '));
+        await shot(pg, nomShot('constat'));
+        // J — AUCUNE écriture de N° sur tout le banc.
+        const NUMS = ['vinted_annonce_numeros', 'vinted_used_numeros', 'vrm_slots', 'vinted_sale_overrides'];
+        const touche = bh.autres.filter((x) => NUMS.some((k) => { try { const c = JSON.parse(x.corps || 'null'); const rows = Array.isArray(c) ? c : [c]; return rows.some((r) => r && r.data && Object.prototype.hasOwnProperty.call(r.data, k) && JSON.stringify(r.data[k]) !== JSON.stringify(MAIN[k])); } catch (_) { return false; } }));
+        const local = await pg.evaluate((ks) => ks.map((k) => localStorage.getItem(k)), NUMS);
+        dit(touche.length === 0 && local.every((v, i) => v === (MAIN[NUMS[i]] === undefined ? null : JSON.stringify(MAIN[NUMS[i]]))), `${t} : J — AUCUNE écriture de N° (requêtes relues : ${bh.autres.length} envoi(s) hors vrm_inventaire, aucun ne change un N°, un pool ou une case)`, JSON.stringify(touche.slice(0, 2).map((x) => x.u.slice(0, 80))));
+        const largeH = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        dit(largeH <= 1, `${t} : F — pas de défilement horizontal (pavé, hors connexion, constat)`, String(largeH));
+        dit(errs.length === 0, `${t} : F — aucune erreur de page (G-H-I-J)`, errs.join(' | ').slice(0, 300));
+        await ctx.close();
+      });
       // E — la lecture de la ligne en panne : rien n'est écrit.
-      await essaie(t + ' E', async () => {
+      if (!seulNeuf) await essaie(t + ' E', async () => {
         const bp = nouvelleBase(); bp.panne = true;
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, tab: 'garage', base: bp });
         await ouvrirInventaire(pg, tel);
