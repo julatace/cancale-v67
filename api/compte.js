@@ -96,7 +96,7 @@ import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ec
 import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
-import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO } from './_lib/plan-regle.js';
+import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur } from './_lib/plan-regle.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -337,11 +337,21 @@ async function ecrireStatut(owner, ligne, evenementTs) {
     let r = await ecrire(ligne);
     if (r.ok) return { ok: true };
     let t = await r.text().catch(() => '');
+    // (9 nov., Solo par plateforme) Migration 030 pas passée : la colonne
+    // `comptes_vendeurs` n'existe pas. Le statut, le plan et le compte Vinted
+    // passent sans elle (les autres plateformes : « pas su » côté serveur).
+    if (/comptes_vendeurs/.test(t) && 'comptes_vendeurs' in ligne) {
+      const { comptes_vendeurs: _cv, ...sans030 } = ligne;
+      ligne = sans030;
+      r = await ecrire(ligne);
+      if (r.ok) return { ok: true, sans030: true };
+      t = await r.text().catch(() => '');
+    }
     // (9 nov.) Migration 028 pas passée : les colonnes `plan`/`compte_vendeur`
     // n'existent pas. Le STATUT compte plus que le plan : on le range sans elles
     // (le plan reste lu en direct chez Stripe par l'app ; « pas su » côté serveur).
     if (/PGRST204|42703|'plan'|compte_vendeur/.test(t) && ('plan' in ligne || 'compte_vendeur' in ligne)) {
-      const { plan: _p, compte_vendeur: _c, ...sans } = ligne;
+      const { plan: _p, compte_vendeur: _c, comptes_vendeurs: _cv2, ...sans } = ligne;
       r = await ecrire(sans);
       if (r.ok) return { ok: true, sansPlan: true };
       t = await r.text().catch(() => '');
@@ -450,12 +460,27 @@ async function vintedPris(req, res) {
   } catch (_) { return repondre(res, 200, { ok: true, pris: false }); }
 }
 
+const comptesVendeursLigne = (autres) => {
+  const o = {};
+  for (const p of PLATEFORMES_SOLO) if (autres && autres[p] && autres[p].id) o[p] = autres[p].id;
+  return o;
+};
+// Ce que l'app lit : { plateforme: { id, le, prochainChangement } } (choisies seulement).
+const comptesVendeursApp = (autres) => {
+  const o = {};
+  for (const p of PLATEFORMES_SOLO) if (autres && autres[p] && autres[p].id) o[p] = { id: autres[p].id, le: autres[p].le, prochainChangement: prochainChangement(autres[p].le) };
+  return o;
+};
 const ligneDeLAbonnement = (sub, livemode) => ({
   // (9 nov.) Le plan et le compte vendeur, lus du PRIX et des métadonnées que
   // NOUS avons posées (route `compte-vendeur`) — jamais d'un champ du navigateur.
   // Colonnes de la migration 028 : sans elle, l'écriture se refait sans ces deux.
   plan: planDeLAbonnement(sub, optsPlan()).plan,
   compte_vendeur: planDeLAbonnement(sub, optsPlan()).vendeur,
+  // (9 nov., Solo par plateforme) Le compte vendeur de Leboncoin, eBay, Vestiaire
+  // (migration 030, `jsonb`) : { leboncoin: id, ebay: ref, vestiaire: id }, seulement
+  // les plateformes CHOISIES. Sans la 030 : l'écriture se refait sans cette colonne.
+  comptes_vendeurs: comptesVendeursLigne(planDeLAbonnement(sub, optsPlan()).autres),
   statut: String(sub.status || 'incomplete'),
   client_stripe: typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || null,
   abonnement_stripe: sub.id || null,
@@ -594,6 +619,8 @@ async function abonnement(req, res) {
     compteVendeur: !acc.proprietaire && lu && lu.vendeur
       ? { uid: lu.vendeur, le: lu.vendeurLe, prochainChangement: prochainChangement(lu.vendeurLe) }
       : null,
+    // (9 nov., Solo par plateforme) Les comptes vendeurs Leboncoin / eBay / Vestiaire.
+    comptesVendeurs: !acc.proprietaire && lu ? comptesVendeursApp(lu.autres) : {},
     offres: {
       solo: { texte: prix && conforme ? prixTexte(prix) : null, ouvert: !!(prix && conforme) },
       // Le geste qui manque (`raison`) ne part qu'au propriétaire.
@@ -743,10 +770,69 @@ async function portail(req, res) {
 //   · le compte doit être l'un de SES comptes Vinted (lu avec SON jeton : RLS) ;
 //   · l'abonnement est le sien (client relu chez Stripe) et c'est un Solo ;
 //   · premier choix libre, puis un changement tous les 30 jours (dit avec la date).
+// (9 nov., Solo par plateforme) POST { plateforme: 'leboncoin'|'ebay'|'vestiaire', id } :
+// le compte vendeur de CETTE plateforme, mêmes garanties (SES comptes, lus avec SON jeton ;
+// SON abonnement relu chez Stripe ; Solo ; 30 jours, comptés par plateforme).
+const LIGNE_COMPTES = {
+  leboncoin: { ligne: 'lbc_accounts', select: 'a:data->accounts' },
+  ebay: { ligne: 'ebay_comptes', select: 'comptes:data->comptes' },
+  vestiaire: { ligne: 'vc_session', select: 'id:data->>id,comptes:data->comptes' },
+};
+// Ses comptes d'une plateforme (identités), lus avec SON jeton (RLS : les siens seulement).
+// `null` = pas su (lecture ratée) ⇒ rien n'est écrit.
+async function comptesAutresDe(req, plateforme, owner) {
+  const d = LIGNE_COMPTES[plateforme];
+  try {
+    // RLS ne lui montre que ses lignes ; base cloisonnée : on filtre AUSSI sur lui (ceinture et bretelles).
+    const filtre = (await baseCloisonnee()) ? `&owner=eq.${encodeURIComponent(owner)}` : '';
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${d.ligne}${filtre}&select=${d.select}`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const l = j[0] || {};
+    const ids = new Set();
+    if (plateforme === 'leboncoin') for (const [k, a] of Object.entries(l.a && typeof l.a === 'object' ? l.a : {})) { const id = idCompteVendeur('leboncoin', (a && a.id) || k); if (id) ids.add(id); }
+    if (plateforme === 'ebay') for (const c of Array.isArray(l.comptes) ? l.comptes : []) { if (!c || typeof c !== 'object' || Number(c.deconnecteLe)) continue; const id = idCompteVendeur('ebay', c.principal === true ? 'principal' : c.cle); if (id) ids.add(id); }
+    if (plateforme === 'vestiaire') { for (const k of Object.keys(l.comptes && typeof l.comptes === 'object' ? l.comptes : {})) { const id = idCompteVendeur('vestiaire', k); if (id) ids.add(id); } const id = idCompteVendeur('vestiaire', l.id); if (id) ids.add(id); }
+    return ids;
+  } catch (_) { return null; }
+}
+async function compteVendeurAutre(req, res, u, corps) {
+  const plateforme = String(corps.plateforme);
+  const nomP = NOMS_PLATEFORMES_SOLO[plateforme];
+  const id = idCompteVendeur(plateforme, corps.id);
+  if (!id) return repondre(res, 400, { erreur: 'compte', message: `Choisis un de tes comptes ${nomP}.` });
+  if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché : rien à choisir." });
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Rien n'a changé ; réessaie dans un instant." });
+  if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est Pro : tous tes comptes vendent.' });
+  const siens = await comptesAutresDe(req, plateforme, u.id);
+  if (siens === null) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes comptes. Rien n'a changé ; réessaie dans un instant." });
+  if (!siens.has(id)) return repondre(res, 403, { erreur: 'pas-a-toi', message: `Ce compte ${nomP} n'est pas relié à ton VRM.` });
+  const sub = await abonnementStripeDe(ligne);
+  if (!sub) return repondre(res, 409, { erreur: 'aucun', message: "Je ne trouve pas ton abonnement chez Stripe : rien n'a changé." });
+  const lu = planDeLAbonnement(sub, optsPlan());
+  if (lu.plan === PLAN_PRO) return repondre(res, 409, { erreur: 'pro', message: 'Tu es en Pro : tous tes comptes vendent.' });
+  const avant = lu.autres && lu.autres[plateforme];
+  if (avant && avant.id === id) return repondre(res, 200, { ok: true, inchange: true, comptesVendeurs: comptesVendeursApp(lu.autres) });
+  const attendre = avant ? prochainChangement(avant.le) : null;
+  if (attendre) return repondre(res, 429, { erreur: 'trop-tot', prochainChangement: attendre, message: `Tu as changé de compte vendeur ${nomP} il y a moins de 30 jours : prochain changement possible le ${new Date(attendre).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Europe/Paris' })}. Pour vendre sur tous tes comptes dès maintenant : Pro.` });
+  const le = new Date().toISOString();
+  const k = META_VENDEUR[plateforme];
+  const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(sub.id)}`, { metadata: { [k]: id, [k + '_le']: le, [k + '_avant']: avant ? avant.id : '' } }, `vrm-cv-${u.id}-${plateforme}-${id}-${Math.floor(Date.now() / 60000)}`);
+  if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
+  const relu = planDeLAbonnement(r.data, optsPlan());
+  if (!(relu.autres && relu.autres[plateforme] && relu.autres[plateforme].id === id)) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
+  return repondre(res, 200, { ok: true, comptesVendeurs: comptesVendeursApp(relu.autres) });
+}
 async function compteVendeur(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
   const corps = await lireCorpsJson(req);
+  if (corps && corps.plateforme != null && corps.plateforme !== 'vinted') {
+    if (!PLATEFORMES_SOLO.includes(String(corps.plateforme))) return repondre(res, 400, { erreur: 'plateforme', message: 'Plateforme inconnue.' });
+    return compteVendeurAutre(req, res, u, corps);
+  }
   const uid = String((corps && corps.uid) || '').trim();
   if (!uidValide(uid)) return repondre(res, 400, { erreur: 'compte', message: 'Choisis un de tes comptes Vinted.' });
   if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché : rien à choisir." });

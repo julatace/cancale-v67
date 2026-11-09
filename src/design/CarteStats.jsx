@@ -14,7 +14,7 @@ import { SheetShell } from '../composants/SheetShell.jsx';
 import { montant } from '../format.js';
 import './aideCarte.css';
 import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif } from './carteChiffres.js';
-import { TYPES_OBJECTIF, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif } from '../objectifMois.js';
+import { TYPES_OBJECTIF, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif, resteObjectif, phraseResteObjectif } from '../objectifMois.js';
 import ChoixPeriode from '../ChoixPeriode.jsx';
 import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
 
@@ -81,26 +81,46 @@ const majuscule = (s) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase()
 // Fine, sous les cases : « Objectif » à gauche, « 1 240 / 2 000 € » à droite,
 // la piste remplie au pourcentage. Pas su ⇒ « — » et piste vide ; partiel ⇒
 // « au moins » dans le titre (§5). Aucun objectif ⇒ la barre n'existe pas.
-export function BarreObjectif({ prog, fmt }) {
+// (9 nov., Julien) « 1 240 € sur 2 000 € · encore 760 € · ≈ 35 €/jour d'ici le 30 » : la ligne
+// du haut dit où il en est, la piste neutre se remplit de l'accent (la part faite, seule en
+// couleur), la ligne du bas dit ce qui reste et le rythme (src/objectifMois.js, `resteObjectif`).
+// Atteint ⇒ « Objectif atteint », sans fête. Touchée (`onOuvrir`) ⇒ le réglage de l'objectif.
+// `prefixe` : les attributs `data-*` de la barre (l'instantané de Ma journée pose `data-ji-objectif` : un
+// chiffre ancien ne se lit jamais comme un chiffre relu, src/JourneeInstantanee.jsx).
+export function BarreObjectif({ prog, fmt, onOuvrir = null, maintenant = null, prefixe = 'data-objectif' }) {
   if (!prog) return null;
   const eur = prog.type === 'ca';
   const montre = (v) => (eur ? euros(v) : String(v));
   const cible = montre(prog.objectif);
+  const quand = maintenant || Date.now();
+  const r = resteObjectif(prog, quand);
+  const bas = phraseResteObjectif(prog, montre, quand);
   const titre = prog.valeur == null ? 'Objectif du mois : pas su'
     : `${prog.partiel ? 'Au moins ' : ''}${eur ? fmt(prog.valeur) : prog.valeur} sur ${eur ? fmt(prog.objectif) : prog.objectif}${prog.partiel && prog.manque.length ? ` · ${prog.manque.join(', ')} pas lu` : ''}`;
-  return (
-    <div className="vrm-fu-objectif" data-objectif={prog.type} data-objectif-cible={eur ? String(Math.round(prog.objectif * 100)) : String(prog.objectif)}
-      data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))}
-      data-objectif-pct={prog.pct == null ? '' : String(prog.pct)} data-objectif-partiel={prog.partiel ? '1' : undefined} data-objectif-atteint={prog.atteint ? '1' : undefined} title={titre}>
-      <div className="vrm-fu-objectif-ligne">
-        <span>Objectif</span>
-        <b>{prog.valeur == null ? '—' : <>{montre(prog.valeur)}<span className="vrm-fu-objectif-sur"> / {cible}</span></>}</b>
-      </div>
-      <div className="vrm-fu-objectif-piste" role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct}>
+  const P = prefixe;
+  const attrs = {
+    className: 'vrm-fu-objectif' + (onOuvrir ? ' is-touchable' : ''), [P]: prog.type, [P + '-cible']: eur ? String(Math.round(prog.objectif * 100)) : String(prog.objectif),
+    [P + '-valeur']: prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur)),
+    [P + '-pct']: prog.pct == null ? '' : String(prog.pct), [P + '-partiel']: prog.partiel ? '1' : undefined, [P + '-atteint']: prog.atteint ? '1' : undefined,
+    [P + '-reste']: r && !r.atteint ? (eur ? String(Math.round(r.reste * 100)) : String(r.reste)) : undefined,
+    [P + '-par-jour']: r && !r.atteint && r.parJour != null ? (eur ? String(Math.round(r.parJour * 100)) : String(r.parJour)) : undefined,
+    title: titre,
+  };
+  const corps = (
+    <>
+      <span className="vrm-fu-objectif-ligne">
+        <span>Objectif du mois</span>
+        <b>{prog.valeur == null ? '—' : <>{prog.partiel ? <span className="vrm-fu-objectif-sur">au moins </span> : null}{montre(prog.valeur)}<span className="vrm-fu-objectif-sur"> sur {cible}</span></>}</b>
+      </span>
+      <span className="vrm-fu-objectif-piste" role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct}>
         {prog.pct ? <span style={{ width: `${prog.pct}%` }} /> : null}
-      </div>
-    </div>
+      </span>
+      <span className={'vrm-fu-objectif-reste' + (prog.atteint ? ' is-atteint' : '')} {...{ [P + '-phrase']: '' }}>{bas}</span>
+    </>
   );
+  return onOuvrir
+    ? <button type="button" {...attrs} data-objectif-ouvrir="" aria-label={`${titre} — ${bas}. Régler l’objectif`} onClick={onOuvrir}>{corps}</button>
+    : <div {...attrs}>{corps}</div>;
 }
 
 // (6 nov., onglets A) « ? » : d'où vient chaque chiffre de la carte — sa phrase (rangée avec sa
@@ -133,6 +153,8 @@ function FeuilleAide({ page, places, fmt, fermer, FermeAuRetour, surtitre }) {
 export default function CarteStats({ owner = '', page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null, aide = false }) {
   const [ouvert, setOuvert] = React.useState(false);
   const [aideOuverte, setAideOuverte] = React.useState(false);
+  // (9 nov.) La barre de l'objectif touchée ouvre la feuille « Modifier » sur l'objectif, déplié.
+  const [objOuvert, setObjOuvert] = React.useState(false);
   const locaux = (sources && sources.locaux) || null;
   const V = valeursCarte(page, reglage, sources, sel, regles);
   if (!V) return null;
@@ -177,10 +199,10 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
           onClick: aller(x),
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },
         }))}>
-        {prog ? <BarreObjectif prog={prog} fmt={fmt} /> : null}
+        {prog ? <BarreObjectif prog={prog} fmt={fmt} onOuvrir={poserObjectif ? () => { setObjOuvert(true); setOuvert(true); } : null} /> : null}
       </CarteMois>
       {aide && aideOuverte ? <FeuilleAide page={page} places={[g, ...V.c]} fmt={fmt} fermer={() => setAideOuverte(false)} FermeAuRetour={FermeAuRetour} surtitre={V.perimetre} /> : null}
-      {ouvert ? <FeuilleCarte owner={owner} page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} /> : null}
+      {ouvert ? <FeuilleCarte owner={owner} page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => { setOuvert(false); setObjOuvert(false); }} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} objectifOuvert={objOuvert} /> : null}
     </>
   );
 }
@@ -190,7 +212,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
 // chiffre qui y va. La période se choisit pour CE chiffre quand la page n'a pas
 // son propre filtre de période. Chaque choix est rangé tout de suite (la carte,
 // derrière, change sous ses yeux) ; « Par défaut » rend la carte des maquettes.
-function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null }) {
+function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null, objectifOuvert = false }) {
   const R = reglageDePage(reglage, page, locaux);
   const [place, setPlace] = React.useState(0);
   const places = [R.g, ...R.c];
@@ -263,7 +285,7 @@ function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, 
               );
             })}
           </ul>
-          {poserObjectif ? <ObjectifFeuille page={page} objectif={objectif} poserObjectif={poserObjectif} /> : null}
+          {poserObjectif ? <ObjectifFeuille page={page} objectif={objectif} poserObjectif={poserObjectif} ouvertDepart={objectifOuvert} /> : null}
           <button type="button" className="vrm-carte-defaut" data-carte-defaut-remettre="" onClick={() => { poser(reglageAEnregistrer(reglage, page, null)); setPlace(0); }}>Par défaut</button>
         </div>
     </SheetShell>
@@ -274,8 +296,8 @@ function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, 
 // CA vendu ou Nombre de ventes (son choix), un montant, « OK » ; « Sur cette
 // carte » (montrée ou non ici) et « Retirer ». Rien n'est enregistré tant qu'il
 // n'a pas touché « OK » ; une saisie illisible n'enregistre rien.
-function ObjectifFeuille({ page, objectif, poserObjectif }) {
-  const [ouvert, setOuvert] = React.useState(false);
+export function ObjectifFeuille({ page, objectif, poserObjectif, ouvertDepart = false }) {
+  const [ouvert, setOuvert] = React.useState(!!ouvertDepart);
   const [type, setType] = React.useState(objectif ? objectif.type : 'ca');
   const [saisie, setSaisie] = React.useState(objectif ? String(objectif.valeur).replace('.', ',') : '');
   const lu = lireSaisieObjectif(type, saisie);

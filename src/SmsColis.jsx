@@ -9,7 +9,7 @@
 import React from 'react';
 import './design/sms-colis.css';
 import { BoutonBase as Bouton } from './composants/Bouton.jsx';
-import { ETAPES_RACCOURCI, SMS_EXEMPLE, etatJetonSms, nouveauJetonSms, urlSms, texteEssai, JETON_COUPE } from './smsColis.js';
+import { ETAPES_RACCOURCI, EXPEDITEURS_SMS, SMS_EXEMPLE, etatJetonSms, nouveauJetonSms, urlSms, texteEssai, JETON_COUPE } from './smsColis.js';
 
 const DessinOnglet = () => (
   <svg viewBox="0 0 120 84" aria-hidden="true" focusable="false">
@@ -100,8 +100,9 @@ export default function SmsColisSetting({ jeton = '', onJeton, toast = () => {},
       <p className="vrm-sc-intro">
         Les colis en <b>casier Mondial Relay</b> (« LOCKER 24/7 ») ne sont parfois annoncés que par SMS. Un iPhone ne laisse aucune app lire tes SMS :
         c’est <b>une automatisation Raccourcis</b> qui envoie à VRM les SMS qui parlent de colis. Le colis apparaît alors dans Colis → À retirer, avec son code.
-        Les codes de vérification ne sont jamais rangés ; un SMS qui n’est pas de Mondial Relay est ignoré.
+        Les codes de vérification ne sont jamais rangés ; un SMS d’un autre expéditeur est ignoré.
       </p>
+      <ul className="vrm-sc-mots" data-sms-expediteurs="">{EXPEDITEURS_SMS.map((x) => <li key={x.nom} data-sms-expediteur={x.nom}><b>{x.nom}</b> — {x.quoi}</li>)}</ul>
       {etat !== 'actif' ? (
         <div className="vrm-sc-bloc">
           <div className="vrm-sc-etat" data-sms-etat={etat}>{etat === 'coupe' ? 'Réception coupée : aucun SMS n’est accepté.' : 'Pas encore activé.'}</div>

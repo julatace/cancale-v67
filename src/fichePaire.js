@@ -91,7 +91,13 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   else etapes.push({ cle: 'achat', etat: 'absent', titre: 'Achat', detail: 'prix d’achat pas saisi' });
 
   // 2. STOCK
+  // (9 nov., zéro banc rouge) `d.sortieStock` : l'entrée du journal `vrm_stock_sortis` de CE N°
+  // (sa case libérée quand Vinted a dit le colis parti — décision de Julien, le N° reste) :
+  // l'histoire dit où elle ÉTAIT rangée et qu'elle en est sortie, jamais « pas rangée ».
+  const so = !rn.stock && d.sortieStock && typeof d.sortieStock === 'object' ? d.sortieStock : null;
   if (rn.stock) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Rangée', detail: [rn.stock.roomName, rn.stock.itemName, rn.stock.nom].filter(Boolean).join(' · ') });
+  else if (so && (so.itemName || so.nom)) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Rangée', sortie: true, date: Number.isFinite(so.at) ? new Date(so.at).toISOString() : null,
+    detail: [so.roomName, so.itemName, so.nom].filter(Boolean).join(' · ') + ' · sa place est libérée (colis parti)' });
   else if (manque('ton Stock')) etapes.push({ cle: 'stock', etat: 'passu', titre: 'Stock', detail: 'ton Stock pas encore lu' });
   else etapes.push({ cle: 'stock', etat: 'absent', titre: 'Stock', detail: 'pas rangée dans le Stock' });
 

@@ -1623,7 +1623,7 @@ function LeboncoinScreen() {
     const ok = await askConfirm({
       title: `Supprimer « ${r.title || 'cette annonce'} » de Leboncoin ?`,
       desc: `${r.numero ? `N°${r.numero}` : 'Annonce Leboncoin'}${prix}${r.pourquoi ? ` — ${r.pourquoi}` : ''}.\n\nC'est sans retour : l'annonce disparaît de Leboncoin, avec ses favoris et ses statistiques. Pour la remettre, il faudra la republier.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
-      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true,
+      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true, irreversible: true,
     });
     if (!ok) return;
     setPauseEnVol(r.id);

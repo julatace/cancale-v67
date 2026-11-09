@@ -262,7 +262,10 @@ const captureEl=async(pg,sel,nom)=>{ if(!CAPT) return; fs.mkdirSync(CAPT,{recurs
 
       console.log('── D. Articles qui dorment');
       await essaie('D'+suf,async()=>{
-        const { ctx, pg, errs }=await page(b,T,{ main:{ vinted_sale_overrides:OV, vinted_annonce_numeros:FICHES, ...(sombre?{vinted_dark:true}:{}) }, sombre });
+        // (9 nov.) Le vendeur inventé AFFICHE ses quatre sites (« Mes plateformes », 8 nov.) : sans ce choix,
+        // seul Vinted est affiché et « Préparer sur eBay / Leboncoin / Vestiaire » n'est pas proposé
+        // (l'écran d'un site masqué ramène sur Vinted : le clic ne menait nulle part).
+        const { ctx, pg, errs }=await page(b,T,{ main:{ vinted_sale_overrides:OV, vinted_annonce_numeros:FICHES, vrm_plateformes_affichees:{ sites:['vinted','leboncoin','ebay','vestiaire'], at:iso(MAINTENANT) }, ...(sombre?{vinted_dark:true}:{}) }, sombre });
         await aller(pg,'vinted_annonces','.vrm-stock-views',3000);
         await pg.locator('.vrm-stock-views button:has-text("À relancer")').first().click().catch(()=>{});
         await pg.waitForSelector('[data-qui-dorment]',{timeout:15000}).catch(()=>{});
@@ -290,8 +293,12 @@ const captureEl=async(pg,sel,nom)=>{ if(!CAPT) return; fs.mkdirSync(CAPT,{recurs
         dit(m.every(x=>x.h>=44),'chaque choix fait 44 px ou plus',JSON.stringify(m.map(x=>Math.round(x.h))));
         await captureEl(pg,'[data-qd-menu]',`dorment-agir-${suf}`);
         await pg.waitForFunction(()=>document.getAnimations().every(a=>a.playState!=='running'||a.effect&&a.effect.getTiming&&a.effect.getTiming().iterations===Infinity),null,{timeout:5000}).catch(()=>{}); await pg.locator('[data-qd-choix-geste="ebay"]').click(); await pg.waitForFunction(()=>!document.querySelector('[data-qui-dorment]')&&!document.querySelector('[data-qd-menu]'),null,{timeout:10000}).catch(()=>{}); const ouEbay=await pg.evaluate(()=>location.search+' '+(document.querySelector('[aria-current="page"]')||{}).textContent+' menu='+!!document.querySelector('[data-qd-menu]')+' liste='+!!document.querySelector('[data-qui-dorment]')+' toast='+([...document.querySelectorAll('[role="status"],.vrm-toast')].map(x=>x.innerText).join('/')).slice(0,120));
-        await pg.waitForSelector('.vrm-ebay-annonces',{timeout:8000}).catch(()=>{});
-        dit(await pg.locator('[data-qui-dorment]').count()===0 && await pg.locator('[data-qd-menu]').count()===0 && await pg.locator('.vrm-ebay-annonces').count()===1,'« Mettre sur eBay » ouvre l’écran des annonces eBay (rien d’envoyé)',ouEbay);
+        // (9 nov.) Navigation par tâche (31 oct.) : l'écran visé est Annonces filtré sur eBay. Sans compte
+        // eBay relié (le cas de ce banc), il dit ce qui manque et « Relier eBay » (`OngletManque`, 5 nov.) ;
+        // avec un compte, la liste eBay (`.vrm-ebay-annonces`).
+        await pg.waitForSelector('[data-tache="annonces"][data-tache-site="ebay"] :is(.vrm-ebay-annonces, [data-onglet-manque="ebay"])',{timeout:8000}).catch(()=>{});
+        const ebayVu=await pg.evaluate(()=>{ const t=document.querySelector('[data-tache="annonces"][data-tache-site="ebay"]'); return t ? t.querySelectorAll('.vrm-ebay-annonces').length+t.querySelectorAll('[data-onglet-manque="ebay"]').length : 0; });
+        dit(await pg.locator('[data-qui-dorment]').count()===0 && await pg.locator('[data-qd-menu]').count()===0 && ebayVu===1,'« Mettre sur eBay » ouvre l’écran des annonces eBay (rien d’envoyé)',ouEbay);
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,200));
         await ctx.close();
       });

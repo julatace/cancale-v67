@@ -66,6 +66,9 @@ async function exemple() {
   const l222 = jeu.lignes.find((l) => l.id === 'harvest_222_orders_sold');
   const mod = l222.data.payload.my_orders[0];
   for (let i = 1; i <= 4; i++) l222.data.payload.my_orders.push({ ...mod, transaction_id: 62005 + i * 11, title: `Paire inventée ${i} taille 4${i}`, date: new Date(Date.now() - i * J).toISOString(), status: i === 1 ? 'Bordereau envoyé au vendeur' : 'Commande finalisée', transaction_user_status: i === 1 ? 'needs_action' : 'completed' });
+  // (9 nov., soir) La configuration de départ déjà faite : sinon son plein écran (src/configurationDepart.js)
+  // couvre la coque et arrête les clics (3 rouges venus de main, pas de l'offre).
+  const main = jeu.lignes.find((x) => x.id === 'main'); main.data = { ...main.data, vrm_configuration: { etat: 'fait', at: new Date(Date.now() - J).toISOString(), statut: null, version: 1 } };
   EX = { uid: d.UID_EXEMPLE, servir: b.servirTable, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes } };
   return EX;
 }

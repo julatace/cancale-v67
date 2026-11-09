@@ -15,12 +15,12 @@ libère son numéro (le dire ici).
 | — | suites serveur (Solo côté serveur, double vente LBC < 24 h) | PR #1070 | **en ligne** |
 | — | direction artistique 4 (feuilles, confirmations, toasts, états vides, barre du bas) | PR #1072 | **en ligne** |
 | — | zéro banc rouge (suite) | `claude/zero-banc-rouge` | en cours |
-| — | direction artistique 5 : colonne de gauche refaite + boutons (demande de Julien) | `claude/direction-artistique-5` | en cours |
-| A | Ma journée instantanée + objectif du mois | `claude/journee-instantanee` | en cours |
-| B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | `claude/annuler-commandes` | à lancer |
+| — | direction artistique 5 : colonne de gauche refaite + boutons (demande de Julien) | PR #1073 | **en ligne** |
+| A | Ma journée instantanée + objectif du mois | PR #1074 | **en ligne** |
+| B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | `claude/annuler-commandes` | en cours |
 | C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | à lancer |
 | D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | `claude/hors-ligne-relie` | à lancer |
-| E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | en cours |
+| E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | **fini, à intégrer** (`2026-11-09-solo-plateformes.md`, migration 030) |
 | F | prix plancher sous chaque offre + « déjà N paires de ce modèle » | `claude/plancher-stock` | à lancer |
 | G | jauge 50 actions/h + journal « ce que VRM a fait » (ext. 5.337) | `claude/jauge-journal` | à lancer |
 | H | échéances .ics + alerte « nouvel appareil » (12 fonctions api au plus) | `claude/ics-appareil` | à lancer |
@@ -38,7 +38,7 @@ libère son numéro (le dire ici).
 | T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | à lancer |
 
 | U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
-| V | scanner au dépôt (Colis) ET au retrait (Achats) | `claude/scanner-colis-achats` | en cours |
+| V | scanner au dépôt (Colis) ET au retrait (Achats) | PR #1075 | **en ligne** |
 | W | inventaire de fin d'année | `claude/inventaire-annuel` | à lancer |
 | X | sélection multiple + filtres enregistrés + fiche à côté de la liste | `claude/lots-vues-panneau` | à lancer |
 | Y | corbeille 30 jours | `claude/corbeille` | à lancer |
@@ -46,6 +46,10 @@ libère son numéro (le dire ici).
 | AA | sur vinted.fr : infos sous SES annonces + calculette pendant un achat (ext. 5.339) | `claude/extension-infos` | à lancer |
 | AB | un seul fil par acheteur et par paire, toutes plateformes | `claude/fil-unique` | à lancer |
 
-| — | transporteurs inconnus (PDF du bordereau, identité) + e-mails Vestiaire et Chronopost mieux lus (demandes de Julien) | `claude/transporteurs-emails` | en cours |
+| — | transporteurs inconnus (PDF du bordereau, identité) + e-mails Vestiaire et Chronopost mieux lus (demandes de Julien) | PR #1074 | **en ligne** |
+
+| — | colis à retirer : relecture fréquente, retirés jamais montrés, carte = onglet (plainte de Julien) | `claude/retraits-frais` | en cours |
+| — | direction artistique 6 : refonte VISIBLE « Widgets » (« il n'y a pas un grand changement ») | `claude/direction-artistique-6` | en cours |
+| — | plus de balayage entre onglets ; vues Vinted à 0 = pas su | PR #1074 | **en ligne** |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
