@@ -23,6 +23,9 @@ import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepense
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
+// (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
+import { useProfilFiscal } from '../App.jsx';
+import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // ⟦← App.jsx #2⟧
 import PorteMonnaie from "../PorteMonnaie.jsx";
 // (6 nov., vitesse 2) Dac7Comptes : à la demande.
@@ -59,6 +62,8 @@ const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) =
 // à partir du 1er juillet 2026, 75 % (12,3 × 0,75 = 9,225 %). `acre` : false · true
 // ou 'avant' (l'ancienne réponse « Oui ») · 'apres'.
 const TAUX_MICRO = { cotisations: 12.3, acre: 6.2, acre2026: 9.225, formation: 0.1, liberatoire: 1 };
+// (9 nov.) Gardée (audit-plateformes-2nov l'exécute) : elle vaut `tauxMicro({ activite: 'vente' })`
+// de src/profilFiscal.js, qui compose aussi les PRESTATIONS (audit-configuration-depart les compare).
 const tauxMicroVente = ({ liberatoire = false, acre = false } = {}) =>
   Math.round(((acre === 'apres' ? TAUX_MICRO.acre2026 : acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations) + TAUX_MICRO.formation + (liberatoire ? TAUX_MICRO.liberatoire : 0)) * 10) / 10;
 // ⟦← App.jsx #10⟧
@@ -2364,12 +2369,15 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   const [taux, setTaux] = useState(() => tauxUrssaf());
   useEffect(() => { const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_taux') setTaux(tauxUrssaf()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   useEffect(() => onCloudReady(() => setTaux(tauxUrssaf())), []);
+  const pf = useProfilFiscal();
   if (regime === undefined) return partie === 'declarer' ? <div className="vrm-compta-carte"><p className="vrm-compta-phrase" style={{ margin: 0 }}>Je lis ton statut…</p></div> : null;
   const choisir = (k) => { save('vinted_regime', k); setChanger(false); };
-  const vl = [false, 'avant', 'apres'].some((a) => tauxMicroVente({ liberatoire: true, acre: a }) === taux);
-  const acre = ['apres', 'avant'].find((a) => [false, true].some((l) => tauxMicroVente({ acre: a, liberatoire: l }) === taux)) || false;
-  const officiel = [false, 'avant', 'apres'].some((a) => [false, true].some((l) => tauxMicroVente({ acre: a, liberatoire: l }) === taux));
-  const poserTaux = (o) => { const t = tauxMicroVente(o); save('vinted_urssaf_taux', t); setTaux(t); };
+  // (9 nov.) L'activité du micro-entrepreneur (achat-revente ou prestations) : SES taux.
+  const activite = pf.activite === 'services' ? 'services' : 'vente';
+  const vl = [false, 'avant', 'apres'].some((a) => tauxMicro({ activite, liberatoire: true, acre: a }) === taux);
+  const acre = ['apres', 'avant'].find((a) => [false, true].some((l) => tauxMicro({ activite, acre: a, liberatoire: l }) === taux)) || false;
+  const officiel = [false, 'avant', 'apres'].some((a) => [false, true].some((l) => tauxMicro({ activite, acre: a, liberatoire: l }) === taux));
+  const poserTaux = (o) => { const t = tauxMicro({ ...o, activite }); save('vinted_urssaf_taux', t); setTaux(t); };
   const choix = (
     <div data-statut-choix="" className="vrm-statut-grille">
       {REGIMES_FISCAUX.map(([k, t, sous, effet]) => (
@@ -2387,6 +2395,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
         <h3 className="vrm-titre-compta" style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: C.text }}>{regime ? 'Change ton statut' : 'Quel est ton statut ?'}</h3>
         <p className="vrm-aide" style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>VRM adapte ta comptabilité à ta situation : il ne te parle d'URSSAF que si tu es micro-entrepreneur. Tu peux le changer à tout moment.</p>
         {choix}
+        {!regime && pf.etat === 'inconnu' ? <AideStatutNeutre /> : null}
         {regime && <button type="button" className="vrm-lien-action" onClick={() => setChanger(false)} style={{ marginTop: 10, border: 'none', background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Annuler</button>}
       </div>
     </Card>
@@ -2412,7 +2421,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
       <ComptaRepli id="compta-suivi" titre="Tes déclarations URSSAF" resume="Ce que tu as déclaré et payé, période par période">
         <SuiviUrssaf onNav={onNav} sansTitre />
       </ComptaRepli>
-      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
+      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} activite={activite} />
     </>);
   }
   // partie === 'declarer'
@@ -2423,9 +2432,26 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
       : regime === 'marge'
         ? <>Régime de la marge : VRM calcule la TVA sur ta marge dans le rapport comptable (Ventes → Outils). Tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas — ton comptable s'en charge.</>
         : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent sur cet écran, pour ton comptable.</>;
-    return <div className="vrm-compta-carte"><div data-statut-carte={regime} style={{ fontSize: 15, color: C.text, lineHeight: 1.6 }}>{texte}</div></div>;
+    // (9 nov.) Société : la TVA qu'il a CHOISIE (jamais déduite), et le livre des recettes et
+    // l'export comptable remontés juste en dessous (`pf.exportEnAvant`).
+    const tvaTexte = { franchise: 'Franchise en base de TVA : tes factures portent « TVA non applicable ».', normale: 'TVA collectée : ton comptable la déclare à partir de ton export.', marge: 'TVA sur la marge.' };
+    return <div className="vrm-compta-carte"><div data-statut-carte={regime} data-profil-fiscal={pf.etat || ''} style={{ fontSize: 15, color: C.text, lineHeight: 1.6 }}>{texte}
+      {pf.livre ? <div data-profil-tva={pf.tva || 'pasdit'} style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{pf.tva ? tvaTexte[pf.tva] : 'Ta TVA n’est pas dite : choisis-la dans Réglages → Ma configuration.'} Ton livre des recettes, ton registre des achats et l’export pour ton comptable sont juste en dessous.</div> : null}
+    </div></div>;
   }
   return <CarteUrssafMois liveStats={liveStats} onNav={onNav} />;
+}
+// (9 nov.) « Je ne sais pas encore » (Ma configuration) : une aide COURTE et NEUTRE, et les
+// pages officielles — jamais un conseil fiscal personnalisé (src/profilFiscal.js).
+function AideStatutNeutre() {
+  return (
+    <div data-statut-aide="" style={{ marginTop: 14, fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
+      {AIDE_NEUTRE.map((t) => <p key={t} style={{ margin: '0 0 6px' }}>{t}</p>)}
+      <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+        {SOURCES_OFFICIELLES.map((s) => <li key={s.url} style={{ margin: '4px 0' }}><a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>{s.nom}</a></li>)}
+      </ul>
+    </div>
+  );
 }
 // ── LES REPLIS DE « LE DÉTAIL » (2 nov.) ─────────────────────────────────
 // Une rangée de 44 px : le titre, une ligne qui dit ce qu'il y a dedans (sans
@@ -2543,23 +2569,24 @@ function Dac7Plateformes({ ligne, annee }) {
     </div>
   );
 }
-function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
+function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite = 'vente' }) {
   const freq = useFreqUrssaf();
   const [opts, optsPret] = useLigneSynchro('vrm_micro_options', lireOptionsMicro);
   const ligne = useLigneUrssaf();
   const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
   const now = new Date();
-  const jauge = React.useMemo(() => jaugeSeuils({ ligne, now }), [ligne]); // eslint-disable-line react-hooks/exhaustive-deps
+  const jauge = React.useMemo(() => jaugeSeuils({ ligne, now, activite }), [ligne, activite]); // eslint-disable-line react-hooks/exhaustive-deps
   const cal = React.useMemo(() => calendrierUrssaf(freq, now, 3), [freq]); // eslint-disable-line react-hooks/exhaustive-deps
   const vl = opts.liberatoire;                     // 'oui' · 'non' · null (pas répondu)
   const acre = opts.acre || (opts.at === 0 && acreTaux) || false;   // false · 'avant' · 'apres'
-  const s = seuilsDe(now.getFullYear());
+  const s = seuilsDe(now.getFullYear(), activite);
   const [microOuvert, setMicroOuvert] = React.useState(false);
   const besoin = (optsPret && opts.liberatoire == null) || !!(jauge && ((jauge.tva && jauge.tva.etat && jauge.tva.etat !== 'ok') || (jauge.plafond && jauge.plafond.etat && jauge.plafond.etat !== 'ok')));
   React.useEffect(() => { if (besoin) setMicroOuvert(true); }, [besoin]);
   const poserOptions = (o) => {
     const n = { ...opts, ...o, at: Date.now() };
-    save('vrm_micro_options', { liberatoire: n.liberatoire, acre: n.acre === 'apres' ? 'apres' : n.acre ? 'avant' : false, at: n.at });
+    // (9 nov.) L'activité (achat-revente / prestations) choisie dans « Ma configuration » est GARDÉE.
+    save('vrm_micro_options', { liberatoire: n.liberatoire, acre: n.acre === 'apres' ? 'apres' : n.acre ? 'avant' : false, ...(opts.activite ? { activite: opts.activite } : {}), at: n.at });
     // Le taux suit ses réponses — sauf un taux posé À LA MAIN (Réglages), qu'on
     // ne remplace jamais en silence.
     if (officiel) poserTaux({ liberatoire: n.liberatoire === 'oui', acre: n.acre === 'apres' ? 'apres' : !!n.acre });
@@ -2568,11 +2595,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const jour = (d) => `${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
   const sTitre = { fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: -0.15 };
   const sCarte = { padding: '16px 18px', margin: 0, height: '100%', boxSizing: 'border-box' };
-  const lignesTaux = [
-    ['Cotisations sociales', acre === 'apres' ? TAUX_MICRO.acre2026 : acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations, acre === 'apres' ? 'ACRE, 1ʳᵉ année (début depuis le 1er juillet 2026)' : acre ? 'ACRE, 1ʳᵉ année' : 'vente de marchandises (BIC)'],
-    ['Formation professionnelle', TAUX_MICRO.formation, 'commerçant'],
-    ...(vl === 'oui' || (vl == null && vlTaux) ? [['Impôt sur le revenu', TAUX_MICRO.liberatoire, 'versement libératoire']] : []),
-  ];
+  // (9 nov.) Le détail vient de src/profilFiscal.js (`detailTaux`), selon SON activité.
+  const lignesTaux = detailTaux({ activite, liberatoire: vl === 'oui' || (vl == null && !!vlTaux), acre }).map((l) => [l.quoi, l.taux, l.note]);
+  const tauxLib = TAUX_ACTIVITE[activite === 'services' ? 'services' : 'vente'].liberatoire;
   // ── 1. Profil ──
   const profil = (
     <Card style={sCarte}>
@@ -2584,9 +2609,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
         </LigneProfil>
         <LigneProfil titre="Versement libératoire de l'impôt" attr={{ 'data-micro-vl': vl || 'passu' }}
           aide={<>
-            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4\u00a0%) laisse penser que oui.' : ''}</div> : null}
-            {vl === 'oui' ? <>Ton impôt sur le revenu ({TAUX_MICRO.liberatoire}&nbsp;%) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({TAUX_MICRO.liberatoire}&nbsp;%), ou à part sur ta déclaration de revenus.</>}
-            <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({TAUX_MICRO.liberatoire}&nbsp;% pour l'achat-revente) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
+            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ` Ton taux actuel (${pctFr(taux)}) laisse penser que oui.` : ''}</div> : null}
+            {vl === 'oui' ? <>Ton impôt sur le revenu ({String(tauxLib).replace('.', ',')}&nbsp;%) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({String(tauxLib).replace('.', ',')}&nbsp;%), ou à part sur ta déclaration de revenus.</>}
+            <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({String(tauxLib).replace('.', ',')}&nbsp;% pour {activite === 'services' ? 'les prestations de services' : "l'achat-revente"}) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
           </>}>
           <Segmente label="Versement libératoire" value={vl} onChange={(v) => poserOptions({ liberatoire: v })}
             options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'liberatoire' } }, { v: 'non', l: 'Non', data: { 'data-micro-vl-choix': 'non' } }]} />
@@ -2605,7 +2630,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
               {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 12 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
             </div>
           ) : <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Posé à la main dans « Ton entreprise » : VRM ne le change pas quand tu réponds ci-dessus.</div>}
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. VRM ne remplace pas un comptable.</div>
+          <div data-micro-activite={activite} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 {activite === 'services' ? 'des prestations de services (BIC)' : "de l'achat-revente"}, à vérifier sur ton espace URSSAF. VRM ne remplace pas un comptable.</div>
         </div>
       </div>
     </Card>
@@ -2616,7 +2641,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
       <div data-micro-calendrier={freq}>
         <div style={sTitre}>Ton calendrier{' '}<Pourquoi titre="Ton calendrier">
           {freq === 'mensuel' ? 'Le chiffre d\'affaires d\'un mois se déclare et se paie le mois suivant.' : 'Le chiffre d\'affaires d\'un trimestre se déclare et se paie le mois qui suit le trimestre.'}
-          {vl === 'oui' ? ' Ton impôt (1\u00a0%) part en même temps.' : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
+          {vl === 'oui' ? ` Ton impôt (${String(tauxLib).replace('.', ',')}\u00a0%) part en même temps.` : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
         </Pourquoi></div>
         <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {cal.map((p, i) => {
@@ -3848,6 +3873,11 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // « Avancé » : replié à chaque ouverture de l'écran (jamais mémorisé). Le
   // sommaire l'ouvre avant d'y descendre.
   const [avance, setAvance] = React.useState(false);
+  // (9 nov.) Le profil fiscal : en société, le livre des recettes et l'export comptable
+  // passent DEVANT (sous « Combien je dois déclarer ? ») au lieu d'être rangés dans
+  // « Documents et réglages » — les mêmes cartes, rendues à UN seul endroit.
+  const profilF = useProfilFiscal();
+  const exportDevant = !!profilF.exportEnAvant;
 
   // (3 nov.) La photo du ticket : réduite dans le navigateur, puis le montant lu
   // DANS la page (gratuit, local) s'il est lisible et que le champ est vide.
@@ -4004,6 +4034,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         </div>
         <PrevisionUrssafCarte onNav={onNav} />
         <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
+        {exportDevant ? <div data-compta-export-devant="" style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+          <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+        </div> : null}
       </section>
 
       <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
@@ -4216,8 +4250,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           </Card>
 
           <RecapComptableMensuel />
-          <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
-          <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          {!exportDevant && <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
+          {!exportDevant && <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
           <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
             {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
                 en compte du bénéfice ». ⚠️ Mesuré le 16 octobre : AUCUNE plateforme ne

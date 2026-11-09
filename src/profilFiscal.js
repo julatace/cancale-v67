@@ -33,6 +33,8 @@
 //
 // JS pur, sans React ni lecture : `scripts/audit-configuration-depart.cjs` l'exécute.
 
+import { seuilsDe } from './microEntreprise.js';
+
 export const CLE_REGIME = 'vinted_regime';
 export const CLE_MICRO_OPTIONS = 'vrm_micro_options';
 export const CLE_RYTHME = 'vinted_urssaf_freq';
@@ -82,16 +84,11 @@ export function tauxEstOfficiel(brut) {
 }
 
 // ── LES SEUILS, SELON L'ACTIVITÉ ─────────────────────────────────────────────
-export const SEUILS_ACTIVITE = Object.freeze({
-  2026: Object.freeze({
-    vente: Object.freeze({ plafond: 203100, tvaBase: 85000, tvaMajore: 93500 }),
-    services: Object.freeze({ plafond: 83600, tvaBase: 37500, tvaMajore: 41250 }),
-    verifie: '9 novembre 2026 (service-public.gouv.fr, F32353 et F21746)',
-  }),
-});
+// Les chiffres vivent dans src/microEntreprise.js (`SEUILS_MICRO`, leur propriétaire,
+// la jauge de Comptabilité) : on les LIT, jamais recopiés.
 export const seuilsActivite = (annee, activite = 'vente') => {
-  const a = SEUILS_ACTIVITE[annee];
-  return a ? a[activite === 'services' ? 'services' : 'vente'] : null;
+  const s = seuilsDe(annee, activite === 'services' ? 'services' : 'vente');
+  return s ? { plafond: s.plafondVente, tvaBase: s.tvaBase, tvaMajore: s.tvaMajore } : null;
 };
 // DAC7 : ce que les plateformes transmettent aux impôts (30 ventes ou plus de 2 000 €).
 export const DAC7 = Object.freeze({ ventes: 30, euros: 2000 });

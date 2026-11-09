@@ -45,6 +45,8 @@ import { actionsReglages } from '../reglagesActions.js';
 // ⟦← App.jsx #3⟧
 import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // ⟦← App.jsx #4⟧
+// (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
+import { useProfilFiscal } from '../App.jsx';
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
@@ -1443,6 +1445,14 @@ function groupesFamillesNotif(familles) {
 }
 function LigneFamilleNotif({ c, on, disabled, onBascule }) {
   const ap = apercuFamilleNotif(c.id);
+  const pf = useProfilFiscal();
+  // Le rappel URSSAF n'existe que pour un micro-entrepreneur (le serveur le même :
+  // api/_lib/rappel-urssaf.js) — la ligne le dit, selon SON statut.
+  const noteRappels = c.id !== 'rappels' || pf.etat === 'encours' ? null
+    : pf.urssaf ? `Dont ta déclaration URSSAF, ${pf.rythme === 'mensuel' ? 'chaque mois' : pf.rythme === 'trimestriel' ? 'chaque trimestre' : 'à ton rythme'}.`
+    : pf.etat === 'particulier' ? 'Aucun rappel URSSAF : tu vends en particulier.'
+    : pf.etat === 'societe' || pf.etat === 'marge' ? 'Aucun rappel URSSAF : ta société ne déclare pas en micro-entreprise.'
+    : 'Aucun rappel URSSAF tant que ton statut n’est pas choisi.';
   const [vue, setVue] = useState(false);
   const idAp = React.useId();
   return (
@@ -1452,6 +1462,7 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
         <span className="vrm-notif-famille-txt">
           <b>{c.titre}</b>
           {ap ? <span className="vrm-notif-famille-quoi">{ap.quoi}</span> : null}
+          {noteRappels ? <span className="vrm-notif-famille-quoi" data-rappels-urssaf={pf.urssaf ? 'oui' : 'non'}>{noteRappels}</span> : null}
         </span>
         <Interrupteur on={on} onClick={onBascule} disabled={disabled} label={`${c.titre} : ${on?'activé':'désactivé'}`}/>
       </div>
