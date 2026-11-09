@@ -58,7 +58,10 @@ import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import { SqueletteChargement } from "./Chargement.jsx";
-import { AttenteEcran, useEssentiel } from './AttenteEcran.jsx';
+import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.jsx';
+// (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
+import { JourneeInstantanee } from './JourneeInstantanee.jsx';
+import { capturerJournee, ecrireInstantane, lireInstantane } from './journeeInstantanee.js';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -26192,7 +26195,7 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = 
   const auj = jours[6];
   const vAuj = vJ(auj);
   return (
-    <div className="vrm-jv2-argent" data-jv2-argent="" data-jv2-periode={semaine ? 'semaine' : jSel.iso}
+    <div className="vrm-jv2-argent" data-jv2-argent="" data-jv2-periode={semaine ? 'semaine' : jSel.iso} data-jv2-choix={choix == null ? 'auto' : 'main'}
       data-fu-vendu-jour={vendu && vAuj != null ? String(Math.round(vAuj * 100)) : ''}>
       <ol className="vrm-fu-semaine vrm-jv2-frise" aria-label="Les sept derniers jours" data-fu-semaine="">
         {jours.map((j) => {
@@ -49459,6 +49462,33 @@ function NoteSatisfactionJournee() {
   if (!uid || !CLOISONNE) return null;
   return <NoteSatisfaction key={uid} compteCreeLe={AUTH.user?.created_at || ''} lireEtat={lireNoteSatisfaction} ecrireEtat={ecrireNoteSatisfaction} lireAbonnement={lireAbonnement}/>;
 }
+// (9 nov., Julien : « Ma journée affichée tout de suite ») L'INSTANTANÉ DE MA JOURNÉE est pris ICI,
+// dans l'écran vrai, et seulement quand TOUTES ses données essentielles sont là (`useAttenteComplete` :
+// jamais au plafond, jamais pendant une lecture — `capturerJournee` refuse une valeur « lecture… »).
+// Ce qui est rangé est ce que l'écran a RENDU (texte et `data-*`), rien n'est recalculé (§11). Repris
+// à chaque changement (1,5 s après le dernier), et quand la page est quittée ou cachée.
+function CaptureJournee({ uid }) {
+  const complet = useAttenteComplete();
+  React.useEffect(() => {
+    if (!complet || !uid || typeof document === 'undefined') return undefined;
+    let t = null, mort = false;
+    const racine = () => [...document.querySelectorAll('[data-attente-ecran="journee"][data-attente="pret"] .vrm-fu-journee')].find((e) => !e.closest('.vrm-ji') && !e.closest('.vrm-attente-cache')) || null;
+    const prendre = () => {
+      t = null; if (mort) return;
+      const r = racine(); if (!r) return;
+      const snap = capturerJournee(r, { uid, maintenant: Date.now(), largeur: window.innerWidth || 0 });
+      if (snap) ecrireInstantane(snap);
+    };
+    const bientot = (ms = 1500) => { if (t) clearTimeout(t); t = setTimeout(prendre, ms); };
+    bientot(1200);
+    let obs = null;
+    try { const r = racine(); if (r) { obs = new MutationObserver(() => bientot()); obs.observe(r, { subtree: true, childList: true, characterData: true, attributes: true }); } } catch (_) {}
+    const cache = () => { if (document.visibilityState === 'hidden') prendre(); };
+    window.addEventListener('pagehide', prendre); document.addEventListener('visibilitychange', cache);
+    return () => { mort = true; if (t) clearTimeout(t); try { if (obs) obs.disconnect(); } catch (_) {} window.removeEventListener('pagehide', prendre); document.removeEventListener('visibilitychange', cache); };
+  }, [complet, uid]);
+  return null;
+}
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
@@ -52109,6 +52139,13 @@ function AppCoeur() {
     // Les actions du jour (la cloche, « À faire » de Ma journée, les pastilles de la navigation).
     notifs: (notifsLus || baseKO || (accountsLoaded && !(vintedAccounts || []).length)) ? true : undefined,
   };
+  // (9 nov.) L'instantané de Ma journée de CE compte VRM sur CET appareil (src/journeeInstantanee.js) :
+  // relu à chaque arrivée sur Ma journée ; celui d'un autre uid n'est jamais rendu (`lireInstantane`).
+  // Base injoignable : aucun instantané (l'écran dit la panne, jamais des chiffres d'avant).
+  const uidInstantane = (authState.user && authState.user.id) || '';
+  const snapJournee = React.useMemo(() => (tab === 'journee' && uidInstantane ? lireInstantane(uidInstantane) : null), [tab, uidInstantane]);
+  const instantaneJournee = tab === 'journee' && snapJournee && !baseKO
+    ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/> : null;
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
   // session on affiche la porte d'entrée au lieu de l'app.
@@ -52854,7 +52891,8 @@ function AppCoeur() {
         {/* (8 nov.) Ma journée, Colis, Ventes, Annonces déjà vues restent montées, gelées et hors de
             la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
-        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque}>
+        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneJournee}>
+        {tab==='journee'&&uidInstantane&&<CaptureJournee uid={uidInstantane}/>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
