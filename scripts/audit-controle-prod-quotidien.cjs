@@ -42,7 +42,7 @@ if (process.argv.includes('--prouve')) {
     ['en-têtes non comparés', 'enteteAbsent', "controle(`en-têtes de sécurité : les ${Object.keys(entetesAttendus).length} de vercel.json, valeur exacte`, !ecarts.length", "controle(`en-têtes de sécurité : les ${Object.keys(entetesAttendus).length} de vercel.json, valeur exacte`, true"],
     ['icônes non vérifiées', 'iconeMorte', "controle(`manifeste : ses ${m.icons.length} icônes répondent (des images)`, !mortes.length", "controle(`manifeste : ses ${m.icons.length} icônes répondent (des images)`, true"],
     ['« expiré » non exigé', 'recupSansExpire', "controle(`${T} : dit « expiré »`, /expir/i.test(v.message)", "controle(`${T} : dit « expiré »`, true"],
-    ['erreurs JavaScript ignorées', 'jsCasse', "controle(`${T} : aucune erreur JavaScript`, !s.erreurs.length", "controle(`${T} : aucune erreur JavaScript`, true"],
+    ['erreurs JavaScript ignorées', 'jsCasse', "controle(`${T} : aucune erreur JavaScript`, !s.erreurs.length, s.erreurs.join(' ¦ '));\n    controle(`${T} : aucun fichier", "controle(`${T} : aucune erreur JavaScript`, true, s.erreurs.join(' ¦ '));\n    controle(`${T} : aucun fichier"],
     ['bouton d’inscription non exigé', 'ctaAbsent', "v.cta && v.ctaVisible && v.ctaHref === '/?inscription'", 'true'],
     ['lecture de la base en mode exemple ignorée', 'fuiteExemple', "controle(`${T} : aucune requête vers la base (lecture comprise)`, !s.base.length", "controle(`${T} : aucune requête vers la base (lecture comprise)`, true"],
     ['seuil de rendu ignoré', 'lent', "rendu && ms <= SEUIL_RENDU_MS", 'rendu'],

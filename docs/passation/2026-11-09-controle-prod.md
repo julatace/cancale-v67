@@ -14,7 +14,7 @@ et prévenir Julien UNE fois quand quelque chose casse — sans recréer le brui
 | `scripts/controle-prod-issue.cjs` | ouvre / met à jour / ferme UNE issue GitHub au titre stable |
 | `scripts/audit-controle-prod-quotidien.cjs` | la preuve : copie locale saine puis cassée exprès, faux GitHub, `--prouve` (mutations) |
 
-### Ce que le contrôle regarde (113 contrôles sur la vraie prod le 9 nov., tous verts)
+### Ce que le contrôle regarde (118 contrôles verts + 1 sauté sur la vraie prod le 9 nov.)
 - **Accueil** : HTTP 200, rendu (plus de 200 caractères), **rendu sous 8 s** (`SEUIL_RENDU_MS` ;
   mesuré ici : 0,8 s), titre « VRM… », bouton « Créer mon compte » (`data-cta="inscription"`)
   visible vers `/?inscription`, « Se connecter » vers `/?connexion`.
@@ -68,7 +68,7 @@ client, une fois par jour.
 ## Preuves
 
 - **Vraie prod, lecture seule** (9 nov., 7 h 45) : `node scripts/controle-prod-quotidien.cjs`
-  ⇒ 113 verts, 1 sauté (compte de démo), 0 écriture bloquée. Captures regardées
+  ⇒ 118 verts, 1 sauté (compte de démo), 0 écriture bloquée, 0 requête vers la base. Captures regardées
   (Colis en exemple, récupération expirée en ordinateur) : écrans réels, bandeau d'exemple.
 - **Copie locale cassée exprès** (`node scripts/audit-controle-prod-quotidien.cjs`, après
   `npm run build`) : saine ⇒ vert ; puis UNE panne à la fois ⇒ rouge et nommée : zip à
