@@ -109,7 +109,11 @@ déjà gardées sur l'appareil, en lecture seule.
   état « sans abonnement » ⇒ carte de l'aperçu + écran marqué ; J retour réseau, serveur 401 ⇒ refermé,
   drapeau effacé ; K retour réseau, oui ⇒ bandeau parti, drapeau redaté, lectures reparties.
   - **Sur `origin/main`** (git archive + build, `BANC_DIST`) : **44 rouges**.
-  - **Mutations** : contrôle de l'uid du drapeau retiré ⇒ rouge (C) ; garde jamais posée ⇒ rouge (A).
+  - **Mutations** (builds mutés) : contrôle de l'uid du drapeau retiré ⇒ 5 rouges (C 390 et 1512 ; plus
+    un K 390 rouge pendant ce passage, machine chargée — K est vert sur les passages normaux) ; garde
+    jamais posée ⇒ 13 rouges (A : lectures `relais_ext`, `push_journal`, `/api/compte?mode=equipe`
+    parties, écriture tentée qui atteint le réseau).
+  - Après le vrai `git merge origin/main` : rebâti, **80/80** ; `bancs/confidentialite.cjs` 26/26.
   - Captures regardées : `captures/hors-ligne-froid-390.png` (bandeau en haut, recouvre le haut de la
     carte « Je n'arrive pas à joindre tes données » au téléphone — lisible, à revoir par
     `claude/direction-artistique-6`), `-apercu-1512.png` (aperçu + carte « Ton abonnement a pris fin »).
