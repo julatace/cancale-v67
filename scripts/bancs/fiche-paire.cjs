@@ -150,7 +150,9 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
         // prix, offres, favoris et retour s'insèrent à leur place dans le cycle.
         dit(f.ordre.join() === 'achat,numero,stock,annonces,prix,offres,favoris,vente,colis,argent,retour,benefice', `A ${T} l'histoire dans l'ordre : achat → numéro → stock → annonces → prix → offres → favoris → vente → colis → argent → retour → bénéfice (9 nov.)`, f.ordre.join());
         dit(f.achat === '5200' && f.etapes.achat.etat === 'fait' && /tom\.kicks/.test(f.etapes.achat.txt) && /n° de transaction/.test(f.etapes.achat.txt), `A ${T} l'achat : 52 €, le vendeur, relié par n° de transaction`, f.achat + ' ' + (f.etapes.achat || {}).txt);
-        dit(f.etapes.stock.etat === 'fait' && /Meuble B/.test(f.etapes.stock.txt), `A ${T} rangée dans le Stock (par N°)`, (f.etapes.stock || {}).txt);
+        // (9 nov.) N°117 est vendue et partie : sa case est LIBÉRÉE (décision de Julien, journal
+        // `vrm_stock_sortis`, le N° reste) — l'histoire dit où elle était et qu'elle en est sortie.
+        dit(f.etapes.stock.etat === 'fait' && /Meuble B/.test(f.etapes.stock.txt) && /libérée/.test(f.etapes.stock.txt), `A ${T} rangée dans le Stock (par N°), puis sa place libérée au départ du colis`, (f.etapes.stock || {}).txt);
         dit(f.etapes.vente.etat === 'fait' && /Vendue sur Vinted/.test(f.etapes.vente.txt) && f.vente === '9500' && f.txs.join() === '9117', `A ${T} vendue sur Vinted 95 €, par SA transaction`, f.vente + ' ' + f.txs.join() + ' ' + (f.etapes.vente || {}).txt);
         dit(f.etapes.colis.etat === 'fait' && /livré/i.test(f.etapes.colis.txt), `A ${T} le colis livré (la règle de l'étiquette de la vente)`, (f.etapes.colis || {}).txt);
         dit(f.etapes.argent.etat === 'fait' && /versé/i.test(f.etapes.argent.txt), `A ${T} l'argent versé (transaction finalisée), daté`, (f.etapes.argent || {}).txt);
