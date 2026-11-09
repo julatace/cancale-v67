@@ -287,7 +287,10 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     const ecran = fs.existsSync(ECRAN) ? sans(fs.readFileSync(ECRAN, 'utf8')) : '';
     const regle = sans(fs.readFileSync(REGLE, 'utf8'));
     const meubles = app.slice(app.indexOf('function StockMeubles('), app.indexOf('function ChoixPlanches('));
-    const el = meubles.slice(meubles.indexOf('const elInventaire'), meubles.indexOf('const elInventaire') + 4000);
+    // (9 nov.) L'attendu est fabriqué UNE fois (`fabriquerStockInv`) : pour la feuille, et
+    // pour la liste figée du hors connexion (src/inventaireHorsLigne.js) — la même source.
+    const iFab = meubles.indexOf('const fabriquerStockInv');
+    const el = meubles.slice(iFab >= 0 ? iFab : meubles.indexOf('const elInventaire'), meubles.indexOf('const elInventaire') + 3000);
     dit(/<InventaireStock /.test(el) && /articles: aa\.articles/.test(el) && /jugeable,/.test(el) && /su: aa\.su/.test(el) && /manque: aa\.manque/.test(el), 'I7 l’attendu de l’inventaire est celui du Stock (aa.articles, aa.manque, jugeable) — jamais une copie', el.slice(0, 300));
     dit(/vendus: venduSig && Array\.isArray\(venduSig\.nums\) \? vendus : null/.test(el), 'I7 ventes jamais publiées (vrm_stock_vendus absent) ⇒ `null`, pas su');
     dit(/lire=\{lireLigneInventaire\}/.test(el) && /ecrire=\{ecrireLigneInventaire\}/.test(el), 'I7 l’écran lit et écrit SA ligne par les fonctions de l’app');
@@ -297,8 +300,11 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     dit(/LIGNE_INVENTAIRE = 'vrm_inventaire'/.test(regle), 'I7 la ligne dédiée s’appelle vrm_inventaire');
     const NUMS = /vinted_annonce_numeros|vinted_used_numeros|vinted_sale_overrides|vrm_vc_numeros|vrm_slots|recordUsed|setNumero/;
     dit(!!ecran && !NUMS.test(ecran) && !NUMS.test(regle) && !/\bsave\(|saveTout\(/.test(ecran + regle), 'I7 l’inventaire n’écrit AUCUN numéro (ni fiche, ni pool, ni case) — §5');
-    dit(/localStorage\.setItem\(cleLocale\(owner\)/.test(ecran) && (ecran.match(/localStorage\.setItem\(/g) || []).length === 1, 'I7 sur l’appareil : la seule copie locale est celle de l’inventaire');
-    dit(/onSubmit=\{\(e\) => \{ e\.preventDefault\(\); valider\(texte\); \}\}/.test(ecran) && /inputMode=\{lettres \? 'text' : 'numeric'\}/.test(ecran), 'I7 « N° + Entrée » (et « OK ») au pavé numérique, dans l’inventaire');
+    // (9 nov.) Plus le drapeau « des saisies attendent d'être envoyées » (`cleAttente`), relu
+    // par l'app au retour du réseau — rien d'autre n'est écrit sur l'appareil.
+    const ecritsLocaux = [...ecran.matchAll(/localStorage\.setItem\(([^,]+),/g)].map((m) => m[1].trim());
+    dit(/localStorage\.setItem\(cleLocale\(owner\)/.test(ecran) && ecritsLocaux.length === 2 && ecritsLocaux.every((k) => /^cleLocale\(owner\)$|^cleAttente\(/.test(k)), 'I7 sur l’appareil : la seule copie locale est celle de l’inventaire (et son drapeau « en attente »)', ecritsLocaux.join(' | '));
+    dit(/onSubmit=\{\(e\) => \{ e\.preventDefault\(\); valider\(texte\); \}\}/.test(ecran) && /inputMode=\{lettres \? 'text' : \(auDoigt \? 'none' : 'numeric'\)\}/.test(ecran), 'I7 « N° + Entrée » (et « OK ») au pavé numérique, dans l’inventaire');
     dit(/data-stock-inventaire-ouvrir/.test(app) && /vrm:inventaire-ouvrir/.test(meubles), 'I7 Stock → « Inventaire » ouvre l’inventaire');
     dit(/id: 'inventaire-en-cours'/.test(app) && /DEMANDE_STOCK_INVENTAIRE\.at = Date\.now\(\)/.test(app) && /useInventaireEnCours\(only === 'journee'\)/.test(app), 'I7 Ma journée dit « Inventaire en cours » et y mène');
     const iC = app.indexOf('const conflitsNum = useMemo('), iP = app.indexOf("save('vrm_num_doublons'");

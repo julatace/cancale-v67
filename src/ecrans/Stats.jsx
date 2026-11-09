@@ -2,8 +2,9 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
 import { annulationsParCompte } from '../annulationsCompte.js';
-import { modeleSur } from '../ceQuiRapporte.js';
-import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from '../statsVentes.js';
+import { modeleSur, classementRapporte } from '../ceQuiRapporte.js';
+import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBrutCompte, SEUIL_CONCLUSION } from '../vendrePlus.js';   // (9 nov., « vendre plus »)
+import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
 import { etapeMotVc, vcVenteAnnulee, montantRecuVc } from '../../api/_lib/vestiaire-regle.js';
@@ -1167,12 +1168,15 @@ function useReleveStats() {
       const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
       const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
       const it = t && t.item && x.items ? x.items[t.item] : null;
-      return { plateforme, compte, id, ts, eur, achat, frais, titre, ...clesVenteStats(titre, it), modeleSur: modeleSur((it && it.brand) || '', titre), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+      return { plateforme, compte, id, ts, eur, achat, frais, titre, ...clesVenteStats(titre, it), marqueLue: String((it && it.brand) || '').trim(), modeleSur: modeleSur((it && it.brand) || '', titre), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
     });
   }, [releve, extras]);
   return { releve, stock, benef, extras, lignes };
 }
 const SITE_COURT = { Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire: 'Vestiaire' };
+// (9 nov.) Les axes de « Ce qui part vite » et la clé de groupe de chacun.
+const AXES_VITE = { modele: 'Modèle', marque: 'Marque', taille: 'Taille', compte: 'Compte' };
+const CLE_VITE = { modele: (l) => l.modele, marque: (l) => l.marqueLue, taille: (l) => l.taille, compte: (l) => l.compte };
 // Le titre de la période : « Octobre · comparé à septembre ».
 const titrePeriodeStats = (b) => {
   const maj = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -1339,7 +1343,13 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const datesPasSu = extras !== undefined && (!extras || extras.items == null || extras.txn == null);
   const lv = lp && !datesPasSu && extras !== undefined ? lp.filter((l) => l.plateforme === 'Vinted') : null;
   const Dl = React.useMemo(() => (lv ? delaisPar(lv, () => '') : null), [lv]);
-  const rapides = React.useMemo(() => (lv ? plusRapides(delaisPar(lv, (l) => l.modele), 5) : null), [lv]);
+  // (9 nov., « vendre plus ») Ce qui part vite, par Modèle · Marque (LUE sur l'annonce,
+  // jamais devinée du titre) · Taille · Compte. Un groupe à moins de 5 ventes datées est
+  // montré, jamais classé (`classerSansConclureTropVite`, src/vendrePlus.js).
+  const [axeVite, setAxeViteEtat] = React.useState(() => { try { const v = localStorage.getItem('vrm_sv_axe_vite'); return AXES_VITE[v] ? v : 'modele'; } catch (_) { return 'modele'; } });
+  const setAxeVite = (v) => { const x = AXES_VITE[v] ? v : 'modele'; setAxeViteEtat(x); try { localStorage.setItem('vrm_sv_axe_vite', x); } catch (_) {} };
+  const rapidesC = React.useMemo(() => (lv ? classerSansConclureTropVite(delaisPar(lv, CLE_VITE[axeVite]), SEUIL_CONCLUSION, 5) : null), [lv, axeVite]);
+  const rapides = rapidesC ? rapidesC.classes : null;
   const tailles = React.useMemo(() => {
     if (!lp || extras === undefined) return null;
     const D = delaisPar(lp, (l) => l.taille);
@@ -1360,6 +1370,11 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       return { k: g.k, plat, nom, site: plat === 'Vinted' ? '' : (SITE_COURT[plat] || plat), n: g.n, eur: g.eur, mediane: d ? d.mediane : null, nDelai: d ? d.nDelai : 0 };
     });
   }, [vendu, b, lp, lv]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (9 nov.) Le bénéfice brut par compte : LA règle du « Bénéfice brut » de Statistiques
+  // (`classementRapporte`, axe Compte), sur les ventes FINALISÉES de la période ; la
+  // couverture (prix d'achat connus) dite à côté. Rien n'est recalculé ici.
+  const brutComptes = React.useMemo(() => (lp ? brutParCompte(classementRapporte(lp, 'compte').groupes) : null), [lp]);
+  const meilleurCompte = React.useMemo(() => compteQuiVendLeMieux(comptes, SEUIL_CONCLUSION), [comptes]);
   // Boost (3 nov.) : les annonces mises en ligne dans la période, boostées
   // contre non boostées du MÊME modèle sûr (`boostRentable`, src/boostRentable.js).
   const boost = React.useMemo(() => {
@@ -1516,13 +1531,14 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
               ))}
             </div>
           ), { 'data-sv-carte': 'barres' }, 'vrm-sv-large')}
-        {carte('sv-rapides', 'Les modèles qui partent vite', rapides && rapides.length ? 'jours pour vendre' : null, !lignes
+        {carte('sv-rapides', 'Ce qui part vite', rapidesC && (rapides.length || rapidesC.peu.length) ? 'jours pour vendre' : null, !lignes
           ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
           : extras === undefined ? vide('Je lis les dates de mise en ligne…', { 'data-sv-etat': 'encours' })
             : datesPasSu ? vide('Tes annonces n’ont pas pu être lues : aucun délai.', { 'data-sv-etat': 'passu' })
-              : !rapides.length ? vide('Aucune vente Vinted à la date de mise en ligne connue sur la période.', { 'data-sv-etat': 'lu' })
+              : !rapides.length && !rapidesC.peu.length ? vide('Aucune vente Vinted à la date de mise en ligne connue sur la période.', { 'data-sv-etat': 'lu' })
                 : (
-                  <div className="vrm-sv-lignes" data-sv-etat="lu">
+                  <div className="vrm-sv-lignes" data-sv-etat="lu" data-sv-axe-vite={axeVite} data-sv-peu={rapidesC.peu.length} data-sv-n-peu={rapidesC.nPeu}>
+                    <Segmente label="Par" className="vrm-sv-axes-vite" value={axeVite} onChange={setAxeVite} options={Object.entries(AXES_VITE).map(([v, l]) => ({ v, l, data: { 'data-sv-axe-choix': v } }))}/>
                     {rapides.map((g) => (
                       <div key={g.k} className="vrm-sv-ligne-rapide" data-sv-rapide={g.k} data-mediane={g.mediane} data-ndelai={g.nDelai} title={`${g.k} : médiane ${jours(g.mediane)}, sur ${pl(g.nDelai, 'vente datée', 'ventes datées')}`}>
                         <span className="vrm-sv-nom">{g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())}</span>
@@ -1530,6 +1546,11 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
                         <span className="vrm-sv-chiffre">{jours(g.mediane)}</span>
                       </div>
                     ))}
+                    {rapidesC.peu.length > 0 && (
+                      <div className="vrm-sv-note" data-sv-pas-conclu={rapidesC.peu.length}>
+                        {rapides.length ? 'Pas encore classés' : 'Rien de classé'} : {pl(rapidesC.peu.length, 'groupe')} à moins de {SEUIL_CONCLUSION} ventes datées ({rapidesC.peu.slice(0, 4).map((g) => `${g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())} ${g.nDelai}`).join(', ')}{rapidesC.peu.length > 4 ? '…' : ''}) — pas assez pour conclure.
+                      </div>
+                    )}
                   </div>
                 ), { 'data-sv-carte': 'rapides' })}
         {carte('sv-comptes', 'Quel compte vend le mieux', comptes && comptes.length ? 'ventes · jours pour vendre' : null, !comptes
@@ -1537,11 +1558,19 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
           : !comptes.length ? vide('Aucune vente sur la période.', { 'data-sv-etat': 'lu' })
             : (
               <div className="vrm-sv-lignes vrm-sv-comptes" data-sv-etat="lu">
-                {comptes.length > 1 && comptes[0].n > comptes[1].n && <p className="vrm-sv-phrase" data-sv-meilleur={comptes[0].k}>{comptes[0].nom}{comptes[0].site && comptes[0].site !== comptes[0].nom ? ` (${comptes[0].site})` : ''} vend le plus</p>}
+                {(() => { const m = meilleurCompte ? comptes.find((c) => c.k === meilleurCompte) : null;
+                  if (m) return <p className="vrm-sv-phrase" data-sv-meilleur={m.k}>{m.nom}{m.site && m.site !== m.nom ? ` (${m.site})` : ''} vend le plus</p>;
+                  return comptes.length > 1 ? <p className="vrm-sv-note" data-sv-pas-conclu-compte="">Moins de {SEUIL_CONCLUSION} ventes ou égalité : pas de « meilleur compte ».</p> : null; })()}
                 {comptes.slice(0, 6).map((c) => (
                   <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
                     <span className="vrm-sv-nom">{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
-                    <span className="vrm-sv-n">{pl(c.n, 'vente')}</span>
+                    <span className="vrm-sv-n">{pl(c.n, 'vente')}{(() => {
+                      // Un site à plusieurs comptes (deux Leboncoin) n'a qu'un brut commun : rien n'est
+                      // attribué à un compte qui ne le porte pas (aucune ligne plutôt qu'un faux).
+                      if (!brutComptes || (c.plat !== 'Vinted' && comptes.filter((x) => x.plat === c.plat).length > 1)) return null;
+                      const bc = brutComptes[cleBrutCompte(c.plat, c.k.split('|').slice(1).join('|'))];
+                      const v = bc && bc.brut != null ? bc.brut : null;
+                      return <span className="vrm-sv-brut-compte" data-benef-notion="brut" data-benef-valeur={v == null ? '' : String(Math.round(v * 100))} data-sv-brut-couv={bc ? `${bc.nCout}/${bc.n}` : '0/0'} title={bc ? `${NOM_BENEFICE_BRUT} : ventes finalisées au prix d’achat connu, ${bc.nCout} sur ${bc.n}` : 'aucune vente finalisée sur la période'}>brut {v == null ? '—' : fmt(v)}{bc && bc.n && bc.nCout < bc.n ? ` · ${bc.nCout} sur ${bc.n}` : ''}</span>; })()}</span>
                     <span className="vrm-sv-chiffre" title={c.plat === 'Vinted' ? (c.mediane == null ? 'aucune vente datée' : `délai médian, sur ${pl(c.nDelai, 'vente datée', 'ventes datées')}`) : 'pas de date de mise en ligne sur cette plateforme'}>{jours(c.mediane)}</span>
                   </div>
                 ))}

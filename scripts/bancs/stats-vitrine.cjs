@@ -102,7 +102,7 @@ rows.push({ id:'ebay_orders', data:{ orders:[] } });
 //   « Pas assez de données », aucun chiffre comparé, sur les trois périodes.
 const ATT={
   mois:    { vendu:{n:5,eur:25000,prec:8000,ecart:213}, benef:{n:4,ncout:3,brut:11000}, delai:{med:'3',couv:'3/4'},
-             barres:'s37…s44', rapides:'1,6.5', comptes:{ '111':{n:3,med:'2'}, '222':{n:2,med:'10'} }, tailles:{ '41':{n:1,med:''}, '42':{n:2,med:'2'}, '43':{n:1,med:'10'} }, plus:'42',
+             barres:'s37…s44', rapides:'', comptes:{ '111':{n:3,med:'2'}, '222':{n:2,med:'10'} }, tailles:{ '41':{n:1,med:''}, '42':{n:2,med:'2'}, '43':{n:1,med:'10'} }, plus:'42',
              boost:{ etat:'pas-assez' } },
   semaine: { vendu:{n:3,eur:14000,prec:7000,ecart:100}, benef:{n:2,ncout:1,brut:4000}, delai:{med:'6.5',couv:'2/2'},
              comptes:{ '111':{n:2,med:'3'}, '222':{n:1,med:'10'} }, tailles:{ '42':{n:1,med:'3'}, '43':{n:1,med:'10'} },
@@ -253,7 +253,8 @@ const capture=async(pg,nom)=>{
           dit(r.barres===bar && r.enCours===bcours,`${p} : barres ${bar} (en cours n° ${bcours})`,`${r.barres} · ${r.enCours} · ${r.libs}`);
           dit(r.cours.length===1 && r.autres.length>0 && r.autres.every(c=>c!==r.cours[0]),`${p} : la barre en cours seule dans la couleur d’accent, les autres en gris`,JSON.stringify({cours:r.cours,autres:[...new Set(r.autres)]}));
           if(p==='mois') dit(r.libs==='07/09,14/09,21/09,28/09,05/10,12/10,19/10,26/10','mois : 8 semaines dites par leur lundi (07/09 → 26/10), plus « s37 »',r.libs);
-          if(a.rapides) dit(r.rapides===a.rapides,`${p} : ce qui part vite — médianes ${a.rapides} (du plus rapide au plus lent)`,r.rapides);
+          // (9 nov., « vendre plus ») Sous 5 ventes datées, un groupe n'est jamais classé : le mois n'en classe aucun.
+          if(a.rapides!=null) dit(r.rapides===a.rapides,`${p} : ce qui part vite — médianes « ${a.rapides} » (aucun groupe classé sous 5 ventes datées)`,r.rapides);
           const cA=r.comptes['Vinted|atelier_sneak']||{}, cP=r.comptes['Vinted|paris_kicks']||{};
           dit(cA.n===String(a.comptes['111'].n) && cP.n===String(a.comptes['222'].n) && (a.comptes['111'].med==null || (cA.med===a.comptes['111'].med && cP.med===a.comptes['222'].med)),
             `${p} : par compte — atelier_sneak ${a.comptes['111'].n}, paris_kicks ${a.comptes['222'].n}${a.comptes['111'].med?` (délais ${a.comptes['111'].med} j et ${a.comptes['222'].med} j)`:''}`,JSON.stringify(r.comptes));
