@@ -229,7 +229,8 @@ async function ouvrirInventaire(pg, tel) {
     b = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     // BANC_SEUL=390|1512 : une seule largeur (pour chercher un défaut).
     const tailles = process.env.BANC_SEUL === '390' ? [true] : (process.env.BANC_SEUL === '1512' ? [false] : [true, false]);
-    for (const tel of tailles) for (const sombre of [false, true]) {
+    // BANC_THEME=clair|sombre : un seul thème.
+    for (const tel of tailles) for (const sombre of [false, true].filter((x) => !process.env.BANC_THEME || (process.env.BANC_THEME === 'sombre') === x)) {
       const t = `${tel ? '390 tactile' : '1512 souris'} ${sombre ? 'sombre' : 'clair'}`;
       const nomShot = (x) => (tel ? '390' : '1512') + (sombre ? '-sombre' : '-clair') + '-' + x;
       const base = nouvelleBase();
@@ -352,7 +353,9 @@ async function ouvrirInventaire(pg, tel) {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, tab: 'garage', base: bh, vib: true });
         // Le service worker doit tenir la page (et ses morceaux) pour la rouvrir sans réseau.
         await pg.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready).catch(() => {});
-        if (!(await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller)))) await pg.reload({ waitUntil: 'domcontentloaded' });
+        // Une ouverture EN LIGNE sous son contrôle : il range la page (« / ») pour plus tard.
+        await pg.reload({ waitUntil: 'domcontentloaded' });
+        await pg.waitForFunction(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller), null, { timeout: 15000 }).catch(() => {});
         await ouvrirInventaire(pg, tel);
         await pg.waitForSelector('[data-inv-commencer]:not([disabled])', { timeout: 25000 });
         // La liste FIGÉE de ce vendeur (src/inventaireHorsLigne.js), écrite par le Stock qui l'a lue.
@@ -364,7 +367,10 @@ async function ouvrirInventaire(pg, tel) {
         const vibs = () => pg.evaluate(() => JSON.stringify(window.__vib || []));
         if (tel) {
           const pave = await pg.evaluate(() => [...document.querySelectorAll('[data-inv-touche]')].map((x) => { const r = x.getBoundingClientRect(); const cs = getComputedStyle(x); return { t: x.getAttribute('data-inv-touche'), h: Math.round(r.height), w: Math.round(r.width), mh: cs.minHeight, hh: cs.height, gp: Math.round(x.parentElement.getBoundingClientRect().height), gr: getComputedStyle(x.parentElement).gridTemplateRows }; }));
-          dit(pave.length === 12 && pave.every((x) => x.h >= 56 && x.w >= 56) && pave.map((x) => x.t).join('') === '123456789B0⌫', `${t} : G — le pavé géant : 12 touches (1-9, B, 0, ⌫), toutes ≥ 56 px`, JSON.stringify(pave.slice(0, 3)) + '…');
+          // Trop petites : le banc dit QUELLE règle fixe la hauteur (CDP, règles appliquées).
+          let qui = '';
+          if (!pave.every((x) => x.h >= 56)) { try { const cdp = await ctx.newCDPSession(pg); await cdp.send('DOM.enable'); await cdp.send('CSS.enable'); const d = await cdp.send('DOM.getDocument'); const nd = await cdp.send('DOM.querySelector', { nodeId: d.root.nodeId, selector: '[data-inv-touche="1"]' }); const m = await cdp.send('CSS.getMatchedStylesForNode', { nodeId: nd.nodeId }); qui = m.matchedCSSRules.filter((r) => r.rule.style.cssProperties.some((c) => /height/.test(c.name))).map((r) => r.rule.selectorList.text + ' {' + r.rule.style.cssProperties.filter((c) => /height/.test(c.name)).map((c) => c.name + ':' + c.value).join(';') + '}').join(' | '); } catch (e) { qui = 'cdp: ' + e.message; } }
+          dit(pave.length === 12 && pave.every((x) => x.h >= 56 && x.w >= 56) && pave.map((x) => x.t).join('') === '123456789B0⌫', `${t} : G — le pavé géant : 12 touches (1-9, B, 0, ⌫), toutes ≥ 56 px`, JSON.stringify(pave.slice(0, 2)) + '… ' + qui.slice(0, 600));
           await toucher(pg, tel, '[data-inv-touche="3"]'); await toucher(pg, tel, '[data-inv-touche="9"]'); await toucher(pg, tel, '[data-inv-touche="⌫"]');
           const v1 = await pg.inputValue('[data-inv-champ]');
           await toucher(pg, tel, '[data-inv-valider]'); await pg.waitForTimeout(250);

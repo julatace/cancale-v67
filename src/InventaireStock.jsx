@@ -75,7 +75,7 @@ export function motJugement(j) {
     return { t: '✓ Attendu', s: `${u.titre ? u.titre + ' · ' : ''}${u.etat === 'masquee' ? 'masquée par Vinted, toujours chez toi' : (u.etat === 'aconfirmer' ? 'à confirmer (lecture ancienne) — le voilà' : (ou ? 'en ligne sur ' + ou : 'en ligne'))}${dbl}` };
   }
   if (j.etat === 'vendu') return { t: 'Vendu — à sortir', s: j.parti === true ? `VRM croit le colis déjà parti : vérifie (retour ?)${dbl}` : `Sors-le pour l’envoi${dbl}` };
-  if (j.etat === 'trop') return { t: 'En trop', s: `${RAISON_TROP[j.raison] || 'VRM ne l’attend pas'}${dbl}` };
+  if (j.etat === 'trop') return { t: 'À vérifier', s: `Pas attendu ici : ${RAISON_TROP[j.raison] || 'VRM ne l’attend pas'}${dbl}` };
   return { t: 'Pas su', s: `${j.raison === 'ventes' ? 'Tes ventes ne sont pas encore lues : ouvre Ventes une fois' : 'Une lecture manque pour ce N° — je ne dis ni présent ni en trop'}${dbl}` };
 }
 const etatAffiche = (j, deuxieme = false) => (j && j.etat !== 'illisible' && (j.doublon || deuxieme) ? 'doublon' : (j ? j.etat : ''));
