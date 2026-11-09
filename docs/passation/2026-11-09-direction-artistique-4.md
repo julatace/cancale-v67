@@ -79,16 +79,24 @@ aucun texte, chiffre, règle ni `data-*` existant changé (deux attributs AJOUT�
 | **confirmation irréversible** | `ConfirmHost` + 3 appels | `askConfirm({ irreversible: true })` ⇒ la réponse en **ambre plein** (`styles-premium.css` §13.1), jamais rouge ; posé seulement sur « Supprimer de Leboncoin » (×2) et « Supprimer d'eBay » (terminer une annonce) — toutes les autres restent bleues |
 | **messages** | `toast` / `Toaster` (`src/App.jsx`) | durée lisible (4 s, + ≈ 15 signes/s, 10 s au plus ; échec 6 s au moins) ; le temps s'arrête sous la souris, au focus clavier, onglet caché ; la zone `aria-live` reste montée même vide (VoiceOver n'annonce pas une zone créée avec son texte) ; au téléphone, au-dessus du **clavier** (`--vrm-clavier`, lu de `visualViewport`) ; sous la pilule « Annuler », monte d'un cran au lieu de la couvrir (§13.3) |
 | **état vide de Messages** | `data-msg-vide` | la forme commune (dessin `courrier`, titre 17/600, phrase 15 grise) au lieu d'une ligne 13 |
+| **Colis à 1512 : « Relier » / « Poser le N° »** | `styles-premium.css` §13.4 | ces pilules tombaient 12 px SOUS leur rangée, à cheval sur le filet (la zone d'action a une hauteur nulle) ; elles prennent la colonne d'ÉTAT (vide tant que rien n'est fait), centrées sur la rangée (10 px au-dessus, 10 dessous, mesuré) ; une rangée qui a déjà sa frise les pose sur une 2e ligne. Téléphone inchangé |
 
 ### Vérifications
 
 `npm run build` vert ; audits `violet`, `icones`, `boutons`, `variables`, `tdz`, `coherence`,
 `composants`, `rouge-doublon` verts ; `photos-vinted` : 1 rouge (« tout `<img>` passe par
 PhotoVinted, 47 vus »), **le même sur `origin/main`** (arbre `git archive`). Banc
-`direction-artistique-4` : **168 verts, 0 rouge** sur cette branche. Captures AVANT/APRÈS
-(confirmation, choix, feuilles Actions et Brouillons, atelier, Messages vide ; 390/1512,
-clair/sombre) dans le dossier de la session : `scratchpad/da4/{avant,apres,comparer}/`
-(hors dépôt).
+`direction-artistique-4` : **168 verts, 0 rouge** sur cette branche. Nouveau banc `feuille-focus` (zone `aria-live`
+montée, Tab piégé, focus rendu) : **6 rouges sur `origin/main` 1087f9fd** (lancé depuis un arbre
+d'archive), **0 ici**. `feuilles-coque` 23 rouges, **les mêmes 23** sur 1087f9fd ;
+`a-confirmer` 2 rouges, les mêmes sur 1087f9fd ; `iphone-reprise` 139 verts (B5 rouge au 1er
+passage — minutage —, vert au 2e) ; `ecrans-gardes` 29 verts ; `beaute` 80 verts ;
+`colis-colonnes` vert ; `ventes-colis-premium` 32 verts. Texte rendu (`innerText` des feuilles et
+écrans capturés) identique avant/après, hors les temps tirés au hasard de l'espacement et
+« il y a N min ». Captures (390/1512, clair/sombre) dans le dossier de la session, hors dépôt :
+`/tmp/claude-0/-home-user-cancale-v67/f70a9764-046d-5574-bac2-0a1794911434/scratchpad/da4/`
+— `comparer/` (AVANT = 82347493, avant TOUTE la phase 4 | APRÈS), et
+`comparer/colis-{1512,390}-{light,dark}.png` (Colis, AVANT = 1087f9fd).
 
 ### Ce qui reste (inchangé)
 
