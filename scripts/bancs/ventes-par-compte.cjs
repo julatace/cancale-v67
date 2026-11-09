@@ -128,7 +128,8 @@ async function main() {
         const ROWS = rowsPour(['111', '222', '333'], ['333']);
         const { ctx, pg } = await preparer(b, vp, ROWS);
         const r = await lireStats(pg);
-        dit(r.carte && r.leader === 'compte_alpha', `${T} Statistiques : « compte_alpha vend le plus » (3 ventes > 1)`, JSON.stringify(r));
+        // (9 nov., « vendre plus ») 3 ventes contre 1 : moins de 5, pas de « meilleur compte » (rien n'est conclu).
+        dit(r.carte && !r.leader, `${T} Statistiques : 3 ventes contre 1 ⇒ pas de « vend le plus » (moins de 5 ventes, pas de conclusion)`, JSON.stringify(r));
         dit(r.comptes[0] === 'compte_alpha' && r.comptes.includes('compte_beta'), `${T} le classement liste alpha (en tête) ET beta`, JSON.stringify(r.comptes));
         dit(!r.gamma && !r.comptes.includes('compte_gamma'), `${T} le compte EXCLU (gamma) n’entre pas dans « Quel compte vend le mieux »`, r.gamma ? 'gamma présent à tort' : '');
         // Rapporté, pas jugé ici (hors de la règle de ce banc, écran Statistiques — chantier F) :

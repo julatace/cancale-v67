@@ -16,6 +16,7 @@ import { prendreDemande } from '../rechercheEcran.js';
 import { recuPublieEntre } from '../design/carteChiffres.js';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre } from '../registres.js';
+import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
@@ -1804,6 +1805,35 @@ const lireAchatsRegistre = async () => {
   const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
   return lignes.flatMap((r) => { const k = /^harvest_(\d+)_orders_purchased$/.exec(String((r && r.id) || '')); const uid = k ? k[1] : ''; return (Array.isArray(r && r.orders) ? r.orders : []).map((o) => ({ ...o, _uid: uid, compte: login.get(uid) || uid })); });
 };
+// Le registre des achats d'une période : UNE écriture pour la carte « Registres » et
+// « Exporter pour mon comptable » (9 nov.) — mêmes fiches, mêmes reçus, mêmes comptes écartés.
+const registreAchatsDe = ({ achats, recus, periode, panelOff }) => {
+  const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+  const delies = load('vrm_recus_delies', {}) || {};
+  const index = indexRecusParTransaction(Array.isArray(recus) ? recus.filter((r) => !(r && r.id && delies[r.id])) : recus, (r) => ventilationRecuAchat(r && r.texte).trouve);
+  let fiches = null; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
+  // (5 nov.) Les achats en gros (Achats → Fournisseurs) : UNE ligne chacun, par
+  // leur total + frais, lus par LA règle du registre (`lireRegistre`).
+  return registreDesAchats({ achats, hors: load('vinted_offvinted_buys', []) || [], fiches, periode,
+    ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
+    exclu: (o) => compteEcarteChoix(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
+    gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,
+    manque: recus === null ? ['reçus d’achat'] : [] });
+};
+// Les recettes d'une période : la carte « Registres » et l'export comptable (même lecture).
+const recettesDe = ({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) => {
+  const rel = lireReleveVentes();
+  const parId = new Map();
+  for (const l of ((rel && rel.l) || [])) if (Array.isArray(l)) parId.set(l[0] === 'Vinted' ? 'vinted:' + l[2] : String(l[2]), l);
+  const compteAutre = new Map();
+  for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) compteAutre.set('lbc:' + v.txId, compteDeVente('leboncoin', v) || '');
+  for (const o of (Array.isArray(ebayCommandes) ? ebayCommandes : [])) if (o && o.orderId) compteAutre.set('ebay:' + o.orderId, compteDeVente('ebay', o) || '');
+  for (const v of (ventesVcER || [])) if (v && v.id) { const c = compteDeVente('vestiaire', v); compteAutre.set('vestiaire:' + v.id, c && c !== '-' ? c : ''); }
+  const parLigne = new Map([...calc.decl.lignes, ...(calc.decl.aDater || [])].filter((l) => l && l.o).map((l) => [String(l.id), l.o]));
+  const compteDe = (id) => { const o = parLigne.get(id); if (o && o._acc) return o._acc.login || String(o._acc.vinted_user_id || ''); const r = parId.get(id); return (r && r[1]) || compteAutre.get(id) || ''; };
+  const numDe = (id) => { const r = parId.get(id); return (r && r[8]) || ''; };
+  return livreDesRecettes({ decl: calc.decl, periode, numDe, compteDe, manque: [...calc.manque, ...(versements === null ? ['dates de versement Vinted'] : [])] });
+};
 function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   const ventesVcER = useVentesVestiaire();
@@ -1826,32 +1856,11 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
   React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_FOURNISSEURS || k === 'vinted_annonce_numeros' || k === 'vinted_offvinted_buys') setTicAchats((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const recettes = React.useMemo(() => {
     if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
-    const rel = lireReleveVentes();
-    const parId = new Map();
-    for (const l of ((rel && rel.l) || [])) if (Array.isArray(l)) parId.set(l[0] === 'Vinted' ? 'vinted:' + l[2] : String(l[2]), l);
-    const compteAutre = new Map();
-    for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) compteAutre.set('lbc:' + v.txId, compteDeVente('leboncoin', v) || '');
-    for (const o of (Array.isArray(ebayCommandes) ? ebayCommandes : [])) if (o && o.orderId) compteAutre.set('ebay:' + o.orderId, compteDeVente('ebay', o) || '');
-    for (const v of (ventesVcER || [])) if (v && v.id) { const c = compteDeVente('vestiaire', v); compteAutre.set('vestiaire:' + v.id, c && c !== '-' ? c : ''); }
-    const parLigne = new Map(calc.decl.lignes.filter((l) => l && l.o).map((l) => [String(l.id), l.o]));
-    const compteDe = (id) => { const o = parLigne.get(id); if (o && o._acc) return o._acc.login || String(o._acc.vinted_user_id || ''); const r = parId.get(id); return (r && r[1]) || compteAutre.get(id) || ''; };
-    const numDe = (id) => { const r = parId.get(id); return (r && r[8]) || ''; };
-    return livreDesRecettes({ decl: calc.decl, periode, numDe, compteDe, manque: [...calc.manque, ...(versements === null ? ['dates de versement Vinted'] : [])] });
+    return recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER });
   }, [calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER]);
-  const registreAchats = React.useMemo(() => {
-    if (achats === undefined) return undefined;
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-    const delies = load('vrm_recus_delies', {}) || {};
-    const index = indexRecusParTransaction(Array.isArray(recus) ? recus.filter((r) => !(r && r.id && delies[r.id])) : recus, (r) => ventilationRecuAchat(r && r.texte).trouve);
-    let fiches = null; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
-    // (5 nov.) Les achats en gros (Achats → Fournisseurs) : UNE ligne chacun, par
-    // leur total + frais, lus par LA règle du registre (`lireRegistre`).
-    return registreDesAchats({ achats, hors: load('vinted_offvinted_buys', []) || [], fiches, periode,
-      ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
-      exclu: (o) => compteEcarteChoix(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
-      gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,
-      manque: recus === null ? ['reçus d’achat'] : [] });
-  }, [achats, recus, periode, panelOff, ticAchats]);
+  const registreAchats = React.useMemo(() => (achats === undefined ? undefined : registreAchatsDe({ achats, recus, periode, panelOff })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [achats, recus, periode, panelOff, ticAchats]);
   const exporter = async (R, forme) => {
     if (!R || enCours) return;
     setEnCours(R.type + forme);
@@ -1893,6 +1902,90 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
       {ligne('recettes', 'Livre des recettes', recettes)}
       {ligne('achats', 'Registre des achats', registreAchats)}
     </div></Card>
+  );
+}
+// ── (9 nov.) « EXPORTER POUR MON COMPTABLE » (src/exportComptable.js) ──────────
+// Une période (mois, trimestre, année) ⇒ un tableur (CSV pour Excel) et un PDF d'une
+// page. AUCUNE règle ici : les ventes = `recettesDe` (le livre des recettes, la même
+// lecture que « Registres »), les achats = `registreAchatsDe`, le CA déclaré = la ligne
+// publiée par Ventes et `montantPeriodeUrssaf` (la carte « Prochaine déclaration »),
+// l'URSSAF = `aPayerUrssaf` pour un micro-entrepreneur seulement (`useRegimeFiscal`).
+// Rien n'est lu tant qu'il n'a pas ouvert la carte (« Préparer »).
+function ExportComptableCarte(props) {
+  const [ouvert, setOuvert] = React.useState(false);
+  return (
+    <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ flex: '1 1 200px', minWidth: 0 }}>
+          <span data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</span>
+        </span>
+        {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
+      </div>
+      {ouvert && <ExportComptableCorps {...props} />}
+    </div></Card>
+  );
+}
+function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
+  const ventesVcER = useVentesVestiaire();
+  const ligne = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const [type, setType] = React.useState('trimestre');
+  const choix = React.useMemo(() => periodesExport(type), [type]);
+  const [periode, setPeriode] = React.useState(() => periodesExport('trimestre')[0]);
+  React.useEffect(() => { if (!choix.includes(periode)) setPeriode(choix[0]); }, [choix, periode]);
+  const [achats, setAchats] = React.useState(undefined);
+  const [recus, setRecus] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    lireAchatsRegistre().then((a) => { if (!mort) setAchats(a); }).catch(() => { if (!mort) setAchats(null); });
+    fetchEmailAchats().then((r) => { if (!mort) setRecus(recusAchatDe(r)); }).catch(() => { if (!mort) setRecus(null); });
+    return () => { mort = true; };
+  }, []);
+  const pret = calc.etat !== 'encours' && achats !== undefined && recus !== undefined && regime !== undefined;
+  const D = React.useMemo(() => {
+    if (!pret) return undefined;
+    const recettes = calc.etat === 'lu' ? recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) : null;
+    const registre = registreAchatsDe({ achats, recus, periode, panelOff });
+    return donneesExportComptable({ periode, recettes, achats: registre, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime });
+  }, [pret, calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER, achats, recus, panelOff, ligne, regime]);
+  const [enCours, setEnCours] = React.useState('');
+  const telecharger = async (forme) => {
+    if (!D || enCours) return;
+    setEnCours(forme);
+    try {
+      let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
+      const d = ent && String(ent.nom || '').trim() ? { ...D, entreprise: { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } } : D;
+      if (forme === 'csv') telechargerFichier(new Blob([csvExportComptable(d)], { type: 'text/csv;charset=utf-8' }), nomFichierExport(periode, 'csv'), 'text/csv;charset=utf-8');
+      else telechargerFichier(new Blob([await pdfExportComptable(d)], { type: 'application/pdf' }), nomFichierExport(periode, 'pdf'), 'application/pdf');
+    } catch (err) { toast('Export pas créé : ' + ((err && err.message) || err)); }
+    setEnCours('');
+  };
+  const cv = D ? couvertureExport(D) : [];
+  const cts = (x) => (x == null ? '' : String(Math.round(x * 100)));
+  return (
+    <div style={{ marginTop: 12 }} data-export-periode={periode} data-export-etat={D === undefined ? 'encours' : 'lu'}
+      data-export-ca={D ? cts(D.caDeclare) : ''} data-export-urssaf={D ? cts(D.urssaf) : ''} data-export-ventes-total={D ? cts(D.totalVentes) : ''}
+      data-export-ventes-n={D && D.nVentes != null ? D.nVentes : ''} data-export-achats-n={D && D.nAchats != null ? D.nAchats : ''}
+      data-export-sans-cout={D && D.sansCout != null ? D.sansCout : ''} data-export-adater={D && D.nADater != null ? D.nADater : ''}>
+      <Segmente label="Période de l’export" value={type} onChange={setType} options={TYPES_PERIODE.map(([v, l]) => ({ v, l, data: { 'data-export-type': v } }))} />
+      <select aria-label="Période" data-export-choix="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ marginTop: 10, width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
+        {choix.map((p) => <option key={p} value={p}>{libellePeriode(p)}</option>)}
+      </select>
+      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {D === undefined ? <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>Je lis tes ventes et tes achats…</div>
+          : resumeExport(D).map(([k, v, cle]) => (
+            <div key={cle} data-export-ligne={cle} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, fontSize: 14 }}>
+              <span style={{ color: C.muted }}>{k}</span><span className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{v}</span>
+            </div>))}
+      </div>
+      {cv.length > 0 && <ul data-export-manque={cv.length} style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{cv.map((c) => <li key={c}>{c}</li>)}</ul>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <Bouton variante="primaire" icone="save" data-export-csv="" disabled={!D || !!enCours} onClick={() => telecharger('csv')} style={{ flex: '1 1 140px' }} title="Un fichier pour Excel ou Numbers">{enCours === 'csv' ? '…' : 'Tableur (Excel)'}</Bouton>
+        <Bouton variante="secondaire" icone="doc" data-export-pdf="" disabled={!D || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 140px' }}>{enCours === 'pdf' ? '…' : 'PDF d’une page'}</Bouton>
+      </div>
+    </div>
   );
 }
 // ── (5 nov.) DAC7 COMPTE PAR COMPTE — Comptabilité → Le détail → « DAC7 » ──
@@ -4123,6 +4216,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           </Card>
 
           <RecapComptableMensuel />
+          <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
             {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris

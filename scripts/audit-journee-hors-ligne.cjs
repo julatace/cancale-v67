@@ -91,7 +91,8 @@ async function verifier(fichier) {
   // L'app : la photo est écrite seulement derrière `lectureComplete`.
   const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
   const i = app.indexOf('const photo = construirePhoto(');
-  const avant = i > 0 ? app.slice(Math.max(0, i - 2500), i) : '';
+  // (9 nov.) 4 000 : la ligne « à déposer » porte aussi ses lignes de bordereau (`pdf`).
+  const avant = i > 0 ? app.slice(Math.max(0, i - 4000), i) : '';
   dit(/if \(!lectureComplete\(/.test(avant), 'l\'app n\'écrit la photo qu\'après lectureComplete');
   dit(/caches\.delete\(CACHE_QR\)/.test(app), 'la réserve des QR part avec les données locales (déconnexion, changement de vendeur)');
   return { ko, out };

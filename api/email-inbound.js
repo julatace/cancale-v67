@@ -57,7 +57,7 @@ import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from '
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
-import { transporteurDeTexteBordereau } from './_lib/transporteur-bordereau.js';
+import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -490,7 +490,7 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
   if (suivi && /^[A-Z0-9]{8,}$/.test(suivi[1].trim())) data.suivi = suivi[1].trim();
   // (9 nov.) Un n° Mondial Relay (8 chiffres) écrit après « N° de suivi » : la même
   // identité (cet e-mail = CETTE transaction), que l'ancienne forme ne lisait pas.
-  if (!data.suivi) { const mr = all.match(/N[°ºo]?\s*de\s*suivi\s*:?\s*(\d{8})(?!\d)/i); if (mr) data.suivi = mr[1]; }
+  if (!data.suivi) { const mr = suiviMondialRelayDuTexte(all); if (mr) data.suivi = mr; }
   // (9 nov., Colis → Envoyés) Le transporteur NOMMÉ dans le texte de CET e-mail (sujet +
   // corps, jamais les pièces) : un seul nom, sinon rien (api/_lib/transporteur-bordereau.js).
   data.transporteur = transporteurDeTexteBordereau(subject + '\n' + body + '\n' + htmlText);
