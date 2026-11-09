@@ -107,6 +107,8 @@ import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actio
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
+import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher } from "./aTrancher.js";
+import ATrancher from "./ATrancher.jsx";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX, ORDRE_CHOIX as ORDRE_CHOIX_CYCLE } from "./cycleArticle.js";
@@ -14064,6 +14066,9 @@ const GROUPES_PLUS=[
   // « Expédier » : les colis à retirer vivent dans Colis (colonne « À retirer »,
   // et leur détail — codes, QR, dates limites, relais — juste dessous).
   { titre:'Gérer', items:[
+    // (9 nov., lot AC — Julien : « tu ne peux pas avoir d'hésitation ») UN endroit pour
+    // tout ce que VRM n'a pas pu décider, une ligne = un geste (src/aTrancher.js).
+    {id:'trancher',   icon:'help', label:'À trancher'},
     {id:'garage',     icon:'home', label:'Stock'},
     {id:'achats',     icon:'cart', label:'Achats'},
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
@@ -14118,7 +14123,7 @@ function titreEcran(tab) {
 // (reçu, litige) vise `achats` directement.
 // La liste blanche des écrans qu'un lien `?tab=` (et la reprise, src/repriseEcran.js)
 // peut ouvrir. Un onglet absent d'ici n'ouvre rien : l'app reste sur Ma journée.
-const ONGLETS_LIENS=['ventes','annonces','messages','achats','retraits','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['ventes','annonces','messages','achats','retraits','journee','trancher','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -14130,6 +14135,18 @@ const ONGLETS_DEPLACES = {
 // consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
 const DEMANDE_VUE={ quoi:null, at:0 };
 const demanderVue=(quoi)=>{ DEMANDE_VUE.quoi=quoi; DEMANDE_VUE.at=Date.now(); };
+// (9 nov., lot AC) Le geste d'« À trancher » rejoint le BLOC où il tranche : un éventuel
+// bouton à toucher d'abord (`clic`, un onglet de l'écran), puis la cible défilée au
+// milieu. 10 s au plus (l'écran arrive à la demande) ; rien trouvé ⇒ l'écran, sans plus.
+const suivreCibleTrancher=(clic,cible)=>{ const t0=Date.now(); let clique=!clic;
+  const pas=()=>{ try{ if(!clique){ const b=document.querySelector(clic); if(b){ b.click(); clique=true; } }
+    if(clique&&cible){ const el=document.querySelector(cible); if(el){ el.scrollIntoView({block:'center'}); return; } }
+    else if(clique&&!cible) return; }catch(_){}
+    if(Date.now()-t0<10000) setTimeout(pas,250); };
+  setTimeout(pas,250); };
+// (9 nov., lot AC) Publier le nombre d'une source d'« À trancher » (src/aTrancher.js) :
+// local à cet appareil et à CE compte VRM ; prévient les lecteurs (`vrm:save`).
+const publierATrancher=(cle,n)=>{ try{ if(publierSourceTrancher(localStorage, AUTH.user?.id, cle, n)) window.dispatchEvent(new CustomEvent('vrm:save',{detail:{k:CLE_A_TRANCHER}})); }catch(_){} };
 const prendreVue=(quoi)=>{ if(DEMANDE_VUE.quoi===quoi && Date.now()-DEMANDE_VUE.at<30000){ DEMANDE_VUE.quoi=null; return true; } return false; };
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
@@ -26837,6 +26854,28 @@ function useObjectifMois() {
 // ⟦→ ecrans/Stats.jsx #19⟧
 const lirePub = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lirePub('vrm_colis_retirer'), lirePairesDorment = lirePub('vrm_paires_dorment');
+// (9 nov., lot AC) « À TRANCHER » : les lignes (src/aTrancher.js), lues des publications
+// des écrans propriétaires — la coque (badge, écran) et Ma journée (sa ligne) lisent ce
+// MÊME calcul. Relu à chaque publication et toutes les 5 min (une publication vieillit).
+const lireUrssafPub = lirePub('vinted_urssaf_mois');
+function useATrancher(liveStats) {
+  const [colisRetirer] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
+  const [urssafMois] = useLigneSynchro('vinted_urssaf_mois', lireUrssafPub);
+  const lirePubs = () => { try { return lirePubsTrancher(localStorage, AUTH.user?.id); } catch (_) { return {}; } };
+  const [pubs, setPubs] = React.useState(lirePubs);
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_A_TRANCHER) setPubs(lirePubs()); };
+    const g = (e) => { if (e && e.key === CLE_A_TRANCHER) setPubs(lirePubs()); };
+    const t = setInterval(() => { setPubs(lirePubs()); setTick((x) => x + 1); }, 5 * 60000);
+    window.addEventListener('vrm:save', f); window.addEventListener('storage', g);
+    return () => { clearInterval(t); window.removeEventListener('vrm:save', f); window.removeEventListener('storage', g); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return React.useMemo(() => lignesATrancher({ pubs, colisRetirer, urssafMois, comptes: comptesARelireDe(liveStats), maintenant: Date.now() }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [pubs, colisRetirer, urssafMois, liveStats, tick]);
+}
 // Les sources : `liveStats` = celui de la coque (`liveStatsVus` : les lignes de
 // `ventesFaites`, le porte-monnaie, les annonces), le reste = les publications.
 // L'état de « vendu » dans le `liveStats` de la coque : 'encours' (pas encore là) · 'pasSu' · 'lu'.
@@ -27777,7 +27816,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null }) {
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
@@ -36172,6 +36211,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     : null),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.items, numeros, buyByNum, achatPlusTard]);
+  // ── (9 nov., lot AC) « À TRANCHER » : cet écran PUBLIE les doutes qu'il compte ──
+  // (src/aTrancher.js). Les nombres de SES règles, tels que ses blocs les montrent :
+  // `conflitsNum`, `aEcrireCarton`, `aVerifierCarton`, `remises`, `fileAchat`
+  // (`aRelierJournee`, celui de Ma journée), `cochesNonPartis`, les cartes « supprimé
+  // de Vinted » pas encore répondues. Seulement sur une lecture COMPLÈTE (une liste
+  // partielle ne publie rien : « pas su » ≠ 0). Un nombre, local : aucune donnée métier.
+  useEffect(() => {
+    const lu = cloudReady && Array.isArray(listings.items) && !listings.loading && !listings.incomplet && !listings.error;
+    if (lu && Array.isArray(sales.items) && !numAttente) publierATrancher('numeros-double', conflitsNum.length);
+    if (lu) { publierATrancher('numeros-a-ecrire', aEcrireCarton.length); publierATrancher('numeros-a-verifier', aVerifierCarton.length); }
+    if (lu && fileAchat) publierATrancher('achats-sans-prix', aRelierJournee(fileAchat));
+    if (lu && supprTous instanceof Map) publierATrancher('remise-en-ligne', remises.length);
+    if (Array.isArray(sales.items)) publierATrancher('colis-postes', cochesNonPartis.length);
+    if (only === 'journee' && cycle && Array.isArray(cycle.cartes)) publierATrancher('supprimes-vinted', cycle.cartes.filter((c) => !cycleRepondus[c.id]).length);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, listings.items, listings.loading, listings.incomplet, listings.error, sales.items, numAttente, conflitsNum, aEcrireCarton, aVerifierCarton, fileAchat, supprTous, remises, cochesNonPartis, only, cycle, cycleRepondus]);
   // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
   // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
   useEffect(() => { if (curSub === 'ventes' && accounts.length && !buys.items) chargerAchats(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
@@ -39207,6 +39262,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (inventaireJournee) {
           const nI = inventaireJournee.n;
           jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: 'Inventaire en cours', detail: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, title: 'Inventaire en cours', sub: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
+        }
+        // (9 nov., lot AC) « À TRANCHER » : UNE ligne, seulement s'il y a quelque chose
+        // (la somme SUE des sources, src/aTrancher.js — « au moins » s'il en manque une).
+        if (aTrancher && aTrancher.total > 0) {
+          const t = phraseATrancher(aTrancher);
+          jobs.push({ id: 'a-trancher', n: aTrancher.total, icon: 'help', color: C.text, court: t, detail: 'Ce que VRM n’a pas pu décider : un geste par ligne', title: t, tab: 'trancher', prio: 0.9 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -44151,11 +44212,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
             {(() => {
               const nRoute = 0;  // (3 nov., 13 h 02) « En route » est une section repliée à la fin de « À retirer »
-              const ls = liveStats && Number(liveStats.dataAgeJours) > 1 ? liveStats : null;
               // (9 nov., Julien : « 1 compte à relire » sans dire lequel — §2.7) La puce NOMME le compte quand il
               // est seul (« Relire shop_x · 3 j ») ; la toucher ouvre, juste dessous, CHAQUE compte avec son âge et
               // LE geste (ouvrir vinted.fr connecté sur ce compte, là où est l'extension), puis « Mes comptes ».
-              const comptesRelire = ls ? ((Array.isArray(ls.dataAgeComptes) && ls.dataAgeComptes.filter((x) => x && x.login).length) ? ls.dataAgeComptes.filter((x) => x && x.login) : [{ login: ls.dataAgeCompte || '', jours: ls.dataAgeJours }]) : [];
+              // (9 nov., lot AC) La règle vit dans src/aTrancher.js (`comptesARelireDe`), la même pour « À trancher ».
+              const comptesRelire = comptesARelireDe(liveStats) || [];
               const nRelire = comptesRelire.length;
               if (!nRoute && !nRelire) return null;
               const liste = (groupesRelais && groupesRelais.sansRelais) || [];
@@ -44181,7 +44242,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
             {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
-            {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} /> : null}
+            {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} publier={publierATrancher} /> : null}
             {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
                 <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton>
@@ -44535,7 +44596,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {blocAEcrire()}
         <BlocBarrerVc/>
         {conflitsNum.length > 0 && (
-          <div style={{border:`2px solid ${C.doublon}`,background:`${C.doublon}12`,borderRadius:12,padding:'12px 14px',marginBottom:12}}>
+          <div data-numeros-double={conflitsNum.length} style={{border:`2px solid ${C.doublon}`,background:`${C.doublon}12`,borderRadius:12,padding:'12px 14px',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:15,fontWeight:700,color:C.doublon}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux articles
             </div>
@@ -49367,6 +49428,9 @@ function AdressesSansCompte({ comptes }) {
     return () => { off(); window.removeEventListener('vrm:save', f); };
   }, []);
   const liste = adressesSansCompte({ lignes, declarees, comptesEmails, acheteurs });
+  // (9 nov., lot AC) « À trancher » consomme CE nombre (lu en entier seulement).
+  const nSansCompte = Array.isArray(liste) ? liste.length : null;
+  useEffect(() => { if (nSansCompte != null) publierATrancher('adresses-sans-compte', nSansCompte); }, [nSansCompte]);
   const libres = comptesSansAdresse(comptes, comptesEmails);
   const nomCompte = (a) => (a && (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)]) || (a && a.login) || `#${a && a.vinted_user_id}`;
   const relier = async (adresse, compte) => {
@@ -51899,6 +51963,8 @@ function AppCoeur() {
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveStats, ventesCoque, ventesCoqueEmail, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque, versementsCoque]);
+  // (9 nov., lot AC) « À trancher » : les lignes et leur somme (badge de la navigation, écran).
+  const aTrancherEtat = useATrancher(liveStatsVus);
   // (8 nov.) LE PROFIL DU VENDEUR (src/profilVendeur.js) : la coque a les comptes,
   // les ventes et les sites reliés — elle décide une fois, la navigation et Ma
   // journée lisent `PROFIL_VENDEUR`. « Pas su » partout ⇒ Complet (rien de caché).
@@ -52612,8 +52678,12 @@ function AppCoeur() {
   // envoyer portent le badge de Colis (l'écran qui les envoie) — Ventes ne le
   // redit plus (la colonne de l'ordinateur montrait « 1 » sur Ventes ET « 1 » sur
   // Colis pour le même colis).
-  const badgesNav={ cat_bord: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0 };
+  // (9 nov., lot AC) « À trancher » : la somme des sources SUES (src/aTrancher.js), rien à 0.
+  const badgesNav={ cat_bord: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0, trancher: badgeATrancher(aTrancherEtat) };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
+  // (9 nov., lot AC) Le geste d'une ligne d'« À trancher » : il OUVRE l'écran propriétaire
+  // (la vue d'Annonces, l'onglet de Colis) et va au bloc où il tranche — il n'écrit rien.
+  const allerTrancher=(l)=>{ const g=l&&l.geste; if(!g) return; if(g.vue) demanderVue(g.vue); if(g.tab==='cat_bord'&&g.onglet) choisirOngletColis(g.onglet); setTab(g.tab); if(g.clic||g.cible) suivreCibleTrancher(g.clic,g.cible); };
   // Vestiaire : ses morceaux, chacun dans SA tâche. Annonces · Vestiaire porte
   // aussi ce qui servait à publier (ta clé Photoroom — sur l'écran Vestiaire,
   // jamais dans les Paramètres, sa décision du 17 oct. — et le dernier passage
@@ -53504,7 +53574,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
@@ -53536,6 +53606,7 @@ function AppCoeur() {
         }}/></GardeEcran>}
         {tab==='sales'    &&<GardeEcran nom="sales"><Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/></GardeEcran>}
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
+        {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} entete={<ScreenHead icon="help" title="À trancher" desc="Ce que VRM n’a pas pu décider seul : un geste par ligne, objectif zéro."/>}/></GardeEcran>}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}
         {tab==='communaute'&&<GardeEcran nom="communaute"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense></GardeEcran>}
