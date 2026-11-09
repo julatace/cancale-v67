@@ -108,7 +108,7 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
   } catch (e) { dit(false, 'les modules se chargent', e.message); }
   dit(!!EXM && typeof EXM.donneesExportComptable === 'function' && typeof EXM.csvExportComptable === 'function' && typeof EXM.pdfExportComptable === 'function', 'src/exportComptable.js : données, tableur et PDF existent');
   dit(!!PRM && typeof PRM.texteProposition === 'function', 'src/prixAchatPropose.js : texteProposition existe');
-  if (!EXM || !PRM || !REGM) { console.log(`\n❌ achats-export : ${ko} rouge(s), ${ok} vert(s)`); process.exit(1); }
+  if (!EXM || !PRM || !REGM || typeof EXM.donneesExportComptable !== 'function' || typeof PRM.texteProposition !== 'function') { console.log(`\n❌ achats-export : ${ko} rouge(s), ${ok} vert(s)`); process.exit(1); }
 
   // ── P1. Le texte de la proposition ─────────────────────────────────────────
   const achat = (tx, eur, titre, date, statut) => ({ transaction_id: tx, title: titre, price: { amount: String(eur), currency_code: 'EUR' }, status: statut || 'Transaction finalisée', date });
@@ -227,6 +227,12 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
   dit(T4.aDater.length === 1 && T4.aDater[0].id === 'vinted:9103' && !T4.ventes.some((v) => v.id === 'vinted:9103'), 'E4 · la vente sans date de versement : à part (« à dater »), hors des ventes et du total');
   dit(!JSON.stringify(T4).includes('9104') && !JSON.stringify(T4).includes('7300003'), 'E4 · le compte exclu n’est nulle part (ni vente, ni achat)');
   dit(T4.nAchats === 2 && T4.sansCout === 1, 'E5 · achats : 2, dont 1 sans coût saisi', `${T4.nAchats} · ${T4.sansCout}`);
+  {
+    const R0a = REGM.registreDesAchats({ achats: achats50.slice(0, 3), fiches: {}, periode: '2026-10' });
+    const d0 = EXM.donneesExportComptable({ periode: '2026-10', achats: R0a, maintenant });
+    const v = (EXM.resumeExport(d0).find(([, , k]) => k === 'cout') || [])[1];
+    dit(d0.coutSaisi == null && v === '—' && !/au moins 0,00/.test(EXM.csvExportComptable(d0) + JSON.stringify(EXM.resumeExport(d0))), 'E5 · aucun coût saisi : « — », jamais « au moins 0,00 € »', v);
+  }
   for (const r of [null, 'particulier', 'societe', 'marge']) {
     const { d } = exporter('2026-T4', r);
     dit(d.urssaf == null && !!d.raisonUrssaf && d.caDeclare != null && EXM.resumeExport(d).some(([k, v]) => k === 'URSSAF' && v === 'non calculée'), `E3 · statut ${r === null ? 'pas choisi' : r} : URSSAF non calculée, et dit pourquoi`, d.raisonUrssaf);

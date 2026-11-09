@@ -55,10 +55,10 @@ export const nomFichierExport = (periode, ext) => `Export-comptable-${periode}.$
 
 const DATE_PAS_LUE = { Leboncoin: 'pas captée (datée à la vente)', eBay: 'non transmise (datée à la commande)' };
 const RAISON_URSSAF = {
-  particulier: 'Particulier : rien à déclarer à l’URSSAF, VRM ne calcule aucune cotisation',
-  societe: 'Société : cotisations et impôts ne se calculent pas sur le chiffre d’affaires, VRM ne les estime pas',
-  marge: 'Régime de la marge : VRM ne calcule pas de cotisation URSSAF',
-  null: 'Statut pas encore choisi (la question est en haut de Comptabilité) : URSSAF non calculée',
+  particulier: 'URSSAF non calculée : un particulier n’a rien à déclarer à l’URSSAF',
+  societe: 'URSSAF non calculée : en société, cotisations et impôts ne se calculent pas sur le chiffre d’affaires',
+  marge: 'URSSAF non calculée : au régime de la marge, VRM ne calcule pas de cotisation',
+  null: 'URSSAF non calculée : choisis ton statut (la question est en haut de Comptabilité)',
 };
 export const raisonUrssaf = (regime) => (regime === 'micro' ? '' : (RAISON_URSSAF[regime] || RAISON_URSSAF.null));
 
@@ -100,7 +100,8 @@ export function donneesExportComptable({ periode, recettes = null, achats = null
     saisi: l.saisi == null ? null : l.saisi, lu: l.source === 'saisi' ? null : l.montant, sourceLue: l.source === 'recu' ? 'reçu Vinted' : l.source === 'article' ? 'article seul (sans port ni frais)' : '', note: l.raison || '',
   })) : null;
   const sansCout = achatsL ? achatsL.filter((l) => l.saisi == null).length : null;
-  const coutSaisi = achatsL ? Math.round(achatsL.reduce((t, l) => t + (l.saisi == null ? 0 : Math.round(l.saisi * 100)), 0)) / 100 : null;
+  // Aucun coût saisi sur des achats de la période : « pas su » (« — »), jamais « au moins 0,00 € » (§5).
+  const coutSaisi = !achatsL || (achatsL.length && sansCout === achatsL.length) ? null : Math.round(achatsL.reduce((t, l) => t + (l.saisi == null ? 0 : Math.round(l.saisi * 100)), 0)) / 100;
   const nonComptees = lu && ligne.nonComptees && Number(ligne.nonComptees.n) > 0 ? Number(ligne.nonComptees.n) : 0;
   return {
     periode: String(periode), libelle: libellePeriode(periode), etabliLe: jourFr(maintenant),
