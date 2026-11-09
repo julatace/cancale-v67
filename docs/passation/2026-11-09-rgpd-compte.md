@@ -77,8 +77,8 @@ geste, contact = `data-e="email"` (`public/legal/editeur.js`, rien inventé).
 - `audit-fermer-compte.cjs` : lance le précédent + l'ancien `?mode=fermer` avec l'ancienne
   confirmation (l'e-mail) est **refusé**.
 - Banc de rendu `scripts/bancs/supprimer-compte.cjs` (390 tactile / 1512, clair / sombre,
-  captures dans `<tmp>/banc-supprimer-compte`). `scripts/bancs/abonnement.cjs` et
-  `discord-nouveau-compte.cjs` mis à la nouvelle confirmation.
+  captures dans `<tmp>/banc-supprimer-compte`, regardées) : 46 OK, 0 en échec. `scripts/bancs/abonnement.cjs` et
+  `discord-nouveau-compte.cjs` mis à la nouvelle confirmation (⚠️ `abonnement.cjs` pas relancé jusqu'au bout : lancé en parallèle d'un build, ses cartes d'abonnement — hors de ce chantier — tombaient en délai ; à relancer seul).
 - Audits verts : fonctions-api (12, aucune nouvelle fonction), vendeur-neutre, variables, tdz,
   icones, boutons, violet, coherence, confiance (C9/C11 mis à jour). `npm run build` vert.
 
