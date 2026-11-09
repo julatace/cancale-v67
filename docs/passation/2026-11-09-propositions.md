@@ -35,3 +35,21 @@ vidéos après. » ⇒ **les 12 sont validées** ; l'aide contextuelle (11) se f
 Lots : F = 1 + 8 · G = 2 + 3 (extension 5.337) · H = 4 + 5 (serveur, 12 fonctions au plus) ·
 I = 6 + 7 · J = 9 + 10 + 11 · K = 12 (en dernier, touche la règle des publieurs uniques).
 Réservation de versions d'extension : 5.336 = baisse de prix en série (lot C), 5.337 = lot G.
+
+## Troisième série (9 nov., soir) — à valider
+
+Vérifié dans le code avant de proposer : aucune n'existe déjà (les dépenses existent dans
+Compta, d'où 4 limité aux emballages). Rien de la liste refusée du 11 octobre.
+
+| # | proposition | pourquoi | effort |
+|---|---|---|---|
+| 13 | **Calculette d'achat** : « je pense la revendre 120 € sur Vinted, je veux 30 € de marge ⇒ paie-la au plus 78 € » (frais réels de la plateforme, son taux URSSAF) | décider vite devant une annonce à acheter ; ce n'est pas un prix conseillé : c'est LUI qui donne le prix de revente | petit |
+| 14 | **Photos au moment d'emballer** : 2-3 photos prises depuis la carte du colis, datées, rangées avec la vente | preuve en cas de litige (« la paire est partie en bon état ») | moyen |
+| 15 | **Étapes d'atelier** pour le stock : achetée → reçue → nettoyée → photographiée → en ligne (une colonne par étape, glisser ou toucher) | voir ce qui attend un geste avant de pouvoir être vendu | moyen |
+| 16 | **Mode vacances sur tous les comptes en un clic** (Vinted, et ce que Leboncoin/eBay/Vestiaire permettent), puis retour en un clic | partir sans faire compte par compte ; SON clic, compte par compte, dans les 50 actions/h | moyen (extension) |
+| 17 | **Historique de prix d'une paire** dans sa fiche (chaque changement de prix, offre acceptée, republication) | comprendre à quel prix elle a fini par partir | petit |
+| 18 | **Ma liste de recherche** : les modèles/tailles qu'il veut acheter, avec un prix maximum (relié à la calculette) | sourcing : ne plus garder ça dans les notes du téléphone | petit |
+| 19 | **Stock d'emballages** : boîtes/sacs restants, décomptés à chaque colis marqué envoyé, prévenu quand il en reste moins que de colis à venir | ne plus tomber à court un samedi | petit |
+| 20 | **Fiche à partager** (Instagram, WhatsApp) : une page propre photos + taille + prix + lien vers l'annonce, sans N° ni prix d'achat, lien révocable | vendre aussi par les réseaux | moyen |
+| 21 | **Raccourcis clavier à l'ordinateur** (J journée, V ventes, C colis, I imprimer, ? l'aide des raccourcis) | les gros vendeurs travaillent à l'ordinateur | petit |
+| 22 | **VRM au lecteur d'écran** (VoiceOver) : chaque bouton nommé, ordre de lecture, contrastes vérifiés | accessibilité, et c'est la loi pour un service en ligne | moyen |
