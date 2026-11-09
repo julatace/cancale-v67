@@ -200,7 +200,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
   const lignes = taches.map((t) => {
     const p = t.querySelector('[data-pile]');
     return { cas: t.getAttribute('data-case') || t.getAttribute('data-job') || '', n: t.getAttribute('data-n'), pile: p ? { n: p.getAttribute('data-pile-n'), photos: Number(p.getAttribute('data-pile-photos')), plus: Number(p.getAttribute('data-pile-plus')), estPile: p.classList.contains('is-pile'), srcs: [...p.querySelectorAll('[data-vignette-src]')].map((v) => v.getAttribute('data-vignette-src')), imgs: [...p.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth > 0).length, w: Math.round(p.querySelector('.vrm-pile-v').getBoundingClientRect().width), rayon: getComputedStyle(p.querySelector('.vrm-pile-v')).borderTopLeftRadius } : null,
-      fond: getComputedStyle(t).backgroundColor, titre: (t.querySelector('.vrm-day-task-title') || {}).textContent || '' };
+      fond: getComputedStyle(t).backgroundColor, prochain: t.hasAttribute('data-prochain'), titre: (t.querySelector('.vrm-day-task-title') || {}).textContent || '' };
   });
   // Une « pastille pleine colorée » : un élément de 20 px ou plus, fond plein ambre ou encre/noir.
   const pleines = liste ? [...liste.querySelectorAll('*')].filter(vis).filter((e) => {
@@ -263,7 +263,9 @@ const mesureJournee = (pg) => pg.evaluate(() => {
             }
           }
           dit(m.pastilles === 0 && !m.pleines.length, 'J3 · aucune pastille pleine colorée (ni ambre, ni encre)', m.pleines.slice(0, 3).join(' | '));
-          dit(new Set(m.lignes.map((l) => l.fond)).size <= 1, 'J3 · un seul fond de carte (pas de carte grisée)', [...new Set(m.lignes.map((l) => l.fond))].join(' | '));
+          // (9 nov., Ma journée v2) La prochaine chose vit dans la tête sombre (sur voile) : jugée à part ; les cartes de « Ensuite » ont UN fond.
+          const ensuite = m.lignes.filter((l) => !l.prochain);
+          dit(new Set(ensuite.map((l) => l.fond)).size <= 1, 'J3 · un seul fond de carte dans « Ensuite » (pas de carte grisée)', [...new Set(ensuite.map((l) => l.fond))].join(' | '));
           dit(m.bleus <= 1 && m.bleuPrincipal, 'J3 · le bleu seulement sur le geste principal', `${m.bleus} bleu(s)`);
           dit(m.deb <= 1, 'aucun débordement horizontal', `${m.deb}px`);
           if (SHOTS) {
