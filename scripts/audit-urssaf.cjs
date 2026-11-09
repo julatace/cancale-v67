@@ -343,7 +343,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
 {
   const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? ENGAGEE_SRC + SRC.slice(a, b) : ''; })();
   const c = {
-    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, Map, Set, load: (k, d) => d,
+    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, Map, Set, Intl, load: (k, d) => d,
+    // (9 nov., vitesse) Les dates passent par src/formatsDate.js (un format créé une fois) : le même texte.
+    dateLocale: (d, l, o) => new Intl.DateTimeFormat(l, o).format(d instanceof Date ? d : new Date(d)),
     classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
     tsCommande: (o) => Date.parse((o && o.date) || '') || 0,
     montantCommande: (o) => { const p = o && o.price; const v = (p && typeof p === 'object') ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; },
@@ -438,7 +440,8 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
 {
   const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? ENGAGEE_SRC + SRC.slice(a, b) : ''; })();
   const c = {
-    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, Map, Set, load: (k, d) => d,
+    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, Map, Set, Intl, load: (k, d) => d,
+    dateLocale: (d, l, o) => new Intl.DateTimeFormat(l, o).format(d instanceof Date ? d : new Date(d)),
     classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
     tsCommande: (o) => Date.parse((o && o.date) || '') || 0,
     montantCommande: (o) => { const p = o && o.price; const v = (p && typeof p === 'object') ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; },

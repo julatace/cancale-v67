@@ -132,8 +132,10 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
 
   // ── La chaîne de l'app : `declarablesCompta` → `ventesDeclarables` ──────────
   const NOMS = ['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'montantCommandeLu', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'lbcAnnulee', 'lbcFinalisee',
-    'commandeEbayEngagee', 'montantRecuEbay', 'compteEcarte', 'phraseNonComptees', 'ventesDeclarables', 'declarablesCompta'];
-  const ctx = { Date, Math, Number, String, Object, Array, JSON, Map, Set, isFinite, parseFloat, isNaN, console, RAISON_NON_COMPTEE: {} };
+    'commandeEbayEngagee', 'montantRecuEbay', 'compteEcarteChoix', 'compteEcarte', 'phraseNonComptees', 'ventesDeclarables', 'declarablesCompta'];
+  const ctx = { Date, Math, Number, String, Object, Array, JSON, Map, Set, isFinite, parseFloat, isNaN, console, RAISON_NON_COMPTEE: {},
+    // (9 nov.) Offre Solo : sans état de plan (« pas su »), aucune vente n'est hors plan — rien n'est bridé.
+    venteHorsPlanUid: () => false };
   if (V) Object.assign(ctx, { vcVenteAnnulee: V.vcVenteAnnulee, montantRecuVc: V.montantRecuVc, dateVersementVc: V.dateVersementVc, etapeMotVc: V.etapeMotVc, dateVenteVc: V.dateVenteVc });
   vm.createContext(ctx);
   const absents = [];
