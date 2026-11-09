@@ -1,0 +1,270 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — DIRECTION ARTISTIQUE 5 (9 nov.) : LA COLONNE DE GAUCHE ET LES BOUTONS
+   Julien, mot pour mot : « je veux vraiment que tu changes totalement le design
+   des onglets sur la gauche, que ce soit beaucoup plus beau ; le design est
+   vraiment pas ouf […] les boutons font moins qualitatif. »
+   Récit et planches : docs/passation/2026-11-09-direction-artistique-5.md.
+
+   Même couche que la direction artistique (`@layer vrm-premium`, chargée après
+   elle) : une déclaration `!important` DANS une couche gagne contre toutes les
+   déclarations `!important` hors couche (vitrine, finition, atelier, mineral…),
+   sans surenchère de sélecteurs. Les styles en ligne SANS `!important` de la
+   colonne (`width`, `background`, `borderRight` de SideBar) perdent aussi : voulu.
+
+   RIEN DE MÉTIER : mêmes entrées, mêmes groupes, même ordre, mêmes `data-*`.
+   Hors périmètre (chantier `claude/direction-artistique-4`) : feuilles,
+   confirmations, toasts, états vides, barre du bas du téléphone.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* La matière de la colonne : un gris plus soutenu que le contenu (« matière
+     lourde » des barres latérales d'Apple), translucide quand le navigateur sait flouter. */
+  --n2-panneau: #E5E5EA;
+  --n2-panneau-verre: rgba(229, 229, 234, .84);
+  --n2-bord: rgba(0, 0, 0, .06);
+  --n2-ombre: 0 0 0 .5px rgba(0, 0, 0, .05), 0 1px 2px rgba(0, 0, 0, .04), 0 18px 40px -18px rgba(16, 24, 40, .22);
+  --n2-pastille: #FFFFFF;
+  --n2-pastille-ombre: 0 0 0 .5px rgba(0, 0, 0, .06), 0 1px 1.5px rgba(0, 0, 0, .07), 0 3px 10px -3px rgba(0, 0, 0, .10);
+  --n2-survol: rgba(0, 0, 0, .045);
+  --n2-encre: #1D1D1F;
+  --n2-libelle: #2C2C2E;             /* 12,6:1 sur le panneau */
+  --n2-titre: #636366;               /* 4,9:1 sur le panneau (AA) — le #8E8E93 d'iOS tomberait à 2,7 */
+  --n2-icone: #636366;
+  --n2-accent: #0071E3;
+  --n2-compteur: rgba(118, 118, 128, .16);
+  --n2-badge-rail: #48484A; --n2-badge-rail-encre: #FFFFFF;   /* rail : un compteur neutre et plein, lisible sur l'icône */
+  --n2-carte: rgba(255, 255, 255, .62);
+  --n2-carte-ombre: 0 0 0 .5px rgba(0, 0, 0, .05), 0 1px 2px rgba(0, 0, 0, .04);
+  --n2-tuile: linear-gradient(150deg, #2E5182 0%, #1E3354 48%, #18191C 100%);
+  --n2-avatar: linear-gradient(160deg, #D8D8DE 0%, #C4C4CC 100%);
+  --n2-avatar-encre: #3A3A3C;
+  --n2-glisse: cubic-bezier(.32, .72, 0, 1);  /* sortie douce, façon tiroir iOS */
+  --n2-marge: 12px;                  /* la colonne flotte : 12 px autour */
+  --n2-l: 236px;                     /* largeur (NAV_LARGEUR) */
+  --n2-rail: 64px;                   /* le rail d'icônes, 1024–1199 px */
+
+  /* LES BOUTONS */
+  --n2-b-second: rgba(29, 29, 31, .06);
+  --n2-b-second-survol: rgba(29, 29, 31, .10);
+  --n2-b-reflet: linear-gradient(180deg, rgba(255, 255, 255, .14) 0%, rgba(255, 255, 255, 0) 52%);
+}
+:root[data-theme="dark"] {
+  --n2-panneau: #1C1C1E;
+  --n2-panneau-verre: rgba(28, 28, 30, .82);
+  --n2-bord: rgba(255, 255, 255, .07);
+  --n2-ombre: 0 0 0 .5px rgba(255, 255, 255, .07), 0 18px 40px -18px rgba(0, 0, 0, .7);
+  --n2-pastille: #2C2C2E;
+  --n2-pastille-ombre: inset 0 .5px 0 rgba(255, 255, 255, .08), 0 0 0 .5px rgba(0, 0, 0, .4), 0 2px 8px -2px rgba(0, 0, 0, .5);
+  --n2-survol: rgba(255, 255, 255, .055);
+  --n2-encre: #F5F5F7;
+  --n2-libelle: #E5E5EA;
+  --n2-titre: #98989D;               /* 6,0:1 sur #1C1C1E */
+  --n2-icone: #A1A1A6;
+  --n2-accent: #0A84FF;
+  --n2-compteur: rgba(118, 118, 128, .28);
+  --n2-badge-rail: #D1D1D6; --n2-badge-rail-encre: #1C1C1E;
+  --n2-carte: rgba(255, 255, 255, .045);
+  --n2-carte-ombre: inset 0 0 0 .5px rgba(255, 255, 255, .06);
+  --n2-tuile: linear-gradient(150deg, #3A639C 0%, #24406A 46%, #1A2436 100%);
+  --n2-avatar: linear-gradient(160deg, #48484A 0%, #3A3A3C 100%);
+  --n2-avatar-encre: #F5F5F7;
+  --n2-b-second: rgba(255, 255, 255, .10);
+  --n2-b-second-survol: rgba(255, 255, 255, .15);
+  --n2-b-reflet: linear-gradient(180deg, rgba(255, 255, 255, .12) 0%, rgba(255, 255, 255, 0) 52%);
+}
+
+@layer vrm-premium {
+
+/* ── 1. LE PANNEAU QUI FLOTTE ─────────────────────────────────────────────── */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] {
+  top: var(--n2-marge) !important; left: var(--n2-marge) !important; bottom: var(--n2-marge) !important; right: auto !important;
+  height: auto !important; width: var(--n2-l) !important;
+  border: 0 !important; border-radius: 20px !important;
+  background: var(--n2-panneau) !important; background-image: none !important;
+  box-shadow: var(--n2-ombre) !important;
+  padding: 14px 8px 8px !important;
+  color: var(--n2-encre) !important;
+  isolation: isolate;
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] {
+    background: var(--n2-panneau-verre) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] { background: var(--n2-panneau) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] { box-shadow: 0 0 0 1px var(--n2-titre) !important; }
+}
+
+/* ── 2. LA MARQUE ─────────────────────────────────────────────────────────── */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-sidebar-brand {
+  display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important;
+  gap: 10px !important; padding: 0 8px 14px !important; margin: 0 !important;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-tuile {
+  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px;
+  display: grid; place-items: center;
+  background: var(--n2-tuile); color: #FFFFFF;
+  font: 700 17px/1 var(--vrm-police); letter-spacing: -.03em;
+  box-shadow: inset 0 .5px 0 rgba(255, 255, 255, .28), inset 0 0 0 .5px rgba(255, 255, 255, .08), 0 1px 2px rgba(0, 0, 0, .18), 0 4px 10px -4px rgba(24, 40, 70, .45);
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-sidebar-mot {
+  font: 700 17px/1 var(--vrm-police) !important; letter-spacing: -.02em !important; color: var(--n2-encre) !important;
+}
+
+/* ── 3. LES RANGÉES ───────────────────────────────────────────────────────── */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] :is(.vrm-rail-platforms, .vrm-rail-management) { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 1px !important; padding: 0 !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button {
+  position: relative; z-index: 1;
+  width: 100% !important; min-height: 38px !important; height: auto !important; margin: 0 !important;
+  display: flex !important; align-items: center !important; justify-content: flex-start !important; gap: 11px !important;
+  padding: 0 10px !important; border: 0 !important; border-radius: 12px !important;
+  background: transparent !important; box-shadow: none !important; filter: none !important;
+  color: var(--n2-libelle) !important;
+  font: 500 14px/1.2 var(--vrm-police) !important; letter-spacing: -.008em !important; text-align: left !important;
+  transition: background-color 120ms ease, transform 120ms var(--p-sortie, ease-out) !important;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button::before { display: none !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button > :first-child {
+  flex: 0 0 20px !important; width: 20px !important; display: flex !important; justify-content: center !important;
+  color: var(--n2-icone) !important; transition: color 160ms ease;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button > :first-child svg { width: 19px !important; height: 19px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-lib { flex: 1 1 auto !important; min-width: 0 !important; overflow-wrap: anywhere; }
+/* L'entrée choisie : libellé 600 à l'encre, icône à l'accent — le SEUL endroit coloré de la colonne. */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button[aria-current="page"] { color: var(--n2-encre) !important; font-weight: 600 !important; background: var(--n2-pastille) !important; box-shadow: var(--n2-pastille-ombre) !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button[aria-current="page"] > :first-child { color: var(--n2-accent) !important; }
+/* Quand la pastille qui glisse est posée (SideBar, `data-indicateur`), c'est ELLE qui porte le fond. */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2][data-indicateur] .vrm-rail-button[aria-current="page"] { background: transparent !important; box-shadow: none !important; }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button:not([aria-current="page"]):hover { background: var(--n2-survol) !important; color: var(--n2-encre) !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button:not([aria-current="page"]):hover > :first-child { color: var(--n2-libelle) !important; }
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button:active { transform: scale(.98); }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button:focus-visible { outline: 2px solid var(--n2-accent) !important; outline-offset: -2px !important; }
+@media (pointer: coarse) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button { min-height: 44px !important; }
+}
+
+/* ── 4. LA PASTILLE QUI GLISSE ────────────────────────────────────────────── */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-nav-indicateur {
+  position: absolute; top: 0; left: 0; z-index: 0; width: 0; height: 0; opacity: 0;
+  border-radius: 12px; background: var(--n2-pastille); box-shadow: var(--n2-pastille-ombre);
+  pointer-events: none; will-change: transform;
+  transition: transform 240ms var(--n2-glisse), width 240ms var(--n2-glisse), height 240ms var(--n2-glisse), opacity 120ms ease;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] > :not(.vrm-nav-indicateur) { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-nav-indicateur { transition: opacity 120ms ease !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button:active { transform: none; }
+}
+
+/* ── 5. LES TITRES DE GROUPE ET LES COMPTEURS ─────────────────────────────── */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] [data-nav-groupe].vrm-rail-management-group { margin-top: 18px !important; padding: 0 !important; border: 0 !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-section-label {
+  display: block; padding: 0 10px 5px !important; margin: 0 !important;
+  font: 600 11px/14px var(--vrm-police) !important; letter-spacing: .04em !important; text-transform: none !important;
+  color: var(--n2-titre) !important; opacity: 1 !important;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-n {
+  margin-left: auto !important; position: static !important;
+  min-width: 22px !important; height: 20px !important; padding: 0 7px !important; border-radius: 999px !important;
+  border: 0 !important; box-shadow: none !important; background: var(--n2-compteur) !important; color: var(--n2-libelle) !important;
+  font: 600 12px/20px var(--vrm-police) !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums !important; text-align: center;
+}
+/* Un point = « nouveau » (Messages) : l'ambre d'un geste à faire, petit (§7). */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-point {
+  margin-left: auto !important; margin-right: 7px !important; position: static !important;
+  width: 7px !important; height: 7px !important; border: 0 !important; border-radius: 50% !important; box-shadow: none !important;
+  background: var(--p-ambre-point, #FF9F0A) !important;
+}
+
+/* ── 6. LE PIED : LA CARTE DU COMPTE ──────────────────────────────────────── */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied {
+  margin: 10px 0 0 !important; padding: 4px !important; border: 0 !important; border-radius: 14px !important;
+  background: var(--n2-carte) !important; box-shadow: var(--n2-carte-ombre) !important;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied [data-nav-groupe].vrm-rail-management-group { margin-top: 0 !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied .vrm-rail-section-label { display: none !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied .vrm-rail-button { padding: 0 6px !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 6px 6px 8px; margin-bottom: 2px;
+  border-bottom: .5px solid var(--n2-bord);
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-avatar {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--n2-avatar); color: var(--n2-avatar-encre);
+  font: 600 13px/1 var(--vrm-police);
+  box-shadow: inset 0 .5px 0 rgba(255, 255, 255, .35);
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte-nom {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 13px/1.25 var(--vrm-police) !important; letter-spacing: -.005em; color: var(--n2-encre) !important; opacity: 1 !important; text-align: left !important; max-width: none !important;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte-sous { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte-mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 12px/1.2 var(--vrm-police); color: var(--n2-titre); }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-offre {
+  flex: 0 0 auto; padding: 1px 6px; border-radius: 6px;
+  font: 600 11px/14px var(--vrm-police); letter-spacing: .01em; color: var(--n2-libelle); background: var(--n2-compteur);
+}
+
+/* ── 7. LE CONTENU À CÔTÉ ─────────────────────────────────────────────────── */
+/* La colonne flotte à 12 px du bord : le contenu garde 24 px d'air après elle
+   (NAV_LARGEUR + 36 en ligne, inchangé à 236 px). */
+
+/* ── 8. LE RAIL D'ICÔNES (1024–1199 px, et les petites fenêtres à la souris) ── */
+@media (max-width: 1199px) {
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] { width: var(--n2-rail) !important; padding: 12px 6px 6px !important; }
+  .vrm-app-shell:has(> nav.vrm-sidebar[data-nav-v2]) > .vrm-main,
+  .vrm-app-shell:has(> nav.vrm-sidebar[data-nav-v2]) > .vrm-exemple-bandeau { margin-left: calc(var(--n2-rail) + var(--n2-marge) + 20px) !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-sidebar-brand { justify-content: center !important; padding: 0 0 12px !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-sidebar-mot { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button { justify-content: center !important; padding: 0 !important; min-height: 40px !important; gap: 0 !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-lib { display: none !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-section-label { text-align: center; padding: 0 0 4px !important; font-size: 10px !important; letter-spacing: 0 !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] [data-nav-groupe].vrm-rail-management-group { margin-top: 12px !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-n { position: absolute !important; top: 3px; right: 6px; margin: 0 !important; min-width: 16px !important; height: 16px !important; padding: 0 4px !important; font-size: 10px !important; line-height: 16px !important; background: var(--n2-badge-rail) !important; color: var(--n2-badge-rail-encre) !important; box-shadow: 0 0 0 2px var(--n2-panneau) !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-point { position: absolute !important; top: 7px; right: 10px; margin: 0 !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied { padding: 3px !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-rail-pied .vrm-rail-button { padding: 0 !important; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte { justify-content: center; padding: 4px 0 6px; gap: 0; }
+  .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte-txt { display: none; }
+}
+
+/* ── 9. LES BOUTONS : UNE RÈGLE PLUS « CHÈRE » ────────────────────────────── */
+/* Les trois formes (styles-boutons.css) gardent leur rôle ; seul le dessin
+   monte d'un cran. ⚠️ Rien ici ne touche `display` des <button> en général (§7) :
+   seules les classes `.vrm-b` (déjà en inline-flex chez elles) sont visées. */
+.vrm-b {
+  border-radius: 12px !important;
+  font-weight: 600 !important; letter-spacing: -.01em !important;
+  transition: transform 120ms var(--p-sortie, ease-out), background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, filter 140ms ease !important;
+}
+@media (hover: hover) and (pointer: fine) { .vrm-b:not(.vrm-b-discret):not(.vrm-b-petit) { min-height: max(36px, var(--vrm-b-h, 36px)); } }
+/* Primaire : l'accent plein, un reflet de 3 % en haut, une ombre intérieure fine. */
+.vrm-b.vrm-b-primaire {
+  background: var(--n2-b-reflet), var(--vrm-accent, #0071E3) !important; color: var(--vrm-on-accent, #FFFFFF) !important;
+  box-shadow: inset 0 .5px 0 rgba(255, 255, 255, .22), inset 0 0 0 .5px rgba(0, 0, 0, .10), 0 1px 2px rgba(0, 60, 140, .22) !important;
+  text-shadow: 0 .5px 0 rgba(0, 0, 0, .08);
+}
+/* Secondaire : l'encre à 6 % (blanc à 10 % la nuit), aucune bordure grise. */
+.vrm-b.vrm-b-secondaire { background: var(--n2-b-second) !important; color: var(--n2-encre) !important; box-shadow: none !important; }
+/* Tertiaire : le texte bleu, rien d'autre. */
+.vrm-b.vrm-b-discret { background: transparent !important; box-shadow: none !important; }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-b.vrm-b-primaire:not(:disabled):hover { filter: brightness(1.06) saturate(1.04) !important; }
+  .vrm-b.vrm-b-secondaire:not(:disabled):hover { background: var(--n2-b-second-survol) !important; }
+}
+.vrm-b:not(:disabled):active { transform: scale(.97) !important; }
+.vrm-b.vrm-b-primaire:not(:disabled):active { filter: brightness(.94) !important; }
+.vrm-b:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: 2px !important; }
+@media (prefers-reduced-motion: reduce) { .vrm-b:not(:disabled):active { transform: none !important; } }
+
+} /* fin @layer vrm-premium */
