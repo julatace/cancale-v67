@@ -39,7 +39,12 @@ catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); pro
 // règles Vestiaire que lisent `ventesFaites`/`ventesDeclarables` vivent dans
 // api/_lib/vestiaire-regle.js (un propriétaire, importé par l'app ET par le
 // miroir) : elles sont posées dans le contexte de l'app avant d'exécuter.
-const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarte'];
+const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarteChoix'];
+// (9 nov., offres Solo/Pro) Dans l'app, `compteEcarte` = choix du vendeur OU vente hors de son offre Solo
+// (`venteHorsPlanUid`, état de l'app). Le serveur ne porte que le CHOIX (`compteEcarteChoix`), sous le nom
+// historique `compteEcarte` (alias écrit par --recopie). Les bilans serveur n'appliquent pas encore l'offre Solo :
+// suite notée dans docs/passation/2026-11-09-plans-solo-pro.md.
+const ALIAS = 'export const compteEcarte = compteEcarteChoix;\n';
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return null; } };
 // Les déclarations de premier niveau `const X = …` d'un fichier, par nom.
 function declarations(src, plugins) {
@@ -68,7 +73,7 @@ if (process.argv.includes('--recopie')) {
   const tete = miroir.slice(0, Math.max(0, miroir.indexOf('export const ')));
   let corps = tete;
   for (const n of NOMS) { if (!declApp[n]) { console.log(`❌ ${n} introuvable dans App.jsx`); process.exit(1); } corps += 'export ' + declApp[n].texte + '\n\n'; }
-  fs.writeFileSync(path.join(R, 'api/_lib/ventes-regle.js'), corps.replace(/\n+$/, '\n'));
+  fs.writeFileSync(path.join(R, 'api/_lib/ventes-regle.js'), corps.replace(/\n+$/, '\n') + '\n' + ALIAS);
   console.log(`✅ miroir refabriqué (${NOMS.length} déclarations)`);
   process.exit(0);
 }
@@ -143,9 +148,9 @@ if (process.argv.includes('--recopie')) {
     }
     dit(appels.length > 0 && appels.every((a) => !/\bdeclare\b/.test(a)), 'le bilan compte le reçu au jour du versement, sans le registre des déclarations', appels.join(' | '));
   });
-  await essaie('compteEcarte', async () => {
+  await essaie('compteEcarteChoix', async () => {
     const cas = [['1', new Set(['1']), {}], ['1', new Set(['1']), { 1: false }], ['2', new Set(), { 2: true }], ['3', null, null]];
-    dit(cas.every(([u, m, p]) => ctxApp.compteEcarte(u, m, p) === srv.compteEcarte(u, m, p)), 'compteEcarte : même réponse (masqué, rallumé exprès, éteint au panneau)');
+    dit(cas.every(([u, m, p]) => ctxApp.compteEcarteChoix(u, m, p) === srv.compteEcarte(u, m, p) && srv.compteEcarte === srv.compteEcarteChoix), 'compteEcarte (serveur) = compteEcarteChoix de l’app : même réponse (masqué, rallumé exprès, éteint au panneau)');
   });
 
   console.log('\n── 3. Les dates de versement : la condition de l’app');
