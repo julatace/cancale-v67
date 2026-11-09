@@ -378,6 +378,7 @@ import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivr
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
+import { venteHorsPlan } from "../api/_lib/plan-regle.js";
 import { VentesHorsPlan, BandeauCompteVendeur } from "./abonnement/PlansSoloPro.jsx";
 import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
@@ -7510,7 +7511,13 @@ const compteEcarteChoix = (uid, masques, panneau) => {
 // `compteEcarte` est la règle des VENTES et des totaux ; ce qui concerne le
 // compte ENTIER (ses achats, ses retraits, la liste « Compte ») lit
 // `compteEcarteChoix` — un compte d'achat garde tous ses achats.
-const compteEcarte = (uid, masques, panneau) => compteEcarteChoix(uid, masques, panneau) || venteHorsPlanUid(uid);
+// (9 nov., suites serveur) LA RÈGLE, PURE : la règle de l'offre (`regle`,
+// `regleVentes` d'api/_lib/plan-regle.js) passée en argument. Le serveur (bilans,
+// widget, rappels) en porte la copie EXACTE, refabriquée par script
+// (`node scripts/audit-bilan-semaine.cjs --recopie` → api/_lib/ventes-regle.js) ;
+// `regle` absente ou « pas su » ⇒ le choix seul (rien n'est bridé).
+const compteEcarteRegle = (uid, masques, panneau, regle) => compteEcarteChoix(uid, masques, panneau) || venteHorsPlan(regle, uid);
+const compteEcarte = (uid, masques, panneau) => compteEcarteRegle(uid, masques, panneau, reglePlanCourante());
 // ⟦→ ecrans/Stats.jsx #7⟧
 // (3 nov.) LES COMPTES LEBONCOIN, VESTIAIRE ET eBAY ÉCARTÉS DES TOTAUX — le même
 // choix que les comptes Vinted sélectionnés, rangé dans `vrm_comptes_exclus`

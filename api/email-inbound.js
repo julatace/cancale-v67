@@ -887,7 +887,9 @@ export async function lireAnnoncesAilleurs() {
     lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens,retirees:data->vrm_annonces_retirees,vcAuto:data->vrm_vc_numeros,vcLiensMain:data->vrm_vc_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
-    lirePagine('id=eq.lbc_listings&select=items:data->items'),
+    // (9 nov., suites serveur) + les lectures COMPLÈTES de « Mes annonces » par compte
+    // (`lectures[compte] = { at, total, n, ids }`, petites) : « en ligne » < 24 h (src/enLigneLbc.js).
+    lirePagine('id=eq.lbc_listings&select=items:data->items,lectures:data->lectures'),
     lirePagine('id=eq.lbc_ventes&select=ventes:data->ventes'),
     lirePagine('id=eq.lbc_accounts&select=accounts:data->accounts'),
     // (1er nov., audit A1) Vestiaire : ses annonces (état, liens posés par VRM) et ses ventes.
@@ -944,7 +946,10 @@ export async function lireAnnoncesAilleurs() {
     const items = lbcL[0] ? objetJson(lbcL[0].items) : null;
     const ventes = ventesL[0] ? objetJson(ventesL[0].ventes) : null;
     const accounts=comptesLbc[0]?objetJson(comptesLbc[0].accounts):null;
-    if (items !== undefined && ventes !== undefined && accounts !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{});
+    // Lectures absentes (`null`) ⇒ jamais lue en entier ⇒ rien n'est « en ligne » ;
+    // forme inconnue (`undefined`) ⇒ pas su ⇒ Leboncoin ne dit RIEN.
+    const lectures = lbcL[0] ? objetJson(lbcL[0].lectures) : null;
+    if (items !== undefined && ventes !== undefined && accounts !== undefined && lectures !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{}, lectures || {}, Date.now());
   }
   return { ebay, lbc, vc, vinted, retraitsEbay };
 }

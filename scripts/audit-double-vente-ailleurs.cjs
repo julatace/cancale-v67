@@ -192,6 +192,13 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
   };
   const dv = (qui) => pushes.filter((p) => String(p.tag || '').startsWith('dv-') && (!qui || p.endpoint.includes('/' + qui + '-')));
   const MAINT = Date.now();
+  // (9 nov., suites serveur) Une annonce Leboncoin n'est « encore en ligne » que VUE par la
+  // lecture COMPLÈTE de « Mes annonces » de son compte, de moins de 24 h (src/enLigneLbc.js,
+  // la règle de l'app et de l'extension 5.335) : forme réelle `lbc_listings.lectures[compte]`.
+  const lbcLu = (items) => {
+    const its = Object.fromEntries(Object.entries(items).map(([k, a]) => [k, { account: 'lbc-account:84420', ...a }]));
+    return { items: its, lectures: { 84420: { at: new Date(MAINT - 3600e3).toISOString(), total: Object.keys(its).length, n: Object.keys(its).length, ids: Object.keys(its) } } };
+  };
   const iso = (ms) => new Date(ms).toISOString();
   // Un dressing Vinted capté connecté (forme mesurée : data.payload.items, data.capturedAt, data.uid).
   const dressing = (own, uid, items, capMs = MAINT - 3600e3) => pose(own, `harvest_${uid}_listings`, { type: 'listings', uid, capturedAt: iso(capMs), payload: { items } });
@@ -212,7 +219,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
   console.log('\n── E1. Vendu sur Vinted, N°231 encore en ligne sur Leboncoin');
   await essaie('E1', async () => {
     reset();
-    pose(A, 'lbc_listings', { items: { L5: { id: 'L5', subject: 'Adidas Samba noire', customRef: 'VRM-231', status: 'active' } } });
+    pose(A, 'lbc_listings', lbcLu({ L5: { id: 'L5', subject: 'Adidas Samba noire', customRef: 'VRM-231', status: 'active' } }));
     pose(A, 'lbc_ventes', { ventes: {} });
     await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
     const n = dv('A');
@@ -309,7 +316,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     await recoit(m); await recoit({ ...m, messageId: '<autre@audit>' });
     dit(dv('A').length === 1, 'E5a e-mail Vestiaire rejoué : une seule', `${dv('A').length}`);
     reset();
-    pose(A, 'lbc_listings', { items: { L5: { id: 'L5', customRef: 'VRM-231', status: 'active' } } });
+    pose(A, 'lbc_listings', lbcLu({ L5: { id: 'L5', customRef: 'VRM-231', status: 'active' } }));
     pose(A, 'lbc_ventes', { ventes: {} });
     await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
     await recoit(bordereau('a@vrm.test', 'Adidas Samba noire n231'));
@@ -320,7 +327,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
   console.log('\n── E6. eBay déjà retiré par le retrait automatique');
   await essaie('E6', async () => {
     reset(); appelsEbay.length = 0;
-    pose(A, 'lbc_listings', { items: { L5: { id: 'L5', customRef: 'VRM-231', status: 'active' } } });
+    pose(A, 'lbc_listings', lbcLu({ L5: { id: 'L5', customRef: 'VRM-231', status: 'active' } }));
     pose(A, 'lbc_ventes', { ventes: {} });
     pose(A, 'ebay_retraits_auto', { items: [{ itemId: '1111', sku: 'VRM-231', titre: 'Adidas Samba', at: MAINT - 60e3, ou: 'Vinted' }] });
     await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
@@ -329,7 +336,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     dit(appelsEbay.length === 0, 'E6b le serveur n’appelle JAMAIS eBay (le retrait automatique n’est pas dupliqué)', `${appelsEbay.length}`);
     reset();
     pose(A, 'ebay_retraits_auto', { items: [{ itemId: '1111', sku: 'VRM-231', at: MAINT - 10 * 86400e3 }] });
-    pose(A, 'lbc_listings', { items: { L5: { id: 'L5', customRef: 'VRM-231', status: 'active' } } }); pose(A, 'lbc_ventes', { ventes: {} });
+    pose(A, 'lbc_listings', lbcLu({ L5: { id: 'L5', customRef: 'VRM-231', status: 'active' } })); pose(A, 'lbc_ventes', { ventes: {} });
     await recoit(vente('a@vrm.test', 'Adidas Samba noire n231'));
     dit(!/retiré/.test((dv('A')[0] || {}).title || ''), 'E6c un retrait vieux de 10 jours ne parle pas de cette vente', JSON.stringify((dv('A')[0] || {}).title));
   });
