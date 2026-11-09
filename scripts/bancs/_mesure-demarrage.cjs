@@ -8,6 +8,18 @@
 //  TABS=journee,colis,ventes ; DETAIL=<préfixe> écrit la liste des requêtes (URL,
 //  octets, départ, arrivée, pile d'appel) dans <préfixe>-<onglet>.json.
 //  REPRISE=1 : ouvre l'onglet DEUX fois dans le même navigateur (2e ouverture).
+//  PROFIL=<préfixe> (9 nov.) : profil CPU (CDP, 500 µs) du démarrage jusqu'au calme,
+//  agrégé par fonction:ligne (propre et inclusif) dans <préfixe>-<onglet>.json — build
+//  NON minifié pour des noms lisibles (npx vite build --minify false --outDir …).
+//  PROFIL_BRUT=1 : écrit aussi le profil brut (<préfixe>-<onglet>.cpuprofile, DevTools).
+//  TRACE=<préfixe> (9 nov.) : trace Chrome du démarrage (<préfixe>-<onglet>.json).
+//  RENDUS=1 (9 nov.) : crochet React posé avant l'app — chaque rendu validé et chaque
+//  rendu de `Comptabilite` (le moteur de Ma journée) avant « prêt », avec son heure
+//  (diagnostic : le parcours de l'arbre à chaque validation ralentit la page).
+//  COMPLET=1 (9 nov.) : ouvert au plafond (~2,5 s), l'heure où TOUTES ses données
+//  essentielles sont arrivées (`complet_ms`, l'attribut passe à « pret »).
+//  JALONS=1 (9 nov.) : les marques `vrm:*` posées par l'app (performance.mark) et les
+//  tâches longues avant « prêt », dans le résultat.
 //  Rien de réel : la base est inventée ; aucune écriture n'arrive nulle part.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
@@ -27,6 +39,22 @@ const srv = http.createServer((q, r) => {
 }).listen(PORT);
 const court = u => { try { return decodeURIComponent(u.replace(/^.*\/rest\/v1\//, '')); } catch { return u; } };
 const attendre = ms => new Promise(r => setTimeout(r, ms));
+function agreger(profil) {
+  const parId = new Map(); for (const n of profil.nodes) parId.set(n.id, n);
+  const propre = new Map(), inclusif = new Map();
+  const dt = profil.timeDeltas || []; const echant = profil.samples || [];
+  const parent = new Map(); for (const n of profil.nodes) for (const c of n.children || []) parent.set(c, n.id);
+  const nom = n => (n.callFrame.functionName || '(anonyme)') + ':' + (n.callFrame.lineNumber + 1) + '@' + path.basename(n.callFrame.url || '?').replace(/-[A-Za-z0-9_-]{8}\.js$/, '');
+  for (let i = 0; i < echant.length; i++) {
+    const ms = (dt[i + 1] || dt[i] || 0) / 1000; let id = echant[i]; const n0 = parId.get(id);
+    if (!n0 || /^\((idle|program|garbage collector)\)$/.test(n0.callFrame.functionName)) continue;
+    propre.set(nom(n0), (propre.get(nom(n0)) || 0) + ms);
+    const vus = new Set();
+    while (id != null) { const n = parId.get(id); const k = nom(n); if (!vus.has(k)) { vus.add(k); inclusif.set(k, (inclusif.get(k) || 0) + ms); } id = parent.get(id); }
+  }
+  const top = (m, k) => [...m].sort((a, b) => b[1] - a[1]).slice(0, k).map(([f, ms]) => [f, Math.round(ms)]);
+  return { propre: top(propre, 60), inclusif: top(inclusif, 150) };
+}
 
 async function ouvrir(ctx, tab, etiquette) {
   const pg = await ctx.newPage();
@@ -35,6 +63,8 @@ async function ouvrir(ctx, tab, etiquette) {
   if (process.env.PILE) { await cdp.send('Debugger.enable'); await cdp.send('Debugger.setAsyncCallStackDepth', { maxDepth: 40 }); }
   await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 60, downloadThroughput: 9e6 / 8, uploadThroughput: 3e6 / 8 });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: +(process.env.CPU || 4) });
+  if (process.env.PROFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
+  if (process.env.TRACE) await ctx.browser().startTracing(pg, { path: process.env.TRACE + '-' + etiquette + '.json', categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink', 'v8.execute', 'v8', 'disabled-by-default-v8.compile'] });
   const init = {};
   cdp.on('Network.requestWillBeSent', e => {
     if (!/rest\/v1/.test(e.request.url)) return;
@@ -62,6 +92,9 @@ async function ouvrir(ctx, tab, etiquette) {
     if (etat === 'pret' || etat === 'plafond') { tPret = Date.now() - t0; break; }
     await attendre(100);
   }
+  // COMPLET=1 (9 nov.) : ouvert au plafond, quand TOUTES ses données essentielles sont-elles là ?
+  let tComplet = etat === 'pret' ? tPret : null;
+  if (process.env.COMPLET && etat === 'plafond') { while (Date.now() < fin + 20000) { const e3 = await pg.evaluate(() => { const ae = document.querySelector('[data-attente]'); return ae ? ae.getAttribute('data-attente') : '-'; }).catch(() => '?'); if (e3 === 'pret') { tComplet = Date.now() - t0; break; } await attendre(100); } }
   let n = reqs.length, tCalme = Date.now();
   while (Date.now() - tCalme < 3000 && Date.now() < fin + 30000) { await attendre(250); if (reqs.length !== n) { n = reqs.length; tCalme = Date.now(); } }
   const m = await pg.evaluate(() => {
@@ -69,6 +102,9 @@ async function ouvrir(ctx, tab, etiquette) {
     const js = res.filter(r => /\.(js|css)(\?|$)/.test(r.name)).reduce((a, r) => a + (r.encodedBodySize || 0), 0);
     return { jsKo: Math.round(js / 1024), lt: window.__lt || [] };
   });
+  if (process.env.TRACE) await ctx.browser().stopTracing();
+  if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(process.env.PROFIL + '-' + etiquette + '.json', JSON.stringify(agreger(profile), null, 1)); if (process.env.PROFIL_BRUT) fs.writeFileSync(process.env.PROFIL + '-' + etiquette + '.cpuprofile', JSON.stringify(profile)); }
+  const jalons = process.env.JALONS ? await pg.evaluate((tp) => ({ marques: performance.getEntriesByType('mark').filter(m => /^vrm:/.test(m.name)).map(m => m.name.replace(/^vrm:/, '') + '@' + Math.round(m.startTime)).join(' '), longues: (window.__lt || []).filter(x => tp == null || x[0] < tp).map(x => x[0] + '+' + x[1]).join(' ') }), tPret).catch(() => null) : null;
   const avant = reqs.filter(r => tPret != null && r.t <= tPret);
   const lec = reqs.filter(r => r.m === 'GET');
   const res = {
@@ -80,6 +116,9 @@ async function ouvrir(ctx, tab, etiquette) {
     lecturesIdentiques: lec.length - new Set(lec.map(r => r.u)).size,
     premiereLecture: (reqs[0] || {}).t, jsKo: m.jsKo, longues_ms: m.lt.reduce((a, x) => a + x[1], 0), longues_n: m.lt.length, plusLongue: Math.max(0, ...m.lt.map(x => x[1])),
   };
+  if (jalons) res.jalons = jalons;
+  if (process.env.COMPLET) res.complet_ms = tComplet;
+  if (process.env.RENDUS) res.rendus = await pg.evaluate((tp) => ({ commits: (window.__commits || []).filter(t => t <= tp).length, compta: (window.__compta || []).filter(t => parseInt(t, 10) <= tp).join(' ') }), tPret || 1e9).catch(() => null);
   if (process.env.EVAL) res.eval = await pg.evaluate(process.env.EVAL).catch(e => String(e));
   if (process.env.ETATS) res.etats = etats.map(x => x.t + ':' + x.e).join(' ; ');
   if (process.env.DETAIL) {
@@ -97,6 +136,14 @@ async function ouvrir(ctx, tab, etiquette) {
     await ctx.addInitScript(() => {
       localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1');
       window.__lt = []; new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push([Math.round(e.startTime), Math.round(e.duration)]); }).observe({ type: 'longtask', buffered: true });
+    });
+    if (process.env.JALONS) await ctx.addInitScript(() => { window.addEventListener('vrm:save', (e) => { try { const k = e && e.detail && e.detail.k; if (k) performance.mark('vrm:save:' + (e.detail.distant ? '~' : '') + k); } catch (_) {} }); });
+    if (process.env.RENDUS) await ctx.addInitScript(() => {
+      window.__commits = []; window.__compta = [];
+      const estCompta = (p) => p && typeof p === 'object' && 'only' in p && 'accounts' in p && 'garageGrid' in p;
+      const vus = new WeakMap();
+      window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { supportsFiber: true, renderers: new Map(), isDisabled: false, inject() { return 1; }, checkDCE() {}, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {},
+        onCommitFiberRoot(id, root) { const t = Math.round(performance.now()); window.__commits.push(t); try { const pile = [root.current]; while (pile.length) { const f = pile.pop(); if (!f) continue; if (f.child) pile.push(f.child); if (f.sibling) pile.push(f.sibling); if (estCompta(f.memoizedProps)) { const av = vus.has(f) ? vus.get(f) : (f.alternate && vus.has(f.alternate) ? vus.get(f.alternate) : undefined); if (av === undefined || av !== f.memoizedState) window.__compta.push(t + (av === undefined ? 'm' : '')); vus.set(f, f.memoizedState); if (f.alternate) vus.set(f.alternate, f.memoizedState); } } } catch (_) {} } };
     });
     console.log(JSON.stringify(await ouvrir(ctx, tab, tab)));
     if (process.env.REPRISE) console.log(JSON.stringify(await ouvrir(ctx, tab, tab + '-2e')));

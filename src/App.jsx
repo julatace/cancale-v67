@@ -70,6 +70,7 @@ import './notif-reglages.css';
 import './design/guide-iphone.css'; // (8 nov.) style de ./GuideIphone.jsx, gardé à sa place (son écran est chargé à la demande)
 import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à sa place (son écran est chargé à la demande)
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
+import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import { transporteurRelu, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
@@ -7644,7 +7645,7 @@ const joursVenduRecu = (vendues, recues, n = 14, maintenant = Date.now()) => {
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(d0); d.setDate(d0.getDate() - i);
     const j = { cle: cleJourLocal(d.getTime()), jour: ['D', 'L', 'M', 'M', 'J', 'V', 'S'][d.getDay()], num: d.getDate(),
-      long: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }),
+      long: dateLocale(d, 'fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }),
       vendu: { n: 0, eur: 0 }, recu: recues ? { n: 0, eur: 0 } : null };
     J.push(j); par[j.cle] = j;
   }
@@ -9313,6 +9314,8 @@ const taillePicto = (style) => {
 //     de quelques secondes et ne les remontrait jamais. Ce composant dessine
 //     lui-même le pictogramme à leur place. Pour une autre adresse (un <img>
 //     ordinaire), `onError` part sur l'erreur du navigateur, comme avant.
+// (9 nov., vitesse) `decoding="async"` : la photo se décode hors du fil qui dessine l'écran
+// (aucun effet sur son chargement ni sur `onLoad`).
 function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
@@ -9350,11 +9353,11 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
   }
   if (etat === 'ok') {
-    return <img src={photosVinted.blobDe(src)} style={style} alt="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
+    return <img src={photosVinted.blobDe(src)} decoding="async" style={style} alt="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
-    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} alt="" {...reste} data-photo-vinted="natif"
+    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} decoding="async" style={style} alt="" {...reste} data-photo-vinted="natif"
       onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
       onError={() => photosVinted.echecNatif(src)}/>;
   }
@@ -12171,7 +12174,16 @@ const SOURCE_ANCIENNE = { brocante: 'Brocante', fournisseur: 'Fournisseur', part
 const libelleSourceAchat = (s) => SOURCE_ANCIENNE[s] || String(s || '').trim();
 // (2 nov., audit des données G2) Le jour en toutes lettres, « 1er » le premier
 // du mois (la règle d'URSSAF, `jour` du profil fiscal) : « dimanche 1er novembre ».
-const dateJourFr = (d) => `${d.toLocaleDateString('fr-FR', { weekday: 'long' })} ${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
+// (9 nov., vitesse) Les deux formats créés UNE fois : `toLocaleDateString(…, options)` refait un
+// Intl.DateTimeFormat à chaque appel (~230 ms du démarrage au téléphone). Même texte (ECMA-402 :
+// `toLocaleDateString(l, o)` = `new Intl.DateTimeFormat(l, o).format(d)` quand `o` nomme un champ de date).
+let _fmtJourSemaine = null, _fmtMoisLong = null;
+const dateJourFr = (d) => {
+  if (!_fmtJourSemaine) { try { _fmtJourSemaine = new Intl.DateTimeFormat('fr-FR', { weekday: 'long' }); _fmtMoisLong = new Intl.DateTimeFormat('fr-FR', { month: 'long' }); } catch (_) { _fmtJourSemaine = _fmtMoisLong = null; } }
+  const js = _fmtJourSemaine ? _fmtJourSemaine.format(d) : d.toLocaleDateString('fr-FR', { weekday: 'long' });
+  const ml = _fmtMoisLong ? _fmtMoisLong.format(d) : d.toLocaleDateString('fr-FR', { month: 'long' });
+  return `${js} ${d.getDate() === 1 ? '1er' : d.getDate()} ${ml}`;
+};
 // (2 nov., audit des données ; limites n°14) Une date de vente illisible ne
 // s'affiche jamais « Invalid Date » : « date inconnue » (la règle de `fmtD`, Colis).
 const dateFr = (d, opts) => { const t = d == null || d === '' ? NaN : (typeof d === 'number' ? d : Date.parse(d)); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', opts) : 'date inconnue'; };
@@ -27345,10 +27357,21 @@ const etatOrdersDuCache = (type, accounts) => {
 // tout de suite (`_persistAcctCache`) et annule l'écriture en attente — sinon un
 // rechargement juste après « Synchroniser » relirait l'ancien cache. Le cache
 // n'est qu'un raccourci : une écriture perdue relit simplement la base.
+// (9 nov., vitesse) Mesuré au démarrage (téléphone émulé, processeur ×4) : l'écriture
+// programmée tombait PENDANT l'ouverture — `JSON.stringify` + `sessionStorage.setItem` des
+// ventes, achats et annonces (~1,5 Mo), ~0,5 s d'un bloc. Le cache ne sert qu'à un
+// rechargement de CET onglet : un rangement le marque à écrire, et il est écrit quand la page
+// est quittée ou cachée (`pagehide`, `visibilitychange` → caché : un rechargement, un autre
+// onglet, l'iPhone qui la met de côté), ou au plus tard 20 s après, quand le navigateur est
+// libre (`requestIdleCallback`). Un effacement reste écrit tout de suite (ci-dessus).
 let _persistAcctTimer = null;
-const _persistAcctCache = ()=>{ if(_persistAcctTimer){ clearTimeout(_persistAcctTimer); _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return; _persistAcctTimer = setTimeout(_persistAcctCache, 400); };
+const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
+  _persistAcctTimer = { idle: false, id: setTimeout(()=>{
+    try { if (typeof window.requestIdleCallback === 'function') { _persistAcctTimer = { idle: true, id: window.requestIdleCallback(_persistAcctCache, { timeout: 5000 }) }; return; } } catch(_) {}
+    _persistAcctCache(); }, 15000) }; };
 try { window.addEventListener('pagehide', ()=>{ if(_persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
+try { document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden' && _persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
 // ── SÉLECTEUR DE COMPTE (onglets d'une plateforme) ───────────────────────────
 // Julien, 6 oct. : « si on sélectionne un compte et qu'on est dans l'onglet
 // annonce, il n'y a que les annonces de ce compte qui apparaissent ; par défaut
@@ -34994,7 +35017,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Tendance sur 6 mois (CA finalisé + bénéfice net) pour le mini-graphique.
   const monthlyChart = useMemo(() => {
     const now = new Date(); const months = [];
-    for (let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ ym:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, benef:0 }); }
+    for (let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ ym:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:dateLocale(d,'fr-FR',{month:'short'}).replace('.',''), ca:0, benef:0 }); }
     const idx = {}; months.forEach((m,i)=>{ idx[m.ym]=i; });
     for (const o of (sales.items||[])){
       if (isHidden(o)) continue;
@@ -36516,7 +36539,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!showAnnual) return null;
     const regime = regimeFiscal();   // (27 oct.) statut de la personne (null : pas choisi ⇒ aucune cotisation estimée)
     const tvaRate = Number(load('vinted_tva',20))||20;
-    const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
+    const months = Array.from({length:12},(_,i)=>({ m:i, label:dateLocale(new Date(reportYear,i,1),'fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
     let nMasq=0, caMasq=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
@@ -38214,7 +38237,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // règle des comptes muets, src/relierCompte.js), dite une fois par jour — touchée, elle s'efface
   // jusqu'au lendemain (préférence de cet appareil ; E-mails et Comptes liés la redisent).
   const { liste: aRelierListe } = useComptesARelier(accounts, only === 'journee');
-  const jourRelier = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  const jourRelier = dateLocale(new Date(), 'fr-CA', { timeZone: 'Europe/Paris' });
   const [aRelierVus, setARelierVus] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_relier_vus') || '{}'); return v && v.j === new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) && Array.isArray(v.uids) ? v.uids : []; } catch (_) { return []; } });
   const comptesARelierJour = only === 'journee' && Array.isArray(aRelierListe) ? aRelierListe.filter((c) => !aRelierVus.includes(c.uid)) : [];
   const noterRelierVus = (uids) => { const n = [...new Set([...aRelierVus, ...uids])]; try { localStorage.setItem('vrm_journee_relier_vus', JSON.stringify({ j: jourRelier, uids: n })); } catch (_) {} setARelierVus(n); };
@@ -38713,7 +38736,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // REÇU = au mois du VERSEMENT (`recuDuMois`, la date des barres) — jamais
         // le mois de déclaration, qui peut être un autre (revue du 6 octobre).
         const recuMois = declarables ? recuDuMois(declarables.lignes, ymIci) : null;
-        const moisNom = new Date().toLocaleDateString('fr-FR',{month:'long'});
+        const moisNom = dateLocale(new Date(),'fr-FR',{month:'long'});
         // (26 octobre) Julien : « le chiffre d'affaires total ». Celui de l'ANNÉE,
         // toutes plateformes, sur les MÊMES lignes et le même mois que le CA déclaré
         // de Compta (`declarables`, `l.ym`) — jamais un second calcul (§11).
@@ -38815,7 +38838,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // les N prêts » (`lignesLot`), les points de la colonne « À retirer »
         // (`pointsARetirer`). Une étape se coche sur un geste réellement noté
         // aujourd'hui (impression, « Déposé », « Je l'ai eu »).
+        // (9 nov., vitesse) La carte n'est plus montrée (`TOURNEE_SUR_JOURNEE`, plus bas) : rien
+        // n'est calculé — mesuré, ce calcul (toutes les cartes de Colis, à chaque rendu de Ma
+        // journée) pesait ~1 s du démarrage au téléphone pour un résultat que rien n'affichait.
         const tournee = (() => {
+          if (!TOURNEE_SUR_JOURNEE) return null;
           if (baseKO || premierJour || loading) return null;
           try {
             const tEnv = T.find(x => x.id === 'envoyer'), tRet = T.find(x => x.id === 'retirer');
@@ -45711,7 +45738,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const avgs = s.pts.map(p=>p.avg); const mn=avgs.length?Math.min(...avgs):0, mx=avgs.length?Math.max(...avgs):1;
         const lo=Math.floor(mn/5)*5, hi=Math.max(lo+5, Math.ceil(mx/5)*5);
         const ys = v => padT + (1-(v-lo)/((hi-lo)||1))*(H-padT-padB);
-        const monLabel = ym => { const [Y,M]=ym.split('-').map(Number); return new Date(Y,M-1,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''); };
+        const monLabel = ym => { const [Y,M]=ym.split('-').map(Number); return dateLocale(new Date(Y,M-1,1),'fr-FR',{month:'short'}).replace('.',''); };
         return (
         <div onClick={()=>setShowBrandCurves(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowBrandCurves(false)}/>
