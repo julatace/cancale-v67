@@ -32,6 +32,8 @@ import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, 
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
 import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation } from './_lib/notif-apercus.js';
 import { stampBordereau } from './_lib/stamp.js';
+// (9 nov., transporteurs inconnus) Le transporteur NOMMÉ dans le PDF du bordereau (sans IA, api/_lib/transporteur-pdf.js).
+import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 // (9 nov.) Solo : la vente d'un compte hors offre ne sonne pas (api/_lib/plan-regle.js).
@@ -2493,6 +2495,14 @@ export async function traiterEmail(req, res) {
       // Tamponnage AUTOMATIQUE : N° + titre imprimés sur le PDF à l'emplacement
       // mémorisé pour ce format d'étiquette (réglé une fois dans l'app).
       let pdfTamponneB64 = null, posKnown = false;
+      // (9 nov.) LE TRANSPORTEUR ÉCRIT SUR L'ÉTIQUETTE (le PDF de CETTE transaction) : un seul
+      // nom ⇒ sa clé, deux ⇒ rien ; un n° gardé seulement s'il a la forme propre de CE
+      // transporteur. Rangé en SCALAIRES (⇒ meta) : le PDF n'est plus jamais relu pour ça.
+      // Le texte du PDF n'est jamais gardé (il porte l'adresse de l'acheteur).
+      let lu = null;
+      if (pdf) { lu = await transporteurDuPdf(pdf.contentB64); Object.assign(data, champsPdf(lu)); }
+      // Un bordereau sans n° dans l'e-mail : celui de l'étiquette (même transaction, forme propre).
+      if (lu && lu.s && !String(data.suivi || '').trim()) { data.suivi = lu.s; data.suiviSource = 'pdf'; }
       if (pdf) {
         try {
           const rf = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`), {

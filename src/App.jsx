@@ -72,7 +72,7 @@ import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à 
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
-import { transporteurRelu, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
+import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -4937,6 +4937,9 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
     // qu'un brouillon n'y est plus (`src/brouillonsProposables.js`).
     _vrmBrLecture: lectureBrouillons(payload, isFinite(ts) ? ts : NaN) };
 };
+// (9 nov.) Ce que l'étiquette (PDF) de chaque vente nomme, relu au cron : { tx: { t, s? } } (null = pas lu).
+let _pdfEtiquettes = null;
+const pdfEtiquettesParTx = () => _pdfEtiquettes;
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
 const fetchEmailBordereaux = async () => {
@@ -4947,7 +4950,9 @@ const fetchEmailBordereaux = async () => {
     // afficher des titres. On ne prend que les champs utiles : 21 Ko.
     // Le PDF est récupéré à la demande, au moment d'imprimer (lirePdfLigne).
     const champs = ['uid','type','suivi','modele','numero','taille','account','article',
-                    'filename','posKnown','dateLimite','receivedAt','transaction','transporteur']
+                    'filename','posKnown','dateLimite','receivedAt','transaction','transporteur',
+                    // (9 nov.) le transporteur et le n° LUS sur l'étiquette (PDF) à la réception — scalaires
+                    'transporteurPdf','suiviPdf','pdfLu']
                    .map(c => `${c}:meta->>${c}`).join(',');
     // ⚠️⚠️ (1er nov.) TOUTES LES PAGES (`lireTout`) : au-delà de 1 000 bordereaux
     //    la base coupait EN SILENCE par ordre d'identifiant — `email_bord_{tx}`,
@@ -4964,10 +4969,13 @@ const fetchEmailBordereaux = async () => {
     // il ne remplace JAMAIS un transporteur rangé. Illisible ⇒ rien de fusionné.
     const [rows, relus] = await Promise.all([
       lireTout(`id=like.email_bord_*&select=id,${champs}`, { strict: true }),
-      lireTout(`id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx`, { strict: true }).catch(() => null),
+      lireTout(`id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx,pdf:data->pdf`, { strict: true }).catch(() => null),
     ]);
     if (!Array.isArray(rows)) return null;
-    const ligneRelue = Array.isArray(relus) && relus[0] ? relus[0] : null;
+    const ligneRelue = ligneRelueDe(relus);
+    // (9 nov.) Les étiquettes relues au cron pour les ventes SANS bordereau e-mail (PDF capté par
+    // l'extension) : gardées à part, par n° de transaction (`pdfEtiquettesParTx`).
+    _pdfEtiquettes = ligneRelue && ligneRelue.pdf ? ligneRelue.pdf : (_pdfEtiquettes || null);
     // `filename` est présent exactement quand un PDF l'est (vérifié : 50/50,
     // aucun écart) — il sert donc de témoin sans télécharger le PDF.
     return rows.filter(r => r && r.filename && r.filename !== 'None')
@@ -30068,7 +30076,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (9 nov., Colis → Envoyés) La vente Vinted : par SON bordereau (même n° de transaction) —
   // la ligne de départ lue chez le transporteur pour son n°, le transporteur NOMMÉ dans l'e-mail
   // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
-  const transporteurVente = (b) => transporteurDeVente({ bord: b || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
+  // (9 nov.) `tx` : la vente sans bordereau e-mail prend ce que SON étiquette captée nomme (relu au cron, par n°).
+  const transporteurVente = (b, tx) => { const k = String((b && b.transaction) || tx || ''); const et = pdfEtiquettesParTx(); return transporteurDeVente({ bord: b || null, pdf: (!b && k && et && et[k]) || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }); };
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -37029,7 +37038,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (3 nov.) le transporteur LU du récapitulatif (e-mails de suivi, lignes du transporteur,
       // lus APRÈS le premier rendu) : sans lui, une ligne dessinée avant la lecture gardait
       // « pas lu » pour toujours (banc transporteurs-logos R2, intermittent).
-      (() => { const t = transporteurVente(bordParTx[tx] || null); return (t.cle || '') + '|' + (t.nom || '') + '|' + (t.source || ''); })(),
+      (() => { const t = transporteurVente(bordParTx[tx] || null, tx); return (t.cle || '') + '|' + (t.nom || '') + '|' + (t.source || ''); })(),
       // (3 nov.) le prix d'achat proposé par identité (src/prixAchatPropose.js)
       (propositionVente(tx) || {}).centimes ?? null, (propositionVente(tx) || {}).detail || '',
       // (6 nov., vague 2) la remise en vente d'une vente annulée avant l'envoi (src/annuleesChezToi.js)
@@ -37253,7 +37262,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         : groupe === 'pret' ? (lim || 'bordereau prêt')
         : [lectureFinie ? 'bordereau pas encore là' : 'bordereau pas encore lu', lim].filter(Boolean).join(' · ');
       L.push({ cle: 'v:' + (e.txn || e.key), groupe, site: 'vinted', nom: nomAvecTaille(o ? o.title : (b && (b.modele || b.article)) || 'Bordereau', o), photo: o ? orderPhoto(o) : bordPhoto(b),
-        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '', transp: transporteurVente(b) });
+        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '', transp: transporteurVente(b, e.txn) });
     }
     if (colisEb) {
       const numEb = (x) => x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
@@ -37783,7 +37792,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const pv = o ? preuvesFriseDe(o) : null;
           out.push({ cle: 'v:' + (e.txn || e.key), site: 'vinted', type: 'coche', e, o, b, np, rang: np ? -1 : 0.5,
             photo: o ? orderPhoto(o) : bordPhoto(b), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Vente',
-            num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), tr: transporteurVente(b),
+            num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), tr: transporteurVente(b, e.txn || tx),
             lues: { imprime: !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b))), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue) } });
         }
         for (const o of sales.items) {
@@ -37794,7 +37803,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const b = bordsParTxn[String(o.transaction_id)] || null;
           const pv = preuvesFriseDe(o);
           out.push({ cle: 'v:' + o.transaction_id, site: 'vinted', type: 'parti', o, b, st, j, rang: ordre[st.label],
-            photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b),
+            photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b, o.transaction_id),
             lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue) } });
         }
         // (8 nov.) Encore « à expédier » chez Vinted (pas relu), mais le n° du bordereau de CETTE
@@ -37811,7 +37820,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (b && isBordShippedManual(b)) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
           out.push({ cle: 'v:' + tx, site: 'vinted', type: 'transp', o, b, j, depart: dp, rang: 1.5,
-            photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b),
+            photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b, tx),
             lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: true } });
         }
       }
@@ -44537,7 +44546,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const capte = e.txn ? labelsCaptes[e.txn] : null;
                 const pdf = !!(b && b.hasPdf) || !!capte;
                 // (2 nov.) Le transporteur LU de ce colis (n° de son bordereau), à côté du bouton.
-                const trV = transporteurVente(b);
+                const trV = transporteurVente(b, e.txn);
                 // (2 nov., Fusion) LA FRISE DU COLIS : Imprimé → Déposé → En route → Livré. Rien de
                 // neuf : « imprimé » = la coche de toujours (`vinted_bords_printed`), « déposé » =
                 // « Colis fait » ou un statut Vinted qui a bougé, « en route » / « livré » = les
