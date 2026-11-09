@@ -87,7 +87,7 @@ export function Courbe({ cle, titre, points, format = nombre, vide }) {
         </p>
       </div>
       <div ref={ref} role="img" tabIndex={0} aria-label={`${titre} : ${format(points[n - 1].n)} le ${jourLong(points[n - 1].jour)}. Flèches gauche et droite pour parcourir.`}
-        onPointerMove={sous} onPointerDown={sous} onPointerLeave={() => setI(null)} onKeyDown={clavier}
+        onPointerMove={sous} onPointerDown={sous} onPointerLeave={(e) => { if (e.pointerType === 'mouse') setI(null); }} onKeyDown={clavier}
         style={{ position: 'relative', marginTop: 8, touchAction: 'pan-y', outlineOffset: 2, cursor: 'crosshair' }}>
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H} style={{ display: 'block', overflow: 'visible' }} aria-hidden="true">
           {[0, 0.5, 1].map((f) => <line key={f} x1={0} x2={W} y1={y(max * f)} y2={y(max * f)} stroke="var(--vrm-line)" strokeWidth={1} vectorEffect="non-scaling-stroke"/>)}
