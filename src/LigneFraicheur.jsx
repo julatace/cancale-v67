@@ -25,6 +25,29 @@ import { EXT_ATTENDUE, DEMANDE_REGLAGE_SOUS, useEtatEmailsComptes, useComptesExc
 
 const RELECTURE_MS = 5 * 60 * 1000;   // la ligne se revérifie toutes les 5 min, page visible
 const DEPART_MS = 1800;               // jamais pendant l'ouverture (src/AttenteEcran : ~2,5 s)
+const DEPART_MAX_MS = 15000;          // au plus tard, même si l'écran attend encore une lecture
+// Ses lectures ne doivent JAMAIS retarder celles de l'écran (mesuré au banc `chargement`, réseau lent :
+// parties à 1,8 s, elles faisaient arriver le contenu de Ventes, Colis, Achats APRÈS le plafond d'attente
+// ⇒ décalages de 0,02 à 0,07). Elles partent quand l'écran a reçu ses données essentielles
+// (`data-attente="pret"`, src/AttenteEcran.jsx) — ou qu'il n'en attend pas —, au repos du navigateur.
+function useDepart() {
+  const [actif, setActif] = React.useState(false);
+  React.useEffect(() => {
+    let fini = false, t = null;
+    const debut = Date.now();
+    const partir = () => { if (fini) return; fini = true; const f = () => setActif(true); if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(f, { timeout: 2000 }); else setTimeout(f, 0); };
+    const voir = () => {
+      if (fini) return;
+      const ecran = document.querySelector('[data-attente-ecran]');
+      const pret = !ecran || ecran.getAttribute('data-attente') === 'pret';
+      if ((Date.now() - debut >= DEPART_MS && pret) || Date.now() - debut >= DEPART_MAX_MS) partir();
+      else t = setTimeout(voir, 400);
+    };
+    t = setTimeout(voir, DEPART_MS);
+    return () => { fini = true; if (t) clearTimeout(t); };
+  }, []);
+  return actif;
+}
 
 function useHorsLigneLigne() {
   const lire = () => { try { return horsLigneActif() || (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (_) { return false; } };
@@ -40,8 +63,7 @@ function useHorsLigneLigne() {
 
 export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
   const horsLigne = useHorsLigneLigne();
-  const [actif, setActif] = React.useState(false);
-  React.useEffect(() => { const t = setTimeout(() => setActif(true), DEPART_MS); return () => clearTimeout(t); }, []);
+  const actif = useDepart();
   const { etat: capture, relire } = useEtatCapture({ complet: true, actif: actif && !baseKO && !horsLigne });
   // La dernière réponse COMPLÈTE reste affichée pendant une relecture (pas de « Vérification… » toutes les 5 min).
   const derniere = React.useRef(undefined);
