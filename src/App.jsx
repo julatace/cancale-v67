@@ -311,6 +311,7 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,SANS_COMPTE_VC,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
+import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
@@ -25631,7 +25632,6 @@ const moyennesParModele = (commandes, ecarte) => {
 const colisKey = (t) => String((t && ((t.suiviLuDansSujet ? t.subject : t.suivi) || (t.source === 'vinted-commande' && t.cleLigne) || t.subject)) || '').trim();
 // (revue du 23 oct.) Au-delà de ce nombre de jours, la ligne de fraîcheur d'Achats
 // nomme le compte : ses colis ne le redisent pas (§7).
-const FRAICHEUR_ACHATS_J = 2;
 // (23 oct.) Les 14 jours supposés (`PICKUP_MAX_DAYS`) et la grâce de 10 jours
 // après la limite sont retirés : la garde MESURÉE est de 4 à 7 jours, et la
 // règle vit dans api/_lib/retrait-colis.js (`etatRetrait`, `GARDE_MAX_J`).
@@ -28126,8 +28126,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (3 nov.) « Colis fait » d'un colis Leboncoin depuis Colis (même clé que l'écran Colis Leboncoin) : on relit.
   const [, majLbcFait] = React.useReducer((x) => x + 1, 0);
   // (3 nov.) Colis → À retirer : la liste des achats en route sans point connu, au toucher de sa puce.
-  const [enRouteOuvert, setEnRouteOuvert] = useState(false);
-  const [relireOuvert, setRelireOuvert] = useState(false);
   // (3 nov., Julien : « sélectionner une ville pour voir les colis de cette ville ») Le choix est une
   // préférence légère de CET appareil (jamais une donnée) : illisible ⇒ « Toutes ».
   const [villeRetrait, setVilleRetraitEtat] = useState(() => { try { return localStorage.getItem('vrm_retirer_ville') || ''; } catch (_) { return ''; } });
@@ -29772,7 +29770,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (x.kind === 'email') return !!(codeRetrait(x.t && x.t.code) || qrVivant(x.t));
     const r = relaisDe(x.o); return !!(r && (codeRetrait(r.code) || r.qr));
   };
-  const joursAchatsRelus = (uid) => { const cap = uid ? _harvestSeen[`${uid}_orders_purchased`] : null; return Number.isFinite(cap) ? Math.floor((Date.now() - cap) / 86400000) : null; };
   // ⚠️ (29 oct.) DEUX DATES, JAMAIS CONFONDUES :
   //   · `arriveeSure` — l'arrivée PROUVÉE : le message d'arrivée de la
   //     conversation (`sur: 'oui'`), ou l'arrivée lue chez le TRANSPORTEUR
@@ -41314,32 +41311,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const colis = achatsAffiches.filter(({st}) => st && st.step>=1 && st.step<4 && !st.retour).map(({o,tk}) => { const su = (tk && tk.suivi) || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? { suivi: su, carrier: (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '' } : null; }).filter(Boolean);
           return <TeteTransporteurs transp={transp} colis={colis} relire={lireTransp}/>;
         })()}
-        {aFilter==='attente' && (()=>{
-          // (3 nov.) Sous Colis → À retirer : la fraîcheur se dit par la puce « N comptes à relire » (en haut).
-          if (retraitsOutils) return null;
-          const vieux = (accounts||[]).filter(a => a && !acctOff(a.vinted_user_id)).map(a => {
-            const j = joursAchatsRelus(String(a.vinted_user_id));
-            return j != null ? { a, j } : null;
-          }).filter(x => x && x.j >= FRAICHEUR_ACHATS_J).sort((x, y) => y.j - x.j);
-          if (!vieux.length) return null;
-          // (30 oct.) La tête de Vinted (`VintedResume` → `FraicheurDonnees`) nomme
-          // déjà ces comptes, avec le MÊME geste (repasser sur Vinted connecté sur
-          // chacun : ventes ET achats sont relus) : une cause, une phrase (§7). On
-          // ne redit que si un compte d'achats anciens n'y est pas.
-          const tete = liveStats && Number(liveStats.dataAgeJours) > 1 && Array.isArray(liveStats.dataAgeComptes) ? new Set(liveStats.dataAgeComptes.filter(x => x && x.login).map(x => String(x.login))) : null;
-          if (tete && tete.size > 1 && vieux.every(x => tete.has(String(accName(x.a))))) return null;
-          // (29 oct.) Une ligne : les comptes de même âge sont groupés (« il y a
-          // 25 j sur a, b, c »), le pourquoi est replié derrière ⓘ.
-          const parAge = []; for (const x of vieux) { const g = parAge.find(y => y.j === x.j); if (g) g.l.push(x.a); else parAge.push({ j: x.j, l: [x.a] }); }
-          return (
-            <div data-fraicheur-achats={vieux.map(x => `${x.a.vinted_user_id}:${x.j}`).join(',')} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'}}>
-              {vieux.length <= 2
-                ? <>Achats relus {parAge.map((g, i) => <span key={g.j}>{i ? ' et ' : ''}il y a {g.j} j sur {g.l.map((a, k) => <React.Fragment key={a.vinted_user_id}>{k ? ', ' : ''}<b style={{color:C.text,fontWeight:600}}>{accName(a)}</b></React.Fragment>)}</span>)} — ouvre Vinted sur {vieux.length > 1 ? 'chacun' : 'ce compte'}. </>
-                : <>Achats de {vieux.length} comptes pas relus depuis {vieux[vieux.length - 1].j} j ou plus — ouvre Vinted sur chacun. </>}
-              <Pourquoi label="Quels comptes">{vieux.length > 2 ? <>{parAge.map((g, i) => <span key={g.j}>{i ? ' · ' : ''}il y a {g.j} j : {g.l.map((a) => accName(a)).join(', ')}</span>)}. </> : null}Un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici : les achats d'un compte ne sont relus que quand le navigateur de l'extension est connecté dessus, avec l'extension VRM.</Pourquoi>
-            </div>
-          );
-        })()}
+        {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
+            des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
+            fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
         {/* (1er nov.) Dans Colis, la colonne « À retirer » (`ColonneRetirer`) porte les
             points relais et leur carte : le détail ne la redessine pas (une carte, §7). */}
         {aFilter==='attente' && !modeRetraits && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
@@ -44183,35 +44157,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (3 nov.) Les puces du haut : « N en route » (achats dont Vinted ne dit pas encore le point — la liste
                 au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
                 les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
-            {(() => {
-              const nRoute = 0;  // (3 nov., 13 h 02) « En route » est une section repliée à la fin de « À retirer »
-              const ls = liveStats && Number(liveStats.dataAgeJours) > 1 ? liveStats : null;
-              // (9 nov., Julien : « 1 compte à relire » sans dire lequel — §2.7) La puce NOMME le compte quand il
-              // est seul (« Relire shop_x · 3 j ») ; la toucher ouvre, juste dessous, CHAQUE compte avec son âge et
-              // LE geste (ouvrir vinted.fr connecté sur ce compte, là où est l'extension), puis « Mes comptes ».
-              const comptesRelire = ls ? ((Array.isArray(ls.dataAgeComptes) && ls.dataAgeComptes.filter((x) => x && x.login).length) ? ls.dataAgeComptes.filter((x) => x && x.login) : [{ login: ls.dataAgeCompte || '', jours: ls.dataAgeJours }]) : [];
-              const nRelire = comptesRelire.length;
-              if (!nRoute && !nRelire) return null;
-              const liste = (groupesRelais && groupesRelais.sansRelais) || [];
-              const seul = nRelire === 1 ? comptesRelire[0] : null;
-              return (<>
-                <div className="vrm-colis-puces" data-colis-puces="">
-                  {nRoute > 0 ? <button type="button" className="vrm-colis-pill" data-retirer-en-route-sans={nRoute} aria-expanded={enRouteOuvert} onClick={() => setEnRouteOuvert((v) => !v)}>{nRoute} en route</button> : null}
-                  {nRelire > 0 ? <button type="button" className="vrm-colis-pill is-ambre" data-comptes-a-relire={nRelire} data-comptes-a-relire-noms={comptesRelire.map((x) => x.login).filter(Boolean).join(',')} aria-expanded={relireOuvert} onClick={() => setRelireOuvert((v) => !v)}>{seul && seul.login ? `Relire ${seul.login} · ${seul.jours} j` : `${nRelire} compte${nRelire > 1 ? 's' : ''} à relire`}</button> : null}
-                </div>
-                {nRelire > 0 && relireOuvert ? <div className="vrm-colis-note" data-comptes-a-relire-detail={nRelire} style={{margin:'0 2px 8px'}}>
-                  {comptesRelire.map((x, i) => <div key={x.login || i} data-compte-a-relire={x.login || ''}>{x.login ? <b>{x.login}</b> : 'Un compte'} : lu il y a {x.jours} j.</div>)}
-                  <div style={{marginTop:4}}>Ouvre vinted.fr connecté sur {nRelire > 1 ? 'chacun de ces comptes' : (seul && seul.login ? seul.login : 'ce compte')}, dans le navigateur où est l’extension VRM : elle le relit toute seule. D’ici là, un colis déjà retiré ou expédié peut encore apparaître.{' '}
-                    <button type="button" className="vrm-lien-action" data-comptes-a-relire-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Mes comptes</button></div>
-                </div> : null}
-                {nRoute > 0 && enRouteOuvert ? <div className="vrm-colis-en-route-liste" data-en-route-liste={liste.length}>
-                  {liste.map((a) => <div key={a.id} className="vrm-rpf-ligne is-attendu" data-en-route-achat={a.id}><div className="vrm-rpf-rang">
-                    <span className={'vrm-rpf-vignette' + (a.photo && !imgMortes.has(a.photo) ? '' : ' is-sans')} aria-hidden="true">{a.photo && !imgMortes.has(a.photo) ? <PhotoVinted src={a.photo} alt="" loading="lazy" onError={() => noterImgMorte(a.photo)}/> : null}</span>
-                    <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{a.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">en route</span></span></span>
-                  </div></div>)}
-                </div> : null}
-              </>);
-            })()}
+            {/* (9 nov., lot AG) Plus de puce « Relire compte_a · 3 j » (ni « N en route », déjà repliée dans « À
+                retirer » depuis le 3 nov.) : un compte pas relu est NOMMÉ, avec son geste, par la ligne de fraîcheur
+                UNIQUE du haut de l'app (src/LigneFraicheur.jsx, règle src/fraicheur.js) — une voix, pas deux (§7).
+                « Suivi vérifié il y a N min » (sous « À retirer ») reste : c'est l'âge du statut CHEZ LE TRANSPORTEUR
+                des colis de cette liste, propre à Colis (la ligne du haut ne nomme le suivi que s'il est en RETARD). */}
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
             {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
@@ -52730,7 +52680,9 @@ function AppCoeur() {
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
           {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
-          {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansFraicheur={sec==='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
+          {/* (9 nov., lot AG) La tête de Vinted ne dit plus la fraîcheur des comptes (« ✓ Ventes Vinted à jour »,
+              « N comptes pas relus depuis N j ») : la ligne de fraîcheur UNIQUE du haut de l'app la dit, avec le
+              geste (src/fraicheur.js). Sans montants (3 nov.) ni fraîcheur, `VintedResume` n'a plus rien à rendre ici. */}
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
             if (achats) return null; // (3 nov.) la carte d'Achats vit dans l'écran Achats (ses chiffres d'achat)
