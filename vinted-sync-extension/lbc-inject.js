@@ -24,7 +24,7 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.331.0';
+  const CAPTEUR_VERSION='5.333.0';
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;
@@ -487,6 +487,44 @@
     }
   };
 
+  // ── « MES ANNONCES » LUE EN ENTIER, TOUTES LES PAGES (5.333, 9 nov.) ───────
+  // Julien : « j'ai plus que 1 annonce, les données de Leboncoin circulent très
+  // mal ». Une liste ne DÉCIDE (« en ligne », « plus en ligne ») que lue EN
+  // ENTIER ; or la page « Mes annonces » ne charge que la page qu'il regarde
+  // (35 annonces) : au-delà, la liste n'était jamais complète. ⇒ Quand le SITE a
+  // lui-même demandé une page de SA liste privée (`dashboard/v1/search` filtrée
+  // sur le SEUL vendeur, `requeteTableau`), on relit les pages qui manquent avec
+  // la MÊME requête (son corps, ses en-têtes ; seul `offset` change) — une
+  // LECTURE de ses propres données (§3), une page à la fois, 700 ms entre deux,
+  // 30 pages au plus, arrêt sur 401/403/429. Les réponses repassent par le
+  // crochet : rangées et comptées exactement comme si il avait cliqué « suivant ».
+  // Jamais une requête inventée : sans requête du site, rien ne part.
+  const pagesDemandees = new Set();
+  let paginationEnCours = false;
+  const completerListe = async (url, texte, corpsReq) => {
+    const u = String(url || '');
+    if (!DASHBOARD.test(u) || paginationEnCours) return;
+    const req = requeteTableau(corpsReq); if (!req) return;
+    const rep = reponseProprietaire(texte, req.owner); if (!rep || !(rep.total > 0)) return;
+    let r; try { r = JSON.parse(corpsReq); } catch (_) { return; }
+    const pas = Number.isInteger(r.limit) && r.limit > 0 ? r.limit : rep.ids.length;
+    if (!(pas > 0) || rep.total <= pas && req.offset === 0) return;       // tout tient sur la page vue
+    const cle = req.owner + '|' + req.tri + '|' + rep.total;
+    if (pagesDemandees.has(cle)) return;
+    pagesDemandees.add(cle); paginationEnCours = true;
+    try {
+      let n = 0;
+      for (let off = 0; off < rep.total && n < 30; off += pas) {
+        if (off === req.offset) continue;
+        const l = lecturesProprio.get(cle); if (l && l.ids.size >= rep.total) break;
+        await new Promise((ok) => setTimeout(ok, 700)); n++;
+        let res;
+        try { res = await window.fetch(u, { method: 'POST', credentials: 'include', headers: Object.assign({ Accept: 'application/json' }, entetesApi || {}, { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign({}, r, { offset: off })) }); } catch (_) { break; }
+        if (!res || [401, 403, 429].includes(res.status)) break;
+      }
+    } finally { paginationEnCours = false; }
+  };
+
   // ── LES EN-TÊTES DU SITE, POUR LA MISE EN PAUSE SUR SON CLIC (22 oct.) ─────
   // La mise en pause part de CETTE page, avec les en-têtes que Leboncoin met
   // lui-même sur ses appels à son API (jamais vus d'ici : on les recopie, on ne
@@ -626,6 +664,7 @@
       post({ kind: 'lbcraw', url, body: text });
       // APRÈS les annonces : la liste complète ne part qu'une fois rangées (même file).
       try { noterListeProprietaire(url, text, corpsReq); } catch (_) {}
+      try { completerListe(url, text, corpsReq); } catch (_) {}
     } catch (_) {}
   };
 

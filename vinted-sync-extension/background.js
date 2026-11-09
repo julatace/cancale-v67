@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.331.0';
+const CODE_VERSION = '5.333.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -165,6 +165,10 @@ async function saveSession(sess) {
     try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit','vrmLbcARetirer']); } catch (_) {}
   }
   await rangerSession(s);
+  // 5.333 (9 nov.) : une session VRM qui ARRIVE (connexion, autre compte, session
+  // revenue après un refus « sans session ») relance les onglets Leboncoin qui
+  // gardent ce que la page a lu pendant qu'il n'y en avait pas (lbc-relay.js).
+  if (s && !s.mort && s.user_id && (_lbcRejeuAttendu || !avant || avant.mort || avant.user_id !== s.user_id)) { _lbcRejeuAttendu = false; relancerLbcApresSession().catch(() => {}); }
   // Une session VIVANTE et NEUVE (autre jeton de renouvellement) lève la pause
   // des renouvellements : la pause portait sur l'ancien jeton. La même session
   // renvoyée, elle, ne lève rien (sinon chaque « ready » relancerait un essai).
@@ -1278,6 +1282,33 @@ let _octetsDernierRefus = 0;
 //    (et effacé) par `noterFlux` juste après.
 let _sansSessionAt = 0;
 function sessionAbsente() { _sansSessionAt = Date.now(); return false; }
+// ══ LEBONCOIN : CE QUE LA PAGE A LU AVANT LA CONNEXION À VRM (5.333, 9 nov.) ══
+// Julien, sur leboncoin.fr : « Identifiant détecté · identité à confirmer —
+// Rien envoyé — VRM n'a pas confirmé l'enregistrement du compte ». CAUSE
+// (lue dans le code) : la page avait chargé son compte (`members/me/account`)
+// et « Mes annonces » AVANT que l'extension soit connectée à VRM (il s'est
+// connecté dans la carte : « C'est fait »). Le fond répondait « non » (aucun
+// compte VRM à qui écrire), le relais de la page prenait ce « non » pour un
+// refus DÉFINITIF de l'identité et jetait toutes les annonces du document —
+// rien n'était relu après la connexion, et la carte ne disait pas de recharger.
+// ⇒ Un refus faute de session dit `sansSession: true` ; le relais GARDE ce que
+//   la page a lu (borné, en mémoire, ce document seulement) et le rejoue dès
+//   qu'une session VRM existe (`lbcRejouer`, envoyé ici à la connexion, ou
+//   demandé par le relais toutes les 30 s). Jamais rejoué à un autre compte
+//   Leboncoin : la preuve d'identité repasse la première, par la même garde.
+let _lbcRejeuAttendu = false;
+async function lbcSansSessionVrm() {
+  try { const t = await authToken(); return !(t && t.user_id && t.access_token); } catch (_) { return true; }
+}
+async function relancerLbcApresSession() {
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: ['https://*.leboncoin.fr/*', 'https://leboncoin.fr/*'] }); } catch (_) { return 0; }
+  let n = 0;
+  for (const t of tabs || []) {
+    try { chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcRejouer' }, { frameId: 0 }, () => { void chrome.runtime.lastError; }); n++; } catch (_) {}
+  }
+  return n;
+}
 async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
@@ -3711,7 +3742,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           if(msg.action==='lbcSessionPrivee'){
             const ownerReception=(await loadSession())?.user_id;
-            if(!ownerReception){sendResponse({ok:false});return;}
+            if(!ownerReception||await lbcSansSessionVrm()){_lbcRejeuAttendu=true;sendResponse({ok:false,sansSession:true});return;}
             const compte=lireSessionPriveeLbc(msg.preuve,msg.url),tabId=sender?.tab?.id;
             if(!compte||tabId==null||sender?.frameId>0||!/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url||'')){sendResponse({ok:false});return;}
             const cartes=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{},avant=cartes[tabId]||{};
@@ -3719,7 +3750,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             cartes[tabId]={...avant,source:'prive',compte:ambigue?'':compte.id,ambigue,at:Date.now()};
             await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
             if(ambigue){sendResponse({ok:false});return;}
-            const ok=await storeLbcAccount(compte,ownerReception);sendResponse({ok});return;
+            const ok=await storeLbcAccount(compte,ownerReception);
+            if(!ok&&await lbcSansSessionVrm()){_lbcRejeuAttendu=true;sendResponse({ok:false,sansSession:true});return;}
+            sendResponse({ok});return;
+          }
+          // 5.333 : le relais demande s'il peut rejouer ce qu'il garde (session VRM là ?).
+          if(msg.action==='lbcSessionPrete'){
+            const tabId=sender?.tab?.id;
+            if(sender?.frameId>0||tabId==null||!/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url||'')){sendResponse({ok:false});return;}
+            sendResponse({ok:!(await lbcSansSessionVrm())});return;
           }
           if(msg.action==='lbcTransport'){
             const tabId=sender?.tab?.id;
@@ -3727,7 +3766,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const avant=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{};
             avant[tabId]={...(msg.capteur===true?avant[tabId]:{}),capteur:msg.capteur===true,at:Date.now()};
             for(const cle of ['capteurVersion','relaisVersion'])if(/^\d+\.\d+\.\d+$/.test(msg[cle]||''))avant[tabId][cle]=msg[cle];
-            if(Object.prototype.hasOwnProperty.call(msg,'erreurCapture'))avant[tabId].erreurCapture=['identite','taille'].includes(msg.erreurCapture)?msg.erreurCapture:null;
+            if(Object.prototype.hasOwnProperty.call(msg,'erreurCapture'))avant[tabId].erreurCapture=['identite','taille','session'].includes(msg.erreurCapture)?msg.erreurCapture:null;
             const recent=Object.fromEntries(Object.entries(avant).sort((a,b)=>b[1].at-a[1].at).slice(0,32));
             await chrome.storage.local.set({vrmLbcTransport:recent});sendResponse({ok:true});return;
           }
@@ -3814,7 +3853,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           if (msg.action === 'lbcRaw' && msg.body) {
             if(/\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
-            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||LBC_ANNONCES_LECTURE.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
+            if(await lbcSansSessionVrm()){_lbcRejeuAttendu=true;sendResponse({ok:false,etat:'ecriture-refusee',sansSession:true});return;}
+            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||LBC_ANNONCES_LECTURE.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);
+            if(r&&r.ok===false&&await lbcSansSessionVrm()){_lbcRejeuAttendu=true;r.sansSession=true;}
+            sendResponse(r||{ok:true,etat:'sans-annonce'});return;
           }
           // 22 oct. : une liste COMPLÈTE d'un vendeur (toutes les pages, total
           // atteint — prouvé par la page, voir lbc-inject.js). Seulement depuis le
@@ -3826,10 +3868,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const ids = Array.isArray(msg.ids) ? msg.ids.map(String) : null;
             if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl) || !/^[0-9a-f-]{8,64}$/i.test(owner)
               || !ids || !Number.isInteger(total) || total < 1 || ids.length !== total || new Set(ids).size !== total || ids.some((x) => !/^\d{1,15}$/.test(x))) { sendResponse({ ok: false }); return; }
+            if (await lbcSansSessionVrm()) { _lbcRejeuAttendu = true; sendResponse({ ok: false, sansSession: true }); return; }
             const miens = await comptesMiens();
             if (!miens.has(owner) && !miens.has('lbc-account:' + owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }
-            await noterListeLbcComplete(owner, ids, total);
-            sendResponse({ ok: true }); return;
+            const rl = await noterListeLbcComplete(owner, ids, total);
+            // 5.333 : la carte de l'onglet dit « 37 annonces lues en entier il y a 2 min ».
+            if (rl && rl.ok) await noterLectureCompleteLbc(owner, ids, total, sender);
+            sendResponse({ ok: !!(rl && rl.ok) }); return;
           }
           // 29 oct. : une suppression / mise en pause faite par Julien SUR LA PAGE
           // Leboncoin (réponse 2xx vue par lbc-inject.js). Seulement depuis le
@@ -3861,7 +3906,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // pas la carte, elle la rafraîchit. Jamais dans une fixture (§6).
           if (msg.action === 'lbcVente' && msg.body) {
             const ownerReception=(await loadSession())?.user_id;
-            if(!ownerReception){sendResponse({ok:false,etat:'ecriture-refusee'});return;}
+            if(!ownerReception||await lbcSansSessionVrm()){_lbcRejeuAttendu=true;sendResponse({ok:false,etat:'ecriture-refusee',sansSession:true});return;}
             const corps=String(msg.body);
             if(/\/compte\/(?:part|pro)\/(?:transaction|mes-transactions)/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
             // ⚠️ (1er nov., 5.296) « Il ne doit plus y avoir d'erreur pendant la lecture » :
@@ -12917,7 +12962,7 @@ async function etatSite(url,tabId) {
   const brut = await authEtatRapide(1500).catch(() => null);
   const vrm = brut && brut.connecte !== null ? brut : null;
   let local = {};
-  try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte','vrmLbcTransport','vrmVcCapte']); } catch (_) {}
+  try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte','vrmLbcTransport','vrmVcCapte','vrmLbcLecture']); } catch (_) {}
   // Le compte du SITE : sur Vinted le cookie le dit (une identité) ; sur
   // Leboncoin le dernier compte « moi » vu ; eBay et Vestiaire ne sont pas
   // encore captés par VRM — on le dit plutôt que de laisser croire.
@@ -12949,9 +12994,14 @@ async function etatSite(url,tabId) {
   const transport=plateforme==='leboncoin'?(local.vrmLbcTransport?.[tabId]||null):null;
   // (29 oct.) Les paires vendues ailleurs, encore en ligne ici : ce que VRM a
   // calculé et publié (`lbc_a_retirer`) — la carte le dit, sans rien recalculer.
-  const aRetirer = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
+  // 5.333 : seulement les lignes PROUVÉES encore en ligne (lecture complète < 24 h).
+  let lectureLbc = null;
+  if (plateforme === 'leboncoin') { const ll = local.vrmLbcLecture, u = vrm && vrm.connecte ? String((await loadSession().catch(() => null))?.user_id || '') : ''; lectureLbc = ll && u && ll.u === u ? (ll.comptes || {}) : null; }
+  const aRetirerBrut = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
+  const aRetirer = aRetirerBrut ? { at: aRetirerBrut.at, liste: aRetirerProuveCarte(aRetirerBrut.liste, lectureLbc, Date.now()) } : null;
+  const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now() }) : null;
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -17640,6 +17690,96 @@ async function noterReceptionLbc(famille,resultat,sender){
     await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
   }catch(_){}
 }
+// 5.333 (9 nov.) : la lecture COMPLÈTE de « Mes annonces » d'un compte, notée
+// pour la carte — dans l'onglet (« 37 lues en entier il y a 2 min ») et dans ce
+// navigateur (`vrmLbcLecture`, propre à CE compte VRM), avec les identifiants lus :
+// la carte ne montre plus « à retirer » une annonce absente d'une lecture plus
+// récente que la preuve de VRM.
+async function noterLectureCompleteLbc(owner, ids, total, sender) {
+  const nu = idCompteLbc(owner); if (!nu) return;
+  const at = Date.now();
+  try {
+    const u = (await loadSession())?.user_id || '';
+    const brut = (await chrome.storage.local.get('vrmLbcLecture')).vrmLbcLecture;
+    const l = brut && brut.u === u && brut.comptes && typeof brut.comptes === 'object' ? brut : { u, comptes: {} };
+    l.comptes[nu] = { at, total: Number(total) || 0, ids: (ids || []).slice(0, 2000).map(String) };
+    await chrome.storage.local.set({ vrmLbcLecture: l });
+  } catch (_) {}
+  const tab = sender?.tab?.id; if (tab == null || sender?.frameId > 0) return;
+  try {
+    const cartes = (await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {}, avant = cartes[tab] || {};
+    cartes[tab] = { ...avant, lecture: { compte: nu, total: Number(total) || 0, at }, at };
+    await chrome.storage.local.set({ vrmLbcTransport: Object.fromEntries(Object.entries(cartes).sort((a, b) => b[1].at - a[1].at).slice(0, 32)) });
+  } catch (_) {}
+}
+// ── LA CARTE SUR LEBONCOIN.FR, EN TROIS LIGNES HUMAINES (5.333, 9 nov.) ─────
+// Julien : « Le "à confirmer" je ne comprends pas, ça doit être beaucoup plus
+// clair ». Plus de jargon (« intégration », « identité à confirmer »,
+// « enregistrement du compte ») : Compte · Annonces · Ventes, chacune « ✓ » ou
+// ce qu'il se passe, et UN SEUL geste (le premier qui débloque). `{quand}` est
+// remplacé par la carte (« il y a 2 min »). Fonction PURE (testée telle quelle).
+const LBC_LECTURE_FRAICHE_MS = 24 * 3600e3;
+function resumeCarteLbc({ vrm, transport, connu, lecture, code, maintenant }) {
+  const t = transport || null, now = Number(maintenant) || Date.now();
+  const R = (ok, texte, geste, at) => ({ ok, texte, geste: geste || '', at: at || null });
+  const RECHARGE = 'Recharge cette page Leboncoin.';
+  let compte, compteOk = false, nu = '';
+  if (vrm && vrm.connecte === false) compte = R(null, 'en attente de ta connexion à VRM (ci-dessous)');
+  else if (!t || t.capteur !== true) compte = R(false, 'pas encore lu sur cette page', RECHARGE);
+  else if (t.capteurVersion && code && t.capteurVersion !== code) compte = R(false, 'cette page tourne sur l’ancienne version de l’extension', RECHARGE);
+  else if (t.ambigue === true) compte = R(false, 'deux comptes Leboncoin ont répondu dans cet onglet : rien n’est envoyé', 'Recharge la page, connecté au compte Leboncoin à relire.');
+  else if (t.compte) {
+    nu = String(t.compte).replace(/^lbc-account:/i, '');
+    if (connu && connu.v === 2 && String(connu.id) === String(t.compte) && connu.name) { compteOk = true; compte = R(true, String(connu.name) + (connu.type === 'pro' ? ' · pro' : '')); }
+    else if (t.erreurCapture === 'session') compte = R(null, (vrm && vrm.connecte) ? 'reconnu, enregistrement en cours…' : 'reconnu, en attente de ta connexion à VRM');
+    else if (t.erreurCapture === 'identite') compte = R(false, 'reconnu, mais VRM n’a pas pu l’enregistrer', RECHARGE);
+    else compte = R(null, 'reconnu, enregistrement en cours…');
+  } else if (t.erreurCapture === 'identite') compte = R(false, 'VRM n’a pas pu l’enregistrer', RECHARGE);
+  else compte = R(false, 'pas encore lu', 'Connecte-toi à Leboncoin, puis ouvre « Mes annonces ».');
+  // Annonces : la lecture COMPLÈTE de CE compte (cet onglet, sinon ce navigateur).
+  let annonces;
+  const lt = t && t.lecture && nu && String(t.lecture.compte) === nu ? t.lecture : null;
+  const ll = lecture && nu && lecture[nu] ? lecture[nu] : null;
+  const L = [lt, ll].filter((x) => x && Number.isFinite(Number(x.at))).sort((a, b) => Number(b.at) - Number(a.at))[0] || null;
+  const ra = t && t.receptions && t.receptions.annonces;
+  if (!compteOk) annonces = R(null, 'en attente du compte Leboncoin');
+  else if (L && now - Number(L.at) <= LBC_LECTURE_FRAICHE_MS) {
+    const n = Number(L.total) || 0;
+    annonces = R(true, n ? `${n} lue${n > 1 ? 's' : ''} en entier {quand}` : 'aucune annonce sur ce compte (liste lue {quand})', '', Number(L.at));
+  } else if (ra && (ra.etat === 'ecriture-refusee' || ra.etat === 'lecture-refusee')) annonces = R(false, 'VRM n’a pas pu les enregistrer (rien n’est perdu)', RECHARGE, ra.at);
+  else if (ra && ra.etat === 'partiel') annonces = R(false, 'réponse trop lourde, rien n’a été envoyé', '', ra.at);
+  else if (L) annonces = R(false, 'lues en entier {quand} : trop ancien pour dire ce qui est en ligne', 'Ouvre « Mes annonces » pour les relire.', Number(L.at));
+  else if (ra && ra.etat === 'enregistre') annonces = R(null, `${Number(ra.nombre) || 0} lue${Number(ra.nombre) > 1 ? 's' : ''} {quand}, liste pas encore lue en entier`, 'Ouvre « Mes annonces » et laisse la page se charger.', ra.at);
+  else annonces = R(null, 'pas encore lues', 'Ouvre « Mes annonces ».');
+  // Ventes : ce que la page « Mes transactions » a rendu.
+  let ventes;
+  const rv = t && t.receptions && t.receptions.transactions;
+  if (!compteOk && !(rv && rv.etat === 'enregistre')) ventes = R(null, 'en attente du compte Leboncoin');
+  else if (rv && rv.etat === 'enregistre') { const n = Number(rv.nombre) || 0; ventes = R(true, `${n} lue${n > 1 ? 's' : ''} {quand}`, '', rv.at); }
+  else if (rv && rv.etat === 'liste-vide') ventes = R(true, 'aucune vente sur ce compte ({quand})', '', rv.at);
+  else if (rv && (rv.etat === 'ecriture-refusee' || rv.etat === 'lecture-refusee')) ventes = R(false, 'VRM n’a pas pu les enregistrer (rien n’est perdu)', RECHARGE, rv.at);
+  else if (rv && rv.etat === 'partiel') ventes = R(false, 'réponse trop lourde, rien n’a été envoyé', '', rv.at);
+  else if (rv && (rv.etat === 'format-non-reconnu' || rv.etat === 'aucune-annonce-reconnue')) ventes = R(false, 'Leboncoin a répondu dans une forme que VRM ne sait pas encore lire : rien n’est deviné', '', rv.at);
+  else ventes = R(null, 'pas encore lues', 'Ouvre « Mes transactions ».');
+  const geste = [compte, annonces, ventes].map((x) => x.geste).find(Boolean) || '';
+  return { compte, annonces, ventes, geste };
+}
+// « À retirer » sur la carte : la liste que VRM a calculée (§11), mais SEULEMENT
+// les lignes dont la preuve « encore en ligne » (une lecture complète, `lu`) a
+// moins de 24 h, et qu'aucune lecture complète plus récente faite dans CE
+// navigateur ne contredit (annonce absente de la liste lue). Une ligne sans
+// preuve (`lu` absent, app d'avant) n'est pas montrée : pas su ≠ en ligne.
+function aRetirerProuveCarte(liste, lecture, maintenant) {
+  const now = Number(maintenant) || Date.now();
+  return (Array.isArray(liste) ? liste : []).filter((r) => {
+    const lu = Number(r && r.lu);
+    if (!r || !r.lbcId || !(lu > 0) || !(now - lu <= LBC_LECTURE_FRAICHE_MS)) return false;
+    // Une lecture complète de SON compte, faite ici APRÈS la preuve, qui ne la porte plus.
+    const l = lecture && r.compte ? lecture[String(r.compte).replace(/^lbc-account:/i, '')] : null;
+    if (l && Array.isArray(l.ids) && Number(l.at) > lu && !l.ids.includes(String(r.lbcId))) return false;
+    return true;
+  });
+}
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
 // fusionne (par id) avec ce qui est déjà connu → l'historique se complète au fil
 // de ta navigation, sans écraser. Sert au dispatcher LBC→Vinted + synchro inverse.
@@ -17850,7 +17990,9 @@ async function noterListeLbcComplete(owner, ids, total) {
       }
       const lectures = Object.assign({}, data.lectures || {});
       const avant = lectures[owner];
-      lectures[owner] = { at: nowIso, total, n: ids.length };
+      // 5.333 : + les identifiants lus (la règle de l'app, src/enLigneLbc.js, juge
+      // alors une annonce ABSENTE de la lecture sans attendre la marque).
+      lectures[owner] = { at: nowIso, total, n: ids.length, ids: ids.slice(0, 2000).map(String) };
       // Rien ne change et la dernière lecture complète date de moins d'une heure :
       // on ne réécrit pas 230 Ko pour une date (§4.4).
       if (!sortent && !reviennent && avant && maintenant - Date.parse(avant.at || 0) < 3600e3 && avant.total === total) return { ok: true, sortent, reviennent, ecrit: false };
@@ -19277,6 +19419,7 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   // document), jamais `vrmLbcCompte` (le dernier vu, peut-être l'ancien).
   const sessListe = await sessionDeListe(sessionPage);
   if (sessListe) miens.add(sessListe.id);
+  const miensNus = new Set([...miens].map(idCompteLbc).filter(Boolean));
   if(listeMoi&&String(sessionPage||'').startsWith('lbc-account:')&&!sessListe)return {ok:false,etat:'compte-non-confirme'};
   if (LBC_URL_DESACTIVEES.test(String(url || ''))) {
     try { noterDiag('lbc_desactivees_vu'); } catch (_) {}
@@ -19368,8 +19511,12 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
         //    « caché », juste pas rangé (élargir une lecture sans l'attribuer,
         //    c'est inventer des données). `miens` vide ⇒ seule la réf VRM garde.
         const ownerId = String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '');
+        // 5.333 : « X » et « lbc-account:X » sont UN compte (le compte privé est rangé
+        // sous la seconde forme, ses annonces portent la première) — la garde ne
+        // reconnaissait pas ses propres annonces de « Mes annonces ».
+        const aMoiParOwner = !!(ownerId && (miens.has(ownerId) || miensNus.has(idCompteLbc(ownerId))));
         const aMoiParSession = !!(listeMoi && sessListe && (sessListe.prive || !ownerId || ownerId === sessListe.id));
-        if (refVRM || (ownerId && miens.has(ownerId)) || aMoiParSession) found.push({
+        if (refVRM || aMoiParOwner || aMoiParSession) found.push({
           id: sid, subject: String(title), price,
           body: bodyTxt.slice(0, 400),
           ref: refVRM,

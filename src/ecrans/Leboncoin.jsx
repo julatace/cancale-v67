@@ -1439,8 +1439,11 @@ function LeboncoinScreen() {
     // (`aRetirerDeLbcVinted`, §11) — la même que Ma journée, le tableau de bord
     // et le logo VRM sur leboncoin.fr. Preuve illisible ⇒ on garde ce qui précède
     // (aucune vente prouvée n'y figure de toute façon).
+    // (9 nov.) Ce que la règle n'a pas pu PROUVER encore en ligne sur Leboncoin.
+    const aConfAilleurs = [];
     {
-      const ar = aRetirerDeLbcVinted({ posted, numeros, enLigne: new Set([...onlineIds, ...aConfirmerIds]), vendus: preuveKO ? null : vendus, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis });
+      const ar = aRetirerDeLbcVinted({ posted, numeros, enLigne: new Set([...onlineIds, ...aConfirmerIds]), vendus: preuveKO ? null : vendus, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis, lectures: lbcRows === null ? null : lecturesLbc });
+      if (ar && Array.isArray(ar.aConfirmer)) for (const r of ar.aConfirmer) aConfAilleurs.push({ numero: r.numero || '?', title: r.titre, ou: 'Vinted', id: r.lbcId || '', lu: r.lu });
       if (ar) {
         const kAr = new Set(ar.map((r) => cleNum(r.numero)).filter(Boolean));
         for (let i = removals.length - 1; i >= 0; i--) { const r = removals[i]; if (r.etat === 'vendue' || kAr.has(cleNum(r.numero))) removals.splice(i, 1); }
@@ -1459,7 +1462,8 @@ function LeboncoinScreen() {
       // geste ; pause et suppression demandent l'identité.
       const soldEbay = numerosVendusEbay(await commandesEbayTous());   // null si un compte eBay illisible ⇒ pas su
       const deja = new Set(removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').map((r) => cleNum(r.numero)).filter(Boolean));
-      const re = aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis, deja });
+      const re = aRetirerDeLbcEbay({ soldEbay, posted, numeros, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis, deja, lectures: lbcRows === null ? null : lecturesLbc });
+      if (re && Array.isArray(re.aConfirmer)) for (const r of re.aConfirmer) aConfAilleurs.push({ numero: r.numero || '?', title: r.titre, ou: 'eBay', id: r.lbcId || '', lu: r.lu });
       if (re && re.length) {
         const parN = new Map(); removals.forEach((r) => { const k = cleNum(r.numero); if (k && !parN.has(k)) parN.set(k, r); });
         for (const r of re) {
@@ -1478,7 +1482,8 @@ function LeboncoinScreen() {
     try {
       const soldVc = numerosVendusVc(ventesVcDe(avecNumerosVc(await lireVentesVestiaire())));
       const deja = new Set(removals.filter((r) => r.etat === 'vendue').map((r) => cleNum(r.numero)).filter(Boolean));
-      const re = aRetirerDeLbcEbay({ soldEbay: soldVc, posted, numeros, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis, deja });
+      const re = aRetirerDeLbcEbay({ soldEbay: soldVc, posted, numeros, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis, deja, lectures: lbcRows === null ? null : lecturesLbc });
+      if (re && Array.isArray(re.aConfirmer)) for (const r of re.aConfirmer) aConfAilleurs.push({ numero: r.numero || '?', title: r.titre, ou: 'Vestiaire', id: r.lbcId || '', lu: r.lu });
       if (re && re.length) {
         const parN = new Map(); removals.forEach((r) => { const k = cleNum(r.numero); if (k && !parN.has(k)) parN.set(k, r); });
         for (const r of re) {
@@ -1490,6 +1495,26 @@ function LeboncoinScreen() {
       }
     } catch (_) { /* une lecture Vestiaire qui tombe ne casse jamais l'écran Leboncoin */ }
     removals.sort((a, b) => triNum(a.numero, b.numero));
+    // ⚠️⚠️ (9 nov., Julien : « elle propose de supprimer des annonces vendues sur
+    // Vinted qui ne sont plus sur Leboncoin ») UNE LIGNE « À RETIRER » SE PROUVE
+    // AUSSI CÔTÉ LEBONCOIN : son annonce doit être EN LIGNE selon la dernière
+    // lecture COMPLÈTE de « Mes annonces », de moins de 24 h (`bilanLbc.etats`,
+    // src/enLigneLbc.js — la règle de Vinted). Sinon : une vente à confirmer
+    // (dite à côté, avec le geste qui relit la liste), jamais une suppression
+    // proposée ; une annonce sortie d'une lecture complète ne revient pas.
+    const retirerAConfirmer = [];
+    for (let i = removals.length - 1; i >= 0; i--) {
+      const r = removals[i];
+      const e = r.id ? bilanLbc.etats.get(String(r.id)) : null;
+      if (e && e.etat === 'enligne') continue;
+      removals.splice(i, 1);
+      if (r.etat === 'vendue' && !(e && e.etat === 'sortie')) retirerAConfirmer.unshift({ numero: r.numero, title: r.title, ou: r.ou || 'Vinted', id: r.id || '', lu: e ? e.lu : null });
+    }
+    {
+      const dejaK = new Set([...removals, ...retirerAConfirmer].map((r) => cleNum(r.numero)).filter(Boolean));
+      for (const r of aConfAilleurs) { const k = cleNum(r.numero); if (k && dejaK.has(k)) continue; if (k) dejaK.add(k); retirerAConfirmer.push(r); }
+      retirerAConfirmer.sort((a, b) => triNum(a.numero, b.numero));
+    }
     // ── L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ────────
     // Les paires que Vinted propose encore à la vente (`onlineIds`), et celles que
     // Vinted a déjà vendues (`vendus`) : vendue ici ET là, c'est une vente qu'il
@@ -1531,7 +1556,7 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
-    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
+    setData({ retirerAConfirmer, catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -1905,6 +1930,22 @@ function LeboncoinScreen() {
             de Leboncoin » lui ferait perdre une vente sur une paire qu'il a
             encore. Trois états, et seul le prouvé est rouge — §5 « mieux vaut un
             blanc qu'un faux », et on dit « à vérifier », jamais « vendu ». */}
+        {/* (9 nov.) Vendues ailleurs, mais l'annonce Leboncoin n'est pas PROUVÉE en
+            ligne (aucune lecture complète de moins de 24 h) : rien n'est proposé à
+            la suppression ; le geste qui tranche, une fois. */}
+        {Array.isArray(data.retirerAConfirmer) && data.retirerAConfirmer.length > 0 && (
+          <Card>
+            <div data-lbc-retirer-aconfirmer={data.retirerAConfirmer.length}>
+              <Titre>{data.retirerAConfirmer.length} vendue{data.retirerAConfirmer.length > 1 ? 's' : ''} ailleurs — encore sur Leboncoin ? À confirmer</Titre>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>
+                {(() => { const lus = data.retirerAConfirmer.map((r) => r.lu).filter((x) => Number.isFinite(x)); return lus.length ? `Ta liste « Mes annonces » a été ${quandLectureLbc(Math.max(...lus))}` : "Ta liste « Mes annonces » n'a pas encore été lue en entier"; })()} : je ne sais pas si {data.retirerAConfirmer.length > 1 ? 'ces annonces sont' : 'cette annonce est'} encore en ligne, donc je ne te propose pas de supprimer. <a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>Ouvre « Mes annonces » sur Leboncoin</a> : l'extension la relit en entier, et seules celles encore en ligne s'afficheront ici.
+              </div>
+              {data.retirerAConfirmer.slice(0, 30).map((r, i) => (
+                <div key={i} data-lbc-retirer-aconfirmer-num={cleNum(r.numero) || undefined} style={{ fontSize: 13, color: C.text, padding: '3px 0' }}><b>N°{r.numero}</b> · {r.title || '—'} <span style={{ color: C.muted }}>· vendue sur {r.ou}</span></div>
+              ))}
+            </div>
+          </Card>
+        )}
         {data.removals.length > 0 && (() => {
           const vendues = data.removals.filter(r => r.etat === 'vendue' && r.ou !== 'eBay' && r.ou !== 'Vestiaire');
           const venduesEbay = data.removals.filter(r => r.etat === 'vendue' && r.ou === 'eBay');
