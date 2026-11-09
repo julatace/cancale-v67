@@ -24,7 +24,7 @@
   box-shadow: 0 0 0 2px var(--w-fond, var(--vrm-bg, #F2F2F7)) !important; transform: none;
 }
 /* Tout va bien : le badge se tait presque (gris doux) ; seul l'ambre appelle un geste. */
-:root:root body .vrm-etat-pastille[data-etat-ton="ok"] .vrm-etat-avatar > .vrm-etat-point { opacity: .55 !important; }
+:root:root body .vrm-etat-pastille[data-etat-ton="ok"] .vrm-etat-avatar > .vrm-etat-point { opacity: .55 !important; box-shadow: none !important; }
 :root:root body .vrm-etat-pastille[data-etat-ton="attention"] .vrm-etat-avatar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--etat-ton) 45%, transparent); }
 :root:root body .vrm-etat-pastille[data-etat-actions="verif"] .vrm-etat-avatar > .vrm-etat-point { animation: none; }
 @media (prefers-reduced-motion: no-preference) {

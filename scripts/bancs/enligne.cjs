@@ -164,7 +164,21 @@ async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligne
   await pg.waitForTimeout(2000);
   return { ctx, pg, errs };
 }
-const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
+
+// (9 nov., lot AI) La fraîcheur d'Annonces / du tableau de bord est une LIGNE COURTE : son texte
+// (la règle, le geste, la liste « à confirmer ») vit dans SA pop-up. Le banc l'ouvre pour lire,
+// puis la ferme (Échap) — la règle jugée est la même, seule la place du texte a changé.
+const ouvrirPop = async (pg, sel) => {
+  if (await pg.locator('[data-popup-corps]').count()) return true;
+  const b = pg.locator(`${sel} [data-popup-ouvrir]`).first();
+  if (!(await b.count())) return false;
+  await b.click({ timeout: 8000 }).catch(() => {});
+  return pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
+};
+const fermerPop = async (pg) => { if (!(await pg.locator('[data-popup-corps]').count())) return; await pg.keyboard.press('Escape'); await pg.waitForSelector('[data-popup-corps]', { state: 'detached', timeout: 4000 }).catch(() => {}); };
+const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel); const r = await pg.evaluate(f, arg); if (o) await fermerPop(pg); return r; };
+const cliquerPop = async (pg, sel, cible) => { await ouvrirPop(pg, sel); await pg.click(`[data-popup-corps] ${cible}`, { timeout: 8000 }); await pg.waitForTimeout(250); await fermerPop(pg); };
+const lireAnnonces0 = (pg) => pg.evaluate((PAIRE) => {
   const f = [...document.querySelectorAll('[data-ann-fraicheur]')];
   const el = f[0];
   // (31 oct.) Les annonces « à confirmer » restent dans la grille, ÉTIQUETÉES
@@ -181,12 +195,13 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
     comptesAC: el ? el.getAttribute('data-a-confirmer-comptes') : null,
     supprimees: el ? el.getAttribute('data-supprimees') : null,
     cap: el ? el.getAttribute('data-cap') : null,
-    texte: el ? el.innerText : '',
+    texte: (document.querySelector('[data-popup-corps] [data-fraicheur-detail]') || el || { innerText: '' }).innerText,
     liste: [...document.querySelectorAll('[data-a-confirmer-annonce]')].map((x) => x.getAttribute('data-a-confirmer-annonce')).sort(),
-    couleurs: el ? [...new Set([...el.querySelectorAll('*')].concat([el]).map((x) => getComputedStyle(x).color))] : [],
+    couleurs: el ? [...new Set([...(document.querySelector('[data-popup-corps]') || el).querySelectorAll('*')].concat([el]).map((x) => getComputedStyle(x).color))] : [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   };
 }, PAIRE);
+const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fraicheur], [data-dash-fraicheur]'); const r = await lireAnnonces0(pg); if (o) await fermerPop(pg); return r; };
 
 (async () => {
   let b;
@@ -215,7 +230,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
         dit(a.cap === 'ok' && /n.importe lequel de tes comptes/.test(a.texte), `${t} : et le geste vrai pour une extension à jour (n'importe lequel de ses comptes)`, a.texte);
         dit(a.supprimees === '2', `${t} : elle dit aussi combien sont sorties parce qu'elles ne sont plus en ligne`, JSON.stringify(a.supprimees));
         dit(a.liste.length === 0, `${t} : la liste « à confirmer » est REPLIÉE par défaut`, JSON.stringify(a.liste));
-        await r.pg.click('[data-a-confirmer-ouvrir]');
+        await cliquerPop(r.pg, '[data-ann-fraicheur]', '[data-a-confirmer-ouvrir]');
         await r.pg.waitForTimeout(300);
         const a2 = await lireAnnonces(r.pg);
         dit(JSON.stringify(a2.liste) === '["7041","7042"]', `${t} : elle s'ouvre au clic, avec ces deux annonces`, JSON.stringify(a2.liste));
@@ -231,10 +246,10 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
     if (veut('3')) await essaie('3', async () => {
       const r = await rendre(b, { lignes: BASE(), onglet: 'dashboard' });
       await r.pg.waitForTimeout(1500);
-      const d = await r.pg.evaluate(() => {
+      const d = await dansPop(r.pg, '[data-dash-fraicheur]', () => {
         const s = document.querySelector('[data-dash-stat="online"]');
         const f = [...document.querySelectorAll('[data-dash-fraicheur]')];
-        return { online: s ? (s.innerText.match(/\d+/) || [null])[0] : null, n: f.length, ac: f[0] ? f[0].getAttribute('data-a-confirmer') : null, texte: f[0] ? f[0].innerText : '' };
+        return { online: s ? (s.innerText.match(/\d+/) || [null])[0] : null, n: f.length, ac: f[0] ? f[0].getAttribute('data-a-confirmer') : null, texte: (document.querySelector('[data-popup-corps] [data-fraicheur-detail]') || f[0] || { innerText: '' }).innerText };
       });
       dit(d.online === '3', '« Annonces en ligne » compte 3 (7003, 7011, 7031) — ni les anciennes, ni le compte figé', JSON.stringify(d));
       dit(d.n === 1 && d.ac === '2', 'et la même ligne « à confirmer », une fois', JSON.stringify(d));
@@ -260,7 +275,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
       if (veut('5')) await essaie('5 ' + t, async () => {
         const r = await rendre(b, { lignes: BASE(), tel, enligneKO: true });
         const a = await lireAnnonces(r.pg);
-        await r.pg.click('[data-a-confirmer-ouvrir]').catch(() => {});
+        await cliquerPop(r.pg, '[data-ann-fraicheur]', '[data-a-confirmer-ouvrir]').catch(() => {});
         await r.pg.waitForTimeout(300);
         const a2 = await lireAnnonces(r.pg);
         const vues = new Set([...a2.cartes, ...a2.liste]);
@@ -272,7 +287,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
         // publique (la republiée 7003) : le croire ferait cacher la republiée.
         dit(!a.cartes.includes('7001') && !a.cartes.includes('7002') && !a.cartes.includes('7031'), `${t} : aucune lecture de plus de 30 min ne décide seule — tout est « à confirmer », rien n'est ressuscité`, JSON.stringify(a.cartes));
         dit(a.supprimees === '0', `${t} : et rien n'est dit « plus en ligne » sur une lecture qui n'a pas eu lieu`, JSON.stringify(a.supprimees));
-        const pk = await r.pg.evaluate(() => { const f = document.querySelector('[data-ann-fraicheur]'); const s = f && f.querySelector('[data-pub-ko-dit]'); return { attr: f && f.getAttribute('data-pub-ko'), n: document.querySelectorAll('[data-pub-ko-dit]').length, t: s ? s.innerText : '' }; });
+        const pk = await dansPop(r.pg, '[data-ann-fraicheur]', () => { const f = document.querySelector('[data-ann-fraicheur]'); const s = document.querySelector('[data-popup-corps] [data-pub-ko-dit]'); return { attr: f && f.getAttribute('data-pub-ko'), n: document.querySelectorAll('[data-pub-ko-dit]').length, t: s ? s.innerText : '' }; });
         dit(pk.attr === '1' && pk.n === 1 && /n.ont pas pu être lues/.test(pk.t), `${t} : et la panne est DITE, une fois`, JSON.stringify(pk));
         dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));
         await r.ctx.close();
@@ -369,7 +384,8 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
       const lu = {};
       for (const onglet of ['dashboard', 'cat_annonces']) {
         const r = await rendre(b, { lignes: BASE(), onglet });
-        await r.pg.click(onglet === 'dashboard' ? '[data-dash-fraicheur] [data-a-confirmer-ouvrir]' : '[data-ann-fraicheur] [data-a-confirmer-ouvrir]', { timeout: 8000 });
+        await cliquerPop(r.pg, onglet === 'dashboard' ? '[data-dash-fraicheur]' : '[data-ann-fraicheur]', '[data-a-confirmer-ouvrir]');
+        await ouvrirPop(r.pg, onglet === 'dashboard' ? '[data-dash-fraicheur]' : '[data-ann-fraicheur]');
         await r.pg.waitForTimeout(400);
         lu[onglet] = await r.pg.evaluate(() => [...document.querySelectorAll('[data-a-confirmer-annonce]')].map((x) => x.getAttribute('data-a-confirmer-annonce') + ' ' + ((x.innerText.match(/N°\S+|sans N°/) || [''])[0])));
         await r.ctx.close();
@@ -434,7 +450,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
       for (const pc of [true, false]) {
         const r = await rendre(b, { lignes: BASE(), pontConnecte: pc });
         await r.pg.waitForTimeout(1500);
-        etats[pc] = await r.pg.evaluate(() => { const f = document.querySelector('[data-ann-fraicheur]'); const g = f && f.querySelector('[data-geste-dit]'); return { relit: f && f.getAttribute('data-relit'), promesse: f && f.getAttribute('data-promesse'), geste: g ? g.innerText : '' }; });
+        etats[pc] = await dansPop(r.pg, '[data-ann-fraicheur]', () => { const f = document.querySelector('[data-ann-fraicheur]'); const g = document.querySelector('[data-popup-corps] [data-geste-dit]'); return { relit: f && f.getAttribute('data-relit'), promesse: f && f.getAttribute('data-promesse'), geste: g ? g.innerText : '' }; });
         await r.ctx.close();
       }
       dit(etats.true.relit === '1' && /vérifiées à ta prochaine visite/.test(etats.true.geste), 'extension connectée : la promesse est faite', JSON.stringify(etats.true));
@@ -449,7 +465,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
     if (veut('13')) await essaie('13b périmé', async () => {
       const r = await rendre(b, { lignes: BASE(), pontPerime: true });
       await r.pg.waitForTimeout(1500);
-      const e = await r.pg.evaluate(() => { const f = document.querySelector('[data-ann-fraicheur]'); const g = f && f.querySelector('[data-geste-dit]'); const x = document.querySelector('[data-etat-actions]');
+      const e = await dansPop(r.pg, '[data-ann-fraicheur]', () => { const f = document.querySelector('[data-ann-fraicheur]'); const g = document.querySelector('[data-popup-corps] [data-geste-dit]'); const x = document.querySelector('[data-etat-actions]');
         return { relit: f && f.getAttribute('data-relit'), promesse: f && f.getAttribute('data-promesse'), perime: f && f.getAttribute('data-perime'), geste: g ? g.innerText : '', pastille: x ? x.getAttribute('data-etat-code') : null }; });
       dit(e.pastille === 'perime', 'la pastille dit « périmé »', JSON.stringify(e.pastille));
       dit(e.relit === '0' && e.promesse === '0' && !/vérifiées à ta prochaine visite|sort d.ici tout de suite/.test(e.geste), 'et l’écran Annonces ne promet AUCUNE relecture (une voix, la même que la pastille)', JSON.stringify(e));
@@ -461,3 +477,4 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
   console.log(ko ? `\n❌ enligne : ${ko} rouge(s)` : '\n✅ enligne : tout est vert');
   process.exit(ko ? 1 : 0);
 })();
+

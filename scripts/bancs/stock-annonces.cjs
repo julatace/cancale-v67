@@ -156,11 +156,11 @@ const shot = async (pg, nom) => {
   if (!process.env.SHOT) return;
   for (const [ou, sel] of [['haut', null], ['etagere', '[data-meuble="mA"]'], ['liste', '[data-stock-liste]']]) {
     if (sel) { const ok = await pg.evaluate((s) => { const el = document.querySelector(s); if (el) el.scrollIntoView({ block: 'start' }); return !!el; }, sel); if (!ok) continue; }
-    else await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); if (el) el.scrollIntoView({ block: 'center' }); });
+    else await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (el) el.scrollIntoView({ block: 'center' }); });
     await pg.waitForTimeout(250);
     await pg.screenshot({ path: `${process.env.SHOT}-${nom}-${ou}.png` });
   }
-  await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); if (el) el.scrollIntoView({ block: 'center' }); });
+  await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (el) el.scrollIntoView({ block: 'center' }); });
 };
 const attr = (pg, sel, a) => pg.evaluate(([s, x]) => { const el = document.querySelector(s); return el ? el.getAttribute(x) : null; }, [sel, a]);
 const toucher = async (pg, tel, sel) => { if (tel) await pg.tap(sel); else await pg.click(sel); };
@@ -169,6 +169,19 @@ const finPage = async (pg, errs, t, quoi) => {
   dit(large <= 1, `${t} : I — pas de défilement horizontal de la page (${quoi})`, String(large));
   dit(errs.length === 0, `${t} : I — aucune erreur de page (${quoi})`, errs.join(' | ').slice(0, 300));
 };
+
+// (9 nov., lot AI) Le résumé du Stock est une LIGNE COURTE : la phrase entière (comptes nommés, masquées,
+// sans N°, gestes) vit dans SA pop-up. Le banc l'ouvre pour lire (texte de la ligne + de la pop-up), puis la
+// ferme — la règle jugée ne change pas.
+const ouvrirPop = async (pg, sel) => {
+  if (await pg.locator('[data-popup-corps]').count()) return true;
+  const b = pg.locator(`${sel} [data-popup-ouvrir]`).first();
+  if (!(await b.count())) return false;
+  await b.click({ timeout: 8000 }).catch(() => {});
+  return pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
+};
+const fermerPop = async (pg) => { if (!(await pg.locator('[data-popup-corps]').count())) return; await pg.keyboard.press('Escape'); await pg.waitForSelector('[data-popup-corps]', { state: 'detached', timeout: 4000 }).catch(() => {}); };
+const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel); const r = await pg.evaluate(f, arg); if (o) await fermerPop(pg); return r; };
 
 (async () => {
   let b;
@@ -183,7 +196,7 @@ const finPage = async (pg, errs, t, quoi) => {
         const theme = await pg.evaluate(() => document.documentElement.getAttribute('data-theme') || '');
         dit(theme === (sombre ? 'dark' : 'light'), `${t} : le thème demandé est rendu`, theme);
         // A — les chiffres en tête.
-        const tete = await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); if (!el) return null; return { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), ac: el.getAttribute('data-stock-a-confirmer'), ma: el.getAttribute('data-stock-masquees'), txt: el.innerText.replace(/\s+/g, ' ') }; });
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (!el) return null; return { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), ac: el.getAttribute('data-stock-a-confirmer'), ma: el.getAttribute('data-stock-masquees'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') }; });
         dit(!!tete && tete.n === '7' && tete.am === '0', `${t} : A/V1 — 7 annonces actuelles (N°2 sur deux sites, N°9 Vinted+Vestiaire : une fois chacune ; N°41 Vestiaire seul), pas « au moins »`, JSON.stringify(tete));
         dit(!!tete && tete.ac === '1' && /compte_beta/.test(tete.txt) && /à confirmer/.test(tete.txt), `${t} : A — dont 1 « à confirmer », le compte NOMMÉ`, tete && tete.txt);
         dit(!!tete && tete.ma === '1' && /masquée/.test(tete.txt), `${t} : A — dont 1 masquée par Vinted, comptée parmi les présentes`, tete && tete.txt);
@@ -237,7 +250,7 @@ const finPage = async (pg, errs, t, quoi) => {
       });
       await essaie(t + ' partiel', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'partiel' });
-        const tete = await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: el.innerText.replace(/\s+/g, ' ') } : null; });
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
         dit(!!tete && tete.n === '6' && tete.am === '1' && /au moins/.test(tete.txt) && /compte_beta/.test(tete.txt), `${t} : G — compte_beta pas lu : « au moins 6 », le compte nommé`, JSON.stringify(tete));
         const e21 = await attr(pg, '[data-case-num="21"]', 'data-case-etat');
         dit(e21 !== 'plusenligne' && !(await pg.$('[data-stock-plus-en-ligne] [data-stock-rangee="21"]')) && !!(await pg.$('[data-stock-rangees-passu]')), `${t} : G — N°21 (de compte_beta) n'est PAS dite « plus en ligne » : « pas vérifiée »`, String(e21));
@@ -248,7 +261,7 @@ const finPage = async (pg, errs, t, quoi) => {
       });
       await essaie(t + ' vc-sans-num', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'vc-sans-num' });
-        const tete = await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: el.innerText.replace(/\s+/g, ' '), sn: (el.querySelector('[data-stock-vc-sans-numero]') || {}).textContent || '' } : null; });
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' '), sn: ((pop || el).querySelector('[data-stock-vc-sans-numero]') || {}).textContent || '' } : null; });
         dit(!!tete && tete.n === '7' && tete.am === '1' && /au moins/.test(tete.txt), `${t} : V2 — annonce Vestiaire sans N° : pas comptée (7), total « au moins »`, JSON.stringify(tete && { n: tete.n, am: tete.am }));
         dit(!!tete && /Vestiaire sans N°/.test(tete.sn) && /Paire inventée une 42/.test(tete.sn), `${t} : V2 — elle est NOMMÉE (son titre)`, tete && tete.sn);
         const l1 = await attr(pg, '[data-stock-annonce="1"]', 'data-stock-annonce-plats');
@@ -259,7 +272,7 @@ const finPage = async (pg, errs, t, quoi) => {
       });
       await essaie(t + ' vc-vieille', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'vc-vieille' });
-        const tete = await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); return el ? { n: el.getAttribute('data-stock-actuelles'), ac: el.getAttribute('data-stock-a-confirmer'), txt: el.innerText.replace(/\s+/g, ' ') } : null; });
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), ac: el.getAttribute('data-stock-a-confirmer'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
         dit(!!tete && tete.n === '7' && tete.ac === '2' && /Vestiaire, lu il y a 3 j/.test(tete.txt) && /Mes articles/.test(tete.txt), `${t} : V3 — lecture Vestiaire de 3 jours : N°41 « à confirmer », Vestiaire NOMMÉ avec le geste`, tete && tete.txt);
         const l41 = await attr(pg, '[data-stock-annonce="41"]', 'data-stock-annonce-etat'), l9 = await attr(pg, '[data-stock-annonce="9"]', 'data-stock-annonce-etat');
         dit(l41 === 'aconfirmer' && l9 === 'enligne', `${t} : V3 — N°41 « à confirmer » ; N°9 reste « en ligne » (lue fraîche sur Vinted)`, JSON.stringify([l41, l9]));
@@ -269,7 +282,7 @@ const finPage = async (pg, errs, t, quoi) => {
       });
       await essaie(t + ' vc-absent', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'vc-absent' });
-        const tete = await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: el.innerText.replace(/\s+/g, ' ') } : null; });
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
         dit(!!tete && tete.n === '6' && tete.am === '1' && /au moins/.test(tete.txt) && /Vestiaire \(jamais lu/.test(tete.txt), `${t} : V4 — Vestiaire jamais lu : « au moins 6 », NOMMÉ avec le geste`, tete && tete.txt);
         const e8 = await attr(pg, '[data-case-num="8"]', 'data-case-etat');
         dit(e8 !== 'plusenligne' && !(await pg.$('[data-stock-plus-en-ligne]')) && !!(await pg.$('[data-stock-rangees-passu]')), `${t} : V4 — N°8 rangée n'est PAS dite « plus en ligne » (Vestiaire pourrait la porter) : « pas vérifiée »`, String(e8));
@@ -279,7 +292,7 @@ const finPage = async (pg, errs, t, quoi) => {
       });
       await essaie(t + ' rien', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'rien' });
-        const tete = await pg.evaluate(() => { const el = document.querySelector('[data-stock-actuelles]'); return el ? { n: el.getAttribute('data-stock-actuelles'), txt: el.innerText.replace(/\s+/g, ' ') } : null; });
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
         dit(!!tete && tete.n === 'passu' && /—/.test(tete.txt) && /pas pu lire/.test(tete.txt) && !/Aucune annonce/i.test(tete.txt), `${t} : H — rien lu : « — » et la raison, jamais « aucune annonce »`, JSON.stringify(tete));
         const pl = await pg.evaluate(() => [...document.querySelectorAll('[data-case-etat="plusenligne"]')].length);
         dit(pl === 0 && !(await pg.$('[data-stock-plus-en-ligne]')) && await attr(pg, '[data-case-num="7"]', 'data-case-etat') === 'vendue', `${t} : H — aucune case dite « plus en ligne » ; la vendue reste allumée`, String(pl));
