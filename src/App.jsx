@@ -502,6 +502,8 @@ import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRel
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
+// (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
+import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
@@ -28028,8 +28030,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Annonces marquées VENDUES à la main (id d'annonce) : retirées des Annonces
   // tout de suite, sans attendre que Vinted/l'extension rescanne le compte.
   const [soldManual, setSoldManual] = useStateCle('vinted_annonces_vendues', () => new Set(load('vinted_annonces_vendues', [])));
-  const markSold = (id) => setSoldManual(prev => { const n=new Set(prev); n.add(String(id)); save('vinted_annonces_vendues',[...n]); return n; });
-  const unmarkSold = (id) => setSoldManual(prev => { const n=new Set(prev); n.delete(String(id)); save('vinted_annonces_vendues',[...n]); return n; });
+  // (9 nov., lot B) « Marquer vendue » (une entrée de `vinted_annonces_vendues`, rien chez Vinted) et
+  // « Réafficher » : réversibles dans VRM ⇒ plus de confirmation, « Annuler » 5 s remet l'état exact.
+  const gesteVendues = (ids, oui) => {
+    const ops = [...new Set((ids || []).map(String))].filter((id) => soldManual.has(id) !== !!oui)
+      .map((id) => ({ k: 'vinted_annonces_vendues', type: 'ensemble', id, apres: !!oui, avant: !oui }));
+    if (!ops.length) return;
+    gesteVrm(oui ? (ops.length > 1 ? `${ops.length} annonces marquées vendues` : 'Annonce marquée vendue') : (ops.length > 1 ? `${ops.length} annonces réaffichées` : 'Annonce réaffichée'), ops, { vinted_annonces_vendues: setSoldManual });
+  };
   const [emailSales, setEmailSales] = useState(null); // emails de vente (auto-retrait des annonces vendues)
   const [showEmailSold, setShowEmailSold] = useState(false); // réafficher les annonces retirées auto
   // ⚠️ LA NUMÉROTATION N'EST PLUS DÉSACTIVABLE (23 août 2026).
@@ -28427,7 +28435,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const markCollected = (t) => gesteCollecte(t, true);
   const unmarkCollected = (t) => gesteCollecte(t, false);
   // Tout marquer retiré en un tap (les transporteurs n'envoient pas d'email « récupéré »).
-  const markAllCollected = (list) => { setCollected(prev => { const n = new Set(prev); (list || []).forEach(t => n.add(colisKey(t))); save('vrm_colis_collected', [...n]); return n; }); };
+  // (9 nov., lot B) « Tout marquer retiré » : réversible dans VRM ⇒ plus de confirmation, un seul geste
+  // annulable (chaque colis posé avec sa valeur d'avant ; « Annuler » les remet tous exactement).
+  const markAllCollected = (list) => {
+    // (Comme avant : seule la liste des retirés change — pas de date posée par ce geste de lot.)
+    const vus = new Set(); const ops = [];
+    for (const t of (list || [])) { const k = colisKey(t); if (!k || vus.has(k) || collected.has(k)) continue; vus.add(k);
+      ops.push({ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: true, avant: false }); }
+    if (!ops.length) return;
+    gesteVrm(vus.size > 1 ? `${vus.size} colis retirés` : 'Colis retiré', ops, { vrm_colis_collected: setCollected });
+  };
   const isCollected = (t) => collected.has(colisKey(t));
   // Un colis « à retirer » (available) qui traîne depuis > 14 j est forcément
   // déjà récupéré (un point relais ne garde pas un colis plus longtemps) : on
@@ -29435,7 +29452,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
   const [bordsHidden, setBordsHidden] = useStateCle('vinted_bords_hidden', () => load('vinted_bords_hidden', {}));
-  const hideBord = (b) => { const k=bordKey(b); if(!k) return; setBordsHidden(prev=>{ const u={...prev,[k]:1}; save('vinted_bords_hidden',u); return u; }); };
+  // (9 nov., lot B) « Masquer ce bordereau » : réversible dans VRM (une entrée de `vinted_bords_hidden`)
+  // ⇒ plus de confirmation : il part tout de suite, « Annuler » 5 s remet la valeur d'avant exacte.
+  const hideBord = (b) => { const k=bordKey(b); if(!k) return; gesteVrm('Bordereau masqué', [{ k: 'vinted_bords_hidden', type: 'cle', id: k, apres: 1, avant: bordsHidden[k] }], { vinted_bords_hidden: setBordsHidden }); };
   const unhideBord = (b) => { const k=bordKey(b); if(!k) return; setBordsHidden(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_hidden',u); return u; }); };
   const isBordHidden = (b) => !!bordsHidden[bordKey(b)];
   const [showBordDone, setShowBordDone] = useState(false); // afficher les bordereaux déjà expédiés
@@ -34222,13 +34241,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ MESURÉ AU BANC LE 7 SEPTEMBRE, onglet « Tous » : **72 880 px de page sur
   // iPhone** — quatre-vingt-six écrans de défilement — pour 8 844 nœuds et
   // 329 photos. La chaîne de filtres vivait, là aussi, en plein milieu du JSX.
-  const masquerAchat = async (o) => {
-    const ok = await askConfirm({ title: 'Masquer cet achat ?', desc: `« ${o.title || 'cet achat'} » sort de la liste des achats et de tous les totaux de la compta. Rien n'est supprimé : tu le retrouves dans l’onglet Masqués (menu), et il revient d'un clic.`, ok: 'Masquer' });
-    if (!ok) return;
-    const n = achatsMasques(); n.add(String(o.transaction_id)); ecrireAchatsMasques([...n]);
-    setBuys(prev => prev && prev.items ? { ...prev, items: prev.items.filter(x => String(x.transaction_id) !== String(o.transaction_id)) } : prev);
-    if (_acctCache['purchased']) { _acctCache['purchased'].items = (_acctCache['purchased'].items || []).filter(x => String(x.transaction_id) !== String(o.transaction_id)); _persistAcctCache(); }
-    toast('Achat masqué — Paramètres → Achats masqués pour le réafficher.');
+  // (9 nov., lot B — « Annuler » au lieu d'une confirmation) Masquer un achat
+  // est RÉVERSIBLE dans VRM (une entrée de `vinted_purchases_hidden`, rien chez
+  // Vinted) : il part tout de suite, la pilule offre « Annuler » 5 s, et
+  // l'annulation remet EXACTEMENT l'état d'avant (l'achat à sa place dans la
+  // liste, la liste des masqués d'avant). src/annulerCommandes.js : la règle.
+  const masquerAchat = (o) => {
+    const tx = String(o && o.transaction_id != null ? o.transaction_id : '');
+    if (!tx) return;
+    const deja = achatsMasques().has(tx);
+    if (deja) return;
+    // Où il était (pour le remettre à SA place, pas en bas de liste).
+    let place = -1; let placeCache = -1;
+    gesteVrm('Achat masqué', [{ k: ACHATS_MASQUES, type: 'ensemble', id: tx, apres: true, avant: false }], {}, (sens) => {
+      const n = achatsMasques(); if (sens === 'apres') n.add(tx); else n.delete(tx);
+      _achatsMasques = [...n];
+      setBuys(prev => {
+        if (!prev || !prev.items) return prev;
+        if (sens === 'apres') { place = prev.items.findIndex(x => String(x.transaction_id) === tx); return { ...prev, items: prev.items.filter(x => String(x.transaction_id) !== tx) }; }
+        if (prev.items.some(x => String(x.transaction_id) === tx)) return prev;
+        const items = [...prev.items]; items.splice(place >= 0 && place <= items.length ? place : items.length, 0, o); return { ...prev, items };
+      });
+      const c = _acctCache['purchased'];
+      if (c) {
+        const l = c.items || [];
+        if (sens === 'apres') { placeCache = l.findIndex(x => String(x.transaction_id) === tx); c.items = l.filter(x => String(x.transaction_id) !== tx); }
+        else if (!l.some(x => String(x.transaction_id) === tx)) { const items = [...l]; items.splice(placeCache >= 0 && placeCache <= items.length ? placeCache : items.length, 0, o); c.items = items; }
+        _persistAcctCache();
+      }
+    });
   };
   const achatsAffiches = useMemo(() => { const uidA = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = buysBase
@@ -36177,8 +36218,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const p = lot ? null : propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx, estLot: estLotApp });
     const patch = ecritureLienAchat(numeros[f.cle] || {}, a, { lot, montant: p ? p.centimes : prixAchatCentimes(a), accNom: a._acc ? accNameOf(a._acc) : '', photo: orderPhoto(a) || '' });
     if (!patch) return;
-    poserPatchAchat('f:' + f.cle, patch);
-    toast(`N°${f.numero} relié`);
+    // (9 nov., lot B) Relier un achat (SON clic, par identité) : la pilule « Annuler » 5 s au lieu du
+    // simple message — l'annulation remet exactement les champs d'avant de CETTE fiche.
+    if (numeros[f.cle]) gesteVrm(`N°${f.numero} relié`, [{ k: 'vinted_annonce_numeros', type: 'champs', id: f.cle, apres: patch, avant: champsAvant(numeros[f.cle], patch) }], { vinted_annonce_numeros: setNumeros });
+    else { poserPatchAchat('f:' + f.cle, patch); toast(`N°${f.numero} relié`); }
   };
   const asoRepartir = async ({ lot, saisies, inclus }) => {
     const ok = await askConfirm({ title: `Répartir ${lot.titre ? '« ' + lot.titre + ' »' : 'ce lot'} ?`,
@@ -36276,9 +36319,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     },
     delier: async (aid, cle) => {
       const e = numeros[cle]; const patch = ecritureDelierGros(e, aid, prixParNumFo); if (!patch) return false;
-      const ok = await askConfirm({ title: `Délier le N°${e.numero} ?`, desc: patch.buyPrice !== undefined ? 'Le prix posé par cet achat part aussi.' : 'Son prix d’achat saisi à la main reste.', ok: 'Délier', cancel: 'Annuler' });
-      if (!ok) return false;
-      poserPatchAchat('f:' + cle, patch);
+      // (9 nov., lot B) Délier est réversible dans VRM (les champs de SA fiche, jamais le N°) : plus de
+      // confirmation, « Annuler » 5 s remet exactement les champs d'avant (src/annulerCommandes.js).
+      gesteVrm(patch.buyPrice !== undefined ? `N°${e.numero} délié · son prix part aussi` : `N°${e.numero} délié`,
+        [{ k: 'vinted_annonce_numeros', type: 'champs', id: cle, apres: patch, avant: champsAvant(e, patch) }], { vinted_annonce_numeros: setNumeros });
       return true;
     },
     poserPrix: async (aid) => {
@@ -37626,6 +37670,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const t=setTimeout(()=>{ try{ ouvrirLot(); }catch(_){} }, 400);
     return ()=>clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[emailBords, only]);
+  // (9 nov., lot B) ⌘K « Imprimer les bordereaux du jour » quand Colis est DÉJÀ ouvert : la même
+  // feuille « Tout imprimer » (rien n'est imprimé avant son clic).
+  const ouvrirLotRef = React.useRef(null); ouvrirLotRef.current = ouvrirLot;
+  React.useEffect(()=>{
+    if(only!=='bordereaux') return undefined;
+    const f=()=>{ if(!_pendingBordPrint || !Array.isArray(emailBords)) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} };
+    window.addEventListener('vrm:tout-imprimer', f); return ()=>window.removeEventListener('vrm:tout-imprimer', f);
   },[emailBords, only]);
   // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
   const adjustBordPlacement = async () => {
@@ -42711,7 +42763,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
                     {/* (3 nov.) L'histoire de CE N° et sa copie (N° neuf). */}
                     {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>Histoire · Dupliquer</button>}
-                    <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
+                    <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={()=>{ gesteVendues([it.id], true); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
                   </div>
                   </SheetShell>
                   )}
@@ -42910,7 +42962,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:12,padding:'7px 11px'}}>
               <span style={{color:C.warn,fontWeight:600}}>✓ {hidden.length} annonce{hidden.length>1?'s':''} marquée{hidden.length>1?'s':''} vendue{hidden.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hidden.map(it=>it.title).join(' · ')}</span>
-              <button type="button" onClick={async ()=>{ if(await askConfirm('Réafficher toutes les annonces marquées vendues ?')) hidden.forEach(it=>unmarkSold(it.id)); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
+              <button type="button" data-reafficher-vendues="" onClick={()=>{ gesteVendues(hidden.map(it=>it.id), false); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
             </div>
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
@@ -44693,7 +44745,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         ) : null; })()}
                       </div>
                       {b && <button type="button" onClick={async ()=>{
-                        if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b);
+                        hideBord(b);
                       }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:12,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>}
                       {/* (2 nov., 22 h) « … » : « Colis fait », « Marquer imprimé », « Suivre » (maquette : rien sous la frise). */}
                       <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={e.txn||e.key} aria-label="Plus d’actions pour ce colis" title="Colis fait, marquer imprimé, suivre le colis" aria-expanded="false"
@@ -46182,7 +46234,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🗺️ Ma tournée</div><div style={{fontSize:12,color:C.muted}}>{avail.length} colis · {points.length} point{points.length>1?'s':''} relais — le plus chargé en premier.</div></div>
-              {avail.length>0 && <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer TOUS ces colis comme récupérés ?')){ markAllCollected(avail); setTourneeOpen(false); } }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:12,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
+              {avail.length>0 && <button type="button" onClick={()=>{ markAllCollected(avail); setTourneeOpen(false); }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:12,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
               <button type="button" onClick={()=>setTourneeOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
@@ -52436,6 +52488,26 @@ function AppCoeur() {
     const j = voisinClavier(l.length, i, e.key); if (j == null) return;
     e.preventDefault(); e.stopPropagation(); allerLigne(l, j);
   };
+  // ── (9 nov., lot B) ⌘K QUI AGIT : lancer une action de la loupe ───────────
+  // Elle OUVRE ce qui existe (Colis et son onglet, la feuille « Tout imprimer », la feuille
+  // du prix, la fiche, Compta → export, Ma configuration, le Stock) — RIEN n'est écrit ni
+  // envoyé : l'impression, le prix envoyé, l'export restent derrière leur clic habituel.
+  const lancerActionRecherche = (a, qBrut) => {
+    const d = destinationAction(a); if (!d) return;
+    if (qBrut && String(qBrut).trim()) setGsRecents(noterRecent(String(qBrut).trim()));
+    setGsOpen(false);
+    if (d.feuille === 'fiche') { setFicheNum(String(d.num)); return; }
+    if (d.feuille === 'prix') { setPrixNum(String(d.num)); return; }
+    if (d.feuille === 'configuration') { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} return; }
+    if (d.stock) { setGarageLocate(String(d.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(d.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
+    if (d.colis) { setPlatSub(null); setOngletColis(d.colis); }
+    if (d.feuille === 'lot') _pendingBordPrint = true;
+    if (d.feuille === 'export') { DEMANDE_COMMANDE.export = Date.now(); setPlatSub(null); }
+    if (d.tab) setTab(d.tab);
+    // Déjà sur l'écran : il ne se remonte pas — on le prévient (la feuille « Tout imprimer », l'export).
+    if (d.feuille === 'lot') setTimeout(() => { try { window.dispatchEvent(new Event('vrm:tout-imprimer')); } catch (_) {} }, 0);
+    if (d.feuille === 'export') setTimeout(() => { try { window.dispatchEvent(new Event('vrm:export-comptable')); } catch (_) {} }, 0);
+  };
   // ── LA RECHERCHE EN PLACE (31 oct.) : les résultats, un panneau sous le champ ──
   // (6 nov., filet 2) Le panneau se calcule SOUS son garde-fou (`Differe`) : une erreur ici ne fait plus tomber la coque.
   const panneauRecherche = !gsOpen ? null : <GardeEcran nom="recherche" feuille onFermer={fermerRecherche}><RechercheVivante rendre={(fil, gsQLent)=>{
@@ -52574,6 +52646,16 @@ function AppCoeur() {
         // Champ vide : les recherches récentes (cet appareil — tues en mode stream, une
         // recherche tapée peut être un pseudo) et des suggestions tirées de ce qui est lu.
         const sugg = !q ? suggestionsRecherche(idx, { n: 3 }) : null;
+        // (9 nov., lot B) ⌘K QUI AGIT : des ACTIONS en plus des résultats (src/annulerCommandes.js).
+        // Une action OUVRE un écran ou une feuille existante — elle n'écrit rien, n'envoie rien.
+        const actionsGs = actionsPour(qBrut, { lireNumero: (t) => lireNumeroCherche(t, { cleNum }, [prefixeNumeros(), archiveNumeros()]) });
+        const ligneAction = (a) => (
+          <button key={'action-' + a.id + (a.num || '')} type="button" className="vrm-recherche-ligne" onClick={()=>lancerActionRecherche(a, qBrut)} data-recherche-resultat="action" data-recherche-action={a.id} data-recherche-num={a.num || undefined} title={a.sous} style={styleLigne}>
+            {thumb(null, <Icon name={a.icone} size={18} style={{color:C.text}}/>)}
+            {ligneTexte(a.libelle, a.sous)}
+            <span style={{fontSize:17,color:C.muted}}>›</span>
+          </button>);
+        const blocActions = actionsGs.length ? <div data-recherche-groupe="action" data-recherche-n={actionsGs.length}>{entete('Actions', null, 'action')}{actionsGs.map(ligneAction)}</div> : null;
         return (
         <div className="vrm-global-search vrm-recherche-panneau" id="vrm-recherche-resultats" data-recherche-panneau="" data-recherche-q={q} data-recherche-pret={gsData ? '1' : '0'} role="region" aria-label="Résultats de la recherche"
           style={ordi?{background:C.bg,borderColor:C.border}:{top:hautRecherche,background:C.bg,borderColor:C.border}} onMouseDown={e=>{ if(e.target===e.currentTarget) e.preventDefault(); }} onKeyDown={clavierPanneau}>
@@ -52587,12 +52669,15 @@ function AppCoeur() {
               </div>}
               {sugg && sugg.colis.length > 0 && <div data-recherche-suggestions="colis">{entete('Colis à retirer', null, 'sugg-colis')}{sugg.colis.map((r,i)=>ligne(r,'colis',i))}</div>}
               {sugg && sugg.ventes.length > 0 && <div data-recherche-suggestions="ventes">{entete('Dernières ventes', null, 'sugg-ventes')}{sugg.ventes.map((r,i)=>ligne(r,'vente',i))}</div>}
+              {blocActions}
               {/* (9 nov.) L'état vide UTILE : ce qu'on peut taper, et le clavier (ordinateur). */}
               <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>Tape un N° (« b125 », « 007 »), un pseudo, un n° de suivi, de transaction ou de commande eBay, Leboncoin, Vestiaire, un code de retrait, un montant ou des mots du titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
             </div>}
             {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
-            {q && total===0 && !estNumQ && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« 125 », « B125 »), un pseudo, un n° de suivi, de transaction ou de commande, un code de retrait, un montant (« 52 € ») ou deux mots du titre.</>:'Je lis tes ventes, achats et colis…'}</div>}
+            {q && !estNumQ && blocActions}
+            {q && total===0 && !estNumQ && !actionsGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« 125 », « B125 »), un pseudo, un n° de suivi, de transaction ou de commande, un code de retrait, un montant (« 52 € ») ou deux mots du titre.</>:'Je lis tes ventes, achats et colis…'}</div>}
             {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
+            {q && estNumQ && blocActions}
             {/* Les résultats, groupés par type : chaque ligne dit PAR QUOI elle a été trouvée et
                 ouvre SON objet par son identité. 50 paires au même titre = 50 lignes (« Voir les N autres »). */}
             {q && GROUPES.map(([type,lib])=>{ const liste = groupe(type); if (!liste.length) return null; const n = totalDe(type);
