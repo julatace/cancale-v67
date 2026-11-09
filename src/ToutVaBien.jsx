@@ -68,7 +68,7 @@ export function useEtatCapture({ complet = false, actif = true } = {}) {
       const appareils = lireAppareils(rows, maintenant);
       const besoin = complet || aUnePreuve(appareils, maintenant);
       if (mort) return;
-      if (!besoin) { setBase({ appareils, ancien, vinted: [], lu: true }); return; }
+      if (!besoin) { setBase({ appareils, ancien, vinted: [], lu: true, at: Date.now() }); return; }
       setLireComptes(true);
       const [comptes, caps, etats] = await Promise.all([fetchVintedAccounts(), lireCapturesDetail(), lireEtatsVinted()]);
       if (mort) return;
@@ -78,7 +78,8 @@ export function useEtatCapture({ complet = false, actif = true } = {}) {
         return uid ? { plateforme: 'vinted', id: uid, nom: a.login || '', lu: caps.by[uid] || null, banni: !!(etats[uid] && etats[uid].etat === 'banni'), masque: masques.has(uid),
           ventesLu: caps.ventes[uid] || null, annoncesLu: caps.annonces[uid] || null } : null;
       }).filter(Boolean) : null;
-      setBase({ appareils, ancien, vinted, lu: true });
+      // (9 nov.) La date des ACHATS de chaque compte, pour la ligne de fraîcheur (src/fraicheur.js) ; null = pas su.
+      setBase({ appareils, ancien, vinted, achats: caps ? (caps.achats || {}) : null, lu: true, at: Date.now() });
     })();
     return () => { mort = true; };
   }, [tour, actif, complet]);
