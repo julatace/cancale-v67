@@ -201,7 +201,8 @@ function base() {
     dit(!rangement(AUTRE) && ECRITS.filter((e) => e.id === 'vrm_bord_transporteurs').every((e) => e.owner === OWNER), 'T1 l\'autre vendeur n\'est ni lu ni écrit');
     const lus = APPELS.filter((a) => a.meth === 'GET' && /id=(like\.email_bord_|like\.email_reception_|in\.\(email_texte_)/.test(a.u));
     dit(lus.length >= 3 && lus.every((a) => !/select=([^&]*,)?data(,|&|$)/.test(a.u)), 'T2 aucune lecture `select=data` sur bordereaux, suivis ni textes', lus.map((a) => a.u).join(' | '));
-    dit(lus.filter((a) => /like\./.test(a.u)).every((a) => a.range && /owner=eq\./.test(a.u)), 'T2 listes paginées (Range) et au nom du vendeur', lus.map((a) => a.u + ' ' + a.range).join(' | '));
+    // (9 nov.) La sonde du statut (`email_reception_*`, une ligne, limit=1, propriétaire neutre) n'est pas une liste de cette passe.
+    dit(lus.filter((a) => /like\./.test(a.u) && !/email_reception_/.test(a.u)).every((a) => a.range && /owner=eq\./.test(a.u)), 'T2 listes paginées (Range) et au nom du vendeur', lus.map((a) => a.u + ' ' + a.range).join(' | '));
     // T3 — second passage.
     const avant = ECRITS.filter((e) => e.id === 'vrm_bord_transporteurs').length;
     const res2 = await lancer();
