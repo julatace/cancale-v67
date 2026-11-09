@@ -3259,11 +3259,15 @@ function NumeroEcritSetting({ onAnnonces }) {
     if (!stop) setAutres(out);
   })(); return () => { stop = true; }; }, []);
   const sites = [
-    ['vinted', 'Vinted', vinted, 'la fin de la description, puis le titre'],
-    ['leboncoin', 'Leboncoin', autres === undefined ? undefined : autres.leboncoin, 'la référence pro, la fin de la description, le titre'],
-    ['vestiaire', 'Vestiaire Collective', autres === undefined ? undefined : autres.vestiaire, 'le titre'],
-    ['ebay', 'eBay', autres === undefined ? undefined : autres.ebay, 'le SKU, puis le titre'],
-  ];
+    ['vinted', 'Vinted', vinted, [['description', 'la fin de la description'], ['titre', 'le titre']]],
+    ['leboncoin', 'Leboncoin', autres === undefined ? undefined : autres.leboncoin, [['ref', 'la référence pro'], ['description', 'la fin de la description'], ['titre', 'le titre']]],
+    ['vestiaire', 'Vestiaire Collective', autres === undefined ? undefined : autres.vestiaire, [['titre', 'le titre']]],
+    ['ebay', 'eBay', autres === undefined ? undefined : autres.ebay, [['ref', 'le SKU'], ['titre', 'le titre']]],
+  ].map(([cle, nom, a, ou]) => {
+    // (9 nov.) Ce que VRM lit sur ce site, selon les endroits cochés.
+    const lus = ou.filter(([k]) => r.ou.includes(k)).map(([, t]) => t);
+    return [cle, nom, a, lus.length ? lus.join(', ') : 'rien ici (aucun endroit coché ne s’applique à ce site)'];
+  });
   const nomsDe = (a, etat) => (a ? a.lignes.filter((l) => l.etat === etat).map((l) => l.titre || 'Annonce') : []);
   const liste = (noms) => noms.slice(0, 3).join(' · ') + (noms.length > 3 ? '…' : '');
   const ligneSite = ([cle, nom, a, ou]) => {
