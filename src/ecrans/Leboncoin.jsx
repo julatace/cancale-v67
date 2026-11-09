@@ -629,11 +629,21 @@ function relierAnnonceLbc(id, n) {
 // rendrait à la fusion (local par-dessus nuage). On pose une valeur VIDE, que
 // l'app (`clesAnnonceLbc`) et l'extension (`adRefKeys`, `cleNum('')`) ignorent
 // — l'annonce redevient « non reliée » et peut être reliée à la bonne paire.
-function delierAnnonceLbc(id) {
+// (9 nov.) Le geste lui-même : `gesteDelierLbc` (annulable), juste en dessous.
+// (9 nov., lot B — « Annuler » au lieu d'une confirmation) Délier est RÉVERSIBLE dans VRM (une
+// valeur de `vrm_lbc_liens`, rien chez Leboncoin) : il part tout de suite et la pilule offre
+// « Annuler » 5 s, qui remet EXACTEMENT le lien d'avant (le même N°). La copie locale suit tout de
+// suite (l'écran se relit, comme `relierAnnonceLbc`) ; l'écriture passe par la file du geste.
+function gesteDelierLbc(id, numero, reload) {
   if (id == null) return;
-  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: '' };
-  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
-  save('vrm_lbc_liens', liens);
+  const k = String(id);
+  const avant = (load('vrm_lbc_liens', {}) || {})[k];
+  if (avant == null || String(avant).trim() === '') return;
+  const poserLocal = (v) => { try { const l = { ...(load('vrm_lbc_liens', {}) || {}), [k]: v }; localStorage.setItem('vrm_lbc_liens', JSON.stringify(l)); } catch (_) {} };
+  gesteVrm(numero ? `Lien avec la N°${numero} retiré` : 'Lien retiré', [{ k: 'vrm_lbc_liens', type: 'cle', id: k, apres: '', avant }], {}, (sens) => {
+    poserLocal(sens === 'apres' ? '' : avant);
+    if (typeof reload === 'function') { try { reload(); } catch (_) {} }
+  });
 }
 // « Ce n'est aucune de celles-là » (16 oct., Julien : « ça sert à rien de relier
 // une paire vendue, je n'ai plus de numéro »). Sa réponse, rangée par identité
@@ -1794,7 +1804,7 @@ function LeboncoinScreen() {
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0, marginLeft: 'auto' }}>
                 {d.vintedUrl && <a href={d.vintedUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, textDecoration: 'none' }}>Ouvrir sur Vinted</a>}
                 {data.liensMain && String(data.liensMain[String(d.ad.id)] || '').trim() && (
-                  <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { if (window.confirm(`Ce n'est pas la N°${d.numero} ? Je retire ce lien : la vente redevient « sans article » et tu pourras choisir le bon.`)) { delierAnnonceLbc(d.ad.id); reload(); } }}
+                  <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { gesteDelierLbc(d.ad.id, d.numero, reload); }}
                     style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.muted, cursor: 'pointer' }}>Pas le bon article</button>
                 )}
                 </div>
@@ -2273,7 +2283,7 @@ function LeboncoinScreen() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre || 'Annonce Leboncoin'}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>reliée à la N°{l.numero}</div>
                 </div>
-                <button type="button" data-lbc-delier={l.id} onClick={() => { if (window.confirm(`Retirer le lien avec la N°${l.numero} ? L'annonce redevient « non reliée » et tu pourras choisir la bonne paire.`)) { delierAnnonceLbc(l.id); reload(); } }}
+                <button type="button" data-lbc-delier={l.id} onClick={() => { gesteDelierLbc(l.id, l.numero, reload); }}
                   style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, cursor: 'pointer' }}>Délier</button>
               </div>
             ))}
