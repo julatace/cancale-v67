@@ -908,11 +908,13 @@
 }
 [data-republier] .vrm-repub-memes { background: transparent !important; padding: 0 2px !important; border-radius: 0 !important; }
 /* Les listes de l'atelier (le choix, l'aperçu, la file) : un groupe blanc, filets de 0,5 px. */
-[data-republier] :is(div:has(> [data-republier-apercu]), div:has(> [data-republier-ligne])) {
+[data-republier] :is(div:has(> [data-republier-apercu]), div:has(> [data-republier-ligne]), div:has(> [data-republier-paire])) {
   background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-ctrl) !important; box-shadow: var(--p-ombre) !important;
 }
 [data-republier] :is([data-republier-apercu], [data-republier-ligne], [data-republier-ordre]) { border-bottom: .5px solid var(--p-filet) !important; }
 [data-republier] :is([data-republier-apercu], [data-republier-ligne]):last-child { border-bottom: 0 !important; }
+[data-republier] [data-republier-paire] { border-bottom-width: .5px !important; border-bottom-color: var(--p-filet) !important; }
+[data-republier] [data-republier-paire]:last-child { border-bottom: 0 !important; }
 [data-republier] [data-republier-apercu] { padding: 10px 14px !important; font-size: var(--p-t-note) !important; }
 [data-republier] :is([data-republier-ligne], [data-republier-ordre]) { padding-left: 14px !important; padding-right: 6px !important; }
 [data-republier] .vrm-sel-liste { background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-ctrl) !important; box-shadow: var(--p-ombre) !important; }
