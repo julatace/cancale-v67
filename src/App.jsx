@@ -13796,7 +13796,12 @@ function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensib
         {(morceaux.length > 0 || etat || compte) && (
           <span className="vrm-msg-article vrm-msg-paire" data-conv-paire="">
             {/* (31 oct., maquettes) « modèle · N° » : le N° vient de l'identité, jamais du titre. */}
-            {morceaux.length > 0 && <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{num&&x===`N°${num}`?<b className="vrm-msg-paire-num" style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>}
+            {/* (9 nov., direction artistique 3) Le N° est son propre élément de la ligne : au téléphone
+                c'est le modèle qui se coupe (« Nike samba ta… · N°368 »), jamais le N°. Même texte, même ordre. */}
+            {morceaux.length > 0 && (() => { const iN = num ? morceaux.indexOf(`N°${num}`) : -1;
+              if (iN < 0) return <span className="vrm-msg-paire-t">{morceaux.join(' · ')}</span>;
+              const av = morceaux.slice(0, iN), ap = morceaux.slice(iN + 1);
+              return <>{av.length ? <span className="vrm-msg-paire-t">{av.join(' · ')}</span> : null}<b className="vrm-msg-paire-num" style={{color:C.text,fontWeight:600}}>{av.length ? '· ' : ''}{morceaux[iN]}</b>{ap.length ? <span className="vrm-msg-paire-t vrm-msg-paire-suite">{'· ' + ap.join(' · ')}</span> : null}</>; })()}
             {compte && <span className="vrm-msg-acc" data-conv-compte-nom="" style={{color:C.muted}}>{morceaux.length ? '· ' : ''}{compte}</span>}
             {etat && <span className="vrm-msg-etat" data-etat={etat.k} style={{color:C.muted,borderColor:C.border}}>{etat.t}</span>}
           </span>
