@@ -105,7 +105,7 @@ vend ? » 390, offres 1512 sombre (Pro ouvert).
 
 ## Ce qui reste
 
-- Décider : Leboncoin/eBay/Vestiaire dans Solo ? Annonces des comptes d'achat : retirées des
+- Décider : Leboncoin/eBay/Vestiaire dans Solo ? → **Fait le 9 nov. (soir)**, un compte vendeur PAR plateforme (à confirmer) : `2026-11-09-solo-plateformes.md`. Annonces des comptes d'achat : retirées des
   listes et compteurs, sans bloc d'aperçu dédié (seules les ventes en ont un).
 - Offres automatiques et favoris (extension) ne regardent pas l'offre : l'extension n'est pas
   touchée ici (5.331/5.332 en cours ailleurs).
