@@ -22,6 +22,8 @@
 //        identifié » (`SANS_COMPTE_VC`), jamais à un compte deviné.
 //    Une vente Leboncoin ou eBay SANS compte n'est jamais écartée : « pas su »
 //    ne vaut pas « oui » — elle compte, comme avant.
+import { venteAutreHorsPlan, brideAutres } from './plan-regle.js';
+
 export const CLE_COMPTES_EXCLUS = 'vrm_comptes_exclus';
 export const PLATEFORMES_EXCLUABLES = Object.freeze(['leboncoin', 'vestiaire', 'ebay']);
 export const SANS_COMPTE_VC = '-';
@@ -49,14 +51,22 @@ export function compteDeVente(plateforme, v) {
 // Le prédicat que reçoivent `ventesFaites`, `ventesDeclarables` et
 // `ventesAutresBenefice` (`excluAutre`). Rien d'écarté ⇒ `null` (les fonctions
 // gardent exactement leur chemin d'avant).
-export function excluAutreDe(v) {
+// (9 nov., Solo par plateforme) `regle` (facultative) : l'offre du vendeur
+// (`regleVentes`, api/_lib/plan-regle.js). En Solo, la vente d'un compte
+// Leboncoin / eBay / Vestiaire qui n'est pas le compte vendeur CHOISI de sa
+// plateforme sort des TOTAUX, comme un compte écarté (`venteAutreHorsPlan`).
+// UN prédicat pour l'app (`useExcluAutre`) et le serveur (bilans) — jamais une
+// copie. Sans `regle` (ou « pas su ») : exactement le choix d'avant.
+export function excluAutreDe(v, regle) {
   const ex = exclusNormes(v);
-  if (PLATEFORMES_EXCLUABLES.every((p) => !ex[p].size)) return null;
+  const bride = brideAutres(regle);
+  if (!bride && PLATEFORMES_EXCLUABLES.every((p) => !ex[p].size)) return null;
   return (plateforme, vente) => {
-    const s = ex[plateforme];
-    if (!s || !s.size) return false;
     const c = compteDeVente(plateforme, vente);
-    return c != null && s.has(c);
+    if (c == null) return false;
+    const s = ex[plateforme];
+    if (s && s.size && s.has(c)) return true;
+    return bride && c !== SANS_COMPTE_VC && venteAutreHorsPlan(regle, plateforme, c);
   };
 }
 

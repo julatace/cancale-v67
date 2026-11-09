@@ -12,7 +12,10 @@
 //   3. le serveur : le plan vient du PRIX Stripe, jamais du navigateur ; le compte
 //      vendeur est à LUI, une fois / 30 j ; Pro fermé tant que son prix n'est pas
 //      posé ; changement d'offre avec prorata ; webhook (avec et sans la 028) ;
-//   4. les notifications de vente d'un compte d'achat ne partent pas.
+//   4. les notifications de vente d'un compte d'achat ne partent pas ;
+//   6. (9 nov., soir) SOLO PAR PLATEFORME : un compte vendeur Leboncoin, eBay,
+//      Vestiaire — deux comptes de chaque, Solo / Pro / ancien Solo / pas su ;
+//      le prédicat des totaux (`excluAutreDe(v, regle)`), la route, le webhook (030).
 // `--prouve` : rejoue des MUTATIONS de la règle (chacune doit rendre du rouge).
 // Aucune donnée réelle : tout est inventé ici.
 const path = require('path'), fs = require('fs'), crypto = require('crypto'), os = require('os');
@@ -62,13 +65,59 @@ async function controlesRegle(R, dire) {
   const T = Date.parse('2026-11-09T10:00:00Z');
   dire(R.prochainChangement(null, T) === null && R.prochainChangement(new Date(T - 31 * 864e5).toISOString(), T) === null && !!R.prochainChangement(new Date(T - 3 * 864e5).toISOString(), T),
     'changer de compte vendeur : premier choix libre, puis une fois tous les 30 jours');
+  await controlesAutres(R, dire);
+}
+
+// ── (9 nov., soir) SOLO PAR PLATEFORME : deux comptes Leboncoin, deux eBay, deux Vestiaire ──
+// Chaque plateforme a un compte vendeur (choisi) et un compte d'achat ; chaque vente vaut 10 €.
+// L'attendu est la phrase de Julien : Solo = un compte vendeur PAR plateforme ; Pro = tous ;
+// un Solo d'avant le 9 nov. et « pas su » ne brident jamais.
+const DEUX = { leboncoin: ['8442001', '8442002'], ebay: ['principal', '0123456789abcdef'], vestiaire: ['vc111', 'vc222'] };
+async function controlesAutres(R, dire) {
+  if (typeof R.venteAutreHorsPlan !== 'function') { dire(false, 'plan-regle porte `venteAutreHorsPlan` (Solo par plateforme)', 'absente'); return; }
+  const somme = (r) => { let t = 0; for (const p of Object.keys(DEUX)) for (const c of DEUX[p]) if (!R.venteAutreHorsPlan(r, p, c)) t += 10; return t; };
+  const choix = { leboncoin: { id: 'lbc-account:8442001' }, ebay: { id: 'principal' }, vestiaire: { id: 'vc111' } };
+  const solo = R.regleVentes({ plan: 'solo', compteVendeur: { uid: '1007' }, comptesVendeurs: choix });
+  dire(somme(solo) === 30 && ['leboncoin', 'ebay', 'vestiaire'].every((p) => !R.venteAutreHorsPlan(solo, p, DEUX[p][0]) && R.venteAutreHorsPlan(solo, p, DEUX[p][1])),
+    'Solo par plateforme : deux comptes Leboncoin, deux eBay, deux Vestiaire ⇒ seul le compte vendeur de chacune compte (30 € sur 60)', `${somme(solo)} €`);
+  dire(!R.venteAutreHorsPlan(solo, 'leboncoin', 'lbc-account:8442001') && R.venteAutreHorsPlan(solo, 'leboncoin', 'lbc-account:8442002'), 'Leboncoin : `8442…` et `lbc-account:8442…` sont le même compte');
+  const pro = R.regleVentes({ plan: 'pro', compteVendeur: { uid: '1007' }, comptesVendeurs: choix });
+  dire(somme(pro) === 60, 'Pro : toutes les ventes de tous les comptes de chaque plateforme', `${somme(pro)} €`);
+  const pasSu = [R.regleVentes(null), R.regleVentes({ plan: null, comptesVendeurs: choix }), R.regleVentes({ plan: 'gold', comptesVendeurs: choix })];
+  dire(pasSu.every((r) => somme(r) === 60), 'plan « pas su » ⇒ rien bridé sur aucune plateforme', pasSu.map(somme).join(' · '));
+  const prop = R.regleVentes({ proprietaire: true, plan: 'solo', comptesVendeurs: choix });
+  dire(somme(prop) === 60, 'propriétaire : Pro sur toutes les plateformes', `${somme(prop)} €`);
+  const sansChoix = R.regleVentes({ plan: 'solo', compteVendeur: { uid: '1007' }, comptesVendeurs: { leboncoin: { id: '8442001' } } });
+  dire(somme(sansChoix) === 50 && !R.venteAutreHorsPlan(sansChoix, 'ebay', DEUX.ebay[1]), 'Solo sans choix sur eBay et Vestiaire : tous leurs comptes comptent (seul Leboncoin est bridé)', `${somme(sansChoix)} €`);
+  dire(!R.venteAutreHorsPlan(solo, 'vestiaire', '-') && !R.venteAutreHorsPlan(solo, 'vestiaire', '') && !R.venteAutreHorsPlan(solo, 'leboncoin', null) && !R.venteAutreHorsPlan(solo, 'ebay', 'pseudo eBay'),
+    'une vente sans compte relevé (Vestiaire « non identifié », Leboncoin sans compte, un pseudo) n’est jamais écartée');
+  // L'abonnement : les métadonnées que VRM pose ; un Solo d'avant le 9 nov. ne bride rien.
+  const sub = (cgv) => ({ items: { data: [{ id: 'si', quantity: 1, price: { id: 'price_s', lookup_key: 'vrm_mensuel' } }] },
+    metadata: { cgv_version: cgv, vrm_vendeur_leboncoin: '8442001', vrm_vendeur_ebay: 'principal', vrm_vendeur_vestiaire: 'vc111', vrm_vendeur_ebay_le: '2026-11-09T10:00:00Z' } });
+  const lu = R.planDeLAbonnement(sub('2026-11-09'), { prixPro: 'price_pro' });
+  const ancien = R.planDeLAbonnement(sub('2026-11-08'), { prixPro: 'price_pro' });
+  const rLu = R.regleVentes({ plan: lu.plan, comptesVendeurs: { leboncoin: lu.autres && lu.autres.leboncoin, ebay: lu.autres && lu.autres.ebay, vestiaire: lu.autres && lu.autres.vestiaire } });
+  const rAncien = R.regleVentes({ plan: ancien.plan, comptesVendeurs: ancien.autres });
+  dire(lu.plan === 'solo' && lu.autres && lu.autres.ebay && lu.autres.ebay.id === 'principal' && lu.autres.ebay.le === '2026-11-09T10:00:00Z' && somme(rLu) === 30,
+    'abonnement Stripe : le compte vendeur de chaque plateforme lu des métadonnées VRM (`vrm_vendeur_{plateforme}`), sa date aussi', JSON.stringify(lu.autres));
+  dire(ancien.plan === null && somme(rAncien) === 60, 'Solo souscrit sous les CGV d’avant le 9 nov. ⇒ jamais bridé, même avec des comptes vendeurs posés', `${somme(rAncien)} €`);
+  dire(R.compteDefautAutre('leboncoin', DEUX.leboncoin, ['8442002', 'lbc-account:8442002', '8442001']) === '8442002'
+    && R.compteDefautAutre('ebay', DEUX.ebay, ['principal', DEUX.ebay[1]]) === null && R.compteDefautAutre('vestiaire', DEUX.vestiaire, null) === null,
+    'compte proposé par plateforme : le plus de ventes lues, strictement ; égalité ou ventes pas lues ⇒ rien');
+  const s1 = R.signatureRegle(solo), s2 = R.signatureRegle(R.regleVentes({ plan: 'solo', compteVendeur: { uid: '1007' }, comptesVendeurs: { ...choix, ebay: { id: DEUX.ebay[1] } } }));
+  dire(s1 !== s2 && R.signatureRegle(pro) === 'libre' && R.signatureRegle(R.regleVentes({ plan: 'solo', compteVendeur: '7' })) === 'solo:7', 'la signature change avec le compte vendeur de CHAQUE plateforme (l’app se remonte)', `${s1} ≠ ${s2}`);
 }
 
 // ── Les mutations (--prouve) : chacune affaiblit la règle ; il faut du rouge ──
 const MUTATIONS = [
+  ['autre plateforme : compte vendeur ignoré', (s) => s.replace("return !!c && c !== choisi;", 'return !!c;')],
+  ['autre plateforme : bridée hors Solo (Pro, pas su)', (s) => s.replace("autres[p] = plan === PLAN_SOLO && id ? id : null;", 'autres[p] = id || null;').replace("if (!regle || regle.plan !== PLAN_SOLO || !regle.autres", 'if (!regle || !regle.autres')],
+  ['Vestiaire « non identifié » écarté', (s) => s.replace("return s !== '-' && /^[\\w-]{1,40}$/.test(s) ? s : null;", "return /^[\\w-]{1,40}$/.test(s) ? s : (s === '' ? null : s);")],
+  ['Leboncoin : lbc-account: pas reconnu', (s) => s.replace("const id = s.replace(/^lbc-account:/i, '');", 'const id = s;')],
+  ['métadonnées des autres plateformes ignorées', (s) => s.replace("const k = META_VENDEUR[pl], id = idCompteVendeur(pl, m[k]);", 'const k = META_VENDEUR[pl], id = null;')],
   ['venteHorsPlan ignore le compte vendeur', (s) => s.replace("return uidValide(u) && u !== regle.vendeur;", 'return uidValide(u);')],
   ['bride sans compte choisi', (s) => s.replace("bride: plan === PLAN_SOLO && !!vendeur", 'bride: plan === PLAN_SOLO')],
-  ['propriétaire bridé', (s) => s.replace("if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false };", '')],
+  ['propriétaire bridé', (s) => s.replace("if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES };", '')],
   ['CGV d’avant bridées', (s) => s.replace("if (plan === PLAN_SOLO && !(String(m.cgv_version || '') >= CGV_PLANS_DEPUIS)) { plan = null; raison = 'cgv-anterieures'; }", '')],
   ['pas su ⇒ Solo', (s) => s.replace("const plan = x.plan === PLAN_PRO || x.plan === PLAN_SOLO ? x.plan : null;", "const plan = x.plan === PLAN_PRO ? x.plan : PLAN_SOLO;")],
   ['égalité ⇒ un compte proposé', (s) => s.replace("return meilleur && !egal ? meilleur : null;", 'return meilleur;')],
@@ -117,7 +166,11 @@ const MUTATIONS = [
   await essaie('câblage App.jsx', async () => {
     const app = sansCommentaires(lire('src/App.jsx'));
     const compta = sansCommentaires(lire('src/ecrans/Compta.jsx'));
-    dit(/const compteEcarte = \(uid, masques, panneau\) => compteEcarteChoix\(uid, masques, panneau\) \|\| venteHorsPlanUid\(uid\);/.test(app), 'les totaux des ventes (`compteEcarte`) écartent les comptes hors offre');
+    // (9 nov., suites serveur) La règle est PURE (`compteEcarteRegle`, la règle de l'offre en
+    // argument — recopiée telle quelle dans api/_lib/ventes-regle.js) ; `compteEcarte` lui passe
+    // la règle courante de l'app. Exécutée app = serveur : audit-bilan-semaine, audit-suites-serveur.
+    dit(/const compteEcarteRegle = \(uid, masques, panneau, regle\) => compteEcarteChoix\(uid, masques, panneau\) \|\| venteHorsPlan\(regle, uid\);/.test(app)
+      && /const compteEcarte = \(uid, masques, panneau\) => compteEcarteRegle\(uid, masques, panneau, reglePlanCourante\(\)\);/.test(app), 'les totaux des ventes (`compteEcarte`) écartent les comptes hors offre');
     dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => \(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
       'les ACHATS d’un compte d’achat restent (acctOff = le choix seul, sans l’offre)');
     dit(/exclu: \(o\) => compteEcarteChoix\(o && o\._uid/.test(compta), 'Compta → registre des achats : les achats des comptes d’achat comptent');
@@ -133,12 +186,18 @@ const MUTATIONS = [
   console.log('── 3. Le serveur : le plan vient du prix Stripe');
   const A = '11111111-1111-4111-8111-111111111111', PROP = '99999999-9999-4999-8999-999999999999';
   const JETONS = { 'aa.bb.A': { id: A, email: 'a@exemple.test' }, 'aa.bb.P': { id: PROP, email: 'p@exemple.test' } };
-  let abos, stripe, sub, prixPro, vintedDe, colonne028;
+  let abos, stripe, sub, prixPro, vintedDe, colonne028, colonne030, autresDe;
   const reset = () => {
     abos = { [A]: { statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A', fin_periode: null, annule_fin_periode: false } };
     stripe = []; prixPro = { id: 'price_pro', unit_amount: 1999, currency: 'eur', recurring: { interval: 'month', interval_count: 1 }, active: true };
     sub = { id: 'sub_A', status: 'active', customer: 'cus_A', metadata: { owner: A, cgv_version: '2026-11-09' }, items: { data: [{ id: 'si_A', quantity: 1, price: { id: 'price_solo', lookup_key: 'vrm_mensuel', unit_amount: 1699, currency: 'eur', recurring: { interval: 'month' } } }] } };
-    vintedDe = { [A]: ['1007', '1008'] }; colonne028 = true;
+    vintedDe = { [A]: ['1007', '1008'] }; colonne028 = true; colonne030 = true;
+    // (9 nov., soir) Ses comptes des autres plateformes, à la forme réelle de `app_data`.
+    autresDe = { [A]: {
+      lbc_accounts: { accounts: { 'lbc-account:8442001': { id: 'lbc-account:8442001', name: 'boutique' }, '8442002': { id: '8442002', name: 'achats' } } },
+      ebay_comptes: { comptes: [{ principal: true, pseudo: 'vend' }, { cle: '0123456789abcdef', pseudo: 'achete' }] },
+      vc_session: { id: 'vc111', comptes: { vc111: '2026-11-09', vc222: '2026-11-08' } },
+    } };
   };
   const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } });
   global.fetch = async (url, opts = {}) => {
@@ -151,18 +210,38 @@ const MUTATIONS = [
     if (u.includes('/rest/v1/abonnements')) {
       if (m === 'POST') {
         const lignes = JSON.parse(opts.body);
+        if (!colonne030 && lignes.some((l) => 'comptes_vendeurs' in l)) return rep({ code: 'PGRST204', message: "Could not find the 'comptes_vendeurs' column of 'abonnements' in the schema cache" }, 400);
         if (!colonne028 && lignes.some((l) => 'plan' in l || 'compte_vendeur' in l)) return rep({ code: 'PGRST204', message: "Could not find the 'plan' column of 'abonnements' in the schema cache" }, 400);
         for (const l of lignes) abos[l.owner] = { ...(abos[l.owner] || {}), ...l }; return rep('', 201);
       }
       if (qui) return rep(abos[qui.id] ? [abos[qui.id]] : []);
       const o = (/owner=eq\.([^&]+)/.exec(u) || [])[1], c = (/client_stripe=eq\.([^&]+)/.exec(u) || [])[1];
       if (/select=statut,plan,compte_vendeur/.test(u) && !colonne028) return rep({ code: '42703' }, 400);
-      if (o) { const id = decodeURIComponent(o); return rep(abos[id] ? [{ ...abos[id], owner: id }] : []); }
+      if (/comptes_vendeurs/.test(u) && !colonne030) return rep({ code: '42703', message: 'column abonnements.comptes_vendeurs does not exist' }, 400);
+      if (o) {
+        const id = decodeURIComponent(o);
+        if (!abos[id]) return rep([]);
+        // Projection : une colonne non demandée ne revient pas (la forme de PostgREST).
+        const l = { ...abos[id], owner: id };
+        if (/select=/.test(u) && !/comptes_vendeurs/.test(u)) delete l.comptes_vendeurs;
+        return rep([l]);
+      }
       if (c) { const e = Object.entries(abos).find(([, l]) => l.client_stripe === decodeURIComponent(c)); return rep(e ? [{ owner: e[0] }] : []); }
       return rep([]);
     }
     if (u.includes('/rest/v1/vinted_accounts')) { const o = qui ? qui.id : decodeURIComponent((/owner=eq\.([^&]+)/.exec(u) || [])[1] || ''); return rep((vintedDe[o] || []).map((v) => ({ vinted_user_id: v }))); }
     if (u.includes('/rest/v1/essais_gratuits')) return rep([]);
+    if (u.includes('/rest/v1/app_data')) {
+      // Lu avec SON jeton (RLS) : seulement ses lignes ; la projection de la route.
+      if (!qui) return rep([]);
+      const id = decodeURIComponent((/[?&]id=eq\.([^&]+)/.exec(u) || [])[1] || '');
+      const d = (autresDe[qui.id] || {})[id];
+      if (!d) return rep([]);
+      if (id === 'lbc_accounts') return rep([{ a: d.accounts }]);
+      if (id === 'ebay_comptes') return rep([{ comptes: d.comptes }]);
+      if (id === 'vc_session') return rep([{ id: d.id, comptes: d.comptes }]);
+      return rep([]);
+    }
     if (u.startsWith('https://api.stripe.com/v1/')) {
       const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
       const corps = new URLSearchParams(opts.body || '');
@@ -282,12 +361,123 @@ const MUTATIONS = [
     dit(gardes.length === 2, 'email-inbound : « vendu » et « argent reçu » passent par la règle avant de sonner (la vente est rangée quand même)', `${gardes.length}/2`);
   });
 
+  console.log('── 6. Solo par plateforme : un compte vendeur Leboncoin, eBay, Vestiaire');
+  await essaie('totaux (prédicat de l’app et du serveur)', async () => {
+    const E = await import('file://' + path.join(RACINE, 'api', '_lib', 'comptes-exclus.js'));
+    const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
+    const ventes = [
+      ['leboncoin', { account: 'lbc-account:8442001' }], ['leboncoin', { account: '8442002' }], ['leboncoin', { account: '' }],
+      ['ebay', { _compte: 'principal' }], ['ebay', { _compte: '0123456789abcdef' }],
+      ['vestiaire', { compte: 'vc111' }], ['vestiaire', { compte: 'vc222' }], ['vestiaire', { compte: '' }],
+    ];
+    const comptees = (f) => ventes.filter(([p, v]) => !(f && f(p, v))).length;
+    const choix = { leboncoin: { id: '8442001' }, ebay: { id: 'principal' }, vestiaire: { id: 'vc111' } };
+    const cas = {
+      solo: R.regleVentes({ plan: 'solo', compteVendeur: { uid: '1007' }, comptesVendeurs: choix }),
+      pro: R.regleVentes({ plan: 'pro', comptesVendeurs: choix }),
+      ancien: R.regleVentes({ plan: null, comptesVendeurs: choix }),   // Solo d'avant le 9 nov. : le serveur rend plan null
+      pasSu: null,
+    };
+    dit(comptees(E.excluAutreDe({}, cas.solo)) === 5, 'Solo : sur 8 ventes (2 comptes par plateforme + 2 sans compte relevé), 5 comptent — les comptes d’achat Leboncoin, eBay, Vestiaire sortent ; les ventes sans compte restent', String(comptees(E.excluAutreDe({}, cas.solo))));
+    dit(E.excluAutreDe({}, cas.pro) === null && E.excluAutreDe({}, cas.ancien) === null && E.excluAutreDe({}, cas.pasSu) === null, 'Pro, ancien Solo, pas su : aucun prédicat (exactement le chemin d’avant : tout compte)');
+    const avecChoix = E.excluAutreDe({ leboncoin: ['8442001'] }, cas.solo);
+    dit(comptees(avecChoix) === 4, 'un compte écarté par SON choix (Comptes liés) s’ajoute à l’offre (même le compte vendeur)', String(comptees(avecChoix)));
+    dit(comptees(E.excluAutreDe({ ebay: ['0123456789abcdef'] }, cas.pro)) === 7, 'Pro : le choix « hors totaux » de Comptes liés marche comme avant');
+  });
+  await essaie('état de l’app (autres plateformes)', async () => {
+    const mem = {}; global.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } };
+    const E = await import('file://' + path.join(RACINE, 'src', 'abonnement', 'etatAbonnement.js'));
+    const P = await import('file://' + path.join(RACINE, 'src', 'abonnement', 'planVentes.js'));
+    const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
+    P.demarrerPlan('uid-banc-2');
+    let n = 0; const stop = P.suivrePlan(() => n++);
+    E.publierAbonnement({ ok: true, plan: 'solo', compteVendeur: null, comptesVendeurs: { leboncoin: { id: '8442001' } } });
+    const r1 = P.reglePlanCourante();
+    dit(n === 1 && R.venteAutreHorsPlan(r1, 'leboncoin', '8442002') && !R.venteAutreHorsPlan(r1, 'leboncoin', '8442001') && !P.venteHorsPlanUid('9'),
+      'Solo sans compte Vinted, compte Leboncoin choisi : Leboncoin bridé, Vinted libre ; un signal de remontage', `${P.signaturePlan()} · ${n}`);
+    dit(String(mem['vrm_plan_regle_uid-banc-2'] || '').includes('8442001'), 'le choix Leboncoin est gardé sur l’appareil (juste dès l’ouverture suivante)');
+    E.publierAbonnement({ ok: true, plan: 'solo', compteVendeur: null, comptesVendeurs: { leboncoin: { id: '8442001' }, ebay: { id: 'principal' } } });
+    dit(n === 2, 'choisir le compte eBay remonte l’app (la signature compte chaque plateforme)', String(n));
+    E.publierAbonnement({ ok: true, plan: 'pro', comptesVendeurs: { leboncoin: { id: '8442001' } } });
+    dit(P.signaturePlan() === 'libre' && !R.venteAutreHorsPlan(P.reglePlanCourante(), 'leboncoin', '8442002') && !mem['vrm_plan_regle_uid-banc-2'], 'passer à Pro rend tout, sur chaque plateforme');
+    stop();
+  });
+  await essaie('câblage App.jsx (autres plateformes)', async () => {
+    const app = sansCommentaires(lire('src/App.jsx'));
+    const plans = sansCommentaires(lire('src/abonnement/PlansSoloPro.jsx'));
+    const reg = sansCommentaires(lire('src/ecrans/Reglages.jsx'));
+    dit(/return React\.useMemo\(\(\) => excluAutreDe\(v, reglePlanCourante\(\)\), \[v, sig\]\);/.test(app), 'les totaux (`useExcluAutre`, Ventes, Compta, Stats, coque) passent l’offre au prédicat des autres plateformes');
+    dit(/const horsPlanAutre = \(plateforme, v\) => venteAutreHorsPlan\(reglePlanCourante\(\), plateforme, compteDeVente\(plateforme, v\)\);/.test(app)
+      && (app.match(/hp: horsPlanAutre\('(leboncoin|ebay|vestiaire)', /g) || []).length === 3 && /<VentesAutresHorsPlan lignes=\{lignesHorsPlan/.test(app),
+      'Ventes « Tous » : une vente d’un compte d’achat Leboncoin / eBay / Vestiaire sort de la liste et passe en aperçu (identité portée par la vente)');
+    dit(/<BandeauCompteVendeur [^>]*autres=\{autresSolo\}/.test(app) && /data-quel-compte-plateforme=\{plateforme\}/.test(plans) && /ouvrirQuelCompte\(p\)/.test(reg),
+      'le choix : la coque porte la feuille de chaque plateforme ; Paramètres → Abonnement a une rangée par plateforme');
+    dit(/data-hors-plan-a-envoyer=\{b\.aEnvoyer\}/.test(plans) && /dont \$\{b\.aEnvoyer\} à envoyer \(dans Colis\)/.test(plans), 'l’aperçu DIT les colis à envoyer d’un compte d’achat (ils restent dans Colis)');
+    // Les colis à envoyer ne lisent JAMAIS l'offre : `excluAutre` ne sert qu'aux totaux.
+    const colis = lire('src/App.jsx').split('\n').filter((l) => /excluAutre/.test(l) && /colis|aPoster|aExpedier/i.test(l) && !/^\s*\/\//.test(l));
+    dit(colis.length === 0, 'aucun calcul de colis à envoyer ne passe par le prédicat des totaux (un colis caché est un colis perdu)', colis.slice(0, 2).join(' | '));
+  });
+  if (compte) await essaie('route compte-vendeur (autres plateformes) et webhook 030', async () => {
+    reset();
+    const signer = (c) => { const t = Math.floor(Date.now() / 1000); return `t=${t},v1=${crypto.createHmac('sha256', SECRET).update(`${t}.${c}`).digest('hex')}`; };
+    const envoyer = async (objet, ts) => { const c = JSON.stringify({ id: 'evt_x' + ts, type: 'customer.subscription.updated', created: ts, livemode: false, data: { object: objet } }); return appel({ method: 'POST', mode: 'webhook', headers: { 'stripe-signature': signer(c) }, corps: c }); };
+    let r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'leboncoin', id: '9999999' } });
+    dit(r.code === 403 && postsStripe().length === 0, 'Leboncoin : un compte qui n’est pas à lui ⇒ refusé, rien chez Stripe', `HTTP ${r.code}`);
+    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'tiktok', id: 'x' } });
+    dit(r.code === 400, 'plateforme inconnue ⇒ refusée');
+    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'leboncoin', id: '8442001' } });
+    dit(r.code === 200 && sub.metadata.vrm_vendeur_leboncoin === '8442001' && r.corps.comptesVendeurs.leboncoin.id === '8442001', 'Leboncoin : son compte rangé dans SON abonnement (`vrm_vendeur_leboncoin`), relu', JSON.stringify(r.corps));
+    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'ebay', id: '0123456789abcdef' } });
+    const rv = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'vestiaire', id: 'vc222' } });
+    dit(r.code === 200 && rv.code === 200 && sub.metadata.vrm_vendeur_ebay === '0123456789abcdef' && sub.metadata.vrm_vendeur_vestiaire === 'vc222', 'eBay et Vestiaire : un geste chacun, le choix de Leboncoin ne bloque pas les autres (30 jours par plateforme)');
+    const rvi = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { uid: '1007' } });
+    dit(rvi.code === 200 && sub.metadata.vrm_compte_vendeur === '1007', 'Vinted garde son geste d’avant ({ uid }), indépendant des autres');
+    const n = postsStripe().length;
+    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'leboncoin', id: '8442002' } });
+    dit(r.code === 429 && postsStripe().length === n && /Leboncoin/.test(r.corps.message) && /30 jours/.test(r.corps.message), 'changer de compte Leboncoin avant 30 jours : refusé, la date est dite, rien écrit', r.corps && r.corps.message);
+    sub.metadata.vrm_vendeur_leboncoin_le = new Date(Date.now() - 31 * 864e5).toISOString();
+    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'leboncoin', id: 'lbc-account:8442002' } });
+    dit(r.code === 200 && sub.metadata.vrm_vendeur_leboncoin === '8442002' && sub.metadata.vrm_vendeur_leboncoin_avant === '8442001', 'après 30 jours : changé (l’ancien gardé ; `lbc-account:` reconnu)');
+    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: P_, corps: { plateforme: 'ebay', id: 'principal' } });
+    dit(r.code === 409, 'propriétaire : rien à choisir (Pro)');
+    r = await appel({ mode: 'abonnement', headers: A_ });
+    dit(r.corps.comptesVendeurs && r.corps.comptesVendeurs.leboncoin.id === '8442002' && r.corps.comptesVendeurs.ebay.id === '0123456789abcdef' && r.corps.comptesVendeurs.vestiaire.id === 'vc222' && !!r.corps.comptesVendeurs.leboncoin.prochainChangement,
+      'l’app relit le compte vendeur de chaque plateforme et son prochain changement', JSON.stringify(r.corps.comptesVendeurs));
+    r = await envoyer({ ...sub }, 500);
+    dit(r.code === 200 && abos[A].comptes_vendeurs && abos[A].comptes_vendeurs.leboncoin === '8442002' && abos[A].comptes_vendeurs.ebay === '0123456789abcdef' && abos[A].comptes_vendeurs.vestiaire === 'vc222' && abos[A].compte_vendeur === '1007',
+      'webhook : `comptes_vendeurs` (030) rangé depuis les métadonnées, à côté du compte Vinted', JSON.stringify(abos[A].comptes_vendeurs));
+    colonne030 = false; delete abos[A].comptes_vendeurs;
+    r = await envoyer({ ...sub, status: 'past_due' }, 600);
+    dit(r.code === 200 && abos[A].statut === 'past_due' && abos[A].plan === 'solo' && abos[A].compte_vendeur === '1007' && !('comptes_vendeurs' in abos[A]), 'sans la migration 030 : statut, plan et compte Vinted quand même rangés', `HTTP ${r.code} · ${JSON.stringify(abos[A])}`.slice(0, 200));
+  });
+  await essaie('serveur : la règle du vendeur (bilans)', async () => {
+    reset();
+    const PV = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-vendeur.js'));
+    const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
+    PV.oublierPlans();
+    abos[A] = { statut: 'active', plan: 'solo', compte_vendeur: '1007', comptes_vendeurs: { leboncoin: '8442001', ebay: 'principal' } };
+    let r = await PV.regleDuVendeur(A);
+    dit(r && R.venteAutreHorsPlan(r, 'leboncoin', '8442002') && !R.venteAutreHorsPlan(r, 'leboncoin', '8442001') && R.venteAutreHorsPlan(r, 'ebay', '0123456789abcdef') && R.venteHorsPlan(r, '1008'),
+      'la ligne `abonnements` (030) donne au serveur le compte vendeur de chaque plateforme', JSON.stringify(r && r.autres));
+    PV.oublierPlans(); colonne030 = false;
+    r = await PV.regleDuVendeur(A);
+    dit(r && R.venteHorsPlan(r, '1008') && !R.venteAutreHorsPlan(r, 'leboncoin', '8442002'), 'base sans la 030 : relue sans la colonne — Vinted bridé comme avant, les autres plateformes « pas su » (rien bridé)', JSON.stringify(r));
+    PV.oublierPlans(); colonne030 = true; abos[A].plan = 'pro';
+    r = await PV.regleDuVendeur(A);
+    dit(r && !R.venteAutreHorsPlan(r, 'leboncoin', '8442002'), 'Pro : rien bridé, même avec des comptes vendeurs rangés');
+  });
+
   console.log('── 5. Les prix : Solo 16,99 €, Pro 19,99 € (décision du 9 nov.), une valeur chacun');
   await essaie('prix', async () => {
     const reg = lire('src/accueil-reglages.js'), cpt = lire('api/compte.js'), cgv = lire('public/legal/cgv.html');
     dit(/PRIX_PRO_MOIS = '19,99'/.test(reg) && /PRIX_PRO_CGV = \{ centimes: 1999, devise: 'eur', intervalle: 'month' \}/.test(cpt) && /Offre Pro : 19,99 € par mois/.test(cgv), 'Pro 19,99 € : app, serveur et CGV disent la même chose');
     dit(/Dernière mise à jour : 9 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-09'/.test(cpt), 'CGV du 9 novembre (Solo et Pro), version acceptée à jour');
     dit(/un compte vendeur/.test(cgv) && /comptes d’achat/.test(cgv) && /rien n’est supprimé/.test(cgv), 'CGV : Solo dit « un compte vendeur » et « comptes d’achat », rien supprimé');
+    const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
+    dit(/un compte vendeur par plateforme<\/b> \(un compte Vinted, un compte Leboncoin, un compte eBay et un compte Vestiaire Collective\)/.test(cgv) && /plateforme par plateforme/.test(cgv) && /colis à envoyer restent affichés/.test(cgv),
+      'CGV : « un compte vendeur par plateforme » (Vinted, Leboncoin, eBay, Vestiaire), 30 jours par plateforme, colis gardés');
+    dit(/^Un compte vendeur par plateforme \(un Vinted, un Leboncoin, un eBay, un Vestiaire\)/.test(R.OFFRES.solo.phrase) && /un compte vend sur chaque plateforme/.test(lire('src/Accueil.jsx')),
+      'l’offre Solo dit la même chose dans l’app, sur l’accueil et dans Paramètres (une phrase, `OFFRES.solo`)');
   });
 
   console.log(`\n${ko ? '❌' : '✅'} audit-plans-solo-pro : ${ok} verts, ${ko} rouge(s)`);

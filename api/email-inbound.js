@@ -32,6 +32,8 @@ import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, 
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
 import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation } from './_lib/notif-apercus.js';
 import { stampBordereau } from './_lib/stamp.js';
+// (9 nov., transporteurs inconnus) Le transporteur NOMMÉ dans le PDF du bordereau (sans IA, api/_lib/transporteur-pdf.js).
+import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 // (9 nov.) Solo : la vente d'un compte hors offre ne sonne pas (api/_lib/plan-regle.js).
@@ -53,6 +55,8 @@ import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
 import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
+// (9 nov.) Les autres e-mails Vestiaire (rappel d'envoi, annonce en attente / en ligne, offres, marketing).
+import { lireEmailVcAutre, fusionAnnonceVc, fusionOffreVc } from './_lib/vestiaire-email-autres.js';
 import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
@@ -887,7 +891,9 @@ export async function lireAnnoncesAilleurs() {
     lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens,retirees:data->vrm_annonces_retirees,vcAuto:data->vrm_vc_numeros,vcLiensMain:data->vrm_vc_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
-    lirePagine('id=eq.lbc_listings&select=items:data->items'),
+    // (9 nov., suites serveur) + les lectures COMPLÈTES de « Mes annonces » par compte
+    // (`lectures[compte] = { at, total, n, ids }`, petites) : « en ligne » < 24 h (src/enLigneLbc.js).
+    lirePagine('id=eq.lbc_listings&select=items:data->items,lectures:data->lectures'),
     lirePagine('id=eq.lbc_ventes&select=ventes:data->ventes'),
     lirePagine('id=eq.lbc_accounts&select=accounts:data->accounts'),
     // (1er nov., audit A1) Vestiaire : ses annonces (état, liens posés par VRM) et ses ventes.
@@ -944,7 +950,10 @@ export async function lireAnnoncesAilleurs() {
     const items = lbcL[0] ? objetJson(lbcL[0].items) : null;
     const ventes = ventesL[0] ? objetJson(ventesL[0].ventes) : null;
     const accounts=comptesLbc[0]?objetJson(comptesLbc[0].accounts):null;
-    if (items !== undefined && ventes !== undefined && accounts !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{});
+    // Lectures absentes (`null`) ⇒ jamais lue en entier ⇒ rien n'est « en ligne » ;
+    // forme inconnue (`undefined`) ⇒ pas su ⇒ Leboncoin ne dit RIEN.
+    const lectures = lbcL[0] ? objetJson(lbcL[0].lectures) : null;
+    if (items !== undefined && ventes !== undefined && accounts !== undefined && lectures !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{}, lectures || {}, Date.now());
   }
   return { ebay, lbc, vc, vinted, retraitsEbay };
 }
@@ -2238,6 +2247,49 @@ export async function traiterEmail(req, res) {
         await repondre(res, 200, { ok: true, type: 'vente-vestiaire', productId: v.productId, nouvelle, gain: v.montant ? v.montant.valeur.toFixed(2) : '', prixVente: v.prixVente ? v.prixVente.valeur.toFixed(2) : '', limite: v.limite, date: v.date });
         return;
       }
+      // (9 nov.) LES AUTRES FORMES APPRISES (captures de Julien) : api/_lib/vestiaire-email-autres.js.
+      // Identité = la réf (#N du sujet = Ref du corps) ; les offres n'en ont pas : jamais rattachées,
+      // et ni le pseudo de l'acheteur ni le prénom du vendeur ne sont rangés.
+      const au = lireEmailVcAutre(mail, corpsTexte, emailAt);
+      if (au && !au.ok) {
+        await garderInconnu(corpsBrut, mail, 'Vestiaire : ' + au.raison, '');
+        await repondre(res, 200, { ok: false, type: 'vestiaire', garde: true, raison: au.raison });
+        return;
+      }
+      if (au && au.ok) {
+        const ko503 = async () => { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cet e-mail Vestiaire : renvoie-le." }); };
+        if (au.type === 'marketing') {
+          // Conservé (le journal garde son texte) ; rien n'en est tiré (pas de prix conseillé, refus du 11 oct.).
+          await logEmail({ type: 'vestiaire-info', subject, from: mail.from });
+          await repondre(res, 200, { ok: true, type: 'information', vestiaire: 'marketing' });
+          return;
+        }
+        if (au.type === 'rappel') {
+          // La date limite d'envoi de CETTE vente (sa réf) ; rien d'autre n'est touché (ni l'état, ni « à expédier »
+          // d'une vente connue). « ou votre vente sera automatiquement annulée » est une condition : rien d'annulé.
+          const v = { productId: au.productId, date: '', limite: au.limite, montant: null, prixVente: null, titre: au.titre, photo: '', etiquette: null };
+          let nouvelle = false;
+          const r = await modifierCas('vc_ventes', (cur) => { const f = fusionnerVenteEmailVc(cur, v, now); nouvelle = f.nouvelle; return f.change ? f.data : undefined; });
+          if (r === null) { await ko503(); return; }
+          await logEmail({ type: 'rappel-vestiaire', subject, from: mail.from, productId: au.productId });
+          await repondre(res, 200, { ok: true, type: 'rappel-vestiaire', productId: au.productId, limite: au.limite, nouvelle });
+          return;
+        }
+        if (au.type === 'attente' || au.type === 'en_ligne') {
+          const r = await modifierCas('vc_email_annonces', (cur) => fusionAnnonceVc(cur, au, emailAt));
+          if (r === null) { await ko503(); return; }
+          await logEmail({ type: 'annonce-vestiaire', subject, from: mail.from, productId: au.productId, etat: au.type });
+          await repondre(res, 200, { ok: true, type: 'annonce-vestiaire', productId: au.productId, etat: au.type });
+          return;
+        }
+        // Les offres : montant + échéance ; le sujet (qui porte le pseudo) n'est pas recopié dans le journal des types.
+        const cle = shortHash(String(mail.messageId || '') + '|' + au.type + '|' + au.montant + '|' + emailAt);
+        const r = await modifierCas('vc_email_offres', (cur) => fusionOffreVc(cur, cle, au, emailAt));
+        if (r === null) { await ko503(); return; }
+        await logEmail({ type: 'offre-vestiaire', subject: au.type === 'contre_offre' ? 'Contre-offre reçue (Vestiaire)' : 'Offre acceptée (Vestiaire)', from: mail.from, montant: au.montant });
+        await repondre(res, 200, { ok: true, type: 'offre-vestiaire', offre: au.type, montant: au.montant, echeance: au.echeance });
+        return;
+      }
       // Un AUTRE email de Vestiaire (expédition, paiement, annulation…) : sa
       // forme n'est pas encore apprise. Gardé ENTIER (jamais jeté, jamais
       // tronqué) pour l'apprendre — sauf un email de transporteur, qui suit
@@ -2488,6 +2540,14 @@ export async function traiterEmail(req, res) {
       // Tamponnage AUTOMATIQUE : N° + titre imprimés sur le PDF à l'emplacement
       // mémorisé pour ce format d'étiquette (réglé une fois dans l'app).
       let pdfTamponneB64 = null, posKnown = false;
+      // (9 nov.) LE TRANSPORTEUR ÉCRIT SUR L'ÉTIQUETTE (le PDF de CETTE transaction) : un seul
+      // nom ⇒ sa clé, deux ⇒ rien ; un n° gardé seulement s'il a la forme propre de CE
+      // transporteur. Rangé en SCALAIRES (⇒ meta) : le PDF n'est plus jamais relu pour ça.
+      // Le texte du PDF n'est jamais gardé (il porte l'adresse de l'acheteur).
+      let lu = null;
+      if (pdf) { lu = await transporteurDuPdf(pdf.contentB64); Object.assign(data, champsPdf(lu)); }
+      // Un bordereau sans n° dans l'e-mail : celui de l'étiquette (même transaction, forme propre).
+      if (lu && lu.s && !String(data.suivi || '').trim()) { data.suivi = lu.s; data.suiviSource = 'pdf'; }
       if (pdf) {
         try {
           const rf = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`), {

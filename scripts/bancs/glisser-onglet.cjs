@@ -132,8 +132,9 @@ const unBouton = (pg) => pg.evaluate(() => {
       const { ctx, pg } = await page(nav, true, 'plat_vinted');
       await glisserDoigt(pg, 300, 700, -220);
       const e = await ecran(pg);
-      // (31 oct.) `?tab=plat_vinted` ouvre Ventes · Vinted ; l'onglet voisin de Ventes est Colis.
-      dit(/colis/i.test(e), 'l’autre sens : au doigt, balayer sur une zone vide passe toujours de Ventes à Colis', `→ ${e}`);
+      // (9 nov., décision de Julien : « je ne veux pas que ça glisse entre les onglets ») le balayage
+      // entre onglets est RETIRÉ : un balayage franc sur une zone vide reste sur Ventes.
+      dit(!/colis/i.test(e) && /vente|vinted/i.test(e), 'au doigt, balayer ne change plus d’onglet (décision du 9 nov.)', `→ ${e}`);
       await ctx.close();
     }
     // (17 oct., Julien : « quand je sélectionne Bon après-midi Shopcancale et
@@ -166,7 +167,8 @@ const unBouton = (pg) => pg.evaluate(() => {
       // (même point de départ, mais un geste franc et rapide : c'est un balayage)
       if (b) await glisserDoigt(pg, Math.min(370, b.x1 + 40), b.y, -260);
       const e2 = await ecran(pg);
-      dit(/annonces/i.test(e2), 'l’autre sens : un balayage rapide depuis Ma journée mène toujours à Annonces (l’onglet voisin)', `→ ${e2}`);
+      // (9 nov., décision de Julien) plus de balayage entre onglets : on reste sur Ma journée.
+      dit(/journ/i.test(e2), 'un balayage rapide depuis Ma journée ne change plus d’onglet (décision du 9 nov.)', `→ ${e2}`);
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }

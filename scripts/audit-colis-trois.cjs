@@ -90,7 +90,7 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   // L'App : le colis du scan vient d'un n° LU (b.suivi / v.suivi), le « Déposé » est le geste existant différé.
   const scanBloc = app.slice(app.indexOf('const colisScannables = () =>'), app.indexOf('const trouverScan ='));
   dit(/suivis: b && b\.suivi \? \[b\.suivi\] : \[\]/.test(scanBloc) && /suivis: v\.suivi \? \[v\.suivi\] : \[\]/.test(scanBloc) && [...scanBloc.matchAll(/suivis: ([^\]]*\])/g)].every((x) => !/titre|title/.test(x[1])), '1n App : les n° d’un colis sont ceux LUS (bordereau, Vestiaire), jamais le titre');
-  dit(/useDeposeDiffere\(\s*\(x\) => \{ if \(!x\) return; if \(x\.site === 'vinted'\) marquerColisFait\(x\.o, x\.b\)/.test(scanBloc) && /onDeposer=\{\(x\) => deposeScan\.demander\(/.test(app), '1o App : « Déposé » = `marquerColisFait` différé (Annuler 5 s)');
+  dit(/useDeposeDiffere\(\s*\(x\) => \{ if \(!x\) return; if \(x\.site === 'vinted'\) marquerColisFait\(x\.o, x\.b\)/.test(scanBloc) && /onConfirmer=\{\(x\) => deposeScan\.demander\(/.test(app), '1o App : « Déposé » = `marquerColisFait` différé (Annuler 5 s)');
 
   // ── 2. TOUT IMPRIMER PAR TRANSPORTEUR ─────────────────────────────────────
   const items = [

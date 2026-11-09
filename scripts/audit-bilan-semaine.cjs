@@ -39,12 +39,15 @@ catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); pro
 // règles Vestiaire que lisent `ventesFaites`/`ventesDeclarables` vivent dans
 // api/_lib/vestiaire-regle.js (un propriétaire, importé par l'app ET par le
 // miroir) : elles sont posées dans le contexte de l'app avant d'exécuter.
-const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarteChoix'];
-// (9 nov., offres Solo/Pro) Dans l'app, `compteEcarte` = choix du vendeur OU vente hors de son offre Solo
-// (`venteHorsPlanUid`, état de l'app). Le serveur ne porte que le CHOIX (`compteEcarteChoix`), sous le nom
-// historique `compteEcarte` (alias écrit par --recopie). Les bilans serveur n'appliquent pas encore l'offre Solo :
-// suite notée dans docs/passation/2026-11-09-plans-solo-pro.md.
-const ALIAS = 'export const compteEcarte = compteEcarteChoix;\n';
+const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarteChoix', 'compteEcarteRegle'];
+// (9 nov., offres Solo/Pro) Dans l'app, `compteEcarte` = `compteEcarteRegle(uid, masques, panneau,
+// reglePlanCourante())` : le choix du vendeur OU une vente hors de son offre Solo (`venteHorsPlan`,
+// api/_lib/plan-regle.js, importé tel quel des deux côtés). (9 nov., suites serveur) Le serveur porte
+// `compteEcarteRegle` au jeton près et l'expose sous le nom historique `compteEcarte` (alias écrit par
+// --recopie) : la règle de l'offre du vendeur (`regleDuVendeur`, api/_lib/plan-vendeur.js) en 4e argument.
+// Sans 4e argument (« pas su », ou un appelant qui ne parle que du COMPTE : relecture, pannes, colis) ⇒
+// le choix seul, exactement `compteEcarteChoix`.
+const ALIAS = 'export const compteEcarte = compteEcarteRegle;\n';
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return null; } };
 // Les déclarations de premier niveau `const X = …` d'un fichier, par nom.
 function declarations(src, plugins) {
@@ -89,6 +92,8 @@ if (process.argv.includes('--recopie')) {
 
   // Les règles de l'APP, exécutées telles quelles.
   const ctxApp = vm.createContext({});
+  // La règle de l'offre (api/_lib/plan-regle.js, un propriétaire) : posée dans le contexte de l'app.
+  try { const plR = await import('file://' + path.join(R, 'api', '_lib', 'plan-regle.js')); for (const k of Object.keys(plR)) ctxApp[k] = plR[k]; } catch (e) { dit(false, 'api/_lib/plan-regle.js se charge', e.message); }
   for (const n of NOMS) { if (declApp[n]) try { vm.runInContext(declApp[n].texte + `\nthis.${n} = ${n};`, ctxApp); } catch (_) {} }
   try { const vcR = await import('file://' + path.join(R, 'api', '_lib', 'vestiaire-regle.js')); for (const k of Object.keys(vcR)) ctxApp[k] = vcR[k]; } catch (e) { dit(false, 'api/_lib/vestiaire-regle.js se charge', e.message); }
   let srv = {}, bil = {}, pushLib = {};
@@ -150,7 +155,21 @@ if (process.argv.includes('--recopie')) {
   });
   await essaie('compteEcarteChoix', async () => {
     const cas = [['1', new Set(['1']), {}], ['1', new Set(['1']), { 1: false }], ['2', new Set(), { 2: true }], ['3', null, null]];
-    dit(cas.every(([u, m, p]) => ctxApp.compteEcarteChoix(u, m, p) === srv.compteEcarte(u, m, p) && srv.compteEcarte === srv.compteEcarteChoix), 'compteEcarte (serveur) = compteEcarteChoix de l’app : même réponse (masqué, rallumé exprès, éteint au panneau)');
+    dit(cas.every(([u, m, p]) => ctxApp.compteEcarteChoix(u, m, p) === srv.compteEcarte(u, m, p)) && srv.compteEcarte === srv.compteEcarteRegle, 'compteEcarte (serveur) sans règle d’offre = compteEcarteChoix de l’app : même réponse (masqué, rallumé exprès, éteint au panneau)');
+  });
+  await essaie('compteEcarteRegle (offre Solo)', async () => {
+    // (9 nov., suites serveur) Avec la règle de l'offre : Solo au compte vendeur 11, Pro, pas su, propriétaire.
+    const P = await import('file://' + path.join(R, 'api', '_lib', 'plan-regle.js'));
+    const regles = [P.regleVentes({ plan: 'solo', compteVendeur: '11' }), P.regleVentes({ plan: 'pro', compteVendeur: '11' }), P.regleVentes({ plan: 'solo' }), P.regleVentes(null), P.regleVentes({ proprietaire: true, plan: 'solo', compteVendeur: '11' }), null, undefined];
+    const uids = ['11', '22', '', 'pseudo', null];
+    const masquesOuPas = [[new Set(), {}], [new Set(['11']), {}], [new Set(), { 22: false }], [null, null]];
+    let tous = true, n = 0;
+    for (const r of regles) for (const u of uids) for (const [m, p] of masquesOuPas) { n++; if (ctxApp.compteEcarteRegle(u, m, p, r) !== srv.compteEcarte(u, m, p, r)) tous = false; }
+    dit(tous, `compteEcarteRegle : app = serveur sur ${n} cas (Solo, Pro, pas su, propriétaire × comptes × choix)`);
+    const solo = regles[0];
+    dit(srv.compteEcarte('22', new Set(), {}, solo) === true && srv.compteEcarte('11', new Set(), {}, solo) === false && srv.compteEcarte('', new Set(), {}, solo) === false,
+      'Solo au compte 11 : le compte 22 est écarté, le 11 compte, une vente sans compte relevé n’est jamais écartée');
+    dit([regles[1], regles[2], regles[3], regles[4], null].every((r) => srv.compteEcarte('22', new Set(), {}, r) === false), 'Pro, Solo sans compte choisi, pas su, propriétaire : rien n’est bridé');
   });
 
   console.log('\n── 3. Les dates de versement : la condition de l’app');

@@ -31,12 +31,14 @@ import { conserverRetrait, normaliserSuivi } from './etat-colis-email.js';
 import { vendeurParIndex, ecrireIndexJeton, memeJeton } from './jeton-index.js';
 import { arriveLeAuRangement } from './arrivee-colis.js';
 import { sbCle } from './cle.js';
+// (9 nov.) Les autres expéditeurs (Chronopost, Vinted Go, Pickup, VestiaireCo) : api/_lib/sms-autres.js.
+import { lireAutreSms, rangerAutreSms, messageAutre, resumeEssaiAutre } from './sms-autres.js';
 
 // ── LE LECTEUR (pur) ─────────────────────────────────────────────────────────
-const plat = (s) => String(s || '').replace(/[  ]/g, ' ').replace(/\s+/g, ' ').trim();
-// Un code d'AUTHENTIFICATION (vérification, connexion, mot de passe à usage
-// unique) : jamais rangé, d'où qu'il vienne. Jugé AVANT tout le reste.
-const AUTHENTIFICATION = /code\s+(?:de\s+|d['’]\s*)?(?:v[ée]rification|confirmation|s[ée]curit[ée]|validation|connexion|authentification|acc[èe]s|activation)|verification\s+code|one[- ]time|\bOTP\b|mot\s+de\s+passe|ne\s+(?:le\s+)?(?:communiquez|partagez|transmettez|donnez)/i;
+// Le texte aplati et le code d'AUTHENTIFICATION (jamais rangé, d'où qu'il vienne,
+// jugé AVANT tout le reste) : api/_lib/sms-commun.js, partagé par chaque lecteur (9 nov.).
+import { plat, AUTHENTIFICATION } from './sms-commun.js';
+export { plat, AUTHENTIFICATION };
 const MARQUE_MR = /mondial\s*relay|mondialrelay\.|mrcolis|\bMRELAY\b/i;
 const N_COLIS = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\b/i;
 // « Votre colis 81234567 est disponible au LOCKER 24/7 ENSEIGNE. Retirez-le vite avec le code 712345. »
@@ -44,6 +46,13 @@ const DISPONIBLE = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+est\s+disponible\s+(?
 // « Au cas où le point de retrait pour votre colis 81234567 serait indisponible, sélectionnez-en un autre… »
 const EN_ROUTE = /au\s+cas\s+o[uù]\s+le\s+point\s+de\s+retrait\s+pour\s+votre\s+colis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+serait\s+indisponible/i;
 export const CONSIGNE = /locker|consigne|casier/i;
+// (9 nov., captures iPhone de Julien — formes RÉELLES, valeurs inventées ici) :
+// « Votre colis 81234560 est arrivé au P. Relais TABAC DU PORT.  Retirez-le vite avec le code 712340. + d'infos: mrcolis.fr »
+// (deux espaces possibles, apostrophe dans le nom ; « P. Relais » porte un point qui n'est pas la fin du lieu).
+const ARRIVE = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+est\s+arriv[ée]e?\s+(?:au|à\s+la|a\s+la|à\s+l['’]|a\s+l['’]|dans\s+(?:le|la|votre)|chez)\s+(?:(?:P\.|Point)\s*Relais\s+)?(.{2,60}?)\s*\.\s+Retirez[- ]le\b.*?\bcode\s*:?\s*(\d{6})\b/i;
+// Le RAPPEL : « Retirez vite votre colis 81234560 avec le code 712340! Il vous attend au Point Relais TABAC DU PORT »
+// (pas de point final, « ! » collé). Même colis (même n°) ⇒ la même ligne ; le rappel ne date jamais l'arrivée.
+const RAPPEL = /Retirez\s+vite\s+votre\s+colis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+avec\s+le\s+code\s*:?\s*(\d{6})\b\s*!?\s*Il\s+vous\s+attend\s+(?:au|à\s+la|a\s+la|dans\s+(?:le|la))\s+(?:(?:P\.|Point)\s*Relais\s+)?([^.!\n]{2,60})/i;
 
 const lieuPropre = (s) => {
   const l = plat(s).replace(/[®™©*_]+/g, ' ').replace(/[\s,;:–-]+$/, '').replace(/\s+/g, ' ').trim();
@@ -65,6 +74,16 @@ export function lireSmsMondialRelay({ texte = '', expediteur = '' } = {}) {
   if (d) {
     const suivi = normaliserSuivi(d[1]); const lieu = lieuPropre(d[2]); const code = d[3];
     if (suivi && lieu && code && code !== suivi) return { type: 'disponible', suivi, lieu, code, consigne: CONSIGNE.test(lieu) };
+  }
+  const a = ARRIVE.exec(t);
+  if (a) {
+    const suivi = normaliserSuivi(a[1]); const lieu = lieuPropre(a[2]); const code = a[3];
+    if (suivi && lieu && code && code !== suivi) return { type: 'disponible', suivi, lieu, code, consigne: CONSIGNE.test(lieu) };
+  }
+  const rp = RAPPEL.exec(t);
+  if (rp) {
+    const suivi = normaliserSuivi(rp[1]); const code = rp[2]; const lieu = lieuPropre(rp[3]);
+    if (suivi && lieu && code && code !== suivi) return { type: 'disponible', suivi, lieu, code, consigne: CONSIGNE.test(lieu), rappel: true };
   }
   const r = EN_ROUTE.exec(t);
   if (r) return { type: 'en_route', suivi: normaliserSuivi(r[1]) };
@@ -88,10 +107,10 @@ export function ligneSms(lu, prev, { smsAt, maintenant } = {}) {
   if (lu.type === 'disponible') {
     if (p && p.status === 'delivered') return { data: null, action: 'deja-retire' };
     const plusRecent = !!(p && isoOk(p.emailAt) && Date.parse(at) > Date.parse(p.emailAt));
-    const subject = `Votre colis ${lu.suivi} est disponible au ${lu.lieu} (SMS Mondial Relay)`;
+    const subject = lu.rappel ? `Rappel : colis ${lu.suivi} à retirer au ${lu.lieu} (SMS Mondial Relay)` : `Votre colis ${lu.suivi} est disponible au ${lu.lieu} (SMS Mondial Relay)`;
     if (!p) {
       return { action: 'range', data: { ...base, status: 'available', statusLabel: 'Arrivé au point de retrait (SMS)',
-        subject, receivedAt: now, emailAt: at, arriveLe: arriveLeAuRangement(null, subject, 'available', at),
+        subject, receivedAt: now, emailAt: at, arriveLe: lu.rappel ? null : arriveLeAuRangement(null, subject, 'available', at),
         code: lu.code, code2: null, artTitle: null, lieu: lu.lieu, limite: null, consigne: !!lu.consigne,
         qrB64: null, qrType: null, qrUrl: null, account: '', source: 'sms', sms: smsTrace } };
     }
@@ -105,7 +124,7 @@ export function ligneSms(lu, prev, { smsAt, maintenant } = {}) {
       code: p.code || lu.code, lieu: p.lieu || lu.lieu, consigne: !!(p.consigne || lu.consigne),
       limite: p.limite || null, sms: smsTrace, aussiSms: true };
     if (p.code && String(p.code) !== lu.code) data.codeSms = lu.code;       // dit à l'écran, jamais caché
-    const a = arriveLeAuRangement(p, subject, status, at); if (a) data.arriveLe = a;
+    const a = lu.rappel ? (p.arriveLe || null) : arriveLeAuRangement(p, subject, status, at); if (a) data.arriveLe = a;
     if (p.smsAVerifier) delete data.smsAVerifier;
     return { action: status === 'available' ? 'fusionne' : 'garde-etat', data };
   }
@@ -216,6 +235,8 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   const nowMs = typeof maintenant === 'function' ? maintenant() : Number(maintenant);
   const lu = lireSmsMondialRelay(corps);
   const smsAt = dateSms(corps.date, nowMs);
+  // (9 nov.) Pas Mondial Relay (ni code d'authentification, ni vide) : un des autres expéditeurs ?
+  const autre = lu.type === 'ignore' && lu.raison === 'pas-mondial-relay' ? lireAutreSms(corps, smsAt) : null;
   const lireLigne = async (id) => {
     try {
       const r = await fetch(`${url}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&${ow}&select=data`, { headers: H });
@@ -234,6 +255,10 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   };
   // MODE ESSAI (bouton « Tester » de l'app) : le jeton est vérifié, le SMS lu,
   // et RIEN n'est écrit — ni colis, ni compteur.
+  if (corps.essai && autre) {
+    res.status(200).json({ ok: true, essai: true, range: false, lu: resumeEssaiAutre(autre), message: `Essai : ${messageAutre(autre, 'essai')} (rien n'a été rangé)` });
+    return;
+  }
   if (corps.essai) {
     const ligne = lu.suivi ? ligneSms(lu, null, { smsAt, maintenant: new Date(nowMs).toISOString() }) : { data: null, action: lu.type === 'ignore' ? 'ignore' : 'sans-numero' };
     res.status(200).json({ ok: true, essai: true, range: false, lu: lu.type === 'ignore' ? { type: 'ignore', raison: lu.raison } : lu, ligne: ligne.data ? { status: ligne.data.status, lieu: ligne.data.lieu, consigne: ligne.data.consigne, code: ligne.data.code ? '✓' : '' } : null, message: `Essai : ${messageSms(lu, ligne.action)} (rien n'a été rangé)` });
@@ -246,6 +271,14 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   const n = cpt.data && cpt.data.heure === h && Number.isFinite(cpt.data.n) ? cpt.data.n : 0;
   if (n >= SMS_PAR_HEURE) { res.status(429).json({ ok: false, erreur: 'trop de SMS', message: `Plus de ${SMS_PAR_HEURE} SMS cette heure-ci : rien rangé` }); return; }
   if (!(await ecrire('vrm_sms_compteur', { heure: h, n: n + 1 }))) { res.status(503).json({ ok: false, erreur: 'ecriture-ratee' }); return; }
+  if (autre) {
+    const lireListe = async (path) => {
+      try { const r = await fetch(`${url}/rest/v1/${path}&${ow}`, { headers: H }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+    };
+    const r = await rangerAutreSms(autre, { lireLigne, lireListe, ecrire, smsAt, maintenant: nowMs });
+    res.status(r.code).json(r.corps);
+    return;
+  }
   if (lu.type === 'ignore' || !lu.suivi) { res.status(200).json({ ok: true, range: false, type: lu.type, raison: lu.raison || 'sans-numero', message: messageSms(lu) }); return; }
   const id = idLigneSms(lu.suivi);
   const avant = await lireLigne(id);
