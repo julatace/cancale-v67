@@ -125,6 +125,9 @@ const ouvrir = async (b, vp, sc, tab) => {
 const attendreAnnonces = async (pg) => {
   await pg.waitForFunction(() => document.querySelector('[data-annonces-deux-fois]') || document.querySelectorAll('[data-ann-id], .vrm-ann-carte, [data-annonce-id]').length > 0 || /Aucune annonce|pas pu/.test(document.body.innerText), null, { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(1500);
+  // L'écran d'attente (le logo) se retire sur une minuterie : l'horloge du banc est posée, on l'avance.
+  await pg.clock.fastForward(6000).catch(() => {});
+  await pg.waitForTimeout(800);
 };
 const lireAlerte = (pg) => pg.evaluate(() => {
   const s = document.querySelector('[data-annonces-deux-fois]');
@@ -135,7 +138,11 @@ const lireAlerte = (pg) => pg.evaluate(() => {
     depuis: (li.querySelector('[data-deux-fois-depuis]') || { getAttribute: () => null }).getAttribute('data-deux-fois-depuis') }));
   const liens = [...s.querySelectorAll('[data-deux-fois-ouvrir]')].map((a) => ({ href: a.getAttribute('href'), cible: a.getAttribute('target'), h: Math.round(a.getBoundingClientRect().height) }));
   const r = s.getBoundingClientRect();
-  return { alerte: true, ids: s.getAttribute('data-annonces-deux-fois'), titre: b && b.textContent, couleurTitre: b && getComputedStyle(b).color, ombre: getComputedStyle(s).boxShadow,
+  // AU-DESSUS de tout (un écran d'attente posé dessus passerait les autres contrôles, §6.2).
+  const tete = s.querySelector('.vrm-deux-fois-alerte-tete');
+  const tr = tete ? tete.getBoundingClientRect() : r;
+  const dessus = document.elementFromPoint(Math.min(window.innerWidth - 2, tr.left + 20), Math.min(window.innerHeight - 2, tr.top + tr.height / 2));
+  return { alerte: true, dessus: !!dessus && s.contains(dessus), ids: s.getAttribute('data-annonces-deux-fois'), titre: b && b.textContent, couleurTitre: b && getComputedStyle(b).color, ombre: getComputedStyle(s).boxShadow,
     lignes, liens, supprimer: [...s.querySelectorAll('button')].filter((x) => /supprim|retirer/i.test(x.textContent)).length, visible: r.width > 2 && r.height > 2,
     deborde: document.documentElement.scrollWidth > window.innerWidth + 1, sombre: document.documentElement.getAttribute('data-theme') || '' };
 });
@@ -167,7 +174,7 @@ const ROUGE = /255,\s*59,\s*48|255,\s*69,\s*58|215,\s*0,\s*21/;
           dit(r.liens.length === 2 && r.liens.every((x) => /^https:\/\/www\.vinted\.fr\/items\/\d+/.test(x.href) && x.cible === '_blank' && x.h >= 44), '« Ouvrir sur Vinted » : vinted.fr, nouvel onglet, ≥ 44 px', JSON.stringify(r.liens));
           dit(!ROUGE.test(r.couleurTitre || '') && !ROUGE.test(r.ombre || '') && /rgb/.test(r.ombre || ''), 'en AMBRE (titre et filet), jamais le rouge du doublon', `${r.couleurTitre} / ${r.ombre}`);
           dit(r.supprimer === 0, 'aucun bouton qui supprime depuis VRM (son clic, sur Vinted)');
-          dit(r.visible && !r.deborde, 'visible, aucun débordement horizontal');
+          dit(r.visible && r.dessus && !r.deborde, 'visible (au-dessus de tout), aucun débordement horizontal', JSON.stringify({ dessus: r.dessus }));
           if (vp.width < 600) dit(r.sombre === 'dark', 'rendu en mode sombre', r.sombre);
         }
         await pg.waitForTimeout(300);

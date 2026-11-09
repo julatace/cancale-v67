@@ -114,8 +114,17 @@ changement de chaque annonce. » Fiches pas lues ⇒ rien (pas su), jamais une h
   - sur `origin/main` (ebe20e49, `git archive`) : **13 rouges** (9/22 : les modules et l'alerte
     n'existent pas).
 - **Banc `scripts/bancs/doublons-historique.cjs`** (données inventées, 390 tactile SOMBRE et 1512
-  clair, port 9652) : voir le résultat ci-dessous ; captures regardées (alerte Annonces, fiches
-  N°12 / N°40).
+  clair, port 9652) : **49 verts, 0 rouge** sur la branche ; **8 rouges** sur le build
+  d'`origin/main` (ebe20e49, `BANC_DIST`) ; mutation « la règle relie aussi par le TITRE » (build
+  à part) : **2 rouges** (50 titres identiques ⇒ une alerte). L'alerte est jugée AU-DESSUS de tout
+  (`elementFromPoint`) : la première capture montrait encore l'écran d'attente (horloge du banc
+  posée) — le banc avance maintenant l'horloge. Captures regardées : alerte Annonces (390 sombre,
+  1512), fiches N°12 (« Saisi à la main (avant : N°7) », une seule fois) et N°40 (« Origine non
+  enregistrée (avant le 9 nov. 2026) »).
+- Remarque vue sur la capture : l'étape « Numéroté » de la frise (`histoireArticle`, déjà là)
+  dit « posé à la main » pour une fiche `auto: false` datée par `numberedAt` ; l'histoire du N° dit
+  la même chose depuis le journal. Pas touché (fichier d'un autre chantier) ; à unifier un jour
+  (une notion, une règle).
 - `audit-en-ligne-deux-fois` : 42/42, `--prouve` 15/15 (son contrôle de l'appel accepte
   l'argument `dateDe` ajouté).
 - `npm run build` vert ; audits `variables`, `tdz`, `coherence`, `identite`, `statuts`, `icones`
