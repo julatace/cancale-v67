@@ -283,7 +283,8 @@ async function main() {
         await pg.waitForSelector('[data-attente-ecran="journee"]', { timeout: 12000 }).catch(() => {});
         await pg.waitForTimeout(2000);
         const r = await pg.evaluate(() => ({ ji: !!document.querySelector('[data-journee-instantane]'), attente: document.querySelector('[data-attente-ecran="journee"]').getAttribute('data-attente'), sq: !!document.querySelector('[data-attente-ecran="journee"] [data-demarrage-attente]') }));
-        dit(!r.ji && r.attente === 'attente' && r.sq, `S ${T} sans instantané : le squelette d'avant, aucun chiffre`, JSON.stringify(r));
+        // Le comportement d'avant : le squelette, ou (sous charge, après 2,5 s) l'écran ouvert à son plafond.
+        dit(!r.ji && ((r.attente === 'attente' && r.sq) || r.attente === 'plafond'), `S ${T} sans instantané : le comportement d'avant (squelette puis plafond), aucun instantané`, JSON.stringify(r));
         r3();
         // O — atteint : « Objectif atteint », sans fête.
         await attendreVrai(pg);
