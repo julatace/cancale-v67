@@ -346,10 +346,10 @@ import "./facture-pro.css";
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted } from "./retoursStock.js";
-import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche } from "./rechercheUnique.js";
+import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
-import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails } from "./rechercheEcran.js";
+import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, voisinClavier } from "./rechercheEcran.js";
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
@@ -442,7 +442,7 @@ import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichi
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
-import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
+import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
 import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
@@ -14466,7 +14466,26 @@ async function lireExtraFiche(rn) {
   if (conv) { offres = []; for (const r of conv) { const uid = (/^harvest_(\d+)_conv_/.exec(String(r.id || '')) || [])[1] || null; offres.push(...offresDeConversation({ messages: r.messages, transaction: { item_id: r.item } }, uid)); } }
   const recus = rec ? new Set(rec.map((r) => String(r.id || '').replace(/^email_invoice_tx/, ''))) : null;
   const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
-  return { reception, receptionRaison, coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} };
+  const colisVente = await lireColisDesVentes(rn);
+  return { reception, receptionRaison, coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {}, colisVente };
+}
+// (9 nov., fiche paire) LA FRISE DU COLIS D'UNE VENTE, par identité : le bordereau de
+// CETTE transaction (`email_bord_*`, sa date de réception et son n° de suivi), SON clic
+// « Colis fait » (`vinted_ship_done[tx]`), les e-mails du transporteur de CE n° de suivi
+// (`email_track_*`). Projeté (§4.4), toutes les pages (§4.5) ; une lecture ratée ⇒
+// `null` (« pas lu »), jamais « rien ». Rend { [tx]: { bord, depose, suivis } } | null.
+async function lireColisDesVentes(rn) {
+  const txs = [...new Set((((rn && rn.ventes) || {}).vinted || []).map((v) => String((v && v._tx) || '')).filter((x) => /^\d{4,20}$/.test(x)))].slice(0, 10);
+  if (!txs.length) return {};
+  const bords = await lireTout(`id=like.email_bord_*&meta->>transaction=in.(${txs.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi,at:meta->>receivedAt`, { strict: true }).catch(() => null);
+  if (bords === null) return null;
+  const k = (v) => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const parTx = {};
+  for (const b of bords || []) { const tx = String((b && b.tx) || ''); if (!txs.includes(tx)) continue; const prev = parTx[tx]; if (!prev || (b.at && (!prev.at || String(b.at) < String(prev.at)))) parTx[tx] = { at: b.at || null, suivi: String(b.suivi || '').trim() }; }
+  const suivis = [...new Set(Object.values(parTx).map((b) => b.suivi).filter((x) => /^[A-Za-z0-9 -]{6,40}$/.test(x)).flatMap((x) => [x, k(x)]))];
+  let track = [];
+  if (suivis.length) track = await lireTout(`id=like.email_track_*&meta->>suivi=in.(${suivis.map((x) => encodeURIComponent(x)).join(',')})&select=suivi:meta->>suivi,status:meta->>status,at:meta->>receivedAt,emailAt:meta->>emailAt,retire:meta->>retireLe`, { strict: true }).catch(() => null);
+  return colisDesVentes({ txs, bords: bords || [], track, shipDone: load('vinted_ship_done', {}) || {} });
 }
 // Le N° d'une annonce Vestiaire, par identité : le lien posé par VRM, la
 // référence « VRM-{n°} », le N° donné au produit — deux qui se contredisent ⇒ personne.
@@ -39741,7 +39760,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('messages', null, ONGLETS_DEPLACES).tab); onNav('messages'); }}>Conversation</Bouton> : null}
-                    {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:num}));}}>Fiche de la paire</Bouton> : null}
+                    {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche de la paire</Bouton> : null}
                     {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
                     {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
                     {isLotTitle(o.title) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
@@ -49324,7 +49343,19 @@ function AppCoeur() {
     ]);
     // (6 nov., v36) Les factures Pro (`email_invoice_*`), en scalaires — la lecture de l'écran Factures.
     const facturesPro=await fetchProInvoices({ metadata: true }).catch(()=>null);
-    setGsData({online,sold,bought,lbc,pseudos,bordereaux,colis,annonces,facturesPro});
+    // (9 nov., recherche universelle) LES CONVERSATIONS VINTED (Messages) : la transaction,
+    // la paire et l'interlocuteur de chaque conversation, en scalaires (§4.4), toutes les
+    // pages (§4.5) — l'identité est (compte, n° de conversation). Et LES VENTES VESTIAIRE
+    // (la lecture partagée de l'app, `lireVentesVestiaire`, chacune avec SON N° par identité).
+    // Lues à l'ouverture de la loupe seulement (aucun coût au démarrage).
+    const [convRows,vcBrut]=await Promise.all([
+      lireTout('id=like.harvest_*_conv_*&select=id,tx:data->payload->conversation->transaction->>id,titre:data->payload->conversation->transaction->>item_title,login:data->payload->conversation->opposite_user->>login').catch(()=>null),
+      lireVentesVestiaire().catch(()=>null),
+    ]);
+    const mr=messagesRetires();
+    const messages=messagesPourRecherche(convRows,(u)=>!mr.has(String(u))&&(!okUid||okUid.has(String(u))));
+    let vcVentes=null; try{ vcVentes=vcBrut?ventesVcDe(avecNumerosVc(vcBrut)):null; }catch(_){ vcVentes=null; }
+    setGsData({online,sold,bought,lbc,pseudos,bordereaux,colis,annonces,facturesPro,messages,vcVentes});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
   // (6 nov., v36) LES E-MAILS DE LA LOUPE : le moteur de l'écran E-mails (côté base, sur
   // TOUTES ses lignes, `filtreRecherche`) — pas de second moteur. Une requête par
@@ -49510,6 +49541,11 @@ function AppCoeur() {
   // « / » ouvre la recherche (hors d'un champ de saisie), comme la maquette.
   React.useEffect(() => {
     const k = (e) => {
+      // (9 nov.) ⌘K (Mac) / Ctrl+K : partout, même depuis un champ — le champ de la loupe
+      // prend le focus et son texte est sélectionné (on retape par-dessus).
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K') && !e.defaultPrevented) {
+        e.preventDefault(); ouvrirRecherche(); try { gsChampRef.current && gsChampRef.current.select(); } catch (_) {} return;
+      }
       if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
       const t = e.target; const tag = t && t.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
@@ -51632,6 +51668,24 @@ function AppCoeur() {
     <div data-ebay-compte-section="" style={{ padding: 16, background: EBAY_SKIN.bg, borderRadius: 12 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setTab('ebay_annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>
   );
 
+  // ── (9 nov.) LE CLAVIER DE LA LOUPE : ↓ du champ va à la 1re ligne, ↑ ↓ Début Fin
+  // passent d'une ligne à l'autre (↑ de la 1re revient au champ), Entrée dans le champ
+  // ouvre la 1re trouvaille (la fiche du N° quand un N° est tapé). Les lignes sont des
+  // boutons : Entrée et Espace les ouvrent d'eux-mêmes. Une composition (accents, IME)
+  // en cours n'est jamais interrompue.
+  const lignesClavier = () => { const p = document.getElementById('vrm-recherche-resultats'); return p ? [...p.querySelectorAll('[data-tout-parcours], .vrm-recherche-ligne, [data-recherche-recent]')].filter(x => !x.disabled && x.getClientRects().length) : []; };
+  const allerLigne = (l, j) => { if (j === -1) { try { gsChampRef.current && gsChampRef.current.focus({ preventScroll: true }); } catch (_) {} return; } const x = l[j]; if (!x) return; try { x.focus({ preventScroll: true }); x.scrollIntoView({ block: 'nearest' }); } catch (_) {} };
+  const clavierChamp = (e) => {
+    if (e.nativeEvent && e.nativeEvent.isComposing) return;
+    if (e.key === 'ArrowDown') { const l = lignesClavier(); const j = voisinClavier(l.length, -1, 'ArrowDown'); if (j != null && j >= 0) { e.preventDefault(); allerLigne(l, j); } return; }
+    if (e.key === 'Enter') { const l = lignesClavier().filter(x => !x.hasAttribute('data-recherche-recent')); if (l[0]) { e.preventDefault(); l[0].click(); } }
+  };
+  const clavierPanneau = (e) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) || e.altKey || e.metaKey || e.ctrlKey) return;
+    const l = lignesClavier(); const i = l.indexOf(document.activeElement); if (i < 0) return;
+    const j = voisinClavier(l.length, i, e.key); if (j == null) return;
+    e.preventDefault(); e.stopPropagation(); allerLigne(l, j);
+  };
   // ── LA RECHERCHE EN PLACE (31 oct.) : les résultats, un panneau sous le champ ──
   // (6 nov., filet 2) Le panneau se calcule SOUS son garde-fou (`Differe`) : une erreur ici ne fait plus tomber la coque.
   const panneauRecherche = !gsOpen ? null : <GardeEcran nom="recherche" feuille onFermer={fermerRecherche}><RechercheVivante rendre={(fil, gsQLent)=>{
@@ -51655,12 +51709,20 @@ function AppCoeur() {
         const factures = memoSur('gs-fac', [invoices, gsData && gsData.facturesPro], () => facturesPourRecherche(invoices, gsData && gsData.facturesPro));
         const lbcSet = (gsData && gsData.lbc) || new Set();
         const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
-        const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData && gsData.pseudos, bordereaux: gsData && gsData.bordereaux, colis: gsData && gsData.colis, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx });
+        // (9 nov.) Les ventes hors Vinted, chacune par SON n° de commande, et leur N° par
+        // IDENTITÉ seulement (eBay : le SKU ; Leboncoin : le lien ou la référence ;
+        // Vestiaire : le N° de la vente lue) — jamais par le titre.
+        const autres = memoSur('gs-autres', [numData && numData.ebayCommandes, numData && numData.lbcVentes, numData && numData.lbcItems, gsData && gsData.vcVentes], () => ventesAutresPourRecherche(
+          { ebay: numData && numData.ebayCommandes, lbc: numData && numData.lbcVentes, vc: gsData && gsData.vcVentes },
+          { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, load('vrm_lbc_liens', {}) || {}) }));
+        const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData && gsData.pseudos, bordereaux: gsData && gsData.bordereaux, colis: gsData && gsData.colis, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx, autres, messages: gsData ? gsData.messages : null });
         const kNumQ = lireNumeroCherche(qBrut, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
         // Une seule recherche pour tout : N° (partiel), pseudo, n° de suivi, code de retrait,
         // n° de transaction, n° de facture, montant, titre / marque / taille. Le titre ne sert
         // qu'à CHERCHER : chaque ligne ouvre SON objet par son identité (src/rechercheUnique.js).
-        const trouve = q ? chercherPartout(idx, qBrut, { numero: kNumQ, max: { paire: gsMax.paire || 12, vente: gsMax.vente || 8, achat: gsMax.achat || 8, colis: gsMax.colis || 8, annonce: gsMax.annonce || 8, facture: gsMax.facture || 6 } }) : null;
+        const trouve = q ? chercherPartout(idx, qBrut, { numero: kNumQ, max: { paire: gsMax.paire || 12, vente: gsMax.vente || 8, achat: gsMax.achat || 8, colis: gsMax.colis || 8, message: gsMax.message || 6, annonce: gsMax.annonce || 8, facture: gsMax.facture || 6 } }) : null;
+        // (9 nov.) Ce que la requête a l'air d'être — DIT, jamais décidé : tout est cherché.
+        const compris = q ? reconnaitreRequete(qBrut, { numero: kNumQ }) : null;
         // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le N° » passe devant,
         // par identité (src/rechercheNumero.js). (3 nov.) Un nombre long (≥ 5 chiffres) qui EST un
         // code de retrait, un n° de suivi ou de transaction exact : « Tout sur le N°482913 — jamais
@@ -51674,10 +51736,11 @@ function AppCoeur() {
         const totalDe = (t) => !trouve ? 0 : (t === 'paire' && estNumQ ? trouve.totaux.paire - trouve.groupes.paire.filter(r => r.par === 'numero' && r.exact).length : trouve.totaux[t]);
         const mails = gsEmails && gsEmails.q === requeteEmails(qBrut.trim()) ? gsEmails : null;
         const listeMails = mails && Array.isArray(mails.liste) ? mails.liste : [];
-        const total = trouve ? ['paire','vente','achat','colis','annonce','facture'].reduce((n,t)=>n+groupe(t).length,0) + listeMails.length : 0;
+        const total = trouve ? ['paire','vente','achat','colis','message','annonce','facture'].reduce((n,t)=>n+groupe(t).length,0) + listeMails.length : 0;
         const shipDoneGs = load('vinted_ship_done', {}) || {};
         const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
         const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+        const nomCompteGs = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return ''; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || ''; };
         const numBadge=(n)=> <span className="vrm-recherche-num" style={{flexShrink:0,minWidth:26,height:26,borderRadius:12,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20,display:'flex'}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         // Où mène une ligne : SON objet, par son identité (`destinationResultat`).
@@ -51688,7 +51751,10 @@ function AppCoeur() {
           if (d.fiche) { setFicheNum(String(d.fiche)); return; }
           if (d.facture) demanderOuverture('facture', d.facture);
           if (d.email) demanderOuverture('email', d.email);
-          if (type === 'achat') demanderVue('achats'); if (type === 'vente') subVoulue.current = 'vinted';
+          if (type === 'achat') demanderVue('achats');
+          // (9 nov.) Une vente eBay : SA commande (`DEMANDE_EBAY_CIBLE`) ; Leboncoin, Vestiaire : SON site.
+          if (d.ebay) { DEMANDE_EBAY_CIBLE.compte = d.ebay.compte || null; DEMANDE_EBAY_CIBLE.id = d.ebay.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); }
+          else if (type === 'vente') subVoulue.current = d.sub || 'vinted';
           if (d.cible) poserCible(d.cible, redirigerOnglet(d.tab, null, ONGLETS_DEPLACES).tab);
           setTab(d.tab);
         };
@@ -51715,6 +51781,15 @@ function AppCoeur() {
             vignette = <>{numBadge(null)}{thumb(e.photo)}</>;
             titre = e.titre || '(sans titre)'; etat = 'En ligne · sans N°';
             info = [etat, e.a && (e.a.brand || e.a.size) ? [e.a.brand, e.a.size].filter(Boolean).join(' ') : '', e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
+          } else if (type === 'vente' && e.site) {
+            const NOM_SITE = { ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
+            vignette = thumb(e.photo, <span style={{display:'flex',color:C.text}}><LogoSite site={e.site}/></span>);
+            titre = e.titre || `Vente ${NOM_SITE[e.site] || e.site}`; etat = `Vendue sur ${NOM_SITE[e.site] || e.site}`;
+            info = [etat, e.numero ? `N°${e.numero}` : '', e.date ? jourCourt(e.date) : '', e.montants && e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
+          } else if (type === 'message') {
+            vignette = thumb(e.photo, <Icon name="chat" size={18} style={{color:C.muted}}/>);
+            titre = e.titre || 'Conversation'; etat = 'Conversation Vinted';
+            info = [etat, nomCompteGs(e.compte), e.date ? jourCourt(e.date) : ''].filter(Boolean).join(' · ');
           } else if (type === 'facture') {
             vignette = thumb(null, <Icon name="doc" size={18} style={{color:C.muted}}/>);
             titre = e.titre || `Facture ${e.facture}`;
@@ -51728,6 +51803,7 @@ function AppCoeur() {
           return (
             <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={()=>ouvrir(r, type)} data-recherche-resultat={type} data-recherche-par={r.par} title={MOTIFS_RECHERCHE[r.par] || motifRecherche(r.par)} data-recherche-cle={e.cle}
               data-recherche-vente={type==='vente'&&e.tx?e.tx:undefined} data-recherche-achat={type==='achat'&&e.tx?e.tx:undefined} data-recherche-num={e.numero || undefined} data-recherche-statut={etat || undefined}
+              data-recherche-site={e.site || undefined} data-recherche-commande={e.site ? e.id : undefined} data-recherche-conv={type==='message' ? e.id : undefined}
               style={styleLigne}>
               {vignette}{ligneTexte(titre, info)}{pastille(r)}
               <span style={{fontSize:17,color:C.muted}}>›</span>
@@ -51744,13 +51820,13 @@ function AppCoeur() {
             </button>); };
         const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
         const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
-        const GROUPES = [['paire','Paires'],['vente','Ventes'],['achat','Achats'],['colis','Colis'],['annonce','Annonces sans N°'],['facture','Factures']];
+        const GROUPES = [['paire','Paires'],['vente','Ventes'],['achat','Achats'],['colis','Colis'],['message','Messages'],['annonce','Annonces sans N°'],['facture','Factures']];
         // Champ vide : les recherches récentes (cet appareil — tues en mode stream, une
         // recherche tapée peut être un pseudo) et des suggestions tirées de ce qui est lu.
         const sugg = !q ? suggestionsRecherche(idx, { n: 3 }) : null;
         return (
         <div className="vrm-global-search vrm-recherche-panneau" id="vrm-recherche-resultats" data-recherche-panneau="" data-recherche-q={q} data-recherche-pret={gsData ? '1' : '0'} role="region" aria-label="Résultats de la recherche"
-          style={ordi?{background:C.bg,borderColor:C.border}:{top:hautRecherche,background:C.bg,borderColor:C.border}} onMouseDown={e=>{ if(e.target===e.currentTarget) e.preventDefault(); }}>
+          style={ordi?{background:C.bg,borderColor:C.border}:{top:hautRecherche,background:C.bg,borderColor:C.border}} onMouseDown={e=>{ if(e.target===e.currentTarget) e.preventDefault(); }} onKeyDown={clavierPanneau}>
           <FermeAuRetour fermer={()=>setGsOpen(false)}/>
           <div className="vrm-recherche-corps">
             {!q && <div data-recherche-vide="">
@@ -51761,8 +51837,11 @@ function AppCoeur() {
               </div>}
               {sugg && sugg.colis.length > 0 && <div data-recherche-suggestions="colis">{entete('Colis à retirer', null, 'sugg-colis')}{sugg.colis.map((r,i)=>ligne(r,'colis',i))}</div>}
               {sugg && sugg.ventes.length > 0 && <div data-recherche-suggestions="ventes">{entete('Dernières ventes', null, 'sugg-ventes')}{sugg.ventes.map((r,i)=>ligne(r,'vente',i))}</div>}
+              {/* (9 nov.) L'état vide UTILE : ce qu'on peut taper, et le clavier (ordinateur). */}
+              <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>Tape un N° (« b125 », « 007 »), un pseudo, un n° de suivi, de transaction ou de commande eBay, Leboncoin, Vestiaire, un code de retrait, un montant ou des mots du titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
             </div>}
-            {q && total===0 && !estNumQ && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13}}>{gsData?'Aucun résultat':'…'}</div>}
+            {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
+            {q && total===0 && !estNumQ && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« 125 », « B125 »), un pseudo, un n° de suivi, de transaction ou de commande, un code de retrait, un montant (« 52 € ») ou deux mots du titre.</>:'Je lis tes ventes, achats et colis…'}</div>}
             {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {/* Les résultats, groupés par type : chaque ligne dit PAR QUOI elle a été trouvée et
                 ouvre SON objet par son identité. 50 paires au même titre = 50 lignes (« Voir les N autres »). */}
@@ -51795,10 +51874,10 @@ function AppCoeur() {
   const champRecherche = (mobile) => <RechercheVivante rendre={(fil)=>(
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
       aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, suivi, code de retrait, montant, titre…'}
-      role="combobox" aria-autocomplete="list" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats" aria-keyshortcuts={mobile ? undefined : '/'}
-      title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction, montant, facture, e-mail, titre, marque, taille (touche /)'}
+      role="combobox" aria-autocomplete="list" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats" aria-keyshortcuts={mobile ? undefined : '/ Meta+K Control+K'}
+      title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction ou de commande, montant, facture, e-mail, message, titre, marque, taille (touche / ou ⌘K)'}
       value={fil.q} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
-      onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); } }}/>
+      onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); return; } clavierChamp(e); }}/>
   )}/>;
   const champRechercheOrdi = (
     <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'}>
@@ -51991,7 +52070,7 @@ function AppCoeur() {
           const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
           const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
             stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
-            coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne,
+            coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne, colisVente: ex ? ex.colisVente : undefined,
             journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [] }, {
             etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
             venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
@@ -52007,6 +52086,12 @@ function AppCoeur() {
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
+            onSource={(src)=>{ fermer(); setGsOpen(false);
+              // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
+              if (src.stock) { setGarageLocate(String(src.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(src.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
+              if (src.tab === 'achats') demanderVue('achats'); if (src.sub) subVoulue.current = src.sub;
+              if (src.cible) poserCible(src.cible, redirigerOnglet(src.tab, null, ONGLETS_DEPLACES).tab);
+              setTab(src.tab); }}
             onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
