@@ -54,7 +54,7 @@ libère son numéro (le dire ici).
 
 | AC | « À trancher » : un seul endroit pour tous les doutes, un geste par ligne | `claude/a-trancher` | en cours |
 | AD | « Préparer mes colis » pas à pas + mode relais (codes plein écran) | `claude/preparer-relais` | en cours |
-| AE | Colis et Ventes instantanés | `claude/colis-ventes-instantanes` | à lancer |
+| AE | Colis et Ventes instantanés | `claude/colis-ventes-instantanes` | en cours |
 | AF | même annonce sur deux comptes Vinted + historique d'un N° | `claude/doublons-historique` | à lancer |
 | AG | ligne de fraîcheur unique | `claude/fraicheur-unique` | à lancer |
 | AH | Siri / Raccourcis (ajouter un achat, où est le N°) | `claude/siri-raccourcis` | à lancer |
