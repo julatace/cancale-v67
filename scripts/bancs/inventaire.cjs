@@ -34,7 +34,8 @@
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+// BANC_DIST=<dist d'avant> : le même banc sur l'arbre d'avant (§6.1, il doit rougir).
+const DIST = process.env.BANC_DIST ? path.resolve(process.env.BANC_DIST) : path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 10310;
 const CHROMIUM = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const AUJ = Date.now();
@@ -108,8 +109,10 @@ async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) 
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    // (9 nov.) Hors connexion : tout échoue comme sans réseau ; une tentative vers la ligne
+    // de l'inventaire, ou une écriture, est comptée (il ne doit y en avoir aucune).
+    if (base.horsLigne) { if (/vrm_inventaire/.test(u + (req.postData() || '')) || req.method() !== 'GET') base.pendantHl++; return route.abort('internetdisconnected'); }
     if (/id=eq\.vrm_inventaire/.test(u) || (req.method() === 'POST' && /vrm_inventaire/.test(req.postData() || ''))) {
-      if (base.horsLigne) base.pendantHl++;
       if (req.method() === 'GET') {
         base.lectures++;
         if (base.panne) return j({ message: 'panne' }, 500);
@@ -128,7 +131,6 @@ async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) 
         base.ligne = JSON.parse(req.postData() || '{}').data; return j([{ id: 'vrm_inventaire' }]);
       }
     }
-    if (base.horsLigne) base.pendantHl++;
     if (req.method() !== 'GET') { base.autres.push({ m: req.method(), u, corps: req.postData() || '' }); return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([
@@ -423,7 +425,7 @@ async function ouvrirInventaire(pg, tel) {
         const fautesH = await horsJetons(pg);
         dit(fautesH.length === 0, `${t} : H — aucune teinte hors des jetons hors connexion`, fautesH.slice(0, 4).join(' | '));
         await shot(pg, nomShot('bilan-hors-ligne'));
-        dit(bh.pendantHl === 0, `${t} : H — hors connexion : AUCUNE requête vers la base (${bh.pendantHl})`);
+        dit(bh.pendantHl === 0, `${t} : H — hors connexion : l'inventaire ne lit ni n'écrit sa ligne, et RIEN n'est écrit dans la base (${bh.pendantHl})`);
         // Le réseau revient : les saisies faites hors connexion partent, une fois.
         bh.horsLigne = false; await ctx.setOffline(false);
         let arrive = false;

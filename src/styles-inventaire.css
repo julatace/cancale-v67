@@ -80,9 +80,10 @@
    au-delà des 44 px), sous le pouce ; « B » pour un ancien N° (archive), ⌫ efface.
    Jetons de la coque seulement : touches neutres, aucune couleur propre. */
 .vrm-inv-pave { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.vrm-inv-touche { min-height: 64px; border: 1px solid var(--vrm-line); border-radius: 14px; background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+/* `.vrm-inv-pave` devant : une règle générale `button[aria-label]` (30 px) l'emportait sur la classe seule. */
+.vrm-inv-pave .vrm-inv-touche { min-height: 64px; border: 1px solid var(--vrm-line); border-radius: 14px; background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 .vrm-inv-touche:active { background: var(--vrm-card2); }
-.vrm-inv-touche-lettre, .vrm-inv-touche-efface { background: var(--vrm-card2); font-size: 22px; }
+.vrm-inv-pave .vrm-inv-touche-lettre, .vrm-inv-pave .vrm-inv-touche-efface { background: var(--vrm-card2); font-size: 22px; }
 .vrm-inv-touche:disabled { opacity: .4; cursor: default; }
 @media (prefers-reduced-motion: no-preference) { .vrm-inv-touche { transition: background-color .12s ease-out; } }
 
