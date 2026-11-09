@@ -37,6 +37,7 @@ export const echapperHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g
 // Une URL ne se pose dans un lien que si elle est http(s) (jamais `javascript:`).
 export const urlSure = (u) => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '');
 // Un paragraphe : échappé, ses retours à la ligne gardés.
+const majuscule = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t);
 const para = (t) => echapperHtml(t).replace(/\r?\n/g, '<br>');
 
 const POLICE = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
@@ -99,10 +100,13 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
     ? `<table role="presentation" class="vrm-chiffres" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:4px 0 20px;border-collapse:separate;background:${FOND};border-radius:14px">`
       + chiffres.map(([l, v, n], i) => {
         const filet = i ? `border-top:1px solid ${FILET};` : '';
-        return `<tr><td class="vrm-filet" style="padding:13px 16px;${filet}vertical-align:top">`
+        // (8 nov., capture 390 px) La note passe SOUS le libellé et le chiffre, sur toute la
+        // largeur : au téléphone, la colonne du montant ne l'écrase plus en trois lignes.
+        const haut = n ? '13px 16px 2px' : '13px 16px';
+        return `<tr><td class="vrm-filet" style="padding:${haut};${filet}vertical-align:top">`
           + `<div class="vrm-t" style="font-size:15px;line-height:1.35;color:${ENCRE}">${echapperHtml(l)}</div>`
-          + (n ? `<div class="vrm-doux" style="font-size:13px;line-height:1.35;color:${DOUX};margin-top:3px">${echapperHtml(n)}</div>` : '')
-          + `</td><td class="vrm-filet vrm-t" align="right" style="padding:13px 16px;${filet}text-align:right;vertical-align:top;white-space:nowrap;font-size:17px;line-height:1.35;font-weight:600;color:${ENCRE};font-variant-numeric:tabular-nums;font-feature-settings:'tnum'">${echapperHtml(v)}</td></tr>`;
+          + `</td><td class="vrm-filet vrm-t" align="right" style="padding:${haut};${filet}text-align:right;vertical-align:top;white-space:nowrap;font-size:17px;line-height:1.35;font-weight:600;color:${ENCRE};font-variant-numeric:tabular-nums;font-feature-settings:'tnum'">${echapperHtml(v)}</td></tr>`
+          + (n ? `<tr><td colspan="2" class="vrm-doux" style="padding:0 16px 13px;font-size:13px;line-height:1.4;color:${DOUX}">${echapperHtml(n)}</td></tr>` : '');
       }).join('')
       + `</table>`
     : '';
@@ -116,7 +120,7 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
   const lienDoux = (url, mot) => `<a href="${echapperHtml(url)}" class="vrm-doux" style="color:${DOUX};text-decoration:underline">${echapperHtml(mot)}</a>`;
   const blocsPied = [];
   if (bouton && urlBouton) blocsPied.push(petit(`Le bouton ne marche pas ? Copie cette adresse dans ton navigateur :<br><span style="word-break:break-all">${echapperHtml(urlBouton)}</span>`));
-  if (pied) blocsPied.push(petit(`${echapperHtml(pied.texte)}${lienPied ? ` ${lienDoux(lienPied, pied.motLien || 'lien')}.` : ''}`));
+  if (pied) blocsPied.push(petit(`${echapperHtml(pied.texte)}${lienPied ? ` ${lienDoux(lienPied, majuscule(pied.motLien || 'lien'))}.` : ''}`));
   if (facultatif) blocsPied.push(petit(lienDoux(LIEN_GERER, 'Gérer mes e-mails')));
   if (mentions.length) blocsPied.push(petit(mentions.map(echapperHtml).join('<br>')));
 

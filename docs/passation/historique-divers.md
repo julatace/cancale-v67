@@ -994,3 +994,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée le 8 nov., chantier vitesse-calcul-partage (telle quelle)
 - **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
 - **8 nov. · À retirer : villes, carte, délai** : villes = seulement celles où un colis compté attend, triées par urgence, + « Autres » (`selecteurVilles`) ; carte AUSSI au téléphone (200 px, suit la ville, deux doigts, « Agrandir », hors réseau ⇒ rien) ; barre du délai arrivée lue → limite (lue, sinon « estimée »), ambre ≤ 24 h, jamais rouge, en tête du point si commune (`src/delaiRetrait.js`). `docs/passation/2026-11-08-retirer-carte-delai.md`. Geste : aucun.
+
+## Déplacé de CLAUDE.md §9 le 8 nov. (nuit) — tel quel
+
+- **8 nov. · Confiance** : Mon compte → « Ce que VRM lit et fait » (par site, quand l'extension agit, Irlande/Dublin, qui y a accès ; chaque phrase tenue par le code, `src/tesDonnees.js`) ; journal : chaque geste avec sa PREUVE + commandes du téléphone (`cmd_relais_*`, sans corps) ; page publique `/statut` + incidents posés à la main (`public/statut-incidents.json`) ; `audit-confiance --prouve`. `docs/passation/2026-11-08-confiance.md`. Geste : aucun.

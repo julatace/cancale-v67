@@ -37,8 +37,8 @@ export function mailEssai() {
       'C’est la forme de tous les e-mails de VRM : un titre, ce qu’il faut savoir, un seul bouton.',
     ],
     bouton: { mot: 'Ouvrir VRM', url: SITE },
-    apres: 'Il est arrivé dans les indésirables ? Marque-le « non indésirable » : les suivants arriveront au bon endroit.',
-    pied: { texte: 'Tu reçois ce message parce que tu as cliqué sur « M’envoyer un e-mail d’essai » dans VRM (Réglages → Notifications).' },
+    apres: 'Il est arrivé dans les indésirables ? Marque-le « non indésirable » : les suivants arriveront au bon endroit.',
+    pied: { texte: 'Tu reçois ce message parce que tu as cliqué sur « M’envoyer un e-mail d’essai » dans VRM (Réglages → Notifications).' },
   });
   return { sujet: 'Ton e-mail d’essai VRM', texte, html };
 }
