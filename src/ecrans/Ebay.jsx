@@ -2257,7 +2257,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   };
   const [supprimee,setSupprimee]=React.useState(false);
   const terminer=async()=>{
-    if(!await askConfirm({title:'Supprimer cette annonce d’eBay ?',desc:`${it.title || it.itemId}${nomCompteConfirm?` · ${nomCompteConfirm}`:''}\nElle est terminée tout de suite sur eBay et n’est plus proposée à la vente. C’est sans retour côté eBay : il faudrait la republier.`,ok:'Oui, supprimer d’eBay',cancel:'Annuler',danger:true}))return;
+    if(!await askConfirm({title:'Supprimer cette annonce d’eBay ?',desc:`${it.title || it.itemId}${nomCompteConfirm?` · ${nomCompteConfirm}`:''}\nElle est terminée tout de suite sur eBay et n’est plus proposée à la vente. C’est sans retour côté eBay : il faudrait la republier.`,ok:'Oui, supprimer d’eBay',cancel:'Annuler',danger:true,irreversible:true}))return;
     setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce supprimée d’eBay.');setSupprimee(true);if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
   };
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 12, padding: '9px 10px', fontSize: 17, fontFamily: 'inherit' };
