@@ -410,6 +410,7 @@ import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU } from "./colisEnvoyes.js";
+import { ordreRecent, nbSansDate, debutSansDate, PHRASE_SANS_DATE, quandCommandeVinted, quandLeboncoin, quandEbay, quandVestiaire, quandColisAEnvoyer, quandARetirer } from "./ordreRecent.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -31833,7 +31834,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
   // `STYLE_FLOU` : UNE définition, partagée avec Leboncoin (src/flouCompte.js, §11).
   const ventesAffichees = useMemo(() => {
-    const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = (ventesListe || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
@@ -31873,14 +31873,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ── FILTRE PAR COMPTE (sélecteur de l'onglet) ────────────────────────────
     // ⚠️ `_acc` d'une vente est l'OBJET compte (son uid vit dans
     //    `_acc.vinted_user_id`, repli `_uid`) — comme les annonces, PAS une
-    //    chaîne. Compte choisi ⇒ ses ventes seules ; « Tous » ⇒ celles du compte
-    //    connecté d'abord (tri STABLE, l'ordre par date ci-dessous conservé dans
-    //    chaque groupe).
-    .sort(parDateDesc);
-    // Compte sélectionné (ou connecté) EN TÊTE ; les autres restent (ils seront
-    // FLOUTÉS à l'affichage, pas masqués — demande de Julien). Tri stable.
-    { const c = selEff;
-      if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
+    //    chaîne. Le compte choisi (ou connecté) est NET, les autres FLOUTÉS à
+    //    l'affichage (pas masqués — demande de Julien).
+    ;
+    // ⚠️⚠️ (9 nov., soir, lot AJ — Julien : « du plus récent en haut au plus vieux en bas, peu importe le
+    // compte ») LA PLUS RÉCENTE EN HAUT, TOUS COMPTES MÉLANGÉS : la règle unique `ordreRecent`
+    // (src/ordreRecent.js), date de vente lue, stable, sans date en bas. AVANT : le compte choisi (ou
+    // connecté) passait EN TÊTE — ne pas le remettre ; le flou par compte reste, à sa place dans le temps.
+    arr = ordreRecent(arr, quandCommandeVinted);
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ventesListe, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff, emailBords, bordsHidden, partisVinted]);
@@ -31891,6 +31891,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // diraient à l'identique se dit une fois en tête de la liste — la note « vue par e-mail » par
   // compte (`groupesVentesEmailEnTete`), le refus de facture commun (`FactureRaisonsTete`, qui
   // juge sur `groupeFacture` avec la règle de la ligne). Placés après `ventesMax` (TDZ, §4.6).
+  // (lot AJ) Les ventes sans date lue vont en bas (src/ordreRecent.js) : où elles commencent, combien — dit une fois.
+  const ventesSansDate = useMemo(() => ({ i: debutSansDate(ventesAffichees, quandCommandeVinted), n: nbSansDate(ventesAffichees, quandCommandeVinted) }), [ventesAffichees]);
   const ventesEmailTete = useMemo(() => groupesVentesEmailEnTete(ventesAffichees.slice(0, ventesMax)), [ventesAffichees, ventesMax]);
   const groupeFacture = useMemo(() => ventesAffichees.slice(0, ventesMax).map((o) => {
     const tx = o && (o._fromEmail ? o._txMail : o.transaction_id);
@@ -34562,7 +34564,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     });
   };
-  const achatsAffiches = useMemo(() => { const uidA = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+  const achatsAffiches = useMemo(() => {
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
@@ -34570,26 +34572,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (aFilter === 'recus') return p === 'recu';
       return true; })
     .filter(o => matchOrd(o))
-    .sort(parDateDesc)
-    .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; })
-    // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui
-    // s'affiche en haut peu importe le compte et le filtre ») EN ROUTE : le plus
-    // RÉCENT en haut, et RIEN d'autre ne passe devant — ni l'étape du colis, ni
-    // le compte choisi. (Avant : le plus ancien d'abord, après l'étape, puis le
-    // compte choisi en tête.) Ailleurs, inchangé : l'étape puis le plus récent.
-    .sort((a, b) => {
-      if (aFilter === 'route') return (tsCommande(b.o)||0) - (tsCommande(a.o)||0);
-      const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
-      const d = pr(a) - pr(b); if (d !== 0) return d;
-      return new Date(b.o.date||0) - new Date(a.o.date||0); });
-    // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés, pas
-    // masqués — demande de Julien). Tri STABLE. Pas dans « En route » (5 nov.).
-    { const c = selEff;
-      if (c && aFilter !== 'route') arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
+    .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; });
+    // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui s'affiche en haut peu importe
+    // le compte et le filtre ») puis (9 nov., soir, lot AJ — « du plus récent en haut au plus vieux en bas,
+    // peu importe le compte ») PARTOUT : le plus RÉCENT en haut (date d'achat lue), et RIEN d'autre ne
+    // passe devant — ni l'étape du colis, ni le compte choisi (il reste net, les autres floutés, à leur
+    // place dans le temps). La règle unique `ordreRecent` (src/ordreRecent.js) : stable, sans date en bas.
+    // Ne PAS remettre « l'étape d'abord » ni « le compte choisi en tête ».
+    arr = ordreRecent(arr, (x) => quandCommandeVinted(x.o));
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
   const [achatsMax, setAchatsMax] = useState(60);
+  // (lot AJ) Les achats sans date lue vont en bas (src/ordreRecent.js) : dit une fois.
+  const achatsSansDate = useMemo(() => ({ i: debutSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)), n: nbSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)) }), [achatsAffiches]);
   const [achatsOutilsOuverts, setAchatsOutilsOuverts] = useState(false);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
@@ -40715,7 +40711,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               (`ordSearchDiff` est en retard) : `LigneVenteVinted` garde alors la
               ligne déjà peinte. Le rendu différé, lui, refait tout comme avant
               — aucun comportement ne change. */}
-          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{ const gel = ordSearch!==ordSearchDiff; return <LigneVenteVinted key={o.transaction_id} o={o} i={i} gel={gel} pre={gel?null:preparerLigneVente(o)} rendre={(o,i,pre)=>{
+          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{ const gel = ordSearch!==ordSearchDiff; return <React.Fragment key={o.transaction_id}>{i === ventesSansDate.i ? <LigneSansDate n={ventesSansDate.n}/> : null}<LigneVenteVinted o={o} i={i} gel={gel} pre={gel?null:preparerLigneVente(o)} rendre={(o,i,pre)=>{
             if (!pre) pre = preparerLigneVente(o);
             const st = classifyOrderStatus(o.status);
             const hidden = pre.hidden;
@@ -40937,7 +40933,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
-          }}/>; })}
+          }}/></React.Fragment>; })}
         </div>
         <BarreAnnulerDepose attente={deposeVente.attente} onAnnuler={deposeVente.annuler} zIndex={Z_CONFIRMATION - 1}/>
         {/* ⚠️ RIEN N'EST CACHÉ : le compte total est écrit sur le bouton, et
@@ -42516,7 +42512,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            <div key={o.transaction_id} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+            <React.Fragment key={o.transaction_id}>
+            {i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
+            <div className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
@@ -42621,6 +42619,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               })()}
             </div>
+            </React.Fragment>
           );})}
         </div>
           </>); })()}
@@ -49866,6 +49865,12 @@ function OngletManque({ site, onglet, onNav }) {
 // son colis à envoyer est DIT et reste dans Colis. La règle : `venteAutreHorsPlan`
 // (api/_lib/plan-regle.js) sur l'identité que la vente PORTE (`compteDeVente`).
 const horsPlanAutre = (plateforme, v) => venteAutreHorsPlan(reglePlanCourante(), plateforme, compteDeVente(plateforme, v));
+// (9 nov., soir, lot AJ) « SANS DATE LUE » : posée UNE fois au-dessus des lignes qu'aucune date lue ne
+// range (src/ordreRecent.js : elles vont en bas, jamais datées au hasard) — le manque est NOMMÉ (§5).
+function LigneSansDate({ n }) {
+  if (!n) return null;
+  return <div role="presentation" data-sans-date={n} style={{ fontSize: 12, color: C.muted, padding: '12px 2px 4px', lineHeight: 1.4 }}>{PHRASE_SANS_DATE(n)}</div>;
+}
 function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir, onPro }) {
   // (8 nov.) Les départs prouvés chez le transporteur : la ligne d'une vente Vestiaire partie se redessine.
   const vcLocDep = useVcLocal();
@@ -49966,12 +49971,15 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null, tr: transporteurDuColis({ declare: v.transporteur || '', suivi: v.suivi || '' }) });
       }
     }
-    // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
-    return out.sort((a, z) => (z.t ?? -Infinity) - (a.t ?? -Infinity));
+    // La plus récente d'abord, TOUS COMPTES ET SITES MÉLANGÉS ; une vente sans date lue va à la fin
+    // (jamais datée au hasard). La règle unique (src/ordreRecent.js, lot AJ du 9 nov.).
+    return ordreRecent(out, (l) => l.t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx, sigPlanT]);
   const lignes = React.useMemo(() => toutesLignes.filter((l) => !l.hp), [toutesLignes]);
   const lignesHorsPlan = React.useMemo(() => toutesLignes.filter((l) => l.hp), [toutesLignes]);
+  // (lot AJ) Où commencent les ventes sans date lue (en bas), et combien : dit une fois.
+  const sansDateT = React.useMemo(() => ({ i: debutSansDate(lignes, (x) => x.t), n: nbSansDate(lignes, (x) => x.t) }), [lignes]);
   const [n, setN] = React.useState(60);
   const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).
@@ -50053,8 +50061,10 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           </div>
         : (
           <div className="vrm-toutes-liste" role="list">
-            {lignes.slice(0, n).map((l) => (
-              <button key={l.cle} type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} onClick={() => onOuvrir(l)}
+            {lignes.slice(0, n).map((l, il) => (
+              <React.Fragment key={l.cle}>
+              {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
+              <button type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
                 aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
@@ -50075,6 +50085,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                   {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}
                 </span>
               </button>
+              </React.Fragment>
             ))}
             {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
           </div>
