@@ -6,9 +6,12 @@
 //   · aucune carte pour : en ligne (11), jamais vue en ligne (B13), vendue prouvée
 //     par sa transaction (14), déjà « Toujours chez moi » (15), retirée par VRM
 //     (Republier, coffre, 16), masquée par Vinted (17), republiée sous le même N° (18) ;
-//   · trois pilules (« Toujours chez moi » · « Vendu en main propre » · « Je m'en
-//     sépare »), 44 px, rien ne déborde ;
-//   · « Toujours chez moi » range SA réponse (`vrm_cycle_decisions`) et la carte part ;
+//   · (9 nov., Ma journée v2) UNE carte « articles supprimés de Vinted », une RANGÉE par
+//     article (`data-cycle-num`) et SA réponse dans un menu de 44 px : « Toujours chez moi »
+//     · « Remise en ligne » · « Vendu en main propre » · « Je m'en sépare » (avant : trois
+//     pilules par carte, une carte par article — la capture de Julien du 9 nov.) ;
+//   · « Toujours chez moi » (390) / « Remise en ligne » (1512) range SA réponse
+//     (`vrm_cycle_decisions`) et la rangée part ;
 //     l'article n'est ni vendu ni sorti (`vinted_annonces_vendues`, `vinted_pairs_lost`
 //     inchangés) ;
 //   · MUTATION (CYCLE_MUTATION=1) : la vente de 7004 n'est plus servie ⇒ une
@@ -123,32 +126,36 @@ const ouvrir = async (b, vp, sombre) => {
         await pg.waitForTimeout(1500);
         const m = await pg.evaluate(() => {
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-          const cartes = [...document.querySelectorAll('[data-job="supprime-vinted"]')].filter(vis);
+          const groupes = [...document.querySelectorAll('[data-job="supprime-vinted"]')].filter(vis);
+          const cartes = groupes.flatMap((g) => [...g.querySelectorAll('[data-cycle-num]')]).filter(vis);
           return {
+            groupes: groupes.length,
             nums: cartes.map((c) => c.getAttribute('data-cycle-num')).sort(),
-            choix: cartes.map((c) => [...c.querySelectorAll('[data-cycle-choix]')].filter(vis).map((x) => ({ k: x.getAttribute('data-cycle-choix'), h: Math.round(x.getBoundingClientRect().height), r: Math.round(x.getBoundingClientRect().right) }))),
+            choix: cartes.map((c) => { const sel = c.querySelector('select[data-cycle-select]'); if (!sel || !vis(sel)) return []; const r = sel.getBoundingClientRect();
+              return [...sel.querySelectorAll('option[data-cycle-choix]')].map((o) => ({ k: o.getAttribute('data-cycle-choix'), h: Math.round(r.height), r: Math.round(r.right) })); }),
             deb: document.documentElement.scrollWidth - window.innerWidth,
             vw: window.innerWidth,
             paire: cartes.some((c) => /\bpaires?\b/i.test(c.innerText)),
           };
         });
-        dit(JSON.stringify(m.nums) === JSON.stringify(['12']), 'une seule carte : N°12 (vue en ligne, absente d\'une lecture complète, sans vente)', JSON.stringify(m.nums));
+        dit(m.groupes === 1 && JSON.stringify(m.nums) === JSON.stringify(['12']), 'UNE carte, une seule rangée : N°12 (vue en ligne, absente d\'une lecture complète, sans vente)', JSON.stringify({ groupes: m.groupes, nums: m.nums }));
         const c0 = m.choix[0] || [];
-        dit(c0.map((x) => x.k).join(',') === 'chez-moi,vendu-main,separe', 'trois réponses sur la carte', c0.map((x) => x.k).join(','));
-        dit(c0.length && c0.every((x) => x.h >= 44 && x.r <= m.vw + 1), 'pilules de 44 px, dans l\'écran', JSON.stringify(c0));
+        dit(c0.map((x) => x.k).join(',') === 'chez-moi,remise,vendu-main,separe', 'quatre réponses dans le menu de la rangée (« Remise en ligne » comprise)', c0.map((x) => x.k).join(','));
+        dit(c0.length && c0.every((x) => x.h >= 44 && x.r <= m.vw + 1), 'menu de 44 px, dans l\'écran', JSON.stringify(c0));
         dit(m.deb <= 1, 'aucun débordement horizontal', String(m.deb));
         dit(!m.paire, 'jamais « paire » sur la carte');
         if (SHOTS) { const el = pg.locator('[data-job="supprime-vinted"]').first(); if (await el.count()) { await el.scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `cycle-${nom}.png`) }); await el.screenshot({ path: path.join(SHOTS, `cycle-carte-${nom}.png`) }); } }
         if (!MUTATION && m.nums.includes('12')) {
-          await pg.locator('[data-cycle-num="12"] [data-cycle-choix="chez-moi"]').click();
+          const CH = nom.startsWith('390') ? 'chez-moi' : 'remise';
+          await pg.locator('[data-cycle-num="12"] select[data-cycle-select]').selectOption(CH);
           await pg.waitForTimeout(800);
           const apres = await pg.evaluate(() => {
             const lire = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (_) { return d; } };
             return { carte: !!document.querySelector('[data-cycle-num="12"]'), dec: lire('vrm_cycle_decisions', {})['7002'] || null,
               vendus: lire('vinted_annonces_vendues', []), perdues: Object.values(lire('vinted_pairs_lost', {})).map((e) => e && e.id) };
           });
-          dit(!apres.carte, '« Toujours chez moi » : la carte part');
-          dit(apres.dec && apres.dec.choix === 'chez-moi' && apres.dec.numero === '12', 'sa réponse est rangée (vrm_cycle_decisions)', JSON.stringify(apres.dec));
+          dit(!apres.carte, `« ${CH} » : la rangée part`);
+          dit(apres.dec && apres.dec.choix === CH && apres.dec.numero === '12', `sa réponse « ${CH} » est rangée (vrm_cycle_decisions)`, JSON.stringify(apres.dec));
           dit(!apres.vendus.includes('7002') && !apres.perdues.includes('7002'), 'l\'article n\'est ni vendu ni sorti du stock', JSON.stringify(apres));
         }
         dit(!errs.length, 'aucune erreur d\'app', errs.join(' | ').slice(0, 200));

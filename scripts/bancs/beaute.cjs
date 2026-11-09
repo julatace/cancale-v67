@@ -7,8 +7,8 @@
 // colis à retirer (Kusmi Tea, Tabac du Port) + l'achat 9401 au relais ; chaque
 // vente porte une photo (servie par le banc, PNG de 2 × 2).
 // Jugé sur les attributs (`data-*`) et les nombres rendus, jamais sur un libellé.
-//  J  Ma journée : UNE « prochaine chose à faire » (`data-prochain`), la première
-//     ligne de « À faire » (la forme appartient à la direction artistique) ; la phrase du
+//  J  Ma journée : UNE « prochaine chose à faire » (`data-prochain`) — (9 nov., Ma journée
+//     v2) posée EN TÊTE, avant l'argent, et plus redite dans la liste « Ensuite » ; la phrase du
 //     jour lit les cases PUBLIÉES (`vrm_colis_aposter` / `vrm_colis_retirer`) sans
 //     redire un compte (§7) — 390 tactile et 1512, clair et sombre (captures).
 //  C  Colis au doigt : glisser à droite au-delà du seuil ⇒ « Déposé » écrit
@@ -161,7 +161,7 @@ async function main() {
         await pg.waitForTimeout(1500);
         const r = await pg.evaluate(() => {
           const L = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } };
-          const liste = document.querySelector('[data-barre-jour]');
+          const liste = document.querySelector('[data-barre-jour]') || document.createElement('div');
           const taches = [...liste.querySelectorAll('.vrm-day-task')];
           const pro = [...document.querySelectorAll('[data-prochain]')];
           const p = pro[0];
@@ -170,14 +170,17 @@ async function main() {
           const act = p ? p.querySelector(':scope > .vrm-day-task-action') : null;
           const ph = document.querySelector('[data-phrase-jour]');
           const t = (id) => { const e = document.querySelector(`[data-tuile="${id}"]`); return e ? e.getAttribute('data-n') : null; };
-          return { n: pro.length, premier: taches[0] === p, plein: rp ? Math.abs(rp.width - rl.width) < 2 : false, largeurPro: rp ? Math.round(rp.width) : 0, autres: autres.map(Math.round),
+          const tete = document.querySelector('.vrm-fu-tete'), frise = document.querySelector('[data-fu-semaine]');
+          const enTete = !!(p && tete && tete.contains(p) && frise && (p.compareDocumentPosition(frise) & Node.DOCUMENT_POSITION_FOLLOWING));
+          const redite = p ? taches.filter((t) => t !== p && ((p.getAttribute('data-tuile') && t.getAttribute('data-tuile') === p.getAttribute('data-tuile')) || (p.getAttribute('data-job') && t.getAttribute('data-job') === p.getAttribute('data-job')))).length : -1;
+          return { n: pro.length, premier: enTete && redite === 0, plein: rp ? Math.abs(rp.width - rl.width) < 2 : false, largeurPro: rp ? Math.round(rp.width) : 0, autres: autres.map(Math.round),
             pile: p ? (p.querySelector('.vrm-pile-v') || { getBoundingClientRect: () => ({ width: 0 }) }).getBoundingClientRect().width : 0,
             bleu: act ? getComputedStyle(act).backgroundColor : '', actH: act ? Math.round(act.getBoundingClientRect().height) : 0,
             phrase: ph ? ph.getAttribute('data-phrase-jour') : null, phEnv: ph ? ph.getAttribute('data-phrase-jour-env') : null, phRet: ph ? ph.getAttribute('data-phrase-jour-ret') : null,
             aposter: (L('vrm_colis_aposter') || {}).total, retirer: (L('vrm_colis_retirer') || {}).total, tEnv: t('envoyer'), tRet: t('retirer'),
             deb: document.documentElement.scrollWidth - document.documentElement.clientWidth };
         });
-        dit(r.n === 1 && r.premier, `${T} UNE « prochaine chose à faire » (data-prochain), la première ligne de « À faire »`, JSON.stringify({ n: r.n, premier: r.premier }));
+        dit(r.n === 1 && r.premier, `${T} UNE « prochaine chose à faire » (data-prochain), en tête avant l'argent, pas redite dans « Ensuite »`, JSON.stringify({ n: r.n, premier: r.premier }));
         dit(r.phrase && String(r.aposter) === r.phEnv && r.tEnv === r.phEnv && String(r.retirer) === r.phRet && r.tRet === r.phRet && /^Des colis à envoyer, puis les retraits$|^Premier colis à envoyer avant/.test(r.phrase) && !/\d/.test(r.phrase.replace(/\d{1,2}\u202Fh(\u202F\d{2})?/g, '')), `${T} la phrase du jour lit les cases PUBLIÉES (à envoyer ${r.aposter}, à retirer ${r.retirer}) sans redire un compte (§7)`, JSON.stringify({ phrase: r.phrase, env: r.phEnv, ret: r.phRet, aposter: r.aposter, retirer: r.retirer, tEnv: r.tEnv, tRet: r.tRet }));
         dit(r.deb <= 1, `${T} aucun débordement`, String(r.deb));
         dit(!errs.length, `${T} aucune erreur`, errs.slice(0, 2).join(' | '));

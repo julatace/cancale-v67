@@ -103,7 +103,9 @@ const VP = { '390': { width: 390, height: 844 }, '1512': { width: 1512, height: 
       dit(carte === attendu, 'Achats : « En route » = recalcul indépendant (l’achat suspendu n’y est pas)', `${carte} / ${attendu}`);
     }
     if (vue === '1512-clair' && ecran === 'journee') {
-      const c = await pg.evaluate(() => { const e = document.querySelector('[data-journal-case="colis"]'); return e ? { v: e.getAttribute('data-valeur'), sous: (e.querySelector('.vrm-js-sous') || {}).textContent || '' } : null; });
+      // (9 nov., Ma journée v2) La semaine passée se touche dans la frise de la tête.
+      await pg.click('[data-jv2-semaine]').catch(() => {}); await pg.waitForTimeout(400);
+      const c = await pg.evaluate(() => { const e = document.querySelector('[data-journal-semaine] [data-journal-case="colis"]'); return e ? { v: e.getAttribute('data-valeur'), sous: e.textContent || '' } : null; });
       dit(!!c && c.v !== '0', 'Ma journée : « Colis envoyés » ne dit pas 0 quand des ventes n’ont aucun geste', JSON.stringify(c));
     }
     dit(errs.length === 0, `${vue} ${ecran} : aucune erreur de page ni de console`, errs.slice(0, 3).join(' | '));

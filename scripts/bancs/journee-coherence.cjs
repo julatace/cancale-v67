@@ -17,9 +17,10 @@
 //   E1 GESTES    — « N gestes » = le nombre de cartes visibles de « À faire » ;
 //   E2 AILLEURS  — « Vendus ailleurs » est une carte DE la liste, seulement
 //                  quand il y a quelque chose à vérifier (jamais hors liste) ;
-//   E3 SEMAINE   — la carte « Semaine » ne passe pas sous la tête sombre (≥ 8 px
-//                  d'air), a les bords des cartes « À faire », aucun filet de
-//                  « liste déroulante » dedans, sa bascule fait 44 px ;
+//   E3 SEMAINE   — (9 nov., Ma journée v2) la semaine passée n'est plus une carte à
+//                  part : elle se touche DANS la frise de la tête (« Semaine du … »,
+//                  44 px), et la touchée montre la semaine (`data-journal-semaine`)
+//                  dans la tête, sans filet de « liste déroulante » ;
 //   E4 SOMBRE    — en sombre, la tête sombre se détache des cartes (pixels) ;
 //   E5 VERBE     — un seul verbe pour ouvrir un écran (« Voir ») ; un vrai geste
 //                  garde le sien ; deux sortes de carte n'ont pas la même icône ;
@@ -32,7 +33,7 @@
 //   E9 STOCK     — « N°42 vendue, toujours rangée » + la case, « Voir » mène au
 //                  Stock sur ce N°, puis la carte ne revient pas (une fois) ;
 //   E10 ALIGNÉ   — le texte de chaque carte « À faire » commence au même endroit ;
-//   E11 JOURS    — un point sous chaque jour de la semaine où il a vendu (aucun ailleurs) ;
+//   E11 JOURS    — une marque (la barre du vendu, 9 nov.) sous chaque jour où il a vendu (aucune ailleurs) ;
 //   E0 GÉNÉRAL   — aucune erreur JS, aucun débordement, 44 px au doigt dans la
 //                  zone, aucun « 0,00 € » sur la tête, aucun mot écarté.
 //  Réglages : `BANC_PORT` (9100–9149, 9121 par défaut), `LARGEURS`, `THEMES`,
@@ -106,8 +107,11 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   out.gestesTexte = sec && sec.querySelector('[data-fu-gestes]') ? txt(sec.querySelector('[data-fu-gestes]')) : '';
   const va = [...document.querySelectorAll('[data-vendus-ailleurs]')].filter(vis);
   // Une carte « à faire » posée HORS de la liste compte aussi : c'est un geste montré.
-  out.nCartes = cartes.length + va.filter((e) => !(lst && lst.contains(e))).length;
-  out.ailleurs = va.map((e) => ({ dansListe: !!(lst && lst.contains(e)), n: e.getAttribute('data-n') || '', texte: txt(e).slice(0, 80) }));
+  // (9 nov., Ma journée v2) La prochaine chose à faire est posée EN TÊTE (`data-prochain`) : elle
+  // est un geste de « À faire » (comptée dans « N gestes »), hors de la liste « Ensuite ».
+  const pro = [...document.querySelectorAll('[data-prochain]')].filter(vis);
+  out.nCartes = cartes.length + pro.filter((e) => !(lst && lst.contains(e))).length + va.filter((e) => !(lst && lst.contains(e)) && !e.hasAttribute('data-prochain')).length;
+  out.ailleurs = va.map((e) => ({ dansListe: !!(lst && lst.contains(e)) || e.hasAttribute('data-prochain'), n: e.getAttribute('data-n') || '', texte: txt(e).slice(0, 80) }));
   // E5 — les verbes et les icônes des cartes.
   out.cartes = cartes.map((c) => {
     const act = c.querySelector('.vrm-day-task-action-mot, .vrm-day-task-action, .vrm-day-task-geste');
@@ -121,6 +125,9 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   const sem = ecran.querySelector('[data-journal-semaine]');
   out.tete = tete ? R(tete) : null;
   out.sem = sem && vis(sem) ? R(sem) : null;
+  const semB = ecran.querySelector('[data-jv2-semaine]');
+  out.semBouton = semB && vis(semB) ? { h: Math.round(semB.getBoundingClientRect().height), dansTete: !!(tete && tete.contains(semB)) } : null;
+  out.semCarteAPart = [...ecran.querySelectorAll('.vrm-journal-semaine')].filter(vis).length;
   out.carte0 = cartes[0] ? R(cartes[0]) : null;
   if (sem && vis(sem)) {
     const filets = [];
@@ -159,11 +166,11 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   out.surtitres = [...document.querySelectorAll('.vrm-fu-surtitre, .vrm-fu-bonjour')].filter(vis).map((e) => { const s = getComputedStyle(e); return { classe: e.className, texte: txt(e).slice(0, 20), regle: [s.textTransform, s.fontSize, s.fontWeight, s.letterSpacing].join(' ') }; });
   // E9 — la sortie du Stock.
   const so = [...document.querySelectorAll('[data-stock-sortie]')].filter(vis);
-  out.stock = so.map((e) => ({ dansListe: !!(lst && lst.contains(e)), nums: e.getAttribute('data-stock-sortie'), texte: txt(e).slice(0, 120) }));
+  out.stock = so.map((e) => ({ dansListe: !!(lst && lst.contains(e)) || e.hasAttribute('data-prochain'), nums: e.getAttribute('data-stock-sortie'), texte: txt(e).slice(0, 120) }));
   // E10 — un alignement : le texte de chaque carte commence au même endroit.
   out.textesX = cartes.map((c) => { const t = c.querySelector('.vrm-day-task-textes'); return t ? Math.round(t.getBoundingClientRect().left) : null; }).filter((x) => x != null);
   // E11 — les jours où il a vendu portent un point (`data-vendu` = la règle « Vendu »).
-  out.jours = [...ecran.querySelectorAll('.vrm-fu-jour')].map((l) => ({ n: l.getAttribute('data-vendu'), point: getComputedStyle(l.querySelector('b'), '::after').content !== 'none' }));
+  out.jours = [...ecran.querySelectorAll('.vrm-fu-jour')].map((l) => { const b = l.querySelector('.vrm-jv2-barre'); return { n: l.getAttribute('data-vendu'), point: !!(b && b.hasAttribute('data-barre') && b.getBoundingClientRect().height > 0.5) }; });
   // E0 — débordement, cibles, zéros.
   out.debord = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1;
   out.petits = [];
@@ -223,12 +230,18 @@ async function tournee(nav, { W, theme, scenario }) {
   if (scenario === 'plein') dit(m.ailleurs.length === 1 && m.ailleurs[0].dansListe, 'E2', `${T} quelque chose à vérifier : « Vendus ailleurs » est UNE carte de la liste`, JSON.stringify(m.ailleurs));
   else dit(m.ailleurs.length === 0, 'E2', `${T} rien à vérifier : pas de carte « Vendus ailleurs »`, JSON.stringify(m.ailleurs));
   // E3
-  if (m.sem && m.tete) {
-    dit(m.sem.y >= m.tete.b + 8, 'E3', `${T} la carte Semaine ne passe pas sous la tête sombre (≥ 8 px d'air)`, `tête bas ${Math.round(m.tete.b)}, semaine haut ${Math.round(m.sem.y)}`);
-    if (m.carte0 && tel) dit(Math.abs(m.sem.x - m.carte0.x) <= 1 && Math.abs(m.sem.r - m.carte0.r) <= 1, 'E3', `${T} la carte Semaine a les bords des cartes « À faire »`, `semaine ${Math.round(m.sem.x)}–${Math.round(m.sem.r)}, carte ${Math.round(m.carte0.x)}–${Math.round(m.carte0.r)}`);
-    dit(!m.semFilets.length, 'E3', `${T} la carte Semaine n'imite pas une liste déroulante (aucun filet dedans)`, m.semFilets.join(' ¦ '));
-    dit(m.semBascule && m.semBascule.h >= 44, 'E3', `${T} la bascule de la Semaine fait 44 px`, JSON.stringify(m.semBascule));
-  } else dit(false, 'E3', `${T} la carte Semaine est rendue`);
+  // (9 nov., Ma journée v2) La semaine se touche dans la frise de la tête ; plus de carte à part.
+  dit(!!(m.semBouton && m.semBouton.dansTete && m.semBouton.h >= 44) && m.semCarteAPart === 0, 'E3', `${T} « Semaine du … » se touche dans la tête (44 px), aucune carte Semaine à part`, JSON.stringify({ bouton: m.semBouton, aPart: m.semCarteAPart }));
+  {
+    await pg.locator('[data-jv2-semaine]').first().click().catch(() => {});
+    await pg.waitForTimeout(500);
+    const w = await pg.evaluate(() => { const t = document.querySelector('.vrm-fu-tete'); const s = t && t.querySelector('[data-journal-semaine]'); if (!s) return null;
+      const filets = []; for (const e of s.querySelectorAll('*')) { const c = getComputedStyle(e); for (const k of ['Top', 'Bottom']) if (parseFloat(c['border' + k + 'Width']) > 0 && c['border' + k + 'Style'] !== 'none' && !/rgba\(\d+, \d+, \d+, 0\)/.test(c['border' + k + 'Color'])) filets.push(e.className + ' ' + k); }
+      return { lundi: s.getAttribute('data-journal-semaine'), filets }; });
+    dit(!!(w && w.lundi && !w.filets.length), 'E3', `${T} touchée, la semaine passée s'affiche dans la tête, sans filet de liste déroulante`, JSON.stringify(w));
+    await pg.locator('[data-jv2-semaine]').first().click().catch(() => {});
+    await pg.waitForTimeout(300);
+  }
   // E4
   if (sombre && m.tete && m.carte0) {
     const t = await moyenne(pg, nav, { x: m.tete.x + 4, y: m.tete.b - 18, width: Math.min(60, m.tete.w / 4), height: 10 });
@@ -270,7 +283,7 @@ async function tournee(nav, { W, theme, scenario }) {
   dit(m.textesX.length > 1 && Math.max(...m.textesX) - Math.min(...m.textesX) <= 1, 'E10', `${T} le texte de chaque carte « À faire » commence au même endroit`, m.textesX.join(', '));
   // E11
   const avec = m.jours.filter((j) => Number(j.n) > 0), sans = m.jours.filter((j) => !(Number(j.n) > 0));
-  dit(avec.length > 0 && avec.every((j) => j.point) && sans.every((j) => !j.point), 'E11', `${T} un point sous chaque jour où il a vendu, aucun ailleurs (${avec.length} jour(s))`, JSON.stringify(m.jours));
+  dit(avec.length > 0 && avec.every((j) => j.point) && sans.every((j) => !j.point), 'E11', `${T} une marque (la barre du vendu) sous chaque jour où il a vendu, aucune ailleurs (${avec.length} jour(s))`, JSON.stringify(m.jours));
   // E0
   dit(!m.debord, 'E0', `${T} aucun débordement horizontal`);
   if (tel) dit(!m.petits.length, 'E0', `${T} au doigt, 44 px dans Ma journée`, m.petits.join(' ¦ '));
