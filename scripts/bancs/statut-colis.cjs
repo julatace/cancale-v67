@@ -258,8 +258,10 @@ const detail = async (pg, sousCle) => {
         // C12
         dit(L(String(12).padStart(12, '0')).every((l) => l.hors || l.section === 'verifier') && !m.lignes.some((l) => /C12/.test(l.titre) && !l.hors), 'C12 achat annulé ⇒ pas à retirer', J(L(String(12).padStart(12, '0'))));
         // C13
-        { const x = L(String(13).padStart(12, '0')); dit(x.length === 1 && x[0].section === 'double' && x[0].hors, 'C13 moitié Vinted sans identité au point d’un colis Mondial Relay ⇒ « peut-être en double », hors compte', J(x));
-          dit(/sans rien qui les relie/.test(m.doubleExpl) && /ne compte(nt)? pas/.test(m.doubleExpl), '« Peut-être en double » est expliqué une fois (le fait, pourquoi, le geste)', m.doubleExpl.slice(0, 160)); }
+        { const x = L(String(13).padStart(12, '0')); dit(x.length === 1 && x[0].section === 'double' && x[0].hors, 'C13 moitié Vinted sans identité au point d’un colis Mondial Relay ⇒ comptée AVEC lui (une fois), hors compte', J(x));
+          // (9 nov., 17 h 24, Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION ») plus de paragraphe « peut-être » : l'état sur la ligne.
+          const st = await pg.evaluate((k) => { const l = [...document.querySelectorAll('[data-rp-section="double"] [data-cc-carte]')].find((e) => (e.getAttribute('data-cc-carte') || '').includes(k)); const p = l && l.querySelector('[data-rp-statut]'); return p ? p.textContent.trim() : ''; }, String(13).padStart(12, '0'));
+          dit(!m.doubleExpl && /^Compté avec le n°…\d{4}$/.test(st), 'C13 la ligne dit UN état (« Compté avec le n°…XXXX »), aucun paragraphe de doute', JSON.stringify({ st, expl: m.doubleExpl.slice(0, 60) })); }
         // C14
         dit(!m.lignes.some((l) => /C14/.test(l.titre) || /c14|Phone Test/i.test(l.point)) && !m.lignes.some((l) => l.raison === 'trop_long' && /phonetest/.test(l.point)), 'C14 e-mail Vinted gardé (lien base64) d’un achat FINALISÉ ⇒ fini, ni « à vérifier » ni « en double »', J(m.lignes.filter((l) => /C14/.test(l.titre) || /phonetest/.test(l.point))));
         // C15
