@@ -26,7 +26,7 @@
 
 import { IDS_PLATEFORMES } from './plateformes.js';
 import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './plateformesAffichage.js';
-import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends } from './profilVendeur.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, CATEGORIES_VENDS, categoriesAPreCocher, reglageJeVendsDe, nomsCategories, affichageAuto } from './profilVendeur.js';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, OU_NUMERO, NOM_OU } from './numeroEcrit.js';
 import { FAMILLES as FAMILLES_NOTIF, familleActive } from '../api/_lib/notif-textes.js';
 import { CLE_REGIME, CLE_MICRO_OPTIONS, CLE_RYTHME, CLE_TAUX, CLE_SOCIETE_TVA, regimeLu, tauxMicro, tauxEstOfficiel, activiteMicro } from './profilFiscal.js';
@@ -37,23 +37,23 @@ export const VERSION_CONFIGURATION = 1;
 // ── LES ÉTAPES ───────────────────────────────────────────────────────────────
 // `si` : l'étape n'existe que pour certains choix (micro ⇒ URSSAF ; société ⇒ TVA).
 export const ETAPES_CONFIGURATION = [
-  { cle: 'vends', titre: 'Que vends-tu ?', sous: 'VRM parle de tes articles avec tes mots.' },
+  { cle: 'vends', titre: 'Qu’est-ce que tu vends ?', sous: 'Touche tout ce qui te concerne. Sneakers seules : VRM parle de « paires » ; sinon, d’« articles ».' },
   { cle: 'plateformes', titre: 'Où vends-tu ?', sous: 'Seules ces plateformes s’affichent. Rien n’est supprimé, aucun total ne change.' },
   { cle: 'statut', titre: 'Quel est ton statut ?', sous: 'VRM adapte ta comptabilité. Il ne le devine jamais.' },
   { cle: 'micro', titre: 'Ta micro-entreprise', sous: 'Ce que VRM ne peut pas lire sur ton espace URSSAF.', si: (c) => c.statut === 'micro-vente' || c.statut === 'micro-services' },
   { cle: 'societe', titre: 'Ta TVA', sous: 'Ta société facture-t-elle la TVA ?', si: (c) => c.statut === 'societe' },
-  { cle: 'numero', titre: 'Où est ton numéro ?', sous: 'Le numéro qui dit dans quel carton est l’article.' },
-  { cle: 'affichage', titre: 'Simple ou complet ?', sous: 'Tu pourras changer à tout moment.' },
+  { cle: 'numero', titre: 'Où est ton numéro ?', sous: 'Le numéro de rangement : il dit où est l’article (carton, étagère, bac…).' },
+  { cle: 'affichage', titre: 'Tout voir, ou l’essentiel ?', sous: 'Ce choix ne change que le menu et les conseils : aucun chiffre, aucune donnée.' },
   { cle: 'notifs', titre: 'Ce qui sonne sur ton téléphone', sous: 'Les notifications que tu veux recevoir.' },
   { cle: 'recap', titre: 'Tout est prêt', sous: 'Voici ton VRM. Chaque choix se change dans Réglages → Ma configuration.' },
 ];
 export const etapesActives = (choix) => ETAPES_CONFIGURATION.filter((e) => !e.si || e.si(choix || {}));
 
 // ── LES CHOIX DE CHAQUE ÉTAPE ────────────────────────────────────────────────
-export const CHOIX_VENDS = [
-  { v: 'sneakers', titre: 'Des sneakers', sous: 'VRM dit « paire », vérifie taille et marque avant de publier.' },
-  { v: 'autre', titre: 'Autre chose', sous: 'Vêtements, sacs, livres… VRM dit « article » ; taille et marque facultatives.' },
-];
+// (9 nov., soir) Des tuiles à choix MULTIPLE (les catégories de src/profilVendeur.js,
+// propriétaire de `vrm_je_vends`). Sneakers SEULES ⇒ « paire », taille et marque jugées ;
+// toute autre réponse ⇒ « article », taille et marque facultatives.
+export const CHOIX_VENDS = CATEGORIES_VENDS;
 export const CHOIX_STATUT = [
   { v: 'particulier', titre: 'Particulier', sous: 'Je vends mes propres affaires.', effet: 'Rien à déclarer à l’URSSAF.' },
   { v: 'micro-vente', titre: 'Micro-entreprise · achat‑revente', sous: 'J’achète pour revendre.', effet: 'VRM estime tes cotisations et te rappelle chaque déclaration.' },
@@ -80,17 +80,37 @@ export const CHOIX_TVA_SOCIETE = [
   { v: 'marge', titre: 'TVA sur la marge', sous: 'Biens d’occasion : la TVA porte sur ma marge.' },
 ];
 export const CHOIX_NUMERO = [
-  { v: 'vrm', titre: 'VRM numérote', sous: 'Chaque annonce reçoit un numéro ; tu l’écris sur le carton.' },
+  { v: 'vrm', titre: 'VRM numérote', sous: 'Chaque annonce reçoit un numéro ; tu l’écris là où tu ranges l’article.' },
   { v: 'moi', titre: 'Je numérote moi-même', sous: 'Tu écris le numéro dans l’annonce ; VRM le lit là où tu le mets.' },
 ];
 // Les endroits où il l'écrit (plusieurs possibles, jamais aucun) : ceux de src/numeroEcrit.js.
 const SOUS_OU = { description: 'Tu écris « N° 123 » en bas de l’annonce.', titre: 'Tu écris « #123 » dans le titre.', ref: 'SKU eBay, référence Leboncoin.' };
 export const CHOIX_OU = OU_NUMERO.map((v) => ({ v, titre: NOM_OU[v], sous: SOUS_OU[v] || '' }));
+// (9 nov., soir) Julien : « Cette étape n'est pas claire. » Chaque carte dit, en puces
+// CONCRÈTES, ce qu'elle montre ou cache — exactement ce que font `entreeMontree` et
+// `caseJourneeMontree` de src/profilVendeur.js (Simple ne cache que des entrées du menu
+// et un conseil ; aucun total ne change ; chaque écran reste joignable).
 export const CHOIX_AFFICHAGE = [
-  { v: 'simple', titre: 'Simple', sous: 'L’essentiel : ce qui sert aujourd’hui. Le reste revient d’un geste.' },
-  { v: 'complet', titre: 'Complet', sous: 'Tous les écrans et tous les outils.' },
-  { v: 'auto', titre: 'Automatique', sous: 'VRM choisit selon ton nombre de comptes et de ventes.' },
+  { v: 'simple', titre: 'L’essentiel (Simple)', sous: 'Pour démarrer : un compte, peu de ventes.', puces: [
+    'Le menu cache Stock tant que tu n’as rangé aucun meuble, et Republier tant que tu n’as jamais republié.',
+    'Les plateformes que tu n’as pas reliées n’apparaissent pas.',
+    'Ma journée garde tout ce qui est à faire, sans le conseil « Prix à baisser ».',
+  ] },
+  { v: 'complet', titre: 'Tout voir (Complet)', sous: 'Pour plusieurs comptes ou beaucoup de ventes.', puces: [
+    'Tous les écrans dans le menu, même ceux qui ne servent pas encore.',
+    'Tous les conseils de Ma journée.',
+  ] },
+  { v: 'auto', titre: 'Laisser VRM choisir', sous: 'L’essentiel tant que tu as un seul compte Vinted et moins de 30 ventes sur 30 jours ; tout, au-delà.' },
 ];
+// « Recommandé pour toi » : la règle existante (`affichageAuto`), seulement quand on SAIT
+// (comptes Vinted et ventes des 30 jours lus). Pas su ⇒ aucune recommandation.
+export function affichageRecommande(contexte) {
+  const c = contexte || {};
+  if (c.proprietaire === true) return 'complet';
+  if (c.proprietaire !== false || typeof c.nComptesVinted !== 'number' || typeof c.nVentes30j !== 'number') return null;
+  return affichageAuto(c);
+}
+export const CHEMIN_REGLAGE_AFFICHAGE = 'Réglages → Affichage → Affichage';
 
 // ── LIRE CE QUI EST DÉJÀ ENREGISTRÉ ──────────────────────────────────────────
 export function lireConfiguration(brut) {
@@ -106,7 +126,6 @@ export function lireConfiguration(brut) {
 //   numeroEcrit, affichage, configuration, pushPrefs (undefined · null · objet).
 // Rend les choix PRÉ-SÉLECTIONNÉS : une réponse jamais donnée reste `null`.
 export function choixInitiaux(lus = {}) {
-  const jv = lireReglageJeVends(lus.jeVends).choix;
   const rp = lirePlateformes(lus.plateformes);
   const regime = regimeLu(lus.regime);
   const conf = lireConfiguration(lus.configuration);
@@ -122,7 +141,9 @@ export function choixInitiaux(lus = {}) {
   const dejaChoisiNum = !!(neBrut && (typeof neBrut.depuis === 'string' || typeof neBrut.choisi === 'string'));
   const aff = lireReglageAffichage(lus.affichage).choix;
   return {
-    vends: jv === 'sneakers' || jv === 'autre' ? jv : null,
+    // Ce qu'il vend : les catégories cochées (jamais devinées ; rien choisi ⇒ null).
+    vends: (() => { const c = categoriesAPreCocher(lus.jeVends); return c.length ? c : null; })(),
+    vendsAutre: lireReglageJeVends(lus.jeVends).autre,
     plateformes: plateformesAffichees(rp ? { sites: rp.sites } : null, lus.relies || {}),
     plateformesChoisies: !!rp,
     statut,
@@ -158,7 +179,14 @@ export function ecrituresEtape(cle, choix, initial, lus = {}, at = new Date().to
   const c = choix || {}, i = initial || {};
   const out = [];
   if (cle === 'vends') {
-    if (c.vends && c.vends !== i.vends) out.push({ cle: CLE_JE_VENDS, valeur: { choix: c.vends, at } });
+    const cats = Array.isArray(c.vends) ? c.vends : [];
+    const avant = Array.isArray(i.vends) ? i.vends : [];
+    const autre = cats.includes('autre') ? String(c.vendsAutre || '').trim() : '';
+    const autreAvant = avant.includes('autre') ? String(i.vendsAutre || '').trim() : '';
+    if (cats.length && (cats.slice().sort().join() !== avant.slice().sort().join() || autre !== autreAvant)) {
+      const v = reglageJeVendsDe(cats, autre, at);
+      if (v) out.push({ cle: CLE_JE_VENDS, valeur: v });
+    }
   } else if (cle === 'plateformes') {
     const sites = IDS_PLATEFORMES.filter((id) => (c.plateformes || []).includes(id));
     const avant = IDS_PLATEFORMES.filter((id) => (i.plateformes || []).includes(id));
@@ -263,7 +291,7 @@ const nomDe = (liste, v) => ((liste.find((x) => x.v === v) || {}).titre) || null
 export function recapConfiguration(choix, { nomsPlateformes = {}, famillesNotif = FAMILLES_NOTIF } = {}) {
   const c = choix || {};
   const L = [];
-  L.push({ etape: 'vends', titre: 'Tu vends', valeur: nomDe(CHOIX_VENDS, c.vends) });
+  L.push({ etape: 'vends', titre: 'Tu vends', valeur: Array.isArray(c.vends) && c.vends.length ? nomsCategories(c.vends, c.vendsAutre).join(', ') : null });
   L.push({ etape: 'plateformes', titre: 'Tes plateformes', valeur: (c.plateformes || []).map((id) => nomsPlateformes[id] || id).join(', ') || null });
   L.push({ etape: 'statut', titre: 'Ton statut', valeur: nomDe(CHOIX_STATUT, c.statut) });
   if (c.statut === 'micro-vente' || c.statut === 'micro-services') {

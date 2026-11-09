@@ -217,7 +217,7 @@ async function main() {
         dit(!!p117 && !p117.transport && !/Bordereau .+ collé/.test(JSON.stringify(p117.cases)), `C ${T} transporteur pas connu ⇒ aucune ligne inventée`, p117 && p117.transport);
         const p42 = vus['v:7002'], p42b = vus['v:7004'];
         const r42 = p42 ? rgb(p42.couleur) : [];
-        dit(!!p42 && p42.etatNum === 'double' && r42[0] > 150 && r42[1] < 110 && /vérifie le carton/.test(p42.alerte) && p42b && p42b.etatNum === 'double', `D ${T} deux paires sous le N°42 ⇒ rouge + « vérifie le carton »`, p42 && `${p42.etatNum} ${p42.couleur} ${p42.alerte}`);
+        dit(!!p42 && p42.etatNum === 'double' && r42[0] > 150 && r42[1] < 110 && /vérifie là où elles sont rangées/.test(p42.alerte) && p42b && p42b.etatNum === 'double', `D ${T} deux paires sous le N°42 ⇒ rouge + « vérifie le carton »`, p42 && `${p42.etatNum} ${p42.couleur} ${p42.alerte}`);
         const p73 = vus['v:7003'], r73 = p73 ? rgb(p73.couleur) : [];
         dit(!!p73 && p73.etatNum === 'a-verifier' && r73[0] > 110 && r73[2] < 90, `D ${T} un N° à vérifier sur son carton ⇒ ambre`, p73 && `${p73.etatNum} ${p73.couleur}`);
         dit(!!p117 && p117.etatNum === 'ok' && rgb(p117.couleur)[0] < 60, `D ${T} un N° sans souci reste à l'encre`, p117 && p117.couleur);

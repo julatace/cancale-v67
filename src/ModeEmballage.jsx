@@ -12,8 +12,8 @@ import { CASES_EMBALLAGE, ordreSeance, complet, aMarquerPostes, lireSeance, ecri
 import './styles-emballage.css';
 
 const PHRASE_NUM = {
-  double: (n) => `Deux paires portent le N°${n} : vérifie le carton avant d'emballer.`,
-  'a-verifier': (n) => `Le N°${n} est à vérifier sur son carton : regarde l'étiquette avant d'emballer.`,
+  double: (n) => `Deux paires portent le N°${n} : vérifie là où elles sont rangées avant d'emballer.`,
+  'a-verifier': (n) => `Le N°${n} est à vérifier là où l'article est rangé : regarde l'étiquette avant d'emballer.`,
   sans: () => 'Aucun N° relié à cette vente : fie-toi à la photo et au titre.',
 };
 

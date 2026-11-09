@@ -81,7 +81,7 @@ export default function FichePaire({ owner = '', p, etat = null, lecture = false
         </span>
         {p.photo && Photo ? <span className="vrm-fp-photo">{Photo(p.photo)}</span> : null}
       </div>
-      {p.double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1">Deux paires présentes portent le N°{p.num} : vérifie le carton avant d’emballer ou d’imprimer.</p> : null}
+      {p.double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1">Deux paires présentes portent le N°{p.num} : vérifie là où elles sont rangées avant d’emballer ou d’imprimer.</p> : null}
       <div className="vrm-fp-tuiles">
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
         <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>

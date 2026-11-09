@@ -68,7 +68,7 @@ const MOMENTS = [
     id: 'numeros', capture: 'numeros',
     alt: 'L’écran Annonces de VRM : chaque paire en ligne porte son numéro de rangement en pastille noire, N°14, N°15, N°16, N°9. Données d’exemple.',
     titre: 'Un numéro par paire. Jamais deux fois.',
-    texte: 'Chaque annonce reçoit un numéro de rangement, celui que tu écris sur le carton. Une vente est reliée à sa paire par une identité — l’annonce, la photo, la transaction —, jamais par un titre qui se ressemble.',
+    texte: 'Chaque annonce reçoit un numéro de rangement : il dit où est l’article (carton, étagère, bac…). Une vente est reliée à sa paire par une identité — l’annonce, la photo, la transaction —, jamais par un titre qui se ressemble.',
     points: ['Un numéro n’est jamais redonné à une autre paire.', 'Deux paires sous un même numéro : VRM te le dit, en rouge, tout de suite.'],
   },
   {
@@ -397,7 +397,7 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <div className="av-journee-tete" data-reveil="">
               <h2 className="av-h2">Ta journée de revendeur, en quatre moments.</h2>
-              <p className="av-chapo">Le matin, au point relais, devant tes cartons, à la fin du mois : VRM te montre ce qu’il y a à faire, et rien que ça.</p>
+              <p className="av-chapo">Le matin, au point relais, devant ton stock, à la fin du mois : VRM te montre ce qu’il y a à faire, et rien que ça.</p>
             </div>
             <div className="av-split">
               <div className="av-plateau" aria-hidden="true">
