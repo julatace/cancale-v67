@@ -25,7 +25,9 @@
 //    scripts/audit-lancement.cjs : ne pas les retirer.
 import React from 'react';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
-import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, ESSAI_JOURS } from './accueil-reglages.js';
+import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, PRIX_PRO_MOIS, PRO_OUVERT, ESSAI_JOURS } from './accueil-reglages.js';
+// (9 nov.) Deux offres : Solo (un compte vendeur + comptes d'achat) et Pro (les ventes de tous les comptes).
+import { OFFRES } from '../api/_lib/plan-regle.js';
 import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
 // (5 nov.) Les navigateurs où l'extension SERVIE s'installe : une source, la même
 // que l'app — jamais « Chrome obligatoire ». Module léger.
@@ -445,12 +447,15 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <div className="av-carte-prix" data-reveil="">
               <div>
-                <h2 className="av-h2">Un prix. Tout VRM.</h2>
+                <h2 className="av-h2">Deux offres. Tout VRM.</h2>
                 {ACCES_OFFERT && <span className="av-offert" data-acces-offert="">Gratuit pour l’instant</span>}
-                <div className="av-montant" data-prix=""><b>{PRIX_MOIS}&nbsp;€</b><span>par mois</span></div>
+                <div className="av-montant" data-prix="" data-offre="solo"><b>{PRIX_MOIS}&nbsp;€</b><span>par mois · {OFFRES.solo.nom}</span></div>
+                <div className="av-montant" data-prix-pro="" data-offre="pro"><b>{PRIX_PRO_MOIS}&nbsp;€</b><span>par mois · {OFFRES.pro.nom}{PRO_OUVERT ? '' : ' · bientôt'}</span></div>
               </div>
               <div>
-                <p>Tous tes comptes Vinted, Leboncoin et eBay, toutes les fonctions, l’extension et l’app sur ton iPhone.</p>
+                <p data-offre-phrase="solo"><b>{OFFRES.solo.nom}</b> : {OFFRES.solo.phrase}</p>
+                <p data-offre-phrase="pro"><b>{OFFRES.pro.nom}</b> : {OFFRES.pro.phrase}{PRO_OUVERT ? '' : ' Ouverture prochaine.'}</p>
+                <p>Toutes les fonctions, l’extension et l’app sur ton iPhone, dans les deux offres.</p>
                 <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>, une fois par adresse e-mail et par compte Vinted. Sans engagement : tu résilies en ligne, depuis l’app.</p>
                 <p className="petit">
                   {ACCES_OFFERT && 'Tant que l’abonnement n’est pas exigé, VRM reste gratuit. '}
@@ -471,7 +476,7 @@ export default function Accueil({ onEntrer }) {
               <p><b>Mes données sont-elles en sécurité ?</b> Ta boutique est cloisonnée : aucun autre vendeur ne la voit. Tu peux ajouter une double vérification par application d’authentification. <a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p>
               <p><b>Comment j’arrête ?</b> Tu résilies en ligne, depuis l’app : l’abonnement s’arrête à la fin de la période payée, et résilier pendant l’essai ne coûte rien. « Fermer mon compte » efface ensuite tes données.</p>
               <p><b>Et sur mon téléphone ?</b> Tu consultes tout, tu retrouves tes codes de retrait au relais, même sans réseau, et tu reçois une notification à chaque vente si tu l’actives. Les actions sur Vinted passent par ton ordinateur allumé.</p>
-              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, et un seul marche aussi : chacun se met à jour quand tu l’ouvres sur ton ordinateur, et ses chiffres restent séparés.</p>
+              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, et un seul marche aussi : chacun se met à jour quand tu l’ouvres sur ton ordinateur, et ses chiffres restent séparés. Avec Solo, un compte vend et les autres servent à acheter (achats et retraits) ; avec Pro, tous tes comptes vendent.</p>
               <p><b>C’est seulement pour les baskets ?</b> Non. Vêtements, sacs, livres : le numéro de rangement, le bordereau et la compta marchent pour n’importe quel article.</p>
               {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> Pas encore compté : VRM apprend à lire Vestiaire, mais ses ventes n’entrent dans aucun total aujourd’hui.</p>}
               <p><b>Une question qui n’est pas ici ?</b> <a href="/aide">L’aide</a> répond pas à pas ; <a href="/statut">l’état du service</a> dit si tout fonctionne en ce moment.</p>

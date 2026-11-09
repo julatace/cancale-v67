@@ -275,11 +275,13 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
   try {
     // (23 oct.) + l'heure de la capture de chaque ligne : un achat vu « au point
     // relais » APRÈS la dernière publication de l'app y est compté (règle partagée).
-    const sel = 'id,txns:data->resume->txns,ra:data->resume->>at,cap:data->>capturedAt';
+    // (9 nov., charge) + la DATE des ventes à expédier, posée dans le résumé par le
+    // serveur (api/_lib/commandes-leger.js) : la limite estimée sans relire la liste.
+    const sel = 'id,txns:data->resume->txns,ra:data->resume->>at,cap:data->>capturedAt' + (kind === 'sold' ? ',dates:data->resume->dates' : '');
     const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`));
     if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
-    const ligneDe = {}, capDe = {}, capParUid = {}, lueParUid = {};
+    const ligneDe = {}, capDe = {}, capParUid = {}, lueParUid = {}, dateDe = {};
     for (const row of rows) {
       if (ligneDunCompteRetire(vivants, row.id)) continue;
       // (8 nov.) La dernière lecture de la liste de CHAQUE compte (`capturedAt`, la date de
@@ -293,6 +295,10 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
       // POSTÉRIEURE n'est plus au point relais.
       { const u = uidDeLigne(row.id); if (u && Number.isFinite(cap)) capParUid[u] = Math.max(capParUid[u] || 0, cap); }
       for (const t of row.txns) { vus.add(String(t)); if (!ligneDe[String(t)]) { ligneDe[String(t)] = row.id; capDe[String(t)] = cap; } }
+      // La date n'est prise que dans la ligne qui porte le n° (§5 : par identité),
+      // et seulement lisible ; sinon la liste est relue, comme avant.
+      const dl = row.dates && typeof row.dates === 'object' && !Array.isArray(row.dates) ? row.dates : null;
+      if (dl) for (const t of row.txns) { const d = dl[String(t)]; if (ligneDe[String(t)] === row.id && typeof d === 'string' && Number.isFinite(Date.parse(d)) && !dateDe[String(t)]) dateDe[String(t)] = d; }
     }
     // Aucune ligne n'a encore de résumé (extension pas rechargée) → on le dit à
     // l'appelant, qui retombera sur la lecture complète. Une seule fois : dès la
@@ -300,7 +306,7 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
     // `ligneDe` : la ligne (le compte) de chaque transaction — pour aller
     // chercher la DATE d'une vente sans bordereau email, et seulement elle.
     if (!resumeTrouve) return null;
-    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); Object.defineProperty(out, 'capDe', { value: capDe }); Object.defineProperty(out, 'capParUid', { value: capParUid }); Object.defineProperty(out, 'lueParUid', { value: lueParUid }); return out;
+    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); Object.defineProperty(out, 'capDe', { value: capDe }); Object.defineProperty(out, 'capParUid', { value: capParUid }); Object.defineProperty(out, 'lueParUid', { value: lueParUid }); Object.defineProperty(out, 'dateDe', { value: dateDe }); return out;
   } catch (_) { return null; }
 }
 async function harvestOrders(kind, vivants) {
@@ -842,7 +848,11 @@ export default async function handler(req, res) {
     for (const [t, o] of Object.entries(venteEmail.ventes)) if (!ventesTx[t]) ventesTx[t] = o;
     let datesPasSu = false;
     if (txSold) {
-      const manque = [...shipTxns].filter((t) => !(bordsTx[t] && lireDateLimite(bordsTx[t].dateLimite)));
+      // (9 nov., charge) La date posée dans le résumé vaut celle de la liste (même
+      // commande, même lecture) : seules les ventes SANS elle font relire leur liste.
+      const dateDe = txSold.dateDe || {};
+      for (const t of shipTxns) if (!ventesTx[t] && dateDe[t]) ventesTx[t] = { transaction_id: t, date: dateDe[t] };
+      const manque = [...shipTxns].filter((t) => !(bordsTx[t] && lireDateLimite(bordsTx[t].dateLimite)) && !(ventesTx[t] && Number.isFinite(Date.parse(ventesTx[t].date || ''))));
       const ids = [...new Set(manque.map((t) => txSold.ligneDe && txSold.ligneDe[t]).filter(Boolean))];
       if (ids.length) {
         const j = await fetchPaginated(scoped(`app_data?id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,my_orders:data->payload->my_orders`));

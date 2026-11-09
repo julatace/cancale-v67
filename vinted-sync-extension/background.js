@@ -1278,6 +1278,9 @@ let _octetsDernierRefus = 0;
 //    (et effacé) par `noterFlux` juste après.
 let _sansSessionAt = 0;
 function sessionAbsente() { _sansSessionAt = Date.now(); return false; }
+// Le dernier refus d'une écriture `vinted_accounts`, par compte : 'preuve' (029),
+// 'unicite' (023) ou ''. Lu (et effacé) par `captureDomain` juste après l'appel.
+const _refusComptes = new Map();
 async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
@@ -1331,6 +1334,19 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
       return true;
     }
     statut = String(res.status || 'inconnu');
+    // 5.332 (migration 029) : la base refuse de CRÉER un compte Vinted par son
+    // API (42501 `vrm_vinted_preuve`) ; la 023 refuse un compte déjà relié
+    // ailleurs (409). `captureDomain` passe alors par la route serveur qui
+    // vérifie le jeton chez Vinted. On lit le code (corps borné, jamais rangé).
+    if (table === 'vinted_accounts') {
+      let code = '';
+      try {
+        const t = String(await res.text()).slice(0, 600);
+        if (/vrm_vinted_preuve/.test(t)) code = 'preuve';
+        else if (res.status === 409 || /"23505"/.test(t)) code = 'unicite';
+      } catch (_) {}
+      for (const r of list) if (r && r.vinted_user_id != null) _refusComptes.set(String(r.vinted_user_id), code);
+    }
   } catch (e) { statut = (e && e.statut) || 'reseau'; }
   // 5.328 : pas connecté ⇒ rien n'est parti, ce n'est pas un refus.
   if (statut === 'sans_session') return sessionAbsente();
@@ -1568,10 +1584,76 @@ async function captureDomain(domain) {
   if (await compteDejaEcrit(uid, sig)) { noterDiag('compte_inchange'); return uid; }
   // 5.331 : jamais écrit depuis CE navigateur ⇒ première écriture de ce compte.
   const premiere = !(await compteDejaConnuIci(uid));
-  const ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  _refusComptes.delete(uid);
+  let ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  // 5.332 (migration 029) : un compte NEUF ne se crée plus par l'API de la base.
+  // Refus « preuve » (ou « unicité » de la 023) ⇒ la route serveur vérifie le
+  // jeton chez Vinted et range la ligne. Avant la 029, l'upsert passe : rien ne
+  // change et la route n'est jamais appelée.
+  const refus = _refusComptes.get(uid) || '';
+  _refusComptes.delete(uid);
+  if (ok === false && (refus === 'preuve' || refus === 'unicite')) ok = await lierCompteParServeur(row);
   if (ok !== false) await noterCompteEcrit(uid, sig);
   if (ok === true) signalerCompteRelie('vinted', uid, premiere);
   return uid;
+}
+
+// ══ RELIER UN COMPTE VINTED NEUF PAR LE SERVEUR (5.332, défaut #5) ═══════════
+// Décision de Julien (9 nov.) : un compte Vinted ne se relie qu'après PREUVE.
+// `POST vrm.center/api/vinted-connect { source:'extension', … }` avec la session
+// VRM : le serveur relit le jeton chez Vinted (`/api/v2/users/current`), vérifie
+// qu'aucun AUTRE compte VRM ne porte ce compte, puis range la ligne (clé de
+// service). Le corps ne porte QUE ce que l'extension rangeait déjà elle-même en
+// base (les jetons du cookie de l'onglet). Le serveur ne renouvelle jamais le
+// jeton (l'onglet resterait connecté avec un refresh_token consommé).
+//   · une seule tentative par compte et par délai (`vrmLiaisonServeur`, §4.9) :
+//     15 min après un « pas su », 1 h après un refus de Vinted, 24 h après un
+//     « déjà relié à un autre compte VRM » (dit dans le journal d'activité) ;
+//   · sans session VRM ⇒ aucun appel, rien noté comme refus (5.328).
+// Rend true (rangé) ou false.
+const LIAISON_URL = 'https://vrm.center/api/vinted-connect';
+const LIAISON_ATTENTE_MS = { deja_relie: 24 * 3600000, refuse: 3600000, abonnement: 3600000, identifiant: 24 * 3600000, jeton_expire: 5 * 60000 };
+const LIAISON_ATTENTE_DEFAUT_MS = 15 * 60000;
+async function lierCompteParServeur(row) {
+  const uid = String((row && row.vinted_user_id) || '');
+  if (!/^[0-9]{1,20}$/.test(uid) || !row.access_token) return false;
+  let memo = {};
+  try { memo = (await chrome.storage.local.get('vrmLiaisonServeur')).vrmLiaisonServeur || {}; } catch (_) { return false; }
+  const e = memo[uid];
+  if (e && Date.now() < Number(e.prochain || 0)) { noterDiag('liaison_serveur_attente'); return false; }
+  const s = await authToken();
+  if (!(s && s.access_token && s.user_id)) return sessionAbsente();
+  let status = 0, json = null;
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
+    const r = await fetch(LIAISON_URL, {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+      body: JSON.stringify({ source: 'extension', accessToken: row.access_token, refreshToken: row.refresh_token || '', anonId: row.anon_id || '', csrfToken: row.csrf_token || '', domain: row.domain || 'www.vinted.fr' }),
+    });
+    clearTimeout(t);
+    status = r.status;
+    try { json = await r.json(); } catch (_) { json = null; }
+  } catch (_) { status = 0; }
+  const ok = status === 200 && !!(json && json.ok === true && json.account && String(json.account.vinted_user_id) === uid);
+  try {
+    const m = (await chrome.storage.local.get('vrmLiaisonServeur')).vrmLiaisonServeur || {};
+    if (ok) delete m[uid];
+    else {
+      const raison = (json && typeof json.raison === 'string' && /^[a-z_]{1,30}$/.test(json.raison)) ? json.raison : (status ? `http_${status}` : 'reseau');
+      m[uid] = { at: Date.now(), prochain: Date.now() + (LIAISON_ATTENTE_MS[raison] || LIAISON_ATTENTE_DEFAUT_MS), raison };
+    }
+    await chrome.storage.local.set({ vrmLiaisonServeur: m });
+  } catch (_) {}
+  if (ok) {
+    noterDiag('liaison_serveur_ok');
+    logActivity(`✅ Compte Vinted ${(json.account && json.account.login) || uid} relié à VRM (vérifié chez Vinted)`);
+    return true;
+  }
+  const raison = json && json.raison;
+  noterDiag(`liaison_serveur_${raison || (status ? 'http_' + status : 'reseau')}`);
+  if (raison === 'deja_relie') logActivity(`⛔ Compte Vinted ${uid} : déjà relié à un autre compte VRM — contacte le support`);
+  return false;
 }
 
 const COMPTE_REECRIT_MS = 30 * 60 * 1000;
@@ -12438,7 +12520,10 @@ async function gardeLecture(uid, acc, classe = 'photos') {
 //    offre, répondre). Et la règle n'était pas ancrée à droite :
 //    `https://vrm.center.autre-site.com` passait. Une seule liste, ici, pour
 //    tous les messages du pont, et `APP_URLS` en découle.
-const ORIGINES_APP = ['https://vrm.center', 'https://cancale-v67-ten.vercel.app'];
+// 5.332 (revue sécurité du 9 nov.) : `cancale-v67-ten.vercel.app` retiré — un
+//    sous-domaine Vercel redevient réservable par un tiers si le projet est
+//    renommé ou supprimé ; il ne doit plus pouvoir donner une session à l'extension.
+const ORIGINES_APP = ['https://vrm.center'];
 const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new URL(String(src || '')).origin); } catch (_) { return false; } } };
 // Ce que l'app peut faire passer par `exec`, et RIEN d'autre (§3 : jamais de
 // suppression, jamais de requête arbitraire).

@@ -166,8 +166,9 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
   // prendre). Une page servie là pouvait faire adopter SA session VRM (les
   // captures de Julien partaient dans sa boutique) et commander des actions
   // Vinted. Et la règle n'était pas ancrée : `https://vrm.center.x.example` passait.
-  const POSSEDEES = ['https://vrm.center', 'https://cancale-v67-ten.vercel.app'];   // vérifiées sur le projet le 4 octobre
-  const IMPOSTEURS = ['https://cancale-v67.vercel.app', 'https://www.vrm.center', 'https://vrm.center.autre-site.example', 'http://vrm.center', 'https://cancale-v67-ten.vercel.app.autre.example'];
+  // 5.332 (revue sécurité du 9 nov.) : l'ancienne adresse Vercel du projet n'est plus de confiance.
+  const POSSEDEES = ['https://vrm.center'];   // vérifiée sur le projet le 4 octobre
+  const IMPOSTEURS = ['https://cancale-v67-ten.vercel.app', 'https://cancale-v67.vercel.app', 'https://www.vrm.center', 'https://vrm.center.autre-site.example', 'http://vrm.center', 'https://cancale-v67-ten.vercel.app.autre.example'];
   await essaie('imposteurs', async () => {
     const acceptes = [];
     for (const o of IMPOSTEURS) {
@@ -191,7 +192,7 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
       const e1 = await envoyer(REPONSE, o);
       if (!(l1 && l1.ok === true) || !(e1 && e1.ok) || envois.length !== 1) refuses.push(o);
     }
-    dit(refuses.length === 0, 'autre sens : vrm.center et l\'adresse Vercel du projet restent l\'app (liaison adressée et exec acceptés)', refuses.join(', '));
+    dit(refuses.length === 0, 'autre sens : vrm.center reste l\'app (liaison adressée et exec acceptés)', refuses.join(', '));
   });
   // ⚠️⚠️ 11 octobre : une session postée PAR LA PAGE (`window.postMessage`) est
   //    entendue par TOUTE extension de la page — une copie ancienne l'adoptait

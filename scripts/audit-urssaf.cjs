@@ -231,7 +231,11 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   //    memo `declarables` (partagé avec Ma journée). On suit le nom jusqu'à sa
   //    définition au lieu d'exiger l'appel en place.
   const defDecl = (() => { const i = SRC.indexOf('const declarables = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf('}, [', i)); })();
-  const pubLit = /exclu: acctOffOf/.test(pub) || (/\bdeclarables\b/.test(pub) && /exclu: acctOffOf/.test(defDecl));
+  // (9 nov.) `venteOffOf` = `acctOffOf` + les ventes hors de l'offre Solo
+  //    (api/_lib/plan-regle.js) : il écarte AU MOINS les comptes exclus — vérifié ici.
+  const venteOffOk = /const venteOffOf = \(o\) => acctOffOf\(o\) \|\|/.test(SRC);
+  const EXCLU_RE = venteOffOk ? /exclu: (acctOffOf|venteOffOf)/ : /exclu: acctOffOf/;
+  const pubLit = EXCLU_RE.test(pub) || (/\bdeclarables\b/.test(pub) && EXCLU_RE.test(defDecl));
   pubLit
     ? ok('l\'écran Ventes publie le CA sans les comptes exclus')
     : nok('la publication écarte les comptes exclus', 'exclu absent');
@@ -252,8 +256,8 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   const boucleDecl = (t) => /for \(const l of \(declarables \? declarables\.lignes : \[\]\)\)/.test(t) || (/for \(const l of declRapport\.lignes\)/.test(t) && rapDeriveDecl);
   const litDecl = (t) => boucleDecl(t) && /\bdeclarables\]\);|\bdeclarables, |\bdeclRapport\]\);|\bdeclRapport, /.test(t.slice(t.lastIndexOf('}, [')));
   for (const [nom, t] of [['mensuel', mens], ['annuel', ann]]) {
-    ((/if \(acctOffOf\(o\)\) continue;/.test(t) && !litDecl(t) && !/if \(isHidden\(o\)\) \{ nMasq/.test(t))
-      || (litDecl(t) && /exclu: acctOffOf/.test(defDecl)))
+    (((venteOffOk ? /if \((acctOffOf|venteOffOf)\(o\)\) continue;/ : /if \(acctOffOf\(o\)\) continue;/).test(t) && !litDecl(t) && !/if \(isHidden\(o\)\) \{ nMasq/.test(t))
+      || (litDecl(t) && EXCLU_RE.test(defDecl)))
       ? ok(`le rapport ${nom} ne compte que les comptes sélectionnés`)
       : nok(`le rapport ${nom} écarte les comptes exclus`, 'les ventes d\'un compte exclu y sont encore comptées');
   }
