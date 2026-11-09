@@ -34,6 +34,8 @@ import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texte
 import { stampBordereau } from './_lib/stamp.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
+// (9 nov.) Solo : la vente d'un compte hors offre ne sonne pas (api/_lib/plan-regle.js).
+import { venteHorsPlanServeur } from './_lib/plan-vendeur.js';
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres as fusionnerRegistresLib, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { retenue, cleLiens, jetonLien, lienConfirmation, emailConfirmation, retirerLiensPreuve, PREFIXE_PREUVE, ID_LIENS_JOUR, reserverEnvois, MAX_ECHECS_ENVOI } from './_lib/preuve-adresse.js';
 import { modifierNeutre } from './_lib/neutre-cas.js';
@@ -2538,7 +2540,7 @@ export async function traiterEmail(req, res) {
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]);
       // Notif push : l'argent arrive dans le porte-monnaie.
-      try { await pushOnce({
+      if (!(await venteHorsPlanServeur(proprietaireCourant(), acc.uid))) try { await pushOnce({
         ...texteArgentRecu({ montant, article, compte: acc.login }),
         tag: `final-${key}`, url: DESTINATIONS.vente({}),
         _cat: 'argent',
@@ -2638,7 +2640,9 @@ export async function traiterEmail(req, res) {
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', compteSource: acc.source || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }), ...(data.photo ? { photo: { url: data.photo, preuve: 'meme-email' } } : {}) }, 'vente'); } catch (_) {}
+      // (9 nov.) Solo : la vente d'un compte qui n'est pas le compte vendeur est
+      // rangée (rien n'est jeté) mais ne sonne pas ; pas su ⇒ elle sonne.
+      if (!(await venteHorsPlanServeur(proprietaireCourant(), acc.uid))) try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }), ...(data.photo ? { photo: { url: data.photo, preuve: 'meme-email' } } : {}) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
       // Vente PRO (la mention de Vinted) avec l'e-mail de l'acheteur et sa
       // transaction : on garde le formulaire de retour pour la facture que le
