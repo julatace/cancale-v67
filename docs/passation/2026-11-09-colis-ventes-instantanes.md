@@ -110,7 +110,32 @@ Suivre, toucher ne fait rien, remplacement par l'écran vrai, CLS au remplacemen
 débordement), U (autre uid jamais rendu), V (autre vendeur ⇒ tout effacé), S (sans instantané :
 le squelette d'avant).
 
-RESULTATS_BANC
+**Résultat sur cette branche : 193 verts, 0 rouge** (4 passes × 2 écrans).
+
+- **Sur `origin/main`** (dist construit depuis `origin/main`, avant tout changement, passe 390
+  clair) : **35 rouges** (aucun instantané rangé, aucun chiffre en 12 s base tenue, ni mention,
+  ni inertie à juger ; et sur Colis un CLS de 0,055 à l'ouverture au plafond).
+- **Mutations** (390 clair), chacune ROUGE, remise en place après : uid non vérifié dans la
+  valeur ⇒ U rouge ; geste « Imprimer » au lieu de « Vérification… » ⇒ I rouge ; nom du compte
+  rangé dans « À venir » ⇒ A rouge (`compte_banc`) ; `inert` retiré ⇒ I rouge (5 boutons actifs) ;
+  âge retiré de la mention ⇒ I rouge ; n° de suivi rangé avec un colis ⇒ A rouge (`ZZ9102`).
+- Bancs relancés sur cette branche, un à la fois : `journee-instantanee` 111/0 (Ma journée sur la
+  règle commune, inchangée), `colis-retirer-propre` 129/0, `scanner-colis-achats` 204/0,
+  `ventes-colis-premium` 32/0, `journee-v2` 0 rouge.
+- Audits verts : `variables`, `tdz`, `coherence`, `identite`, `statuts`, `icones`. `npm run build` vert.
+- Captures regardées (390 et 1512, clair et sombre) : instantané et écran vrai superposables (tête,
+  carte, onglets, groupes et lignes au même endroit, à quelques px près) ; différences voulues :
+  aucune photo (place neutre), « Vérification… » à la place des gestes, à l'ordinateur pas de
+  bouton par colis (un « Vérification… » à droite).
+
+### Temps mesurés (banc, conteneur partagé, `performance.now()` depuis la navigation)
+| | avant (`origin/main`) | après |
+|---|---|---|
+| chiffres de **Colis**, lectures TENUES (2e ouverture) | **jamais** (squelette puis plafond, 12 s) | **1,5 à 2,3 s** (1,49 · 1,49 · 1,99 · 2,28 ; 1,57 · 2,23 sur des passes isolées) |
+| chiffres de **Ventes**, lectures TENUES (2e ouverture) | **jamais** (12 s) | **1,5 à 2,2 s** (1,45 · 1,62 · 1,72 · 1,78 · 2,17 · 2,22) |
+| écran vrai, base servie (1re ouverture, sans instantané) | Colis 10,1–11,3 s · Ventes 1,5–3,0 s | inchangé (rien ne change sans instantané) |
+| CLS au remplacement | Colis 0,055 (ouverture au plafond) | **0,000 à 0,008** |
+
 
 `scripts/tests/colis-ventes-instantanes.test.mjs` : 6/6 (clé par écran et uid, uid dans la
 valeur, écran dans la valeur, ancienne clé de Ma journée, un seul compte tous écrans, effacement,
