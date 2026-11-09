@@ -183,7 +183,7 @@ async function popup(pg, mobile, tag, { ligne, nom, attendu, quoi }) {
   dit(await corps.waitFor({ state: 'detached', timeout: 4000 }).then(() => true).catch(() => false), `${tag} : ${quoi} — Échap la ferme`);
 }
 
-async function ecran(b, largeur, sombre, { nom, url, pret, apres }) {
+async function ecran(b, largeur, sombre, { nom, url, pret, apres, zone }) {
   const mobile = largeur < 700, tag = `${largeur}${sombre ? ' sombre' : ' clair'} · ${nom}`;
   const { pg, ctx, errs, base } = await ouvrir(b, { url, largeur, sombre });
   try {
@@ -191,6 +191,8 @@ async function ecran(b, largeur, sombre, { nom, url, pret, apres }) {
     await pg.waitForTimeout(800);
     await pg.evaluate(() => window.scrollTo(0, 0));
     await capture(pg, `${largeur}-${sombre ? 'sombre' : 'clair'}-${nom}`);
+    // La zone changée, amenée au milieu de l'écran (planches avant / après).
+    if (zone) { const z = pg.locator(zone).filter({ visible: true }).first(); if (await z.count()) { await z.evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(400); await capture(pg, `${largeur}-${sombre ? 'sombre' : 'clair'}-${nom}-zone`); await pg.evaluate(() => window.scrollTo(0, 0)); } }
     const p = await paragraphes(pg, SEUIL);
     dit(!p.pasDEcran && p.longs.length === 0, `${tag} : P1 — aucun paragraphe visible de plus de ${SEUIL} caractères hors pop-up`, p.pasDEcran ? 'écran absent' : p.longs.join(' | '));
     const rg = await rouges(pg);
@@ -204,7 +206,7 @@ async function ecran(b, largeur, sombre, { nom, url, pret, apres }) {
 const fiches = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}') || {}; } catch (_) { return {}; } });
 
 const ECRANS = [
-  { nom: 'annonces-vinted', url: '/?tab=annonces&site=vinted', pret: '[data-ann-fraicheur]', apres: async (pg, mobile, tag) => {
+  { nom: 'annonces-vinted', url: '/?tab=annonces&site=vinted', pret: '[data-ann-fraicheur]', zone: '[data-ann-fraicheur]', apres: async (pg, mobile, tag) => {
     await popup(pg, mobile, tag, { ligne: '[data-ann-fraicheur]', nom: 'fraicheur-annonces', quoi: 'fraîcheur des annonces',
       attendu: [/annonces lues/i, /ce que tu as supprimé ou mis en ligne depuis n'y est pas/] });
     // P3 — la proposition
@@ -226,16 +228,16 @@ const ECRANS = [
     await attendre(async () => String(((await fiches(pg))['9303'] || {}).numero || '') === '7', 10000);
     dit(String(((await fiches(pg))['9303'] || {}).numero || '') === '7', `${tag} : P3 — « Oui, N°7 » relie 9303 au N°7`, JSON.stringify((await fiches(pg))['9303'] || null));
   } },
-  { nom: 'annonces-toutes', url: '/?tab=annonces&site=toutes', pret: '.vrm-main' },
-  { nom: 'annonces-vestiaire', url: '/?tab=annonces&site=vestiaire', pret: '[data-vc-annonces]', apres: async (pg, mobile, tag) => {
+  { nom: 'annonces-toutes', url: '/?tab=annonces&site=toutes', pret: '.vrm-main', zone: '[data-ann-fraicheur]' },
+  { nom: 'annonces-vestiaire', url: '/?tab=annonces&site=vestiaire', pret: '[data-vc-annonces]', zone: '[data-vc-annonces-fraicheur]', apres: async (pg, mobile, tag) => {
     await popup(pg, mobile, tag, { ligne: '[data-vc-annonces-fraicheur]', nom: 'vc-fraicheur', quoi: 'fraîcheur Vestiaire',
       attendu: [/\(au moins\)/, /À confirmer/, /la lecture a plus de 24 h/, /Mes articles/] });
   } },
-  { nom: 'stock', url: '/?tab=garage', pret: '[data-stock-actuelles]', apres: async (pg, mobile, tag) => {
+  { nom: 'stock', url: '/?tab=garage', pret: '[data-stock-actuelles]', zone: '[data-stock-actuelles]', apres: async (pg, mobile, tag) => {
     await popup(pg, mobile, tag, { ligne: '[data-stock-resume-court]', nom: 'stock-resume', quoi: 'résumé du Stock',
       attendu: [/rangée/, /pas encore rangée/] });
   } },
-  { nom: 'colis', url: '/?tab=cat_bord', pret: '[data-colis-barre]', apres: async (pg, mobile, tag) => {
+  { nom: 'colis', url: '/?tab=cat_bord', pret: '[data-colis-barre]', zone: '[data-colis-prochain]', apres: async (pg, mobile, tag) => {
     const n = await pg.evaluate(() => {
       const vis = (e) => e.getClientRects().length > 0;
       const lot = [...document.querySelectorAll('[data-lot-ouvrir]')].filter(vis).length;
