@@ -506,6 +506,7 @@ import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
+import "./styles-popups.css";       // (9 nov., lot AI) l'avatar du compte Vinted ouvert (en haut à droite) — après la DA6
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {LignePlancher} from "./LignePlancher.jsx";
 import {DejaEnStock} from "./DejaEnStock.jsx";
@@ -15293,13 +15294,15 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   const planLu = (reglePlanCourante() || {}).plan;
   const offre = planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : '';
   const initiale = (nomCompte || mail).trim().charAt(0).toUpperCase();
-  const carteCompte = (nomCompte || mail) ? <div className="vrm-nav-compte" data-nav-compte="">
+  // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE : elle ouvre Paramètres (un bouton, clavier compris).
+  const carteCompte = (nomCompte || mail) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="settings"
+    aria-label={`${nomCompte || mail}${offre ? ' · ' + offre : ''} — ouvrir Paramètres`} title="Paramètres" onClick={() => setTab('settings')}>
     <span className="vrm-nav-avatar vrm-sensible" aria-hidden="true">{initiale}</span>
     <span className="vrm-nav-compte-txt">
       {nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
       {(offre || (nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
     </span>
-  </div> : null;
+  </button> : null;
   return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
     <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
@@ -18001,7 +18004,16 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
         title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
           padding: court ? '6px 8px' : '6px 10px 6px 11px', color: ink, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-        <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 6, background: point, flexShrink: 0 }}/>
+        {/* (9 nov., lot AI — Julien : le point « pas ouf ») L'AVATAR du compte (son initiale) dans une
+            pastille ronde ; l'état passe dans un petit badge posé sur son bord (le même point, la même
+            couleur : encre = tu peux agir, ambre = un geste à faire, gris = lecture) — jamais de rouge (§7).
+            Sans compte Vinted lu : l'icône de l'état à la place de l'initiale. Même information, même menu. */}
+        <span aria-hidden="true" className="vrm-etat-avatar" data-etat-avatar={st.niveau === 'ok' && loginVinted ? 'compte' : st.niveau}>
+          {st.niveau === 'ok' && loginVinted
+            ? <span className="vrm-etat-initiale vrm-sensible">{String(loginVinted).trim().charAt(0).toUpperCase()}</span>
+            : <Icon name={st.niveau === 'verif' ? 'sync' : 'eye'} size={13}/>}
+          <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 6, background: point, flexShrink: 0 }}/>
+        </span>
         <span className={st.niveau === 'ok' && loginVinted ? 'vrm-etat-compte vrm-sensible' : undefined} style={st.niveau === 'ok' && loginVinted ? { maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}>{court && st.niveau === 'lecture' ? (code === 'absente' ? 'Extension' : 'Lecture') : court && st.niveau === 'ok' && !loginVinted ? (st.relais ? 'Via ton ordi' : 'Actions') : visible}</span>
         {!court && st.niveau === 'ok' && loginVinted && (st.relais || st.exception) ? <span className="vrm-etat-precision" style={{ color: C.muted, fontWeight: 500 }}>· {st.relais ? 'via ton ordinateur' : 'sauf publier'}</span> : null}
         {!court ? <i className="vrm-etat-chevron" aria-hidden="true"><Icon name="chevron" size={13}/></i> : null}
@@ -44267,7 +44279,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 if (g.point) setTimeout(() => { const el = [...document.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === g.point); if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } } }, 80);
               };
               // (8 nov., clarté) Un verbe qui dit le geste : « Ouvrir la tournée » (« Tournée » seul n'était pas un geste).
-              const verbe = g.action === 'imprimer' ? 'Imprimer' : g.action === 'tournee' ? 'Ouvrir la tournée' : g.onglet && g.onglet !== onglet ? 'Voir' : g.point ? 'Voir le point' : null;
+              // (9 nov., lot AI — Julien : « deux boutons font la même chose ») Le geste « imprimer » de cette
+              // ligne appelait `ouvrirLot`, EXACTEMENT ce que fait « Tout imprimer » en haut (même lot `lignesLot`,
+              // même compte `nLot`, même garde `batchBusy`) : un seul bouton, celui du haut ; la phrase reste.
+              const verbe = g.action === 'imprimer' ? null : g.action === 'tournee' ? 'Ouvrir la tournée' : g.onglet && g.onglet !== onglet ? 'Voir' : g.point ? 'Voir le point' : null;
               return (
                 <div className={'vrm-colis-prochain' + (g.ambre ? ' is-ambre' : '')} data-colis-prochain={g.cle} data-colis-prochain-onglet={g.onglet || ''} data-colis-prochain-point={g.point || undefined} role="status">
                   <span className="vrm-colis-prochain-txt">{g.partiel ? 'Au moins ' : ''}{g.texte}{g.sous ? <span className="vrm-colis-prochain-sous"> · {g.sous}</span> : null}</span>
