@@ -50,6 +50,10 @@
 
 export const CLE_NUMERO_ECRIT = 'vrm_numero_ecrit';
 
+// <numero-ecrit-lecture> — LA LECTURE, recopiée TELLE QUELLE dans l'extension
+// (background.js : la description du dressing ; lbc.js : la description entière
+// d'une annonce Leboncoin) par `node scripts/audit-numero-etiquette.cjs --recopie`.
+// Ne pas la modifier dans l'extension : la modifier ICI, puis recopier.
 // La clé d'un numéro : la MÊME que `cleNum` de l'app et de l'extension
 // (majuscules, sans espace ni tiret, « 007 » = « 7 »). L'audit vérifie qu'elles
 // rendent la même chose.
@@ -59,13 +63,6 @@ export const cleNumero = (v) => {
   return s;
 };
 const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
-
-// Le réglage enregistré → un réglage sûr. Une valeur inconnue = éteint : VRM
-// numérote comme avant (le défaut ne change rien chez personne).
-export function lireReglageNumeroEcrit(brut) {
-  const o = brut && typeof brut === 'object' ? brut : {};
-  return { actif: o.actif === true, depuis: typeof o.depuis === 'string' ? o.depuis : null };
-}
 
 // ── LA LECTURE D'UN TEXTE ─────────────────────────────────────────────────────
 // La marque devant le numéro. `ref` : « Réf » (plus strict, voir plus haut).
@@ -143,6 +140,44 @@ export function lireNumeroTexte(texte, zone = 'description') {
   return { etat: 'lu', cle: surFin[0].cle, brut: surFin[0].brut };
 }
 
+// Ce que l'extension range à la place du texte (§34 : jamais la description
+// elle-même) : la lecture, en quelques octets. `null` pour une forme inconnue.
+export function compacterLecture(l) {
+  if (!l || typeof l !== 'object') return null;
+  if (l.etat === 'lu' && typeof l.cle === 'string' && NUM_OK.test(l.cle) && l.cle !== '0') return { etat: 'lu', cle: l.cle, brut: String(l.brut || '').slice(0, 24) };
+  if (l.etat === 'ambigu' && Array.isArray(l.cles)) { const cles = l.cles.filter((k) => typeof k === 'string' && NUM_OK.test(k)).slice(0, 4); return cles.length > 1 ? { etat: 'ambigu', cles, raison: `deux numéros écrits (${cles.join(' et ')})` } : null; }
+  if (l.etat === 'rien') return { etat: 'rien', raison: String(l.raison || 'aucun N° écrit').slice(0, 60), ...(typeof l.ailleurs === 'string' && NUM_OK.test(l.ailleurs) ? { ailleurs: l.ailleurs } : {}) };
+  return null;
+}
+// </numero-ecrit-lecture>
+
+// Une lecture REÇUE (de l'extension, de la base) : passée par la même forme ;
+// une forme inconnue vaut « pas lue » (`null`), jamais « rien d'écrit ».
+export const lectureRecue = (x) => compacterLecture(x);
+
+// ── LE RÉGLAGE : « OÙ EST TON NUMÉRO ? » (9 nov.) ─────────────────────────────
+// `{ actif, depuis, ou }`. `actif` faux = « VRM numérote pour moi » (le défaut,
+// rien ne change chez personne). Allumé, `ou` dit OÙ il l'écrit — plusieurs
+// cochables : 'description' (la fin), 'titre', 'ref' (le champ référence de la
+// plateforme : SKU eBay, référence pro Leboncoin ; Vinted pro et Vestiaire : aucun
+// champ mesuré, rien n'y est lu). Une valeur inconnue ou vide ⇒ les trois (le
+// comportement du 7 nov.) ; une source décochée n'est plus lue du tout (ni pour
+// poser, ni pour se dire « ambigu »).
+export const OU_NUMERO = ['description', 'titre', 'ref'];
+export const NOM_OU = { description: 'À la fin de la description', titre: 'Dans le titre', ref: 'Dans le champ « référence » de la plateforme' };
+export function lireReglageNumeroEcrit(brut) {
+  const o = brut && typeof brut === 'object' ? brut : {};
+  const ou = Array.isArray(o.ou) ? OU_NUMERO.filter((k) => o.ou.includes(k)) : [];
+  return { actif: o.actif === true, depuis: typeof o.depuis === 'string' ? o.depuis : null, ou: ou.length ? ou : OU_NUMERO.slice() };
+}
+// Cocher / décocher une source : jamais zéro (la dernière cochée reste).
+export function basculerOu(reglage, cle) {
+  const r = lireReglageNumeroEcrit(reglage);
+  if (!OU_NUMERO.includes(cle)) return r;
+  const ou = r.ou.includes(cle) ? r.ou.filter((k) => k !== cle) : OU_NUMERO.filter((k) => k === cle || r.ou.includes(k));
+  return ou.length ? { ...r, ou } : r;
+}
+
 // ── LA LECTURE D'UNE ANNONCE ─────────────────────────────────────────────────
 // `ref` : le champ de référence natif (s'il existe) ; `description` : le texte,
 // ou `undefined` si VRM ne l'a pas (encore) lu ; `descriptionCoupee` : VRM n'en
@@ -152,13 +187,17 @@ export function lireNumeroTexte(texte, zone = 'description') {
 //   { etat: 'lu', cle, source: 'ref'|'description'|'titre', brut, descriptionSue }
 //   { etat: 'rien', raison, descriptionSue }
 //   { etat: 'ambigu', cles, raison, descriptionSue }
-export function lireNumeroEcrit({ ref, description, descriptionLue, descriptionCoupee = false, titre } = {}) {
+export function lireNumeroEcrit({ ref, description, descriptionLue, descriptionCoupee = false, titre, ou } = {}) {
+  // (9 nov.) `ou` : les sources qu'IL a cochées (le réglage) ; absent ⇒ toutes.
+  const veut = (k) => !Array.isArray(ou) || ou.includes(k);
   const sources = [];
-  if (ref != null && String(ref).trim()) sources.push(['ref', lireNumeroTexte(ref, 'ref')]);
+  if (veut('ref') && ref != null && String(ref).trim()) sources.push(['ref', lireNumeroTexte(ref, 'ref')]);
   let descriptionSue = false;
-  if (descriptionLue && typeof descriptionLue === 'object' && descriptionLue.etat) { sources.push(['description', descriptionLue]); descriptionSue = true; }
+  const lue = lectureRecue(descriptionLue);
+  if (!veut('description')) descriptionSue = true;
+  else if (lue) { sources.push(['description', lue]); descriptionSue = true; }
   else if (typeof description === 'string' && !descriptionCoupee) { sources.push(['description', lireNumeroTexte(description, 'description')]); descriptionSue = true; }
-  if (titre != null) sources.push(['titre', lireNumeroTexte(titre, 'titre')]);
+  if (veut('titre') && titre != null) sources.push(['titre', lireNumeroTexte(titre, 'titre')]);
   const amb = sources.find(([, r]) => r.etat === 'ambigu');
   if (amb) return { etat: 'ambigu', cles: amb[1].cles, raison: `${NOM_SOURCE[amb[0]]} : ${amb[1].raison}`, descriptionSue };
   const lus = sources.filter(([, r]) => r.etat === 'lu');
