@@ -112,3 +112,9 @@ retrait, pas les bordereaux). Rien de la liste refusée, ni prix venu des autres
 identité) ⇒ « retiré » coché sur CET achat (jamais par ressemblance ; code inconnu ⇒ dit, rien coché).
 Lots : U = 31 + 32 · V = 33 Colis + Achats (scanner) · W = 34 · X = 35 + 36 + 37 · Y = 38 ·
 Z = 39 · AA = 40 + 41 (extension, version réservée **5.339**) · AB = 42.
+### Ajout de Julien au lot V (9 nov., soir)
+« Quand on scanne le bordereau, l'app peut dire la paire qu'il doit y avoir dedans. » ⇒ au scan
+d'un bordereau (Colis), VRM affiche en grand **la paire attendue dans ce colis** : photo, N°,
+titre, taille — retrouvée par l'IDENTITÉ (n° de suivi ⇒ vente ⇒ annonce ⇒ fiche, §5), jamais par
+ressemblance. Deux paires possibles ou aucune ⇒ dit, rien deviné (« mieux vaut un blanc qu'un faux »).
+Utile AVANT de fermer le carton (vérifier qu'on met la bonne paire) et au dépôt.

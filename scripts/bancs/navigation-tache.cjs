@@ -113,6 +113,8 @@ const ouvrir = async (b, tel, tab, options = {}) => {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: maintenant });
+  // (9 nov., lot Z) La pastille de l'icône : on écoute ce que l'app demande au navigateur (API Badging).
+  await pg.addInitScript(() => { window.__pastille = []; try { navigator.setAppBadge = (n) => { window.__pastille.push(n); return Promise.resolve(); }; navigator.clearAppBadge = () => { window.__pastille.push(null); return Promise.resolve(); }; } catch (_) {} });
   await pg.addInitScript((loc) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vrm_bascule_mineral_v1', '1'); for (const [k, v] of Object.entries(loc || {})) localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch (_) {} }, options.local || {});
   const LIGNES = [...LIGNES_BASE];
   if (!options.sansVestiaire) LIGNES.push({ id: 'vc_ventes', data: { ventes: { 'vc-1': { ref: '80', etat: 'Expédiée', date: il(5).toISOString(), montant: { valeur: 120, devise: 'EUR', cle: 'price' } } }, lectures: {} } }, { id: 'vc_listings', data: { items: {}, liens: {} } });
@@ -205,6 +207,9 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(barre.every((x) => x.h >= 44), 'A. chaque onglet ≥ 44 px', JSON.stringify(barre.map((x) => x.h)));
           const badge = await pg.evaluate(() => { const x = document.querySelector('.vrm-mobile-nav [data-badge-nav="cat_bord"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter')); } catch (_) {} return { n: x ? x.getAttribute('data-badge-n') : '', pub: pub && pub.total }; });
           dit(badge.n !== '' && badge.n === String(badge.pub) && Number(badge.n) > 0, 'H. badge sur Colis = le nombre PUBLIÉ (`vrm_colis_aposter`), jamais recalculé', JSON.stringify(badge));
+          // (9 nov., lot Z) L'icône de VRM porte LE MÊME nombre que le badge de Colis (dernière demande au navigateur).
+          const pastille = await pg.evaluate(() => (window.__pastille || []).slice(-1)[0]);
+          dit(badge.n !== '' && pastille === Number(badge.n), 'Z. pastille de l\'icône de VRM = le badge de Colis', JSON.stringify({ pastille, badge: badge.n }));
           await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').tap();
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });

@@ -42,7 +42,7 @@ libère son numéro (le dire ici).
 | W | inventaire de fin d'année | `claude/inventaire-annuel` | à lancer |
 | X | sélection multiple + filtres enregistrés + fiche à côté de la liste | `claude/lots-vues-panneau` | à lancer |
 | Y | corbeille 30 jours | `claude/corbeille` | à lancer |
-| Z | pastille sur l'icône (colis à envoyer) | `claude/pastille-icone` | à lancer |
+| Z | pastille sur l'icône (colis à envoyer) | `claude/pastille-icone` | fait (session principale) |
 | AA | sur vinted.fr : infos sous SES annonces + calculette pendant un achat (ext. 5.339) | `claude/extension-infos` | à lancer |
 | AB | un seul fil par acheteur et par paire, toutes plateformes | `claude/fil-unique` | à lancer |
 
