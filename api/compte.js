@@ -80,6 +80,8 @@ import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
+// (9 nov.) L'état rangé par les sondes automatiques (projection publique, api/_lib/statut-sondes.js).
+import { statutPourSante } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
@@ -1404,7 +1406,7 @@ async function mesures(req, res) {
 async function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30');
-  const etat = await etatPublic({ pushPret: pushConfigure(), anon: ANON });
+  const [etat, statut] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
   return repondre(res, 200, {
     ok: true,
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
@@ -1415,6 +1417,7 @@ async function sante(req, res) {
     stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
     relancesEssai: configurationRelances().pret,
     etat,
+    statut,
   });
 }
 
