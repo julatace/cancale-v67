@@ -2898,15 +2898,23 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
 }
 
 // Feuille de SAISIE (remplace window.prompt).
+// (9 nov., DA4) Fermée par Échap, le glisser, le voile ou « retour », elle GARDE ce
+// qui a été tapé : la même question rouverte retrouve la saisie (mémoire de la page,
+// rien d'écrit nulle part). « Annuler » et « Valider » l'oublient.
+const _saisiesGardees = new Map();
+const cleSaisie = (q) => String(q.data || '') + '|' + String(q.title || q.titre || q.desc || '');
 function AskTextSheet({ q, close }) {
-  const [v, setV] = React.useState(q.value == null ? '' : String(q.value));
+  const initial = q.value == null ? '' : String(q.value);
+  const [v, setV] = React.useState(() => { const g = _saisiesGardees.get(cleSaisie(q)); return g && g.initial === initial ? g.v : initial; });
+  const oublier = () => _saisiesGardees.delete(cleSaisie(q));
+  const garderEtFermer = () => { if (v !== initial) _saisiesGardees.set(cleSaisie(q), { v, initial }); else oublier(); close(null); };
   const ref = React.useRef(null);
   // Sur téléphone le clavier ne s'ouvre que si le champ prend le focus tout
   // seul ; sinon il faut taper dessus, ce que window.prompt n'imposait pas.
   React.useEffect(() => { const t = setTimeout(() => { try { ref.current.focus(); ref.current.select(); } catch (_) {} }, 60); return () => clearTimeout(t); }, []);
   const { titre, corps } = sheetTexte(q, 'Saisir');
   return (
-    <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION} className="vrm-confirmation">
+    <SheetShell onClose={garderEtFermer} z={Z_CONFIRMATION} className="vrm-confirmation">
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -2918,17 +2926,18 @@ function AskTextSheet({ q, close }) {
         <div className="vrm-ask-sugg" data-ask-suggestion="" style={{display:'flex',alignItems:'center',gap:10,marginTop:12,padding:'8px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
           {q.suggestion.photo ? <PhotoVinted src={q.suggestion.photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : null}
           <span style={{flex:1,minWidth:0,fontSize:13,color:C.muted,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{q.suggestion.detail}</span>
-          <Bouton variante="secondaire" icone="link" data-ask-relier="" onClick={() => close({ relier: true })} style={{flexShrink:0}}>{q.suggestion.bouton}</Bouton>
+          <Bouton variante="secondaire" icone="link" data-ask-relier="" onClick={() => { oublier(); close({ relier: true }); }} style={{flexShrink:0}}>{q.suggestion.bouton}</Bouton>
         </div>
       ) : null}
-      <form onSubmit={(e) => { e.preventDefault(); close(v); }}>
+      <form onSubmit={(e) => { e.preventDefault(); oublier(); close(v); }}>
         <input ref={ref} value={v} onChange={e => setV(e.target.value)}
+          aria-label={titre}
           placeholder={q.placeholder || ''}
           data-ask-champ={q.data || undefined}
           inputMode={q.decimal ? 'decimal' : q.numeric ? 'numeric' : undefined}
           style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.surface,color:C.text,fontSize:17,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
         <div style={{display:'flex',gap:9,marginTop:12}}>
-          <Bouton variante="discret" onClick={() => close(null)} style={{flex:1}}>
+          <Bouton variante="discret" onClick={() => { oublier(); close(null); }} style={{flex:1}}>
             {q.cancel || 'Annuler'}
           </Bouton>
           <Bouton variante="primaire" type="submit" style={{flex:2}}>
@@ -2986,8 +2995,10 @@ function ConfirmHost() {
   // étaient écrits d'un bloc avec des retours à la ligne.
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
   return createPortal(
-    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation">
-      {/* (29 oct.) Plus de rouge sur une confirmation (§7 : le rouge, c'est deux
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation" data-confirmation={q.irreversible ? 'irreversible' : undefined}>
+      {/* (9 nov., DA4) `irreversible: true` (supprimer chez Leboncoin, terminer chez eBay) :
+          l'action en AMBRE (styles-premium §13) — jamais rouge, et seulement là.
+          (29 oct.) Plus de rouge sur une confirmation (§7 : le rouge, c'est deux
           paires sous un même N°) : la conséquence est dite par le texte. */}
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
@@ -14891,9 +14902,31 @@ const toast = (msg, type) => {
   const id = ++_toastId;
   // Le même message redit (un réglage cliqué plusieurs fois) remplace le précédent :
   // quatre bulles identiques empilées ne disent rien de plus qu'une (§7).
-  _toasts = [..._toasts.filter(x => x.text !== text).slice(-3), { id, text, type: t }];
+  // (9 nov., DA4) UNE DURÉE LISIBLE : 4 s pour une ligne courte, puis le temps de la
+  // lire (≈ 15 signes par seconde), 10 s au plus ; un échec 6 s au moins. Le temps
+  // s'arrête sous la souris, au focus clavier et quand l'onglet est caché (`suspendreToasts`).
+  const duree = Math.min(10000, Math.max(t === 'err' ? 6000 : 4000, 1500 + text.length * 65));
+  const nouveau = { id, text, type: t, reste: duree, depart: Date.now() };
+  _toasts.filter(x => x.text === text).forEach(x => clearTimeout(_toastTimers.get(x.id)));
+  _toasts = [..._toasts.filter(x => x.text !== text).slice(-3), nouveau];
   _emitToasts();
-  setTimeout(() => dismissToast(id), t === 'err' ? 6000 : 3800);
+  _planToast(nouveau);
+};
+const _toastTimers = new Map();
+let _toastSuspendu = false;
+function _planToast(x) {
+  clearTimeout(_toastTimers.get(x.id));
+  if (_toastSuspendu) return;
+  x.depart = Date.now();
+  _toastTimers.set(x.id, setTimeout(() => { _toastTimers.delete(x.id); dismissToast(x.id); }, Math.max(600, x.reste)));
+}
+const suspendreToasts = (on) => {
+  if (!!on === _toastSuspendu) return;
+  _toastSuspendu = !!on;
+  for (const x of _toasts) {
+    if (on) { clearTimeout(_toastTimers.get(x.id)); x.reste -= Date.now() - x.depart; }
+    else _planToast(x);
+  }
 };
 
 // ── DÉFILEMENT PARTOUT (K1, 30 septembre) ────────────────────────────────────
@@ -14958,10 +14991,35 @@ function Toaster() {
   // passait SOUS elle : rien n'était dit. Et en bas il couvrirait le pied de la
   // feuille (« Annuler / Supprimer »). Banc `feuilles-coque.cjs`.
   const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
-  if (!list.length) return null;
+  // (9 nov., DA4) La zone `aria-live` reste montée même vide (une zone créée en même
+  // temps que son texte n'est pas annoncée par VoiceOver) ; le message passe au-dessus
+  // du CLAVIER (`--vrm-clavier`, lu de `visualViewport` : dit pendant une saisie, il
+  // tombait derrière) ; survol, focus clavier, onglet caché : son temps s'arrête.
+  const raisons = React.useRef({ survol: false, focus: false, cache: false });
+  const suspendre = () => { const r = raisons.current; suspendreToasts(r.survol || r.focus || r.cache); };
+  React.useEffect(() => {
+    const vis = () => { raisons.current.cache = document.visibilityState === 'hidden'; suspendre(); };
+    document.addEventListener('visibilitychange', vis);
+    const vv = window.visualViewport;
+    const clavier = () => {
+      if (!vv) return;
+      const h = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      document.documentElement.style.setProperty('--vrm-clavier', (h > 80 ? h : 0) + 'px');
+    };
+    if (vv) { vv.addEventListener('resize', clavier); vv.addEventListener('scroll', clavier); clavier(); }
+    return () => {
+      document.removeEventListener('visibilitychange', vis);
+      if (vv) { vv.removeEventListener('resize', clavier); vv.removeEventListener('scroll', clavier); }
+    };
+  }, []);
+  React.useEffect(() => { if (!list.length) { raisons.current.survol = false; raisons.current.focus = false; suspendre(); } }, [list.length]);
   return (
-    <div className="vrm-toasts" data-toasts-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,...(enHaut ? {top:'calc(12px + env(safe-area-inset-top))'} : {bottom:'calc(92px + env(safe-area-inset-bottom))'}),zIndex:Z_MESSAGES,
-      display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'0 14px',pointerEvents:'none'}}>
+    <div className="vrm-toasts" data-toasts-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,...(enHaut ? {top:'calc(12px + env(safe-area-inset-top))'} : {bottom:'max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px))'}),zIndex:Z_MESSAGES,
+      display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'0 14px',pointerEvents:'none'}}
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = true; suspendre(); } }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = false; suspendre(); } }}
+      onFocus={() => { raisons.current.focus = true; suspendre(); }}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { raisons.current.focus = false; suspendre(); } }}>
       {list.map(t => {
         const col = t.type==='err' ? C.danger : t.type==='ok' ? INV_STATUS.online.color : C.text;
         return (
@@ -27725,7 +27783,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!l.length || lbcSupprEnVol) return;
     const ok = await askConfirm({ title: l.length > 1 ? `Supprimer ${l.length} annonces de Leboncoin ?` : `Supprimer le N°${l[0].numero} de Leboncoin ?`,
       desc: l.map((r) => `N°${r.numero} · ${String(r.titre || '').slice(0, 50)} — vendu sur ${r.ou}`).join('\n'),
-      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true });
+      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true, irreversible: true });
     if (!ok) return;
     setLbcSupprEnVol(true);
     let faites = 0;
@@ -43473,7 +43531,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {liste.length===0 && messageSearch.trim() && retireesIci.length===0 && <p data-msg-sans-resultat="" style={{fontSize:13,color:C.muted,lineHeight:1.45,margin:'4px 0 12px'}}>Aucune conversation ne correspond. Essaie un pseudo, un mot de l’article ou « N°12 ». <button type="button" className="vrm-pied-lien" data-pied-lien="effacer" onClick={()=>setMessageSearch('')}>{VERBES.effacer} la recherche</button></p>}
               {tri.length===0 && liste.length>0 && messageFilter!=='all' && <div data-msg-filtre-vide="" className="vrm-vue-vide"><b>Aucune conversation dans ce filtre</b><p>Les conversations sont toujours disponibles dans « Toutes ».</p><Bouton variante="secondaire" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Voir toutes les conversations</Bouton></div>}
               {/* (5 nov., chantier G) L'état vide dit QUOI FAIRE, en une phrase, et nomme les comptes lus. */}
-              {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" style={{fontSize:13,color:C.muted,lineHeight:1.5,padding:'14px 0'}}><b style={{display:'block',fontSize:15,color:C.text,marginBottom:2}}>Aucune conversation pour l’instant</b>Ouvre ta messagerie sur vinted.fr {NAV.dans} : l’extension relève les conversations de chaque compte en passant.</div>}
+              {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" className="vrm-vide-dessin"><Illustration nom="courrier" taille={104}/><p>Aucune conversation pour l’instant</p><p>Ouvre ta messagerie sur vinted.fr {NAV.dans} : l’extension relève les conversations de chaque compte en passant.</p></div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const paire = paireDeConv(uidC(c), c.id, null);
