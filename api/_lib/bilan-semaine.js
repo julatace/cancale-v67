@@ -169,7 +169,9 @@ export function calculerBilan(e) {
   const cachee = vintedLisible ? (o) => e.masquesTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : () => false;
 
   // ── VENDU : `ventesFaites`, au jour de la VENTE ──
-  const excluAutre = excluAutreDe(e.exclusAutres);
+  // (9 nov., Solo par plateforme) + l'offre : en Solo, une vente Leboncoin / eBay / Vestiaire
+  // d'un compte d'achat sort des totaux (le même prédicat que l'app, api/_lib/comptes-exclus.js).
+  const excluAutre = excluAutreDe(e.exclusAutres, e.regle);
   const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre });
   let n = 0, eur = 0, meilleure = null;
   // (8 nov.) La plus haute vente de la fenêtre (le bilan du MOIS la cite : son

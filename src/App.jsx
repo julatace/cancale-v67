@@ -299,7 +299,7 @@ import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/de
 import {ventesPartiesParPreuve} from '../api/_lib/depart-vente.js';
 import {publierDepartsVinted,raisonDepartPubliee} from './departVente.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
-import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
+import {CLE_COMPTES_EXCLUS,SANS_COMPTE_VC,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
@@ -378,8 +378,8 @@ import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivr
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
-import { venteHorsPlan } from "../api/_lib/plan-regle.js";
-import { VentesHorsPlan, BandeauCompteVendeur } from "./abonnement/PlansSoloPro.jsx";
+import { venteHorsPlan, venteAutreHorsPlan } from "../api/_lib/plan-regle.js";
+import { VentesHorsPlan, VentesAutresHorsPlan, BandeauCompteVendeur } from "./abonnement/PlansSoloPro.jsx";
 import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
 import { masquerPourEnvoi, jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
@@ -7536,9 +7536,15 @@ function useComptesExclus() {
   }, []);
   return [v, setV];
 }
+// (9 nov., Solo par plateforme) + L'OFFRE : en Solo, la vente d'un compte Leboncoin,
+// eBay ou Vestiaire qui n'est pas le compte vendeur CHOISI de sa plateforme sort des
+// totaux comme un compte écarté (`excluAutreDe(v, regle)`, api/_lib/comptes-exclus.js
+// + api/_lib/plan-regle.js — le même prédicat que le bilan serveur). La règle change
+// rarement ; l'app se remonte alors (`signaturePlan`), la clé du mémo la suit aussi.
 function useExcluAutre() {
   const [v] = useComptesExclus();
-  return React.useMemo(() => excluAutreDe(v), [v]);
+  const sig = signaturePlan();
+  return React.useMemo(() => excluAutreDe(v, reglePlanCourante()), [v, sig]);
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // CE QUE VINTED TRANSMET AUX IMPÔTS — LES SEUILS, COMPTE PAR COMPTE (6 octobre)
@@ -49209,7 +49215,13 @@ function OngletManque({ site, onglet, onNav }) {
 // (`compteEcarte`, la même règle que l'écran Ventes). Les montants Vestiaire ne
 // sont pas écrits : on ne sait pas si c'est le prix ou ce que Vestiaire verse.
 // Une ligne ouvre l'écran de SON site (une vente eBay : sa commande).
-function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir }) {
+// (9 nov., Solo par plateforme) En Solo, une vente Leboncoin / eBay / Vestiaire d'un compte qui
+// n'est pas le compte vendeur CHOISI de sa plateforme sort de cette liste (et des totaux,
+// `useExcluAutre`) et se montre en APERÇU dessous (`VentesAutresHorsPlan`) — jamais supprimée ;
+// son colis à envoyer est DIT et reste dans Colis. La règle : `venteAutreHorsPlan`
+// (api/_lib/plan-regle.js) sur l'identité que la vente PORTE (`compteDeVente`).
+const horsPlanAutre = (plateforme, v) => venteAutreHorsPlan(reglePlanCourante(), plateforme, compteDeVente(plateforme, v));
+function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir, onPro }) {
   // (8 nov.) Les départs prouvés chez le transporteur : la ligne d'une vente Vestiaire partie se redessine.
   const vcLocDep = useVcLocal();
   const voit = (s) => !sites || sites.has(s);
@@ -49253,7 +49265,8 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites && sites.has('vestiaire')]);
-  const lignes = React.useMemo(() => {
+  const sigPlanT = signaturePlan();
+  const toutesLignes = React.useMemo(() => {
     const out = [];
     const ts = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? t : null; };
     const euro = (n) => (n == null || !isFinite(Number(n))) ? null : Number(n);
@@ -49279,7 +49292,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!v || v.isSeller !== true || lbcAnnulee(v)) continue;
         const id = String(v.txId || v.id || v.itemId || '');
         if (!id) continue;
-        out.push({ cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
+        out.push({ hp: horsPlanAutre('leboncoin', v) ? compteDeVente('leboncoin', v) : null, cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
           prix: v.price != null ? euro(Number(v.price) / 100) : null, devise: 'EUR',
           etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: compteVenteLbc(v, null, annLbc) || '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null,
           tr: transporteurDuColis({ declare: v.deliveryMethod || v.deliveryLabel || '' }) });
@@ -49290,7 +49303,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!c || !c.orderId) continue;
         const li = (c.lineItems || [])[0] || {};
         const st = c.pricingSummary && c.pricingSummary.priceSubtotal;
-        out.push({ cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
+        out.push({ hp: horsPlanAutre('ebay', c) ? compteDeVente('ebay', c) : null, cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
           prix: st && st.value != null ? euro(st.value) : null, devise: (st && st.currency) || 'EUR',
           etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: compteVenteEbay(c, null) || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null });
       }
@@ -49303,7 +49316,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         // Vestiaire te verse) ; pas sûr ⇒ rien d'écrit. Avant : la ligne était muette (203,23 € comptés
         // dans la carte du haut, aucun montant sur la vente).
         const recuVc = montantRecuVc(v);
-        out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
+        out.push({ hp: horsPlanAutre('vestiaire', v) ? compteDeVente('vestiaire', v) : null, cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
           prix: recuVc && recuVc.eur != null ? recuVc.eur : null, devise: 'EUR', etat: v.aExpedier ? (partisVc.has(String(id)) ? 'Envoyée' : L.aEnvoyer) : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
           num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null, tr: transporteurDuColis({ declare: v.transporteur || '', suivi: v.suivi || '' }) });
       }
@@ -49311,7 +49324,9 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
     return out.sort((a, z) => (z.t ?? -Infinity) - (a.t ?? -Infinity));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx]);
+  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx, sigPlanT]);
+  const lignes = React.useMemo(() => toutesLignes.filter((l) => !l.hp), [toutesLignes]);
+  const lignesHorsPlan = React.useMemo(() => toutesLignes.filter((l) => l.hp), [toutesLignes]);
   const [n, setN] = React.useState(60);
   const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).
@@ -49419,6 +49434,8 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
             {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
           </div>
         )}
+      {/* (9 nov., Solo par plateforme) Les ventes Leboncoin / eBay / Vestiaire des comptes d'achat, en aperçu. */}
+      <VentesAutresHorsPlan lignes={lignesHorsPlan.map((l) => ({ cle: l.cle, site: l.site, compteId: l.hp, compte: l.compte, titre: l.titre, prix: prix(l), aEnvoyer: geste(l) }))} onPro={onPro}/>
     </div>
   );
 }
@@ -51414,6 +51431,27 @@ function AppCoeur() {
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
   const excluAutreCoque = useExcluAutre();
+  // (9 nov., Solo par plateforme) Les comptes Leboncoin, eBay et Vestiaire et le compte de
+  // chaque vente lue — pour « Quel compte vend sur … ? » (rien n'est lu hors d'un Solo).
+  const [aboCoque, setAboCoque] = useState(() => abonnementPublie());
+  useEffect(() => suivreAbonnement(setAboCoque), []);
+  const [autresSitesSolo] = useComptesAutresSites(!!(aboCoque && aboCoque.plan === 'solo'));
+  const autresSolo = useMemo(() => {
+    const out = {};
+    const sources = {
+      leboncoin: lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []).filter((v) => v && v.isSeller === true) : null,
+      ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null,
+      vestiaire: Array.isArray(ventesVcCoque) ? ventesVcCoque : null,
+    };
+    for (const p of ['leboncoin', 'ebay', 'vestiaire']) {
+      const l = autresSitesSolo && Array.isArray(autresSitesSolo[p]) ? autresSitesSolo[p] : [];
+      out[p] = {
+        comptes: l.filter((c) => c && !c.nonIdentifie).map((c) => ({ uid: p === 'ebay' ? c.ref : c.id, nom: nomCompteLie(c) })),
+        comptesDesVentes: sources[p] ? sources[p].map((v) => compteDeVente(p, v)).filter((c) => c && c !== SANS_COMPTE_VC) : null,
+      };
+    }
+    return out;
+  }, [autresSitesSolo, lbcVentes, lbcCoqueLu, ebayCommandes, ventesVcCoque]);
   // (4 nov.) L'ARGENT À VENIR, toutes plateformes (`argentAVenir`, src/argentAVenir.js) :
   // UNE règle, calculée ici une fois et publiée dans `liveStats.aVenir` pour la carte
   // des chiffres, Ma journée, Ventes et le widget. Les dates de versement Vinted
@@ -52217,7 +52255,7 @@ function AppCoeur() {
         <GardeEcran nom={t+':'+site} resetKey={platSub}>
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
-            : <><VentesToutes sites={sitesPresents} ventesVinted={ventesCoqueEmail} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
+            : <><VentesToutes sites={sitesPresents} ventesVinted={ventesCoqueEmail} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous} onPro={()=>voirAbonnement(setTab)}
                 onOuvrir={(l)=>{ if(l.site==='ebay'){ DEMANDE_EBAY_CIBLE.compte=l.compteRef||null; DEMANDE_EBAY_CIBLE.id=l.id; DEMANDE_EBAY_CIBLE.at=Date.now(); setTab('ebay_ventes'); return; } setPlatSub(l.site); }}/>
           {/* (9 nov.) Solo : les ventes des comptes d'achat, en aperçu sous la liste (jamais supprimées). */}
           {t==='ventes' && <div style={{padding:'0 16px'}}><VentesHorsPlan ventes={Array.isArray(ventesCoque) ? ventesCoque.filter(o => o && classifyOrderStatus(o.status) !== 'cancelled') : null}
@@ -52843,7 +52881,7 @@ function AppCoeur() {
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
         <BandeauAbonnement setTab={setTab}/>
-        <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque}
+        <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
           comptes={(vintedAccounts || []).filter((a) => a && a.vinted_user_id != null).map((a) => ({ uid: String(a.vinted_user_id), nom: (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)] || a.login || ('#' + a.vinted_user_id) }))}/>
         <ApercuSansAbonnement tab={tab} setTab={setTab}/>
         <BandeauLiaison/>

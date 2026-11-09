@@ -31,9 +31,10 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
 // (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
-import { OffresSoloPro, ouvrirQuelCompte } from '../abonnement/PlansSoloPro.jsx';
+import { OffresSoloPro, ouvrirQuelCompte, choixDe } from '../abonnement/PlansSoloPro.jsx';
+import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO } from '../../api/_lib/plan-regle.js';
 import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
-import { publierAbonnement } from '../abonnement/etatAbonnement.js';
+import { publierAbonnement, suivreAbonnement } from '../abonnement/etatAbonnement.js';
 
 // (8 nov.) « Vérifier mon installation » : le même contrôle que le guide de démarrage (src/guideDemarrage.js).
 import { VerifierInstallationApp } from '../App.jsx';
@@ -2708,6 +2709,11 @@ function MonAbonnement() {
     if (m) { setMsg(m); setOccupe(''); }
   };
   const enEssai = !!(e && e.statut === 'trialing');
+  // (9 nov., Solo par plateforme) Un choix fait dans la feuille « Quel compte vend ? »
+  // (publié par elle) se relit ici tout de suite ; et les comptes des autres plateformes
+  // (lus seulement en Solo) disent quelles rangées montrer.
+  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs } : p)); }), []);
+  const [autresSolo] = useComptesAutresSites(!!(e && e.plan === 'solo'));
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
       const fin = e && e.finPeriode ? dateLisible(e.finPeriode) : 'la fin du mois payé';
@@ -2756,10 +2762,22 @@ function MonAbonnement() {
         onChoisirPro={e && e.plan === 'solo' ? () => changerOffre('pro') : null}
         onChoisirSolo={e && e.plan === 'pro' && !e.proprietaire ? () => changerOffre('solo') : null}/>}
       {e && e.plan === 'solo' && (
-        <GroupeIos titre="Le compte qui vend" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Tes autres comptes restent des comptes d’achat. Changement possible une fois tous les 30 jours.'}>
+        <GroupeIos titre="Le compte qui vend sur chaque plateforme" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Tes autres comptes restent des comptes d’achat. Changement possible une fois tous les 30 jours.'}>
           <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Pas encore choisi</span>}
             detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
             onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
+          {/* (9 nov., Solo par plateforme) Un compte vendeur PAR plateforme : une rangée chacune, dès
+              DEUX comptes (ou un choix déjà fait) ; le même geste, la même règle des 30 jours. */}
+          {PLATEFORMES_SOLO.map((p) => {
+            const l = autresSolo && Array.isArray(autresSolo[p]) ? autresSolo[p].filter((c) => c && !c.nonIdentifie) : [];
+            const ch = choixDe(e, p);
+            if (!ch && l.length < 2) return null;
+            const c = ch ? l.find((x) => String(p === 'ebay' ? x.ref : x.id) === ch.id) : null;
+            const nom = c ? nomCompteLie(c) : ch ? (ch.id === 'principal' ? 'Compte principal' : `Compte n° ${ch.id}`) : 'Pas encore choisi';
+            return <RangeeIos key={p} titre={<span data-compte-vendeur-plateforme={p} data-compte-vendeur={ch ? ch.id : ''}>{NOMS_PLATEFORMES_SOLO[p]} · {nom}</span>}
+              detail={ch ? (ch.prochainChangement ? `Prochain changement le ${dateLisible(ch.prochainChangement)}` : 'Ses ventes et sa compta comptent') : `Tant que tu n’as pas choisi, tous tes comptes ${NOMS_PLATEFORMES_SOLO[p]} comptent`}
+              onClick={() => ouvrirQuelCompte(p)} data-rangee-compte-vendeur={p}/>;
+          })}
         </GroupeIos>
       )}
       {e && e.plan === 'solo' && e.offres && e.offres.pro && e.offres.pro.ouvert && <CaseCgv cases={cases} onChange={setCases}/>}
