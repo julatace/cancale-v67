@@ -376,6 +376,7 @@ import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
+import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU } from "./colisEnvoyes.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -4913,7 +4914,7 @@ const fetchEmailBordereaux = async () => {
     // afficher des titres. On ne prend que les champs utiles : 21 Ko.
     // Le PDF est récupéré à la demande, au moment d'imprimer (lirePdfLigne).
     const champs = ['uid','type','suivi','modele','numero','taille','account','article',
-                    'filename','posKnown','dateLimite','receivedAt','transaction']
+                    'filename','posKnown','dateLimite','receivedAt','transaction','transporteur']
                    .map(c => `${c}:meta->>${c}`).join(',');
     // ⚠️⚠️ (1er nov.) TOUTES LES PAGES (`lireTout`) : au-delà de 1 000 bordereaux
     //    la base coupait EN SILENCE par ordre d'identifiant — `email_bord_{tx}`,
@@ -29575,7 +29576,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'e-mail du MÊME n°, sinon la forme du n° — jamais deviné ; rien ⇒ « pas lu ».
   // Une vente Vinted : par le n° de suivi de SON bordereau (e-mail du bordereau).
   const transporteurColis = (declare, suivi) => transporteurDuColis({ declare: declare || '', suivi: suivi || '', transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
-  const transporteurVente = (b) => transporteurColis('', b && b.suivi);
+  // (9 nov., Colis → Envoyés) La vente Vinted : par SON bordereau (même n° de transaction) —
+  // la ligne de départ lue chez le transporteur pour son n°, le transporteur NOMMÉ dans l'e-mail
+  // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
+  const transporteurVente = (b) => transporteurDeVente({ bord: b || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -36831,6 +36835,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [outilsColis, curSub]);
   // (5 nov.) « Tournée de dépôt » : la feuille des colis à envoyer, par transporteur.
   const [tourneeDepot, setTourneeDepot] = useState(false);
+  // (9 nov.) Colis → Envoyés : la pastille de transporteur choisie (« tous » par défaut).
+  const [filtreEnvoyes, setFiltreEnvoyes] = useState('tous');
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
   // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
   // (5 nov.) Leboncoin aussi (la tournée) : sa coche « Colis fait » de toujours (`vrm_lbc_colis_done`).
@@ -37163,13 +37169,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const exTout = vintedLu ? expeditions().filter(e => !e.o || matchOrd(e.o)) : [];
     const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
     const autresColis = [
-      ...(voitSite('vestiaire') ? (((colisVestiaire(vcEtat) || {}).aEnvoyer) || []) : []).map((v) => { const tr = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return { __autre: 'vc', key: 'vc:' + v.id, v, tr, trNom: (tr && tr.nom) || 'Autres', dl: joursAvantVc(v.limite) }; }),
-      ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => ({ __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr: transporteurDuColis({ declare: '' }), trNom: 'Autres', dl: x.jours })),
-      ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: (tr && tr.nom) || 'Autres', dl: null }; }),
+      ...(voitSite('vestiaire') ? (((colisVestiaire(vcEtat) || {}).aEnvoyer) || []) : []).map((v) => { const tr = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return { __autre: 'vc', key: 'vc:' + v.id, v, tr, trNom: nomEnvoye(tr), dl: joursAvantVc(v.limite) }; }),
+      ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => ({ __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr: transporteurDuColis({ declare: '' }), trNom: TRANSP_INCONNU, dl: x.jours })),
+      ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: nomEnvoye(tr), dl: null }; }),
     ];
     return { vintedLu, exTout, autresColis };
   };
-  const trNomColis = (x) => { if (x.__autre) return x.trNom; const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };
+  const trNomColis = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(transporteurVente(x.b)); };
   const estPosteColis = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
   // (5 nov., chantier D) « TEMPS DE PRÉPARATION » : depuis combien de jours chaque vente attend son
   // envoi — jours de calendrier depuis la date de VENTE lue (src/colisEnvoi.js), jamais deviné : une
@@ -37268,7 +37274,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         }
       }
     } catch (_) {}
-    return out.sort((a, b) => a.rang - b.rang);
+    // (9 nov.) LA DATE QUI RANGE UN COLIS ENVOYÉ (src/colisEnvoyes.js `quandEnvoye`) : la prise
+    // en charge LUE (transporteur, son e-mail du MÊME n°), sinon son « Colis fait », sinon la vente.
+    return out.sort((a, b) => a.rang - b.rang).map((x) => {
+      const tx = x.o && x.o.transaction_id != null ? String(x.o.transaction_id) : '';
+      const rv = tx && x.site === 'vinted' ? partisVinted.get(tx) : null;
+      const depart = x.depart || (rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null);
+      const coche = x.type === 'coche' && tx ? (shipDone[tx] || null) : (rv && rv.type === 'colis-fait' ? rv.at : null);
+      const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : (x.lo && x.lo.dateVente);
+      return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
+    });
   };
   // La coque monte sous « À retirer » les outils de retrait (suivi à la main,
   // e-mails, « Tout est OK ») : elle apprend ici l'onglet réellement montré.
@@ -43799,7 +43814,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
                 // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
                 // (le plus pressé d'abord) ; les transporteurs dans l'ordre de leur premier colis.
-                const trNomDe = (x) => { if (x.__autre) return x.trNom; const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };  // (3 nov., critique #15) « Autres », pas le jargon « Transporteur pas lu »
+                const trNomDe = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(transporteurVente(x.b)); };  // (9 nov.) « Transporteur inconnu » (des mots simples), plus « Autres » fourre-tout
                 // (3 nov.) Tous les sites : le plus pressé d'abord (jours avant la limite ; sans limite à la fin,
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
                 // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
@@ -44171,10 +44186,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
           if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis marqué « Déposé » arrive ici, jusqu’à sa livraison.</span></div></>;
           const plusieursComptes = (accounts || []).length > 1;
-          const nomT = (x) => (x.tr && x.tr.nom) || 'Autres';
-          const ordreT = new Map(); L.forEach((x) => { const k = nomT(x); if (!ordreT.has(k)) ordreT.set(k, ordreT.size); });
-          const LT = L.map((x, k) => [x, k]).sort((a, b) => ordreT.get(nomT(a[0])) - ordreT.get(nomT(b[0])) || a[1] - b[1]).map(([x]) => x);
-          const nParT = {}; L.forEach((x) => { const k = nomT(x); nParT[k] = (nParT[k] || 0) + 1; });
+          // (9 nov., Julien : « mets le plus récent en haut, comme pour tous les onglets ») UNE liste,
+          // la plus récente en haut (src/colisEnvoyes.js : prise en charge lue, sinon « Colis fait »,
+          // sinon la vente), le transporteur sur chaque carte, et des pastilles pour n'en voir qu'un.
+          // Avant : des groupes par transporteur, et « Autres » pour tout ce qui n'était pas lu.
+          const nomT = (x) => nomEnvoye(x.tr);
+          const pastillesT = filtresTransporteurs(L);
+          const { liste: LF, filtre: filtreT } = filtrerEnvoyes(L, filtreEnvoyes);
+          const LT = rangerEnvoyes(LF);
           const postes = L.filter((x) => x.type === 'coche');
           const nbAuRelais = L.filter((x) => x.st && x.st.label === 'Au relais').length;
           const sousDe = (x) => {
@@ -44189,10 +44208,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
           };
           return (
-            <>{retoursHaut}<section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais}>
+            <>{retoursHaut}<section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais} data-envoyes-tri="recent" data-envoyes-filtre={filtreT}>
+              {pastillesT.length > 1 && (
+                <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyes-filtres="" style={{display:'flex',gap:6,marginBottom:10}}>
+                  <button type="button" aria-pressed={filtreT === 'tous'} data-envoyes-filtre-choix="tous" data-envoyes-filtre-n={L.length} onClick={() => setFiltreEnvoyes('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {L.length}</button>
+                  {pastillesT.map((p) => (
+                    <button key={p.nom} type="button" aria-pressed={filtreT === p.nom} data-envoyes-filtre-choix={p.nom} data-envoyes-filtre-cle={p.cle || 'inconnu'} data-envoyes-filtre-n={p.n} onClick={() => setFiltreEnvoyes(filtreT === p.nom ? 'tous' : p.nom)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.nom} · {p.n}</button>
+                  ))}
+                </div>
+              )}
+              <p className="vrm-colis-envoyes-tri" data-envoyes-phrase="" style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>Le plus récent en haut : prise en charge lue, sinon « Colis fait », sinon date de vente.</p>
               <div className="vrm-colis-grille" style={{display:'flex',flexDirection:'column',gap:6}}>
                 {LT.map((x, ix) => {
-                  const ouvreT = ix === 0 || nomT(LT[ix-1]) !== nomT(x);
                   const so = sousDe(x);
                   const frise = friseColisFusion(x.lues || {}, {});
                   const tx = x.o ? String(x.o.transaction_id) : '';
@@ -44204,14 +44231,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : null;
                   return (
                     <React.Fragment key={x.cle}>
-                      {ouvreT && (
-                        <div data-groupe-transp={nomT(x)} className="vrm-fu-groupe-transp">
-                          <span className="vrm-fu-groupe-tuile" aria-hidden="true">{x.tr && x.tr.cle ? <LogoTransporteur cle={x.tr.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                          <h3>{nomT(x)}</h3>
-                          <span>{nParT[nomT(x)]} colis</span>
-                        </div>
-                      )}
-                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site} data-depart-lu={x.depart ? (x.depart.carrier || x.depart.type) : undefined} data-depart-preuve={x.depart ? (x.depart.type || 'transporteur') : undefined}
+                      <div className="vrm-colis-carte vrm-colis-envoye" data-colis-envoye={x.cle} data-envoye-rang={ix} data-envoye-transp={(x.tr && x.tr.cle) || (x.tr && x.tr.nom ? 'autre' : 'inconnu')} data-envoye-transp-source={(x.tr && x.tr.source) || ''} data-envoye-quand={x.quand && x.quand.ms != null ? String(x.quand.ms) : ''} data-envoye-quand-source={(x.quand && x.quand.source) || ''} data-colis-ident={x.type === 'parti' ? 'p:' + x.o.transaction_id : x.cle} data-parti={x.type === 'coche' ? 'coche' : x.type === 'parti' ? x.st.label : x.type} data-plateforme-colis={x.site} data-depart-lu={x.depart ? (x.depart.carrier || x.depart.type) : undefined} data-depart-preuve={x.depart ? (x.depart.type || 'transporteur') : undefined}
                         {...(x.type === 'coche' && x.np ? { 'data-tx': tx, 'data-limite': x.np.limiteDepassee ? 'depassee' : 'ok' } : {})} {...(x.type === 'coche' ? { 'data-postes-pas-partis': x.np ? '1' : undefined, 'data-postes-recents': x.np ? undefined : '1' } : {})}
                         style={{padding:'14px',border:`1px solid ${so.ambre ? C.warn + '66' : C.border}`,background:C.card,borderRadius:12}}>
                         <div style={{display:'flex',gap:12,alignItems:'center'}}>
@@ -44221,7 +44241,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                           <div style={{flex:'1 1 150px',minWidth:0}}>
                             <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? <><Numero n={x.num} taille="petit"/>{' '}</> : null}{x.titre}</span></div>
-                            <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{so.t}</span>
+                            <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{(filtreT !== 'tous' || so.t.includes(nomT(x))) ? so.t : <><span data-colis-envoye-transp="">{nomT(x)}</span>{' · '}{so.t}</>}</span>
                           </div>
                         </div>
                         <Frise etapes={frise} cle={x.cle} className="vrm-colis-frise" label="Où en est le colis"/>
