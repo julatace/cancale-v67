@@ -113,7 +113,7 @@ async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) 
     // de l'inventaire, ou une écriture, est comptée (il ne doit y en avoir aucune).
     // (Une écriture d'un AUTRE geste de l'app, rejouée par la file d'envoi, n'est pas de
     // l'inventaire : elle est relevée à part, et jugée par J — aucun N° changé.)
-    if (base.horsLigne) { const corps = req.postData() || ''; if (/vrm_inventaire/.test(u + corps) || (req.method() !== 'GET' && /vinted_annonce_numeros|vinted_used_numeros|vrm_slots/.test(corps))) { base.pendantHl++; base.pendantHlQui = (base.pendantHlQui || []).concat(req.method() + ' ' + u.slice(0, 90)); } else if (req.method() !== 'GET') base.autres.push({ m: req.method(), u, corps }); return route.abort('internetdisconnected'); }
+    if (base.horsLigne) { const corps = req.postData() || ''; if (req.method() === 'GET') { if (/vrm_inventaire/.test(u)) base.lecturesHl = (base.lecturesHl || 0) + 1; } else if (/vrm_inventaire/.test(u + corps) || /vinted_annonce_numeros|vinted_used_numeros|vrm_slots/.test(corps)) { base.pendantHl++; base.pendantHlQui = (base.pendantHlQui || []).concat(req.method() + ' ' + u.slice(0, 90)); } else if (req.method() !== 'GET') base.autres.push({ m: req.method(), u, corps }); return route.abort('internetdisconnected'); }
     if (/id=eq\.vrm_inventaire/.test(u) || (req.method() === 'POST' && /vrm_inventaire/.test(req.postData() || ''))) {
       if (req.method() === 'GET') {
         base.lectures++;
@@ -427,7 +427,7 @@ async function ouvrirInventaire(pg, tel) {
         const fautesH = await horsJetons(pg);
         dit(fautesH.length === 0, `${t} : H — aucune teinte hors des jetons hors connexion`, fautesH.slice(0, 4).join(' | '));
         await shot(pg, nomShot('bilan-hors-ligne'));
-        dit(bh.pendantHl === 0, `${t} : H — hors connexion : l'inventaire ne lit ni n'écrit sa ligne, et rien qui touche un N° n'est envoyé (${bh.pendantHl})`, (bh.pendantHlQui || []).join(' | '));
+        dit(bh.pendantHl === 0, `${t} : H — hors connexion : l'inventaire ne lit ni n'écrit sa ligne, et rien qui touche un N° n'est envoyé (${bh.pendantHl}) — une lecture tentée (${bh.lecturesHl || 0}, l'écran resté en ligne une seconde) échoue sans rien écrire`, (bh.pendantHlQui || []).join(' | '));
         // Le réseau revient : les saisies faites hors connexion partent, une fois.
         bh.horsLigne = false; await ctx.setOffline(false);
         let arrive = false;
