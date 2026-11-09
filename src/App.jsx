@@ -28,6 +28,8 @@ import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
 import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j } from './profilVendeur.js';
+// (9 nov.) Le bandeau discret d'un incident ouvert par les sondes de /statut.
+import { bandeauStatut, CLE_VUS as CLE_STATUT_VUS } from './statutBandeau.js';
 // ⟦→ ecrans/Ebay.jsx #1⟧
 // « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
 const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)}\u00a0€` : `${Number(v).toFixed(2).replace('.', ',')}\u00a0€`);
@@ -16332,6 +16334,43 @@ function ApercuSansAbonnement({ tab, setTab }) {
       <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
     </div>, document.body);
 }
+// ── (9 nov.) UN INCIDENT OUVERT PAR LES SONDES DE /statut ─────────────────────
+// Une ligne discrète, neutre (aucun geste à faire : « on s'en occupe »), UNE fois
+// par incident et par appareil (la clé est notée dès qu'elle s'affiche ; la croix
+// la ferme pour cette visite). La règle : src/statutBandeau.js. `/api/sante` est
+// relu toutes les 10 min, seulement page visible ; une lecture ratée ne dit rien.
+const lireVusStatut = () => { try { const v = JSON.parse(localStorage.getItem(CLE_STATUT_VUS) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
+function BandeauStatut() {
+  const [bandeau, setBandeau] = React.useState(null);
+  const [ferme, setFerme] = React.useState(false);
+  const affiche = React.useRef(false);
+  React.useEffect(() => {
+    let vivant = true;
+    const lire = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      fetch('/api/sante', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+        // Déjà affiché pendant cette visite : il reste jusqu'à la croix.
+        if (!vivant || !j || j.ok !== true || affiche.current) return;
+        const b = bandeauStatut(j.statut, lireVusStatut());
+        if (!b) return;
+        affiche.current = true;
+        try { localStorage.setItem(CLE_STATUT_VUS, JSON.stringify([...lireVusStatut(), b.cle].slice(-50))); } catch (_) {}
+        setBandeau(b);
+      }).catch(() => {});
+    };
+    lire();
+    const t = setInterval(lire, 10 * 60 * 1000);
+    return () => { vivant = false; clearInterval(t); };
+  }, []);
+  if (!bandeau || ferme) return null;
+  return (
+    <div data-bandeau-statut={bandeau.composant} role="status" style={{margin:'10px 16px 0',display:'flex',alignItems:'center',gap:10,padding:'8px 8px 8px 14px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,fontSize:13,lineHeight:1.4,color:C.text}}>
+      <span style={{flex:1,minWidth:0}}>{bandeau.phrase} <a href="/statut" target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600,whiteSpace:'nowrap'}}>Voir l’état</a></span>
+      <button type="button" aria-label="Fermer" onClick={() => setFerme(true)} style={{flexShrink:0,minWidth:44,minHeight:44,border:0,background:'transparent',color:C.muted,fontSize:18,cursor:'pointer'}}>×</button>
+    </div>
+  );
+}
+
 function BandeauLiaison() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
@@ -51967,6 +52006,7 @@ function AppCoeur() {
         <BandeauAbonnement setTab={setTab}/>
         <ApercuSansAbonnement tab={tab} setTab={setTab}/>
         <BandeauLiaison/>
+        {!baseKO && <BandeauStatut/>}
         {/* (8 nov.) Un compte qui n'arrive plus alors que l'extension travaille : la ligne ambre (src/ToutVaBien.jsx). */}
         {!baseKO && <Suspense fallback={null}><AlerteCaptureParesseuse onVoir={() => setTab('settings')}/></Suspense>}
         <BandeauConfirmationAdresse onVoir={() => { ouvrirEmailsRelier('adresses'); setTab('emails'); }}/>
