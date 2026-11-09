@@ -28,6 +28,8 @@ import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
 import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j } from './profilVendeur.js';
+// (9 nov.) Le bandeau discret d'un incident ouvert par les sondes de /statut.
+import { bandeauStatut, CLE_VUS as CLE_STATUT_VUS } from './statutBandeau.js';
 // ⟦→ ecrans/Ebay.jsx #1⟧
 // « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
 const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)}\u00a0€` : `${Number(v).toFixed(2).replace('.', ',')}\u00a0€`);
@@ -65,6 +67,7 @@ import './design/guide-iphone.css'; // (8 nov.) style de ./GuideIphone.jsx, gard
 import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à sa place (son écran est chargé à la demande)
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
+import { transporteurRelu, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -128,6 +131,7 @@ import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 import { requeteDeLaVoix } from "./rechercheVocale.js";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
 import QuiDorment from "./design/QuiDorment.jsx";
+import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
 // ⟦→ ecrans/Vestiaire.jsx #2⟧
 // ⟦→ ecrans/Compta.jsx #2⟧
 import { versementsDuReleve, completerVersementsParReleve } from "./versementReleve.js";
@@ -520,7 +524,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.330.0';
+const EXT_ATTENDUE = '5.331.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -947,7 +951,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
+const EXT_CAPACITES = { comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -4932,12 +4936,19 @@ const fetchEmailBordereaux = async () => {
     //    bordereau » sur Colis, avec le bouton « Générer » — alors que leurs PDF
     //    étaient en base. `null` = pas su (une page ratée aussi) : l'écran le dit
     //    et réessaie.
-    const rows = await lireTout(`id=like.email_bord_*&select=id,${champs}`, { strict: true });
+    // (9 nov.) Le transporteur RELU dans le texte de l'e-mail des anciens bordereaux
+    // (api/_lib/transporteur-anciens.js, cron du matin) : une ligne légère à part ;
+    // il ne remplace JAMAIS un transporteur rangé. Illisible ⇒ rien de fusionné.
+    const [rows, relus] = await Promise.all([
+      lireTout(`id=like.email_bord_*&select=id,${champs}`, { strict: true }),
+      lireTout(`id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx`, { strict: true }).catch(() => null),
+    ]);
     if (!Array.isArray(rows)) return null;
+    const ligneRelue = Array.isArray(relus) && relus[0] ? relus[0] : null;
     // `filename` est présent exactement quand un PDF l'est (vérifié : 50/50,
     // aucun écart) — il sert donc de témoin sans télécharger le PDF.
     return rows.filter(r => r && r.filename && r.filename !== 'None')
-      .map(r => ({ ...r, _row: r.id, hasPdf: true }))
+      .map(r => transporteurRelu({ ...r, _row: r.id, hasPdf: true }, ligneRelue))
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return null; }
 };
@@ -15399,7 +15410,7 @@ function LiensLegaux() {
 // ── Compte créé par Discord/Google sans le savoir (30 octobre) ──────────────
 // Julien avait relié Discord à son compte (pseudo seulement), puis « Se
 // connecter avec Discord » a créé un SECOND compte VRM, vide. On le dit avant
-// d'ouvrir l'app, et on propose de supprimer ce compte vide (la route « Fermer
+// d'ouvrir l'app, et on propose de supprimer ce compte vide (la route « Supprimer
 // mon compte », confirmée ici) pour pouvoir relier Discord au vrai compte.
 function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
   const nom = fournisseur === 'google' ? 'Google' : 'Discord';
@@ -15421,7 +15432,9 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
   const supprimer = async () => {
     setBusy(true); setErr('');
     try {
-      const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation: email }) });
+      // (9 nov.) La route de « Supprimer mon compte » : ce compte vient d'être ouvert par
+      // Google/Discord (connexion de moins de 10 min), son clic ici est la confirmation.
+      const r = await fetch('/api/compte?mode=supprimer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation: 'SUPPRIMER' }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(j?.message || 'Le compte n’a pas pu être supprimé. Réessaie.'); setBusy(false); return; }
       setEtape('fait');
@@ -15447,7 +15460,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'}, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
-          <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy || !email} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
+          <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
           <button type="button" className="vrm-b vrm-b-discret vrm-b-plein" onClick={() => setEtape('choix')} disabled={busy}>Annuler</button>
         </div>
       </>}
@@ -16334,6 +16347,43 @@ function ApercuSansAbonnement({ tab, setTab }) {
       <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
     </div>, document.body);
 }
+// ── (9 nov.) UN INCIDENT OUVERT PAR LES SONDES DE /statut ─────────────────────
+// Une ligne discrète, neutre (aucun geste à faire : « on s'en occupe »), UNE fois
+// par incident et par appareil (la clé est notée dès qu'elle s'affiche ; la croix
+// la ferme pour cette visite). La règle : src/statutBandeau.js. `/api/sante` est
+// relu toutes les 10 min, seulement page visible ; une lecture ratée ne dit rien.
+const lireVusStatut = () => { try { const v = JSON.parse(localStorage.getItem(CLE_STATUT_VUS) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
+function BandeauStatut() {
+  const [bandeau, setBandeau] = React.useState(null);
+  const [ferme, setFerme] = React.useState(false);
+  const affiche = React.useRef(false);
+  React.useEffect(() => {
+    let vivant = true;
+    const lire = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      fetch('/api/sante', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+        // Déjà affiché pendant cette visite : il reste jusqu'à la croix.
+        if (!vivant || !j || j.ok !== true || affiche.current) return;
+        const b = bandeauStatut(j.statut, lireVusStatut());
+        if (!b) return;
+        affiche.current = true;
+        try { localStorage.setItem(CLE_STATUT_VUS, JSON.stringify([...lireVusStatut(), b.cle].slice(-50))); } catch (_) {}
+        setBandeau(b);
+      }).catch(() => {});
+    };
+    lire();
+    const t = setInterval(lire, 10 * 60 * 1000);
+    return () => { vivant = false; clearInterval(t); };
+  }, []);
+  if (!bandeau || ferme) return null;
+  return (
+    <div data-bandeau-statut={bandeau.composant} role="status" style={{margin:'10px 16px 0',display:'flex',alignItems:'center',gap:10,padding:'8px 8px 8px 14px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,fontSize:13,lineHeight:1.4,color:C.text}}>
+      <span style={{flex:1,minWidth:0}}>{bandeau.phrase} <a href="/statut" target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600,whiteSpace:'nowrap'}}>Voir l’état</a></span>
+      <button type="button" aria-label="Fermer" onClick={() => setFerme(true)} style={{flexShrink:0,minWidth:44,minHeight:44,border:0,background:'transparent',color:C.muted,fontSize:18,cursor:'pointer'}}>×</button>
+    </div>
+  );
+}
+
 function BandeauLiaison() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
@@ -28351,6 +28401,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [seuilDort, setSeuilDortEtat] = useState(() => { try { return seuilValide(localStorage.getItem('vrm_qd_seuil')); } catch (_) { return 30; } });
   const setSeuilDort = (v) => { const x = seuilValide(v); setSeuilDortEtat(x); try { localStorage.setItem('vrm_qd_seuil', String(x)); } catch (_) {} };
   const [dortAgir, setDortAgir] = useState(null);
+  // (9 nov., « vendre plus ») La même vue porte deux listes : « Qui dorment » et
+  // « Favoris sans vente » (src/vendrePlus.js) ; le choix et le seuil de favoris
+  // sont des conforts de CET appareil.
+  const [modeDort, setModeDortEtat] = useState(() => { try { return localStorage.getItem('vrm_qd_mode') === 'favoris' ? 'favoris' : 'dort'; } catch (_) { return 'dort'; } });
+  const setModeDort = (v) => { const x = v === 'favoris' ? 'favoris' : 'dort'; setModeDortEtat(x); try { localStorage.setItem('vrm_qd_mode', x); } catch (_) {} };
+  const [seuilFav, setSeuilFavEtat] = useState(() => { try { return seuilFavorisValide(localStorage.getItem('vrm_qd_seuil_fav')); } catch (_) { return 5; } });
+  const setSeuilFav = (v) => { const x = seuilFavorisValide(v); setSeuilFavEtat(x); try { localStorage.setItem('vrm_qd_seuil_fav', String(x)); } catch (_) {} };
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   // (27 oct., décision de Julien) Acceptation AUTOMATIQUE des offres ≥ au mini.
   // Éteinte par défaut, synchronisée (`vinted_offres_auto`, rattrapée au nuage).
@@ -31802,7 +31859,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     else if (annSort==='sleeping') {
       // « Qui dorment » : en ligne depuis longtemps -> baisser le prix / republier.
       // (3 nov.) LA règle « qui dort » (src/quiDorment.js), au seuil choisi (30/60/90 j).
-      arr = articlesQuiDorment(arr.map(it=>({id:String(it.id),it,age:listedAgeDays(it)})), seuilDort).liste.map(x=>x.it);
+      // (9 nov.) « Favoris sans vente » : la règle `favorisSansVente` (src/vendrePlus.js),
+      // sur la MÊME base en ligne ; les offres par annonce ne sont pas lues (null).
+      arr = modeDort==='favoris'
+        ? favorisSansVente(arr.map(it=>({id:String(it.id),it,favoris:it.favourites,offres:null})), seuilFav).liste.map(x=>x.it)
+        : articlesQuiDorment(arr.map(it=>({id:String(it.id),it,age:listedAgeDays(it)})), seuilDort).liste.map(x=>x.it);
     }
     // ── FILTRE PAR COMPTE (sélecteur de l'onglet) + mise en avant du connecté ──
     // Un compte choisi ⇒ seulement SES annonces. « Tous » ⇒ celles du compte
@@ -31816,7 +31877,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort]);
+  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort, modeDort, seuilFav]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // ── SÉLECTIONNER, PUIS « ACTIONS POSSIBLES » (5 nov., `src/annoncesActions.js`) ──
@@ -32364,6 +32425,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { n:arr.length, val, valConnus, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc, prepaCompte, prepaCommun: prepaCommunDe(prepaCompte) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates, lbcAussi]);
+  // (9 nov., « vendre plus ») Les deux nombres de la vue « À relancer », sur la MÊME
+  // base que la grille (`annBase`) : qui dorment au seuil choisi, favoris sans vente.
+  // Annonces pas lues ⇒ `null` (le bouton ne dit pas 0).
+  const vueRelancer = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.error) return { dort: null, favoris: null };
+    const d = articlesQuiDorment(annBase.map(it=>({id:String(it.id),age:listedAgeDays(it)})), seuilDort);
+    const f = favorisSansVente(annBase.map(it=>({id:String(it.id),favoris:it.favourites,offres:null})), seuilFav);
+    return { dort: listingDatesLu === true && d ? d.n : null, favoris: f ? f.n : null, favorisPasLus: f ? f.favorisPasLus : 0 };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, listings.items, listings.error, listingDates, listingDatesLu, seuilDort, seuilFav]);
   // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
   // Même motif que `vrm_colis_aposter` (§11) : l'écran qui a toutes les sources
   // publie, le serveur lit — il ne recalcule jamais `annBase`. ⚠️ On ne publie
@@ -37333,7 +37404,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   React.useEffect(()=>{
     const appliquer=()=>{
       if(only==='annonces' && prendreVue('republier')) setAnnSort('selection');   // (5 nov., chantier C) l'entrée « Republier » mène à « Sélectionner », puis Actions
-      if(only==='annonces' && prendreVue('dorment')) setAnnSort('sleeping');
+      if(only==='annonces' && prendreVue('dorment')) { setModeDort('dort'); setAnnSort('sleeping'); }
       // (6 nov., vague 2) Ma journée : « N annonces sans achat relié » et « N ventes annulées avant l'envoi ».
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
       if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
@@ -38305,6 +38376,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // carte, qui le dit ; la file porte « Saisie en série » (la porte du chiffre faux, §5).
         { const nR = fileAchat ? aRelierJournee(fileAchat) : 0;
           if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: `${nR} annonce${nR > 1 ? 's' : ''} numérotée${nR > 1 ? 's' : ''} sans prix d’achat`, detail: 'Saisis le prix ou relie l’achat (une suggestion par annonce, ou la saisie en série)', title: `${nR} annonce${nR > 1 ? 's' : ''} numérotée${nR > 1 ? 's' : ''} sans prix d’achat`, tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
+        // (9 nov., « vendre plus » — retenu le 11 oct. : « plan des paires qui dorment ») Les
+        // articles EN LIGNE depuis au moins le seuil choisi dans Annonces (30/60/90 j), comptés
+        // par la règle du stock qui dort (`stockQuiDort`, la base de la grille). Seulement
+        // quand les annonces ET leurs dates sont LUES et qu'il y en a (0 ou pas su ⇒ rien).
+        // « Voir » ouvre Annonces → « À relancer » : chaque geste y reste SON clic.
+        { const datesOkJ = listingDatesLu === true && Array.isArray(listings.items) && !listings.error;
+          const cD = datesOkJ ? cartePairesQuiDorment(stockDort, seuilDort) : null;
+          if (cD) { const mA = motsArticle(vendActuel()); const nom = cD.n > 1 ? mA.noms : mA.nom;
+            const court = `${cD.partiel ? 'Au moins ' : ''}${cD.n} ${nom} en ligne depuis ${cD.seuil}\u00a0j ou plus`;
+            jobs.push({ id: 'paires-dorment', n: cD.n, icon: 'sleep', color: C.text, court, detail: 'Republier, préparer ailleurs ou changer le prix toi-même : tu choisis, rien ne part seul', title: court, tab: 'cat_annonces', prio: 3.6, avant: () => demanderVue('dorment') }); } }
         // (6 nov.) UN INVENTAIRE DU STOCK EN COURS (src/inventaire.js, sa ligne
         // `vrm_inventaire`) : « Reprendre » ouvre le Stock sur l'inventaire. Neutre :
         // rien ne presse, c'est lui qui l'a commencé.
@@ -38927,7 +39008,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (1er nov.) Une tendance SANS BASE (« — aucune date », « pas de moyenne »)
           // n'est pas un chiffre : elle ne prend pas une case. Statistiques la dit,
           // avec sa raison (rythme, stock qui dort) — la carte y mène.
-          ].filter((c) => c.v != null && !(loading && c.id === 'attente'));
+          ].filter((c) => c.v != null && !(loading && c.id === 'attente') && !(c.id === 'dort' && datesOk && cartePairesQuiDorment(stockDort, seuilDort)));   // (9 nov.) la carte « en ligne depuis N j » de la liste des gestes le dit déjà : jamais deux fois (§7)
           if (!cases.length) return null;
           return (
             <div className="vrm-day-card vrm-day-tendances vrm-jc" data-widget-tendances="" style={{border:`1px solid ${C.border}`,background:C.card}}>
@@ -41579,7 +41660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
           {/* (6 nov., vague 2 · point 4) Les annonces numérotées dont l'achat n'est pas relié (src/achatsARelier.js). */}
           {((fileAchat && fileAchat.length > 0) || annSort==='sansachat') && <button type="button" data-vue-sans-achat={fileAchat ? fileAchat.length : ''} aria-pressed={annSort==='sansachat'} onClick={()=>setAnnSort('sansachat')}>Sans achat relié{fileAchat && fileAchat.length ? <span className="vrm-of-n">{fileAchat.length}</span> : null}</button>}
-          {annStats.sleeping>0 && <button type="button" data-vue-relancer={annStats.sleeping} aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
+          {(annStats.sleeping>0 || vueRelancer.favoris>0) && <button type="button" data-vue-relancer={annStats.sleeping} aria-pressed={annSort==='sleeping'} onClick={()=>{ if (!(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort('sleeping'); }}>À relancer</button>}
           {/* (6 nov.) Pour les conseils (src/accompagnement.js) : les nombres de cet écran, lus
               seulement (liste pas chargée ou en erreur ⇒ rien). */}
           <ChiffreConseil cle="annonces.dorment" valeur={Array.isArray(listings.items) && !listings.error ? annStats.sleeping : undefined}/>
@@ -41831,6 +41912,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
+            mode={modeDort} onMode={setModeDort} seuilFavoris={seuilFav} onSeuilFavoris={setSeuilFav} nDort={vueRelancer.dort} nFavoris={vueRelancer.favoris}
+            pasLus={modeDort==='favoris' && vueRelancer.favorisPasLus>0 ? `Favoris pas lus sur ${vueRelancer.favorisPasLus} annonce${vueRelancer.favorisPasLus>1?'s':''}.` : ''}
             liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
               return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
                 vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
@@ -45839,18 +45922,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {dortAgir && (()=>{
         const a = dortAgir, it = a.it, e = numeros[it.id] || {};
         const versRepub = (act) => { setDortAgir(null); setRepubReprise([String(it.id)]); setRepubAction(act); };
-        const choix = [
-          { k:'prix', t:'Baisser le prix', cap:'republiermodif', go:()=>versRepub('modifier') },
-          { k:'republier', t:'Republier', cap:'recreer', go:()=>versRepub('recreer') },
+        // (9 nov., « vendre plus ») Les gestes viennent d'UNE règle (`gestesDormeuse`,
+        // src/vendrePlus.js) : chacun ouvre l'écran EXISTANT, sur SON clic, rien ne part
+        // tout seul et aucun prix n'est proposé. Republier : la paire pré-choisie dans
+        // l'atelier, c'est LUI qui lance.
+        const urlFiche = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
+        const uidIt = String((it._acc && it._acc.vinted_user_id) || '');
+        const aller = {
+          republier: ()=>versRepub('recreer'),
+          prix: ()=>versRepub('modifier'),
+          vinted: ()=>{ try { window.open(urlFiche, '_blank', 'noopener'); } catch (_) {} setDortAgir(null); },
           // ⚠️ On change d'écran AVANT de fermer la feuille : fermée d'abord, elle
           // retirait son entrée d'historique (history.back) avant que le nouvel
           // écran soit rendu, et ce retour ramenait Vinted (mesuré au banc, 1 fois sur 2).
           // Le nouvel écran démonte la feuille ; la fermeture différée ne sert qu'en secours.
-          { k:'lbc', t:'Mettre sur Leboncoin', bloque: !a.numero ? 'Mets un N° à cet article d’abord.' : '', go:()=>{
+          lbc: ()=>{
               if (!mpChoisi(e,'lbc')) updatePair(it, { mp: { ...(e.mp||{}), lbc: true } });
-              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); setTimeout(()=>setDortAgir(null), 400); } },
-          { k:'ebay', t:'Mettre sur eBay', go:()=>{ DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); setTimeout(()=>setDortAgir(null), 400); } },
-        ];
+              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); setTimeout(()=>setDortAgir(null), 400); },
+          ebay: ()=>{ DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); setTimeout(()=>setDortAgir(null), 400); },
+          vestiaire: ()=>{ DEMANDE_VC_PAIRE.id = String(it.id); DEMANDE_VC_PAIRE.at = Date.now(); onNav && onNav('vestiaire_annonces'); setTimeout(()=>setDortAgir(null), 400); },
+          // La file « Envoyer une offre aux favoris » (Messages → Favoris reçus) du compte
+          // de l'annonce : c'est LUI qui choisit et envoie.
+          favoris: ()=>{ if (uidIt && typeof setCompteSel === 'function') setCompteSel(uidIt); demanderVue('favoris'); onNav && onNav('messages'); setTimeout(()=>setDortAgir(null), 400); },
+        };
+        const choix = gestesDormeuse({ numero: a.numero, favoris: a.favoris, url: urlFiche, cap: (c)=>extSait(c), version: (c)=>EXT_CAPACITES[c] || '' })
+          .map((g)=>({ ...g, go: aller[g.k] }));
         return (
           <SheetShell onClose={()=>setDortAgir(null)} maxWidth={420}>
             <div className="vrm-qd-menu" data-qd-menu={a.id}>
@@ -45858,9 +45954,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <h2 className="vrm-qd-menu-titre">{a.numero ? `N°${a.numero} · ` : ''}{a.titre}</h2>
                 <button type="button" className="vrm-qd-fermer" aria-label="Fermer" onClick={()=>setDortAgir(null)}>✕</button>
               </div>
-              {choix.map(c=>{ const raison = c.bloque || (c.cap && extSait(c.cap)!=='ok' ? `Demande l'extension VRM ${EXT_CAPACITES[c.cap]} ou plus récente.` : ''); return (
-                <button key={c.k} type="button" className="vrm-qd-choix" data-qd-choix-geste={c.k} aria-disabled={raison?'true':undefined} title={raison||undefined}
-                  onClick={()=>{ if (raison) { toast(raison); return; } c.go(); }}>{c.t}</button>
+              {choix.map(c=>{ const raison = c.bloque || ''; return (
+                <button key={c.k} type="button" className="vrm-qd-choix" data-qd-choix-geste={c.k} aria-disabled={raison?'true':undefined} title={raison||c.sous||undefined}
+                  onClick={()=>{ if (raison) { toast(raison); return; } c.go(); }}><span className="vrm-qd-choix-t">{c.t}</span>{c.sous ? <span className="vrm-qd-sous vrm-qd-choix-sous" data-qd-choix-sous="">{c.sous}</span> : null}</button>
               ); })}
             </div>
           </SheetShell>
@@ -52012,6 +52108,7 @@ function AppCoeur() {
         <BandeauAbonnement setTab={setTab}/>
         <ApercuSansAbonnement tab={tab} setTab={setTab}/>
         <BandeauLiaison/>
+        {!baseKO && <BandeauStatut/>}
         {/* (8 nov.) Un compte qui n'arrive plus alors que l'extension travaille : la ligne ambre (src/ToutVaBien.jsx). */}
         {!baseKO && <Suspense fallback={null}><AlerteCaptureParesseuse onVoir={() => setTab('settings')}/></Suspense>}
         <BandeauConfirmationAdresse onVoir={() => { ouvrirEmailsRelier('adresses'); setTab('emails'); }}/>

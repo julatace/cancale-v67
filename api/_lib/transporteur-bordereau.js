@@ -54,3 +54,16 @@ export function transporteurDeTexteBordereau(texte) {
   const t = transporteursNommes(texte);
   return t.size === 1 ? [...t][0] : '';
 }
+
+// (9 nov.) LE N° MONDIAL RELAY ÉCRIT DANS L'E-MAIL DU BORDEREAU : 8 chiffres après
+// « N° de suivi » (cet e-mail = CETTE transaction : une identité, jamais devinée).
+// La MÊME règle à la réception (`parseBordereauEmail`) et pour les anciens
+// bordereaux (api/_lib/transporteur-anciens.js). Le premier n° écrit, comme la
+// réception. Rend { n, fin } (fin = indice juste après le n°) ou null.
+const RE_SUIVI_MR = /N[°ºo]?\s*de\s*suivi\s*:?\s*(\d{8})(?!\d)/i;
+export function suiviMondialRelayLu(texte) {
+  const s = String(texte == null ? '' : texte);
+  const m = RE_SUIVI_MR.exec(s);
+  return m ? { n: m[1], fin: m.index + m[0].length } : null;
+}
+export const suiviMondialRelayDuTexte = (texte) => { const l = suiviMondialRelayLu(texte); return l ? l.n : ''; };

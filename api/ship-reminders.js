@@ -21,6 +21,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
+import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme } from './_lib/notif-textes.js';
@@ -56,6 +57,7 @@ import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis,
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
+import { passageClientsPartis } from './_lib/clients-partis.js';
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
 import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
 import { envoyerSmtp } from './_lib/smtp.js';
@@ -63,6 +65,8 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
+// (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
+import { passeTransporteursAnciens, avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
@@ -79,6 +83,9 @@ import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.j
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+// (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
+import { passageSondes } from './_lib/statut-sondes.js';
+import { pushConfigure } from './_lib/push.js';
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
 const RELANCES_JUSQUA_MS = 60000;
@@ -240,7 +247,7 @@ async function lireDonneesBilan() {
   // (8 nov., « à envoyer » prouvé) Les bordereaux (leur n° de suivi) et les preuves de départ :
   // le bilan compte les colis à envoyer avec la règle du widget et de Colis (§11).
   const [bordsB, preuves, mailsVentes] = await Promise.all([
-    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_COLIS}`)),
+    lireBordsAvecRelus(BORD_COLIS),
     lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x))),
     // (8 nov.) Les e-mails de vente récents (scalaires `meta->>`, la requête de l'app).
     fetchPaginated(scoped(reqVentesEmail(Date.now()))),
@@ -744,8 +751,17 @@ async function traiterVendeur() {
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
   try { bilanMois = await bilanDuMoisVendeur(); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (9 nov.) Le transporteur des ANCIENS bordereaux, relu dans le texte gardé de
+  // LEUR e-mail (api/_lib/transporteur-anciens.js) : N par passage, idempotent ;
+  // une lecture ratée n'écrit rien, et un échec n'empêche aucun rappel.
+  let transporteursAnciens = null;
+  try {
+    transporteursAnciens = await passeTransporteursAnciens({
+      lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup,
+    });
+  } catch (e) { transporteursAnciens = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -935,6 +951,16 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
 const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_accounts_hidden'];
+// (9 nov.) Les bordereaux + ce qui a été RELU dans le texte de l'e-mail des anciens
+// (transporteur, n° Mondial Relay — api/_lib/transporteur-anciens.js), seulement là où
+// le bordereau n'a rien : la même fusion que le widget et l'app. Ligne illisible ⇒ rien fusionné.
+async function lireBordsAvecRelus(select) {
+  const [b, relus] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${select}`)),
+    fetchPaginated(scoped(REQ_RELUS)).catch(() => null),
+  ]);
+  return avecRelus(b, relus);
+}
 const BORD_COLIS = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
 async function lireDonneesColis() {
   const BORD = BORD_COLIS;
@@ -943,7 +969,7 @@ async function lireDonneesColis() {
     getRowProjete('main', MAIN_COLIS),
     fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt')),
     lireCommandesEbay(),
-    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
+    lireBordsAvecRelus(BORD),
     // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : leurs seules ventes (§4.4).
     getRowProjete('lbc_ventes', ['ventes']),
     getRowProjete('vc_ventes', ['ventes']),
@@ -1111,6 +1137,23 @@ async function veilleDesLenteurs(maintenant = Date.now()) {
   }));
 }
 
+// ── (9 nov.) LES SONDES DE vrm.center/statut (api/_lib/statut-sondes.js) ─────
+// `?moment=sondes` (GitHub, toutes les 10 min : .github/workflows/sondes-statut.yml),
+// et aussi au cron du matin et du soir. Une vraie connexion SMTP (aucun message)
+// une fois par heure au plus. L'incident ouvert part au PROPRIÉTAIRE seul
+// (VRM_OWNER_UID ou le propriétaire rangé en base), dans SON contexte.
+// `_bancSondes.envoyer` : le banc compte les notifications sans service de push.
+export const _bancSondes = { envoyer: null };
+async function sondesStatut(maintenant = Date.now()) {
+  const proprietaire = (await proprietaireInstallation()) || '';
+  const cfg = configurationRelances();
+  return passageSondes({
+    maintenant, proprietaire, pushPret: pushConfigure(), configSmtp: cfg,
+    smtp: () => envoyerSmtp({ seulementConnexion: true, hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE, de: process.env.RELANCES_EXPEDITEUR, a: process.env.RELANCES_EXPEDITEUR }),
+    envoyer: (notif) => (_bancSondes.envoyer ? _bancSondes.envoyer(notif, proprietaire) : contexteVendeur.run({ owner: proprietaire }, () => sendPushToAll({ ...notif, cat: 'signalement' }))),
+  });
+}
+
 // ── LES LIGNES DU PROPRIÉTAIRE NEUTRE (le curseur du cron) ─────────────────
 // Trois états : objet · `null` (absente) · `undefined` (pas su).
 async function lireNeutre(id) {
@@ -1145,8 +1188,11 @@ export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
   res.setHeader?.('Cache-Control','no-store');
   if (!secret) { res.status(503).json({ok:false,error:'cron-non-configure'});return; }
-  const auth = req.headers?.authorization || '';
-  if (auth !== `Bearer ${secret}`) { res.status(401).json({error:'clé invalide'});return; }
+  const auth = String(req.headers?.authorization || '');
+  // (9 nov., revue sécurité) Comparée en temps constant, comme la clé du script
+  // Gmail (email-inbound) : une comparaison qui s'arrête au premier écart.
+  const empreinte = (t) => crypto.createHash('sha256').update(String(t)).digest();
+  if (!crypto.timingSafeEqual(empreinte(auth), empreinte(`Bearer ${secret}`))) { res.status(401).json({error:'clé invalide'});return; }
   // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
   if (repondreSansCleService(res)) return;
 
@@ -1154,6 +1200,14 @@ export default async function handler(req, res) {
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
   // (ni URSSAF, ni bilan, ni rappel du matin).
   const moment = String((req.query && req.query.moment) || '');
+  // (9 nov.) `?moment=sondes` : les sondes de /statut, RIEN d'autre (aucun vendeur).
+  // État pas lu ou pas écrit ⇒ 503 (le workflow GitHub échoue : GitHub prévient).
+  if (moment === 'sondes') {
+    let s = null;
+    try { s = await sondesStatut(); } catch (e) { s = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(s && s.fait ? 200 : 503).json({ ok: !!(s && s.fait), moment: 'sondes', sondes: s });
+    return;
+  }
   const soir = moment === 'soir';
   const reveil = moment === 'reveil';
   const debutCron = Date.now();
@@ -1179,6 +1233,9 @@ export default async function handler(req, res) {
     //    fait échouer ni les autres ni les rappels (elle est dite dans la réponse).
     // (5 nov.) Les e-mails de l'essai gratuit (api/_lib/relances-essai.js). Sans
     // envoi configuré elle ne fait rien (et le dit dans la réponse).
+    // (9 nov.) Les sondes de /statut, aussi au matin et au soir (si GitHub ne passe pas).
+    let sondes = null;
+    if (!reveil) { try { sondes = await sondesStatut(debutCron); } catch (e) { sondes = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
@@ -1210,6 +1267,11 @@ export default async function handler(req, res) {
     // éclats compris) : lecture projetée, une lecture ratée ne supprime rien.
     let purgeMesures = null;
     if (!soir && !reveil) { try { purgeMesures = await purgerMesuresAnciennes({ url: SUPABASE_URL, headers: HEADERS, proprietaire: await proprietaireInstallation(), maintenant: debutCron }); } catch (e) { purgeMesures = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (9 nov.) Les clients partis (api/_lib/clients-partis.js) : avis à 11 mois après
+    // la fin de l'abonnement, suppression à 12 (la fonction de « Supprimer mon compte »),
+    // bornés par passage ; une lecture ratée ne fait rien (dit dans la réponse).
+    let clientsPartis = null;
+    if (!soir && !reveil) { try { clientsPartis = await passageClientsPartis({ maintenant: debutCron }); } catch (e) { clientsPartis = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
 
     // ── LES VENDEURS, PAR LOTS (api/_lib/cron-lots.js) ─────────────────────────
     //    UNE passe PAR vendeur, chacun dans SON contexte (AsyncLocalStorage : deux
@@ -1231,7 +1293,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
