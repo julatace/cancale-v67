@@ -61,7 +61,7 @@ import { SqueletteChargement } from "./Chargement.jsx";
 import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.jsx';
 // (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
-import { capturerJournee, ecrireInstantane, lireInstantane } from './journeeInstantanee.js';
+import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -49476,6 +49476,9 @@ function CaptureJournee({ uid }) {
     const prendre = () => {
       t = null; if (mort) return;
       const r = racine(); if (!r) return;
+      // Sans abonnement, l'écran est un APERÇU flouté (src/abonnement/apercu.js) : rien n'est rangé, et ce
+      // qui l'était part (un instantané ne rendra jamais lisible ce que l'aperçu floute).
+      if (r.closest('[data-apercu]')) { effacerInstantanes(); return; }
       const snap = capturerJournee(r, { uid, maintenant: Date.now(), largeur: window.innerWidth || 0 });
       if (snap) ecrireInstantane(snap);
     };
@@ -52144,7 +52147,8 @@ function AppCoeur() {
   // Base injoignable : aucun instantané (l'écran dit la panne, jamais des chiffres d'avant).
   const uidInstantane = (authState.user && authState.user.id) || '';
   const snapJournee = React.useMemo(() => (tab === 'journee' && uidInstantane ? lireInstantane(uidInstantane) : null), [tab, uidInstantane]);
-  const instantaneJournee = tab === 'journee' && snapJournee && !baseKO
+  // Sans abonnement (aperçu flouté) : jamais d'instantané lisible.
+  const instantaneJournee = tab === 'journee' && snapJournee && !baseKO && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })()
     ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/> : null;
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
