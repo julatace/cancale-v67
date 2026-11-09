@@ -280,7 +280,8 @@ export async function calculerPilotage({ proprio, env = process.env, fetcher = f
     lireComptes(env, fetcher),
     lireTout(env, fetcher, `app_data?id=eq.${ID_VU}&${pasMoi}&select=owner,jour:data->>jour`),
     lireTout(env, fetcher, `app_data?id=like.ext_appareil_*&${pasMoi}&select=owner,at:meta->>at`),
-    lireTout(env, fetcher, `abonnements?${pasMoi}&select=owner,statut,annule_fin_periode,client_stripe,maj`),
+    // Toutes les lignes : celles du propriétaire servent à écarter SES abonnements Stripe.
+    lireTout(env, fetcher, `abonnements?select=owner,statut,annule_fin_periode,client_stripe,maj`),
     lireTout(env, fetcher, `essais_gratuits?select=owner,cree`),
     lireTout(env, fetcher, `app_data?id=eq.${ID_SATISFACTION}&${pasMoi}&select=note:data->reponse->>note,mot:data->reponse->>mot,at:data->reponse->>at`),
     lireTout(env, fetcher, `app_data?owner=eq.${NEUTRE}&id=eq.${ID_STATUT}&select=data&limit=1`),
