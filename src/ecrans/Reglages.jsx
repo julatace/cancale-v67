@@ -1165,7 +1165,9 @@ async function sourcesExportDonnees() {
   };
 }
 async function exporterMesDonnees() {
-  if (lectureSeuleActive()) { toast(EXPORT_FERME); return; }
+  // (9 nov., Julien) Sans abonnement, l'export de SES données reste ouvert (RGPD, portabilité,
+  // art. 20) : il ne sert pas à utiliser VRM, seulement à repartir avec ses données. La
+  // « Sauvegarde complète » (restaurer VRM) reste, elle, fermée sans abonnement.
   try {
     const src = await sourcesExportDonnees();
     const zip = zipStocke(fichiersExport(feuillesExport(src)));

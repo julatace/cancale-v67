@@ -10,7 +10,7 @@ require('./_porte-banc.cjs');
 //      3 premières lignes de chaque liste NETTES, la 4e et la suite FLOUTÉES,
 //      `inert` et `aria-hidden`, ni sélectionnables ; une carte nette « Ton
 //      abonnement a pris fin » ; tout clic dans l'écran est arrêté ; AUCUNE
-//      écriture n'atteint la base ; l'export est fermé ;
+//      écriture n’atteint la base ; la sauvegarde complète est fermée (l’export de ses données reste ouvert) ;
 //    · expiré sans la 027 : l'ancienne porte (jamais une app vide) ;
 //    · actif · résilié · impayé · Stripe absent : chacun son état, aucun
 //      bouton qui mènerait nulle part quand Stripe n'est pas branché ;

@@ -81,7 +81,7 @@ export function mailAvis({ quand }) {
     paras: [
       `Ton abonnement VRM s’est terminé il y a 11 mois. Comme le dit notre politique de confidentialité, VRM garde tes données 12 mois après la fin de l’abonnement, puis les efface.`,
       `Le ${quand}, ton compte et tes données (ventes, annonces, numéros, compta, réglages) seront supprimés. Les factures Pro que tu as émises seront gardées 10 ans, sans accès, comme la loi l’exige.`,
-      `Pour les garder : reviens sur VRM et reprends l’abonnement — tu pourras continuer, ou exporter tes données (Mon compte → Tes données → Exporter mes données).`,
+      `Pour les garder : exporte-les gratuitement (Mon compte → Tes données → Exporter mes données), ou reprends l’abonnement pour continuer avec VRM.`,
     ],
     bouton: { mot: 'Ouvrir mon compte VRM', url: LIEN_COMPTE },
     pied: { texte: 'Tu reçois ce message parce que tu as eu un abonnement VRM. C’est le seul rappel avant la suppression.' },
