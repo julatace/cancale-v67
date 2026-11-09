@@ -11574,8 +11574,8 @@ const confirmerNumerosAVerifier = async (numeros) => {
     const pasEcrit = vivantes.filter((f) => f && cles.has(cleNum(f.numero)) && reattribueAEcrire(f));
     if (pasEcrit.length) {
       const ok = await askConfirm({
-        title: `As-tu écrit le N°${pasEcrit[0].numero} sur le carton ?`,
-        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'un article'}`).join('\n')}\n\n${pasEcrit.every((f) => f.reattribue.main) ? 'Tu as changé ce numéro' : pasEcrit.some((f) => f.reattribue.main) ? 'Ces numéros ont changé (à la main ou doublon réglé)' : 'Cet article a reçu un numéro neuf (doublon réglé)'}. Son carton porte peut-être encore l'ancien.`,
+        title: `As-tu écrit le N°${pasEcrit[0].numero} là où l’article est rangé ?`,
+        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'un article'}`).join('\n')}\n\n${pasEcrit.every((f) => f.reattribue.main) ? 'Tu as changé ce numéro' : pasEcrit.some((f) => f.reattribue.main) ? 'Ces numéros ont changé (à la main ou doublon réglé)' : 'Cet article a reçu un numéro neuf (doublon réglé)'}. Là où il est rangé (carton, étagère, bac…), c'est peut-être encore l'ancien qui est écrit.`,
         ok: 'Oui, c\'est écrit', cancel: 'Annuler',
       });
       if (!ok) return false;
@@ -17083,7 +17083,7 @@ function BlocInventaireHorsLigne({ uid, ouvrirAuto = false }) {
     <div data-hl-inventaire="liste" data-hl-inventaire-at={new Date(figee.at).toISOString()} style={{...carte,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
       <div style={{flex:1,minWidth:180}}>
         <div style={{fontSize:15,fontWeight:700,color:C.text}}>Inventaire</div>
-        <div style={{fontSize:13,color:C.muted,marginTop:2,lineHeight:1.45}}>Fais le tour de tes cartons sans réseau : {nA} paire{nA > 1 ? 's' : ''} attendue{nA > 1 ? 's' : ''} selon la liste du {quandEtat(figee.at)}.</div>
+        <div style={{fontSize:13,color:C.muted,marginTop:2,lineHeight:1.45}}>Fais le tour de tes rangements sans réseau : {nA} paire{nA > 1 ? 's' : ''} attendue{nA > 1 ? 's' : ''} selon la liste du {quandEtat(figee.at)}.</div>
       </div>
       <Bouton variante="secondaire" data-hl-inventaire-ouvrir="" onClick={() => setOuvert(true)} style={{minHeight:44}}>Faire l’inventaire</Bouton>
     </div>
@@ -21271,7 +21271,7 @@ async function relierVc({ productId, item, numVinted, titre }) {
   const r = poserLienVc({ liens, productId, item, numeroVinted: numVinted, numeroVc: numVc, cleNum });
   if (r.refus) { toast(REFUS_LIEN_VC[r.refus] || 'Rien n’est relié'); return false; }
   const de = r.liens[String(productId)].de;
-  const ok = await askConfirm({ title: `Un seul N° : N°${numVinted}`, desc: [titre ? `« ${String(titre).slice(0, 60)} »` : '', de ? `N°${de} → N°${numVinted} sur le carton.` : ''].filter(Boolean).join('\n'), ok: 'Relier', cancel: 'Annuler' });
+  const ok = await askConfirm({ title: `Un seul N° : N°${numVinted}`, desc: [titre ? `« ${String(titre).slice(0, 60)} »` : '', de ? `N°${de} → N°${numVinted} là où l’article est rangé.` : ''].filter(Boolean).join('\n'), ok: 'Relier', cancel: 'Annuler' });
   if (!ok) return false;
   vcPoser('vrm_vc_liens', poserLienVc({ liens: vcCarte('vrm_vc_liens'), productId, item, numeroVinted: numVinted, numeroVc: numVc, cleNum }).liens || vcCarte('vrm_vc_liens'));
   toast(de ? `Relié · N°${numVinted} · barre le N°${de}` : `Relié · N°${numVinted}`);
@@ -23921,7 +23921,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               {aRanger.slice(0, 60).map(p => {
                 const on = pairePrete === p.numero;
                 return (
-                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} data-paire-plateformes={(p.plateformes || []).join(' ')} data-paire-aussi={(p.aussi || []).join(' ') || undefined} title={p.aussi && p.aussi.length ? `Même photo que N°${p.aussi.join(', N°')} : c'est un seul article — range le carton sous le numéro écrit dessus.` : undefined} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
+                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} data-paire-plateformes={(p.plateformes || []).join(' ')} data-paire-aussi={(p.aussi || []).join(' ') || undefined} title={p.aussi && p.aussi.length ? `Même photo que N°${p.aussi.join(', N°')} : c'est un seul article — range-le sous le numéro écrit dessus.` : undefined} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
                     style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px 5px 5px', borderRadius: 999, border: `1px solid ${on ? C.text : C.border}`, background: on ? `${C.text}10` : C.bg, color: C.text, cursor: 'grab', fontFamily: 'inherit', touchAction: 'pan-x', userSelect: 'none' }}>
                     {p.photo ? <PhotoVinted src={p.photo} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: 'cover', background: C.card2 }}/> : <span style={{ width: 28, height: 28, borderRadius: 999, background: C.card2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={14} style={{ color: C.muted }}/></span>}
                     <span style={{ fontSize: 13, fontWeight: 600 }}>N°{p.numero}{p.aussi && p.aussi.length ? <span style={{ fontWeight: 500, color: C.muted }}> · N°{p.aussi.join(' · N°')}</span> : null}</span>
@@ -31607,7 +31607,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (9 nov.) « C'est la même paire » déjà dit (remise en ligne) : pas redemandé.
       const meme = opts.memePaire ? true : await askConfirm({
         title: `Le N°${n} a déjà servi`,
-        desc: `Ce numéro a déjà été donné à un article (il est peut-être écrit sur un carton).\n\nEst-ce bien le MÊME article qui revient ? Sinon, prends un numéro neuf.`,
+        desc: `Ce numéro a déjà été donné à un article (il est peut-être écrit là où un article est rangé : carton, étagère, bac…).\n\nEst-ce bien le MÊME article qui revient ? Sinon, prends un numéro neuf.`,
         ok: 'Oui, le même article', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
@@ -32284,7 +32284,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       recordUsed(neuf);
       faits.push(`N°${x.ancien} → N°${neuf}`);
     }
-    if (faits.length) toast(`Numéros en double réglés : ${faits.join(' · ')} — écris le nouveau sur le carton`);
+    if (faits.length) toast(`Numéros en double réglés : ${faits.join(' · ')} — écris le nouveau là où l’article est rangé`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudReady, conflitsNum, listings.items, listings.loading, listings.incomplet, sales.items, sales.failedUids]);
   // (23 oct.) Le bloc des paires MASQUÉES par Vinted : dans « Conseils &
@@ -32335,7 +32335,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // barre ambre à gauche ; le titre et son « ⓘ » (le geste détaillé), la liste. Le geste
     // en une ligne reste sous le titre — « barre l'ancien, écris le nouveau ».
     <div data-numeros-a-ecrire={aEcrireCarton.length} className="vrm-carte-alerte" style={{ background: C.card, borderRadius: 14, padding: '12px 16px 4px' }}>
-      <div className="vrm-alerte-tete"><span aria-hidden="true" className="vrm-alerte-icone"><Icon name="pencil" size={15}/></span><span className="vrm-alerte-ligne-texte"><span className="vrm-alerte-ligne-titre">{/* (6 nov., v36-visuel-2) Le titre tient sur UNE ligne au téléphone (« ⓘ » compris) : le geste est dessous. */}{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux N° pour tes cartons` : 'Nouveau N° pour un carton'}{' '}<Pourquoi label="Écrire le nouveau numéro" titre="Le nouveau numéro">{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</Pourquoi></span>
+      <div className="vrm-alerte-tete"><span aria-hidden="true" className="vrm-alerte-icone"><Icon name="pencil" size={15}/></span><span className="vrm-alerte-ligne-texte"><span className="vrm-alerte-ligne-titre">{/* (6 nov., v36-visuel-2) Le titre tient sur UNE ligne au téléphone (« ⓘ » compris) : le geste est dessous. */}{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux N° à écrire` : 'Nouveau N° à écrire'}{' '}<Pourquoi label="Écrire le nouveau numéro" titre="Le nouveau numéro">{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si l’ancien numéro est encore écrit là où l’article est rangé, barre-le et écris le nouveau.' : 'Barre l’ancien numéro là où l’article est rangé (carton, étagère, bac…) et écris le nouveau.'} L'ancien ne sera jamais redonné.</Pourquoi></span>
       <span className="vrm-alerte-ligne-sous">Barre l’ancien, écris le nouveau.</span></span></div>
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero, f.reattribue.de, it.title); return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} data-a-ecrire-main={f.reattribue.main ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
@@ -32378,7 +32378,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocNouveaux = () => numerosNeufs.length > 0 && (
     <div className="vrm-ann-neufs" data-num-neufs={numerosNeufs.length}>
       <div className="vrm-ann-neufs-tete">{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
-      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui de ton carton, par exemple). Le prix d'achat est facultatif : tu peux le mettre plus tard.</div>
+      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui que tu as déjà écrit sur ton rangement, par exemple). Le prix d'achat est facultatif : tu peux le mettre plus tard.</div>
       {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {};
         // (6 nov.) LE PRIX D'ACHAT AU MÊME GESTE (src/prixAuNumerotage.js) : un champ vide,
         // jamais pré-rempli ; une suggestion d'achat est PROPOSÉE à côté (« Relier · 32 € »),
@@ -32893,7 +32893,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!r.ok) return;
     let num = r.num;
     if (r.conflit) {
-      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Un autre article présent porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
+      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Un autre article présent porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux articles là où ils sont rangés : VRM ne choisit pas à ta place.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
       if (!ok) return;
       num = null;
     }
@@ -32914,7 +32914,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     let num = r.num;
     if (r.conflit) {
-      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Un autre article présent porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
+      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Un autre article présent porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux articles là où ils sont rangés : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
       if (!ok) return;
       num = null;
     } else {
@@ -34766,7 +34766,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!numeroReprenable(l.lu)) { toast(`N°${l.lu} est un ancien numéro : il ne se redonne pas.`); return; }
       updatePair(it, { numero: l.lu, auto: false, manuelAt: now, ecrit: l.lecture && l.lecture.source, ecritAt: now, ecritRefuse: null, reattribue: { de: l.connu, vers: l.lu, at: now } });
       recordUsed(l.lu);
-      toast(`« ${it.title} » → N°${l.lu} · écris-le sur son carton`);
+      toast(`« ${it.title} » → N°${l.lu} · écris-le là où il est rangé`);
     } else {
       updatePair(it, { ecritRefuse: l.lu });
       toast(`« ${it.title} » garde le N°${l.connu}. Corrige son annonce pour qu'elle dise « N° ${l.connu} ».`);
@@ -34810,7 +34810,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return (
       <div data-remise-bloc={remises.length} style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px'}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>{remises.length > 1 ? `${remises.length} annonces remises en ligne ?` : 'Une annonce remise en ligne ?'}</div>
-        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.5}}>Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire sur le carton.</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.5}}>Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire là où elle est rangée.</div>
         {remises.slice(0, 20).map((r) => (
           <div key={r.nouvelle} data-remise-ligne={r.nouvelle} data-remise-force={r.options[0].force} style={{padding:'9px 0',borderTop:`1px solid ${C.border}`,marginTop:6}}>
             <div style={{fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || 'Nouvelle annonce'}</div>

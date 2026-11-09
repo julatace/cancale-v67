@@ -191,7 +191,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre de la paire" aria-label="Chercher une paire"
               style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 15, background: C.card, color: C.text, marginBottom: 8, fontFamily: 'inherit' }} />
             {!(paires || []).length ? (
-              <div style={{ fontSize: 13, color: C.muted }}>Aucune paire numérotée chez toi pour l’instant : le studio range les photos sous le numéro du carton.</div>
+              <div style={{ fontSize: 13, color: C.muted }}>Aucune paire numérotée chez toi pour l’instant : le studio range les photos sous le numéro de rangement.</div>
             ) : liste.map((p) => (
               <button key={p.cle} type="button" data-studio-paire={p.cle} onClick={() => { setSel(p); setMode('choix'); setMsg(''); }}
                 style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', textAlign: 'left', border: 'none', borderBottom: `1px solid ${C.border}`, background: 'transparent', padding: '10px 4px', cursor: 'pointer', fontFamily: 'inherit', color: C.text }}>

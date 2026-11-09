@@ -3480,7 +3480,7 @@ function NumeroEcritSetting({ onAnnonces }) {
         </div>}
       </div>
       <GuideReglage titre="Numéroter dans tes annonces" etapes={[
-        ['Écris le numéro sur la boîte', 'Sur le carton, comme d’habitude.'],
+        ['Écris le numéro là où tu ranges l’article', 'Sur le carton, l’étagère ou le bac, comme d’habitude.'],
         ['Écris-le à la fin de la description', '« N° 123 » sur la dernière ligne. Sur Leboncoin, la référence pro marche aussi ; sur eBay, le SKU.'],
         ['Ouvre tes annonces dans VRM', 'Il lit le numéro et le range avec la paire. Si un numéro ne colle pas, il te demande.'],
       ]}/>
@@ -3698,8 +3698,8 @@ function NumeroSurVinted() {
         </div>)}
       <GuideReglage titre="Bien placer ton N°" etapes={[
         ['Pense au moment où tu le cherches', 'Une vente tombe : tu lis la liste (le titre) ou tu ouvres l’annonce (la description). Mets le N° là où ton œil va en premier.'],
-        ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… La même partout : tu la repères d’un coup d’œil, et elle ne change jamais le numéro écrit sur ton carton.'],
-        ['Si tu changes un N°', 'Dans les textes que VRM te prépare, l’ancienne étiquette est remplacée, jamais empilée. Sur une annonce déjà en ligne, c’est à toi de la changer : VRM te dit quoi remplacer. L’ancien numéro passe dans « numéros à écrire sur tes cartons » jusqu’à « C’est écrit ».'],
+        ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… La même partout : tu la repères d’un coup d’œil, et elle ne change jamais le numéro écrit là où l’article est rangé.'],
+        ['Si tu changes un N°', 'Dans les textes que VRM te prépare, l’ancienne étiquette est remplacée, jamais empilée. Sur une annonce déjà en ligne, c’est à toi de la changer : VRM te dit quoi remplacer. L’ancien numéro passe dans « Nouveaux N° à écrire » jusqu’à « C’est écrit ».'],
       ]}/>
     </section>
   );

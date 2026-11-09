@@ -22,7 +22,7 @@ export function Numero({ n, taille = 'normal', etat, prefixe = true, titre, clas
   const txt = String(n).trim();
   if (!txt) return null;
   const e = etat === 'doublon' || etat === 'aVerifier' ? etat : null;
-  const nomLu = titre || `Numéro ${txt}${e === 'doublon' ? ', porté par deux articles' : e === 'aVerifier' ? ', à vérifier sur le carton' : ''}`;
+  const nomLu = titre || `Numéro ${txt}${e === 'doublon' ? ', porté par deux articles' : e === 'aVerifier' ? ', à vérifier là où l’article est rangé' : ''}`;
   return (
     <span className={`vrm-num vrm-num-${taille === 'petit' || taille === 'grand' ? taille : 'normal'}${className ? ' ' + className : ''}`}
       data-num={txt} data-num-etat={e || undefined} title={titre} role="img" aria-label={nomLu} {...rest}>
