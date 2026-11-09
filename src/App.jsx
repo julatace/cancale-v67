@@ -4,7 +4,7 @@ import './stylesApp.js';
 import ChampSaisie from './composants/ChampSaisie.jsx';
 import ChoixPlateformes from './ChoixPlateformes.jsx';
 import ConfigurationDepart from './ConfigurationDepart.jsx';
-import { CLE_CONFIGURATION, CLE_METHODE_NUMERO, lireConfiguration, configurationAOuvrir } from './configurationDepart.js';
+import { CLE_CONFIGURATION, lireConfiguration, configurationAOuvrir } from './configurationDepart.js';
 import { CLE_SOCIETE_TVA, cotisationsUrssaf, profilFiscal, rappelDac7Journee } from './profilFiscal.js';
 import { dac7ParPlateforme } from './seuilsAnnee.js';
 import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './plateformesAffichage.js';
@@ -2394,9 +2394,9 @@ const SYNC_KEYS = [
   // (8 nov.) Affichage Simple / Complet et « Je vends : Sneakers / Autre » (src/profilVendeur.js) : { choix, at }.
   'vrm_affichage','vrm_je_vends',CLE_PLATEFORMES,
   // (9 nov.) La configuration de départ (src/configurationDepart.js) : { etat: 'fait'|'plusTard', at,
-  // statut: 'inconnu'|null } ; la TVA d'une société (src/profilFiscal.js) ; la méthode d'étiquetage
-  // (`vrm_methode_numero`, clé à confirmer avec la branche claude/numero-etiquette).
-  CLE_CONFIGURATION, CLE_SOCIETE_TVA, CLE_METHODE_NUMERO,
+  // statut: 'inconnu'|null } ; la TVA d'une société (src/profilFiscal.js). La méthode d'étiquetage
+  // est `vrm_numero_ecrit` (actif + `ou`, src/numeroEcrit.js), déjà synchronisée.
+  CLE_CONFIGURATION, CLE_SOCIETE_TVA,
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
@@ -18317,7 +18317,7 @@ function ConfigurationDepartApp({ onFin }) {
   const lus = React.useMemo(() => ({
     jeVends: load(CLE_JE_VENDS, null), plateformes: load(CLE_PLATEFORMES, null), regime: load('vinted_regime', null),
     microOptions: load('vrm_micro_options', null), rythme: load('vinted_urssaf_freq', null), tauxBrut: load('vinted_urssaf_taux', null),
-    societeTva: load(CLE_SOCIETE_TVA, null), numeroEcrit: load(CLE_NUMERO_ECRIT, null), methodeNumero: load(CLE_METHODE_NUMERO, null),
+    societeTva: load(CLE_SOCIETE_TVA, null), numeroEcrit: load(CLE_NUMERO_ECRIT, null),
     affichage: load(CLE_AFFICHAGE, null), configuration: load(CLE_CONFIGURATION, null),
   }), []);
   const ecrire = React.useCallback((liste) => Promise.all((liste || []).map((w) => w.ligne

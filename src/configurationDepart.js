@@ -14,29 +14,24 @@
 // sans réponse n'écrit rien. Le statut n'est jamais deviné (« Je ne sais pas
 // encore » garde `null`). La méthode d'étiquetage ne renumérote RIEN : elle ne
 // touche ni `vinted_annonce_numeros` ni le pool, seulement le réglage
-// `vrm_numero_ecrit` (VRM donne-t-il un N° à une annonce sans numéro ?) et la
-// méthode choisie.
+// `vrm_numero_ecrit` (VRM donne-t-il un N° à une annonce sans numéro ?).
 //
-// ⚠️ LA MÉTHODE D'ÉTIQUETAGE — CLÉ À CONFIRMER : la branche parallèle
-// `claude/numero-etiquette` crée le réglage « Où est ton numéro ? ». Elle n'était
-// pas sur `main` le 9 nov. ; la clé retenue ici est `vrm_methode_numero`
-// `{ methode: 'vrm' | 'description' | 'titre' | 'reference', at }` (le nom donné
-// par la demande). À la fusion : si l'autre branche range autrement, changer
-// `CLE_METHODE_NUMERO` et `lireMethodeNumero` ICI seulement (l'écran et l'audit
-// passent par eux). Le réglage `vrm_numero_ecrit` (7 nov.), lui, est déjà la règle
-// des quatre sites : « VRM numérote » ⇒ éteint ; les trois autres ⇒ allumé.
+// LA MÉTHODE D'ÉTIQUETAGE = LE RÉGLAGE DE `claude/numero-etiquette` (fusionné sur
+// main le 9 nov., extension 5.334) : `vrm_numero_ecrit` `{ actif, depuis, ou }`,
+// `ou` ⊂ ['description', 'titre', 'ref'] (src/numeroEcrit.js, `OU_NUMERO`, jamais
+// vide). « VRM numérote » ⇒ `actif: false` (les sources gardées telles quelles) ;
+// « Je numérote moi-même » ⇒ `actif: true` et les endroits cochés. Aucune clé à part.
 //
 // JS pur, sans React ni lecture : `scripts/audit-configuration-depart.cjs` l'exécute.
 
 import { IDS_PLATEFORMES } from './plateformes.js';
 import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './plateformesAffichage.js';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends } from './profilVendeur.js';
-import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit } from './numeroEcrit.js';
+import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, OU_NUMERO, NOM_OU } from './numeroEcrit.js';
 import { FAMILLES as FAMILLES_NOTIF, familleActive } from '../api/_lib/notif-textes.js';
 import { CLE_REGIME, CLE_MICRO_OPTIONS, CLE_RYTHME, CLE_TAUX, CLE_SOCIETE_TVA, regimeLu, tauxMicro, tauxEstOfficiel, activiteMicro } from './profilFiscal.js';
 
 export const CLE_CONFIGURATION = 'vrm_configuration';
-export const CLE_METHODE_NUMERO = 'vrm_methode_numero';
 export const VERSION_CONFIGURATION = 1;
 
 // ── LES ÉTAPES ───────────────────────────────────────────────────────────────
@@ -86,16 +81,16 @@ export const CHOIX_TVA_SOCIETE = [
 ];
 export const CHOIX_NUMERO = [
   { v: 'vrm', titre: 'VRM numérote', sous: 'Chaque annonce reçoit un numéro ; tu l’écris sur le carton.' },
-  { v: 'description', titre: 'À la fin de la description', sous: 'Tu écris « N° 123 » en bas de l’annonce ; VRM le lit.' },
-  { v: 'titre', titre: 'Dans le titre', sous: 'Tu écris « #123 » dans le titre ; VRM le lit.' },
-  { v: 'reference', titre: 'Dans le champ référence', sous: 'SKU eBay, référence Leboncoin : VRM le lit.' },
+  { v: 'moi', titre: 'Je numérote moi-même', sous: 'Tu écris le numéro dans l’annonce ; VRM le lit là où tu le mets.' },
 ];
+// Les endroits où il l'écrit (plusieurs possibles, jamais aucun) : ceux de src/numeroEcrit.js.
+const SOUS_OU = { description: 'Tu écris « N° 123 » en bas de l’annonce.', titre: 'Tu écris « #123 » dans le titre.', ref: 'SKU eBay, référence Leboncoin.' };
+export const CHOIX_OU = OU_NUMERO.map((v) => ({ v, titre: NOM_OU[v], sous: SOUS_OU[v] || '' }));
 export const CHOIX_AFFICHAGE = [
   { v: 'simple', titre: 'Simple', sous: 'L’essentiel : ce qui sert aujourd’hui. Le reste revient d’un geste.' },
   { v: 'complet', titre: 'Complet', sous: 'Tous les écrans et tous les outils.' },
   { v: 'auto', titre: 'Automatique', sous: 'VRM choisit selon ton nombre de comptes et de ventes.' },
 ];
-export const METHODES_NUMERO = CHOIX_NUMERO.map((c) => c.v);
 
 // ── LIRE CE QUI EST DÉJÀ ENREGISTRÉ ──────────────────────────────────────────
 export function lireConfiguration(brut) {
@@ -105,14 +100,10 @@ export function lireConfiguration(brut) {
   if (!etat) return null;
   return { etat, at: typeof o.at === 'string' ? o.at : null, statut: o.statut === 'inconnu' ? 'inconnu' : null, version: Number(o.version) || 0 };
 }
-export function lireMethodeNumero(brut) {
-  const o = brut && typeof brut === 'object' ? brut : null;
-  return o && METHODES_NUMERO.includes(o.methode) ? o.methode : null;
-}
 
 // `lus` : ce que l'app a lu, TEL QUEL (valeurs brutes des clés) :
 //   jeVends, plateformes, relies, regime, microOptions, rythme, tauxBrut, societeTva,
-//   numeroEcrit, methodeNumero, affichage, configuration, pushPrefs (undefined · null · objet).
+//   numeroEcrit, affichage, configuration, pushPrefs (undefined · null · objet).
 // Rend les choix PRÉ-SÉLECTIONNÉS : une réponse jamais donnée reste `null`.
 export function choixInitiaux(lus = {}) {
   const jv = lireReglageJeVends(lus.jeVends).choix;
@@ -129,7 +120,6 @@ export function choixInitiaux(lus = {}) {
   const ne = lireReglageNumeroEcrit(lus.numeroEcrit);
   const neBrut = lus.numeroEcrit && typeof lus.numeroEcrit === 'object' ? lus.numeroEcrit : null;
   const dejaChoisiNum = !!(neBrut && (typeof neBrut.depuis === 'string' || typeof neBrut.choisi === 'string'));
-  const meth = lireMethodeNumero(lus.methodeNumero);
   const aff = lireReglageAffichage(lus.affichage).choix;
   return {
     vends: jv === 'sneakers' || jv === 'autre' ? jv : null,
@@ -140,10 +130,10 @@ export function choixInitiaux(lus = {}) {
     liberatoire: mo.liberatoire === 'oui' || mo.liberatoire === 'non' ? mo.liberatoire : null,
     acre: mo.acre === 'apres' ? 'apres' : (mo.acre === true || mo.acre === 'avant') ? 'avant' : (mo.at ? 'non' : null),
     tvaSociete: regime === 'marge' ? 'marge' : (ts === 'franchise' || ts === 'normale' ? ts : null),
-    // La méthode : celle choisie ; sinon « VRM numérote » si le réglage a été
-    // posé éteint, rien si VRM ne sait pas (allumé sans méthode : l'écran le dit).
-    numero: meth || (ne.actif ? null : (dejaChoisiNum ? 'vrm' : null)),
-    numeroEcritActif: ne.actif,
+    // Allumé ⇒ « je numérote » (et ses endroits) ; éteint ET choisi ⇒ « VRM numérote » ;
+    // jamais choisi ⇒ rien de coché. Les endroits : ceux du réglage (tous, par défaut).
+    numero: ne.actif ? 'moi' : (dejaChoisiNum ? 'vrm' : null),
+    numeroOu: ne.ou.slice(),
     affichage: aff === 'simple' || aff === 'complet' ? aff : (lus.affichage && typeof lus.affichage === 'object' && lus.affichage.choix === 'auto' ? 'auto' : null),
     familles: famillesDe(lus.pushPrefs),
   };
@@ -213,15 +203,21 @@ export function ecrituresEtape(cle, choix, initial, lus = {}, at = new Date().to
       out.push({ cle: CLE_SOCIETE_TVA, valeur: { choix: c.tvaSociete, at } });
     }
   } else if (cle === 'numero') {
-    if (!c.numero || c.numero === i.numero) return out;
-    const actif = c.numero !== 'vrm';
-    // `vrm_numero_ecrit` seulement s'il CHANGE (allumé ⇄ éteint) ou n'a jamais été choisi :
-    // la date `depuis` d'un réglage déjà allumé est gardée telle quelle.
+    if (!c.numero) return out;
+    const actif = c.numero === 'moi';
+    const ou = OU_NUMERO.filter((k) => (c.numeroOu || []).includes(k));
+    if (actif && !ou.length) return out;                       // jamais zéro endroit
+    // `vrm_numero_ecrit` seulement s'il CHANGE (allumé ⇄ éteint, endroits) ou n'a jamais été
+    // choisi. La date `depuis` ne bouge que si allumé/éteint change ; le reste est gardé.
     const ne = lireReglageNumeroEcrit(lus.numeroEcrit);
     const neBrut = lus.numeroEcrit && typeof lus.numeroEcrit === 'object' ? lus.numeroEcrit : null;
     const jamais = !(neBrut && (typeof neBrut.depuis === 'string' || typeof neBrut.choisi === 'string'));
-    if (ne.actif !== actif || jamais) out.push({ cle: CLE_NUMERO_ECRIT, valeur: { actif, depuis: at, choisi: at } });
-    out.push({ cle: CLE_METHODE_NUMERO, valeur: { methode: c.numero, at } });
+    const ouChange = actif && ou.join() !== ne.ou.join();
+    if (ne.actif !== actif || ouChange || jamais) {
+      out.push({ cle: CLE_NUMERO_ECRIT, valeur: { ...(neBrut || {}), actif,
+        depuis: ne.actif !== actif || !ne.depuis ? at : ne.depuis, choisi: (neBrut && neBrut.choisi) || at,
+        ...(actif ? { ou } : {}) } });
+    }
   } else if (cle === 'affichage') {
     if (c.affichage && c.affichage !== i.affichage) out.push({ cle: CLE_AFFICHAGE, valeur: { choix: c.affichage, at } });
   } else if (cle === 'notifs') {
@@ -276,7 +272,7 @@ export function recapConfiguration(choix, { nomsPlateformes = {}, famillesNotif 
     L.push({ etape: 'micro', titre: 'Tes cotisations', valeur: `${String(tauxMicro({ activite: c.statut === 'micro-services' ? 'services' : 'vente', liberatoire: lib, acre })).replace('.', ',')} % · ${c.rythme === 'mensuel' ? 'chaque mois' : c.rythme === 'trimestriel' ? 'chaque trimestre' : 'rythme à choisir'}` });
   }
   if (c.statut === 'societe') L.push({ etape: 'societe', titre: 'Ta TVA', valeur: nomDe(CHOIX_TVA_SOCIETE, c.tvaSociete) });
-  L.push({ etape: 'numero', titre: 'Ton numéro', valeur: nomDe(CHOIX_NUMERO, c.numero) || (c.numeroEcritActif ? 'Tu numérotes toi-même' : null) });
+  L.push({ etape: 'numero', titre: 'Ton numéro', valeur: c.numero === 'moi' ? `Tu numérotes : ${(c.numeroOu || []).map((k) => NOM_OU[k].replace(/^À la fin de la /, 'fin de la ').replace(/^Dans le champ « référence » de la plateforme$/, 'champ référence').replace(/^Dans le /, '')).join(', ')}` : nomDe(CHOIX_NUMERO, c.numero) });
   L.push({ etape: 'affichage', titre: 'Affichage', valeur: nomDe(CHOIX_AFFICHAGE, c.affichage) });
   if (c.familles) {
     const on = famillesNotif.filter((f) => c.familles[f.id]).length;
@@ -290,7 +286,7 @@ export function recapConfiguration(choix, { nomsPlateformes = {}, famillesNotif 
 const CHAMP_DE = {
   [CLE_JE_VENDS]: 'jeVends', [CLE_PLATEFORMES]: 'plateformes', [CLE_REGIME]: 'regime', [CLE_MICRO_OPTIONS]: 'microOptions',
   [CLE_RYTHME]: 'rythme', [CLE_TAUX]: 'tauxBrut', [CLE_SOCIETE_TVA]: 'societeTva', [CLE_NUMERO_ECRIT]: 'numeroEcrit',
-  [CLE_METHODE_NUMERO]: 'methodeNumero', [CLE_AFFICHAGE]: 'affichage', push_prefs: 'pushPrefs', [CLE_CONFIGURATION]: 'configuration',
+  [CLE_AFFICHAGE]: 'affichage', push_prefs: 'pushPrefs', [CLE_CONFIGURATION]: 'configuration',
 };
 export function appliquerEcritures(lus, ecritures) {
   const out = { ...(lus || {}) };

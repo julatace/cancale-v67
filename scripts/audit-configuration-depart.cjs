@@ -46,6 +46,8 @@ if (process.argv.includes('--prouve')) {
     ['configurationDepart.js', 'ouverte pour le propriétaire', "  if (proprietaire !== false) return false;\n", ""],
     ['configurationDepart.js', 'ouverte à un vendeur déjà installé', "  if (lirePlateformes(plateformes)) return false;\n", ""],
     ['configurationDepart.js', 'les notifications écrites sans lecture', "if (!c.familles || !i.familles || !lus.pushPrefs || typeof lus.pushPrefs !== 'object') return out;", "if (!c.familles) return out;"],
+    ['configurationDepart.js', '« je numérote » écrit sans aucun endroit', "if (actif && !ou.length) return out;", ""],
+    ['configurationDepart.js', 'la date du réglage du N° réécrite à chaque passage', "depuis: ne.actif !== actif || !ne.depuis ? at : ne.depuis", "depuis: at"],
     ['configurationDepart.js', 'l’étape micro offerte à un particulier', "si: (c) => c.statut === 'micro-vente' || c.statut === 'micro-services' }", "si: (c) => !!c.statut }"],
   ];
   let rates = 0;
@@ -131,14 +133,15 @@ const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 
   const deja = G.choixInitiaux({
     jeVends: { choix: 'sneakers' }, plateformes: { sites: ['vinted', 'ebay'] }, relies: { leboncoin: true }, regime: 'micro',
     microOptions: { liberatoire: 'non', acre: 'apres', activite: 'services', at: 1 }, rythme: 'mensuel',
-    numeroEcrit: { actif: true, depuis: '2026-11-07T00:00:00Z' }, methodeNumero: { methode: 'titre' }, affichage: { choix: 'simple' },
+    numeroEcrit: { actif: true, depuis: '2026-11-07T00:00:00Z', ou: ['titre'] }, affichage: { choix: 'simple' },
     pushPrefs: { familles: { offres: false } },
   });
-  dit(deja.vends === 'sneakers' && deja.statut === 'micro-services' && deja.rythme === 'mensuel' && deja.liberatoire === 'non' && deja.acre === 'apres' && deja.numero === 'titre' && deja.affichage === 'simple', 'F4 un vendeur installé retrouve SES choix', deja);
+  dit(deja.vends === 'sneakers' && deja.statut === 'micro-services' && deja.rythme === 'mensuel' && deja.liberatoire === 'non' && deja.acre === 'apres' && deja.numero === 'moi' && deja.numeroOu.join() === 'titre' && deja.affichage === 'simple', 'F4 un vendeur installé retrouve SES choix', deja);
   dit(deja.plateformes.join() === 'vinted,leboncoin,ebay' && deja.familles && deja.familles.offres === false && deja.familles.ventes === true, 'F4 plateformes choisies + compte relié ; familles lues par la règle du serveur', deja);
   dit(G.choixInitiaux({ regime: 'marge' }).statut === 'societe' && G.choixInitiaux({ regime: 'marge' }).tvaSociete === 'marge', 'F4 régime de la marge ⇒ société, TVA sur la marge');
   dit(G.choixInitiaux({ regime: null, configuration: { etat: 'plusTard', statut: 'inconnu' } }).statut === 'inconnu', 'F4 « je ne sais pas encore » reste pré-sélectionné');
-  dit(G.choixInitiaux({ numeroEcrit: { actif: true, depuis: 'x' } }).numero === null && G.choixInitiaux({ numeroEcrit: { actif: false, depuis: 'x' } }).numero === 'vrm', 'F4 numéro : « je numérote » sans méthode connue ⇒ rien de coché ; éteint choisi ⇒ « VRM numérote »');
+  const nAncien = G.choixInitiaux({ numeroEcrit: { actif: true, depuis: 'x' } });
+  dit(nAncien.numero === 'moi' && nAncien.numeroOu.join() === 'description,titre,ref' && G.choixInitiaux({ numeroEcrit: { actif: false, depuis: 'x' } }).numero === 'vrm' && G.choixInitiaux({ numeroEcrit: { actif: false } }).numero === null, 'F4 numéro (`vrm_numero_ecrit`, src/numeroEcrit.js) : allumé ⇒ « je numérote » et ses endroits (tous par défaut) ; éteint choisi ⇒ « VRM numérote » ; jamais choisi ⇒ rien');
   dit(G.etapesActives(vide).map((e) => e.cle).join() === 'vends,plateformes,statut,numero,affichage,notifs,recap', 'F4 sans statut : ni étape micro ni étape TVA');
   dit(G.etapesActives({ statut: 'micro-vente' }).some((e) => e.cle === 'micro') && G.etapesActives({ statut: 'societe' }).some((e) => e.cle === 'societe') && !G.etapesActives({ statut: 'particulier' }).some((e) => e.cle === 'micro' || e.cle === 'societe'), 'F4 micro ⇒ étape URSSAF ; société ⇒ étape TVA ; particulier ⇒ aucune');
 
@@ -168,10 +171,16 @@ const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 
   dit(wsoc.length === 1 && wsoc[0].cle === 'vrm_societe_tva' && wsoc[0].valeur.choix === 'franchise', 'F5 société : la TVA choisie est rangée', wsoc);
   const wmarge = G.ecrituresEtape('societe', { statut: 'societe', tvaSociete: 'marge' }, { statut: 'societe', tvaSociete: null }, { regime: 'societe' }, AT);
   dit(wmarge.length === 1 && wmarge[0].cle === 'vinted_regime' && wmarge[0].valeur === 'marge', 'F5 TVA sur la marge ⇒ le régime de la marge (connu de toute l’app)');
-  const wn = G.ecrituresEtape('numero', { numero: 'description' }, { numero: null }, { numeroEcrit: null }, AT);
-  dit(wn.length === 2 && wn.every((w) => ['vrm_numero_ecrit', 'vrm_methode_numero'].includes(w.cle)) && wn[0].valeur.actif === true && wn[1].valeur.methode === 'description', 'F5 numéro : le réglage `vrm_numero_ecrit` + la méthode, RIEN d’autre (aucun numéro touché)', wn);
-  const wn2 = G.ecrituresEtape('numero', { numero: 'titre' }, { numero: 'description' }, { numeroEcrit: { actif: true, depuis: '2026-11-07T00:00:00Z' } }, AT);
-  dit(wn2.length === 1 && wn2[0].cle === 'vrm_methode_numero', 'F5 changer de méthode en restant « je numérote » garde la date du réglage', wn2);
+  const wn = G.ecrituresEtape('numero', { numero: 'moi', numeroOu: ['description'] }, { numero: null }, { numeroEcrit: null }, AT);
+  dit(wn.length === 1 && wn[0].cle === 'vrm_numero_ecrit' && wn[0].valeur.actif === true && wn[0].valeur.ou.join() === 'description' && wn[0].valeur.depuis === AT, 'F5 numéro : le seul réglage `vrm_numero_ecrit` (allumé, endroit « description »), RIEN d’autre', wn);
+  const wn2 = G.ecrituresEtape('numero', { numero: 'moi', numeroOu: ['titre', 'description'] }, { numero: 'moi' }, { numeroEcrit: { actif: true, depuis: '2026-11-07T00:00:00Z', ou: ['description'] } }, AT);
+  dit(wn2.length === 1 && wn2[0].valeur.depuis === '2026-11-07T00:00:00Z' && wn2[0].valeur.ou.join() === 'description,titre', 'F5 ajouter un endroit en restant « je numérote » garde la date du réglage (ordre de numeroEcrit)', wn2);
+  const wn3 = G.ecrituresEtape('numero', { numero: 'moi', numeroOu: [] }, { numero: null }, { numeroEcrit: null }, AT);
+  dit(wn3.length === 0, 'F5 « je numérote » sans aucun endroit n’écrit rien (jamais zéro endroit)', wn3);
+  const wn4 = G.ecrituresEtape('numero', { numero: 'vrm', numeroOu: ['titre'] }, { numero: 'moi' }, { numeroEcrit: { actif: true, depuis: 'x', ou: ['titre'] } }, AT);
+  dit(wn4.length === 1 && wn4[0].valeur.actif === false && wn4[0].valeur.ou.join() === 'titre', 'F5 « VRM numérote » éteint le réglage, ses endroits gardés tels quels', wn4);
+  const wn5 = G.ecrituresEtape('numero', { numero: 'moi', numeroOu: ['description', 'titre', 'ref'] }, { numero: 'moi' }, { numeroEcrit: { actif: true, depuis: 'x', choisi: 'x' } }, AT);
+  dit(wn5.length === 0, 'F5 un réglage allumé sans `ou` (tous les endroits) reconfirmé tel quel : rien n’est réécrit', wn5);
   dit(!JSON.stringify([wn, wn2]).match(/annonce_numeros|used_numeros|pool/), 'F5 aucune écriture ne vise les numéros ni le pool');
   dit(G.ecrituresEtape('notifs', { familles: { ventes: false } }, { familles: { ventes: true } }, { pushPrefs: null }, AT).length === 0, 'F5 notifications pas lues ⇒ rien écrit');
   const wpush = G.ecrituresEtape('notifs', { familles: { ventes: false, offres: true } }, { familles: { ventes: true, offres: true } }, { pushPrefs: { calme: { actif: true }, familles: { messages: false } } }, AT);
@@ -204,7 +213,7 @@ const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 
   dit(/const urssafConcerne = \(r = regimeFiscal\(\)\) => cotisationsUrssaf\(r\);/.test(app), 'F8 `urssafConcerne` de l’app appelle LA règle (`cotisationsUrssaf`)');
   dit(/configurationAOuvrir\(\{ pret:true, baseKO, exemple:exempleActif\(\), bienvenue, proprietaire:proprio, configuration:load\(CLE_CONFIGURATION,null\), plateformes:load\(CLE_PLATEFORMES,null\) \}\)/.test(app), 'F8 l’ouverture passe les LECTURES (propriétaire lu, configuration, plateformes)');
   dit(/visite && !bienvenue && !configOuverte/.test(app) && /silence=\{!!\(bienvenue \|\| visite \|\| configOuverte\)\}/.test(app), 'F8 la visite et la feuille « compte relié » attendent la configuration');
-  dit(/CLE_CONFIGURATION, CLE_SOCIETE_TVA, CLE_METHODE_NUMERO,/.test(app), 'F8 les nouvelles clés sont synchronisées (SYNC_KEYS)');
+  dit(/CLE_CONFIGURATION, CLE_SOCIETE_TVA,/.test(app) && /'vrm_numero_ecrit',/.test(app), 'F8 les clés sont synchronisées (SYNC_KEYS), la méthode d’étiquetage est `vrm_numero_ecrit`');
   dit(/rappelDac7Journee\(profilFiscalLu\(\), dac7ParPlateforme\(/.test(app), 'F8 Ma journée : le rappel DAC7 lit la règle de Comptabilité');
   dit(/jaugeSeuils\(\{ ligne, now, activite \}\)/.test(compta) && /exportDevant/.test(compta) && /<AideStatutNeutre \/>/.test(compta), 'F8 Comptabilité : jauge de SON activité, export devant en société, aide neutre');
   const reglages = fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8');

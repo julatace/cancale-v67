@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { PLATEFORMES } from './plateformes.js';
 import {
   etapesActives, choixInitiaux, ecrituresEtape, ecritureFin, recapConfiguration, appliquerEcritures, famillesDe,
-  CHOIX_VENDS, CHOIX_STATUT, CHOIX_RYTHME, CHOIX_LIBERATOIRE, CHOIX_ACRE, CHOIX_TVA_SOCIETE, CHOIX_NUMERO, CHOIX_AFFICHAGE, FAMILLES_NOTIF,
+  CHOIX_VENDS, CHOIX_STATUT, CHOIX_RYTHME, CHOIX_LIBERATOIRE, CHOIX_ACRE, CHOIX_TVA_SOCIETE, CHOIX_NUMERO, CHOIX_OU, CHOIX_AFFICHAGE, FAMILLES_NOTIF,
 } from './configurationDepart.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, seuilsActivite, regimeLu } from './profilFiscal.js';
 import './configuration-depart.css';
@@ -144,7 +144,7 @@ function choixRepondu(cle, c, lus) {
   if (cle === 'statut') return !!c.statut;
   if (cle === 'micro') return !!(c.rythme && c.liberatoire && c.acre);
   if (cle === 'societe') return !!c.tvaSociete;
-  if (cle === 'numero') return !!c.numero;
+  if (cle === 'numero') return c.numero === 'vrm' || (c.numero === 'moi' && (c.numeroOu || []).length > 0);
   if (cle === 'affichage') return !!c.affichage;
   if (cle === 'notifs') return !!c.familles && !!lus.pushPrefs;
   return true;
@@ -208,13 +208,23 @@ function corpsEtape(cle, { choix: c, poser, lus, aller }) {
       {CHOIX_TVA_SOCIETE.map((x) => <Carte key={x.v} choisi={c.tvaSociete === x.v} onClick={() => poser({ tvaSociete: x.v })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `tva:${x.v}` }} />)}
     </Groupe>
   );
-  if (cle === 'numero') return (<>
-    <Groupe label="Où est ton numéro">
-      {CHOIX_NUMERO.map((x) => <Carte key={x.v} choisi={c.numero === x.v} onClick={() => poser({ numero: x.v })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `numero:${x.v}` }} />)}
-    </Groupe>
-    {c.numeroEcritActif && !c.numero ? <p className="vrm-cfg-note">Aujourd’hui, tu numérotes toi-même : dis où tu écris le numéro.</p> : null}
-    <p className="vrm-cfg-note">Changer de méthode ne renumérote aucun article : les numéros déjà écrits sur tes cartons restent.</p>
-  </>);
+  if (cle === 'numero') {
+    // Les endroits : plusieurs possibles, jamais aucun (la dernière cochée reste, comme `basculerOu`).
+    const ou = c.numeroOu || [];
+    const basculer = (k) => { const n = ou.includes(k) ? ou.filter((x) => x !== k) : [...ou, k]; if (n.length) poser({ numero: 'moi', numeroOu: n }); };
+    return (<>
+      <Groupe label="Qui numérote" colonnes="duo">
+        {CHOIX_NUMERO.map((x) => <Carte key={x.v} choisi={c.numero === x.v} onClick={() => poser({ numero: x.v, ...(x.v === 'moi' && !ou.length ? { numeroOu: ['description'] } : {}) })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `numero:${x.v}` }} />)}
+      </Groupe>
+      {c.numero === 'moi' ? <>
+        <h2 className="vrm-cfg-question">Où l’écris-tu ?</h2>
+        <Groupe label="Où est ton numéro" multi>
+          {CHOIX_OU.map((x) => <Carte key={x.v} multi choisi={ou.includes(x.v)} onClick={() => basculer(x.v)} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `ou:${x.v}` }} />)}
+        </Groupe>
+      </> : null}
+      <p className="vrm-cfg-note">Changer de méthode ne renumérote aucun article : les numéros déjà écrits sur tes cartons restent.</p>
+    </>);
+  }
   if (cle === 'affichage') return (
     <Groupe label="Affichage">
       {CHOIX_AFFICHAGE.map((x) => <Carte key={x.v} choisi={c.affichage === x.v} onClick={() => poser({ affichage: x.v })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `affichage:${x.v}` }} />)}

@@ -7,7 +7,7 @@
 //      fenêtre), titre centré, barre de progression, cartes ≥ 44 px, pas de « Retour »
 //      à la 1re étape ; chaque étape écrit SA clé dans `main` (je vends, plateformes,
 //      statut micro achat-revente, rythme + versement libératoire + ACRE ⇒ taux 13,4 %,
-//      numéro « fin de description » ⇒ `vrm_numero_ecrit` + `vrm_methode_numero`,
+//      « je numérote », fin de description + titre ⇒ `vrm_numero_ecrit` { actif, ou },
 //      affichage, notifications ⇒ la ligne `push_prefs` fusionnée), le récap,
 //      « C'est parti » ⇒ `vrm_configuration` fait, la feuille se ferme ;
 //  C2  « Plus tard » à la 3e étape : ce qui est choisi est GARDÉ, la configuration se
@@ -185,10 +185,15 @@ async function neuf(nav, W, theme) {
   await capture(o.pg, `cfg-${W}-${theme}-4-micro`, true);
   e = await continuer(o.pg);
   dit(await attendre(o.pg, async () => { const d = ligneMain(base); return d.vinted_urssaf_freq === 'mensuel' && Number(d.vinted_urssaf_taux) === 13.4 && d.vrm_micro_options && d.vrm_micro_options.liberatoire === 'oui' && d.vrm_micro_options.activite === 'vente'; }), `${T} rythme, taux 13,4 % et options rangés dans les clés de Comptabilité`, JSON.stringify(ligneMain(base)));
-  dit(e && e.etape === 'numero' && e.cartes.length === 4, `${T} étape « Où est ton numéro ? » : 4 méthodes`, JSON.stringify(e));
-  await choisir(o.pg, 'numero:description');
+  dit(e && e.etape === 'numero' && e.cartes.length === 2 && e.cartes.every((c) => !c.coche), `${T} étape « Où est ton numéro ? » : VRM numérote / je numérote, rien de coché`, JSON.stringify(e));
+  await choisir(o.pg, 'numero:moi');
+  e = await etat(o.pg);
+  dit(e && e.cartes.filter((c) => c.cle.startsWith('ou:')).length === 3 && e.cartes.find((c) => c.cle === 'ou:description').coche, `${T} « je numérote » ⇒ où : fin de description (cochée), titre, référence`, JSON.stringify(e && e.cartes));
+  await choisir(o.pg, 'ou:titre');
+  await capture(o.pg, `cfg-${W}-${theme}-4b-numero`, true);
   e = await continuer(o.pg);
-  dit(await attendre(o.pg, async () => { const d = ligneMain(base); return d.vrm_numero_ecrit && d.vrm_numero_ecrit.actif === true && d.vrm_methode_numero && d.vrm_methode_numero.methode === 'description'; }), `${T} méthode « fin de description » ⇒ vrm_numero_ecrit allumé + vrm_methode_numero`, JSON.stringify(ligneMain(base).vrm_methode_numero));
+  dit(await attendre(o.pg, async () => { const d = ligneMain(base).vrm_numero_ecrit; return d && d.actif === true && (d.ou || []).join() === 'description,titre'; }), `${T} « fin de description + titre » ⇒ vrm_numero_ecrit { actif, ou } (le réglage de numeroEcrit)`, JSON.stringify(ligneMain(base).vrm_numero_ecrit));
+  dit(!('vrm_methode_numero' in ligneMain(base)), `${T} aucune clé à part pour la méthode`);
   dit(e && e.etape === 'affichage', `${T} étape affichage`, JSON.stringify(e));
   await choisir(o.pg, 'affichage:simple');
   e = await continuer(o.pg);
@@ -200,7 +205,7 @@ async function neuf(nav, W, theme) {
   await capture(o.pg, `cfg-${W}-${theme}-5-notifs`, true);
   e = await continuer(o.pg);
   dit(await attendre(o.pg, async () => { const p = ligne(base, 'push_prefs'); return p && p.familles && p.familles.offres === false && p.calme && p.calme.actif === true; }), `${T} « Offres » coupées dans la ligne push_prefs, heures calmes gardées`, JSON.stringify(ligne(base, 'push_prefs')));
-  dit(e && e.etape === 'recap' && /Autre chose/.test(e.recap.vends || '') && /Leboncoin/.test(e.recap.plateformes || '') && /13,4/.test(e.recap.micro || '') && /description/.test(e.recap.numero || '') && /7 sur 8/.test(e.recap.notifs || ''), `${T} le récap redit chaque choix`, JSON.stringify(e && e.recap));
+  dit(e && e.etape === 'recap' && /Autre chose/.test(e.recap.vends || '') && /Leboncoin/.test(e.recap.plateformes || '') && /13,4/.test(e.recap.micro || '') && /description, titre/.test(e.recap.numero || '') && /7 sur 8/.test(e.recap.notifs || ''), `${T} le récap redit chaque choix`, JSON.stringify(e && e.recap));
   await capture(o.pg, `cfg-${W}-${theme}-6-recap`, true);
   dit(!(await deborde(o.pg)), `${T} rien ne déborde`);
   await o.pg.click('[data-configuration-fin]');
@@ -269,7 +274,7 @@ async function installe(nav, W, theme) {
   const coche = (k, c) => !!(de(k).cartes.find((x) => x.cle === c) || {}).coche;
   dit(coche('plateformes', 'plateforme:ebay') && coche('plateformes', 'plateforme:vinted') && !coche('plateformes', 'plateforme:leboncoin'), `${T} pré-sélection : ses plateformes`, JSON.stringify(de('plateformes').cartes));
   dit(coche('statut', 'statut:micro-vente') && coche('micro', 'rythme:trimestriel') && coche('micro', 'liberatoire:non') && coche('micro', 'acre:non'), `${T} pré-sélection : son statut et ses options URSSAF`, JSON.stringify([de('statut').cartes, de('micro').cartes]));
-  dit(coche('affichage', 'affichage:complet') && de('numero').cartes.every((c) => !c.coche), `${T} pré-sélection : affichage ; numéro « je numérote » sans méthode connue ⇒ rien de coché (jamais deviné)`, JSON.stringify(de('numero').cartes));
+  dit(coche('affichage', 'affichage:complet') && coche('numero', 'numero:moi') && ['description', 'titre', 'ref'].every((k) => coche('numero', 'ou:' + k)), `${T} pré-sélection : affichage ; « je numérote », à tous ses endroits (le défaut du réglage)`, JSON.stringify(de('numero').cartes));
   dit(de('vends').cartes.every((c) => !c.coche), `${T} « Je vends » jamais choisi ⇒ rien de coché`);
   await capture(o.pg, `cfg-${W}-${theme}-9-installe-recap`, true);
   if (e && e.etape === 'recap') await o.pg.click('[data-configuration-fin]');
