@@ -24,3 +24,9 @@ Aucun geste technique requis, aucune extension modifiée. Ceci ne prétend pas r
 Validation finale locale : 46 contrôles navigation/activation (dont écriture réellement reçue dans la base fictive), 20 composants dédiés, 274 contrôles du banc composants, profil de vendeurs différents vert ; 104 contrôles argent/mois verts ; audit identité et 45 contrôles prix/numérotage verts. Le banc historique cible désormais son propre summary, puisque la sélection possède un second détail. Le jeu argent/mois fixe son fuseau à Paris, comme son navigateur : le dimanche après 23 h UTC il attendait encore la semaine précédente (12 faux échecs), sans défaut dans l’app. Les tests purs exécutent aussi le hook de profil pour prouver le rejet du profil d’un autre UID.
 
 Le refus `etat: illisible` du véritable parseur de prix est aussi transmis au champ : le texte invalide reste corrigeable, sans enregistrer de valeur inventée.
+
+## Finition du 9 novembre
+
+Le démarrage suit aussi un choix sans Vinted : eBay seul ne demande plus de relier Vinted ; le guide explique la connexion des sites choisis. Un seul site ne produit pas une barre de filtres inutile. L’icône d’Affichage devient un œil pour ne pas doubler celle de Mes plateformes. Les composants communs retrouvent le dernier import CSS. L’audit du raccordement des emails accepte la carte passée par son animation `P`, déjà présente sur main ; sa suppression reste refusée (12 mutations attrapées).
+
+Les lots d’audits ont été exécutés localement : les tests SQL n’ont pas pu tourner faute de PostgreSQL, et deux anciens audits d’extension cherchent un Chromium absent à leur emplacement par défaut. Aucun code SQL, d’authentification ou d’extension n’a été modifié par cette refonte. Les paquets régénérés par les audits ont été remis à leur version originale.

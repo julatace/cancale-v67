@@ -43,6 +43,7 @@ const MUTATIONS = {
   'recherche-sans-garde': [['api/_lib/reception-email.js', "replace(/[^\\p{L}\\p{N} @._'’-]+/gu,' ')", "replace(/[\\u0000]+/gu,' ')"]],
   'recherche-ignoree': [['api/_lib/reception-email.js', " if(parMots)filtres.push(parMots);", " "]],
   'yahoo-regle': [['src/relierBoite.js', "  if (m.regle === 'transfert' || m.regle === 'relais') return { lignes: [], texte: '' };", ""]],
+  'journee-sans-carte': [['src/App.jsx', '{comptesARelierJour.length ? P(carteARelier()) : null}', '{null}']],
   'colis-sans-chemin': [['src/App.jsx', "onClick={() => relierBoiteDe(c.uid)}>Relier la boîte de {c.login}</button>", "onClick={() => {}}>Relier la boîte de {c.login}</button>"]],
 };
 if (process.argv.includes('--prouve')) prouver(__filename, R, MUTATIONS);
@@ -229,7 +230,7 @@ const iso = (j) => new Date(NOW - j * J).toISOString();
     const colis = (/function ComptesARelierColis\([\s\S]*?\n\}/.exec(APP) || [''])[0];
     dit(/aExpedier\(o\)/.test(colis) && /useComptesARelier\(comptes\)/.test(colis) && /!Array\.isArray\(liste\)/.test(colis), 'R7 Colis : seulement un compte à relier qui a des colis à envoyer (la règle `aExpedier`), rien sur une lecture ratée');
     dit(/\{only === 'bordereaux' && <ComptesARelierColis comptes=\{accounts\}\/>\}/.test(APP), 'R7 Colis porte la ligne');
-    dit(/\{comptesARelierJour\.length \? carteARelier\(\) : null\}/.test(APP) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
+    dit(/\{comptesARelierJour\.length \? (?:carteARelier\(\)|P\(carteARelier\(\)\)) : null\}/.test(APP) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
     dit(/useComptesARelier\(accounts, only === 'journee'\)/.test(APP), 'R7 Ma journée ne lit la règle que sur Ma journée');
   });
 

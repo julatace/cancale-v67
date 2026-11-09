@@ -1781,7 +1781,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'affichage', titre:'Affichage', items:[
       { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
-      { id:'affichage-mode', type:'panneau', nu:true, ic:'grid', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
+      { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
       { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:'Je vends', desc:'Sneakers, ou autre chose : les mots et les vérifications suivent.', val: profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre', data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : 'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).

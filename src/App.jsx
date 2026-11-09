@@ -18009,8 +18009,13 @@ function useNumerosGuide() {
 // prouve déjà l'extension, Ma journée ne questionne pas l'extension pour rien.
 function GuidePont({ children }) { const { etape } = useEtapePont(); return children(etape); }
 function GuideDemarrageApp(props) {
+  const profil = useProfilVendeur();
   if (exempleActif()) return null;
-  return <><PlateformesSetting initial/>{props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>}</>;
+  const sansVinted = Array.isArray(profil.plateformes) && !profil.plateformes.includes('vinted');
+  const aRelier = sansVinted ? profil.plateformes.filter(id => profil.relies[id] !== true) : [];
+  return <><PlateformesSetting initial/>{sansVinted
+    ? aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null
+    : props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>}</>;
 }
 // Préférences synchronisées et cloisonnées par le stockage du compte VRM.
 function PlateformesSetting({ initial = false }) {
