@@ -26054,6 +26054,7 @@ function JournalSemaineCarte({ liveStats }) {
 //    transaction, `photosEntre` de l'écran) : la pile ne cherche rien (PileVignettes).
 const jourIso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const LETTRES_JOUR = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const CLES_VERSE_JOURNEE = ['vinted_urssaf_mois'];
 const majusculeJ = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = null, mortes, onMorte, maintenant: maint = null }) {
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
@@ -26061,6 +26062,7 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = 
   const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
   const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
   const ligneUrssaf = useLigneUrssaf();
+  const prepVerse = useEnPreparation(CLES_VERSE_JOURNEE);
   const vendu = venduEtat(liveStats) !== 'lu' ? (venduEtat(liveStats) === 'pasSu' ? null : undefined)
     : { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] };
   const colisFaits = pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {};
@@ -26091,14 +26093,16 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = 
   const J = P.J;
   const max = Math.max(0, ...jours.map((j) => vJ(j) || 0));
   // Le versé de la période (jour local, la ligne publiée par Ventes). `undefined` = pas encore lue.
-  const verse = ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuPublieEntre(ligneUrssaf, { de: P.debut, a: P.fin - 1 });
+  // Une publication pas encore là qu'un écran ouvert prépare (src/preparations.js) : « lecture… », jamais « pas lu ».
+  const verse0 = ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuPublieEntre(ligneUrssaf, { de: P.debut, a: P.fin - 1 });
+  const verse = verse0.valeur == null && verse0.raison === 'absente' && prepVerse.has('vinted_urssaf_mois') ? { valeur: null, raison: 'encours' } : verse0;
   const nom = semaine ? S.titre : sel === 0 ? 'Aujourd’hui' : sel === 1 ? 'Hier' : majusculeJ(dateJourFr(jSel.d));
   const auMoins = (x) => x && x.partiel ? 'au moins ' : '';
   const pl = (n, mot) => `${n.toLocaleString('fr-FR')} ${mot}${n > 1 ? 's' : ''}`;
   // Les faits de la période, chacun avec son état (§5 : « — » dit sa raison, jamais un 0 inventé).
   const faitVentes = J.ventes.valeur == null ? (J.ventes.raison === 'encours' ? 'ventes : lecture…' : 'ventes pas lues')
     : J.ventes.valeur === 0 ? 'aucune vente' : `${auMoins(J.ventes)}${pl(J.ventes.valeur, 'vente')}`;
-  const faitVerse = verse.valeur == null ? (verse.raison === 'encours' ? 'versements : lecture…' : 'versements pas lus')
+  const faitVerse = verse.valeur == null ? (verse.raison === 'encours' ? 'versé : lecture…' : `versé : ${raisonCourte({ valeur: null, raison: verse.raison }) || 'pas lu'}`)
     : verse.valeur === 0 ? 'rien de versé' : `${auMoins(verse)}${montant(verse.valeur)} versé${verse.valeur >= 2 ? 's' : ''}`;
   const faitColis = J.colis.valeur == null ? (J.colis.raison === 'nonNotes' ? 'envois pas notés' : J.colis.raison === 'encours' ? 'colis : lecture…' : 'colis pas sus')
     : J.colis.valeur === 0 ? 'aucun colis envoyé' : `${auMoins(J.colis)}${J.colis.valeur.toLocaleString('fr-FR')} colis envoyé${J.colis.valeur > 1 ? 's' : ''}`;
@@ -39582,11 +39586,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </button>
                 );
               };
-              if (loading) return { prochain: null, section: null };
+              // (9 nov., Ma journée v2) Pendant la lecture, la PLACE de la prochaine chose est gardée dans la tête :
+              // elle arrive sans pousser la frise (banc `chargement`, CLS).
+              const placeProchain = <div className="vrm-jv2-prochain-attente" aria-hidden="true" data-jv2-prochain-attente=""/>;
+              if (loading) return { prochain: placeProchain, section: null };
               // (6 nov.) Les actions du jour de la coque (la cloche) pas encore rangées : la liste
               // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
               // Et jamais « Rien à faire… : pas lu » pendant qu'elles se lisent.
-              if (!alertesLues) return { prochain: null, section: (
+              if (!alertesLues) return { prochain: placeProchain, section: (
                 <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-afaire-attente="">
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2></div>
                   <SqLignes n={3} montant={false}/>

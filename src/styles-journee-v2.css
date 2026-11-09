@@ -104,7 +104,9 @@
 .vrm-main[data-ecran="journee"] .vrm-jv2-sem[aria-pressed="true"]::before { background: #fff; }
 .vrm-main[data-ecran="journee"] .vrm-jv2-sem:active { transform: scale(.96); }
 .vrm-main[data-ecran="journee"] .vrm-jv2-sem:focus-visible { outline: 2px solid #fff; outline-offset: 0; border-radius: 999px; }
-.vrm-main[data-ecran="journee"] .vrm-jv2-corps { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
+.vrm-main[data-ecran="journee"] .vrm-jv2-corps { display: flex; align-items: flex-start; gap: 12px; margin-top: 2px; min-height: 96px; }
+/* La place de la prochaine chose, gardée pendant la lecture (rien ne saute quand elle arrive). */
+.vrm-main[data-ecran="journee"] .vrm-jv2-prochain-attente { min-height: 68px; border-radius: 14px; background: rgba(255,255,255,.06); }
 .vrm-main[data-ecran="journee"] .vrm-jv2-chiffre { flex: 1 1 auto; min-width: 0; }
 .vrm-main[data-ecran="journee"] .vrm-jv2-grand { margin: 0 !important; color: #fff !important; white-space: nowrap; }
 .vrm-main[data-ecran="journee"] .vrm-jv2-grand.is-vide { color: rgba(255,255,255,.66) !important; font-weight: 400 !important; }
@@ -178,6 +180,7 @@
 /* ── 6. ORDINATEUR : la tête (prochaine chose, frise, cases) à gauche, « Ensuite » à droite ── */
 @media (min-width: 1024px) {
   .vrm-main[data-ecran="journee"] .vrm-jv2-pile-bouton { width: 128px !important; height: 104px !important; }
+  .vrm-main[data-ecran="journee"] .vrm-jv2-corps { min-height: 104px; }
   .vrm-main[data-ecran="journee"] .vrm-jv2-pile .vrm-pile-v { width: 76px !important; height: 76px !important; left: 26px !important; }
   .vrm-main[data-ecran="journee"] .vrm-jv2-jour { min-height: 68px; }
 }
