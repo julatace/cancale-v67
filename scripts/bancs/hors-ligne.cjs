@@ -182,7 +182,7 @@ async function main() {
             code: !!document.querySelector('[data-hl-code="4321"]') && !!document.querySelector('[data-hl-code="C49341"]'),
             qr: qrs.length ? qrs.map((q) => ({ etat: q.getAttribute('data-hl-qr'), w: q.naturalWidth || 0 })) : null,
             soir: document.querySelector('[data-hl-soir]') ? document.querySelector('[data-hl-soir]').getAttribute('data-hl-soir-n') : null,
-            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled && !b.hasAttribute('data-hl-file') && !b.hasAttribute('data-hl-en-grand-ouvrir')).map((b) => b.innerText) : ['(pas de vue)'],
+            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled && !b.hasAttribute('data-hl-file') && !b.hasAttribute('data-hl-en-grand-ouvrir') && !b.hasAttribute('data-hl-inventaire-ouvrir')).map((b) => b.innerText) : ['(pas de vue)'],
             gestes: v ? v.querySelectorAll('[data-hl-geste][data-hl-file]').length : 0,
             texte: document.body.innerText,
             mdp: !!document.querySelector('input[type="password"]'),
