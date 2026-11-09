@@ -158,7 +158,12 @@ const lire = (pg) => pg.evaluate(() => ({
   catIds: [...document.querySelectorAll('[data-lbc-catalog-id]')].map((e) => e.getAttribute('data-lbc-catalog-id') + ':' + e.getAttribute('data-lbc-catalog-etat')),
   resSuppr: [...document.querySelectorAll('[data-lbc-supprimer-resultat]')].map((e) => ({ id: e.getAttribute('data-lbc-supprimer-resultat'), etape: e.getAttribute('data-etape'), t: e.innerText })),
   resultats: [...document.querySelectorAll('[data-lbc-pause-resultat]')].map((e) => ({ id: e.getAttribute('data-lbc-pause-resultat'), etape: e.getAttribute('data-etape'), t: e.innerText })),
-  deborde: [...document.querySelectorAll('button,input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1; }).map((e) => e.textContent.trim().slice(0, 20) || e.tagName),
+  // (9 nov.) Une RANGÉE DÉFILANTE (§7 ; les filtres d'état Leboncoin le sont depuis le 6 nov.,
+  // styles-visuel-2.css) porte exprès des boutons au-delà du bord : ils ne sont pas rognés si
+  // leur rangée, elle, tient dans l'écran et défile.
+  deborde: [...document.querySelectorAll('button,input')].filter((e) => { const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1)) return false;
+    for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth) return p.getBoundingClientRect().right > document.documentElement.clientWidth + 1; }
+    return true; }).map((e) => e.textContent.trim().slice(0, 20) || e.tagName),
   sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
 }));
 const feuilleS = (pg) => pg.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Oui, supprimer de Leboncoin'); let t = ''; let n = b; for (let i = 0; i < 6 && n; i++) { n = n.parentElement; if (n && n.innerText && n.innerText.length > t.length && n.innerText.length < 900) t = n.innerText; } return { ok: !!b, t }; });
@@ -319,12 +324,15 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       await oj.pg.waitForFunction(() => [...document.querySelectorAll('[data-job]')].some((e) => /à retirer de Leboncoin/.test(e.innerText)), null, { timeout: 15000 }).catch(() => {});
       await oj.pg.waitForTimeout(1200);
       const lj = await oj.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job]')].find((x) => /à retirer de Leboncoin/.test(x.innerText)); return e ? e.innerText.replace(/\s+/g, ' ') : ''; });
-      dit(/N°18/.test(lj) && !/N°15/.test(lj) && /(^|\D)1 à retirer de Leboncoin/.test(lj), 'Ma journée : « 1 à retirer de Leboncoin — N°18 », pas la N°15 rapprochée par titre', lj.slice(0, 120));
+      // (9 nov.) Ma journée v2 dit « 1 annonce à retirer de Leboncoin ».
+      dit(/N°18/.test(lj) && !/N°15/.test(lj) && /(^|\D)1 (annonce )?à retirer de Leboncoin/.test(lj), 'Ma journée : « 1 à retirer de Leboncoin — N°18 », pas la N°15 rapprochée par titre', lj.slice(0, 120));
       const pubs = ECRITS.filter((x) => /lbc_a_retirer/.test(x.corps)).map((x) => { try { const c = JSON.parse(x.corps); const r = Array.isArray(c) ? c[0] : c; return r.data.liste; } catch (_) { return null; } });
       const toutes = pubs.flat().filter(Boolean);
       dit(pubs.length >= 1 && pubs.every((l) => Array.isArray(l) && l.length === 1) && toutes.every((r) => r.numero === '18') && toutes.every((r) => r.numero || r.lbcId), 'la liste publiée pour le logo VRM : la N°18 seulement — jamais une ligne vide, jamais une liste vidée avant l’arrivée des numéros', JSON.stringify(pubs).slice(0, 200));
       // Le clic mène À la paire, pas en haut de l'écran Leboncoin.
-      await oj.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job]')].find((x) => /à retirer de Leboncoin/.test(x.innerText)); if (e) e.click(); });
+      // (9 nov.) Depuis le 3 nov. la rangée porte DEUX gestes (« Supprimer » et l'ouverture) :
+      // on touche l'ouverture (`.vrm-day-task-ouvrir`), comme Julien — pas le cadre de la rangée.
+      await oj.pg.evaluate(() => { const e = [...document.querySelectorAll('[data-job]')].find((x) => /à retirer de Leboncoin/.test(x.innerText)); const o = e && (e.matches('button') ? e : e.querySelector('.vrm-day-task-ouvrir') || e); if (o) o.click(); });
       await oj.pg.waitForSelector('[data-lbc-retirer]', { timeout: 20000 }).catch(() => {});
       await oj.pg.waitForTimeout(3500);
       const pos = await oj.pg.evaluate(() => { const e = document.querySelector('[data-lbc-retirer]'); if (!e) return null; const r = e.getBoundingClientRect(); return { top: Math.round(r.top), h: window.innerHeight }; });
