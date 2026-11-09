@@ -12,7 +12,7 @@ libère son numéro (le dire ici).
 | lot | contenu | branche | état |
 |---|---|---|---|
 | — | intégration journee-v2 + zero-banc-rouge (1re partie) | PR #1069 | **en ligne** |
-| — | suites serveur (Solo côté serveur, double vente LBC < 24 h) | `claude/suites-serveur` | en cours |
+| — | suites serveur (Solo côté serveur, double vente LBC < 24 h) | PR #1070 | **en ligne** |
 | — | direction artistique 4 (feuilles, confirmations, toasts, états vides, barre du bas) | `claude/direction-artistique-4` | en cours |
 | — | zéro banc rouge (suite) | `claude/zero-banc-rouge` | en cours |
 | — | direction artistique 5 : colonne de gauche refaite + boutons (demande de Julien) | `claude/direction-artistique-5` | en cours |
@@ -20,7 +20,7 @@ libère son numéro (le dire ici).
 | B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | `claude/annuler-commandes` | à lancer |
 | C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | à lancer |
 | D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | `claude/hors-ligne-relie` | à lancer |
-| E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | après suites-serveur |
+| E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | en cours |
 | F | prix plancher sous chaque offre + « déjà N paires de ce modèle » | `claude/plancher-stock` | à lancer |
 | G | jauge 50 actions/h + journal « ce que VRM a fait » (ext. 5.337) | `claude/jauge-journal` | à lancer |
 | H | échéances .ics + alerte « nouvel appareil » (12 fonctions api au plus) | `claude/ics-appareil` | à lancer |
