@@ -79,7 +79,7 @@ export function masquer(texte) {
 // Les écrans de l'app (les `tab` d'App.jsx : `ONGLETS_LIENS` et chaque `tab==='…'`).
 // Un nom hors de cette liste n'est pas un écran — il pourrait être une donnée
 // (un pseudo) : il devient « ». audit-signalement tient la liste à jour.
-export const ECRANS = ['ventes', 'annonces', 'messages', 'achats', 'retraits', 'journee', 'collectif', 'plat_vinted', 'plat_leboncoin', 'plat_ebay', 'plat_vestiaire', 'prixmarche', 'dashboard', 'compta', 'comptabilite', 'cat_annonces', 'cat_ventes', 'cat_achats', 'cat_bord', 'cat_msg', 'cat_expedition', 'garage', 'organisation', 'communaute', 'emails', 'invoices', 'masques', 'settings', 'vintedaccounts', 'catalog', 'sales', 'stockvinted', 'leboncoin', 'ebay_annonces', 'ebay_ventes', 'ebay_agent', 'ebay_messages', 'vinted_annonces', 'inventory'];
+export const ECRANS = ['ventes', 'annonces', 'messages', 'achats', 'retraits', 'journee', 'collectif', 'plat_vinted', 'plat_leboncoin', 'plat_ebay', 'plat_vestiaire', 'prixmarche', 'dashboard', 'compta', 'comptabilite', 'cat_annonces', 'cat_ventes', 'cat_achats', 'cat_bord', 'cat_msg', 'cat_expedition', 'garage', 'organisation', 'communaute', 'emails', 'invoices', 'masques', 'settings', 'vintedaccounts', 'catalog', 'sales', 'stockvinted', 'leboncoin', 'ebay_annonces', 'ebay_ventes', 'ebay_agent', 'ebay_messages', 'vinted_annonces', 'inventory', 'trancher'];
 // La version de l'app telle que l'app l'écrit (`BUILD_ID` : « 6 novembre à 14:32 »).
 const VERSION_APP = /^(\d{1,2} (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) à \d{2}:\d{2}|inconnue)$/;
 const ORIGINES = ['ecran', 'feuille', 'page', 'promesse', 'csp', 'retour'];

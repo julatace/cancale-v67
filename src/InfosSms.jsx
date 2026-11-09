@@ -10,8 +10,23 @@ import { lignesInfosSms } from './infosSms.js';
 const jourFr = (j) => { const d = new Date(String(j).slice(0, 10) + 'T12:00:00Z'); return Number.isFinite(d.getTime()) ? d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }) : ''; };
 const aujourdhuiParis = () => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date()); } catch (_) { return ''; } };
 
-export default function InfosSms({ onglet, lire, ecrireLiens }) {
+// Les lignes montrées pour une source (la règle de cet écran, une fois).
+const lignesDe = (etat, source) => {
+  let l = lignesInfosSms(etat.infos, { liens: etat.liens, ventes: etat.ventes, aujourdhui: aujourdhuiParis(), source });
+  if (source === 'pickup') l = l.filter((x) => Date.parse(x.derniere || '') > Date.now() - 14 * 864e5).reverse();
+  return l;
+};
+
+// `publier(cle, n)` (9 nov., lot AC) : « À trancher » (src/aTrancher.js) consomme CE compte —
+// les ventes Vestiaire reçues par SMS pas reliées par son clic, les colis Pickup montrés.
+// Une lecture ratée ne publie rien (pas su ≠ 0) ; les liens pas lus ⇒ Vestiaire pas publié.
+export default function InfosSms({ onglet, lire, ecrireLiens, publier = null }) {
   const [etat, setEtat] = React.useState(undefined);   // undefined en cours · null pas su · { infos, liens, ventes }
+  React.useEffect(() => {
+    if (!etat || typeof publier !== 'function') return;
+    if (etat.liensLus) publier('sms-vestiaire', lignesDe(etat, 'vestiaire').filter((x) => !x.lie).length);
+    publier('sms-pickup', lignesDe(etat, 'pickup').length);
+  }, [etat, publier]);
   const charger = React.useCallback(async () => {
     const [i, l, v] = await Promise.all([
       lire('id=eq.vrm_sms_infos&select=infos:data->infos'),
@@ -27,8 +42,7 @@ export default function InfosSms({ onglet, lire, ecrireLiens }) {
   if (!etat) return null;
   const source = onglet === 'envoyer' ? 'vestiaire' : onglet === 'retirer' ? 'pickup' : null;
   if (!source) return null;
-  let lignes = lignesInfosSms(etat.infos, { liens: etat.liens, ventes: etat.ventes, aujourdhui: aujourdhuiParis(), source });
-  if (source === 'pickup') lignes = lignes.filter((x) => Date.parse(x.derniere || '') > Date.now() - 14 * 864e5).reverse();
+  const lignes = lignesDe(etat, source);
   if (!lignes.length) return null;
   const relier = async (cle, pid) => {
     if (!etat.liensLus) return;                                  // une lecture ratée n'écrit rien

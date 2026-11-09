@@ -74,13 +74,13 @@ const ARTICLES = [
   },
   {
     slug: 'numeros', titre: 'Les numéros de rangement',
-    resume: 'Un numéro par paire, écrit sur le carton, jamais redonné.',
+    resume: 'Un numéro par article : il dit où il est rangé (carton, étagère, bac…), jamais redonné.',
     mots: 'numéro rangement carton étagère stock meuble case doublon rouge réattribué archive B je numérote moi-même sku',
-    chapo: 'Chaque paire en ligne reçoit un numéro. Tu l’écris sur son carton : quand elle se vend, VRM te dit quel carton prendre. **Même avec 50 paires identiques, tu ne dois pas pouvoir te tromper.**',
+    chapo: 'Chaque paire en ligne reçoit un numéro. Tu l’écris là où tu la ranges (carton, étagère, bac…) : quand elle se vend, VRM te dit laquelle prendre. **Même avec 50 paires identiques, tu ne dois pas pouvoir te tromper.**',
     blocs: [
       { liste: [
         'Le numéro suit l’ordre de mise en ligne : la paire suivante prend le suivant.',
-        '**Un numéro n’est jamais redonné** à une autre paire, même quand l’ancienne est vendue : il est peut-être encore écrit sur un carton.',
+        '**Un numéro n’est jamais redonné** à une autre paire, même quand l’ancienne est vendue : il est peut-être encore écrit sur un rangement.',
         'Un numéro qui monte haut est normal : il compte aussi les paires déjà parties.',
         'Un numéro qui commence par **B** est un ancien numéro d’archive. Il n’est jamais redonné non plus.',
       ] },
@@ -88,10 +88,10 @@ const ARTICLES = [
       { titre: 'Ce qui peut changer un numéro', id: 'changer' },
       { liste: [
         'Une annonce **sans** numéro en reçoit un.',
-        'Deux paires sous le même numéro (un doublon) : VRM le règle seul et liste les **nouveaux numéros à écrire sur tes cartons**, jusqu’à ce que tu touches **C’est écrit**.',
+        'Deux paires sous le même numéro (un doublon) : VRM le règle seul et liste les **nouveaux numéros à écrire**, jusqu’à ce que tu touches **C’est écrit**.',
         'Une paire republiée garde le numéro de l’ancienne annonce.',
       ] },
-      { note: 'Deux paires présentes sous le même numéro, c’est le seul risque d’envoyer la mauvaise chaussure. C’est le seul endroit où VRM met du rouge : vérifie les deux cartons.', titreNote: 'Le rouge.' },
+      { note: 'Deux paires présentes sous le même numéro, c’est le seul risque d’envoyer la mauvaise chaussure. C’est le seul endroit où VRM met du rouge : vérifie les deux, là où elles sont rangées.', titreNote: 'Le rouge.' },
       { titre: 'Retrouver une paire', id: 'stock' },
       'Dans **Stock**, cherche un numéro : VRM te dit le meuble et la case.',
       { titre: '« Je numérote moi-même »', id: 'moi-meme' },
@@ -103,12 +103,12 @@ const ARTICLES = [
     slug: 'bordereau', titre: 'Imprimer un bordereau',
     resume: 'Les colis prêts, le bordereau tamponné du numéro, la date limite d’envoi.',
     mots: 'bordereau étiquette imprimer pdf colis expédier envoyer date limite imprimante thermique a4 ebay leboncoin vinted',
-    chapo: 'Quand une paire se vend, le bordereau arrive avec la vente. VRM le range dans **Colis**, tamponné du numéro de rangement : tu imprimes, tu prends le bon carton, tu déposes.',
+    chapo: 'Quand une paire se vend, le bordereau arrive avec la vente. VRM le range dans **Colis**, tamponné du numéro de rangement : tu imprimes, tu prends la bonne paire là où elle est rangée, tu déposes.',
     blocs: [
       { etapes: [
         'Ouvre **Colis**. En haut : les colis **prêts à imprimer**.',
         'Touche un colis pour ouvrir son bordereau, puis imprime-le. Le numéro de rangement y est tamponné.',
-        'Prends le carton qui porte ce numéro, colle le bordereau, dépose le colis.',
+        'Prends la paire rangée sous ce numéro (carton, étagère, bac…), emballe-la, colle le bordereau, dépose le colis.',
       ] },
       { capture: 'colis.jpg', alt: 'L’écran Colis de VRM sur iPhone, avec les colis prêts à imprimer', legende: 'Colis : ce qui est prêt d’abord, puis ce qui attend, puis ce qui est parti.', h: 844 },
       { liste: [

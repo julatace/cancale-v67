@@ -3824,6 +3824,9 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // L'extension prévient quand elle a rangé une preuve (une transaction lue,
   // un bordereau, des ventes) : on relit, regroupé (une rafale = une lecture).
   const [preuveRelue, setPreuveRelue] = React.useState(0);
+  // (9 nov., Julien : « qu'est-ce que ça fait dans eBay ? c'est moche et mal présenté ») la liste des ventes
+  // Vinted pas reliées s'ouvre dans une FEUILLE ; sur l'écran, une seule ligne et un bouton.
+  const [sansPreuveOuvert, setSansPreuveOuvert] = React.useState(false);
   React.useEffect(() => {
     let t = null;
     const f = (e) => { const d = e && e.detail; if (!d || d.type !== 'maj' || !['preuves', 'label', 'ventes'].includes(d.quoi)) return; clearTimeout(t); t = setTimeout(() => setPreuveRelue((n) => n + 1), 1500); };
@@ -4657,7 +4660,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
             entière du geste et le pourquoi s'ouvrent en feuille (textContent les porte). */}
         <div className="vrm-alerte-ligne-titre">{nSansPreuve} vente{un ? '' : 's'} Vinted pas encore reliée{un ? '' : 's'}{' '}<Pourquoi label="Que faire" titre={`Vente${un ? '' : 's'} pas encore reliée${un ? '' : 's'} à ${un ? 'son' : 'leur'} annonce`}>{geste} Tant que ce n'est pas fait, VRM ne peut pas te dire de retirer {un ? 'sa' : 'leur'} paire d'eBay quand elle se vend sur Vinted.</Pourquoi></div>
         <div className="vrm-alerte-ligne-sous" data-ebay-sans-preuve-court="">{noms.join(', ')} · {promet ? `se relie toute seule ${quand}` : ailleurs ? 'à relier : ouvre Vinted là où est l’extension' : cap === 'retard' ? `mets l'extension à jour (${EXT_ATTENDUE})` : blocage ? 'l\'extension ne peut pas la lire' : 'je vérifie l\'extension…'}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
+        <Bouton variante="secondaire" data-ebay-sans-preuve-voir={nSansPreuve} onClick={() => setSansPreuveOuvert(true)} style={{ minHeight: 44, marginTop: 8 }}>{un ? 'Voir la vente' : `Voir les ${nSansPreuve} ventes`}</Bouton>
+        {sansPreuveOuvert && <SheetShell onClose={() => setSansPreuveOuvert(false)} titre={`Vente${un ? '' : 's'} Vinted à relier`} data-ebay-sans-preuve-feuille="">
+          <p style={{ margin: '0 0 8px', fontSize: 14, color: E.muted, lineHeight: 1.45 }}>Pour que VRM puisse te dire de retirer une paire d'eBay quand elle se vend sur Vinted, chaque vente doit être reliée à son annonce. {geste}</p>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
           {sansPreuve.map((v) => (
             <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} className="vrm-eb-sanspreuve-vente">
               <span className="vrm-eb-sanspreuve-titre">{v.titre || `Vente n° ${v.tx}`}{(parCompte.size > 1 || v.bordCapte) ? <small>{parCompte.size > 1 ? nom(v.uid) : ''}{v.bordCapte && <span data-ebay-sans-preuve-bord-capte={v.tx}>{parCompte.size > 1 ? ' · ' : ''}bordereau déjà là (Ventes)</span>}</small> : null}</span>
@@ -4668,6 +4674,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
             </div>
           ))}
         </div>
+        </SheetShell>}
       </div>
     );
   })();

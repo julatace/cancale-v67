@@ -121,7 +121,7 @@ export function lectureEmail(e, delies = {}) {
       o = { quoi: `Bordereau de la vente ${r.a ? r.a : 'n° ' + (r.tx || '?')}`,
         fait: `Ajouté aux colis à expédier · vente n° ${r.tx}${numSur ? ` · N°${r.n}` : ''}${r.tp ? ' · déjà tamponné' : ''}`,
         lien: lien('cat_bord'), num: numSur ? String(r.n) : null, cible: { k: 'tx', v: r.tx } };
-      if (r.av === 'num-titre') Object.assign(o, { raison: `Le N°${r.n} a été retrouvé par le titre de l’annonce, pas lu dans l’e-mail : il peut désigner une autre paire.`, geste: 'Vérifie ce N° sur ton carton avant d’imprimer le bordereau (Colis).' });
+      if (r.av === 'num-titre') Object.assign(o, { raison: `Le N°${r.n} a été retrouvé par le titre de l’annonce, pas lu dans l’e-mail : il peut désigner une autre paire.`, geste: 'Vérifie ce N° là où l’article est rangé (carton, étagère, bac…) avant d’imprimer le bordereau (Colis).' });
       if (r.av === 'sans-pdf') Object.assign(o, { raison: 'L’e-mail ne portait pas de PDF : il n’y a rien à imprimer depuis VRM.', geste: 'Télécharge le bordereau depuis la vente sur Vinted.' });
       o.delier = { offert: false, pourquoi: POURQUOI_PAS_DELIER.bordereau };
       break;

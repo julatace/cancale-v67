@@ -131,7 +131,7 @@ export const CONSEILS = [
     quand: (v) => estObjet(v) && v.jamais === true && fini(v.numeros) && v.numeros >= 10,
     cibles: ['[data-stock-inventaire-ouvrir]'],
     titre: 'Ton premier inventaire',
-    texte: 'Tape les N° de tes cartons : VRM te dit ce qui manque.',
+    texte: 'Tape les N° de tes articles rangés : VRM te dit ce qui manque.',
     geste: 'Commencer',
   },
   {

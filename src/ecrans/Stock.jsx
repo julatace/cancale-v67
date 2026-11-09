@@ -450,7 +450,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const options = [];
         if (ancien && mAncien) options.push(['echanger', `Échanger : N°${fo.numero} va dans l'ancienne case de N°${f ? f.numero : cle} (${ici(mAncien, ancien.i)})`]);
         options.push(['choisir', `Je choisis maintenant la nouvelle case de N°${fo.numero}`]);
-        options.push(['aranger', `N°${fo.numero} repart dans « À ranger » (son carton sort de cette case)`]);
+        options.push(['aranger', `N°${fo.numero} repart dans « À ranger » (il sort de cette case)`]);
         const choix = await askChoix({
           title: `${ici(m, i)} contient déjà N°${fo.numero}`,
           desc: `${fo.title ? '« ' + fo.title + ' »\n' : ''}Tu ranges N°${f ? f.numero : cle} dans cette case : où va N°${fo.numero} ?`,
@@ -757,7 +757,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       <div data-stock-plus-en-ligne={plusEnLigne.length}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Plus en ligne · {plusEnLigne.length}</div>
         <InfoPop nom="stock-plus-en-ligne" titre="Plus en ligne" style={{ margin: '2px 0 4px' }} resume="Rangées, plus en annonce nulle part">
-          <p>Rangées, mais plus en annonce nulle part : retire-les du carton, ou garde-les si elles reviennent en vente.</p>
+          <p>Rangées, mais plus en annonce nulle part : retire-les de leur case, ou garde-les si elles reviennent en vente.</p>
         </InfoPop>
         {plusEnLigne.map((f) => ligneRangee(f, <>
           <button className="vrm-b vrm-b-secondaire" type="button" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>Je l'ai retirée</button>
