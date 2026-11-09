@@ -12118,7 +12118,16 @@ const SOURCE_ANCIENNE = { brocante: 'Brocante', fournisseur: 'Fournisseur', part
 const libelleSourceAchat = (s) => SOURCE_ANCIENNE[s] || String(s || '').trim();
 // (2 nov., audit des données G2) Le jour en toutes lettres, « 1er » le premier
 // du mois (la règle d'URSSAF, `jour` du profil fiscal) : « dimanche 1er novembre ».
-const dateJourFr = (d) => `${d.toLocaleDateString('fr-FR', { weekday: 'long' })} ${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
+// (9 nov., vitesse) Les deux formats créés UNE fois : `toLocaleDateString(…, options)` refait un
+// Intl.DateTimeFormat à chaque appel (~230 ms du démarrage au téléphone). Même texte (ECMA-402 :
+// `toLocaleDateString(l, o)` = `new Intl.DateTimeFormat(l, o).format(d)` quand `o` nomme un champ de date).
+let _fmtJourSemaine = null, _fmtMoisLong = null;
+const dateJourFr = (d) => {
+  if (!_fmtJourSemaine) { try { _fmtJourSemaine = new Intl.DateTimeFormat('fr-FR', { weekday: 'long' }); _fmtMoisLong = new Intl.DateTimeFormat('fr-FR', { month: 'long' }); } catch (_) { _fmtJourSemaine = _fmtMoisLong = null; } }
+  const js = _fmtJourSemaine ? _fmtJourSemaine.format(d) : d.toLocaleDateString('fr-FR', { weekday: 'long' });
+  const ml = _fmtMoisLong ? _fmtMoisLong.format(d) : d.toLocaleDateString('fr-FR', { month: 'long' });
+  return `${js} ${d.getDate() === 1 ? '1er' : d.getDate()} ${ml}`;
+};
 // (2 nov., audit des données ; limites n°14) Une date de vente illisible ne
 // s'affiche jamais « Invalid Date » : « date inconnue » (la règle de `fmtD`, Colis).
 const dateFr = (d, opts) => { const t = d == null || d === '' ? NaN : (typeof d === 'number' ? d : Date.parse(d)); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', opts) : 'date inconnue'; };
@@ -27064,10 +27073,21 @@ const etatOrdersDuCache = (type, accounts) => {
 // tout de suite (`_persistAcctCache`) et annule l'écriture en attente — sinon un
 // rechargement juste après « Synchroniser » relirait l'ancien cache. Le cache
 // n'est qu'un raccourci : une écriture perdue relit simplement la base.
+// (9 nov., vitesse) Mesuré au démarrage (téléphone émulé, processeur ×4) : l'écriture
+// programmée tombait PENDANT l'ouverture — `JSON.stringify` + `sessionStorage.setItem` des
+// ventes, achats et annonces (~1,5 Mo), ~0,5 s d'un bloc. Le cache ne sert qu'à un
+// rechargement de CET onglet : un rangement le marque à écrire, et il est écrit quand la page
+// est quittée ou cachée (`pagehide`, `visibilitychange` → caché : un rechargement, un autre
+// onglet, l'iPhone qui la met de côté), ou au plus tard 20 s après, quand le navigateur est
+// libre (`requestIdleCallback`). Un effacement reste écrit tout de suite (ci-dessus).
 let _persistAcctTimer = null;
-const _persistAcctCache = ()=>{ if(_persistAcctTimer){ clearTimeout(_persistAcctTimer); _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return; _persistAcctTimer = setTimeout(_persistAcctCache, 400); };
+const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof cancelIdleCallback==='function') cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
+  _persistAcctTimer = { idle: false, id: setTimeout(()=>{
+    try { if (typeof requestIdleCallback === 'function') { _persistAcctTimer = { idle: true, id: requestIdleCallback(_persistAcctCache, { timeout: 5000 }) }; return; } } catch(_) {}
+    _persistAcctCache(); }, 15000) }; };
 try { window.addEventListener('pagehide', ()=>{ if(_persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
+try { document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden' && _persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
 // ── SÉLECTEUR DE COMPTE (onglets d'une plateforme) ───────────────────────────
 // Julien, 6 oct. : « si on sélectionne un compte et qu'on est dans l'onglet
 // annonce, il n'y a que les annonces de ce compte qui apparaissent ; par défaut
@@ -38437,7 +38457,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // les N prêts » (`lignesLot`), les points de la colonne « À retirer »
         // (`pointsARetirer`). Une étape se coche sur un geste réellement noté
         // aujourd'hui (impression, « Déposé », « Je l'ai eu »).
+        // (9 nov., vitesse) La carte n'est plus montrée (`TOURNEE_SUR_JOURNEE`, plus bas) : rien
+        // n'est calculé — mesuré, ce calcul (toutes les cartes de Colis, à chaque rendu de Ma
+        // journée) pesait ~1 s du démarrage au téléphone pour un résultat que rien n'affichait.
         const tournee = (() => {
+          if (!TOURNEE_SUR_JOURNEE) return null;
           if (baseKO || premierJour || loading) return null;
           try {
             const tEnv = T.find(x => x.id === 'envoyer'), tRet = T.find(x => x.id === 'retirer');
