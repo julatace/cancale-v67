@@ -15160,7 +15160,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   </div> : null;
   return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
-    <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true">V</span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
+    <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
       {groupes.filter(g => g.titre !== 'Moi').map(groupe)}
