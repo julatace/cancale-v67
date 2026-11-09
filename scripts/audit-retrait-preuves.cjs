@@ -114,7 +114,7 @@ function cablage(dit) {
   const pu = app.slice(app.indexOf('const pickupUnion = useMemo('), app.indexOf('const groupesRelais = useMemo(') > 0 ? app.indexOf('const groupesRelais = useMemo(') : app.indexOf('const pickupUnion = useMemo(') + 40000);
   dit(/finParIdentite\(t, preuvesIdentite\(t, cmd\)\)/.test(pu) && /fi === 'retire'/.test(pu), 'D1 pickupUnion juge la fin par les autres identités (commande, code)');
   dit(/fusionnerParCode\(emailList/.test(pu), 'D2 pickupUnion : une ligne par code de retrait');
-  dit(/regrouperArrivees\(emailList, \{[^}]*temoins, sansIdentite \}\)/.test(pu), 'D3 pickupUnion donne les témoins (finis compris) et la règle « sans identité »');
+  dit(/regrouperArrivees\(emailList, \{[^}]*temoins, sansIdentite(?:, temoinActif: [^}]*)? \}\)/.test(pu), 'D3 pickupUnion donne les témoins (finis compris) et la règle « sans identité »');
   dit(/enDouble/.test(pu) && /doute_meme_relais/.test(pu), 'D4 les doubles possibles sont à part : ni « à retirer », ni « à vérifier »');
   const tfb = app.slice(app.indexOf('const colisParTx = useMemo('), app.indexOf('const achatStage ='));
   dit(tfb.length > 0 && !/normTitle/.test(tfb) && /achatParConversation|parConv/.test(tfb), 'D5 l\'écran Achats relie un colis à SA commande par identité, jamais par le titre');
