@@ -935,12 +935,68 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
 const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_accounts_hidden'];
 const BORD_COLIS = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
+// (9 nov., charge — scripts/charge/) LES LISTES DE VENTES SEULEMENT QUAND ELLES SERVENT.
+// Le matin et le soir lisaient la liste ENTIÈRE de chaque compte (≈ 100 Ko par
+// compte, ~2 Mo par vendeur et par jour au banc) pour trois usages : le résumé
+// « à expédier » (posé par l'extension DANS la ligne), la date des ventes à
+// expédier (limite estimée) et les n° connus (ventes vues par e-mail). On lit
+// d'abord le résumé seul (`txns`, `dates`, `capturedAt`) ; la liste entière n'est
+// relue QUE si un compte lié n'a pas de résumé (extension d'avant), si une vente
+// vue par e-mail est à juger (tous les comptes, exactement comme avant), ou pour
+// les comptes d'une vente à expédier sans date. Le résultat est le même qu'avec
+// les listes entières (scripts/audit-charge-rappels.cjs le compare).
+const SEL_RESUME_VENTES = 'id,txns:data->resume->txns,dates:data->resume->dates,cap:data->>capturedAt';
+const SEL_LISTE_VENTES = 'id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt';
+const uidLigneVentes = (id) => (String(id || '').match(/^harvest_(.+?)_orders_sold$/) || [])[1] || '';
+async function lireVentesColis(comptesL, lireListes) {
+  const resumes = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=${SEL_RESUME_VENTES}`));
+  if (!Array.isArray(resumes)) return null;
+  const vivants = Array.isArray(comptesL) ? new Set(comptesL.map((c) => String((c && c.vinted_user_id) || '')).filter(Boolean)) : null;
+  // Comptes liés pas sus, ou un compte lié sans résumé : la lecture d'avant.
+  const sansResume = resumes.some((l) => { const u = uidLigneVentes(l && l.id); return u && (!vivants || !vivants.size || vivants.has(u)) && !Array.isArray(l.txns); });
+  if (!vivants || !vivants.size || sansResume) return { lignes: await lireListes(), entieres: true };
+  return { lignes: resumes.map((l) => ({ id: l.id, orders: null, txns: l.txns, cap: l.cap, dates: l.dates })), entieres: false };
+}
+// Complète `d` (lu par résumé) avec les listes entières là où elles servent.
+// Rend `d` (inchangé quand rien ne manque) ; une relecture ratée rend `null`
+// pour les commandes (« pas su », comme une lecture ratée d'avant).
+async function completerVentesColis(d, lireListes) {
+  if (!d || !d.commandes || d.listesEntieres) return d;
+  const mettre = (lignes) => {
+    if (!Array.isArray(lignes)) { d.commandes = null; return; }
+    for (const l of lignes) { const u = uidLigneVentes(l && l.id); if (u && d.commandes[u]) d.commandes[u].orders = Array.isArray(l.orders) ? l.orders : []; }
+  };
+  // 1. Une vente vue par e-mail se juge sur les n° de TOUTES les listes : si le
+  //    résumé seul en laisse une à juger, toutes les listes sont relues (comme avant).
+  const avecResume = ventesEmailColis(d);
+  if (avecResume.txs.length) { mettre(await lireListes()); d.listesEntieres = true; return d; }
+  // 2. La date des ventes à expédier sans date dans le résumé : leurs seuls comptes.
+  const t = txsAExpedier(d);
+  if (!t) return d;
+  const manque = new Set();
+  for (const tx of t.vinted) {
+    let date = null, uid = null;
+    for (const [u, l] of Object.entries(d.commandes)) {
+      if (!Array.isArray(l.txns) || !l.txns.map(String).includes(String(tx))) continue;
+      uid = uid || u;
+      const dl = l.dates && typeof l.dates === 'object' && !Array.isArray(l.dates) ? l.dates[String(tx)] : null;
+      if (typeof dl === 'string' && Number.isFinite(Date.parse(dl))) { date = dl; break; }
+    }
+    if (!date && uid) manque.add(uid);
+  }
+  if (!manque.size) return d;
+  const ids = [...manque].map((u) => encodeURIComponent(`harvest_${u}_orders_sold`)).join(',');
+  mettre(await fetchPaginated(scoped(`app_data?id=in.(${ids})&select=${SEL_LISTE_VENTES}`)));
+  return d;
+}
 async function lireDonneesColis() {
   const BORD = BORD_COLIS;
-  const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL, dep, mailsVentes, panneau] = await Promise.all([
-    fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
+  const lireListes = () => fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=${SEL_LISTE_VENTES}`));
+  const comptesP = fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login'));
+  const [comptesL, m, ventes, ebay, bords, lbcL, vcV, vcL, dep, mailsVentes, panneau] = await Promise.all([
+    comptesP,
     getRowProjete('main', MAIN_COLIS),
-    fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt')),
+    comptesP.then((c) => lireVentesColis(c, lireListes)),
     lireCommandesEbay(),
     fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
     // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : leurs seules ventes (§4.4).
@@ -957,18 +1013,19 @@ async function lireDonneesColis() {
   // (8 nov., « à envoyer » prouvé) Les preuves de départ de la règle de Colis (api/_lib/depart-vente.js).
   const preuves = await lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x)));
   const comptes = Array.isArray(comptesL) ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || '') })).filter((c) => c.uid) : null;
+  const lignes = ventes ? ventes.lignes : null;
   let commandes = null;
   if (Array.isArray(lignes)) {
     commandes = {};
     for (const l of lignes) {
       const um = String((l && l.id) || '').match(/^harvest_(.+?)_orders_sold$/);
-      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null, cap: l.cap || null };
+      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null, cap: l.cap || null, ...(l.dates !== undefined ? { dates: l.dates } : {}) };
     }
   }
-  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords, departs, preuves,
+  return completerVentesColis({ comptes, commandes, listesEntieres: !ventes || ventes.entieres, main: m === undefined ? null : objet(m), ebay, bords, departs, preuves,
     mailsVentes: Array.isArray(mailsVentes) ? mailsVentes : null, panneau: panneau === undefined ? null : objet(panneau),
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
-    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {}, departs } };
+    vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {}, departs } }, lireListes);
 }
 // Les ventes par transaction (leur DATE sert à la limite estimée), des seuls
 // comptes encore liés — la même portée que `txsAExpedier`.
@@ -979,6 +1036,13 @@ function ventesParTx(d) {
   for (const [uid, l] of Object.entries(d.commandes)) {
     if (vivants.size && !vivants.has(uid)) continue;
     for (const o of l.orders) if (o && o.transaction_id != null) out[String(o.transaction_id)] = o;
+  }
+  // (9 nov., charge) Liste pas relue : la date posée dans le résumé, par n° (même commande).
+  for (const [uid, l] of Object.entries(d.commandes)) {
+    if (vivants.size && !vivants.has(uid)) continue;
+    const dl = l.dates && typeof l.dates === 'object' && !Array.isArray(l.dates) ? l.dates : null;
+    if (!dl || !Array.isArray(l.txns)) continue;
+    for (const t of l.txns) { const k = String(t); if (!out[k] && typeof dl[k] === 'string' && Number.isFinite(Date.parse(dl[k]))) out[k] = { transaction_id: k, date: dl[k] }; }
   }
   // (8 nov.) La vente vue par e-mail : sa date (l'arrivée de l'e-mail), comme dans l'app.
   for (const [t, o] of Object.entries(ventesEmailColis(d).ventes)) if (!out[t]) out[t] = o;
