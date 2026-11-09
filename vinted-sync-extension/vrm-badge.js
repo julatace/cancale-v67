@@ -101,7 +101,7 @@
   .val { margin-top: 2px; word-break: break-word; }
   .val.alerte { color: var(--ambre); }
   .val.gris { color: var(--doux); }
-  /* 5.333 : Leboncoin en trois lignes ; « ✓ » discret (pas de couleur : §7), un seul geste. */
+  /* 5.335 : Leboncoin en trois lignes ; « ✓ » discret (pas de couleur : §7), un seul geste. */
   .val .coche { color: var(--doux); margin-left: 4px; }
   .geste { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--remplir); font-size: 13px; }
   .geste b { font-weight: 600; }
@@ -253,7 +253,7 @@
     const f = e.flux;
     if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
     if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
-    if (e.plateforme === 'leboncoin' && e.lbc && e.lbc.compte && e.lbc.compte.ok === false) return true;   // 5.333 : le compte Leboncoin attend un geste (recharger, se connecter)
+    if (e.plateforme === 'leboncoin' && e.lbc && e.lbc.compte && e.lbc.compte.ok === false) return true;   // 5.335 : le compte Leboncoin attend un geste (recharger, se connecter)
     return false;
   };
 
@@ -362,7 +362,7 @@
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
     else compteSite = '<div class="val gris">pas encore reconnu</div>';
 
-    // 5.333 (9 nov.) — Julien : « le "à confirmer" je ne comprends pas, ça doit
+    // 5.335 (9 nov.) — Julien : « le "à confirmer" je ne comprends pas, ça doit
     // être beaucoup plus clair ». Sur Leboncoin : Compte · Annonces · Ventes, ce
     // que le fond a résumé (`resumeCarteLbc`), et UN geste.
     const lbcVal = (x) => {
@@ -403,7 +403,7 @@
       });
       if (lignes.length) flux = lignes.join('') + flux.replace(/<div class="val gris">Rien envoyé[^<]*<\/div>/, '');
     }
-    // 5.333 : plus de « nouvelle intégration non confirmée » ni de diagnostic
+    // 5.335 : plus de « nouvelle intégration non confirmée » ni de diagnostic
     // technique : les lignes Annonces et Ventes, puis le geste (un seul).
     const lbcLignes = e.plateforme === 'leboncoin' && e.lbc && e.capte && !(v && v.connecte === false)
       ? `<div class="ligne"><div class="lib">Annonces</div>${lbcVal(e.lbc.annonces)}</div><div class="ligne"><div class="lib">Ventes</div>${lbcVal(e.lbc.ventes)}</div>` : '';
@@ -418,7 +418,7 @@
       const lignes = e.aRetirer.liste.slice(0, 6).map((r) => {
         const cette = r.lbcId && ici.includes(String(r.lbcId));
         const nom = (r.numero ? 'N°' + r.numero + ' · ' : '') + (r.titre || 'une paire');
-        return `<div class="val alerte" data-a-retirer="${esc(r.lbcId || r.numero || '')}">${cette ? '<b>C’est cette annonce</b> — ' : ''}${esc(nom)} — vendue, encore en ligne ici${r.lu ? ' (vu ' + esc(depuis(r.lu)) + ')' : ''}${r.url && !cette ? ` · <a href="${esc(r.url)}" target="_top">voir l’annonce</a>` : ''}</div>`;
+        return `<div class="val alerte" data-a-retirer="${esc(r.lbcId || r.numero || '')}">${cette ? '<b>C’est cette annonce</b> — ' : ''}${esc(nom)} — vendue sur Vinted, encore en ligne ici${r.lu ? ' (vu ' + esc(depuis(r.lu)) + ')' : ''}${r.url && !cette ? ` · <a href="${esc(r.url)}" target="_top">voir l’annonce</a>` : ''}</div>`;
       }).join('');
       const plus = e.aRetirer.liste.length > 6 ? `<div class="val gris">et ${e.aRetirer.liste.length - 6} autre(s) — la liste complète est dans VRM → Leboncoin → Annonces</div>` : '';
       const n = e.aRetirer.liste.length;

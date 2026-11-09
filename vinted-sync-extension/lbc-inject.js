@@ -24,7 +24,7 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.333.0';
+  const CAPTEUR_VERSION='5.335.0';
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;
@@ -487,7 +487,7 @@
     }
   };
 
-  // ── « MES ANNONCES » LUE EN ENTIER, TOUTES LES PAGES (5.333, 9 nov.) ───────
+  // ── « MES ANNONCES » LUE EN ENTIER, TOUTES LES PAGES (5.335, 9 nov.) ───────
   // Julien : « j'ai plus que 1 annonce, les données de Leboncoin circulent très
   // mal ». Une liste ne DÉCIDE (« en ligne », « plus en ligne ») que lue EN
   // ENTIER ; or la page « Mes annonces » ne charge que la page qu'il regarde

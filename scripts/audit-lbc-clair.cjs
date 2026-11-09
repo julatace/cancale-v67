@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// LEBONCOIN CLAIR (5.333.0, 9 nov.) — la page, le relais et le fond, EXÉCUTÉS
+// LEBONCOIN CLAIR (5.335.0, 9 nov.) — la page, le relais et le fond, EXÉCUTÉS
 //   node scripts/audit-lbc-clair.cjs                (le code du dépôt)
 //   node scripts/audit-lbc-clair.cjs --ext <dossier> (une autre copie de
 //        vinted-sync-extension/ : la preuve sur la 5.331, §6.1)
@@ -31,7 +31,7 @@ const EXT = path.resolve(arg('--ext', path.join(racine, 'vinted-sync-extension')
 const lire = (f) => fs.readFileSync(path.join(EXT, f), 'utf8');
 
 if (process.argv.includes('--prouve')) {
-  // Chaque mutation réaffaiblit UNE règle de la 5.333 dans une copie de l'extension.
+  // Chaque mutation réaffaiblit UNE règle de la 5.335 dans une copie de l'extension.
   const MUT = [
     ['refusSansSessionDefinitif', 'lbc-relay.js', "if(!ok&&sansSession===true&&REJOUABLES.includes(m.action)){", "if(false){"],
     ['comptePriveNonReconnu', 'background.js', "const aMoiParOwner = !!(ownerId && (miens.has(ownerId) || miensNus.has(idCompteLbc(ownerId))));", "const aMoiParOwner = !!(ownerId && miens.has(ownerId));"],

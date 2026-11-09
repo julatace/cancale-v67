@@ -4,12 +4,12 @@
   const vus=new Set();
   const pausesEnAttente=new Map();     // jeton → réponse au fond (22 oct.)
   const envoisEnAttente=new Map();     // 5.318 : jeton → réponse au fond (répondre dans un fil)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.333.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.335.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
   const signaler=erreurCapture=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur:true,erreurCapture});}catch(_){}};
-  // 5.333 (9 nov.) : ce que la page a lu PENDANT que l'extension n'était pas
+  // 5.335 (9 nov.) : ce que la page a lu PENDANT que l'extension n'était pas
   // connectée à VRM (le fond répond `sansSession`) n'est plus jeté : gardé ici
   // (en mémoire, ce document seulement, 48 messages / 4 Mo / 30 min au plus) et
   // rejoué — l'identité d'abord, par la même garde — dès qu'une session existe.
@@ -123,7 +123,7 @@
     window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:msg.action==='lbcSupprimeAnnonce'?'supprime':'pause',id,jeton},'*');
     return true;
   });}catch(_){}
-  // 5.333 : le fond dit qu'une session VRM vient d'arriver ⇒ on rejoue ce qu'on garde.
+  // 5.335 : le fond dit qu'une session VRM vient d'arriver ⇒ on rejoue ce qu'on garde.
   try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
     if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcRejouer')return;
     if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
