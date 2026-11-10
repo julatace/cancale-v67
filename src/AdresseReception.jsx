@@ -17,11 +17,11 @@
 // ══════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SheetShell } from './composants/SheetShell.jsx';
-import { SegmenteBase } from './composants/Bouton.jsx';
 import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import { EtatPanne } from './composants/EtatPanne.jsx';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
-import { ROUTE_ADRESSE, etatAdresse, codeAMontrer, ilYa, NOM_FOURNISSEUR, FOURNISSEURS, CE_QUI_EST_LU, lienEssai } from './adresseReception.js';
+import { ROUTE_ADRESSE, etatAdresse, codeAMontrer, ilYa, NOM_FOURNISSEUR, FOURNISSEURS, CE_QUI_EST_LU, lienEssai, RELAIS_APPLE, ETAPES_FILTRE_GMAIL, nouveauCodeEssai, sujetEssai, etatEssai, gestesMiseEnService, DOC_MISE_EN_SERVICE } from './adresseReception.js';
+import { EXPEDITEURS, regleFiltre } from './relierBoite.js';
 import './adresse-reception.css';
 
 const Svg = ({ children, t = 18 }) => <svg viewBox="0 0 24 24" width={t} height={t} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
@@ -41,13 +41,13 @@ async function copier(texte) {
   } catch (_) { return false; }
 }
 
-function BoutonCopier({ texte, mot = 'Copier', className = 'vrm-b vrm-b-primaire', ...rest }) {
+function BoutonCopier({ texte, mot = 'Copier', className = 'vrm-b vrm-b-primaire', onCopie, ...rest }) {
   const [etat, setEtat] = useState('');
   const t = useRef(0);
   useEffect(() => () => clearTimeout(t.current), []);
   return (
     <button type="button" className={className} data-copie={etat || undefined} {...rest}
-      onClick={async () => { const ok = await copier(texte); setEtat(ok ? 'ok' : 'ko'); clearTimeout(t.current); t.current = setTimeout(() => setEtat(''), 2200); }}>
+      onClick={async () => { const ok = await copier(texte); setEtat(ok ? 'ok' : 'ko'); if (ok && onCopie) onCopie(); clearTimeout(t.current); t.current = setTimeout(() => setEtat(''), 2200); }}>
       <span aria-live="polite">{etat === 'ok' ? 'Copié' : etat === 'ko' ? 'Sélectionne-la pour copier' : mot}</span>
     </button>
   );
@@ -67,6 +67,73 @@ function Schema({ f, adresse }) {
   );
 }
 
+// L'essai en cours, gardé sur CET appareil (un confort : il revient après un
+// passage par l'app d'e-mail ; jamais une preuve — la preuve est au serveur).
+const CLE_ESSAI = 'vrm_essai_adresse_reception';
+const lireEssaiLocal = (adresse) => { try { const x = JSON.parse(localStorage.getItem(CLE_ESSAI) || 'null'); return x && x.adresse === adresse && /^[A-Z2-9]{4}$/.test(x.code || '') ? x : null; } catch (_) { return null; } };
+const ecrireEssaiLocal = (x) => { try { if (x) localStorage.setItem(CLE_ESSAI, JSON.stringify(x)); else localStorage.removeItem(CLE_ESSAI); } catch (_) {} };
+
+// Le numéro rond d'une étape du parcours.
+const Pas = ({ n, titre, fait }) => (
+  <h3 className="vrm-ar-pas" data-pas={n} data-pas-fait={fait ? '1' : undefined}>
+    <span className="vrm-ar-pas-num" aria-hidden="true">{fait ? <Svg t={14}><path d="m5 12.5 4.5 4.5L19 7.5"/></Svg> : n}</span>
+    <span><span className="vrm-ar-hors-champ">Étape {n} : </span>{titre}</span>
+  </h3>
+);
+
+// Étape 3 : l'e-mail d'essai, suivi en direct.
+function Essai({ adresse, d, maintenant, essai, prepare, onLancer, onRecommencer }) {
+  const e = etatEssai(d, essai, maintenant);
+  const code = essai ? essai.code : prepare;
+  return (
+    <section className="vrm-ar-bloc vrm-ar-essai" data-bloc="essai" data-essai-etat={e.etat} aria-labelledby="vrm-ar-essai-titre">
+      <div id="vrm-ar-essai-titre"><Pas n={3} titre="Vérifie que ça marche" fait={e.etat === 'recu'}/></div>
+      {e.etat === 'recu' ? (
+        <div className="vrm-ar-recu" role="status" data-essai-recu={essai.code}>
+          <p className="vrm-ar-recu-grand"><Svg t={22}><path d="m5 12.5 4.5 4.5L19 7.5"/></Svg> Reçu</p>
+          <p className="vrm-ar-texte">Ton adresse VRM marche{e.at ? ` · ${ilYa(e.at, maintenant)}` : ''}.</p>
+          <p className="vrm-ar-note">Le transfert se verra au prochain e-mail de Vinted.</p>
+          <button type="button" className="vrm-lien-action vrm-ar-lien" onClick={onRecommencer} data-essai-refaire="">Refaire un essai</button>
+        </div>
+      ) : (<>
+        <p className="vrm-ar-texte">Envoie-toi un e-mail depuis ta boîte habituelle.</p>
+        <p className="vrm-ar-objet">Objet : <b translate="no" data-essai-code={code}>{sujetEssai(code)}</b></p>
+        <div className="vrm-ar-actions">
+          <a className={'vrm-b ' + (e.etat === 'repos' ? 'vrm-b-primaire' : 'vrm-b-secondaire')} href={lienEssai(adresse, code)} data-essai="" onClick={() => onLancer(code)}>{e.etat === 'repos' ? 'Envoyer l’e-mail d’essai' : 'Le renvoyer'}</a>
+          <BoutonCopier texte={sujetEssai(code)} mot="Copier l’objet" className="vrm-b vrm-b-secondaire" data-copier-objet="" onCopie={() => onLancer(code)}/>
+        </div>
+        <p className="vrm-ar-etat" data-ton={e.etat === 'attente' ? 'attente' : e.etat === 'repos' ? 'off' : 'passu'} aria-live="polite" data-essai-phrase="">
+          <span className="vrm-ar-point" aria-hidden="true"/>
+          <span><b>{e.etat === 'attente' ? 'J’attends ton e-mail…' : e.etat === 'trop-long' ? 'Pas encore reçu.' : e.etat === 'passu' ? 'Pas su pour l’instant : je relis.' : 'Pas encore envoyé.'}</b>
+            {e.etat === 'attente' ? ' Ça prend souvent moins d’une minute.' : e.etat === 'trop-long' ? ' Vérifie l’adresse collée, puis renvoie-le.' : ''}</span>
+        </p>
+        {e.etat === 'trop-long' ? <button type="button" className="vrm-lien-action vrm-ar-lien" onClick={onRecommencer} data-essai-refaire="">Recommencer avec un nouveau code</button> : null}
+      </>)}
+    </section>
+  );
+}
+
+// Pas encore ouverte, vue du PROPRIÉTAIRE : ce qui manque (états de la route).
+function MiseEnService({ m }) {
+  const g = gestesMiseEnService(m);
+  const MOT = { fait: 'Fait', 'a-faire': 'À faire', 'a-verifier': 'À vérifier' };
+  return (
+    <div className="vrm-ar-mes" data-mise-en-service="">
+      <p className="vrm-ar-note">Toi seul vois ceci. Ce qui manque pour l’ouvrir :</p>
+      <ol className="vrm-ar-mes-liste">
+        {g.map((x) => (
+          <li key={x.id} data-geste={x.id} data-geste-etat={x.etat}>
+            <span className="vrm-ar-mes-titre">{x.titre}</span>
+            <span className="vrm-ar-mes-etat">{MOT[x.etat]}</span>
+            <span className="vrm-ar-mes-detail">{x.detail}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="vrm-ar-note">Le pas-à-pas complet : <code>{DOC_MISE_EN_SERVICE}</code></p>
+    </div>
+  );
+}
+
 export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, proprio = false, onBoite }) {
   const [d, setD] = useState(undefined);
   const [envoi, setEnvoi] = useState('');          // '' · 'actif' · 'remplacer'
@@ -74,6 +141,8 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
   const [confirmer, setConfirmer] = useState(false);
   const [service, setService] = useState('gmail');
   const [maintenant, setMaintenant] = useState(Date.now());
+  const [essai, setEssai] = useState(null);        // { adresse, code, depuis } — l'essai lancé
+  const [prepare, setPrepare] = useState(() => nouveauCodeEssai());
   const auth = useRef(headers); auth.current = headers;
   const enCours = useRef(null);
 
@@ -91,6 +160,11 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
   }, []);
   const lire = useCallback(async () => { const r = await appeler('GET'); if (r.ko && !r.abandon) setD((x) => (x === undefined ? null : x)); return r; }, [appeler]);
 
+  const pret = d && d.pret;
+  const adresse = pret ? d.adresse : '';
+  const eEssai = etatEssai(d, essai, maintenant);
+  const attend = eEssai.etat === 'attente' || eEssai.etat === 'passu';
+
   useEffect(() => {
     lire();
     // Relue toutes les 30 s, page visible : le code de Gmail et le premier e-mail apparaissent seuls.
@@ -99,6 +173,21 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
     document.addEventListener('visibilitychange', retourPage);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', retourPage); enCours.current?.abort(); };
   }, [lire]);
+  // Un essai lancé (même avant de passer par l'app d'e-mail) revient sur CETTE adresse.
+  useEffect(() => { if (adresse) { const x = lireEssaiLocal(adresse); setEssai(x); if (x) setPrepare(x.code); } }, [adresse]);
+  // Pendant l'attente de l'e-mail d'essai : relue toutes les 5 s (page visible).
+  useEffect(() => {
+    if (!attend) return undefined;
+    const t = setInterval(() => { if (document.visibilityState === 'visible') lire(); else setMaintenant(Date.now()); }, 5000);
+    return () => clearInterval(t);
+  }, [attend, lire]);
+
+  const lancerEssai = (code) => {
+    if (!adresse || (essai && essai.code === code && eEssai.etat !== 'trop-long')) return;
+    const x = { adresse, code, depuis: Date.now() };
+    setEssai(x); ecrireEssaiLocal(x); setMaintenant(Date.now());
+  };
+  const recommencerEssai = () => { const c = nouveauCodeEssai(); setEssai(null); ecrireEssaiLocal(null); setPrepare(c); };
 
   const basculer = async (actif) => {
     if (envoi || !d) return;
@@ -113,18 +202,20 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
     setEnvoi('remplacer'); setRetour('');
     const r = await appeler('POST', { geste: 'remplacer' });
     setEnvoi(''); setConfirmer(false);
+    if (!r.ko) recommencerEssai();
     setRetour(r.ko ? (r.message || 'Pas remplacée — ton adresse n’a pas changé. Réessaie.') : 'Adresse remplacée. Mets la nouvelle dans ton transfert.');
   };
 
-  const pret = d && d.pret;
-  const adresse = pret ? d.adresse : '';
   const [local, domaine] = adresse ? [adresse.slice(0, adresse.indexOf('@')), adresse.slice(adresse.indexOf('@'))] : ['', ''];
   const e = etatAdresse(d, maintenant);
   const f = FOURNISSEURS.find((x) => x.id === service) || FOURNISSEURS[0];
   const code = codeAMontrer(d, maintenant) ? d.code : null;
+  const voitGestes = !!(d && !d.pret && (d.proprio === true || proprio));
+  const regle = regleFiltre('gmail', EXPEDITEURS.map((x) => x.id)).texte;
+  const recu = !!(d && d.dernier);
 
   return (
-    <SheetShell onClose={onFermer} FermeAuRetour={FermeAuRetour} titre="Ton adresse VRM" maxWidth={600} z={9000} className="vrm-ar-feuille"
+    <SheetShell onClose={onFermer} FermeAuRetour={FermeAuRetour} titre="Recevoir tes e-mails Vinted" maxWidth={600} z={9000} className="vrm-ar-feuille"
       data-feuille-adresse-reception="" data-etat={d === undefined ? 'lecture' : d === null ? 'pas-su' : !d.pret ? 'pas-prete' : d.actif === false ? 'off' : 'active'}>
       <div className="vrm-ar">
         {d === undefined && <div className="vrm-ar-hero vrm-ar-squelette" role="status" aria-label="Lecture de ton adresse…"><span/><span/><span/></div>}
@@ -132,19 +223,20 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
         {d && !d.pret && (
           <section className="vrm-ar-hero vrm-ar-fermee" data-adresse-reception="pas-prete">
             <span className="vrm-ar-tuile" aria-hidden="true">{ICONES.arobase}</span>
-            <h2>Bientôt ici : ton adresse VRM</h2>
-            <p>{d.manque === 'domaine' ? 'L’adresse de réception de VRM n’est pas encore ouverte : il lui manque son domaine.' : 'L’adresse de réception de VRM n’est pas encore disponible sur cette installation.'}</p>
-            {proprio ? <p className="vrm-ar-note" data-adresse-proprio="">Pour l’ouvrir : un domaine dédié sur Cloudflare (Email Routing → catch-all → le Worker), puis <code>DOMAINE_RECEPTION</code> sur le serveur — le pas-à-pas est dans <code>docs/email-pipeline.md</code>.</p>
-              : <p className="vrm-ar-note">En attendant, tes adresses habituelles continuent de marcher (Adresses, plus haut).</p>}
+            <h2>Bientôt disponible</h2>
+            <p>Ton adresse VRM n’est pas encore ouverte.</p>
+            <p className="vrm-ar-note">{d.manque === 'cloisonnement' ? 'Elle demande une base séparée par vendeur.' : 'Tes adresses habituelles marchent toujours, rien ne change.'}</p>
+            {voitGestes ? <MiseEnService m={d.miseEnService}/> : null}
           </section>
         )}
         {pret && <>
-          <section className="vrm-ar-hero" data-actif={d.actif === false ? '0' : '1'}>
-            <p className="vrm-ar-sur">{d.actif === false ? 'Ton adresse de réception · désactivée' : 'Ton adresse de réception'}</p>
+          <p className="vrm-ar-chapo">Trois étapes, une seule fois. Ensuite, tout arrive seul.</p>
+          <section className="vrm-ar-hero" data-actif={d.actif === false ? '0' : '1'} aria-labelledby="vrm-ar-pas-1">
+            <div id="vrm-ar-pas-1"><Pas n={1} titre="Copie ton adresse VRM" fait={recu}/></div>
+            <p className="vrm-ar-sur">{d.actif === false ? 'Ton adresse de réception · désactivée' : 'Elle est à toi seul.'}</p>
             <p className="vrm-ar-adresse" data-adresse-reception={adresse} translate="no"><span>{local}</span><wbr/><span className="vrm-ar-domaine">{domaine}</span></p>
             <div className="vrm-ar-actions">
-              <BoutonCopier texte={adresse} mot="Copier l’adresse" data-copier-adresse="" className={codeAMontrer(d, maintenant) ? 'vrm-b vrm-b-secondaire' : 'vrm-b vrm-b-primaire'}/>
-              <a className="vrm-b vrm-b-secondaire" href={lienEssai(adresse)} data-essai="">Envoyer un e-mail d’essai</a>
+              <BoutonCopier texte={adresse} mot="Copier l’adresse" data-copier-adresse="" className={code ? 'vrm-b vrm-b-secondaire' : 'vrm-b vrm-b-primaire'}/>
             </div>
             <p className="vrm-ar-etat" data-ton={e.ton} data-dernier={d.dernier ? d.dernier.at : ''} aria-live="polite">
               <span className="vrm-ar-point" aria-hidden="true"/>
@@ -155,7 +247,7 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
           {code && (
             <section className="vrm-ar-code" data-code-transfert={code.fournisseur} aria-label={`Confirmation de ${NOM_FOURNISSEUR[code.fournisseur] || 'ta messagerie'}`}>
               <p className="vrm-ar-code-sur">{NOM_FOURNISSEUR[code.fournisseur] || 'Ta messagerie'} demande une confirmation · {ilYa(code.recuLe, maintenant)}</p>
-              {code.code ? <p className="vrm-ar-code-valeur" data-code-valeur={code.code} translate="no">{code.code.replace(/(\d{3})(?=\d)/g, '$1 ')}</p> : null}
+              {code.code ? <p className="vrm-ar-code-valeur" data-code-valeur={code.code} translate="no">{code.code.replace(/(\d{3})(?=\d)/g, '$1 ')}</p> : null}
               {code.source ? <p className="vrm-ar-code-source">Demande de <b>{code.source}</b>. Si ce n’est pas ta boîte, ne confirme pas.</p> : null}
               {code.fournisseur === 'gmail' && !code.signe ? <p className="vrm-ar-code-source" data-code-non-signe="">Signature de Google non vérifiée : compare bien l’adresse.</p> : null}
               <div className="vrm-ar-actions">
@@ -165,7 +257,47 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
             </section>
           )}
 
-          <GroupeIos titre="Réception" pied={d.actif === false ? 'Désactivée : ce qui arrive à cette adresse est gardé à part, jamais rangé chez toi ni chez un autre.' : 'Tout e-mail livré à cette adresse est rangé chez toi : elle est à toi seul.'}>
+          <section className="vrm-ar-bloc" data-bloc="transfert" aria-labelledby="vrm-ar-pas-2">
+            <div id="vrm-ar-pas-2"><Pas n={2} titre="Crée le transfert automatique" fait={recu && eEssai.etat === 'recu'}/></div>
+            <p className="vrm-ar-texte">Ta messagerie envoie une copie. Tu gardes tout chez toi.</p>
+            <div className="vrm-ar-choix" role="radiogroup" aria-label="Ta messagerie">
+              {FOURNISSEURS.map((x) => (
+                <button key={x.id} type="button" role="radio" aria-checked={x.id === service} className="vrm-ar-choix-btn" data-fournisseur={x.id} onClick={() => setService(x.id)}>{x.nom}</button>
+              ))}
+            </div>
+            <p className="vrm-ar-ou">{f.ou}</p>
+            <ol className="vrm-ar-etapes" data-etapes={f.id}>{f.etapes.map((t, i) => (
+              <li key={i}><span className="vrm-ar-num" aria-hidden="true">{i + 1}</span>
+                <span>{t}
+                  {f.code === i ? (code && code.fournisseur === f.id
+                    ? <span className="vrm-ar-code-etape" data-code-etape="recu"> <b translate="no">{code.code ? code.code.replace(/(\d{3})(?=\d)/g, '$1 ') : 'Lien reçu'}</b> · reçu {ilYa(code.recuLe, maintenant)}, en haut.</span>
+                    : <span className="vrm-ar-code-etape" data-code-etape="attente"> En attente : il arrive dans la minute.</span>) : null}
+                </span>
+              </li>))}
+            </ol>
+            <Schema f={f} adresse={adresse}/>
+            {f.note ? <p className="vrm-ar-note">{f.note}</p> : null}
+            {f.filtre ? (
+              <details className="vrm-ar-repli" data-bloc="filtre-gmail">
+                <summary>Seulement Vinted et les colis ?</summary>
+                <ol className="vrm-ar-etapes">{ETAPES_FILTRE_GMAIL.map((t, i) => <li key={i}><span className="vrm-ar-num" aria-hidden="true">{i + 1}</span><span>{t}</span></li>)}</ol>
+                <p className="vrm-ar-regle" translate="no" data-regle-filtre="">{regle}</p>
+                <div className="vrm-ar-actions"><BoutonCopier texte={regle} mot="Copier la règle" className="vrm-b vrm-b-secondaire" data-copier-regle=""/></div>
+                <p className="vrm-ar-note">Avec le filtre, saute l’étape 5.</p>
+              </details>
+            ) : null}
+            {f.relais ? (
+              <details className="vrm-ar-repli" data-bloc="relais-apple">
+                <summary>Ton adresse finit par @privaterelay.appleid.com ?</summary>
+                <ol className="vrm-ar-etapes">{RELAIS_APPLE.map((t, i) => <li key={i}><span className="vrm-ar-num" aria-hidden="true">{i + 1}</span><span>{t}</span></li>)}</ol>
+              </details>
+            ) : null}
+            {f.lien ? <a className="vrm-lien-action vrm-ar-lien" href={f.lien} target="_blank" rel="noopener noreferrer">{f.lienMot} ↗</a> : null}
+          </section>
+
+          <Essai adresse={adresse} d={d} maintenant={maintenant} essai={essai} prepare={prepare} onLancer={lancerEssai} onRecommencer={recommencerEssai}/>
+
+          <GroupeIos titre="Réception" pied={d.actif === false ? 'Désactivée : ce qui arrive est gardé à part, jamais chez un autre.' : 'Tout e-mail livré à cette adresse est rangé chez toi.'}>
             <RangeeIos icone={ICONES.actif} titre="Adresse active" interrupteur={{ on: d.actif !== false, onChange: basculer, disabled: !!envoi, label: 'Adresse active', attrs: { 'data-interrupteur-adresse': d.actif === false ? '0' : '1' } }}/>
           </GroupeIos>
 
@@ -173,29 +305,20 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
             {CE_QUI_EST_LU.map((l) => <RangeeIos key={l.id} icone={ICONES[l.id]} titre={l.titre} detail={l.detail} data-lu={l.id}/>)}
           </GroupeIos>
 
-          <section className="vrm-ar-bloc" data-bloc="transfert">
-            <h3>Un transfert automatique</h3>
-            <p className="vrm-ar-texte">Dans ta messagerie, fais suivre tes e-mails vers ton adresse VRM. Tu les gardes aussi chez toi.</p>
-            <SegmenteBase label="Ta messagerie" value={service} onChange={setService} plein className="vrm-ar-seg" options={FOURNISSEURS.map((x) => ({ v: x.id, l: x.nom, data: { 'data-fournisseur': x.id } }))}/>
-            <p className="vrm-ar-ou">{f.ou}</p>
-            <ol className="vrm-ar-etapes" data-etapes={f.id}>{f.etapes.map((t, i) => <li key={i}><span className="vrm-ar-num" aria-hidden="true">{i + 1}</span><span>{t}</span></li>)}</ol>
-            <Schema f={f} adresse={adresse}/>
-            {f.id === 'gmail' ? <p className="vrm-ar-note">Pour ne faire suivre que Vinted et les transporteurs : après l’étape 3, un filtre « De : vinted.fr OR mondialrelay OR chronopost » → Transférer à ton adresse VRM.</p> : null}
-            <a className="vrm-lien-action vrm-ar-lien" href={f.lien} target="_blank" rel="noopener noreferrer">{f.lienMot} ↗</a>
-          </section>
-
           <section className="vrm-ar-bloc" data-bloc="vinted">
             <h3>Ou l’e-mail d’un compte Vinted</h3>
-            <p className="vrm-ar-texte">Sur Vinted : Paramètres → Compte → E‑mail, mets ton adresse VRM. Vinted t’écrit alors directement ici, sans transfert — tu lis ces e-mails dans ta boîte VRM (plus dans ta boîte habituelle).</p>
+            <p className="vrm-ar-texte">Sur Vinted : Paramètres → Compte → E‑mail. Mets ton adresse VRM.</p>
+            <p className="vrm-ar-note">Vinted t’écrit alors ici seulement, plus dans ta boîte.</p>
           </section>
 
           <section className="vrm-ar-bloc vrm-ar-avertir" data-bloc="manuel">
             <h3>Pas de transfert à la main</h3>
-            <p className="vrm-ar-texte">« Transférer » un e-mail un par un fait perdre son expéditeur d’origine. VRM lit encore une vente ou un code de colis si le message garde la ligne « De : Vinted » ou « De : Mondial Relay », mais le point relais, la date d’arrivée et le bordereau (s’il n’est pas joint) se perdent. Le transfert automatique garde tout.</p>
+            <p className="vrm-ar-texte">« Transférer » un e-mail perd son expéditeur d’origine.</p>
+            <p className="vrm-ar-texte">Le point relais et le bordereau peuvent se perdre.</p>
           </section>
 
           <section className="vrm-ar-bloc" data-bloc="boite">
-            <p className="vrm-ar-texte">Les e-mails reçus apparaissent dans ta boîte VRM, comme les autres.</p>
+            <p className="vrm-ar-texte">Tes e-mails reçus arrivent dans ta boîte VRM.</p>
             {onBoite ? <button type="button" className="vrm-lien-action vrm-ar-lien" onClick={() => { onFermer && onFermer(); onBoite(); }}>Ouvrir ma boîte VRM</button> : null}
           </section>
 
@@ -203,7 +326,8 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
           <div className="vrm-ar-pied">
             {confirmer
               ? <div className="vrm-ar-confirmer" role="group" aria-label="Remplacer l’adresse" data-confirmer-remplacer="">
-                  <p>L’ancienne adresse cesse tout de suite : ce qui y arrive ensuite est gardé à part, jamais donné à un autre. Tu devras mettre la nouvelle dans ton transfert.</p>
+                  <p>L’ancienne cesse tout de suite. Ce qui y arrive est gardé à part.</p>
+                  <p>Tu devras mettre la nouvelle dans ton transfert.</p>
                   <div className="vrm-ar-actions">
                     <button type="button" className="vrm-b vrm-b-secondaire" onClick={() => setConfirmer(false)} disabled={!!envoi}>Annuler</button>
                     <button type="button" className="vrm-b vrm-b-secondaire vrm-ar-destructif" onClick={remplacer} disabled={!!envoi} data-remplacer-ok="">{envoi === 'remplacer' ? 'Remplacement…' : 'Remplacer'}</button>
@@ -218,8 +342,8 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
   );
 }
 
-// L'entrée (Paramètres → E-mails → Adresses, « Relier ma boîte ») : une rangée qui ouvre la feuille.
-export default function CarteAdresseReception({ headers, FermeAuRetour, proprio = false, onBoite, titre = 'Ton adresse VRM', detail = 'Une adresse à toi : fais-y suivre tes e-mails' }) {
+// L'entrée (Paramètres → E-mails → Adresses, « Relier ma boîte ») : une rangée qui ouvre la feuille.
+export default function CarteAdresseReception({ headers, FermeAuRetour, proprio = false, onBoite, titre = 'Recevoir tes e-mails Vinted dans VRM', detail = 'Ton adresse VRM, puis un transfert automatique' }) {
   const [ouvert, setOuvert] = useState(false);
   return (
     <>

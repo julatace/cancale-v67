@@ -101,3 +101,40 @@
 @media (min-width: 900px) { .vrm-ar-schema { max-width: 420px; } }
 @media (prefers-contrast: more) { .vrm-ar-hero, .vrm-ar-bloc:not(.vrm-ar-avertir), .vrm-ar-code, .vrm-ar .vrm-ios-carte { box-shadow: none; border: 1px solid var(--d-encre, #1D1D1F); } }
 :root[data-theme="dark"] .vrm-ar-hero, :root[data-theme="dark"] .vrm-ar-bloc:not(.vrm-ar-avertir), :root[data-theme="dark"] .vrm-ar-code, :root[data-theme="dark"] .vrm-ar .vrm-ios-carte, :root[data-theme="dark"] .vrm-ar-confirmer, :root[data-theme="dark"] .vrm-ar-termine { box-shadow: 0 0 0 .5px rgba(255,255,255,.06); }
+
+/* ── (10 nov.) Le parcours « Recevoir tes e-mails Vinted dans VRM » ────────
+   Trois étapes numérotées (rond noir ; coché quand c'est prouvé), le choix de
+   la messagerie en pilules (44 px), l'essai suivi en direct. DA6 : cartes
+   blanches, un seul bleu, l'ambre pour ce qu'on attend, jamais de rouge. */
+.vrm-ar-chapo { font-size: var(--d-t-15, 15px); color: var(--d-gris, #6E6E73); padding: 0 var(--d-e-4, 16px); }
+.vrm-ar-pas { display: flex; align-items: center; gap: var(--d-e-3, 12px); font-size: var(--d-t-17, 17px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.25; margin: 0; }
+.vrm-ar-pas-num { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: var(--d-t-15, 15px); font-weight: 700; font-variant-numeric: tabular-nums; background: var(--d-encre, #1D1D1F); color: var(--d-carte, #FFF); }
+.vrm-ar-hors-champ { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.vrm-ar-choix { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--d-e-2, 8px); }
+.vrm-ar-choix-btn { min-height: 44px; min-width: 0; padding: 0 10px; border-radius: 999px; border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-ar-choix-btn[aria-checked="true"] { background: var(--d-encre, #1D1D1F); color: var(--d-carte, #FFF); }
+.vrm-ar-choix-btn:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
+.vrm-ar-code-etape { color: var(--d-gris, #6E6E73); }
+.vrm-ar-code-etape[data-code-etape="recu"] b { color: var(--d-encre, #1D1D1F); font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+.vrm-ar-code-etape[data-code-etape="attente"]::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); margin: 0 6px 1px 2px; }
+.vrm-ar-repli { border-radius: var(--d-r-case, 14px); background: var(--d-case, #F2F2F7); padding: 0 var(--d-e-4, 16px); display: grid; gap: var(--d-e-3, 12px); min-width: 0; }
+.vrm-ar-repli[open] { padding-bottom: var(--d-e-4, 16px); }
+.vrm-ar-repli > summary { min-height: 44px; display: flex; align-items: center; font-weight: 600; cursor: pointer; list-style: none; overflow-wrap: anywhere; min-width: 0; }
+.vrm-ar-repli > summary::-webkit-details-marker { display: none; }
+.vrm-ar-repli > summary::after { content: '›'; margin-left: auto; padding-left: 8px; color: var(--d-gris, #6E6E73); transition: transform var(--d-m-court, 150ms) var(--d-sortie, ease-out); }
+.vrm-ar-repli[open] > summary::after { transform: rotate(90deg); }
+.vrm-ar-regle { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: var(--d-t-13, 13px); padding: var(--d-e-3, 12px); border-radius: var(--d-r-ctrl, 12px); background: var(--d-carte, #FFF); overflow-wrap: anywhere; word-break: break-word; user-select: all; -webkit-user-select: all; }
+.vrm-ar-objet { font-size: var(--d-t-15, 15px); color: var(--d-gris, #6E6E73); }
+.vrm-ar-objet b { color: var(--d-encre, #1D1D1F); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; letter-spacing: .02em; }
+.vrm-ar-recu { display: grid; gap: var(--d-e-2, 8px); }
+.vrm-ar-recu-grand { display: flex; align-items: center; gap: var(--d-e-2, 8px); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+@media (prefers-reduced-motion: no-preference) { .vrm-ar-recu { animation: vrm-ar-entre var(--d-m-long, 250ms) var(--d-sortie, ease-out); } .vrm-ar-essai[data-essai-etat="attente"] .vrm-ar-point { animation: vrm-ar-pulse 1.4s ease-in-out infinite; } }
+.vrm-ar-mes { display: grid; gap: var(--d-e-3, 12px); width: 100%; min-width: 0; }
+.vrm-ar-mes-liste { list-style: none; margin: 0; padding: 0; display: grid; border-radius: var(--d-r-case, 14px); background: var(--d-case, #F2F2F7); overflow: hidden; }
+.vrm-ar-mes-liste li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 12px var(--d-e-4, 16px); }
+.vrm-ar-mes-liste li + li { border-top: .5px solid var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-ar-mes-titre { font-weight: 600; }
+.vrm-ar-mes-etat { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6E6E73); }
+.vrm-ar-mes-liste li[data-geste-etat="a-faire"] .vrm-ar-mes-etat { color: var(--d-ambre, #B25000); }
+.vrm-ar-mes-detail { grid-column: 1 / -1; font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); overflow-wrap: anywhere; }
+.vrm-ar-mes code { overflow-wrap: anywhere; word-break: break-all; }
