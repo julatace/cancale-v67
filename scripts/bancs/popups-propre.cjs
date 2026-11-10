@@ -165,7 +165,8 @@ async function popup(pg, mobile, tag, { ligne, nom, attendu, quoi }) {
   const la = await l.count() > 0;
   dit(la, `${tag} : ${quoi} — la ligne courte est là`);
   if (!la) return;
-  const m = await l.evaluate((e) => { const b = e.querySelector('[data-popup-ouvrir]'); const r = (b || e).getBoundingClientRect(); return { bouton: !!b, i: !!(e.querySelector('.vrm-pop-i svg')), h: Math.round(r.height), t: (e.innerText || '').replace(/\s+/g, ' ').trim() }; });
+  // (10 nov.) Des pastilles (chacune ouvre la feuille) ou une ligne + ⓘ.
+  const m = await l.evaluate((e) => { const b = e.querySelector('[data-popup-ouvrir]'); const r = (b || e).getBoundingClientRect(); return { bouton: !!b, i: !!(e.querySelector('.vrm-pop-i svg') || e.querySelector('.vrm-pop-chip')), h: Math.round(r.height), t: (e.innerText || '').replace(/\s+/g, ' ').trim() }; });
   dit(m.bouton && m.i && m.h <= 48 && m.t.length <= 90, `${tag} : ${quoi} — une ligne (${m.h} px), ⓘ, « ${m.t} »`, JSON.stringify(m));
   await toucher(pg, `${ligne} [data-popup-ouvrir]`, mobile);
   const corps = pg.locator(`[data-popup-corps="${nom}"]`);
@@ -200,7 +201,14 @@ async function ecran(b, largeur, sombre, { nom, url, pret, apres, zone }) {
     const p = await paragraphes(pg, SEUIL);
     dit(!p.pasDEcran && p.longs.length === 0, `${tag} : P1 — aucun paragraphe visible de plus de ${SEUIL} caractères hors pop-up`, p.pasDEcran ? 'écran absent' : p.longs.join(' | '));
     const nc = await pg.evaluate(() => { const main = [...document.querySelectorAll('.vrm-main')].find((m) => m.getClientRects().length); return main ? (main.innerText || '').replace(/\s+/g, ' ').trim().length : 0; });
-    console.log(`  CARACTÈRES ${largeur}-${sombre ? 'sombre' : 'clair'}-${nom} ${nc}`);
+    // Le TEXTE COURANT : les phrases (blocs de texte de plus de 30 caractères, hors boutons et pastilles) —
+    // c'est le « mur de texte » que Julien refuse ; le total compte aussi titres, chiffres et cartes.
+    const np = await pg.evaluate(() => { const main = [...document.querySelectorAll('.vrm-main')].find((m) => m.getClientRects().length); if (!main) return 0; let n = 0;
+      const bloc = (d) => /^(block|flex|grid|list-item|table|table-cell|flow-root)$/.test(d);
+      for (const el of main.querySelectorAll('*')) { if (el.closest('[data-feuille], button, a, svg, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary)')) continue; const s = getComputedStyle(el); if (!bloc(s.display) || !el.getClientRects().length || s.visibility === 'hidden') continue;
+        if ([...el.children].some((c) => bloc(getComputedStyle(c).display) && (c.innerText || '').trim())) continue; const t = (el.innerText || '').replace(/\s+/g, ' ').trim(); if (t.length > 30) n += t.length; }
+      return n; });
+    console.log(`  CARACTÈRES ${largeur}-${sombre ? 'sombre' : 'clair'}-${nom} total=${nc} phrases=${np}`);
     const rg = await rouges(pg);
     dit(rg.length === 0, `${tag} : P6 — aucun rouge rendu`, rg.join(' | '));
     if (apres) await apres(pg, mobile, tag, base);
