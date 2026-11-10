@@ -221,6 +221,29 @@ export function lieuSousEnTete(txt) {
   return parts.join(', ').replace(/®|™|©/g, '').replace(/\s+(super\s*pratique|retrouvez).*$/i, '').replace(/\s{2,}/g, ' ').trim() || null;
 }
 
+// (10 nov.) LE NOUVEAU POINT d'un colis redirigé (« Votre colis a changé de plan » :
+// le point prévu est indisponible). Lu SOUS la ligne qui le nomme « nouveau » ou
+// « suivant » (« Votre nouveau Point Relais : », « livré dans le Point Relais
+// suivant : »), avec la règle des lieux (`lieuSousEnTete`). Rien de tel ⇒ `null` :
+// jamais l'ancien point ni un point deviné.
+const EN_TETE_LIEU = /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i;
+export function nouveauPointDansTexte(txt) {
+  const lines = String(txt || '').split('\n').map((l) => l.trim());
+  const norm = (l) => String(l).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const nomme = (l) => { const n = norm(l); return /\b(?:nouveau|nouvel|nouvelle|suivant|suivante)\b/.test(n) && /\b(?:point|relais|lieu|adresse|locker|consigne|casier)\b/.test(n) && !/\b(?:ancien|initial|prevu|choisi)\b/.test(n); };
+  const enTete = (l) => EN_TETE_LIEU.test(l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
+  for (let i = 0; i < lines.length; i++) {
+    if (!nomme(lines[i])) continue;
+    const apres = lines[i].split(/[:：]/).slice(1).join(':').trim();
+    const reste = [...(apres ? [apres] : []), ...lines.slice(i + 1)];
+    // Les lignes vides, un en-tête « Point Relais » ou une autre ligne « nouveau point » avant le nom.
+    while (reste.length && (!reste[0] || enTete(reste[0]) || nomme(reste[0]))) reste.shift();
+    const l = lieuSousEnTete(['Point Relais', ...reste].join('\n'));
+    if (l && /\d{5}/.test(l)) return l;
+  }
+  return null;
+}
+
 // Un « lieu » qui annonce le FUTUR (« … sera disponible dans les prochains jours
 // dans votre Relais Pickup ») n'est pas un lieu : le colis n'est pas encore là.
 export const LIEU_AU_FUTUR = /prochains?\s+jours|prochainement|d[èe]s\s+(?:son|que)/i;

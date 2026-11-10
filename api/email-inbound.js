@@ -1,5 +1,5 @@
 import './_lib/sans-bruit.js';
-import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture} from './_lib/etat-colis-email.js';
+import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture,changementDeRelais} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 import { listePieces } from "./_lib/boite-email.js";
@@ -48,7 +48,7 @@ import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVc
 import { numVcVente, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
-import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
+import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR, nouveauPointDansTexte } from './_lib/retrait-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
@@ -1275,6 +1275,13 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   // arrivée à venir, sans code, n'est pas un colis à retirer.
   if (status === 'available' && !code && annonceArriveeFuture(all)) { status = 'transit'; label = 'En transit'; lieu = null; }
 
+  // (10 nov.) « Votre colis a changé de plan » (Mondial Relay : le point prévu est
+  // indisponible, le colis part vers un autre) : EN ROUTE vers le NOUVEAU point, jamais
+  // arrivé ni livré (api/_lib/etat-colis-email.js, `changementDeRelais`). Le lieu rangé est
+  // le nouveau point LU sous « nouveau / suivant » — sinon aucun (jamais l'ancien).
+  const relaisChange = status === 'transit' && changementDeRelais(mail.subject, txt);
+  if (relaisChange) { label = 'Point relais changé'; lieu = nouveauPointDansTexte(txt); extraitLieu = null; }
+
   // ── MESURE : code introuvable sur un colis À RETIRER (17 oct.) ─────────
   // Julien : « des fois tu me mets juste un colis dans un point relais sans le
   // code ». Le texte brut n'est gardé nulle part : on garde, SEULEMENT dans ce
@@ -1288,7 +1295,7 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     if (bouts.length) extraitCode = [...new Set(bouts)].join(' | ').slice(0, 400);
   }
 
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(relaisChange ? { relaisChange: true } : {}), ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -2395,7 +2402,7 @@ export async function traiterEmail(req, res) {
           if (!qr.qrUrl && prev.qrUrl) qr.qrUrl = prev.qrUrl;
           if (!track.code && prev.code) track.code = prev.code;
           if (!track.code2 && prev.code2) track.code2 = prev.code2;
-          if (!track.lieu && prev.lieu) track.lieu = prev.lieu;
+          if (!track.lieu && prev.lieu && !track.relaisChange) track.lieu = prev.lieu;   // (10 nov.) un colis redirigé ne garde pas l'ancien point
           if (!track.limite && prev.limite) track.limite = prev.limite;
           if (!track.consigne && prev.consigne) track.consigne = true;
           if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
@@ -2447,6 +2454,9 @@ export async function traiterEmail(req, res) {
         ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, emailAt || now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,
+        // (10 nov.) Point relais changé : le nouveau point (lu) et l'ancien (la ligne d'avant), rangés
+        // tels quels. Un e-mail suivant du même n° (arrivé, retiré) réécrit la ligne sans eux.
+        ...(track.relaisChange && track.status === 'transit' ? { relaisChange: true, ...(prevLigne && prevLigne.lieu && prevLigne.lieu !== track.lieu ? { ancienLieu: String(prevLigne.lieu).slice(0, 200) } : {}) } : {}),
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
         ...(track.extraitCode && !track.code ? { extraitCode: track.extraitCode } : {}),
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,

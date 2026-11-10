@@ -1800,6 +1800,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
       // l'onglet « Relier ma boîte » de l'écran E-mails ; Paramètres y MÈNE (plus de second écran ici).
       { id:'adresses', type:'nav', ic:'mail', lib:L.emails, desc:'Relier ta boîte pour que VRM lise tes ventes, colis et codes de retrait.', onClick:()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }, data:{ 'data-reglage-emails':'', 'data-sous-ouvrir':'adresses' } },   // l'attribut d'avant reste : « Paramètres → E-mails » se touche au même endroit
+      // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
+      // (10 nov., Julien : « mets ça avec les e-mails ») Rangé dans « Mes e-mails », sous le transfert des e-mails.
+      { id:'sms-colis', type:'panneau', nu:true, ic:'truck', lib:'SMS de colis', desc:'Transférer à VRM tes SMS Mondial Relay, Vinted Go et Pickup, comme tes e-mails.', val: etatJetonSms(jetonSms) === 'actif' ? 'Activé' : etatJetonSms(jetonSms) === 'coupe' ? 'Coupé' : 'À activer', data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
+        el:<SmsColisSetting jeton={jetonSms} onJeton={(v)=>{ save('vrm_sms_token', v); setJetonSms(v); }} toast={toast}/> },
       proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des e-mails Vinted', desc:'À partir de quelle date VRM relit tes anciens e-mails.', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
     ]},
     { id:'notifications', titre:'Notifications', items:[
@@ -1808,9 +1812,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
-      // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
-      { id:'sms-colis', type:'panneau', nu:true, ic:'truck', lib:'SMS Mondial Relay', desc:'Faire lire à VRM les SMS de Mondial Relay pour tes colis en casier.', val: etatJetonSms(jetonSms) === 'actif' ? 'Activé' : etatJetonSms(jetonSms) === 'coupe' ? 'Coupé' : 'À activer', data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
-        el:<SmsColisSetting jeton={jetonSms} onJeton={(v)=>{ save('vrm_sms_token', v); setJetonSms(v); }} toast={toast}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
