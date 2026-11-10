@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.336.0';
+const CODE_VERSION = '5.337.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9798,6 +9798,7 @@ async function autoAccepterOffres(uid) {
       await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv });   // écrit AVANT de boucler : un worker tué ne retraite pas
       if (r && r.ok) {
         faites += 1;
+        await noterJournal(uid, quoi === 'accept' ? 'offre_acceptee' : 'offre_refusee', { a: o.item, x: o.tx, p: o.prix, auto: true });
         if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
         else logActivity(`↩️ Offre de ${o.prix.toFixed(2)} € refusée automatiquement (ton seuil : ${refuse} €)${reg.msgRefus ? ' + ton message' : ''}`);
         notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
@@ -9824,6 +9825,8 @@ async function visiteVinted() {
     // propre budget : rien de la visite Vinted n'est consommé ni attendu.
     transpTick('visite').catch(() => {});
     if (await compteNonCapte(uid)) { noterDiag('visite_compte_supprime'); return; }
+    // (5.337) La jauge du plafond : ce Chrome dit ses actions de l'heure pour ce compte, même zéro.
+    publierJaugeVisite(uid).catch(() => {});
     // ⚠️ 5.162 : Vinted a demandé de ralentir (429/403) — la visite ne lui
     // envoie RIEN tant que la pause court, et chaque étape revérifie (un frein
     // reçu en route arrête la suite). Le ménage des PDF ne touche que NOTRE
@@ -12288,6 +12291,8 @@ function miseEnLigneTick() {
     const finir = async (job, r) => {
       try { const f = (await chrome.storage.local.get('vrmRepubFins')).vrmRepubFins || {}; const lim = Date.now() - 864e5; for (const k of Object.keys(f)) if (!(f[k] && f[k].at > lim)) delete f[k]; f[job.id] = { ...(r || {}), at: Date.now() }; await chrome.storage.local.set({ vrmRepubFins: f }); } catch (_) {}
       try { notifierApp({ type: 'maj', quoi: 'repub', id: String(job.id), etape: 'fin', fin: r || null }); } catch (_) {}
+      // (5.337) La mise en ligne planifiée qui a abouti : la republication est FAITE.
+      if (r && r.etape === 'fait') await noterJournal(job.uid, 'republiee', { a: job.id, b: r.nouvelId, vers: r.nouveau });
     };
     try {
       // (29 oct., revue) Un job MARQUÉ « en cours » au départ de cette boucle vient d'un
@@ -12501,7 +12506,113 @@ async function actionsAutresNavigateurs(uid) {
 async function publierActions(uid, list) {
   const moi = await idNavigateur(); if (!moi) return;
   const t = Date.now();
-  try { await supabaseUpsert('app_data', [{ id: `${ACTIONS_PARTAGEES}${uid}_${moi}`, data: { uid: String(uid), nav: moi, ts: (list || []).filter((x) => t - x < 3600000), at: new Date(t).toISOString() } }], 'id'); } catch (_) {}
+  // (10 nov., 5.337, lot G) La ligne porte aussi le plafond et la réserve : l'app en
+  // tire la jauge « 12/50 cette heure » (src/jaugeActions.js) sans deviner les chiffres.
+  // Rien de personnel : le n° du compte, l'empreinte du navigateur, des heures.
+  try { await supabaseUpsert('app_data', [{ id: `${ACTIONS_PARTAGEES}${uid}_${moi}`, data: { uid: String(uid), nav: moi, ts: (list || []).filter((x) => t - x < 3600000), at: new Date(t).toISOString(), max: ACTIONS_MAX_HEURE, reserve: RESERVE_GESTES, v: CODE_VERSION } }], 'id'); } catch (_) {}
+}
+// ── LA JAUGE, MÊME SANS ACTION (10 nov., 5.337, lot G) ──────────────────────────
+// La ligne `actions_compte_` ne s'écrivait qu'à une action : un compte sans action
+// depuis la 5.312 n'en avait aucune, et l'app ne pouvait pas distinguer « 0 » de
+// « pas su ». À chaque visite du compte connecté (au plus toutes les 10 min), ce
+// Chrome publie SES heures de la dernière heure, même vides. Lue dans le compteur
+// (une seule file) : jamais une liste à moitié écrite.
+const JAUGE_VISITE_MS = 10 * 60000;
+function publierJaugeVisite(uid) {
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return Promise.resolve(false);
+  return unCompteurALaFois(async () => {
+    try {
+      const g = (await chrome.storage.local.get('vrmJaugePubliee')).vrmJaugePubliee || {};
+      const t = Date.now();
+      if (g[uid] && t - Number(g[uid]) < JAUGE_VISITE_MS) return false;
+      const l = (((await chrome.storage.local.get('vrmActions')).vrmActions || {})[uid] || []).filter((x) => t - x < 3600000);
+      await publierActions(String(uid), l);
+      g[uid] = t; await chrome.storage.local.set({ vrmJaugePubliee: g });
+      return true;
+    } catch (_) { return false; }
+  });
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// LE JOURNAL « CE QUE VRM A FAIT » (10 nov., 5.337, lot G — validé par Julien)
+// ══════════════════════════════════════════════════════════════════════════════
+// La liste datée des gestes que l'extension a FAITS chez Vinted au nom d'un compte :
+// republication, mise en ligne d'un brouillon, baisse de prix, message à un favori,
+// offre acceptée/refusée, contre-offre, réponse, bordereau généré. Seulement ce que
+// Vinted a ACCEPTÉ (un refus n'est pas un geste fait). Rien de personnel : ni texte
+// de message, ni pseudo, ni nom — une sorte, une heure, des numéros d'annonce ou de
+// transaction, des prix. Chaque entrée est REBÂTIE champ par champ (liste blanche) :
+// un objet passé tel quel ne peut rien faire fuir.
+// Rangé dans `chrome.storage.local` (`vrmJournal`, §4.9), puis publié dans la ligne
+// DÉDIÉE `journal_vrm_{uid}_{navigateur}` (un seul écrivain par ligne, jamais `main`).
+// 30 jours, 300 gestes au plus par compte et par Chrome. Une écriture ratée ne bloque
+// AUCUN geste : le journal se tait, le geste est déjà fait.
+const JOURNAL_LIGNE = 'journal_vrm_';
+const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
+const JOURNAL_SORTES = ['republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau'];
+function entreeJournal(sorte, extra, t) {
+  if (!JOURNAL_SORTES.includes(sorte)) return null;
+  const e = { t: Number(t) || Date.now(), s: sorte };
+  const x = extra && typeof extra === 'object' ? extra : {};
+  const num = (v) => (v != null && /^\d{1,20}$/.test(String(v)) ? String(v) : undefined);
+  const prix = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 && n < 1e6 ? Math.round(n * 100) / 100 : undefined; };
+  if (num(x.a)) e.a = num(x.a);
+  if (num(x.b) && num(x.b) !== e.a) e.b = num(x.b);
+  if (num(x.x)) e.x = num(x.x);
+  if (prix(x.p) !== undefined) e.p = prix(x.p);
+  if (prix(x.de) !== undefined) e.de = prix(x.de);
+  if (prix(x.vers) !== undefined) e.vers = prix(x.vers);
+  if (x.auto === true) e.auto = true;
+  return e;
+}
+let _chaineJournal = Promise.resolve();
+function noterJournal(uid, sorte, extra) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(false);   // Vinted seulement (`vc:`/`lbc:` ne passent pas)
+  const e = entreeJournal(sorte, extra);
+  if (!e) return Promise.resolve(false);
+  const suite = _chaineJournal.then(async () => {
+    try {
+      const cur = (await chrome.storage.local.get('vrmJournal')).vrmJournal || {};
+      const lim = Date.now() - JOURNAL_JOURS * 864e5;
+      const l = (Array.isArray(cur[u]) ? cur[u] : []).filter((y) => y && Number(y.t) > lim);
+      l.push(e); l.sort((p, q) => p.t - q.t);
+      cur[u] = l.slice(-JOURNAL_MAX);
+      await chrome.storage.local.set({ vrmJournal: cur });
+      const moi = await idNavigateur();
+      if (moi) { try { await supabaseUpsert('app_data', [{ id: `${JOURNAL_LIGNE}${u}_${moi}`, data: { uid: u, nav: moi, v: CODE_VERSION, at: new Date().toISOString(), e: cur[u].map((y) => entreeJournal(y.s, y, y.t)).filter(Boolean) } }], 'id'); } catch (_) {} }
+      return true;
+    } catch (_) { return false; }
+  });
+  _chaineJournal = suite.then(() => {}, () => {});
+  return suite;
+}
+// Ce qu'une commande de l'app a FAIT chez Vinted (`executerCommande`) : seule une
+// issue « fait » entre au journal (un « incertain » n'est pas un geste prouvé).
+function sorteCommande(cmd, r) {
+  if (!r || r.etape !== 'fait') return null;
+  if (cmd === 'baisserPrixVinted') return 'baisse_prix';
+  if (cmd === 'republierVinted') return 'modifiee';
+  if (cmd === 'publierBrouillon') return 'mise_en_ligne';
+  if (cmd === 'recreerVinted' || cmd === 'refaireBrouillon') return r.brouillon ? 'brouillon' : 'republiee';
+  return null;
+}
+async function journalCommande(msg, r) {
+  try {
+    const s = sorteCommande(msg && msg.cmd, r);
+    if (!s) return;
+    const id = msg.cmd === 'publierBrouillon' ? (r.itemId || undefined) : msg.id;
+    await noterJournal(msg.uid, s, { a: id, b: r.nouvelId, de: r.ancien, vers: s === 'baisse_prix' ? r.prixVu : r.nouveau });
+  } catch (_) {}
+}
+// Un geste de la messagerie de l'app (`executerPourApp`) : la sorte se lit sur le
+// CHEMIN (liste blanche `EXEC_PERMIS`), jamais sur le corps (le texte n'est pas gardé).
+function sorteExec(methode, endpoint) {
+  const e = String(endpoint || '');
+  if (methode === 'PUT' && /\/offer_requests\/\d+\/accept$/.test(e)) return 'offre_acceptee';
+  if (methode === 'PUT' && /\/offer_requests\/\d+\/reject$/.test(e)) return 'offre_refusee';
+  if (methode === 'POST' && /^\/api\/v2\/transactions\/\d+\/offers$/.test(e)) return 'contre_offre';
+  if (methode === 'POST' && /^\/api\/v2\/conversations\/\d+\/replies$/.test(e)) return 'reponse';
+  return null;
 }
 function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n)); }
 async function compterActionUn(uid, plafond, n = 1) {
@@ -12783,6 +12894,12 @@ async function executerPourApp(msg, sender) {
     return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);
   });
   if (arret) return arret;
+  // (5.337) Le journal « ce que VRM a fait » : seulement un geste ACCEPTÉ par Vinted ;
+  // la sorte vient du chemin, le n° de transaction aussi — jamais le texte envoyé.
+  if (r && r.ok && !permis.lecture) {
+    if (permis.favori) { if (r.json && r.json.resultat === 'envoye') await noterJournal(msg.uid, 'favori', { auto: !!(msg.body && msg.body.auto === true) }); }
+    else { const s = sorteExec(methode, msg.endpoint); const m = /\/transactions\/(\d+)\//.exec(String(msg.endpoint || '')); if (s) await noterJournal(msg.uid, s, { x: m ? m[1] : undefined }); }
+  }
   if(permis.favori&&r.json?.resultat==='ignore')logActivity('Favori ignoré : conversation déjà commencée, aucun message envoyé.');
   else if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, data: r.json,
@@ -13710,12 +13827,13 @@ async function executerCommande(msg) {
     return ok ? { accepte: true, etape: 'fait' } : { accepte: true, etape: 'echec', raison: "Vinted n'a pas rendu ses photos pour l'instant" };
   }
   // 22 oct. : mettre UNE annonce Leboncoin en pause, sur son clic (voir `pauseLbcDepuisApp`).
-  if (msg && msg.cmd === 'republierVinted') return await republierVinted(msg);
+  // (10 nov., 5.337) Chaque issue « fait » entre au journal « ce que VRM a fait » (`journalCommande`).
+  if (msg && msg.cmd === 'republierVinted') { const r = await republierVinted(msg); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
-  if (msg && msg.cmd === 'baisserPrixVinted') return await baisserPrixVinted(msg);
-  if (msg && msg.cmd === 'recreerVinted') return await recreerVinted(msg);
-  if (msg && msg.cmd === 'publierBrouillon') return await publierBrouillon(msg);
-  if (msg && msg.cmd === 'refaireBrouillon') return await refaireBrouillon(msg);
+  if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted(msg); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'recreerVinted') { const r = await recreerVinted(msg); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'publierBrouillon') { const r = await publierBrouillon(msg); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'refaireBrouillon') { const r = await refaireBrouillon(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   // 29 oct. : supprimer UNE annonce Leboncoin, sur son clic confirmé (voir `supprimeLbcDepuisApp`).
   if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);
@@ -14522,6 +14640,7 @@ async function genererBordereau(uid, tx, opts = {}) {
   const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
     { seller_address_id: adr, drop_off_type: null, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
+  if (r.ok) await noterJournal(uid, 'bordereau', { x: tx, auto: opts.automatique === true });
   // ⚠️ ON MESURE LES ÉCHECS AU LIEU DE LES SUPPOSER (§5.24). Sans ça, « il y a
   // des messages d'erreur » ne peut mener qu'à des hypothèses : on ne sait ni
   // combien, ni ce que Vinted a répondu. Un échantillon de la réponse est gardé

@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
+import JaugeActions from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h du compte
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
@@ -1648,6 +1649,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   ? `Aucun compte Vinted ouvert ${NAV.dansNu} : ouvre vinted.fr sur le bon compte, puis rouvre.`
                   : <>Compte ouvert {NAV.dansNu} pas encore connu : ouvre vinted.fr sur le bon compte, puis rouvre. <Pourquoi label="Pourquoi ?">L'extension VRM n'a pas encore été interrogée, ou elle ne répond pas.</Pourquoi></>}
             </div>
+            {compteUid ? <JaugeActions uid={compteUid} /> : null}
             <div style={{ fontSize: 13, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'article')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
             {action === 'modifier' && <div style={{ fontSize: 13, color: C.muted }}>Modifiées sur place : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && <div style={{ fontSize: 13, color: C.muted }}>Chaque annonce repasse en brouillon : favoris et vues ne suivent pas. <Pourquoi label="Comment ça marche">Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait.</Pourquoi></div>}

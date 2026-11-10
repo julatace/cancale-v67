@@ -49,6 +49,7 @@ import { VerifierInstallationApp } from '../App.jsx';
 import SuiviComptes from '../SuiviComptes.jsx';
 // (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
 import { ToutVaBien } from '../ToutVaBien.jsx';
+import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
@@ -2513,6 +2514,8 @@ function JournalVrm() {
   }
   return (
     <div data-journal={String(vus.length)}>
+      {/* (10 nov., lot G) La jauge des 50 actions/h de chaque compte Vinted, en tête (src/JaugeActions.jsx). */}
+      <JaugesComptes uids={comptesV.map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={nomCompte}/>
       <HistoriqueModifications owner={AUTH.user?.id||''}/>
       <div className="vrm-sec-filtres vrm-compte-puces" role="radiogroup" aria-label="Type">
         {FILTRES_TYPE.map(([id, lib]) => <button key={id} type="button" role="radio" aria-checked={type === id} data-journal-type={id} className={'vrm-compte-puce' + (type === id ? ' is-actif' : '')} onClick={() => setType(id)}>{lib}</button>)}
@@ -2526,7 +2529,7 @@ function JournalVrm() {
             {g.l.map((e, i) => { const L = ligneJournal(e, { numeroDeItem, nomCompte }); return (
               <div key={i} className="vrm-sec-ligne" data-journal-ligne={e.type} data-journal-resultat={e.resultat}>
                 <div className="vrm-sec-corps">
-                  <span className="vrm-sec-titre">{L.titre}{L.article ? <> · {L.article}</> : null}</span>
+                  <span className="vrm-sec-titre">{L.titre}{L.article ? <> · {L.article}</> : null}{L.montant ? <> · {L.montant}</> : null}</span>
                   <span className="vrm-sec-sous">{e.at ? new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}{L.compte ? ` · ${L.compte}` : ''}{e.via === 'telephone' ? ' · depuis ton téléphone' : ''}</span>
                   {/* (8 nov., confiance) La PREUVE de la ligne : ce qui, dans sa base, note ce geste. */}
                   <span className="vrm-sec-sous vrm-sec-preuve" data-journal-preuve={L.preuve ? 'oui' : 'pas-su'}>{L.preuve || 'D’où vient cette ligne : pas su'}</span>
@@ -2539,7 +2542,7 @@ function JournalVrm() {
       ))}
       {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
       <div className="vrm-sec-trous" data-journal-trous="">
-        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone', extension: 'gestes de l’extension' }[x] || x)).join(', ')}.</p> : null}
         {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
       </div>
     </div>
