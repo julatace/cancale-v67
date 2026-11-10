@@ -1236,3 +1236,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Baisse de prix en série + Qui dorment (lots C + AW, extension 5.336)** : cases dans Annonces → À relancer · Qui dorment (et « Baisser le prix… » dans Sélectionner) ⇒ feuille −X € / −X %, arrondi à l'euro, ancien → nouveau, plancher du lot F (sous ⇒ ambre, décochée), autre compte que l'onglet ⇒ « Ouvre … sur Vinted », jamais envoyée ; « Baisser N prix » → confirmer → UNE commande `baisserPrixVinted` à la fois (garde, 45/h, pause, frein), seul le prix RELU s'affiche, Arrêter ; le nombre « qui dorment » publié = `articlesQuiDorment`. `docs/passation/2026-11-10-baisse-prix-serie.md`. Geste : installer 5.336.0.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot T)
+- **10 nov. · « Je dépose » + hors ligne au relais (lots AU, AY)** : Colis → À envoyer → « Je dépose » : les colis de la liste par transporteur, scan du bordereau ⇒ « Colis fait » (5 s), hors liste ⇒ rien, « Tout est déposé » ; hors ligne : la photo de Ma journée (suivi, transporteur, verdict des codes) datée « vue à », « Déposé » en file d'envoi. `docs/passation/2026-11-10-depot-hors-ligne.md`. Geste : aucun.

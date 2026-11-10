@@ -15,6 +15,7 @@
 //   part sans logo (il n'est pas une mention obligatoire).
 
 import { euros, MENTION_FRANCHISE } from './regle.js';
+import { bi, EN, paiementAnglais } from './anglais.js';
 
 const A4 = [595.28, 841.89];
 const M = 48;                       // marge
@@ -45,6 +46,10 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
   const fb = await doc.embedFont(StandardFonts.HelveticaBold);
   const c = (a) => rgb(a[0], a[1], a[2]);
   const accent = hexRgb(contenu.couleur);
+  // (10 nov., lot T) Facture en anglais : chaque libellé « français / English »,
+  // même taille, le français d'abord (./anglais.js dit pourquoi).
+  const en = !!contenu.anglais;
+  const B = (fr) => bi(fr, en);
 
   // Un caractère que Helvetica ne sait pas dessiner est remplacé.
   const cache = new Map();
@@ -97,10 +102,10 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
       page.drawImage(img, { x: M, y: y - hLogo, width: w, height: hLogo });
     } catch (_) { hLogo = 0; }
   }
-  ecrire(estAvoir ? 'AVOIR' : 'FACTURE', W - M, y - 20, { font: fb, t: 22, droite: true });
+  ecrire(B(estAvoir ? 'AVOIR' : 'FACTURE'), W - M, y - 20, { font: fb, t: en ? 18 : 22, droite: true });
   ecrire(`N° ${contenu.numero}`, W - M, y - 38, { font: fb, t: 11, couleur: accent, droite: true });
-  ecrire(`Date d'émission : ${contenu.emiseJour}`, W - M, y - 53, { t: 9.5, couleur: GRIS, droite: true });
-  if (estAvoir && contenu.origine) ecrire(`Annule la facture ${contenu.origine}`, W - M, y - 66, { t: 9.5, couleur: GRIS, droite: true });
+  ecrire(`${B("Date d'émission")} : ${contenu.emiseJour}`, W - M, y - 53, { t: 9.5, couleur: GRIS, droite: true });
+  if (estAvoir && contenu.origine) ecrire(`${B('Annule la facture')} ${contenu.origine}`, W - M, y - 66, { t: 9.5, couleur: GRIS, droite: true });
   y -= Math.max(hLogo, estAvoir ? 70 : 58) + 26;
 
   // ── Vendeur | Acheteur ───────────────────────────────────────────────────
@@ -113,25 +118,28 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
     return yy;
   };
   const v = contenu.vendeur; const a = contenu.acheteur;
-  const y1 = bloc('VENDEUR', v.nom, [...v.adresse, ...v.legal, v.email, v.telephone], M);
-  const y2 = bloc(estAvoir ? 'CLIENT' : 'FACTURÉ À', a.nom, [...a.adresse, a.email], M + col + 24);
+  const y1 = bloc(B('VENDEUR'), v.nom, [...v.adresse, ...v.legal, v.email, v.telephone], M);
+  const y2 = bloc(B(estAvoir ? 'CLIENT' : 'FACTURÉ À'), a.nom, [...a.adresse, a.email], M + col + 24);
   y = Math.min(y1, y2) - 18;
 
   // ── Les infos de la vente ────────────────────────────────────────────────
-  const infos = [`Date de la vente : ${contenu.venteJour}`, `Nature : ${contenu.nature}`, contenu.reference ? `Référence : ${contenu.reference}` : ''].filter(Boolean).join('   ·   ');
+  const infos = [`${B('Date de la vente')} : ${contenu.venteJour}`, `${B('Nature')} : ${en && EN[contenu.nature] ? `${contenu.nature} / ${EN[contenu.nature]}` : contenu.nature}`, contenu.reference ? `${B('Référence')} : ${contenu.reference}` : ''].filter(Boolean).join('   ·   ');
   for (const l of couper(infos, f, 9, W - 2 * M)) { ecrire(l, M, y, { t: 9, couleur: GRIS }); y -= 12; }
   y -= 10;
 
   // ── Le tableau ───────────────────────────────────────────────────────────
   const marge = contenu.regime === 'marge';
   const cols = { des: M, qte: W - M - 200, pu: W - M - 95, tot: W - M };
-  page.drawRectangle({ x: M, y: y - 6, width: W - 2 * M, height: 20, color: c(accent), opacity: 0.08 });
-  page.drawLine({ start: { x: M, y: y - 6 }, end: { x: W - M, y: y - 6 }, thickness: 1, color: c(accent) });
-  ecrire('Désignation', cols.des + 6, y, { font: fb, t: 9 });
-  ecrire('Qté', cols.qte, y, { font: fb, t: 9, droite: true });
-  ecrire(marge ? 'Prix unitaire' : 'Prix unit. HT', cols.pu, y, { font: fb, t: 9, droite: true });
-  ecrire(marge ? 'Total' : 'Total HT', cols.tot - 6, y, { font: fb, t: 9, droite: true });
-  y -= 24;
+  // Bilingue : l'en-tête du tableau sur deux lignes (français, puis anglais à la même taille).
+  const hEnt = en ? 11 : 0;
+  page.drawRectangle({ x: M, y: y - 6 - hEnt, width: W - 2 * M, height: 20 + hEnt, color: c(accent), opacity: 0.08 });
+  page.drawLine({ start: { x: M, y: y - 6 - hEnt }, end: { x: W - M, y: y - 6 - hEnt }, thickness: 1, color: c(accent) });
+  const entete = (fr, x, o) => { ecrire(fr, x, y, o); if (en && EN[fr]) ecrire(EN[fr], x, y - 11, o); };
+  entete('Désignation', cols.des + 6, { font: fb, t: 9 });
+  entete('Qté', cols.qte, { font: fb, t: 9, droite: true });
+  entete(marge ? 'Prix unitaire' : 'Prix unit. HT', cols.pu, { font: fb, t: 9, droite: true });
+  entete(marge ? 'Total' : 'Total HT', cols.tot - 6, { font: fb, t: 9, droite: true });
+  y -= 24 + hEnt;
   for (const ligne of contenu.lignes) {
     const ls = couper(ligne.designation, f, 9.5, cols.qte - cols.des - 50).slice(0, 8);
     ls.forEach((l, i) => ecrire(l, cols.des + 6, y - i * 12.5));
@@ -145,7 +153,15 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
 
   // ── Les totaux ───────────────────────────────────────────────────────────
   const xL = W - M - 230; const xR = W - M - 6;
-  const tot = (lib, val, gras = false) => { ecrire(lib, xL, y, { font: gras ? fb : f, t: gras ? 11 : 9.5 }); ecrire(val, xR, y, { font: gras ? fb : f, t: gras ? 11 : 9.5, droite: true }); y -= gras ? 18 : 14; };
+  // Bilingue : le libellé anglais sous le français, à la même taille.
+  const tot = (lib0, val0, gras = false) => {
+    const o = { font: gras ? fb : f, t: gras ? 11 : 9.5 };
+    const [fr, ...reste] = String(lib0).split(' ');
+    const cle = EN[lib0] ? lib0 : EN[fr] ? fr : '';
+    ecrire(lib0, xL, y, o); ecrire(val0, xR, y, { ...o, droite: true });
+    if (en && cle) { y -= gras ? 13 : 11.5; ecrire([EN[cle], ...(cle === fr ? reste : [])].join(' '), xL, y, o); if (val0 === 'non applicable') ecrire(EN[val0], xR, y, { ...o, droite: true }); }
+    y -= gras ? 18 : 14;
+  };
   const T = contenu.totaux;
   if (contenu.regime === 'normal') {
     tot('Total HT', euros(T.ht));
@@ -164,8 +180,14 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
 
   // ── Paiement, mentions, note ─────────────────────────────────────────────
   for (const l of couper(contenu.paiement, fb, 9.5, W - 2 * M)) { ecrire(l, M, y, { font: fb, t: 9.5 }); y -= 13; }
+  if (en) for (const l of couper(paiementAnglais(contenu), fb, 9.5, W - 2 * M)) { ecrire(l, M, y, { font: fb, t: 9.5 }); y -= 13; }
   y -= 4;
-  for (const m of contenu.mentions) for (const l of couper(m, f, 9, W - 2 * M)) { ecrire(l, M, y, { t: 9 }); y -= 12; }
+  // La mention légale reste MOT POUR MOT en français ; sa traduction juste après.
+  contenu.mentions.forEach((m, i) => {
+    for (const l of couper(m, f, 9, W - 2 * M)) { ecrire(l, M, y, { t: 9 }); y -= 12; }
+    const t = en && contenu.anglais.mentions ? contenu.anglais.mentions[i] : '';
+    if (t) for (const l of couper(t, f, 9, W - 2 * M)) { ecrire(l, M, y, { t: 9 }); y -= 12; }
+  });
   if (contenu.note) {
     y -= 8;
     const lignesNote = String(contenu.note).split(/\r?\n/).flatMap((p) => couper(p, f, 9, W - 2 * M)).slice(0, 12);
