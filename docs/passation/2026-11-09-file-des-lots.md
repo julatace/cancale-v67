@@ -70,4 +70,18 @@ libère son numéro (le dire ici).
 | AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | en cours |
 | AR | Communauté pour les créateurs de formation (7) | `claude/communaute-formateurs` | à lancer |
 
+
+Validé par Julien le 10 nov. (« Parfait fait tout ») :
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| AK2 | vrais logos Mondial Relay/Chronopost partout, rangée « Imprimer » en double retirée, bandeaux e-mails doublons retirés, « Votre colis a changé de plan » = changement de point (jamais livré), SMS Mondial Relay avec les e-mails ; + alerte ambre « point changé » avec le nouveau point et l'itinéraire (proposition 2) | `claude/colis-propre-logos` | en cours |
+| AS | À trancher : une carte par doute, photo de la paire, deux gros boutons (proposition 1, « Améliore ça stp ») | `claude/a-trancher-cartes` | en cours |
+| AT | résumé du soir 20 h : ce qu'il y a à faire demain (proposition 3 ; ≠ « rappel la veille au soir » déjà retenu le 11 oct. : le relier, une seule notification) | `claude/resume-soir` | à lancer |
+| AU | mode « dépôt » au point relais : les colis à déposer, scannés un à un, coche quand tout est déposé (proposition 4 ; s'appuie sur le scanner V et Préparer AD) | `claude/mode-depot` | à lancer |
+| AV | prix de revente réel par modèle sur la fiche d'achat (SES ventes seulement, ressemblance = proposition, jamais une identité) (proposition 5) | `claude/revente-modele` | à lancer |
+| AW | paires qui dorment > 30 j + baisse de prix en série en un geste (proposition 6 ; fusionne avec C) | `claude/baisse-prix-serie` | à lancer avec C |
+| AX | recherche universelle : N°, pseudo, n° de suivi, code de retrait (proposition 7 ; étendre ⌘K et la loupe « Tout sur le N° », pas un 3e outil) | `claude/recherche-universelle` | à lancer |
+| AY | hors ligne au point relais : codes et colis à déposer lisibles sans réseau (proposition 8 ; prolonge D et le mode relais AD) | `claude/hors-ligne-relais` | à lancer |
+
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
