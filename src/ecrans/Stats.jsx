@@ -17,6 +17,8 @@ import { AUTH, Bouton, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LA
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
+import { useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF)
+import { texteValeurStock } from '../coutVente.js';
 // ⟦← App.jsx #2⟧
 import {comparerMois,ymEnFace} from '../comparerMois.js';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
@@ -292,6 +294,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const [caLabel,setCaLabel]=useState('');
   // (31 oct., maquette) La période de la page : Semaine · Mois · Année — une règle (`bornesPeriode`) pour tout le bloc du haut.
   const [periodeStats,setPeriodeStats]=useState('mois');
+  const valeurStk = useValeurStock((AUTH.user && AUTH.user.id) || '');   // (10 nov., lot BF) lue, jamais recalculée
 
 
   // Paires réellement présentes dans le garage (mémorisé)
@@ -308,7 +311,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   
   // Stock & valeur (mémorisés)
   const stockCount=garageVals.length;
-  const stockValue=useMemo(()=>garageVals.reduce((s,id)=>s+(catMap[id]||0),0),[garageVals,catMap]);
   const freeSlots=TOTAL_SLOTS-stockCount;
   const fillRate=Math.round((stockCount/TOTAL_SLOTS)*100);
   
@@ -586,8 +588,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // est saisi, la valeur du stock s'affiche et n'attend plus rien : la citer
   // quand même serait une alerte fausse, et une alerte fausse fait douter des
   // vraies.
-  const stockInconnu = !!(liveStats && liveStats.online > 0
-    && !((liveStats.stockValue != null ? liveStats.stockValue : stockValue) > 0));
+  const stockInconnu = !!(valeurStk && valeurStk.n > 0 && valeurStk.centimes == null);
   // (3 nov.) Le bénéfice et la marge attendent un prix d'achat seulement quand LA règle le dit (`CBa.raison`).
   const quoiDepuisDebut = stockInconnu
     ? (CBa.raison === 'achats' ? 'La valeur du stock, le bénéfice et la marge' : 'La valeur du stock')
@@ -630,7 +631,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
-          Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
+          celle publiée par Annonces (`vrm_valeur_stock`, paires présentes) · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div data-stats-carte="hero" data-notion="finalise-vinted" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
         <div style={sLib}>Finalisé sur Vinted · depuis le début</div>
@@ -706,11 +707,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             l'écran Annonces (qui, lui, somme les prix de VENTE). Deux chiffres
             qui portent presque le même nom et se contredisent (§11). Tant qu'on
             ne sait rien, on l'écrit. */}
-        {(()=>{ const v = (liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue) || 0;
-          const enLigne = liveStats && liveStats.online > 0;
-          return <StatCard icon="💰" label="Valeur d'achat du stock"
-            value={(v>0 || !enLigne) ? fmt(v) : '—'} color={C.text}
-            sub={(v>0 || !enLigne) ? "prix d'achat des annonces en ligne" : undefined}/>; })()}
+        {/* (10 nov., lot BF) LA VALEUR DU STOCK : celle publiée par Annonces (`vrm_valeur_stock`,
+            src/coutVente.js — paires PRÉSENTES, prix d'achat SAISIS), avec sa couverture ;
+            « N sans prix » ouvre la saisie en série. Jamais publiée ⇒ « — ». */}
+        {(()=>{ const t = texteValeurStock(valeurStk, { partiel: !!(valeurStk && valeurStk.partiel) });
+          return <StatCard icon="💰" label="Valeur du stock"
+            value={valeurStk && valeurStk.centimes != null ? `${t.auMoins ? 'au moins ' : ''}${t.montant}` : '—'} color={C.text}
+            sub={valeurStk ? [t.sur, t.sans].filter(Boolean).join(' · ') : 'annonces pas encore lues'}
+            onClick={valeurStk && valeurStk.nSans ? versSaisiePrix : null} title={valeurStk && valeurStk.nSans ? 'Saisir les prix d’achat qui manquent' : null}/>; })()}
         {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
         <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>

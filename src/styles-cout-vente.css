@@ -1,0 +1,52 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   COÛT RÉEL D'UNE VENTE (lot BA) · VALEUR DU STOCK (lot BF) — 10 nov.
+   Neutre partout ; le bénéfice porte l'accent ; ambre = un geste à faire ou une
+   perte ; jamais rouge (§7). Chiffres alignés (tabular-nums). Style DA6 : widget
+   blanc, rayon 24 côté stock.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-cv-barre {
+  position: relative; display: flex; height: 12px; border-radius: 999px; overflow: hidden;
+  background: var(--vrm-line, rgba(0,0,0,.08)); margin: 4px 0 10px; gap: 2px;
+}
+.vrm-cv-seg { display: block; height: 100%; min-width: 3px; }
+.vrm-cv-seg.is-achat, .vrm-cv-point.is-achat { background: var(--vrm-ink, #1D1D1F); opacity: .82; }
+.vrm-cv-seg.is-frais, .vrm-cv-point.is-frais { background: var(--vrm-muted, #6E6E73); opacity: .7; }
+.vrm-cv-seg.is-emballage, .vrm-cv-point.is-emballage { background: var(--vrm-muted, #6E6E73); opacity: .38; }
+.vrm-cv-seg.is-benefice, .vrm-cv-point.is-benefice { background: var(--vrm-accent, #0066CC); }
+.vrm-cv-barre[data-cv-perte="1"] { box-shadow: inset 0 0 0 1.5px var(--vrm-warn, #B25000); }
+.vrm-cv-trait { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--vrm-warn, #B25000); }
+.vrm-cv-point { display: inline-block; width: 8px; height: 8px; border-radius: 999px; margin-right: 8px; vertical-align: 1px; flex: none; }
+.vrm-recap-argent .vrm-recap-ligne > dt { display: inline-flex; align-items: center; }
+
+/* La porte « non saisi » : un lien ambre, cible de 44 px. */
+.vrm-cv-porte {
+  appearance: none; border: 0; background: transparent; padding: 0 2px; margin: 0; min-height: 44px; cursor: pointer;
+  font: 600 15px/1.2 var(--vrm-police, inherit); color: var(--vrm-warn, #B25000); word-spacing: normal;
+}
+.vrm-cv-porte:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent, #0066CC)); outline-offset: 2px; border-radius: 8px; }
+.vrm-cv-champ { display: inline-flex; align-items: center; gap: 6px; word-spacing: normal; }
+.vrm-cv-champ input {
+  width: 84px; height: 44px; box-sizing: border-box; border-radius: 12px; padding: 0 10px; text-align: right;
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  font: 500 17px var(--vrm-police, inherit); font-variant-numeric: tabular-nums;
+}
+.vrm-cv-champ input[aria-invalid="true"] { border-color: var(--vrm-warn, #B25000); }
+.vrm-cv-ok {
+  appearance: none; height: 44px; min-width: 44px; border: 0; border-radius: 999px; padding: 0 14px; cursor: pointer;
+  background: var(--vrm-accent, #0066CC); color: var(--vrm-on-accent, #fff); font: 600 15px var(--vrm-police, inherit);
+}
+
+/* ── BF : le widget « Valeur du stock » ── */
+.vrm-cv-stock {
+  box-sizing: border-box; border-radius: 24px; padding: 16px 18px; margin: 0 0 12px;
+  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-cv-stock-tete { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); letter-spacing: .01em; }
+.vrm-cv-stock-montant { margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.vrm-cv-stock-montant b { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+.vrm-cv-stock-borne { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-cv-stock-jauge { height: 6px; border-radius: 999px; overflow: hidden; margin: 12px 0 6px; background: var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-cv-stock-jauge > span { display: block; height: 100%; border-radius: 999px; background: var(--vrm-ink, #1D1D1F); opacity: .82; }
+.vrm-cv-stock-sous { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; font-size: 15px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-cv-stock-sous > span { min-height: 32px; display: inline-flex; align-items: center; }

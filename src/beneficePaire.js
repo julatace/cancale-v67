@@ -1,12 +1,15 @@
 // Les montants inconnus restent inconnus. Aucun frais de port payé par
 // l'acheteur n'est déduit : transportVendeur désigne une dépense saisie du vendeur.
+// (10 nov., lot BA) `emballage` : le coût d'emballage SAISI pour cette vente — un frais
+// comme les autres (dans `coutsVente`, donc dans tous les totaux) ; vide = non saisi,
+// jamais deviné (la cascade de la vente le nomme, src/coutVente.js).
 export function centimes(v){
  if(v==null || String(v).trim()==='')return null;
  const s=String(v).trim().replace(',','.');
  if(!/^\d{1,9}(?:\.\d{1,2})?$/.test(s))return null;
  const [a,b='']=s.split('.');return Number(a)*100+Number(b.padEnd(2,'0'));
 }
-export const champsCharges=[['commission','Commission plateforme'],['transportVendeur','Port payé par moi'],['remboursement','Remboursement acheteur'],['autresFrais','Autres frais']];
+export const champsCharges=[['commission','Commission plateforme'],['transportVendeur','Port payé par moi'],['remboursement','Remboursement acheteur'],['autresFrais','Autres frais'],['emballage','Emballage']];
 export function coutsVente(e={}){
  let cents=centimes(e?.fees) ?? 0,valid=!(e?.fees!=null && String(e.fees).trim()!=='' && centimes(e.fees)==null);
  for(const [key] of champsCharges){const v=e?.[key],c=centimes(v);if(v!=null && String(v).trim()!=='' && c==null)valid=false;cents+=c ?? 0;}
