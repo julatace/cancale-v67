@@ -1176,3 +1176,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne §9 de CLAUDE.md déplacée telle quelle (10 nov., retraits irréprochables)
 - **9 nov. · Lot AF : même annonce sur deux comptes + histoire du N°** : alerte ambre dans Annonces (compte, prix, depuis quand ; photo exacte, rien supprimé) ; fiche paire « L'histoire du N° » en lecture seule + journal append-only `vrm_numeros_journal`. `docs/passation/2026-11-09-doublons-historique.md`. Geste : aucun.
+
+## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (lot AI, textes courts, taille)
+- **9 nov. (soir) · Colis et Ventes tout de suite (lot AE)** : comme Ma journée, en ≈ 1,5–2 s les derniers chiffres et listes rendus sur CET appareil pour CE compte, « Mis à jour il y a N min », inertes (« Vérification… »), puis l'écran vrai en place (CLS ≈ 0) ; UNE règle d'instantané pour les trois écrans (`src/instantaneEcran.js`), rien de personnel rangé (liste blanche). `docs/passation/2026-11-09-colis-ventes-instantanes.md`. Geste : aucun.

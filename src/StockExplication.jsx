@@ -74,9 +74,9 @@ export default function StockExplication({ onFermer = null }) {
         </g>
       </svg>
       <ol className="vrm-sx-etapes">
-        <li className="vrm-sx-etape" data-etape="1"><b>1</b><span>Crée ton meuble comme le vrai, puis glisse (ou touche) chaque article dans sa case.</span></li>
+        <li className="vrm-sx-etape" data-etape="1"><b>1</b><span>Crée ton meuble, puis glisse chaque article dans sa case.</span></li>
         <li className="vrm-sx-etape" data-etape="2"><b>2</b><span>Vendu : sa case s’allume jusqu’à ce que tu l’enlèves.</span></li>
-        <li className="vrm-sx-etape" data-etape="3"><b>3</b><span>Oublié ? Quand le colis part, la case se libère toute seule. Le numéro reste.</span></li>
+        <li className="vrm-sx-etape" data-etape="3"><b>3</b><span>Colis parti : la case se libère, le numéro reste.</span></li>
       </ol>
     </section>
   );

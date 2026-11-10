@@ -225,6 +225,17 @@
   font: 600 13px/1 var(--vrm-police);
   box-shadow: inset 0 .5px 0 rgba(255, 255, 255, .35);
 }
+/* (9 nov., lot AI) La carte du compte est un BOUTON qui ouvre Paramètres : mêmes mesures, fond neutre,
+   un léger fond au survol / à l'appui, l'anneau du clavier. */
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] button.vrm-nav-compte {
+  width: 100% !important; min-height: 44px; box-sizing: border-box; text-align: left !important; cursor: pointer;
+  background: transparent !important; box-shadow: none !important; border: 0 !important; border-bottom: .5px solid var(--n2-bord) !important;
+  border-radius: 12px 12px 0 0 !important; font: inherit; color: inherit; -webkit-tap-highlight-color: transparent;
+  transition: background-color 120ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) { .vrm-app-shell nav.vrm-sidebar[data-nav-v2] button.vrm-nav-compte:hover { background: var(--w-remplir, rgba(118,118,128,.12)) !important; } }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] button.vrm-nav-compte:active { background: var(--w-remplir-fort, rgba(118,118,128,.16)) !important; transform: none !important; }
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] button.vrm-nav-compte:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: -2px; }
 .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
 .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-compte-nom {
   display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
