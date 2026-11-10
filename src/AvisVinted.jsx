@@ -50,11 +50,11 @@ export default function AvisLus({ comptes = [] }) {
         return (
           <section key={c.uid} className="vrm-av-compte" data-av-compte={c.uid} data-av-etat="lu" data-av-lus={L.lus} data-av-moyenne={L.moyenneLus == null ? '' : L.moyenneLus} data-av-total={L.total == null ? '' : L.total}>
             <div className="vrm-av-tete">
-              <span className="vrm-av-nom">{c.nom}</span>
+              <span className="vrm-av-nom">Derniers avis{comptes.length > 1 ? ` · ${c.nom}` : ''}</span>
               <b className="vrm-display vrm-av-moy">{noteFr(L.moyenneLus)}<small>/5</small></b>
             </div>
             <div className="vrm-av-sous">
-              <span data-av-couverture="">{L.lus ? `sur les ${L.lus} derniers lus${L.total != null && L.total > L.lus ? ` · ${nFr(L.total)} en tout` : ''}` : 'aucun avis lisible'}</span>
+              <span data-av-couverture="">{L.lus ? `moyenne des ${L.lus} derniers lus${L.total != null && L.total > L.lus ? ` · ${nFr(L.total)} en tout` : ''}` : 'aucun avis lisible'}</span>
               <Evolution e={L.evolution}/>
             </div>
             {L.dernieres.length ? (
