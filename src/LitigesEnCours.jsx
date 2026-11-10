@@ -48,7 +48,7 @@ function Preuve({ type, p }) {
   );
 }
 
-function Carte({ c, Photo }) {
+function Carte({ c, Photo, onDossier = null }) {
   const P = Photo || ((x) => <img {...x} alt=""/>);
   const ph = c.preuves && c.preuves.photo && c.preuves.photo.etat === 'ok' ? c.preuves.photo.src : '';
   const tuile = <span className="vrm-lit-tuile" aria-hidden="true">{ICONES.photo}</span>;
@@ -70,7 +70,38 @@ function Carte({ c, Photo }) {
       {c.geste && c.geste.url ? (
         <a className="vrm-lit-geste" href={c.geste.url} target="_blank" rel="noreferrer" data-litige-geste={c.geste.url}>{c.geste.libelle} ↗</a>
       ) : null}
+      {onDossier ? <Dossier c={c} onDossier={onDossier}/> : null}
     </article>
+  );
+}
+
+// (10 nov., lot BJ) « Dossier PDF » : fabriqué dans le navigateur (src/dossierLitige.js), rien
+// n'est envoyé. La page du bordereau porte l'adresse de l'acheteur : jointe seulement s'il coche.
+function Dossier({ c, onDossier }) {
+  const [etat, setEtat] = React.useState('');
+  const [avecB, setAvecB] = React.useState(false);
+  const bordOk = !!(c.preuves && c.preuves.bordereau && c.preuves.bordereau.etat === 'ok');
+  const lancer = async () => {
+    if (etat === 'encours') return;
+    setEtat('encours');
+    let r = 'passu';
+    try { r = await onDossier(c, { avecBordereau: bordOk && avecB }); } catch (_) { r = 'passu'; }
+    setEtat(r === 'ok' ? 'ok' : 'passu');
+  };
+  return (
+    <div className="vrm-lit-dossier" data-litige-dossier={etat || 'pret'}>
+      <button type="button" className="vrm-lit-dossier-b" data-litige-dossier-b={c.cle} onClick={lancer} disabled={etat === 'encours'} aria-busy={etat === 'encours' ? 'true' : undefined}>
+        {ICONES.bordereau}<span>{etat === 'encours' ? 'Création…' : 'Dossier PDF'}</span>
+      </button>
+      {bordOk ? (
+        <label className="vrm-lit-dossier-case">
+          <input type="checkbox" checked={avecB} onChange={(e) => setAvecB(e.target.checked)} data-litige-dossier-bordereau=""/>
+          <span>Joindre le bordereau <small>(il porte l’adresse)</small></span>
+        </label>
+      ) : null}
+      {etat === 'ok' ? <span className="vrm-lit-dossier-msg" role="status" data-litige-dossier-ok="">PDF téléchargé ✓</span> : null}
+      {etat === 'passu' ? <span className="vrm-lit-dossier-msg is-passu" role="status" data-litige-dossier-passu="">PDF pas créé : réessaie.</span> : null}
+    </div>
   );
 }
 
@@ -107,7 +138,7 @@ function RetoursParModele({ bi }) {
   );
 }
 
-export default function LitigesEnCours({ r, bi, Photo = null, entete = null }) {
+export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onDossier = null }) {
   if (!r) return null;
   const n = r.cartes.length;
   const partiel = r.manques.length > 0;
@@ -121,7 +152,7 @@ export default function LitigesEnCours({ r, bi, Photo = null, entete = null }) {
           {partiel ? <span>Au moins</span> : null}<b className="vrm-lit-total">{n}</b><span>en cours</span>
         </div>
       ) : null}
-      {r.etat === 'lu' && n > 0 ? <div className="vrm-lit-grille">{r.cartes.map((c) => <Carte key={c.cle} c={c} Photo={Photo}/>)}</div> : null}
+      {r.etat === 'lu' && n > 0 ? <div className="vrm-lit-grille">{r.cartes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier}/>)}</div> : null}
       {r.etat === 'lu' && n === 0 ? (
         <div className="vrm-lit-vide vrm-vide-dessin" data-litiges-vide={partiel ? 'partiel' : 'zero'}>
           <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="34" fill="currentColor" opacity=".10"/><path d="M22 37.5 31.5 47 50 26" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -131,7 +162,7 @@ export default function LitigesEnCours({ r, bi, Photo = null, entete = null }) {
       {r.anciennes.length ? (
         <details className="vrm-lit-anciennes vrm-repli" data-litiges-anciennes={r.anciennes.length}>
           <summary>{r.anciennes.length} {r.anciennes.length > 1 ? 'plus anciens' : 'plus ancien'} (échéance passée)</summary>
-          <div className="vrm-lit-grille">{r.anciennes.map((c) => <Carte key={c.cle} c={c} Photo={Photo}/>)}</div>
+          <div className="vrm-lit-grille">{r.anciennes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier}/>)}</div>
         </details>
       ) : null}
       {r.plateformes.length > 1 || partiel ? (
