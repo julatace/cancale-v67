@@ -110,6 +110,7 @@ async function capture(pg, nom) {
         await pg.goto(new URL('/?tab=journee', pg.url()).href, { waitUntil: 'domcontentloaded' });
         await attendre(4000);
         const eS = await entreesVues(pg, tel);
+        // (9 nov., lot AL) « Republier » n'est plus une entrée du menu (une vue d'Annonces) : jamais dans le menu, en Simple comme en Complet.
         dit(!eS.includes('garage') && !eS.includes('republier'), `A3 ${cle} Simple : ni Stock ni Republier dans le menu`, eS.join(','));
         dit(!eS.some((x) => /^plat_(ebay|leboncoin|vestiaire)$/.test(x)), `A4 ${cle} Simple : aucun site jamais relié dans le menu`, eS.join(','));
         dit(eS.includes('compta') && eS.includes('settings'), `A5 ${cle} Simple : Compta et Paramètres restent`, eS.join(','));
@@ -120,7 +121,7 @@ async function capture(pg, nom) {
         await pg.reload({ waitUntil: 'domcontentloaded' });
         await attendre(4500);
         const eC = await entreesVues(pg, tel);
-        dit(eC.includes('garage') && eC.includes('republier'), `A6 ${cle} Complet : Stock et Republier reviennent`, eC.join(','));
+        dit(eC.includes('garage') && !eC.includes('republier'), `A6 ${cle} Complet : Stock revient (Republier vit dans Annonces, lot AL)`, eC.join(','));
         const cC = await compteurs(pg);
         dit(Object.keys(cS).length > 0 && JSON.stringify(cS) === JSON.stringify(cC), `A7 ${cle} aucun compteur ni chiffre de Ma journée ne change entre Simple et Complet`, JSON.stringify(cS) + ' ≠ ' + JSON.stringify(cC));
         await pg.goto(new URL('/?tab=garage', pg.url()).href, { waitUntil: 'domcontentloaded' });
@@ -140,7 +141,7 @@ async function capture(pg, nom) {
         await pg.goto(new URL('/?tab=journee', pg.url()).href, { waitUntil: 'domcontentloaded' });
         await attendre(3500);
         const e = await entreesVues(pg, tel);
-        dit(e.includes('garage') && e.includes('republier'), `B2 ${cle} propriétaire : Stock et Republier là`, e.join(','));
+        dit(e.includes('garage') && !e.includes('republier'), `B2 ${cle} propriétaire : Stock là (Republier vit dans Annonces, lot AL)`, e.join(','));
         dit(journal.erreurs.length === 0, `B3 ${cle} aucune erreur JS`, journal.erreurs.join(' | '));
         await ctx.close();
       }
