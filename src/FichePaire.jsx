@@ -96,7 +96,7 @@ function EscalierPrix({ points }) {
     <figure className="vrm-fp-prixserie" data-fiche-prix-serie={points.length} data-prix-premier={premier.prix} data-prix-dernier={dernier.prix} role="img" aria-label={`Prix : de ${eurosPrix(premier.prix)} à ${eurosPrix(dernier.prix)}, ${points.length} prix`}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden="true">
         <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
-        {g.marches.map((m, i) => <circle key={i} cx={x(m.x0)} cy={y(m.y)} r="3" fill="currentColor"/>)}
+        {g.marches.map((m, i) => <path key={i} d={`M${x(m.x0).toFixed(1)} ${y(m.y).toFixed(1)} l0 0`} stroke="currentColor" strokeWidth="7" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>)}
       </svg>
     </figure>
   );

@@ -44,7 +44,7 @@
 .vrm-calc-note { margin: 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); text-align: center; }
 
 /* ── L'escalier des prix (fiche paire) ── */
-.vrm-fp-prixserie { margin: 6px 0 8px; color: var(--vrm-ink, #1D1D1F); }
+.vrm-fp-prixserie { margin: 6px 0 8px; max-width: 360px; color: var(--vrm-ink, #1D1D1F); }
 .vrm-fp-prixserie svg { display: block; overflow: visible; }
 .vrm-fp-prixserie figcaption { display: flex; gap: 8px; align-items: baseline; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--vrm-muted, #6E6E73); }
 .vrm-fp-prixserie figcaption b { color: var(--vrm-ink, #1D1D1F); font-weight: 700; }
@@ -89,3 +89,4 @@
 .vrm-emb2-form label > input { flex: none; }
 .vrm-calc-sites { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .vrm-calc-sites .vrm-calc-site { padding: 0 6px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 480px) { .vrm-calc-sites { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vrm-calc-sites .vrm-calc-site { font-size: 15px; } }
