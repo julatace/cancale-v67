@@ -417,6 +417,8 @@ import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCou
 import { venteHorsPlan, venteAutreHorsPlan } from "../api/_lib/plan-regle.js";
 import { VentesHorsPlan, VentesAutresHorsPlan, BandeauCompteVendeur } from "./abonnement/PlansSoloPro.jsx";
 import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js";
+import { publicationAgendaEnvoi } from './agendaEcheances.js';   // (10 nov., lot H)
+import { verifierAppareilUneFois, DEMANDE_APPAREIL, sessionValide } from './appareilNouveau.js';   // (10 nov., lot H)
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
 import { masquerPourEnvoi, jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 // ⟦→ ecrans/Reglages.jsx #14⟧
@@ -2636,6 +2638,9 @@ const SYNC_KEYS = [
   // retirer » quand l'app en comptait 7, mesuré le 23 oct.) et la relit avec la
   // même règle (api/_lib/retrait-colis.js). Aucun code, aucune identité.
   'vrm_colis_retirer',
+  // (10 nov., lot H) Les dates limites d'envoi LUES ([N°, jour, heure, at]) : PUBLIÉES par Ma
+  // journée (src/agendaEcheances.js), CONSOMMÉES par l'agenda .ics (api/_lib/agenda-ics.js).
+  'vrm_agenda_envoi',
   // Le bénéfice des ventes Vinted, cumulé JOUR PAR JOUR (19 octobre) : PUBLIÉ
   // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
   // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.
@@ -36665,6 +36670,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const retirer = pickupUnion.emailList.map(ligneEmail).concat(pickupUnion.extra.map(ligneVinted));
       const aVerifier = pickupUnion.aVerifier.filter(aEncoreCode)
         .map((x) => ({ ...(x.kind === 'email' ? ligneEmail(x.t) : ligneVinted(x.o)), raison: x.e.etat, garde: Number.isFinite(x.e.garde) ? x.e.garde : null }));
+      // (10 nov., lot H) Les dates limites LUES, pour l'agenda du téléphone (src/agendaEcheances.js).
+      try { const pubAg = publicationAgendaEnvoi(envoyer, load('vrm_agenda_envoi', null)); if (pubAg) save('vrm_agenda_envoi', pubAg); } catch (_) {}
       const photo = construirePhoto({ uid, at: Date.now(), envoyer, retirer, aVerifier, nAVerifier: pickupUnion.aVerifier.length, nePasPoster: colisEb.nePasPoster.length });
       if (photo && ecrirePhoto(uid, photo, localStorage)) rechaufferQr(photo);
     } catch (_) {}
@@ -51257,6 +51264,9 @@ function AppCoeur() {
   // Discord lancé sur le téléphone : le retour arrive dans un autre navigateur ;
   // l'app reprend la preuve rangée par le serveur (src/communaute/discordAttente.js).
   React.useEffect(()=>ecouterDiscord(enTeteSession),[]);
+  // (10 nov., lot H) « Nouvel appareil » : une fois par session de ce navigateur, le serveur relit SES sessions
+  // et alerte s'il en voit une d'un appareil jamais vu (src/appareilNouveau.js, api/_lib/appareil-nouveau.js).
+  React.useEffect(()=>{ const id=authState&&authState.user&&authState.user.id; if(!id||!MULTI_USER) return; verifierAppareilUneFois({ uid:id, enTete:enTeteSession(), stockage:(()=>{ try{ return sessionStorage; }catch(_){ return null; } })(), fetch:(...a)=>fetch(...a) }); },[authState&&authState.user&&authState.user.id]);
   // (5 nov.) Groupes d'accompagnement : si le vendeur partage ses chiffres dans un
   // groupe, ses agrégats repartent quand ils changent (src/communaute/accompagnement.js).
   React.useEffect(()=>ecouterPartage(enTeteSession),[]);
@@ -51603,6 +51613,8 @@ function AppCoeur() {
       if(t==='settings'&&section==='signalements') DEMANDE_SIGNALEMENTS.on=true;
       // (10 nov., lot BC) La notification du bilan porte le lundi de SA semaine.
       if(t==='semaine'){ const l=p.get('lundi'); DEMANDE_SEMAINE.lundi=l&&/^\d{4}-\d{2}-\d{2}$/.test(l)?l:null; try{ window.dispatchEvent(new Event('vrm:semaine')); }catch(_){} }
+      // (10 nov., lot H) « Nouvel appareil » : Appareils connectés, CETTE session en évidence.
+      if(t==='settings'&&section==='appareils'){ DEMANDE_APPAREIL.session=sessionValide(p.get('session')); DEMANDE_REGLAGE_SOUS.id='appareils'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }

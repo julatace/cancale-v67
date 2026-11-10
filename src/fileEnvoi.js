@@ -119,7 +119,7 @@ const lireLocal = (stock, k) => { let t; try { t = stock.getItem(k); } catch (_)
 // elles partent avec la file comme le reste, mais ne sont pas des « changements »
 // qu'il a faits — on ne les compte pas à l'écran (« 1 changement » quand il a
 // tapé un prix, pas « 41 »).
-export const CLES_PUBLIEES = ['vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vrm_paires_dorment', 'vinted_annonces_email_sold', 'vrm_widget_token', 'vrm_agent_ebay_resume', 'vrm_agent_ebay_jour'];
+export const CLES_PUBLIEES = ['vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vrm_paires_dorment', 'vinted_annonces_email_sold', 'vrm_widget_token', 'vrm_agent_ebay_resume', 'vrm_agent_ebay_jour', 'vrm_agenda_envoi'];
 const vide = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length) || (estObjet(v) && !Object.keys(v).length);
 const memeValeur = (a, b) => (vide(a) && vide(b)) || egal(a, b);
 // Un élément de liste : un nombre et sa chaîne sont le même (« 12 » = 12, le pool).
