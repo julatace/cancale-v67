@@ -1148,3 +1148,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (À trancher en cartes)
 - **9 nov. (soir) · Solo par plateforme (lot E)** : Solo = UN compte vendeur PAR plateforme (Vinted, Leboncoin, eBay, Vestiaire) — **à confirmer par Julien** ; `venteAutreHorsPlan` + `excluAutreDe(v, regle)` (app = bilans serveur), feuille « Quel compte vend sur … ? », 30 j par plateforme, CGV. `docs/passation/2026-11-09-solo-plateformes.md`. Geste : confirmer, migration 030 (après 028).
+
+## Ligne déplacée de CLAUDE.md §9 le 10 nov. (taille, colis propre)
+- **9 nov. (soir) · Plancher + « déjà N » (lot F)** : sous chaque offre Vinted « En dessous de 103 € tu perds de l'argent » (prix d'achat SAISI + frais connus, règle `beneficePaire` ; pas de prix d'achat ⇒ porte de saisie ; sous ⇒ ambre ; mini sous le plancher dit, jamais changé ; Vestiaire : rien, commission pas lue) ; « Tu as déjà N paires de ce modèle en stock » à la saisie d'un achat (ressemblance, rien écrit). `docs/passation/2026-11-09-plancher-stock.md`. Geste : aucun.
+- **9 nov. · Zéro banc rouge** : ~20 bancs remis au vert (périmés à la règle actuelle, fragiles rendus déterministes, aucun contrôle retiré) ; vrais défauts : note « adresse reliée à aucun compte » + son geste cachée sur Colis, limite d'envoi invisible au téléphone, filtre des sites qui sautait, « Préparer sur » un site masqué, paire partie « pas rangée ». `docs/passation/2026-11-09-zero-banc-rouge.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (taille, lots BA/BF)
+- **9 nov. (soir) · DA4 suite** : focus piégé et rendu dans les feuilles, feuille refusée qui remonte (`bloque`), saisie gardée à la fermeture, confirmation `irreversible` en ambre (Leboncoin/eBay supprimer), messages au-dessus du clavier à durée lisible, zone `aria-live` toujours montée, Messages vide dessiné. `docs/passation/2026-11-09-direction-artistique-4.md` (Suite). Geste : aucun.

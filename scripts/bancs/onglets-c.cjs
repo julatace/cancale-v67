@@ -195,13 +195,15 @@ async function colis(nav, { W, theme }) {
   const T = `[${W}px ${theme}]`;
   const o = await ouvrir(nav, { W, theme, tab: 'cat_bord' });
   const { pg } = o;
-  await pg.waitForSelector('[data-colis-a-relier-compte]', { timeout: 15000 }).catch(() => {});
-  const c = await pg.evaluate(() => [...document.querySelectorAll('[data-colis-a-relier-compte]')].map((x) => ({ uid: x.getAttribute('data-colis-a-relier-compte'), n: x.getAttribute('data-n'), h: Math.round((x.querySelector('[data-colis-relier]') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height) })));
-  dit(c.length === 1 && c[0].uid === '222' && c[0].n === '1' && c[0].h >= 44, 'C4', `${T} Colis : la ligne du compte qui a 1 colis à envoyer sans ses e-mails, avec LE geste`, JSON.stringify(c));
-  await pg.locator('[data-colis-a-relier]').first().scrollIntoViewIfNeeded().catch(() => {});
+  // (10 nov., Julien : « Enlève ça, car c'est déjà marqué au-dessus ») plus de bandeau « 1 colis de X : ses
+  // e-mails n'arrivent pas » : une marque DISCRÈTE sur la carte du colis de ce compte, qui ouvre le même pas-à-pas.
+  await pg.waitForSelector('[data-colis-sans-email]', { timeout: 15000 }).catch(() => {});
+  const c = await pg.evaluate(() => ({ bandeau: document.querySelectorAll('[data-colis-a-relier]').length, marques: [...document.querySelectorAll('[data-colis-sans-email]')].map((x) => x.getAttribute('data-colis-sans-email')) }));
+  dit(c.bandeau === 0 && c.marques.length === 1 && c.marques[0] === '222', 'C4', `${T} Colis : plus de bandeau ; une marque discrète sur LA carte du compte sans e-mails`, JSON.stringify(c));
+  await pg.locator('[data-colis-sans-email]').first().scrollIntoViewIfNeeded().catch(() => {});
   await capture(pg, `c-colis-${W}-${theme}`);
   await inspecte(o, 'C0', T, 'Colis');
-  await pg.locator('[data-colis-relier="222"]').first().click().catch(() => {});
+  await pg.locator('[data-colis-sans-email="222"]').first().click().catch(() => {});
   await pg.waitForSelector('[data-relier-compte="222"]', { timeout: 10000 }).catch(() => {});
   dit((await lireRelier(pg)).compte === '222', 'C4', `${T} le geste ouvre son pas-à-pas`);
   await ferme(o);
