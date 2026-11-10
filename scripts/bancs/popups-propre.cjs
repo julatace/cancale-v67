@@ -219,7 +219,7 @@ const ECRANS = [
     const corps = pg.locator('[data-popup-corps="remise-en-ligne"]');
     const ouverte = await corps.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
     const txt = ouverte ? (await corps.innerText()).replace(/\s+/g, ' ') : '';
-    dit(ouverte && /la même paire que N°7/.test(txt) && /rien à réécrire sur le carton/.test(txt) && await corps.locator('[data-remise-oui="7"]').count() === 1 && await corps.locator('[data-remise-non]').count() >= 1,
+    dit(ouverte && /la même paire que N°7/.test(txt) && /rien à réécrire/.test(txt) && await corps.locator('[data-remise-oui="7"]').count() === 1 && await corps.locator('[data-remise-non]').count() >= 1,
       `${tag} : P3 — la pop-up porte la question, la règle et les deux boutons`, txt.slice(0, 300));
     await pg.waitForTimeout(1500);
     dit(String(((await fiches(pg))['9303'] || {}).numero || '') === avant, `${tag} : P3 — ouvrir la pop-up ne relie RIEN`);

@@ -172,6 +172,7 @@ const ouvrirPop = async (pg, sel) => {
   if (await pg.locator('[data-popup-corps]').count()) return true;
   const b = pg.locator(`${sel} [data-popup-ouvrir]`).first();
   if (!(await b.count())) return false;
+  await b.evaluate((e) => e.scrollIntoView({ block: 'center' })).catch(() => {});
   await b.click({ timeout: 8000 }).catch(() => {});
   return pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
 };

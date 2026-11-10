@@ -42821,7 +42821,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </>)}
             </div>
             </div>
-            {nRefaire > 0 && <Bouton variante="secondaire" taille="petit" className="vrm-annbar-refaire" data-refaire-ouvrir={nRefaire} onClick={()=>setRefaireOpen(true)}>{nRefaire} brouillon{nRefaire>1?'s':''} à refaire</Bouton>}
+            {/* (9 nov., lot AI — Julien : « encore du texte ») Une puce compacte (compteur + mots), plus un gros bouton large. */}
+            {nRefaire > 0 && <button type="button" className="vrm-pop-puce vrm-annbar-refaire" data-refaire-ouvrir={nRefaire} aria-haspopup="dialog" onClick={()=>setRefaireOpen(true)}><span className="vrm-pop-puce-n">{nRefaire}</span><span>brouillon{nRefaire>1?'s':''} à refaire</span></button>}
             {!repubAction && <CompteRenduOperation onRefaire={()=>setRefaireOpen(true)} onReprendre={(act, ids)=>{ setRepubReprise(ids); setRepubAction(act); }} />}
           </div>}
 

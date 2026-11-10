@@ -35,3 +35,13 @@
 @media (max-width: 767px) {
   :root:root body .vrm-app-header .vrm-etat-pastille .vrm-etat-avatar { width: 30px; height: 30px; font-size: 13px; }
 }
+
+/* (9 nov., 22 h 37 — Julien : « Encore du texte ») Annonces : « 4 brouillons à refaire » et « 21 nouveaux N° »
+   en PUCES compactes (pilule grise, compteur), plus en gros blocs sur toute la largeur. Même information. */
+:root:root body .vrm-main .vrm-annbar-refaire.vrm-pop-puce { flex: 0 0 auto !important; width: auto !important; align-self: flex-start; margin: 2px 0 6px; }
+:root:root body .vrm-ann-avis > button.vrm-ann-avis-neufs,
+:root:root body .vrm-ann-avis > button.vrm-ann-avis-neufs:only-child {
+  flex: 0 0 auto !important; width: auto !important; justify-content: flex-start !important; gap: 6px;
+  min-height: 44px; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important;
+  background: var(--w-remplir, rgba(118,118,128,.12)) !important; box-shadow: none !important; font-size: 15px !important; font-weight: 600;
+}
