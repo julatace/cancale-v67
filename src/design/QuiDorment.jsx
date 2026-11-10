@@ -14,8 +14,15 @@ import React from 'react';
 import { SEUILS_QUI_DORMENT } from '../quiDorment.js';
 import { SEUILS_FAVORIS, texteCompteur } from '../vendrePlus.js';
 
-export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fmt, attrs, mode = 'dort', onMode, seuilFavoris = 5, onSeuilFavoris, nDort, nFavoris, pasLus }) {
+// (10 nov., lot C) `selection` (Set d'identifiants) + `onSelection` + `onBaisser` : une case
+// par ligne et « Baisser le prix (N) » — la feuille de baisse en série (src/BaissePrixSerie.jsx).
+// Absents ⇒ la vue d'avant, sans case. Cocher n'envoie rien : c'est la feuille qui demande.
+export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fmt, attrs, mode = 'dort', onMode, seuilFavoris = 5, onSeuilFavoris, nDort, nFavoris, pasLus, selection, onSelection, onBaisser }) {
   const fav = mode === 'favoris';
+  const avecCases = !!(onBaisser && onSelection && selection);
+  const ids = liste ? liste.map((a) => a.id) : [];
+  const nSel = avecCases ? ids.filter((id) => selection.has(id)).length : 0;
+  const basculer = (id) => { const n = new Set(selection); if (n.has(id)) n.delete(id); else n.add(id); onSelection(n); };
   const titre = fav ? 'Favoris sans vente' : 'Articles qui dorment';
   return (
     <section className="vrm-qd" data-qui-dorment="" data-qd-mode={mode} data-qd-seuil={fav ? seuilFavoris : seuil} data-qd-n={liste ? liste.length : ''} {...(attrs || {})}>
@@ -39,10 +46,17 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fm
       </p>
       {!liste ? <div className="vrm-qd-vide">—</div>
         : !liste.length ? <div className="vrm-qd-vide" data-qd-vide="">{fav ? `Aucune annonce en ligne avec ${seuilFavoris} favoris ou plus.` : `Aucun article en ligne depuis ${seuil} jours ou plus.`}</div>
-          : (
+          : (<>
+            {avecCases ? (
+              <div className="vrm-qd-barre" data-qd-barre={nSel}>
+                <button type="button" className="vrm-qd-tout" data-qd-tout="" onClick={() => onSelection(nSel === ids.length ? new Set() : new Set(ids))}>{nSel === ids.length ? 'Tout décocher' : 'Tout cocher'}</button>
+                <button type="button" className="vrm-qd-baisser" data-qd-baisser={nSel} disabled={!nSel} onClick={() => onBaisser(liste.filter((a) => selection.has(a.id)))}>{nSel ? `Baisser le prix (${nSel})` : 'Baisser le prix'}</button>
+              </div>
+            ) : null}
             <ul className="vrm-qd-liste">
               {liste.map((a) => (
-                <li key={a.id} className="vrm-qd-ligne" data-qd-ligne={a.id} data-qd-age={a.age == null ? '' : a.age} data-qd-vues={a.vues == null ? '' : a.vues} data-qd-favoris={a.favoris == null ? '' : a.favoris}>
+                <li key={a.id} className="vrm-qd-ligne" data-qd-ligne={a.id} data-qd-age={a.age == null ? '' : a.age} data-qd-vues={a.vues == null ? '' : a.vues} data-qd-favoris={a.favoris == null ? '' : a.favoris} data-qd-coche={avecCases ? (selection.has(a.id) ? '1' : '0') : undefined}>
+                  {avecCases ? <label className="vrm-qd-coche-zone"><input type="checkbox" className="vrm-qd-coche" checked={selection.has(a.id)} onChange={() => basculer(a.id)} data-qd-case={a.id} aria-label={`Cocher ${a.numero ? 'le N°' + a.numero : a.titre || 'cette annonce'}`}/></label> : null}
                   {a.photo ? <img className="vrm-qd-photo" data-vrm-vignette="" src={a.photo} alt="" loading="lazy"/> : <span className="vrm-qd-photo" aria-hidden="true"/>}
                   <span className="vrm-qd-centre">
                     <span className="vrm-qd-nom">{a.numero ? <span className="vrm-qd-num">N°{a.numero}</span> : null}{a.titre || 'Sans titre'}</span>
@@ -58,7 +72,7 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fm
                 </li>
               ))}
             </ul>
-          )}
+          </>)}
     </section>
   );
 }
