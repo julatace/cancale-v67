@@ -35,5 +35,5 @@
   .vrm-jauge-rangee { flex-wrap: wrap; gap: 4px 10px; padding: 6px 0; }
   .vrm-jauge-rangee .vrm-jauge-nom { flex-basis: 100%; }
 }
-.vrm-bp-jauge { margin: 0 0 8px; }
+.vrm-bp-plafond { margin: 0 4px 8px; }
 .vrm-fa-jauge { margin: 4px 2px 0; }

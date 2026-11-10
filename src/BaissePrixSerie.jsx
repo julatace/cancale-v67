@@ -94,7 +94,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </label>
         </div>
         <p className="vrm-bp-note">Arrondi à l’euro. Le prix change sur Vinted, annonce par annonce, puis VRM le relit.</p>
-        {compteOnglet ? <div className="vrm-bp-jauge"><JaugeActions uid={compteOnglet} /></div> : null}
+        {compteOnglet ? <div className="vrm-bp-plafond"><JaugeActions uid={compteOnglet} /></div> : null}
         {!baisse.ok ? <p className="vrm-ao-mini" role="alert" data-bp-erreur="">{baisse.erreur}</p> : null}
         {extRaison ? <p className="vrm-ao-mini" role="status" data-bp-ext="">{extRaison}</p> : null}
         {ouvrir.map((o) => <p key={o.texte} className="vrm-bp-compte" data-bp-ouvrir={o.n}>{o.texte} pour baisser {o.n > 1 ? `ses ${o.n} annonces` : 'son annonce'}.</p>)}
