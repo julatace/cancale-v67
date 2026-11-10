@@ -2354,11 +2354,21 @@ const prechargerDemarrage = () => {
     const memo = comptesLiesMemorises(qui);
     // (10 nov., lot K) Les comptes connus : leurs commandes gardées sur l'appareil, revalidées
     // par leur VERSION (src/copieLignes.js) — seules les lignes changées sont téléchargées.
-    const uidCopie = memo && AUTH.user?.id ? AUTH.user.id : '';
+    // Première ouverture sur l'appareil (comptes pas encore connus) : les versions par le
+    // même motif nomment les lignes ; illisibles ⇒ la lecture d'avant.
+    const uidCopie = AUTH.user?.id || '';
+    const lireCommandes = (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null);
     const famille = (uidCopie
-      ? lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids: idsCommandes(memo), stockage: stockageApp(), local: localStorage,
-          lireVersions: (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null),
-          lireLignes: (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null) }).then((r) => (r.ok ? r.rows : null))
+      ? (async () => {
+          const versMotif = memo ? null : await lireTout(`id=like.harvest_*_orders_*d&select=${SEL_VERSION}`, { strict: true }).catch(() => null);
+          if (!memo && !Array.isArray(versMotif)) return lireTout(`id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
+          const ids = memo ? idsCommandes(memo) : versMotif.map((r) => String(r && r.id)).filter((x) => x && x !== 'undefined');
+          if (!ids.length) return [];
+          const r = await lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids, stockage: stockageApp(), local: localStorage,
+            lireVersions: memo ? (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null) : async () => versMotif,
+            lireLignes: lireCommandes });
+          return r.ok ? r.rows : null;
+        })()
       : lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }))
       .then((rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null)).catch(() => null);
     // Les comptes que la lecture commune couvre. ⚠️ §4.1 : une liste VIDE n'est
