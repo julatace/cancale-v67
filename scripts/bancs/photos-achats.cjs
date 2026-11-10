@@ -16,7 +16,8 @@ require('./_porte-banc.cjs');
 //   V2 une annonce à 3 photos : compteur « n/3 », flèche, clavier (←/→) ou
 //      glisser changent de photo ; une photo seule : ni flèche ni compteur ;
 //   V3 zoom : double toucher (téléphone) / double clic et molette (ordinateur) ;
-//   V4 fermer : le RETOUR du navigateur (téléphone) ou Échap, et la croix ; on
+//   V4 fermer : le RETOUR du navigateur (téléphone) ou Échap, la croix, un toucher
+//      à côté de la photo (SUR elle : rien, le double toucher zoome) ; on
 //      reste sur le même écran ;
 //   V5 le reste de la rangée garde son geste : la vignette n'ouvre pas le menu
 //      ⋯ d'un achat ; le ⋯ l'ouvre toujours ;
@@ -34,7 +35,7 @@ require('./_porte-banc.cjs');
 //      ni `b64`) : les octets ne partent qu'au toucher ;
 //   F4 « Ajouter un achat » (hors Vinted) : la facture se joint au formulaire et
 //      apparaît sur l'achat saisi.
-//  `SHOTS=dossier` range les captures (à REGARDER, §6.2). `BANC_DIST`, `BANC_PORT`,
+//  `SHOTS=dossier` range les captures (à REGARDER, §6.2). `BANC_DIST`, `BANC_PORT`, `PA_VUES`,
 //  `BANC_SEUL=V,A,F`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -142,16 +143,25 @@ const ecran = (pg) => pg.evaluate(() => { const m = [...document.querySelectorAl
 async function toucherVignette(pg, tel, sel = '.vrm-main', filtre = '') {
   // La première vignette d'article de l'écran : amenée au centre (les photos se chargent à la demande),
   // puis touchée À SA PLACE (un vrai toucher / clic aux coordonnées, comme un doigt).
-  for (let essai = 0; essai < 4; essai++) {
+  for (let essai = 0; essai < 8; essai++) {
     const pos = await pg.evaluate(async ([sel, filtre]) => {
       const zone = [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().width > 0) || document;
-      const img = [...zone.querySelectorAll('img[data-vrm-vignette]')].find((i) => { const r = i.getBoundingClientRect(); return r.width >= 32 && r.height >= 32 && !i.closest('.vrm-visionneuse') && (!filtre || (filtre[0] === '[' ? i.closest(filtre) != null : (i.getAttribute('src') || '').includes(filtre))); });
+      const candidates = () => [...zone.querySelectorAll('img[data-vrm-vignette]')].filter((i) => { const r = i.getBoundingClientRect(); return r.width >= 32 && r.height >= 32 && !i.closest('.vrm-visionneuse') && (!filtre || (filtre[0] === '[' ? i.closest(filtre) != null : (i.getAttribute('src') || '').includes(filtre))); });
+      const img = candidates()[0];
       if (!img) return null;
       img.scrollIntoView({ block: 'center' });
       await new Promise((ok) => setTimeout(ok, 700));
-      if (!img.isConnected || !(img.naturalWidth > 0)) return { attendre: true };
-      const r = img.getBoundingClientRect();
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      // L'écran finit de se poser (instantané remplacé par l'écran vrai, ligne de fraîcheur…) : la
+      // vignette a pu bouger ou passer sous la barre du haut. Un doigt ne touche que ce qu'il VOIT :
+      // la première vignette chargée, à l'écran, que rien ne couvre en son centre.
+      for (const i of candidates()) {
+        if (!(i.naturalWidth > 0)) continue;
+        const r = i.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > innerHeight) continue;
+        const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (at && (at === i || i.contains(at))) return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+      return { attendre: true };
     }, [sel, filtre]);
     if (!pos) return false;
     if (pos.attendre) { await pg.waitForTimeout(500); continue; }
@@ -220,7 +230,16 @@ async function blocV(nav, W, sombre) {
     await pg.click('[data-visionneuse-fermer]'); await pg.waitForTimeout(400);
     dit(!(await visionneuse(pg)), `${T} V4 la croix ferme`);
     // Une photo seule : ni flèche, ni compteur.
-    if (await toucherVignette(pg, tel, '.vrm-main', '/ph/L1-0.svg')) { v = await visionneuse(pg); dit(v && v.n === 1 && v.fleches === 0 && !v.compteur.trim(), `${T} V2 photo seule : ni flèche ni compteur`, JSON.stringify(v)); }
+    if (await toucherVignette(pg, tel, '.vrm-main', '/ph/L1-0.svg')) {
+      v = await visionneuse(pg); dit(v && v.n === 1 && v.fleches === 0 && !v.compteur.trim(), `${T} V2 photo seule : ni flèche ni compteur`, JSON.stringify(v));
+      // V4 : un toucher SUR la photo ne ferme rien ; à côté d'elle (le noir), il ferme.
+      const tape = async (x, y) => { if (tel) await pg.touchscreen.tap(x, y); else await pg.mouse.click(x, y); await pg.waitForTimeout(450); };
+      const H = await pg.evaluate(() => innerHeight);
+      await tape(W / 2, H / 2);
+      dit(!!(await visionneuse(pg)), `${T} V4 un toucher sur la photo ne la ferme pas`);
+      await tape(20, tel ? H - 150 : H / 2);
+      dit(!(await visionneuse(pg)), `${T} V4 un toucher à côté de la photo la ferme`);
+    }
     await ctx.close();
   });
   // V5, V6 sur Achats.
@@ -234,7 +253,11 @@ async function blocV(nav, W, sombre) {
     await pg.keyboard.press('Escape'); if (tel) await pg.click('[data-visionneuse-fermer]').catch(() => {}); await pg.waitForTimeout(300);
     await pg.locator(`${row} .vrm-buy-more`).evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.click(`${row} .vrm-buy-more`); await pg.waitForTimeout(300);
     dit(await pg.locator('[role="menu"].vrm-buy-menu').count() === 1 && !(await visionneuse(pg)), `${T} V5 le ⋯ de la rangée ouvre toujours son menu`);
-    await pg.mouse.click(5, 5).catch(() => {}); await pg.waitForTimeout(300);
+    // Le menu se referme comme un doigt le referme : un toucher à côté, sur son fond (au milieu de
+    // l'écran : en haut, la barre de l'app passe devant le fond) — sinon le fond couvre la rangée suivante.
+    if (tel) await pg.touchscreen.tap(W / 2, 600); else await pg.mouse.click(5, 5);
+    await pg.waitForTimeout(300);
+    dit(!(await pg.locator('[role="menu"].vrm-buy-menu').count()), `${T} V5 le menu se referme`);
     // V6 : l'achat dont la photo est absente : rien ne s'ouvre.
     const vide = pg.locator('[data-achat-tx="73004"] .vrm-buy-ph').first();
     if (await vide.count()) { await vide.evaluate((e) => e.scrollIntoView({ block: 'center' })); if (tel) await vide.tap(); else await vide.click(); await pg.waitForTimeout(300); dit(!(await visionneuse(pg)), `${T} V6 photo absente : rien ne s'ouvre`); }
@@ -354,7 +377,9 @@ async function blocF(nav, W, sombre) {
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
-    for (const [W, sombre] of [[390, true], [1512, false]]) {
+    // `PA_VUES=390-clair,1512-sombre` (ou 390-sombre, 1512-clair…) : les autres vues ; par défaut 390 sombre + 1512 clair.
+    const VUES = process.env.PA_VUES ? process.env.PA_VUES.split(',').map((x) => { const [w, t] = x.split('-'); return [Number(w), t === 'sombre']; }) : [[390, true], [1512, false]];
+    for (const [W, sombre] of VUES) {
       console.log(`\n── ${W} px${sombre ? ' sombre' : ''} ──`);
       if (SEUL.includes('V')) await blocV(nav, W, sombre);
       if (SEUL.includes('A')) await blocA(nav, W, sombre);

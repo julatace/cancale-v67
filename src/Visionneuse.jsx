@@ -37,6 +37,8 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
   const ptrs = useRef(new Map());
   const geste = useRef(null);
   const dernierTap = useRef(0);
+  const typePointeur = useRef('mouse');   // au doigt, le double toucher est compté dans `haut` : le dblclick que le navigateur y ajoute est ignoré
+  const aBouge = useRef(false);   // le geste qui finit a glissé / pincé : son « clic » ne ferme rien
   const n = photos.length;
   const aller = useCallback((d) => { if (n < 2) return; setI((v) => (v + d + n) % n); setZ(1); setPos({ x: 0, y: 0 }); setGlisse(0); }, [n]);
   const taille = () => { const r = scene.current ? scene.current.getBoundingClientRect() : { width: 390, height: 700 }; return { w: r.width, h: r.height }; };
@@ -81,6 +83,8 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
   const bas = (e) => {
     if (e.target.closest && e.target.closest('button')) return;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    if (ptrs.current.size === 0) aBouge.current = false;
+    typePointeur.current = e.pointerType || 'mouse';
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const L = [...ptrs.current.values()];
     if (L.length === 2) geste.current = { type: 'pince', d0: Math.hypot(L[0].x - L[1].x, L[0].y - L[1].y) || 1, z0: z };
@@ -91,9 +95,9 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const g = geste.current; if (!g) return;
     const L = [...ptrs.current.values()];
-    if (g.type === 'pince' && L.length === 2) { const d = Math.hypot(L[0].x - L[1].x, L[0].y - L[1].y); setZ(borneZoom(g.z0 * d / g.d0)); setPos((p) => { const { w, h } = taille(); return borneDeplacement(p.x, p.y, borneZoom(g.z0 * d / g.d0), w, h); }); return; }
+    if (g.type === 'pince' && L.length === 2) { aBouge.current = true; const d = Math.hypot(L[0].x - L[1].x, L[0].y - L[1].y); setZ(borneZoom(g.z0 * d / g.d0)); setPos((p) => { const { w, h } = taille(); return borneDeplacement(p.x, p.y, borneZoom(g.z0 * d / g.d0), w, h); }); return; }
     const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
-    if (Math.abs(dx) + Math.abs(dy) > 6) g.bouge = true;
+    if (Math.abs(dx) + Math.abs(dy) > 6) { g.bouge = true; aBouge.current = true; }
     if (g.type === 'deplace') { const { w, h } = taille(); setPos(borneDeplacement(g.p0.x + dx, g.p0.y + dy, z, w, h)); }
     else if (g.type === 'glisse' && n > 1) setGlisse(dx);
   };
@@ -114,6 +118,15 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
       else dernierTap.current = t;
     }
   };
+  // Un toucher À CÔTÉ de la photo ferme ; SUR la photo, non (double toucher = zoom). La photo est
+  // contenue dans son cadre : on calcule le rectangle qu'elle occupe vraiment.
+  const surLaPhoto = (e) => {
+    const im = scene.current && scene.current.querySelector('[data-visionneuse-img]');
+    if (!im || !(im.naturalWidth > 0)) return false;
+    const b = im.getBoundingClientRect(); const k = Math.min(b.width / im.naturalWidth, b.height / im.naturalHeight);
+    const w = im.naturalWidth * k, h = im.naturalHeight * k, x0 = b.left + (b.width - w) / 2, y0 = b.top + (b.height - h) / 2;
+    return e.clientX >= x0 && e.clientX <= x0 + w && e.clientY >= y0 && e.clientY <= y0 + h;
+  };
   const annule = (e) => { ptrs.current.delete(e.pointerId); geste.current = null; setGlisse(0); };
   const src = photos[i];
   return (
@@ -122,8 +135,8 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
       style={{ position: 'fixed', inset: 0, zIndex: Z_VISIONNEUSE, background: '#000', color: '#fff', display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
       {Retour ? <Retour fermer={fermer}/> : null}
       <div ref={scene} className="vrm-visionneuse-scene" onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={annule}
-        onDoubleClick={(e) => { const { cx, cy } = centre(e); zoomer(z > 1 ? 1 : ZOOM_DOUBLE, cx, cy); }}
-        onClick={(e) => { if (e.target === e.currentTarget && z === 1 && !glisse) fermer(); }}
+        onDoubleClick={(e) => { if (typePointeur.current !== 'mouse') return; const { cx, cy } = centre(e); zoomer(z > 1 ? 1 : ZOOM_DOUBLE, cx, cy); }}
+        onClick={(e) => { if (e.target === e.currentTarget && z === 1 && !glisse && !aBouge.current && !surLaPhoto(e)) fermer(); }}
         style={{ position: 'absolute', inset: 0, touchAction: 'none', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: z > 1 ? 'grab' : 'zoom-in', userSelect: 'none', WebkitUserSelect: 'none' }}>
         <div key={i} className="vrm-visionneuse-photo" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
           transform: `translate3d(${pos.x + glisse}px, ${pos.y}px, 0) scale(${z})`, transition: geste.current ? 'none' : 'transform .22s cubic-bezier(.2,.8,.2,1)' }}>
