@@ -1225,3 +1225,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Note privée d'une paire + achat saisi deux fois (lots BD, BH)** : note ≤ 200 car. rangée par IDENTITÉ (`n:<N°>`, sinon `a:<annonce>` ; N° sur deux paires ⇒ cachée), visible Annonces/fiche/Ventes/Préparer/scan/Stock, clé `vrm_notes_paires` (main), jamais envoyée ; doublon d'achat par n° de transaction/commande/facture SEULEMENT (champ « N° de commande ou de facture »), « Garder celle-ci » masque l'autre (annulable, `vrm_achats_hors_masques`, hors des totaux), source À trancher. `docs/passation/2026-11-10-note-achat-double.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Frise d'une vente + D'où viennent mes achats (BE, BG)** : récap d'une vente Vinted = frise Vendue → Bordereau → Déposée → En route → Livrée → Finalisée → Versée, chaque étape par SA preuve (bordereau par transaction, règle du départ, transporteur/e-mails du n° de SON bordereau, 450, date de versement), JAMAIS déduite (« pas lu » gris), ambre = son geste, litige/retour/annulation en bifurcation (`src/friseProuvee.js`) ; Statistiques : bénéfice moyen par source (achat Vinted relié, fournisseur, « Où » d'un achat hors plateforme par SON N°, + « Magasin »), publié par Ventes `vrm_sources_ventes` (`src/sourceAchats.js`). `docs/passation/2026-11-10-frise-source.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (recherche universelle lot AX, taille du dossier)
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Lot AN : photo en grand + Achats DA6 + facture jointe** : toucher une vignette d'article ⇒ LA visionneuse (`src/Visionneuse.jsx`, la seule : la photo du carton du lot AZ y est fondue ; galerie par fichier, zoom, retour) ; rangées d'Achats DA6 (`src/styles-achats-photos.css`) ; facture PDF/photo jointe à un achat dans SA ligne `achat_facture_*` (RLS 021, aucune migration). `docs/passation/2026-11-10-photos-achats.md`. Geste : aucun.
