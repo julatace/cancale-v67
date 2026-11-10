@@ -43,7 +43,7 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fm
             <ul className="vrm-qd-liste">
               {liste.map((a) => (
                 <li key={a.id} className="vrm-qd-ligne" data-qd-ligne={a.id} data-qd-age={a.age == null ? '' : a.age} data-qd-vues={a.vues == null ? '' : a.vues} data-qd-favoris={a.favoris == null ? '' : a.favoris}>
-                  {a.photo ? <img className="vrm-qd-photo" src={a.photo} alt="" loading="lazy"/> : <span className="vrm-qd-photo" aria-hidden="true"/>}
+                  {a.photo ? <img className="vrm-qd-photo" data-vrm-vignette="" src={a.photo} alt="" loading="lazy"/> : <span className="vrm-qd-photo" aria-hidden="true"/>}
                   <span className="vrm-qd-centre">
                     <span className="vrm-qd-nom">{a.numero ? <span className="vrm-qd-num">N°{a.numero}</span> : null}{a.titre || 'Sans titre'}</span>
                     <span className="vrm-qd-sous">

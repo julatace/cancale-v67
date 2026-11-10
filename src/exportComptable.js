@@ -24,6 +24,7 @@
 // « Pas su » s'écrit « — » (jamais 0) ; un total incomplet dit « au moins » et
 // nomme ce qui manque ; jamais « encaissé » (§5).
 // ─────────────────────────────────────────────────────────────────────────────
+import { mentionFacture } from './factureAchat.js';
 import { PERIODE_OK, libellePeriode, moisDePeriode, jourFr, eurosTexte } from './registres.js';
 
 export { libellePeriode };
@@ -71,7 +72,9 @@ export const raisonUrssaf = (regime) => (regime === 'micro' ? '' : (RAISON_URSSA
 //   taux         `tauxUrssaf()` (en %)
 //   montantPeriode(due, ligne, taux) = `montantPeriodeUrssaf` ; aPayer(ca, taux) = `aPayerUrssaf`
 //   libelleRegime(regime), entreprise ({ nom, siret } | null), maintenant
-export function donneesExportComptable({ periode, recettes = null, achats = null, ligne = null, regime = null, taux = null, montantPeriode, aPayer, libelleRegime = (r) => String(r || ''), entreprise = null, maintenant = Date.now() } = {}) {
+// (10 nov., lot AN) `factures` : { clé → meta } des factures d'achat JOINTES (src/factureAchat.js), sans contenu ;
+// la ligne d'achat le MENTIONNE (« facture jointe (nom) ») — null = pas lu, aucune mention inventée.
+export function donneesExportComptable({ periode, recettes = null, achats = null, ligne = null, regime = null, taux = null, montantPeriode, aPayer, libelleRegime = (r) => String(r || ''), entreprise = null, maintenant = Date.now(), factures = null } = {}) {
   if (!PERIODE_OK.test(String(periode || ''))) return null;
   const bornes = bornesPeriode(periode);
   const ymNow = (() => { const d = new Date(maintenant); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
@@ -98,6 +101,7 @@ export function donneesExportComptable({ periode, recettes = null, achats = null
   const achatsL = achats ? achats.lignes.map((l) => ({
     id: l.id, date: l.date, plateforme: l.plateforme, fournisseur: l.compte || l.fournisseur || '', reference: l.reference, num: l.num, titre: l.titre,
     saisi: l.saisi == null ? null : l.saisi, lu: l.source === 'saisi' ? null : l.montant, sourceLue: l.source === 'recu' ? 'reçu Vinted' : l.source === 'article' ? 'article seul (sans port ni frais)' : '', note: l.raison || '',
+    facture: mentionFacture(l, factures),
   })) : null;
   const sansCout = achatsL ? achatsL.filter((l) => l.saisi == null).length : null;
   // Aucun coût saisi sur des achats de la période : « pas su » (« — »), jamais « au moins 0,00 € » (§5).
@@ -174,7 +178,7 @@ export function csvExportComptable(d) {
   L.push([]);
   L.push(['ACHATS DE LA PÉRIODE']);
   L.push(['Date', 'Plateforme', 'Compte ou fournisseur', 'Référence', 'N°', 'Article', 'Coût saisi (€)', 'Montant lu (€)', 'Montant lu sur', 'Note']);
-  if (d.achats) { for (const a of d.achats) L.push([a.date, a.plateforme, a.fournisseur, a.reference, a.num, a.titre, nbT(a.saisi), nbT(a.lu), a.sourceLue, a.saisi == null ? (a.note || 'coût pas saisi') : a.note]); L.push(['', '', '', '', '', 'Total saisi', nbT(d.coutSaisi), '', '', d.sansCout ? `${d.sansCout} sans coût` : '']); }
+  if (d.achats) { for (const a of d.achats) L.push([a.date, a.plateforme, a.fournisseur, a.reference, a.num, a.titre, nbT(a.saisi), nbT(a.lu), a.sourceLue, [a.saisi == null ? (a.note || 'coût pas saisi') : a.note, a.facture].filter(Boolean).join(' · ')]); L.push(['', '', '', '', '', 'Total saisi', nbT(d.coutSaisi), '', '', d.sansCout ? `${d.sansCout} sans coût` : '']); }
   else L.push(['—', 'achats pas lus']);
   return '﻿' + L.map((r) => r.map(cel).join(';')).join('\r\n') + '\r\n';
 }
