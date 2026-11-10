@@ -565,7 +565,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
               {nFiltres ? <Bouton variante="discret" data-filtres-effacer onClick={() => { setPrixMin(''); setPrixMax(''); setRecuDu(''); setRecuAu(''); setMarque(''); setTaille(''); }} style={{ minHeight: 44, gridColumn: '1 / -1', justifySelf: 'start' }}>Effacer les filtres</Bouton> : null}
             </div>
           )}
-          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? 'Je lis les dates de réception de tes achats…' : 'Je n’ai pas pu lire les dates de réception — seules celles cochées « Je l’ai retiré » comptent ; réessaie dans un moment.'}</div> : null}
+          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? 'Je lis les dates de réception de tes achats…' : 'Dates de réception pas lues : seules « Je l’ai retiré » comptent.'}</div> : null}
           {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{detail.sansReception} achat{detail.sansReception > 1 ? 's' : ''} sans date de réception lue, pas dans cette liste.</div>}
           {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
         </div>
