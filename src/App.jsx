@@ -19606,7 +19606,7 @@ function TeteTransporteurs({ transp, colis, relire }) {
     : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) : elle lira Mondial Relay depuis {NAV.ce}.</>;
   return <>
     {transp === null && <div data-transp-passu="" style={{...st,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-      <span style={{flex:'1 1 220px'}}>Transporteurs pas relus : affichage d'après e-mails et Vinted.</span>
+      <span style={{flex:'1 1 220px'}}>Le statut chez les transporteurs n'a pas pu être relu. Rien n'est perdu.</span>
       {relire && <button type="button" data-transp-reessayer="" onClick={relire} style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'0 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>Réessayer</button>}
     </div>}
     {montrerMr && <div data-transp-mr={sansSouris ? 'telephone' : sait} data-transp-mr-n={String(mrSans)} style={st}>
