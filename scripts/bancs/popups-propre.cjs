@@ -129,7 +129,7 @@ const paragraphes = (pg, seuil) => pg.evaluate((seuil) => {
   const bloc = (d) => /^(block|flex|grid|list-item|table|table-cell|flow-root)$/.test(d);
   const longs = [];
   for (const el of main.querySelectorAll('*')) {
-    if (el.closest('[data-feuille], [data-feuille-cadre], svg, script, style, select, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary), .vrm-pop-corps')) continue;
+    if (el.closest('[data-feuille], [data-feuille-cadre], svg, script, style, select, table, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary), .vrm-pop-corps')) continue;
     const s = getComputedStyle(el);
     if (!bloc(s.display) || !vis(el)) continue;
     // une feuille de texte : aucun enfant BLOC qui porte du texte
@@ -272,6 +272,12 @@ const ECRANS = [
   { nom: 'messages-leboncoin', url: '/?tab=messages&site=leboncoin', pret: '.vrm-main' },
   { nom: 'achats', url: '/?tab=achats', pret: '.vrm-main' },
   { nom: 'achats-vestiaire', url: '/?tab=achats&site=vestiaire', pret: '.vrm-main' },
+  // (10 nov., 3e série — branche claude/textes-courts-3) Argent (Compta, Statistiques, Déclarer,
+  // Factures) et Republier, passés à la même règle.
+  { nom: 'argent', url: '/?tab=argent', pret: '.vrm-main' },
+  { nom: 'argent-stats', url: '/?tab=stats', pret: '.vrm-main' },
+  { nom: 'argent-declarer', url: '/?tab=argent_declarer', pret: '.vrm-main' },
+  { nom: 'argent-factures', url: '/?tab=invoices', pret: '.vrm-main' },
 ].filter((e) => !process.env.ECRANS_SEULS || process.env.ECRANS_SEULS.split(',').includes(e.nom));
 
 async function compte(b, sombre) {

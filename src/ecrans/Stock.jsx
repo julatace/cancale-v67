@@ -12,7 +12,7 @@ import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees } from '../stockAnnonces.js';
 import { LIGNE_INVENTAIRE } from '../inventaire.js';
 import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
-import { NotePaireCoque, InfoPop, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -703,7 +703,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         </div>
         {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
         {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
-        {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted {NAV.dans} avec l'extension, puis reviens ici.</div>}
+        {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Annonces pas lues{manqueTxt ? ` (${manqueTxt})` : ''}, rien n'est perdu : ouvre Vinted {NAV.dans}.</div>}
         {/* (9 nov., lot AI — Julien : « ça fait très moche ») UNE ligne courte (rangées · à ranger, et le
             signal de ce qui manque) ; la phrase d'avant, entière, dans sa pop-up. Ambre : un geste à faire. */}
         {aa && aa.su && <InfoPop nom="stock-resume" titre="Tes annonces actuelles" className="vrm-s2d-resume-l"
@@ -1070,7 +1070,7 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
     </div>
     <label data-gravite-choix="" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '12px 0 4px', cursor: 'pointer', minHeight: 44 }}>
       <input type="checkbox" checked={gravite} onChange={(e) => setGravite(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
-      <span style={{ fontSize: 15, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Quand tu retires un article, ceux du dessus descendent jusqu'à la planche en dessous.</span></span>
+      <span style={{ fontSize: 15, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Un article retiré : ceux du dessus descendent.</span></span>
     </label>
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
       <ChoixPlanches cols={cols} rows={rows} planches={planches} setPlanches={setPlanches} />
@@ -1408,10 +1408,9 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         </button>}/>
 
       <p style={{fontSize:13,color:C.muted,margin:'0 0 14px',lineHeight:1.5}}>
-        L'<b>ancienne</b> liste de numéros en ligne, tenue à la main avant que l'app lise Vinted
-        directement (l'onglet <b>Annonces</b> a pris le relais). Ajoute tes numéros un par un ci-dessous.
-        Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.
+        L'<b>ancienne</b> liste tenue à la main (<b>Annonces</b> a pris le relais). Ajoute tes numéros ci-dessous.
       </p>
+      <div style={{fontSize:13,color:C.muted,margin:'-8px 0 14px'}}><Pourquoi label="Comment elle bouge">Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.</Pourquoi></div>
 
       {/* Saisie à l'unité */}
       <div style={{display:'flex',gap:8,marginBottom:12}}>
@@ -1449,9 +1448,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
       {/* ⚠️ Rien a comparer tant que le garage est vide : on le DIT, une fois. */}
       {garageVide && stockVinted.length>0 && (
         <div style={{marginBottom:16,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,fontSize:13,color:C.muted,lineHeight:1.5}}>
-          Aucun numéro n'est encore posé dans le <b style={{color:C.text}}>Stock</b> : la comparaison
-          avec cette liste ne dirait donc rien d'utile (elle signalerait les {stockVinted.length} numéros
-          d'un coup). Range tes articles dans le Stock, et les écarts apparaîtront ici.
+          Range tes articles dans le <b style={{color:C.text}}>Stock</b> : les écarts apparaîtront ici. <Pourquoi>Aucun numéro n'est encore posé dans le Stock : la comparaison avec cette liste signalerait les {stockVinted.length} numéros d'un coup.</Pourquoi>
         </div>
       )}
       {!garageVide && (enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
@@ -1479,7 +1476,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           {garagePasEnLigne.length>0&&(
             <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:12}}>
               <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>Au stock mais pas en ligne ({garagePasEnLigne.length})</div>
-              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces articles sont dans le stock mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
+              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>Dans le stock, pas sur Vinted : à mettre en ligne ?</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {garagePasEnLigne.map(n=>(
                   <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
@@ -1800,8 +1797,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
         <Card style={{marginBottom:14}}>
           <div style={{fontWeight:600,marginBottom:4,color:C.text}}>Importer mes annonces en ligne</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:12}}>
-            Charge tes annonces Vinted actuellement en ligne, puis attribue à chacune son numéro et clique « Associer ».
-            {' '}Si le titre contient déjà « nXX », le numéro est pré-rempli (tu peux le corriger).
+            Charge tes annonces en ligne, donne à chacune son numéro, puis « Associer ».
+            {' '}<Pourquoi>Si le titre contient déjà « nXX », le numéro est pré-rempli (tu peux le corriger).</Pourquoi>
           </div>
           {accounts.length === 0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
           {accounts.map(acc => {
