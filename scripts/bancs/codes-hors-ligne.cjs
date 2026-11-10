@@ -12,9 +12,21 @@ const auj = new Date();
 
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 // Un colis à retirer, vu par email transporteur : code 1234, Mondial Relay.
-const TRACK = { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '1234',
-  lieu: 'Phone Cash Cancale', carrier: 'mondial_relay', suivi: 'MR123456', artTitle: 'Nike Air Max 1',
-  receivedAt: auj.toISOString() };
+// (10 nov., lot AY) La VRAIE forme d'une ligne de suivi (`type`, `subject`, `emailAt`, `arriveLe` — §6.3) :
+// sans elles la règle « le sujet d'abord » ne la classe pas à retirer et la copie n'était jamais écrite
+// (rouge sur main en phases 1 et 2 pour cette seule raison).
+const TRACK = { type: 'suivi', status: 'available', statusLabel: 'Arrivé au point de retrait', code: '1234',
+  lieu: 'Phone Cash Cancale', carrier: 'mondialrelay', suivi: 'MR123456', artTitle: 'Nike Air Max 1',
+  subject: 'Votre colis MR123456 est disponible', consigne: false, account: 'compte_test',
+  receivedAt: auj.toISOString(), emailAt: auj.toISOString(), arriveLe: auj.toISOString() };
+// (10 nov., lot AY) La phase « réseau coupé » rouvre l'app À FROID : la porte hors ligne (lot D) ne laisse
+// passer qu'une session dont le jeton dit le même compte (`sub`), vérifiée sur l'appareil, avec le dernier
+// état de l'abonnement lu. Le banc range donc SA session (un jeton de la forme JWT) et sert
+// `/api/compte?mode=abonnement` — avant, la porte refusait (« Vérification indisponible ») : rouge sur main.
+const UID = '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b';
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+const JETON = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, aal: 'aal1', exp: Math.floor(Date.now() / 1000) + 86400 })}.signature-de-banc`;
+const SESSION = { access_token: JETON, refresh_token: 'r-codes-hors-ligne', expires_at: Date.now() + 864e5, totp: [], user: { id: UID, email: 'banc@vrm.test', totp: [] } };
 const rows = [
   { id: 'main', data: {} },
   { id: 'email_track_mondial_relay_MR123456', data: TRACK },
@@ -59,7 +71,8 @@ async function main() {
         const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
         const pg = await ctx.newPage();
         let baseDown = false;
-        await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+        await pg.addInitScript(({ sess, uid }) => { try { if (!localStorage.getItem('vrm_session')) { localStorage.setItem('vrm_session', JSON.stringify(sess)); localStorage.setItem('vrm_local_owner', uid); } localStorage.setItem('schema_cloisonne', '1'); } catch (_) {} }, { sess: SESSION, uid: UID });
+        await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? SESSION.user : { access_token: JETON, refresh_token: SESSION.refresh_token, expires_in: 86400, user: SESSION.user }) }));
         await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
         await pg.route('**/rest/v1/**', (route) => {
           if (baseDown) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>error</html>' });
@@ -70,13 +83,17 @@ async function main() {
           if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
           const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
           const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+          // (10 nov.) La relecture ENTIÈRE par identités (`id=in.(…)`, la forme de la vraie lecture des suivis) :
+          // le banc rendait [] — aucun colis n'arrivait à l'écran.
+          const inn = /[?&]id=in\.\(([^)]*)\)/.exec(u);
+          if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
           const eq = /id=eq\.([^&]*)/.exec(u);
           if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
           const lk = /id=like\.([^&]*)/.exec(u);
           if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
           return j([]);
         });
-        await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+        await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: /mode=abonnement/.test(r.request().url()) ? JSON.stringify({ ok: true, acces: true, statut: 'active', configure: true }) : '{"pret":true}' }));
 
         // ── Phase 1 : base UP, on ouvre « À retirer » → le cache s'écrit ───────
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
