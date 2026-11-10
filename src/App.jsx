@@ -162,6 +162,9 @@ import { versementsDuReleve, completerVersementsParReleve } from "./versementRel
 import { aDaterParAnnee, anneeSureDeVente, tsVenteADater, periodeADater } from './aDaterAnnee.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
+import VueACompleter from "./AnnoncesACompleter.jsx";
+import AvisVente from "./AvisVente.jsx";
+import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
 import { nombreNonLues, marquerLues, fusionnerLus } from "./journalNotifs.js";
 import { masqueesParCompte } from "./annoncesMasquees.js";
@@ -1353,6 +1356,17 @@ const detectSchema = async () => {
   return CLOISONNE;
 };
 
+// (10 nov., lot U) Les avis Vinted d'UN compte (≤ 20, rangés par l'extension) : une projection,
+// jamais `select=data`. Lecture ratée ou rien capté ⇒ `null` (« pas lus », jamais « aucun avis »).
+const lireAvisCompte = async (uid) => {
+  if (!/^\d{1,15}$/.test(String(uid || ''))) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_feedbacks&select=avis:data->payload->user_feedbacks`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) && j[0] && Array.isArray(j[0].avis) ? j[0].avis : null;
+  } catch (_) { return null; }
+};
 const sbAuth = (extra) => {
   // Le jeton du vendeur ne sert QUE si la base sait s'en servir. Avant la
   // migration on garde la clé publique : le rôle « connecté » n'a pas forcément
@@ -9930,6 +9944,9 @@ const mapWardrobeItem = (it) => (enregistrerGaleries([it]), ({
   brand: it.brand_title || (typeof it.brand === 'string' ? it.brand : (it.brand && it.brand.title)) || null,
   size: it.size_title || (typeof it.size === 'string' ? it.size : (it.size && it.size.title)) || null,
   condition: it.status || null,
+  // (10 nov., lot U) Le champ a-t-il été LU dans le dressing ? Un champ lu vide est un manque
+  // (« À compléter », src/annoncesACompleter.js) ; un champ jamais vu est « pas su ».
+  champsLus: { marque: ['brand', 'brand_title'].some((k) => k in it), taille: ['size', 'size_title'].some((k) => k in it), etat: 'status' in it },
   // Pourquoi l'annonce est fermée, quand Vinted l'a dit ('sold' = vendue).
   closingAction: it.item_closing_action || null,
   reserved: !!it.is_reserved,
@@ -36791,6 +36808,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     : null),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.items, numeros, buyByNum, achatPlusTard]);
+  // (10 nov., lot U) « À COMPLÉTER » : les annonces en ligne (la base de « Sans achat relié ») à qui
+  // il manque quelque chose de LU — src/annoncesACompleter.js ; rien envoyé à Vinted.
+  const annACompleter = useMemo(() => {
+    if (!Array.isArray(listings.items)) return listings.loading ? undefined : null;
+    const ouN = ouNumeroEcrit();
+    const enLigne = listings.items.filter((it) => it && !acctOffOf(it));
+    const unCompte = new Set(enLigne.map((x) => String((x._acc && x._acc.vinted_user_id) || ''))).size <= 1;
+    return annoncesACompleter(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
+      return { id: it.id, titre: it.title, photo: photoArticle(it) || '', num: e.numero ? String(e.numero) : '', compte: unCompte ? '' : ((it._acc && (it._acc.login || it._acc.username)) || ''),
+        domaine: it._acc && it._acc.domain, prix: it.price, ts: it.createdTs, nPhotos: it.photoCount, marque: it.brand, taille: it.size, etat: it.condition, champsLus: it.champsLus,
+        descNumero: it.numEcritDesc, prixAchat: a != null && !isNaN(a) ? a : null }; }),
+      { numeroEcrit: numeroEcritActif() && (!Array.isArray(ouN) || ouN.includes('description')) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, listings.loading, numeros, buyByNum]);
   // ── (9 nov., lot AC) « À TRANCHER » : cet écran PUBLIE les doutes qu'il compte ──
   // (src/aTrancher.js). Les nombres de SES règles, tels que ses blocs les montrent :
   // `conflitsNum`, `aEcrireCarton`, `aVerifierCarton`, `remises`, `fileAchat`
@@ -41522,6 +41553,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <dl>
                     {acheteur ? <div className="vrm-recap-ligne"><dt>Acheteur</dt><dd>{acheteur}</dd></div> : null}
                     <div className="vrm-recap-ligne" data-vente-acces=""><dt>Compte</dt><dd><CompteVente compte={o._acc ? (accNameOf(o._acc) || null) : null} plateforme="vinted" ou="detail"/> · Vinted</dd></div>
+                    {/* (10 nov., lot U) L'avis de l'acheteur, relié par n° de transaction SEULEMENT (src/avisVente.js). */}
+                    {o.transaction_id != null && st !== 'cancelled' && o._acc ? <AvisVente uid={o._acc.vinted_user_id} tx={String(o.transaction_id)} lire={lireAvisCompte}/> : null}
                     {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{o.date ? dateFr(o.date, { weekday: 'short', day: 'numeric', month: 'short' }) : '— date pas lue'}</dd></div> : null}
                     {!bordGeste && (trRecap.cle || trRecap.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trRecap} C={C} seul data-recap-transporteur=""/></dd></div> : null}
                     {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
@@ -43461,6 +43494,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
           {/* (6 nov., vague 2 · point 4) Les annonces numérotées dont l'achat n'est pas relié (src/achatsARelier.js). */}
           {((fileAchat && fileAchat.length > 0) || annSort==='sansachat') && <button type="button" data-vue-sans-achat={fileAchat ? fileAchat.length : ''} aria-pressed={annSort==='sansachat'} onClick={()=>setAnnSort('sansachat')}>Sans achat relié{fileAchat && fileAchat.length ? <span className="vrm-of-n">{fileAchat.length}</span> : null}</button>}
+          {((annACompleter && annACompleter.n>0) || annSort==='acompleter') && <button type="button" data-vue-a-completer={annACompleter && annACompleter.n!=null ? annACompleter.n : ''} aria-pressed={annSort==='acompleter'} onClick={()=>setAnnSort('acompleter')}>À compléter{annACompleter && annACompleter.n>0 ? <span className="vrm-of-n">{annACompleter.n}</span> : null}</button>}
           {(annStats.sleeping>0 || vueRelancer.favoris>0) && <button type="button" data-vue-relancer={annStats.sleeping} aria-pressed={annSort==='sleeping'} onClick={()=>{ if (!(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort('sleeping'); }}>À relancer</button>}
           {/* (6 nov.) Pour les conseils (src/accompagnement.js) : les nombres de cet écran, lus
               seulement (liste pas chargée ou en erreur ⇒ rien). */}
@@ -43470,7 +43504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
-        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
+        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && annSort!=='acompleter' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
           <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Tout afficher</button>
         </div>}
@@ -43626,7 +43660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {(()=>{
             const m = annBase.length;
             const n = m ? annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length : 0;
-            const vuePrix = !['selection','republier','brouillons','masquees','sleeping','sansachat'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
+            const vuePrix = !['selection','republier','brouillons','masquees','sleeping','sansachat','acompleter'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
             // (6 nov.) LE PROCHAIN GESTE EN TÊTE (src/prochainGesteAnnonces.js) : un geste, celui
             // qui compte le plus, avec son bouton — sur la liste de toujours (pas dans une vue filtrée).
             const geste = annSort === 'oldest' && !annSearch.trim() && listings.items && !listings.error
@@ -43724,6 +43758,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it)=>openPicker({ ...it, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
+        ) : annSort==='acompleter' ? (
+          <VueACompleter Photo={PhotoVinted} res={annACompleter} onPrixAchat={(id)=>{ const it=(listings.items||[]).find(x=>x&&String(x.id)===String(id)); if (it) saisirPrixAnnonce(it); }}/>
         ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
