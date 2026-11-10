@@ -46,7 +46,7 @@ export function useFacturesAchat(deps, actif = true) {
     const contenu = await lireContenuFacture(cle, D);
     setEnCours('');
     if (!contenu) { D.dire('Facture pas lue : réessaie dans un moment.', 'error'); return; }
-    if (/^data:image\//.test(contenu)) { ouvrirVisionneuse([contenu], 0); return; }
+    if (/^data:image\//.test(contenu)) { ouvrirVisionneuse([contenu], 0, { titre: 'Facture d’achat', sous: (f && f.nom) || '' }); return; }
     let url = contenu;
     try { const b = await (await fetch(contenu)).blob(); url = URL.createObjectURL(b); } catch (_) {}
     const nom = (f && f.nom) || 'facture.pdf';

@@ -93,3 +93,48 @@ d'achat d'`App.jsx` retouchée (aucun `data-*` retiré) :
 - Un bouton « Retirer la facture » si Julien le veut.
 - La galerie complète pour les achats/ventes (Vinted n'envoie qu'une photo par commande) : seules les
   annonces du dressing donnent toutes leurs photos.
+
+## Reprise (10 nov., après-midi) : une seule visionneuse, `main` fusionné, bancs verts
+
+- **Merge** : vrai `git merge origin/main` (lots AZ photo du carton, colis-propre-logos, coût de vente, litiges,
+  ordre récent, à trancher en cartes). Conflits : CLAUDE.md §9 et `historique-divers.md` seulement (leurs lignes
+  gardées ; la ligne « À trancher (lot AC) » déplacée telle quelle, taille). `claude/ordre-recent` étant sur
+  `main`, son tri s'applique aux Achats tel quel.
+- **Une seule visionneuse** : `VuePhotoCarton` (src/PhotoCarton.jsx, sa vue plein écran à part) est RETIRÉE ;
+  « Voir » (fiche de la vente) et l'aperçu après « Colis fait » appellent `ouvrirVisionneuse([src], 0,
+  { titre: 'Photo du carton', sous: 'N°… · date' })`. La visionneuse prend une **légende** (titre + sous-ligne,
+  aussi pour la facture jointe : « Facture d'achat · nom du fichier »). Styles `.vrm-pc-vue*` retirés.
+- **Ordre des couches** : la visionneuse était à z 15000, SOUS le scanner (z 19998) — une photo touchée dans le
+  scanner s'ouvrait derrière lui. Elle passe à **19999** (devant le scanner et les pleins écrans, sous les
+  confirmations 20000 et les messages 30000).
+- **Échap** : l'écouteur clavier est celui de la coque, posé au démarrage (avant ceux des feuilles), avec
+  `stopImmediatePropagation` : Échap ferme la photo SEULE, jamais le scanner / Préparer / mode relais dessous.
+- **Gestes corrigés** (trouvés par le banc au vrai toucher) : un toucher SUR la photo ne ferme plus rien (à côté,
+  dans le noir, il ferme ; le rectangle réel de la photo contenue est calculé) ; le « clic » qui suit un glisser
+  ou un pincement ne ferme plus ; au doigt, le `dblclick` que Chrome ajoute au double toucher est ignoré (il
+  dézoomait aussitôt). La photo remplit l'écran, contenue (même petite, comme Photos).
+- **Preuves** :
+  - `scripts/audit-visionneuse.cjs --prouve` (NOUVEAU, le commentaire de `src/visionneuse.js` le citait sans
+    qu'il existe) : EXÉCUTE la vraie règle — galerie par fichier (2 annonces au même titre gardent chacune
+    leurs photos), ce qui ouvre / n'ouvre pas, légende, une seule vue, couches, Échap. **19 verts**, **6/6
+    mutations rouges** ; sur `origin/main` : le module n'existe pas (rouge) ; sur la pointe d'avant la reprise
+    (c41f45cf) : **5 rouges** (légende, z sous le scanner, vue à part, Échap).
+  - `scripts/bancs/photo-colis-scan.cjs` : **124 conformes** (390/1512 × clair/sombre). Nouveau P5 : l'aperçu
+    ⇒ LA visionneuse, une seule, devant le scanner, légende « Photo du carton · N°33 », Échap ferme la photo et
+    le scanner reste. F1 « Voir » jugé dans la visionneuse. P3 compté depuis SON scan (sous charge, la capture
+    faisait dépasser les 5 s d'« Annuler » : rouge aussi sur `main` avec `SHOTS`, mesuré).
+  - `scripts/bancs/photos-achats.cjs` : **142 verts** (390 sombre + 1512 clair) et **142 verts**
+    (`PA_VUES=390-clair,1512-sombre`). Le doigt ne touche qu'une vignette à l'écran que rien ne couvre (l'écran
+    finit de se poser : instantané, ligne de fraîcheur) ; le menu ⋯ refermé par un toucher sur son fond ; V4
+    nouveau : un toucher sur la photo ne ferme pas, à côté il ferme.
+  - `npm run build` ; audits variables, tdz, coherence, identite, icones, fonctions-api, factures-achat : verts.
+  - Captures regardées : Achats 390 clair / 1512 sombre (rangées, pastilles, facture jointe), galerie 3/3 avec
+    « Voir l'annonce », photo du carton en grand devant le scanner (390) et depuis la fiche (1512 sombre).
+
+## Ce qui reste (après la reprise)
+
+- Le menu ⋯ d'un achat ne se ferme pas à Échap (son fond seul le ferme) : hors de ce lot.
+- Au téléphone, le menu message « Facture jointe » (z 30000) passe un instant devant la légende de la
+  visionneuse quand on ouvre la facture tout de suite après l'avoir jointe : il disparaît seul.
+- Litiges : la preuve « Carton » dit seulement qu'une photo existe ; la toucher pour la voir (dans LA
+  visionneuse, `ouvrirVisionneuse`) serait le prochain pas.
