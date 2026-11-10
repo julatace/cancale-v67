@@ -1,0 +1,90 @@
+/* ── MODE « DÉPÔT » (10 nov., lots AU et AY) ──────────────────────────────────
+   Écran plein (portail) au comptoir : la caméra en haut, la liste par
+   transporteur dessous. Jetons DA6 (--vrm-*), clair et sombre. Couleur rare
+   (§7) : aucune couleur d'accent ; ambre pour un geste à faire (un bordereau
+   pas dans la liste, un dépôt qui attend le réseau). Cibles ≥ 44 px. */
+.vrm-depot {
+  position: fixed; inset: 0; z-index: 9000; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--vrm-bg, #F2F2F7); color: var(--vrm-ink, #1D1D1F);
+  font-family: var(--vrm-police, system-ui, -apple-system, sans-serif);
+}
+.vrm-depot-cadre {
+  box-sizing: border-box; width: 100%; max-width: 640px; min-height: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: max(12px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+}
+.vrm-depot-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; }
+.vrm-depot-rond-vide { flex: none; width: 48px; height: 48px; }
+.vrm-depot .vrm-depot-rond:not(#vrm-d-a):not(#vrm-d-b) {
+  flex: none; margin: 0 !important; width: 48px; height: 48px; min-width: 48px !important; min-height: 48px !important; border-radius: 999px !important;
+  border: 0 !important; background: var(--vrm-surface, #FFFFFF) !important; color: var(--vrm-ink, #1D1D1F) !important; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.vrm-depot-titre { flex: 1; text-align: center; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+.vrm-depot-hl, .vrm-depot-file { margin: 0; text-align: center; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-depot-file { color: var(--vrm-warn, #B25000); font-weight: 700; }
+.vrm-depot-progres { display: flex; flex-direction: column; gap: 6px; }
+.vrm-depot-progres-n { font-size: 17px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-depot-progres-n b { font-size: 28px; color: var(--vrm-ink, #1D1D1F); font-weight: 800; }
+.vrm-depot-barre { height: 6px; border-radius: 999px; background: var(--vrm-line, #E5E5EA); overflow: hidden; }
+.vrm-depot-barre > span { display: block; height: 100%; border-radius: inherit; background: var(--vrm-ink, #1D1D1F); transition: width .25s ease; }
+.vrm-depot-scan { display: flex; flex-direction: column; gap: 8px; background: var(--vrm-surface, #FFFFFF); border-radius: 24px; padding: 10px; }
+.vrm-depot-video { position: relative; height: min(30vh, 240px); border-radius: 16px; overflow: hidden; background: #000; }
+.vrm-depot-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-depot-viseur { position: absolute; left: 12%; right: 12%; top: 36%; bottom: 36%; border: 2px solid rgba(255, 255, 255, .9); border-radius: 12px; }
+.vrm-depot-sans { position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; color: #FFFFFF; font-size: 17px; line-height: 1.35; }
+.vrm-depot-res { min-height: 56px; display: flex; align-items: center; padding: 0 4px; }
+.vrm-depot-attente { font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-depot-res-paire { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; width: 100%; }
+.vrm-depot-res-num { font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-depot-res-titre { flex: 1 1 140px; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-depot-res-etat { font-size: 17px; font-weight: 800; }
+.vrm-depot-res-etat.is-deja { color: var(--vrm-muted, #6E6E73); }
+.vrm-depot-res-non { display: flex; flex-direction: column; gap: 2px; font-size: 17px; font-weight: 700; color: var(--vrm-warn, #B25000); }
+.vrm-depot-res-non small { font-size: 13px; font-weight: 500; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-depot-saisie { display: flex; gap: 8px; }
+.vrm-depot-saisie input {
+  flex: 1; min-width: 0; min-height: 48px; box-sizing: border-box; border-radius: 14px; padding: 0 14px; font: inherit; font-size: 17px;
+  border: 1px solid var(--vrm-line, #D1D1D6); background: var(--vrm-bg, #F2F2F7); color: var(--vrm-ink, #1D1D1F);
+}
+.vrm-depot .vrm-depot-saisie button:not(#vrm-d-a), .vrm-depot .vrm-depot-b:not(#vrm-d-a) {
+  flex: none; margin: 0 !important; min-height: 48px !important; min-width: 64px; border-radius: 14px !important; padding: 0 16px; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 700; border: 1px solid var(--vrm-line, #D1D1D6) !important; background: var(--vrm-surface, #FFFFFF) !important; color: var(--vrm-ink, #1D1D1F) !important;
+}
+.vrm-depot .vrm-depot-saisie button:disabled { opacity: .45; cursor: default; }
+.vrm-depot .vrm-depot-b-plein:not(#vrm-d-a) { background: var(--vrm-ink, #1D1D1F) !important; border-color: var(--vrm-ink, #1D1D1F) !important; color: var(--vrm-bg, #FFFFFF) !important; }
+.vrm-depot-vide { margin: 12px 2px; font-size: 17px; color: var(--vrm-muted, #6E6E73); }
+.vrm-depot-groupe { background: var(--vrm-surface, #FFFFFF); border-radius: 24px; padding: 6px 14px; }
+.vrm-depot-groupe-tete { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 0; font-size: 17px; font-weight: 700; }
+.vrm-depot-logo { display: flex; width: 32px; height: 32px; align-items: center; justify-content: center; }
+.vrm-depot-groupe-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-depot-groupe-n { color: var(--vrm-muted, #6E6E73); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-depot-liste { list-style: none; margin: 0; padding: 0; }
+.vrm-depot-colis { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 0; border-top: 1px solid var(--vrm-line, #E5E5EA); }
+.vrm-depot-coche {
+  flex: none; width: 30px; height: 30px; border-radius: 999px; border: 2px solid var(--vrm-line, #C7C7CC);
+  display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800;
+}
+.vrm-depot-coche.is-oui { background: var(--vrm-ink, #1D1D1F); border-color: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); }
+.vrm-depot-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-depot-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.vrm-depot-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-depot-t { min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-depot-l2 { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-depot-colis.is-fait .vrm-depot-t, .vrm-depot-colis.is-sorti .vrm-depot-quoi { color: var(--vrm-muted, #6E6E73); }
+.vrm-depot-tout {
+  position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 24px; text-align: center; background: var(--vrm-bg, #F2F2F7);
+}
+.vrm-depot-tout-coche {
+  width: 132px; height: 132px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); font-size: 72px; font-weight: 800;
+  animation: vrm-depot-pop .35s cubic-bezier(.2, .9, .3, 1.2);
+}
+.vrm-depot-tout-t { margin: 8px 0 0; font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+.vrm-depot-tout-s { margin: 0; font-size: 15px; color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-depot-tout-gestes { display: flex; gap: 10px; width: 100%; max-width: 360px; margin-top: 12px; }
+.vrm-depot-tout-gestes .vrm-depot-b { flex: 1 1 0; min-height: 56px !important; font-size: 17px !important; }
+@keyframes vrm-depot-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .vrm-depot-tout-coche { animation: none; } .vrm-depot-barre > span { transition: none; } }
+.vrm-depot .vrm-depot-rond:focus-visible, .vrm-depot .vrm-depot-b:focus-visible, .vrm-depot-saisie input:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }

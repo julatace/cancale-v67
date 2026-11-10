@@ -68,9 +68,46 @@ export async function creerLecteur() {
   } catch (_) { return null; }
 }
 
-const vibrer = (motif) => { try { if (navigator.vibrate) navigator.vibrate(motif); } catch (_) {} };
+// (10 nov., lot AU) LA CAMÉRA DU SCANNER, partagée avec le mode « dépôt » (src/ModeDepot.jsx) : le flux
+// arrière, le lecteur (`creerLecteur`), une même lecture comptée une fois (2,5 s), le flux COUPÉ en
+// sortant. Rend l'état : 'demarrage' · 'active' · 'sans' (pas de caméra, refus, lecteur absent).
+export function useLectureCamera(video, traiter) {
+  const [camera, setCamera] = React.useState('demarrage');
+  React.useEffect(() => {
+    let vivant = true, flux = null, minuterie = null;
+    const nouveau = filtreRepetition(2500);
+    (async () => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('pas de caméra');
+        flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+        if (!vivant) { flux.getTracks().forEach((t) => t.stop()); return; }
+        const v = video.current; if (!v) return;
+        v.srcObject = flux; v.setAttribute('playsinline', ''); v.muted = true;
+        try { await v.play(); } catch (_) {}
+        const lecteur = await creerLecteur();
+        if (!vivant) return;
+        if (!lecteur) { setCamera('sans'); return; }
+        setCamera('active');
+        const tour = async () => {
+          if (!vivant) return;
+          try {
+            if (v.readyState >= 2) { const vals = await lecteur.detect(v); for (const x of vals) if (nouveau(x)) traiter(x); }
+          } catch (_) {}
+          if (vivant) minuterie = setTimeout(tour, 220);
+        };
+        tour();
+      } catch (_) { if (vivant) setCamera('sans'); }
+    })();
+    // La caméra est COUPÉE en sortant (le flux est rendu au système).
+    const v0 = video.current;
+    return () => { vivant = false; if (minuterie) clearTimeout(minuterie); if (flux) flux.getTracks().forEach((t) => t.stop()); try { if (v0) v0.srcObject = null; } catch (_) {} };
+  }, [traiter]);
+  return camera;
+}
+
+export const vibrer = (motif) => { try { if (navigator.vibrate) navigator.vibrate(motif); } catch (_) {} };
 // Un bip discret (WebAudio, si le navigateur le permet) — jamais un fichier, rien n'est chargé.
-const creerBip = () => {
+export const creerBip = () => {
   let ctx = null;
   return (ok) => {
     try {
@@ -111,7 +148,6 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
   const M = MOTS[mode] || MOTS.envoi;
   const video = React.useRef(null);
   const saisieRef = React.useRef(null);
-  const [camera, setCamera] = React.useState('demarrage');   // demarrage · active · sans
   const [res, setRes] = React.useState(null);                 // { etat, colis?, n, lu }
   const [scannes, setScannes] = React.useState([]);           // la série : [{ n, cle, etat, num, titre, fait }]
   const [saisie, setSaisie] = React.useState('');
@@ -139,35 +175,7 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
     setRes({ etat: r.etat, colis: r.colis || null, n, lu: String(brut) });
     noter(n, r.colis || null, r.etat === 'autre' ? 'inconnu' : r.etat, r.etat === 'deja');
   }, [noter]);
-  React.useEffect(() => {
-    let vivant = true, flux = null, minuterie = null;
-    const nouveau = filtreRepetition(2500);
-    (async () => {
-      try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('pas de caméra');
-        flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
-        if (!vivant) { flux.getTracks().forEach((t) => t.stop()); return; }
-        const v = video.current; if (!v) return;
-        v.srcObject = flux; v.setAttribute('playsinline', ''); v.muted = true;
-        try { await v.play(); } catch (_) {}
-        const lecteur = await creerLecteur();
-        if (!vivant) return;
-        if (!lecteur) { setCamera('sans'); return; }
-        setCamera('active');
-        const tour = async () => {
-          if (!vivant) return;
-          try {
-            if (v.readyState >= 2) { const vals = await lecteur.detect(v); for (const x of vals) if (nouveau(x)) traiter(x); }
-          } catch (_) {}
-          if (vivant) minuterie = setTimeout(tour, 220);
-        };
-        tour();
-      } catch (_) { if (vivant) setCamera('sans'); }
-    })();
-    // La caméra est COUPÉE en sortant (le flux est rendu au système).
-    const v0 = video.current;
-    return () => { vivant = false; if (minuterie) clearTimeout(minuterie); if (flux) flux.getTracks().forEach((t) => t.stop()); try { if (v0) v0.srcObject = null; } catch (_) {} };
-  }, [traiter]);
+  const camera = useLectureCamera(video, traiter);
   React.useEffect(() => {
     const f = (e) => { if (e.key === 'Escape') onFermer && onFermer(); };
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);

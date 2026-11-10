@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.335.0';
+const CODE_VERSION = '5.336.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -11009,6 +11009,124 @@ async function republierVinted(msg) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// BAISSE DE PRIX EN SÉRIE (10 novembre, 5.336 — lot C, validé par Julien)
+// ══════════════════════════════════════════════════════════════════════════════
+// Il coche des annonces dans VRM, choisit −X € ou −X %, voit l'ancien et le
+// nouveau prix de chacune, puis « Baisser N prix ». L'app envoie UNE commande par
+// annonce, l'une APRÈS l'autre (elle attend la réponse avant la suivante) ; ici
+// chaque baisse est UN geste, jamais une rafale :
+//   · confirmée (son clic) · compte connecté DANS L'ONGLET = compte de l'annonce
+//     (`gardeStricte`, rien au nom d'un autre) · plafond de 50 actions/h du compte
+//     sous la réserve des gestes sur clic (`RESERVE_GESTES` : la série s'arrête
+//     à 45, comme toute commande de l'app) · frein après un refus (`lireFreinRepub`) ·
+//     pause sur 429/403 (`requeteVinted` → `vrmPauseVinted`) ;
+//   · tout part DE L'ONGLET vinted.fr (`vintedPage`, comme Republier) ;
+//   · le prix ACTUEL est LU d'abord (la page « Modifier », `GET item_upload/items/{id}`) :
+//     s'il n'est plus celui qu'il a vu dans l'aperçu (`prixAvant`), RIEN ne part —
+//     on ne baisse jamais un prix qu'on n'a pas montré ;
+//   · le corps envoyé est le corps que Vinted a ACCEPTÉ pour CETTE annonce
+//     (`vrm_vinted_modele`, la règle de `republierVinted`), seul le prix changé ;
+//     si ce modèle ne montre plus le même titre, la même description ou les mêmes
+//     photos que l'annonce lue, RIEN ne part (le rejouer effacerait ses retouches) ;
+//   · le prix est RELU après la modification (`prixVu`) : « fait » seulement si
+//     Vinted montre le prix voulu ; relecture ratée ⇒ « incertain » (jamais « fait ») ;
+//     autre prix ⇒ « écart », avec le prix lu.
+// Rien n'est programmé ni répété : sans son clic dans l'app, cette fonction ne
+// tourne pas. Exécuté par scripts/audit-baisse-prix.cjs (le vrai fichier, dans un vm).
+const centimesBaisse = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) : NaN; };
+const memeTexteBaisse = (a, b) => String(a == null ? '' : a).replace(/\s+/g, ' ').trim() === String(b == null ? '' : b).replace(/\s+/g, ' ').trim();
+// Le prix (et ce qui sert à vérifier le modèle) de l'annonce telle que la page
+// « Modifier » la montre. Forme lue défensivement ; inconnue ⇒ null (pas su).
+function annonceLueBaisse(j) {
+  const it = j && typeof j === 'object' ? (j.item && typeof j.item === 'object' ? j.item : j) : null;
+  if (!it || typeof it !== 'object') return null;
+  const v = it.price;
+  let n = NaN, dev = '';
+  if (v && typeof v === 'object') { n = Number(v.amount); dev = String(v.currency_code || v.currency || ''); }
+  else if (v != null && v !== '') n = Number(String(v).replace(',', '.'));
+  if (!Number.isFinite(n) && it.price_numeric != null) n = Number(it.price_numeric);
+  if (!dev) dev = String(it.currency || '');
+  if (!(Number.isFinite(n) && n > 0)) return null;
+  if (dev && dev.toUpperCase() !== 'EUR') return { autreDevise: dev.toUpperCase() };
+  const ph = photosDuBrouillonLu(it);
+  return { prix: Math.round(n * 100) / 100, titre: typeof it.title === 'string' ? it.title : null,
+    description: typeof it.description === 'string' ? it.description : null,
+    photos: ph && ph.length ? ph.map((p) => p.id).sort((a, b) => a - b).join(',') : null };
+}
+// Le modèle appris montre-t-il encore l'annonce lue ? (seulement ce qui est LU des
+// deux côtés compte ; un champ absent d'un côté ne prouve rien et ne bloque rien).
+function modeleEncoreJuste(corpsModele, lue) {
+  const m = annonceLueBaisse((() => { try { return JSON.parse(corpsModele); } catch (_) { return null; } })());
+  if (!m || m.autreDevise) return { ok: false, quoi: 'illisible' };
+  if (m.titre != null && lue.titre != null && !memeTexteBaisse(m.titre, lue.titre)) return { ok: false, quoi: 'le titre' };
+  if (m.description != null && lue.description != null && !memeTexteBaisse(m.description, lue.description)) return { ok: false, quoi: 'la description' };
+  if (m.photos && lue.photos && m.photos !== lue.photos) return { ok: false, quoi: 'les photos' };
+  return { ok: true };
+}
+async function baisserPrixVinted(msg) {
+  const uid = String(msg.uid || ''), id = String(msg.id || '');
+  if (!/^\d+$/.test(uid) || !/^\d{4,15}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce incomplète' };
+  if (msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'baisser un prix sur Vinted demande ton clic — rien n’est parti' };
+  const voulu = centimesBaisse(msg.prix), avant = centimesBaisse(msg.prixAvant);
+  if (!(voulu >= 100 && voulu < 10000000 && Math.abs(Number(msg.prix) * 100 - voulu) < 1e-6)) return { accepte: false, code: 'invalide', raison: 'nouveau prix illisible — rien n’est parti' };
+  if (!(avant > 0)) return { accepte: false, code: 'invalide', raison: 'ancien prix inconnu — rien n’est parti' };
+  if (!(voulu < avant)) return { accepte: false, code: 'pas-une-baisse', raison: 'le nouveau prix n’est pas plus bas que l’ancien — rien n’est parti' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable dans cette extension' };
+  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu_baisse'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
+  // Le compte de l'onglet ET le plafond : UNE place réservée (le changement de prix).
+  const recu = {};
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu });
+  if (stop) return { accepte: false, code: stop.code, actif: stop.actif, raison: stop.error };
+  const rendre = async () => { if (recu.at) await rendreActions(uid, recu.at, 1); };
+  // Filet : la sauvegarde coffre de l'annonce (la règle de `republierVinted`).
+  let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=n:data->photos`); } catch (_) { coffre = null; }
+  if (coffre === null) { await rendre(); return { accepte: false, code: 'coffre-lecture', raison: "je n'ai pas pu vérifier la sauvegarde de l'annonce — rien n’est parti" }; }
+  const n0 = coffre && coffre[0] && coffre[0].n;
+  if (!(Array.isArray(n0) && n0.length)) { await rendre(); return { accepte: false, code: 'coffre-absent', raison: "cette annonce n'est pas encore sauvegardée dans VRM — passe une fois sur son annonce Vinted, puis réessaie. Rien n’est parti." }; }
+  const modele = await lireModeleRepub(id);
+  if (modele === null) { await rendre(); return { accepte: false, code: 'modele-lecture', raison: "je n'ai pas pu lire le format de l'annonce — réessaie dans un moment. Rien n’est parti." }; }
+  if (!modele.corps) { await rendre(); return { accepte: false, code: 'modele-absent', raison: "VRM n'a pas encore vu le format de CETTE annonce : modifie-la une fois à la main sur Vinted (enregistre sans rien changer), puis réessaie. Rien n’est parti." }; }
+  return await avecVinted(async () => {
+    // À SON TOUR dans la file : le frein et le compte de l'onglet sont relus.
+    { const fr = await lireFreinRepub(uid); if (fr) { await rendre(); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
+    { const s2 = await gardeStricte(uid, acc, { lecture: true }); if (s2) { await rendre(); return { accepte: false, code: s2.code, actif: s2.actif, raison: s2.error }; } }
+    // 1. LE PRIX ACTUEL, LU chez Vinted (jamais supposé).
+    const rl = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
+    if (pasParti(rl)) { await rendre(); return { accepte: false, code: rl.pause ? 'vinted-pause' : 'onglet-vinted', raison: rl.pause ? (rl.raison || 'Vinted demande de ralentir') : raisonSansPage(rl) }; }
+    if (!rl || !rl.ok) { await rendre(); return { accepte: false, code: 'lecture-refusee', status: (rl && rl.status) || 0, raison: `Vinted n'a pas montré l'annonce (${(rl && rl.status) || 'pas de réponse'}) — rien n’est parti` }; }
+    const lue = annonceLueBaisse(rl.json);
+    if (!lue) { noterDiag('baisse_forme_inconnue'); await rendre(); return { accepte: false, code: 'forme', raison: "VRM ne sait pas lire le prix de cette annonce — rien n’est parti" }; }
+    if (lue.autreDevise) { await rendre(); return { accepte: false, code: 'devise', raison: `annonce en ${lue.autreDevise} : VRM ne baisse que des prix en euros — rien n’est parti` }; }
+    if (centimesBaisse(lue.prix) !== avant) { await rendre(); return { accepte: false, code: 'prix-change', prixVu: lue.prix, raison: `sur Vinted le prix est maintenant ${String(lue.prix).replace('.', ',')} € : rien n’est parti — revois l'aperçu` }; }
+    const juste = modeleEncoreJuste(modele.corps, lue);
+    if (!juste.ok) { await rendre(); return { accepte: false, code: 'modele-ancien', raison: juste.quoi === 'illisible' ? "le format appris n'est pas exploitable : modifie l'annonce une fois à la main sur Vinted. Rien n’est parti." : `${juste.quoi} a changé sur Vinted depuis que VRM a appris l'annonce : enregistre-la une fois à la main sur Vinted, puis réessaie. Rien n’est parti.` }; }
+    const built = corpsAvecPrixBaisse(modele.corps, 0, null, { prix: voulu / 100 });
+    if (!built || centimesBaisse(built.nouveau) !== voulu) { await rendre(); return { accepte: false, code: 'modele-illisible', raison: "le format appris n'est pas exploitable — rien n’est parti" }; }
+    await wait(600 + Math.floor(Math.random() * 900));   // le temps d'une page « Modifier » lue
+    // 2. LA MODIFICATION, en place (jamais une suppression, jamais une création).
+    const r = await vintedPage(acc, 'PUT', `/api/v2/item_upload/items/${id}`, built.corps, { timeoutMs: 60000 });
+    if (pasParti(r)) { await rendre(); return { accepte: false, code: r.pause ? 'vinted-pause' : 'onglet-vinted', raison: r.pause ? (r.raison || 'Vinted demande de ralentir') : raisonSansPage(r) }; }
+    if (!r || !r.ok) {
+      await poserFreinRepub(uid, r);
+      noterDiag('baisse_refus_' + ((r && r.status) || 0));
+      return { accepte: true, etape: 'echec', status: (r && r.status) || 0, ancien: lue.prix, voulu: voulu / 100, prixVu: lue.prix,
+        raison: `Vinted a refusé (${(r && r.status) || 'pas de réponse'}) — le prix est resté à ${String(lue.prix).replace('.', ',')} €` };
+    }
+    // 3. LA RELECTURE : le prix affiché est celui que Vinted montre, jamais supposé.
+    await wait(400 + Math.floor(Math.random() * 600));
+    const rr = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
+    const relue = rr && rr.ok ? annonceLueBaisse(rr.json) : null;
+    if (!relue || relue.autreDevise) { noterDiag('baisse_pas_relue'); logActivity(`💶 Prix envoyé sur Vinted (annonce …${id.slice(-4)}) — pas relu`); return { accepte: true, etape: 'incertain', ancien: lue.prix, voulu: voulu / 100, prixVu: null, raison: 'Vinted a accepté, mais VRM n’a pas pu relire le prix : regarde l’annonce' }; }
+    if (centimesBaisse(relue.prix) !== voulu) { noterDiag('baisse_ecart'); return { accepte: true, etape: 'ecart', ancien: lue.prix, voulu: voulu / 100, prixVu: relue.prix, raison: `Vinted montre ${String(relue.prix).replace('.', ',')} €` }; }
+    noterDiag('baisse_ok');
+    logActivity(`💶 Prix baissé sur Vinted (annonce …${id.slice(-4)}) : ${lue.prix} → ${relue.prix} €, relu`);
+    return { accepte: true, etape: 'fait', ancien: lue.prix, voulu: voulu / 100, prixVu: relue.prix, nouveau: relue.prix };
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // SUPPRIMER ET RECRÉER UNE ANNONCE (28 octobre, 5.248) — sa décision
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien : « je veux que ça supprime et recrée l'annonce », « en modifiant les
@@ -13593,6 +13711,8 @@ async function executerCommande(msg) {
   }
   // 22 oct. : mettre UNE annonce Leboncoin en pause, sur son clic (voir `pauseLbcDepuisApp`).
   if (msg && msg.cmd === 'republierVinted') return await republierVinted(msg);
+  // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
+  if (msg && msg.cmd === 'baisserPrixVinted') return await baisserPrixVinted(msg);
   if (msg && msg.cmd === 'recreerVinted') return await recreerVinted(msg);
   if (msg && msg.cmd === 'publierBrouillon') return await publierBrouillon(msg);
   if (msg && msg.cmd === 'refaireBrouillon') return await refaireBrouillon(msg);
