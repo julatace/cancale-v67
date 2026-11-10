@@ -55,7 +55,6 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
 // ⟦← App.jsx #4⟧
-const ListeFacturesAutres = aLaDemande(() => import('../FactureAutres.jsx').then((m) => ({ default: m.ListeFacturesAutres })));
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
 const FacturesAEnvoyer = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FacturesAEnvoyer })));
@@ -1003,7 +1002,6 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
       <FacturesAEnvoyer deps={DEPS_FACTURE}/>
       <ListeFacturesPro deps={DEPS_FACTURE}/>
-      <ListeFacturesAutres deps={DEPS_FACTURE}/>
 
       {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>

@@ -202,6 +202,20 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   }
   dit(bons === 3 && [...base.keys()].filter((x) => /email_invoice_lbc/.test(x)).length === 3, 'S6 50 ventes identiques : chaque facture porte SA vente, aucune autre n’est touchée');
 
+  // ── S9 LE REGISTRE (lot Q) VOIT CES FACTURES, SANS FAUX TROU ───────────
+  try {
+    const reg = await import(path.join(racine, 'src/facturePro/registre.js'));
+    raz();
+    base.set(cle(A, 'lbc_ventes'), { ventes: { 123456789: lbc(123456789) } });
+    base.set(cle(A, 'email_invoice_tx9999999'), { type: 'facture_pro', number: `FA-${annee}-0005`, emiseLe: '2026-11-01T00:00:00Z', contenu: { totaux: { ttc: 100 } }, transaction: '9999999' });
+    for (let n = 1; n <= 4; n++) base.set(cle(A, 'email_invoice_txv' + n), { type: 'facture_pro', number: `FA-${annee}-000${n}`, emiseLe: '2026-11-01T00:00:00Z', transaction: 'v' + n });
+    await appel({ action: 'emettre', confirme: true, plateforme: 'leboncoin', ref: '123456789', acheteur: ACH });
+    const rows = [...base.entries()].filter(([k]) => /\|email_invoice_/.test(k)).map(([k, d]) => ({ id: k.split('|')[1], numero: d.number, type: d.type, emiseLe: d.emiseLe, ttc: d.contenu && d.contenu.totaux ? d.contenu.totaux.ttc : null }));
+    const lignes = reg.lignesRegistre(rows);
+    const t = reg.trousNumerotation(rows);
+    dit(lignes.some((l) => l.id === 'email_invoice_lbc123456789' && l.numero === `FA-${annee}-0006` && l.ttc === 2500) && t.facture.max === 6 && !t.facture.manquants.length, 'S9 le registre d’Argent → Factures porte la facture Leboncoin, la suite 1…6 sans trou');
+  } catch (e) { dit(false, 'S9 le registre (lot Q) se lit', e.message); }
+
   // ── S7 LA RÈGLE D'ANNULATION = CELLE DE L'APP ───────────────────────────
   const regleApp = (lire('api/_lib/ventes-regle.js').match(/export const lbcAnnulee = (.*);/) || [])[1];
   const regleIci = (lire('src/facturePro/sources.js').match(/export const lbcAnnuleeFacture = (.*);/) || [])[1];

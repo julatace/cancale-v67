@@ -12,7 +12,7 @@
 // Le serveur (api/_lib/facture-autres.js) relit la vente lui-même et refait la règle.
 import React from 'react';
 import { SheetShell } from './composants/SheetShell.jsx';
-import { ApercuFacture, useFicheFacturation, FicheFacturation } from './FacturePro.jsx';
+import { ApercuFacture, useFicheFacturation, FicheFacturation, relireFactures } from './FacturePro.jsx';
 import { verifierSiret, manquantsVendeur, manquantsVente, contenuFacture, euros, jourParis, nomFichier } from './facturePro/regle.js';
 import { PLATEFORMES, venteAutre, idFactureAutre, manquantsAcheteurSaisi, venteFacture, ID_FACTURE_AUTRE_RE } from './facturePro/sources.js';
 
@@ -115,7 +115,8 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer }) {
     const r = await route(deps, { action: 'emettre', confirme: true, plateforme: v.plateforme, ref: v.ref, acheteur, designation });
     setOccupe(false);
     if (r.code !== 200) { setRetour(r.j.manquants ? `Il manque ${r.j.manquants.map((m) => m.l).join(', ')}.` : (r.j.message || "La facture n'a pas pu être émise. Réessaie : elle gardera le même numéro.")); return; }
-    setEmise(r.j.facture); relireFacturesAutres(deps);
+    // Le registre d'Argent → Factures (lot Q) lit toutes les pièces `email_invoice_*` : il la montre aussi.
+    setEmise(r.j.facture); relireFacturesAutres(deps); try { relireFactures(deps); } catch (_) {}
   };
   const titre = emise ? `Facture ${emise.numero}` : 'Faire la facture';
   return <SheetShell onClose={fermer} titre={fiche ? 'Ma facture' : titre} maxWidth={760} FermeAuRetour={deps.FermeAuRetour} className="vrm-fp-fs" data-fa-feuille={v.ref}>
@@ -152,24 +153,8 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer }) {
   </SheetShell>;
 }
 
-// La liste, dans Comptabilité → Factures, à côté des factures Vinted.
-export function ListeFacturesAutres({ deps }) {
-  const f = useFacturesAutres(deps);
-  const [occupe, setOccupe] = React.useState('');
-  if (f === undefined || (f instanceof Map && !f.size)) return null;
-  if (f === null) return <p className="vrm-fp-muet">Tes factures Leboncoin, eBay et Vestiaire n'ont pas pu être lues — réessaie dans un instant.</p>;
-  const lignes = [...f.values()].sort((a, b) => String(b.numero).localeCompare(String(a.numero), 'fr', { numeric: true }));
-  const ouvrir = async (x) => { setOccupe(x.id); const c = await lireContenu(deps, x.id); setOccupe(''); if (!c) { deps.toast("Le PDF n'a pas pu être lu — réessaie."); return; } ouvrirPdf(c, deps); };
-  return <section className="vrm-fp-section" data-fa-liste={lignes.length}>
-    <h3>Factures Leboncoin, eBay, Vestiaire</h3>
-    <ul className="vrm-fp-liste">
-      {lignes.map((x) => <li key={x.id}><button type="button" disabled={occupe === x.id} onClick={() => ouvrir(x)} data-fa-ligne={x.numero}>
-        <b>{x.numero}</b><span>{(PLATEFORMES[x.plateforme] || {}).l || ''} · <span className="vrm-sensible" data-stream-type="acheteur">{x.acheteur || '—'}</span> · {jourParis(x.emiseLe)}</span>
-        <em>{x.ttc != null && x.ttc !== '' ? euros(Number(x.ttc)) : '—'}</em>
-      </button></li>)}
-    </ul>
-  </section>;
-}
+// (La liste des factures émises est le registre d'Argent → Factures, src/FacturePro.jsx :
+// il lit toutes les pièces `facture_pro`, Leboncoin et eBay comprises — pas de seconde liste.)
 
 // Vestiaire : la même raison pour CHAQUE vente (le prix payé par l'acheteur n'est
 // jamais relevé) ⇒ dite UNE fois, sous la liste (§7), au vendeur Pro seulement.
