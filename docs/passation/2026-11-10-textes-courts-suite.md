@@ -69,13 +69,26 @@ emails-mis-de-cote), `résiliable à tout moment`, `sans engagement` (abonnement
   ⚠️ Avec les données du banc (aucun compte eBay/Leboncoin), `annonces-ebay`/`annonces-leboncoin` et
   `messages-leboncoin` rendent le même écran que Vinted : le filtre de site n'apparaît qu'avec un compte du site.
 - `npm run build` vert ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`, `boutons`, `statuts`,
-  `urssaf` verts. Comparaison de tous les audits avant/après : voir « Ce qui reste ».
+  `urssaf` verts.
+- **Les 424 audits** passés avant (arbre `git archive` d'`origin/main`) et après : 2 rouges venaient de moi et sont
+  corrigés (`guide-iphone` veut « — Non disponible ici », `mondialrelay-serveur` veut « code postal du point
+  relais ») ; `chantier-f` (titre « Argent ») et `vente-verification` (`RecapFrise`) sont rouges à l'identique sur
+  l'`origin/main` fusionné ; `renum-b` a dépassé son délai sous charge, vert seul.
+- **Bancs touchés** (un à la fois, `BANC_PORT` aléatoire), comparés à l'arbre d'avant : verts — popups-propre,
+  reglages (après correction : « rien ne sera écrit par-dessus » gardé), adresses-preuve, suivi-colis,
+  lbc-supprimer, double-verification-appareils, sauvegarde (après correction : « n'a pas pu être enregistrée »
+  gardé) ; transporteurs : C corrigé (« n'a pas pu être relu. Rien n'est perdu »), F rouge à l'identique sur
+  `origin/main` ; premierjour : « sans rien à taper » remis, les 8 rouges restants sont ceux d'`origin/main` ;
+  rouges à l'identique sur `origin/main` (non touchés) : emails-mis-de-cote (2), ebay-form (4), ebay-annonces (3),
+  vestiaire (14), messages-sites (7), vestiaire-messages (2), photoroom-carte (≈ 52-55, l'écran Vestiaire ne
+  monte pas dans ce banc).
 - Zips de l'extension : le build les régénère (octets différents, même contenu) ; remis à l'identique de `main`.
 
 ## Ce qui reste
 
-- **Compta / Statistiques** (≈ 100 textes dans `Comptabilite`, 36 dans `src/ecrans/Compta.jsx`) : libre depuis
-  « Argent », pas fait faute de temps.
+- **Compta / Statistiques** : libre depuis « Argent » ; 13 phrases de `src/ecrans/Compta.jsx` faites (lectures
+  ratées, SIRET, profil, Super PDP ; `audit-urssaf` vert). Restent ≈ 50 dans `Compta.jsx` (URSSAF, TVA, impôts,
+  factures électroniques : chaque mot y compte, à faire avec soin) et ≈ 100 dans `Comptabilite` d'App.jsx.
 - `src/ecrans/Republier.jsx` (32), `src/Accueil.jsx` (16), `src/FacturePro.jsx` (12), `Operations.jsx`,
   `FavorisVinted.jsx`, `InventaireStock.jsx`… (relevé : ~150 textes hors App.jsx).
 - Les messages de confirmation et d'incertitude (toasts, `askConfirm`) d'eBay/Leboncoin : gardés longs exprès
