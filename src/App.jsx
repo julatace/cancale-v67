@@ -565,6 +565,9 @@ import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRel
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
+import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
+import { combiner as combinerIssues } from "./gesteAnnulable.js";
+import "./styles-corbeille.css";
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
@@ -2506,6 +2509,8 @@ const SYNC_KEYS = [
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
   'vrm_notes_paires', 'vrm_achats_hors_masques',
+  // (10 nov., lot Y) La CORBEILLE 30 jours ({ [id]: entrée }, src/corbeille.js) : ce qu'il a supprimé DANS VRM.
+  'vrm_corbeille',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
   'vrm_brouillons_refaire_ecartes',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
@@ -3362,11 +3367,12 @@ function FichesNeuves() {
   for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
   const liste = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum);
   if (!liste.length) return null;
-  const retirer = async (f) => {
-    if (!(await askConfirm({ title: `Retirer la fiche N°${f.numero} ?`, ok: 'Retirer', cancel: 'Annuler' }))) return;
-    const toutes = { ...(load('vrm_fiches_neuves', {}) || {}) };
-    if (toutes[f.id]) toutes[f.id] = { ...toutes[f.id], retireeAt: new Date().toISOString() };
-    save('vrm_fiches_neuves', toutes); maj();
+  // (10 nov., lot Y) « Retirer » range la fiche (le N° reste servi, §5) ET la met à la corbeille 30 jours :
+  // pilule « Annuler » 5 s, puis Paramètres → Corbeille la remet « À publier », même N°.
+  const retirer = (f) => {
+    const toutes = load('vrm_fiches_neuves', {}) || {};
+    if (!toutes[f.id]) return;
+    gesteCorbeille({ type: 'fiche', libelle: f.titre || '', numero: f.numero, morceaux: [{ k: 'vrm_fiches_neuves', type: 'champs', id: f.id, avant: { retireeAt: toutes[f.id].retireeAt }, apres: { retireeAt: new Date().toISOString() } }] }, {}, () => maj());
   };
   return (
     <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label="À publier">
@@ -3781,6 +3787,111 @@ function PiluleAnnulerCoque() {
   return <PiluleAnnuler gestes={_gestes} enHaut={enHaut}/>;
 }
 
+// ── (10 nov., lot Y) LA CORBEILLE 30 JOURS (src/corbeille.js) ─────────────────
+// Supprimer DANS VRM = un geste annulable 5 s (la pilule du lot B) qui range une
+// entrée dans `vrm_corbeille` ; Paramètres → Corbeille la restaure pendant 30 jours,
+// puis la purge l'efface pour de bon. Rien ici ne part vers un site.
+// Chaque écriture relit la clé (une lecture ratée n'écrit rien, `ecrireMorceaux`) ;
+// après elle, les écrans qui tiennent la clé dans leur état se relisent et leur
+// prochaine sauvegarde fusionne à trois voies — le chemin d'un changement venu
+// d'un autre onglet (`noterAvantDistant` + `emettreClesRelues`).
+const ecrireCleCorbeille = async (k, v) => {
+  let avantTxt; try { avantTxt = localStorage.getItem(k); } catch (_) { avantTxt = null; }
+  // `v` vient d'être calculé sur la valeur COURANTE : la base « distante » d'une écriture
+  // précédente n'a plus cours (sinon la fusion à trois voies défaisait ce geste).
+  delete _avantDistant[k];
+  const r = await _ecrivainVrm.ecrire(k, v);
+  if (!r || r.ok !== false) { noterAvantDistant(k, avantTxt); emettreClesRelues([k]); }
+  return r;
+};
+const gesteMorceaux = (texte, morceaux, setters = {}, apres = null) => _gestes.lancer({
+  texte, cles: clesDesMorceaux(morceaux),
+  vue: (sens) => {
+    for (const k of clesDesMorceaux(morceaux)) { const s = setters[k]; if (typeof s === 'function') s((p) => appliquerMorceaux(p, morceaux, sens, k, { force: true }).valeur); }
+    if (typeof apres === 'function') { try { apres(sens); } catch (_) {} }
+  },
+  ecrire: (sens) => ecrireMorceaux({ morceaux, sens, lire: _ecrivainVrm.lire, ecrire: ecrireCleCorbeille, combiner: combinerIssues }),
+});
+const courtCorbeille = (t) => { const s = String(t || '').trim(); return s.length > 28 ? s.slice(0, 27) + '…' : s; };
+// `e` : { type, libelle, numero, morceaux, lignes } (src/corbeille.js, `creerEntree`).
+// Rend l'entrée rangée (null = rien à supprimer).
+const gesteCorbeille = (e, setters = {}, apres = null) => {
+  const entree = e && e.morceaux ? creerEntree(e) : null;
+  if (!entree) return null;
+  const quoi = entree.numero ? `N°${entree.numero}` : entree.libelle ? `« ${courtCorbeille(entree.libelle)} »` : '';
+  gesteMorceaux(quoi ? `${TEXTE_MIS} · ${quoi}` : TEXTE_MIS, morceauxSupprimer(entree), setters, apres);
+  return entree;
+};
+// Restaurer : la valeur d'avant revient à sa place (même id, même N°) ; ce qui a
+// changé depuis est gardé ; un N° porté maintenant par une autre paire ⇒ rien (§5).
+const restaurerCorbeille = (entree) => {
+  const plan = planRestauration(entree, (k) => load(k, null), cleNum);
+  if (plan.conflit) { toast(`Le N°${plan.conflit} est porté par une autre paire : rien n'est restauré.`); return false; }
+  if (!plan.ok) return false;
+  gesteMorceaux(plan.gardes ? 'Restauré · ce qui a changé depuis est gardé' : `Restauré${entree.numero ? ` · N°${entree.numero}` : ''}`, morceauxRestaurer(entree));
+  return true;
+};
+// Une ligne annexe (photo d'un achat, ticket d'une dépense) se VIDE (un DELETE
+// sur app_data ne supprime rien) — seulement à la purge, jamais avant.
+const viderLigneAnnexe = async (id) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id, data: { b64: null, supprime: true, at: new Date().toISOString() } })]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+};
+// La purge : plus de 30 jours (ou au-delà des 300 plus récentes). Seulement le
+// nuage lu (sinon la carte de l'appareil n'est pas la vraie) ; lire-fusionner-réécrire.
+let _purgeCorbeilleEnVol = null;
+const purgerCorbeille = () => {
+  if (!isCloudReady() || !AUTH.user?.id) return Promise.resolve(0);
+  if (_purgeCorbeilleEnVol) return _purgeCorbeilleEnVol;
+  _purgeCorbeilleEnVol = (async () => {
+    const r = aPurger(load(CLE_CORBEILLE, {}));
+    if (!r.ids.length) return 0;
+    const lignes = [...new Set(r.purgees.flatMap((e) => annexesAVider(e, (k) => load(k, null))))];
+    const cur = { ...lireCorbeille(load(CLE_CORBEILLE, {})) };
+    for (const id of r.ids) delete cur[id];
+    save(CLE_CORBEILLE, cur);
+    for (const l of lignes) await viderLigneAnnexe(l);
+    return r.ids.length;
+  })().finally(() => { _purgeCorbeilleEnVol = null; });
+  return _purgeCorbeilleEnVol;
+};
+onCloudReady(() => { setTimeout(() => { purgerCorbeille().catch(() => {}); }, 5000); });
+const lireListeCorbeille = () => listeCorbeille(load(CLE_CORBEILLE, {}));
+const dateCorbeille = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
+// Paramètres → Corbeille : la plus récente en haut, la date, « Restaurer ».
+function CorbeilleSetting() {
+  const [liste, setListe] = useStateCle(CLE_CORBEILLE, lireListeCorbeille);
+  React.useEffect(() => {
+    const relire = () => setListe(lireListeCorbeille());
+    const offNuage = onCloudReady(relire);
+    const surSave = (e) => { if (e && e.detail && e.detail.k === CLE_CORBEILLE) relire(); };
+    window.addEventListener('vrm:save', surSave);
+    purgerCorbeille().then((n) => { if (n) relire(); }).catch(() => {});
+    return () => { if (typeof offNuage === 'function') offNuage(); window.removeEventListener('vrm:save', surSave); };
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!liste.length) return <div className="vrm-corbeille is-vide" data-corbeille="0"><Icon name="trash" size={22}/><p>La corbeille est vide.</p></div>;
+  return (
+    <div className="vrm-corbeille" data-corbeille={liste.length}>
+      <p className="vrm-corbeille-tete">Effacé pour de bon après 30 jours.</p>
+      <ul className="vrm-corbeille-liste">
+        {liste.map((e) => { const j = joursRestants(e); return (
+          <li key={e.id} className="vrm-corbeille-ligne" data-corbeille-ligne={e.id} data-corbeille-type={e.type} data-corbeille-num={e.numero || ''} data-corbeille-jours={j}>
+            <span className="vrm-corbeille-quoi">
+              <b>{e.numero ? `N°${e.numero} · ` : ''}{e.libelle || nomType(e.type)}</b>
+              <small>{nomType(e.type)} · supprimé le {dateCorbeille(e.at)} · {j > 1 ? `encore ${j} j` : 'dernier jour'}</small>
+            </span>
+            <Bouton variante="secondaire" className="vrm-corbeille-restaurer" data-corbeille-restaurer={e.id} onClick={() => { if (restaurerCorbeille(e)) setListe((l) => l.filter((x) => x.id !== e.id)); }}>Restaurer</Bouton>
+          </li>); })}
+      </ul>
+    </div>);
+}
+export { gesteCorbeille, restaurerCorbeille, CorbeilleSetting, lireListeCorbeille };
+
 // ── (10 nov., lot BD) LA NOTE PRIVÉE D'UNE PAIRE (src/notePaire.js, src/NotePaire.jsx) ──
 // UN état pour tous les endroits où la paire apparaît (Annonces, fiche paire, Ventes,
 // Colis → Préparer et scan, Stock) : la clé synchronisée `vrm_notes_paires`, relue à
@@ -3810,6 +3921,8 @@ const editerNotePaire = async (paire, actuelle) => {
   if (v == null) return;
   const ops = opsNote(lireNotesPaires(), paire, v, { cleNum });
   if (!ops.length) return;
+  // (10 nov., lot Y) Une note effacée va à la corbeille 30 jours (pilule « Annuler » 5 s, puis Paramètres → Corbeille).
+  if (!String(v).trim() && actuelle) { gesteCorbeille({ type: 'note', libelle: String(actuelle), numero: num || null, morceaux: ops }, { [CLE_NOTES_PAIRES]: poserNotesVue }); return; }
   gesteVrm(String(v).trim() ? 'Note enregistrée' : 'Note effacée', ops, { [CLE_NOTES_PAIRES]: poserNotesVue });
 };
 // `ajout` : l'icône discrète pour en écrire une quand il n'y en a pas (Annonces,
@@ -7090,7 +7203,7 @@ const tauxUrssaf = () => tauxDe(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT));
 const REGIMES_FISCAUX = [
   ['particulier', 'Particulier', 'Je vends mes propres affaires', "Rien à déclarer à l'URSSAF : VRM ne calcule aucune cotisation."],
   ['micro', 'Micro-entrepreneur', 'Auto-entrepreneur, achat-revente', 'VRM estime tes cotisations URSSAF sur ce que tu reçois.'],
-  ['societe', 'Société', 'SAS, SASU, SARL, EURL…', "Tes impôts et cotisations ne se calculent pas sur le chiffre d'affaires : VRM ne les estime pas."],
+  ['societe', 'Société', 'SAS, SASU, SARL, EURL…', "Impôts et cotisations hors chiffre d'affaires : VRM ne les estime pas."],
   ['marge', 'Régime de la marge', 'Société, TVA sur la marge', 'VRM calcule la TVA sur ta marge.'],
 ];
 const regimeValide = (r) => REGIMES_FISCAUX.some((x) => x[0] === r) ? r : null;
@@ -32868,7 +32981,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocNouveaux = () => numerosNeufs.length > 0 && (
     <div className="vrm-ann-neufs" data-num-neufs={numerosNeufs.length}>
       <div className="vrm-ann-neufs-tete">{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
-      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui que tu as déjà écrit sur ton rangement, par exemple). Le prix d'achat est facultatif : tu peux le mettre plus tard.</div>
+      <div className="vrm-ann-neufs-phrase">Touche le N° pour le changer. Prix d'achat : facultatif.</div>
       {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {};
         // (6 nov.) LE PRIX D'ACHAT AU MÊME GESTE (src/prixAuNumerotage.js) : un champ vide,
         // jamais pré-rempli ; une suggestion d'achat est PROPOSÉE à côté (« Relier · 32 € »),
@@ -35864,7 +35977,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reafficherHorsDouble = (id) => gesteVrm('Achat réaffiché', [{ k: CLE_HORS_MASQUES, type: 'ensemble', id: String(id), apres: false, avant: true }], { [CLE_HORS_MASQUES]: setHorsMasques });
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
-  const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
+  // (10 nov., lot Y) Supprimer = à la corbeille 30 jours (pilule « Annuler » 5 s, puis Paramètres → Corbeille).
+  // Sa photo (sa ligne `achat_hors_photo_{id}`) reste rangée : elle n'est vidée qu'à la purge.
+  const delOffBuy = (id) => {
+    const L = load('vinted_offvinted_buys', []); const i = L.findIndex(x => x && x.id === id); const b = i >= 0 ? L[i] : null;
+    if (!b) { setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; }); return; }
+    gesteCorbeille({ type: 'achat', libelle: b.title || '', numero: b.numero || null, lignes: b.photo ? ['achat_hors_photo_' + String(id).replace(/[^\w-]/g, '')] : [],
+      morceaux: [{ k: 'vinted_offvinted_buys', type: 'element', idCle: 'id', id, index: i, avant: b }] }, { vinted_offvinted_buys: setOffBuys });
+  };
   // (le formulaire d'ajout vit dans `AchatsHorsPlateforme`, avec son état)
   // Lien ACHAT → N° : un achat Vinted relié à une annonce numérotée (bouton 🔗,
   // qui pose buyFromId = transaction de l'achat) fait remonter SON numéro ici.
@@ -37138,6 +37258,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const poserRegistreFo = (fn) => setRegistreFo((prev) => { const u = fn(lireRegistre(prev)); save(CLE_FOURNISSEURS, u); return u; });
   // Délier toutes les paires d'un achat : le lien part, le prix que CE lot avait posé aussi (un prix saisi à la main reste).
   const delierToutFo = (aid) => { for (const x of reliesDuLot(numeros, aid)) { const patch = ecritureDelierGros(x.entree, aid, prixParNumFo); if (patch) poserPatchAchat('f:' + x.cle, patch); } };
+  // (10 nov., lot Y) Les mêmes déliaisons, en morceaux de corbeille (les champs de CHAQUE fiche, jamais son N°).
+  const morceauxDelierFo = (aid) => reliesDuLot(numeros, aid).map((x) => { const patch = ecritureDelierGros(x.entree, aid, prixParNumFo); return patch ? { k: 'vinted_annonce_numeros', type: 'champs', id: x.cle, apres: patch, avant: champsAvant(x.entree, patch) } : null; }).filter(Boolean);
   const foActions = {
     creer: async (c) => {
       const id = idFo('f'), at = new Date().toISOString();
@@ -37158,9 +37280,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ids = Object.keys(reg.achats).filter((k) => reg.achats[k].fournisseur === id);
       const ok = await askConfirm({ title: `Retirer ${p.nom} ?`, desc: ids.length ? `${ids.length} achat${ids.length > 1 ? 's' : ''} en gros partent avec lui et ses paires sont déliées. Un prix d’achat saisi à la main reste.` : 'Ses achats déjà saisis restent dans Achats.', ok: 'Retirer', cancel: 'Garder', danger: true });
       if (!ok) return false;
-      for (const aid of ids) delierToutFo(aid);
-      poserRegistreFo((r) => sansFournisseur(r, id).registre);
-      toast(`${p.nom} retiré`);
+      // (10 nov., lot Y) La confirmation reste (plusieurs prix d'un coup, §2.5) ; le retrait va ensuite à la
+      // corbeille 30 jours : lui, ses achats en gros, ses rattachements et les liens de ses paires reviennent
+      // ensemble (un prix retapé depuis est gardé). Pilule « Annuler » 5 s.
+      const brut = load(CLE_FOURNISSEURS, {}) || {};
+      const sous = (k) => (brut[k] && typeof brut[k] === 'object' ? brut[k] : {});
+      const morceaux = [{ k: CLE_FOURNISSEURS, type: 'cle', sous: 'personnes', id, avant: sous('personnes')[id] || reg.personnes[id] }];
+      for (const aid of ids) { morceaux.push({ k: CLE_FOURNISSEURS, type: 'cle', sous: 'achats', id: aid, avant: sous('achats')[aid] || reg.achats[aid] }); morceaux.push(...morceauxDelierFo(aid)); }
+      for (const [hid, h] of Object.entries(sous('hors'))) if (h && h.fournisseur === id) morceaux.push({ k: CLE_FOURNISSEURS, type: 'cle', sous: 'hors', id: hid, avant: h });
+      gesteCorbeille({ type: 'fournisseur', libelle: p.nom, morceaux }, { [CLE_FOURNISSEURS]: setRegistreFo, vinted_annonce_numeros: setNumeros });
       return true;
     },
     creerAchat: async (fid, c) => {
@@ -37184,8 +37312,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const n = reliesDuLot(numeros, aid).length;
       const ok = await askConfirm({ title: 'Retirer cet achat en gros ?', desc: n ? `${n} paire${n > 1 ? 's' : ''} reliée${n > 1 ? 's' : ''} : le prix posé par cet achat part aussi. Un prix d’achat saisi à la main reste.` : '', ok: 'Retirer', cancel: 'Garder', danger: true });
       if (!ok) return false;
-      delierToutFo(aid);
-      poserRegistreFo((p) => sansAchatGros(p, aid));
+      // (10 nov., lot Y) À la corbeille 30 jours, avec les liens de ses paires (un prix retapé depuis est gardé).
+      const brut = load(CLE_FOURNISSEURS, {}) || {};
+      const avantA = (brut.achats && brut.achats[aid]) || lireRegistre(registreFo).achats[aid];
+      const nomFo = (lireRegistre(registreFo).personnes[a.fournisseur] || {}).nom || '';
+      gesteCorbeille({ type: 'achat-gros', libelle: [nomFo, a.date ? a.date.split('-').reverse().join('/') : ''].filter(Boolean).join(' · '),
+        morceaux: [{ k: CLE_FOURNISSEURS, type: 'cle', sous: 'achats', id: aid, avant: avantA }, ...morceauxDelierFo(aid)] }, { [CLE_FOURNISSEURS]: setRegistreFo, vinted_annonce_numeros: setNumeros });
       return true;
     },
     regler: (aid, x) => poserRegistreFo((p) => avecRepartition(p, aid, x)),
@@ -39306,7 +39438,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const offreBloquee=!!actionsOffresIncertaines[cleActionOffreVinted(openConv.owner,openConv.acc?.vinted_user_id,openConv.convId)]; const sansExt = !vmrExtPresent() && !msgRelais; const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
               <div className="vrm-chat-foot" data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
                 {offreBusy&&<div className="vrm-chat-note" role="status">Action sur une offre en cours… Attends le résultat avant de recommencer.</div>}
-                {offreBloquee&&<div className="vrm-chat-note" role="alert" data-offre-incertaine>Une action sur cette offre n’est pas confirmée. Vérifie le résultat avant de recommencer. <a href={lienVinted} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a><button type="button" className="vrm-chat-btn" onClick={autoriserNouvelleActionOffre}>J’ai vérifié sur Vinted</button></div>}
+                {offreBloquee&&<div className="vrm-chat-note" role="alert" data-offre-incertaine>Action pas confirmée : vérifie sur Vinted avant de recommencer. <a href={lienVinted} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a><button type="button" className="vrm-chat-btn" onClick={autoriserNouvelleActionOffre}>J’ai vérifié sur Vinted</button></div>}
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
                     de la liste (§7). */}
@@ -39330,7 +39462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (offCapturee) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-cible="offre" data-offre="annonce-partie" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(offCapturee.prix)}</b></div>
-                      <div className="vrm-chat-offre-p" style={{color:C.muted}}>Ton dressing, lu après cette offre, ne montre plus cette annonce : l’offre ne peut plus être acceptée.</div>
+                      <div className="vrm-chat-offre-p" style={{color:C.muted}}>Annonce plus dans ton dressing : offre plus acceptable.</div>
                       <button type="button" className="vrm-chat-offre-retirer" data-offre-retirer="" onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}>Retirer de la liste</button>
                     </div>
                   );
@@ -39398,7 +39530,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
                 {msgRelais && !ro && <EtatRelaisConv vinted={msgRelaisVinted}/>}
                 {replyNotice&&<div className="vrm-chat-retour" role="status">{replyNotice}</div>}
-                {reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]&&<div className="vrm-chat-retour" role="alert">Envoi précédent à vérifier sur Vinted. Aucun nouvel envoi automatique. <a href={lienVinted} target="_blank" rel="noreferrer">Vérifier sur Vinted ↗</a><button type="button" onClick={autoriserNouvelleReponse}>Autoriser un nouvel envoi après vérification</button></div>}
+                {reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]&&<div className="vrm-chat-retour" role="alert">Envoi précédent à vérifier : rien ne repart tout seul. <a href={lienVinted} target="_blank" rel="noreferrer">Vérifier sur Vinted ↗</a><button type="button" onClick={autoriserNouvelleReponse}>Autoriser un nouvel envoi après vérification</button></div>}
                 {replyErr && <div role="alert" style={{fontSize:12,color:C.danger,marginBottom:8,lineHeight:1.35}}>{replyErr}</div>}
                 {/* (16 oct.) Sans extension ici (téléphone), VRM ne peut pas
                     envoyer : un champ de saisie inutilisable n'y a pas sa place.
@@ -42637,7 +42769,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {!code && !qrImage(t) && (t.viaTransporteur
                             // (24 oct.) « Disponible » LU CHEZ LE TRANSPORTEUR (aucun e-mail ne
                             // l'a encore dit) : VRM ne lit que le statut, jamais le code.
-                            ? <div data-colis-code-pas-lu="transporteur" style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait : dans l'e-mail du transporteur ou la conversation Vinted (VRM ne lit que le statut)</div>
+                            ? <div data-colis-code-pas-lu="transporteur" style={{fontSize:11,color:C.muted,marginTop:1}}>Code : dans l'e-mail du transporteur ou la conversation Vinted.</div>
                             : <div data-colis-code-pas-lu="" style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas lu — ouvre l'e-mail du transporteur{t.suivi?' (ou le suivi du colis)':''}</div>)}
                           {/* Le n° de suivi sur SA ligne, en chiffres lisibles :
                               au comptoir c'est ce qu'on demande quand le scan
@@ -42946,7 +43078,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-achats-bloc" data-en-verification={n} style={{background:C.card,border:`1px solid ${C.border}`,marginBottom:10}}>
             <div className="vrm-achats-bloc-t" style={{color:C.text}}>{n} {n>1?'achats':'achat'} au point relais en cours de vérification</div>
             <div className="vrm-achats-bloc-p" style={{color:C.muted}}>
-              Vinted {n>1?'les dit':'le dit'} « déposé{n>1?'s':''} en point relais », mais rien ne {n>1?'les':'le'} relie encore à un colis ci-dessus (ni code de retrait, ni n° de suivi) : c'est peut-être le même colis. {n>1?'Ils ne comptent':'Il ne compte'} pas dans « à retirer » tant que {n>1?'leur':'son'} n° de suivi n'est pas connu.{/* (tour 2 n° 4) Le geste (l'extension qui relève le suivi Vinted) est dit par `EtatSuiviVinted`, gardé par `extSait` — une voix, et jamais une promesse à un téléphone ni à une extension qui ne le fait pas. */}
+              Vinted {n>1?'les dit':'le dit'} « déposé{n>1?'s':''} en point relais » : peut-être {n>1?'les mêmes colis':'le même colis'}. <Pourquoi>Rien ne {n>1?'les':'le'} relie encore à un colis ci-dessus (ni code de retrait, ni n° de suivi). {n>1?'Ils ne comptent':'Il ne compte'} pas dans « à retirer » tant que {n>1?'leur':'son'} n° de suivi n'est pas connu.</Pourquoi>{/* (tour 2 n° 4) Le geste (l'extension qui relève le suivi Vinted) est dit par `EtatSuiviVinted`, gardé par `extSait` — une voix, et jamais une promesse à un téléphone ni à une extension qui ne le fait pas. */}
             </div>
             <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
               {l.map((o,i)=>(
@@ -42970,7 +43102,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <Icon name="alert" size={16} color={C.warn}/>{pickupUnion.aVerifier.length} colis à vérifier
             </div>
             <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.45}}>
-              Si tu l'as eu, coche « Je l'ai eu » ; sinon le suivi du transporteur et la conversation Vinted disent s'il est encore là ou reparti. <Pourquoi label="Pourquoi « à vérifier »">Délai de retrait dépassé, ou au point relais depuis plus longtemps que son transporteur ne garde un colis (mesuré sur tes e-mails : Chronopost 4 jours, Mondial Relay 5, Vinted Go 6 ; {GARDE_MAX_J} pour les autres){pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème (son message est recopié sur la ligne)':''}. Ils ne comptent plus dans « à retirer » : rien ne dit encore s'ils ont été retirés ou s'ils sont repartis.</Pourquoi>
+              Tu l'as eu ? Coche « Je l'ai eu ». Sinon, regarde son suivi. <Pourquoi label="Pourquoi « à vérifier »">Délai de retrait dépassé, ou au point relais depuis plus longtemps que son transporteur ne garde un colis (mesuré sur tes e-mails : Chronopost 4 jours, Mondial Relay 5, Vinted Go 6 ; {GARDE_MAX_J} pour les autres){pickupUnion.aVerifier.some(x=>x.e&&x.e.etat==='transporteur')?', ou le transporteur signale un problème (son message est recopié sur la ligne)':''}. Ils ne comptent plus dans « à retirer » : rien ne dit encore s'ils ont été retirés ou s'ils sont repartis.</Pourquoi>
               {/* (revue du 23 oct.) Le compte suit la MÊME règle que les lignes
                   (`aEncoreCode`) : un colis vu par Vinted dont la conversation
                   porte le code compte aussi — avant, seuls les e-mails comptaient. */}
@@ -43544,7 +43676,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             peuvent juste plus s'y vendre. */}
         {annBannies.n>0 && (
           <div style={{margin:'0 0 12px',fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'9px 12px',lineHeight:1.5}}>
-            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} par Vinted {annBannies.n>1?'ont été retirées':'a été retirée'} de « en ligne » : le compte est bloqué, {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Mais les articles restent là — tu peux {annBannies.n>1?'les':'la'} publier sur <b>Leboncoin</b> ou <b>eBay</b> (onglet de la plateforme → À publier).
+            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} retirée{annBannies.n>1?'s':''} par Vinted (compte bloqué). Publie-{annBannies.n>1?'les':'la'} sur <b>Leboncoin</b> ou <b>eBay</b>. <Pourquoi>Le compte est bloqué : {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Les articles restent chez toi : onglet de la plateforme → À publier.</Pourquoi>
           </div>
         )}
         {/* ── SIGNALEMENTS, REPLIÉS ────────────────────────────────────────
@@ -43575,7 +43707,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {numDoublons.length} numéro{numDoublons.length>1?'s':''} porté{numDoublons.length>1?'s':''} par deux annonces
             </div>
             <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
-              Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Donne un numéro NEUF à l'une des deux (les numéros ne se réutilisent jamais).
+              Même N° sur deux paires : donne un numéro NEUF à l'une des deux. <Pourquoi>Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Les numéros ne se réutilisent jamais.</Pourquoi>
             </div>
             {numDoublons.map(g => (
               <div key={g.numero} style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
@@ -44633,7 +44765,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {messageFilter.startsWith('repondre')&&<ChoixReponses mode={messageFilter} total={aRepondre.length} offres={offresARepondre} onChoix={v=>{setMessageFilter(v);setConvMax(40);}}/>}
               {messageFilter.startsWith('repondre')&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
-              {messageFilter==='unread' && nonLusAnciens>0 && <p className="vrm-inbox-feedback" data-nonlus-anciens={nonLusAnciens}>{nonLusAnciens} autre{nonLusAnciens>1?'s':''} marquée{nonLusAnciens>1?'s':''} non lue{nonLusAnciens>1?'s':''} sans message depuis plus de 7 jours — pas comptée{nonLusAnciens>1?'s':''} ici ni dans Ma journée ; {nonLusAnciens>1?'elles restent':'elle reste'} dans {'«\u00a0Toutes\u00a0»'}.</p>}
+              {messageFilter==='unread' && nonLusAnciens>0 && <p className="vrm-inbox-feedback" data-nonlus-anciens={nonLusAnciens}>{nonLusAnciens} autre{nonLusAnciens>1?'s':''} non lue{nonLusAnciens>1?'s':''}, sans message depuis 7 jours : dans {'«\u00a0Toutes\u00a0»'}, pas comptée{nonLusAnciens>1?'s':''} ici.</p>}
               {messageFilter==='offres' && tri.length===0 && liste.length===0 && <p className="vrm-inbox-feedback">Plus aucune offre en attente dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:13,color:C.text,lineHeight:1.45,marginBottom:8}}>
@@ -44672,7 +44804,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {liste.length===0 && messageSearch.trim() && retireesIci.length===0 && <p data-msg-sans-resultat="" style={{fontSize:13,color:C.muted,lineHeight:1.45,margin:'4px 0 12px'}}>Aucune conversation ne correspond. Essaie un pseudo, un mot de l’article ou « N°12 ». <button type="button" className="vrm-pied-lien" data-pied-lien="effacer" onClick={()=>setMessageSearch('')}>{VERBES.effacer} la recherche</button></p>}
               {tri.length===0 && liste.length>0 && messageFilter!=='all' && <div data-msg-filtre-vide="" className="vrm-vue-vide"><b>Aucune conversation dans ce filtre</b><p>Les conversations sont toujours disponibles dans « Toutes ».</p><Bouton variante="secondaire" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Voir toutes les conversations</Bouton></div>}
               {/* (5 nov., chantier G) L'état vide dit QUOI FAIRE, en une phrase, et nomme les comptes lus. */}
-              {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" className="vrm-vide-dessin"><Illustration nom="courrier" taille={104}/><p>Aucune conversation pour l’instant</p><p>Ouvre ta messagerie sur vinted.fr {NAV.dans} : l’extension relève les conversations de chaque compte en passant.</p></div>}
+              {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" className="vrm-vide-dessin"><Illustration nom="courrier" taille={104}/><p>Aucune conversation pour l’instant</p><p>Ouvre ta messagerie sur vinted.fr {NAV.dans} : elles arrivent ici.</p></div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const paire = paireDeConv(uidC(c), c.id, null);
@@ -44700,7 +44832,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo} non lu${nonLusRo>1?'s':''}`:''}</span>
                         </div>
                         <div className="vrm-msg-section-p" style={{color:C.text}}>
-                          {NAV.Ce} est sur <b>{nomActif}</b> : VRM ne répond qu'au nom de ce compte. Pour répondre aux autres, bascule {NAV.nom} sur leur compte.
+                          VRM répond au nom de <b>{nomActif}</b> seulement. Autre compte : bascule {NAV.nom} dessus.
                         </div>
                       </div>
                     )}
@@ -44770,7 +44902,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {showQR ? (
                   <>
                     <button className="vrm-icon-control" aria-label={`Modifier « ${t} »`} type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title={VERBES.modifier} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
-                    <button type="button" className="vrm-icon-control" aria-label={`Supprimer « ${t} »`} onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title={VERBES.supprimer} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="trash" size={15}/></button>
+                    <button type="button" className="vrm-icon-control" aria-label={`Supprimer « ${t} »`} data-reponse-supprimer={i} onClick={()=>{ /* (10 nov., lot Y) à la corbeille 30 jours, pilule « Annuler » 5 s */ if (!gesteCorbeille({ type:'reponse', libelle:t, morceaux:[{ k:'vinted_quick_replies', type:'element', id:t, index:i, avant:t, defaut:quickReplies }] }, { vinted_quick_replies: setQuickReplies })) { const a=[...quickReplies]; a.splice(i,1); saveQR(a); } }} title={VERBES.supprimer} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="trash" size={15}/></button>
                   </>
                 ) : null}
               </div>
@@ -45181,7 +45313,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // retirer comme les autres) : la ligne ne parle que pour donner le geste —
                   // l'adresse de réception est connue et n'est reliée à aucun compte.
                   if (!adresseLibre) return null;
-                  return <p className="vrm-colis-note" data-pickup-sans-compte={n}>{n>1?`${n} colis sont arrivés`:'1 colis est arrivé'} sur une adresse e-mail reliée à aucun de tes comptes Vinted : ils sont ci-dessous. Relie l’adresse pour qu’ils comptent.{' '}
+                  return <p className="vrm-colis-note" data-pickup-sans-compte={n}>{n>1?`${n} colis arrivés`:'1 colis arrivé'} sur une adresse reliée à aucun compte : relie-la.{' '}
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
@@ -45230,7 +45362,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {voitSite('ebay') && colisEb && colisEb.nePasPoster.length>0 && (
           <div data-ebay-ne-pas-poster={colisEb.nePasPoster.length} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'11px 13px',marginBottom:12}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text}}>Ne poste pas {colisEb.nePasPoster.length>1?`ces ${colisEb.nePasPoster.length} colis eBay`:'ce colis eBay'}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>{colisEb.nePasPoster.length>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation. Accepte ou refuse dans eBay → À traiter : tant que ce n'est pas tranché, le colis reste chez toi.</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>{colisEb.nePasPoster.length>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation : réponds dans eBay → À traiter. Garde le colis d'ici là.</div>
             {colisEb.nePasPoster.map(x => {
               const num = x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
               return <div key={x.compte+':'+x.orderId} data-ebay-ne-pas-poster-cmd={x.orderId} data-colis-ident={'e:'+x.compte+':'+x.orderId} data-numero={num} style={{fontSize:12,color:C.text,marginTop:6}}>{num?<b>N°{num} · </b>:null}{x.titre || `Commande ${x.orderId}`}</div>;
@@ -45350,10 +45482,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        titre, croix de 44 px, retour du navigateur) au lieu d'un calque fait main. */
                     <SheetShell onClose={()=>setLot(null)} maxWidth={560} z={9000} className="vrm-lot" data-noswipe="1" data-lot={L.length} aria-label="Bordereaux à imprimer"
                       titre={lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}>
-                        <>{lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont sélectionnés. Les PDF préparés avec succès ne seront pas repris.</p>}</><div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
+                        <>{lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont repris.</p>}</><div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
                         {lot.erreur&&<p className="vrm-preparation-note" role="alert" data-lot-erreur="">{lot.erreur}</p>}
                         <RecapSelection lignes={L} coches={lot.coches}/>
-                        <p className="vrm-preparation-note">Compare le numéro et la photo avec l’article physique. Cocher « Article contrôlé » ne marque pas le colis expédié.</p>
+                        <p className="vrm-preparation-note">Compare le N° et la photo avec l’article. « Contrôlé » ≠ expédié.</p>
                         {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 0',fontSize:12,color:C.muted,alignItems:'center'}} className="vrm-lot-outils">
                           <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
@@ -45500,7 +45632,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:15,fontWeight:700,color:C.doublon}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux articles
             </div>
-            <div style={{fontSize:12,color:C.text,marginTop:3,lineHeight:1.45}}>Deux articles portent le même numéro : au moment d'expédier, c'est le mauvais article qui part. Corrige le numéro de l'un des deux avant d'envoyer.</div>
+            <div style={{fontSize:12,color:C.text,marginTop:3,lineHeight:1.45}}>Même N° sur deux articles : corrige l'un des deux avant d'envoyer. <Pourquoi>Au moment d'expédier, c'est peut-être le mauvais article qui part.</Pourquoi></div>
             {conflitsNum.slice(0,6).map(c=>{
               // Laquelle a reçu ce numéro par ERREUR ? Une annonce numérotée
               // automatiquement pendant la panne (`ficheAVerifier`), face à un
@@ -45563,7 +45695,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             elles sont dans LA liste ci-dessous, sous leur transporteur, avec la même carte que les autres
             (l'étiquette se prend dans eBay : l'acheteur a payé le port, §2.8). Reste ici l'âge de la lecture. */}
         {voitSite('ebay') && colisEb && colisEb.aPoster.length>0 && ebayLuA && Math.floor((Date.now() - ebayLuA) / 3600000) >= 6 ? (() => { const ageH = Math.floor((Date.now() - ebayLuA) / 3600000);
-          return <p className="vrm-colis-note-ebay" data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 2px 10px'}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`} : une vente plus récente ou un colis déjà parti n'y est peut-être pas. eBay → Compte → Rafraîchir.</p>; })() : null}
+          return <p className="vrm-colis-note-ebay" data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 2px 10px'}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`}, peut-être pas à jour : eBay → Compte → Rafraîchir.</p>; })() : null}
         {voitSite('vinted') && sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
         {voitSite('vinted') && sales.error && <div data-colis-ventes="passu" style={{marginBottom:10}}><EtatPanne compact quoi="Tes ventes Vinted" raison="Les colis à envoyer ne sont pas connus tant qu’elles ne sont pas lues." onReessayer={()=>loadOrders('sold',setSales,true)}/></div>}
         {(()=>{
@@ -45721,7 +45853,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             </div>
                           ) : null}
                           <div className="vrm-tournee-haut">
-                            <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
+                            <p className="vrm-tournee-note">Dépose chaque groupe chez son transporteur.</p>
                             <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert('envoi')}>Scanner</Bouton>
                           </div>
                           {!groupesT.length ? <div className="vrm-colis-vide-envoi" data-tournee-fini=""><span className="vrm-colis-vide-titre">Tout est déposé</span><span className="vrm-colis-vide-sous">Plus aucun colis à déposer pour l’instant.</span></div> : null}
@@ -45809,7 +45941,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return <CarteColisSite ident={e.key} site="ebay" photo={x.ordre ? photoCommande(x.ordre) : null} titre={x.titre || `Commande ${x.orderId}`} num={num}
                       sous={`eBay · ${urgTxt}${plusieurs ? ` · ${x.pseudo || x.compte}` : ''}`} sousAmbre={dl != null && dl <= 1} transporteur={e.tr} frise={friseColisFusion({}, { geste: dl != null && dl <= 1 })}
                       attrs={{ 'data-colis-ebay-cmd': x.orderId, 'data-numero': num, 'data-jours': dl == null ? '' : String(dl), 'data-compte': x.compte }}
-                      detail={<><LigneDestinationEbay d={x.destination}/>{x.authentification ? <div data-colis-ebay-auth="" style={{fontSize:12,color:C.text,marginTop:4,lineHeight:1.45}}>Part vers l'authentificateur d'eBay (garantie d'authenticité) : l'étiquette d'eBay l'y envoie, pas chez l'acheteur.</div> : null}</>}
+                      detail={<><LigneDestinationEbay d={x.destination}/>{x.authentification ? <div data-colis-ebay-auth="" style={{fontSize:12,color:C.text,marginTop:4,lineHeight:1.45}}>Part vers l'authentificateur d'eBay, pas chez l'acheteur.</div> : null}</>}
                       primaire={<a data-lien-etiquette-ebay="" href={lienCommandeEbay(x.orderId, x.compte)} target="_blank" rel="noreferrer" className="vrm-colis-primaire" title="L'étiquette se prend dans eBay : elle est prépayée par le port que l'acheteur a payé" style={primaireBleu}><Icon name="printer" size={16}/><span className="vrm-lib-long">Étiquette sur eBay</span><span className="vrm-lib-court">Étiquette</span></a>}
                       gestes={<button type="button" data-gerer-ebay={x.orderId} className="vrm-colis-sec" onClick={()=>{ DEMANDE_EBAY_CIBLE.compte = x.compte; DEMANDE_EBAY_CIBLE.id = x.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); onNav && onNav('ebay_ventes'); }}
                         style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.text}}>Suivi et message à l'acheteur</button>}/>;
@@ -45953,7 +46085,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par un autre article</span>
                               <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
-                                {' '}— vérifie la photo ci-contre avant de fermer le colis, et corrige le numéro de l'autre article dans Annonces.
+                                {' '}— vérifie la photo, puis corrige l'autre dans Annonces.
                               </span>
                             </div>
                           );
@@ -46154,7 +46286,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
           </>;
           const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
-          if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis marqué « Déposé » arrive ici, jusqu’à sa livraison.</span></div></>;
+          if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis « Déposé » arrive ici.</span></div></>;
           const plusieursComptes = (accounts || []).length > 1;
           // (9 nov., Julien : « mets le plus récent en haut, comme pour tous les onglets ») UNE liste,
           // la plus récente en haut (src/colisEnvoyes.js : prise en charge lue, sinon « Colis fait »,
@@ -46342,7 +46474,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </>)}
             {!relayPicker.loading && !relayPicker.error && relayPicker.results.length===0 && (
               <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13,textAlign:'center',padding:'0 24px',lineHeight:1.6}}>
-                Tes points relais confirmés par tes e-mails apparaissent déjà tout seuls sur la carte.<br/>Ici, ajoute-en un que tu utilises : tape son nom + la ville.
+                Tes points relais lus dans tes e-mails y sont déjà.<br/>Ajoute un autre : tape son nom + la ville.
               </div>
             )}
           </div>
@@ -46360,7 +46492,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
             {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est tamponné à la place gardée pour sa forme, sinon dans une zone libre, sinon sur une fiche colis juste après.</div>}
+            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
@@ -46375,7 +46507,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {(bordResult.etiquettes||0)>iso ? ` · ${bordResult.etiquettes} pages : un envoi international porte aussi l'étiquette du transporteur partenaire, colle-les toutes` : ''}
                     {ent.length>0 ? ` · ${ent.length} page${ent.length>1?'s':''} entière${ent.length>1?'s':''}` : ''}
                   </div>
-                  {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 complet — découpe-{ent.length===1?'le':'les'} à la main, comme avant.</div>}
+                  {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 : découpe à la main.</div>}
                 </div>
               ); })()}
             <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
@@ -46439,7 +46571,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Résultat après charges" value={inc ?? fmtE(annual.resultatCharges)} color={inc ? C.muted : annual.resultatCharges>=0?INV_STATUS.online.color:C.danger} sub={inc ? undefined : "bénéfice net − tes charges (hors coût d'achat manquant)"}/>
                 </>)}
               </div>); })()}
-              {annual.vinted === 'passu' && !annual.enCours && <div data-annuel-sans-vinted style={{fontSize:12,color:C.warn,lineHeight:1.45,marginBottom:12}}>Les dates de versement de tes ventes Vinted n'ont pas pu être lues : elles ne sont dans aucun mois ci-dessous — ce n'est pas zéro. Rouvre le registre dans un moment.</div>}
+              {annual.vinted === 'passu' && !annual.enCours && <div data-annuel-sans-vinted style={{fontSize:12,color:C.warn,lineHeight:1.45,marginBottom:12}}>Dates de versement Vinted pas lues : absentes des mois, pas zéro. Rouvre plus tard.</div>}
               {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
               {annual.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:12,padding:'8px 12px',marginBottom:12}}>
                 <b>{annual.nMasq} vente{annual.nMasq>1?'s':''} masquée{annual.nMasq>1?'s':''} dans l'app</b> ({fmtE(annual.caMasq)}) {annual.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
@@ -46497,7 +46629,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>📄 Reçus officiels Vinted</div>
                 {capturedReceipts.length>0 ? (
                   <>
-                    <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Dernier reçu consulté sur Vinted, capté par l'extension (le vrai document, pas le justificatif maison).</div>
+                    <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Le vrai reçu Vinted, le dernier que tu as ouvert.</div>
                     {capturedReceipts.map((rec,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text}}>{rec.name}</div><div style={{fontSize:11,color:C.muted}}>capté le {rec.capturedAt?new Date(rec.capturedAt).toLocaleDateString('fr-FR'):'—'}</div></div>
@@ -46512,14 +46644,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ) : recusPasLus>0 ? (
                   <div data-recus-pas-lus={recusPasLus} style={{fontSize:11,color:C.muted,lineHeight:1.5}}>La base n'a pas répondu pour {recusPasLus} compte{recusPasLus>1?'s':''} — rouvre le bilan dans un instant.</div>
                 ) : (
-                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Aucun reçu capté pour l'instant. Ouvre/télécharge un reçu ou une facture officielle sur Vinted (avec l'extension active) → il apparaîtra ici, prêt pour ta compta.</div>
+                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Aucun reçu. Ouvre un reçu ou une facture sur Vinted : il arrive ici.</div>
                 )}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 <button type="button" onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
                 <button type="button" onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
               </div>
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
+              <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Indicatif, pas un conseil comptable. Sans prix d'achat, bénéfice incomplet.</div>
             </div>
           </div>
         </div>
@@ -46546,7 +46678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
               </div>
               {!lister ? (
-                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de l'article que tu mets en vente.<br/><span style={{fontSize:12}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
+                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de l'article que tu mets en vente.<br/><span style={{fontSize:12}}>Un prix d'après tes ventes, un titre et une description.</span></div>
               ) : (<>
                 {/* Prix conseillé */}
                 <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:12,padding:'13px 15px',marginBottom:14}}>
@@ -46571,7 +46703,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     )}
                   </>) : (
-                    <div style={{fontSize:13,color:C.muted}}>Pas encore assez d'infos pour un prix. Renseigne un prix d'achat, ou tape un modèle plus courant.</div>
+                    <div style={{fontSize:13,color:C.muted}}>Pas assez d'infos : ajoute un prix d'achat, ou un modèle plus courant.</div>
                   )}
                 </div>
                 {/* Titre optimisé */}
@@ -46588,7 +46720,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{lister.desc}</div>
                   <button type="button" onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:12,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
                 </div>
-                <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:12}}>Le prix vient de tes ventes finalisées du même modèle (recherche par mots). Colle le titre et la description sur Vinted, ajoute tes photos, et fixe le prix conseillé.</div>
+                <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:12}}>Prix tiré de tes ventes du même modèle. Colle tout sur Vinted, avec tes photos.</div>
               </>)}
             </div>
           </div>
@@ -46613,7 +46745,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {lotView.loading ? (
               <Skeleton variant="row" count={4}/>
             ) : lotView.items.length===0 ? (
-              <div style={{textAlign:'center',padding:'26px 16px',color:C.muted,fontSize:13,lineHeight:1.5}}>Détail indisponible.<br/><span style={{fontSize:12}}>Vinted n'a pas renvoyé le contenu de ce lot (compte peut-être déconnecté).</span></div>
+              <div style={{textAlign:'center',padding:'26px 16px',color:C.muted,fontSize:13,lineHeight:1.5}}>Détail indisponible.<br/><span style={{fontSize:12}}>Vinted ne l'a pas renvoyé (compte déconnecté ?).</span></div>
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:7}}>
                 {lotView.items.map((it,i)=>{
@@ -46633,7 +46765,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   );
                 })}
-                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>Vinted ne dit pas le prix payé pour chaque article du lot — seul le total est connu. Le N° s'affiche quand le titre correspond à un de tes articles.</div>
+                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>Vinted ne donne que le total du lot, pas le prix par article. <Pourquoi label="Le N° ?">Le N° s'affiche quand le titre correspond à un de tes articles.</Pourquoi></div>
               </div>
             )}
           </div>
@@ -46657,7 +46789,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* Vérificateur d'achat : en friperie, tape le modèle + le prix demandé */}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px',marginBottom:16}}>
                 <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:2}}>🔍 Vérificateur d'achat</div>
-                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>En friperie : tape le modèle et le prix demandé → tes propres ventes te disent si ça vaut le coup.</div>
+                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Modèle + prix demandé : tes ventes disent si ça vaut le coup.</div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:checker?10:0}}>
                   <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder="Modèle (ex : gel-lyte, spezial…)"
                     style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
@@ -46665,7 +46797,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
                 </div>
                 {checker && (checker.nb===0 ? (
-                  <div style={{fontSize:12,color:C.muted}}>Aucune vente finalisée ne correspond à « {srcQuery.trim()} ». Essaie un mot plus court (ex : juste la marque).</div>
+                  <div style={{fontSize:12,color:C.muted}}>Aucune vente pour « {srcQuery.trim()} ». Essaie juste la marque.</div>
                 ) : (()=>{
                   const ok = checker.estBenef!=null ? (checker.estBenef>=15?'go':checker.estBenef>=5?'mid':'no') : null;
                   const okCol = ok==='go'?INV_STATUS.online.color:ok==='mid'?C.warn:C.danger;
@@ -46719,7 +46851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (<>
                   <Section title="Par marque" rows={sourcing.brands} hint="Trié par nb de ventes. Le bénéfice/article aide à prioriser les rachats."/>
                   <Section title="Par taille" rows={sourcing.sizes} hint="Taille estimée depuis le titre — approximatif. « ? » = pointure non détectée."/>
-                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Le bénéfice n'est calculé que pour les ventes dont le prix d'achat est renseigné (bouton 🔗 dans Annonces). Les marques reconnues viennent d'une liste interne.</div>
+                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Bénéfice : seulement les ventes avec un prix d'achat (🔗 dans Annonces).</div>
                 </>);
               })()}
             </div>
@@ -46742,7 +46874,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:'#16a34a',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>✅ Reçu dans le porte-monnaie</div>
                 <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)}&nbsp;€</div>
-                <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — argent crédité sur ton solde Vinted. <b>Ne compte pas</b> tes virements vers ta banque.</div>
+                <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''}, créditée{treasury.nRecu>1?'s':''} sur ton solde. <b>Sans</b> tes virements vers ta banque.</div>
               </div>
               {/* EN ATTENTE = somme des porte-monnaie Vinted (escrow réel si capté,
                   sinon somme des ventes en cours = argent que Vinted te retient). */}
@@ -46906,7 +47038,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>✨ Rédiger une annonce (IA)</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis un article — l'IA propose un titre et une description. <b>Tu copies, tu publies</b> ; rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis un article : l'IA propose titre et description. <b>Tu copies, tu publies.</b> <Pourquoi>Rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</Pourquoi></div>
               </div>
               <button type="button" onClick={()=>setIaOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -47085,15 +47217,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 //    ne compare de date. Ce qui est vrai, quelle que soit la règle
                 //    de la déclaration : ces ventes ne sont dans AUCUNE (une vente
                 //    déclarée ailleurs n'est pas ici, elle est « déjà déclarée »).
-                if (d && report.nApres>0) lignes.push(<div key="apr" data-decl="apres" data-decl-n={report.nApres} data-decl-cents={Math.round(report.caApres*100)}><b style={{color:C.warn}}>+ {report.nApres} vente{report.nApres>1?'s':''} ({fmtE(report.caApres)})</b> de ce mois {report.nApres>1?'ne figurent':'ne figure'} dans aucune de tes déclarations : à ajouter à ta prochaine déclaration (régularisation).</div>);
+                if (d && report.nApres>0) lignes.push(<div key="apr" data-decl="apres" data-decl-n={report.nApres} data-decl-cents={Math.round(report.caApres*100)}><b style={{color:C.warn}}>+ {report.nApres} vente{report.nApres>1?'s':''} ({fmtE(report.caApres)})</b> de ce mois {report.nApres>1?'ne figurent':'ne figure'} dans aucune déclaration : à ajouter à la prochaine.</div>);
                 // Déclaré à la DATE DE VENTE : une vente vendue le mois d'avant relève
                 // de la déclaration de son mois de vente — la dire « à régulariser »
                 // faisait payer ses cotisations deux fois.
                 if (d && report.nVenteAvant>0) {
                   const mv = Object.keys(report.venteAvant||{}).sort();
-                  lignes.push(<div key="va" data-decl="venteavant" data-decl-n={report.nVenteAvant} data-decl-cents={Math.round(report.caVenteAvant*100)}><b>{report.nVenteAvant} vente{report.nVenteAvant>1?'s':''} ({fmtE(report.caVenteAvant)})</b> {report.nVenteAvant>1?'ont été vendues':'a été vendue'} en {mv.map(nomMois).join(', ')} et versée{report.nVenteAvant>1?'s':''} ce mois-ci : déclaré à la date de vente, {report.nVenteAvant>1?'elles relèvent':'elle relève'} de ta déclaration {de(mv.map(nomMois).join(', '))}, pas de celle-ci : <b>rien à régulariser</b>. Note {mv.length>1?'ces mois-là':'ce mois-là'} dans ce rapport pour qu'{report.nVenteAvant>1?'elles n\'y soient':'elle n\'y soit'} plus comptée{report.nVenteAvant>1?'s':''}.</div>);
+                  lignes.push(<div key="va" data-decl="venteavant" data-decl-n={report.nVenteAvant} data-decl-cents={Math.round(report.caVenteAvant*100)}><b>{report.nVenteAvant} vente{report.nVenteAvant>1?'s':''} ({fmtE(report.caVenteAvant)})</b> vendue{report.nVenteAvant>1?'s':''} en {mv.map(nomMois).join(', ')} : <b>rien à régulariser</b>. Note {mv.length>1?'ces mois-là':'ce mois-là'} ici. <Pourquoi>Versée{report.nVenteAvant>1?'s':''} ce mois-ci, mais déclaré à la date de vente : {report.nVenteAvant>1?'elles relèvent':'elle relève'} de ta déclaration {de(mv.map(nomMois).join(', '))}, pas de celle-ci. Note {mv.length>1?'ces mois-là':'ce mois-là'} dans ce rapport pour qu'{report.nVenteAvant>1?'elles n\'y soient':'elle n\'y soit'} plus comptée{report.nVenteAvant>1?'s':''}.</Pourquoi></div>);
                 }
-                if (report.nDouble>0) lignes.push(<div key="dbl" data-decl="double"><b style={{color:C.warn}}>{report.nDouble} vente{report.nDouble>1?'s':''} ({fmtE(report.caDouble)})</b> {report.nDouble>1?'figurent':'figure'} dans deux de tes déclarations ({report.doubles.map(nomMois).join(' et ')}) : {report.nDouble>1?'elles sont comptées':'elle est comptée'} une fois ici. Signale-le à l'URSSAF lors de ta prochaine déclaration.</div>);
+                if (report.nDouble>0) lignes.push(<div key="dbl" data-decl="double"><b style={{color:C.warn}}>{report.nDouble} vente{report.nDouble>1?'s':''} ({fmtE(report.caDouble)})</b> déclarée{report.nDouble>1?'s':''} deux fois ({report.doubles.map(nomMois).join(' et ')}) : signale-le à l'URSSAF. <Pourquoi>{report.nDouble>1?'Elles sont comptées':'Elle est comptée'} une fois ici. Signale-le à l'URSSAF lors de ta prochaine déclaration.</Pourquoi></div>);
                 if (!d && !passe && !lignes.length) return null;
                 const ecart = d && d.montant != null ? Math.round((d.montant - Number(d.ca||0)) * 100) / 100 : null;
                 return (
@@ -47130,7 +47262,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div>{fmtE(report.ca)} — {report.nb} vente{report.nb>1?'s':''} finalisée{report.nb>1?'s':''}, à la date de versement.</div>
                         )}
                         <label style={{display:'flex',flexDirection:'column',gap:3}}>
-                          <span style={{fontSize:12,color:C.muted}}>Montant de ta déclaration, tel qu'il est sur ton espace URSSAF (facultatif — je le compare)</span>
+                          <span style={{fontSize:12,color:C.muted}}>Montant sur ton espace URSSAF (facultatif, comparé)</span>
                           <input inputMode="decimal" value={declForm.montant} onChange={e=>setDeclForm(f=>({...f, montant:e.target.value}))} placeholder="ex. 1 234,50" style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'7px 10px',fontSize:17,background:C.bg,color:C.text,maxWidth:200,fontFamily:'inherit'}}/>
                         </label>
                         <label style={{display:'flex',flexDirection:'column',gap:3}}>
@@ -47179,7 +47311,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div><div className="vrm-label" style={{fontSize:11,color:C.muted}}>VIRÉ VERS TA BANQUE</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(Math.abs(releveTotaux.virements))}</div></div>
                   </div>
                   <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.4}}>
-                    Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour où la vente est finalisée (l'argent versé). Les deux viennent de deux sources différentes : un jour d'écart est normal. Un virement vers ta banque déplace ton propre argent — ce n'est pas une recette.
+                    Un jour d'écart avec le CA est normal ; un virement n'est pas une recette. <Pourquoi>Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour où la vente est finalisée (l'argent versé). Les deux viennent de deux sources différentes. Un virement vers ta banque déplace ton propre argent.</Pourquoi>
                   </div>
                 </div>
               ) : (
@@ -47286,7 +47418,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:12,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
-              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucun article hors ligne{q?' pour cette recherche':' disponible'}. Les articles encore en ligne ne sont pas proposés pour cette vente.</div>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucun article hors ligne{q?' pour cette recherche':' disponible'} (ceux en ligne ne sont pas proposés).</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:12,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
@@ -47338,7 +47470,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {s.pts.map(p=>(<g key={p.i}><circle cx={xs(p.i)} cy={ys(p.avg)} r="3.5" fill={C.accent}/><text x={xs(p.i)} y={ys(p.avg)-7} textAnchor="middle" fontSize="8.5" fontWeight="800" fill={C.text}>{Math.round(p.avg)}</text></g>))}
                 </svg>
               )}
-              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des articles <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Une pente qui monte = tu vends plus cher (marché porteur ou meilleurs articles).</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des articles <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Ça monte : tu vends plus cher.</div>
             </div>
           </div>
         </div>
@@ -47560,7 +47692,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               ))}
               {disputes.salesLost.length===0 && disputes.buysBack.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 0'}}>Aucun litige — nickel ! 👌</div>}
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.4}}>Basé sur le statut Vinted (« Remboursement validé/effectué », « Retour initié », annulations). Se met à jour tout seul.</div>
+              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.4}}>D'après le statut Vinted (remboursements, retours, annulations).</div>
             </div>
           </div>
         </div>
@@ -47595,7 +47727,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div style={{fontSize:11,color:C.muted,marginTop:9,lineHeight:1.45}}>
-                  ⚠️ Si tu as déjà <b style={{color:C.text}}>écrit ces numéros sur tes boîtes</b>, il faudra les réécrire. Les articles rangés au garage et ceux d'une vente en cours ne bougent pas.
+                  ⚠️ Déjà <b style={{color:C.text}}>écrits sur tes boîtes</b> ? Il faudra les réécrire. <Pourquoi>Les articles rangés au garage et ceux d'une vente en cours ne bougent pas.</Pourquoi>
                 </div>
               </div>
             )}
@@ -47676,12 +47808,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button className="vrm-icon-control" type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
               </div>
               <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>
-                <b style={{color:C.text}}>{lignes.length} article{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, l'article n'est pas là où l'app le croit.
+                <b style={{color:C.text}}>{lignes.length} article{lignes.length>1?'s':''}</b> chez toi : compte tes boîtes contre cette liste. <Pourquoi>Celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Si un numéro manque, l'article n'est pas là où l'app le croit.</Pourquoi>
               </div>
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.doublon,background:`${C.doublon}12`,border:`1px solid ${C.doublon}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
                   <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux articles</span>
-                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux articles portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : rien ne dit lequel expédier (en rouge ci-dessous).</span>
                 </div>
               )}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
@@ -47756,7 +47888,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {unknownAtGarage.length>0 && (
                 <div style={{marginBottom:4}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.muted}}>❓ Au garage, numéro inconnu ({unknownAtGarage.length})</div>
-                  <div className="vrm-aide" style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucun article numéroté ne correspond (ancien numéro / faute de frappe).</div>
+                  <div className="vrm-aide" style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Au garage, sans article à ce N° (ancien ou faute de frappe).</div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{unknownAtGarage.slice(0,80).map(t=><span key={t} style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 9px'}}>N°{t}</span>)}</div>
                 </div>
               )}
@@ -52878,7 +53010,7 @@ function AppCoeur() {
   // chaque vente lue — pour « Quel compte vend sur … ? » (rien n'est lu hors d'un Solo).
   const [aboCoque, setAboCoque] = useState(() => abonnementPublie());
   useEffect(() => suivreAbonnement(setAboCoque), []);
-  const [autresSitesSolo] = useComptesAutresSites(!!(aboCoque && aboCoque.plan === 'solo'));
+  const [autresSitesSolo] = useComptesAutresSites(!!(aboCoque && (aboCoque.plan === 'solo' || aboCoque.proLimite === true)));
   const autresSolo = useMemo(() => {
     const out = {};
     const sources = {
