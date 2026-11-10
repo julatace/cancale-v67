@@ -621,6 +621,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
+      {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine) : un lien, rien de recalculé ici. */}
+      {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>Ma semaine ›</button> : null}
       <ComparerMoisCarte liveStats={liveStats}/>
       <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui

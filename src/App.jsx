@@ -115,6 +115,9 @@ import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee 
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher } from "./aTrancher.js";
 import ATrancher from "./ATrancher.jsx";
+// (10 nov., lot BC) « Ma semaine » : l'écran du bilan de la semaine (src/maSemaine.js, aucune règle à lui).
+import MaSemaine from "./MaSemaine.jsx";
+import { maSemaine } from "./maSemaine.js";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX, ORDRE_CHOIX as ORDRE_CHOIX_CYCLE } from "./cycleArticle.js";
@@ -2830,6 +2833,9 @@ const DEMANDE_SIGNALEMENTS = { on: false };
 // (6 nov.) Un conseil (src/accompagnement.js, `action: 'reglages:…'`) ouvre un panneau de
 // Paramètres : la demande est servie au montage de l'écran, ou tout de suite s'il est ouvert.
 const DEMANDE_REGLAGE_SOUS = { id: null };
+// (10 nov., lot BC) La semaine demandée par un lien `?tab=semaine&lundi=AAAA-MM-JJ` (la notification
+// du bilan) : lue par l'écran « Ma semaine » à son montage, ou par l'événement `vrm:semaine`.
+const DEMANDE_SEMAINE = { lundi: null };
 
 // ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
 // Julien : « tu peux sélectionner lesquels tu ranges ici, la taille… vraiment
@@ -14189,11 +14195,14 @@ const BAR_GROUPE={
   cat_expedition:'cat_bord',
   // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue est mise en avant.
   organisation:'settings',
+  // (10 nov., lot BC) « Ma semaine » s'ouvre depuis Ma journée (et la notification du bilan).
+  semaine:'journee',
 };
 // Le nom COURT d'un écran, pour l'en-tête de la coque (titre qui apparaît au
 // défilement). Une source : les listes de navigation elles-mêmes (§11).
 function titreEcran(tab) {
   if (tab === 'journee') return 'Ma journée';
+  if (tab === 'semaine') return 'Ma semaine';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
   return { cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
@@ -14213,7 +14222,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -26498,7 +26507,7 @@ const jourIso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${Str
 const LETTRES_JOUR = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const CLES_VERSE_JOURNEE = ['vinted_urssaf_mois'];
 const majusculeJ = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = null, mortes, onMorte, maintenant: maint = null }) {
+function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemaine = null, Photo = null, mortes, onMorte, maintenant: maint = null }) {
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
   const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
@@ -26575,6 +26584,8 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = 
         <div className="vrm-jv2-quand">
           <span className="vrm-fu-surtitre vrm-jv2-nom" data-jv2-nom="">{nom}</span>
           <button type="button" className="vrm-jv2-sem" aria-pressed={semaine} data-jv2-semaine={S.lundi} onClick={() => setChoix(semaine ? null : 'sem')}>{semaine ? 'Revenir aux jours' : S.titre}</button>
+          {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine en cours). */}
+          {onSemaine ? <button type="button" className="vrm-jv2-sem vrm-jv2-ma-semaine" data-ouvre-ma-semaine="" onClick={onSemaine}>Ma semaine ›</button> : null}
         </div>
         <div className="vrm-jv2-corps">
           <div className="vrm-jv2-chiffre">
@@ -27074,6 +27085,47 @@ function useSourcesCarte(liveStats) {
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
     enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
   }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep]);
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
+// ═══════════════════════════════════════════════════════════════════════════
+// Les sources sont celles de la carte « Semaine du … » (`JournalSemaineCarte`) et de la frise :
+// les lignes de `ventesFaites` de la coque (comptes sélectionnés), `vrm_benefice_jours`, ses
+// gestes « Colis fait », le reçu publié par Ventes (`recuPublieEntre`, + ventes à dater) et
+// `vrm_paires_dorment`. Les bornes, la comparaison et « qui dorment » : src/maSemaine.js
+// (les bornes et la règle du bilan en notification, api/_lib/bilan-semaine.js).
+const REGLES_SEMAINE = { bilanLignes, beneficeDesJours, chiffreBrut };
+function EcranMaSemaine({ liveStats, onNav, entete }) {
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
+  const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
+  const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
+  const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
+  const ligneUrssaf = useLigneUrssaf();
+  const [lundi, setLundi] = React.useState(() => { const l = DEMANDE_SEMAINE.lundi; DEMANDE_SEMAINE.lundi = null; return l; });
+  React.useEffect(() => {
+    const f = () => { const l = DEMANDE_SEMAINE.lundi; DEMANDE_SEMAINE.lundi = null; setLundi(l); };
+    window.addEventListener('vrm:semaine', f);
+    return () => window.removeEventListener('vrm:semaine', f);
+  }, []);
+  // L'heure qui passe : la semaine en cours finit MAINTENANT (relue chaque minute, et au retour).
+  const [maintenant, setMaintenant] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 60000);
+    const vu = () => { if (document.visibilityState === 'visible') setMaintenant(Date.now()); };
+    document.addEventListener('visibilitychange', vu);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vu); };
+  }, []);
+  const vendu = venduEtat(liveStats) !== 'lu' ? (venduEtat(liveStats) === 'pasSu' ? null : undefined)
+    : { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] };
+  const M = React.useMemo(() => maSemaine({
+    maintenant, lundi, vendu, joursBenef: pub, dorment,
+    colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {},
+    recuEntre: (de, a) => ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuAvecADater(recuPublieEntre(ligneUrssaf, { de, a }, maintenant), ligneUrssaf),
+    R: REGLES_SEMAINE,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [maintenant, lundi, liveStats, pub, dorment, pret, ship, lbcF, vcF, ligneUrssaf]);
+  return <MaSemaine M={M} entete={entete} onSemaine={setLundi} onNav={onNav}/>;
 }
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
@@ -40517,7 +40569,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     (« vendu · aujourd'hui ») EST le chiffre du jour de la frise : il n'est plus écrit deux fois. */}
                 {!premierJour && (
                   <FriseJournee liveStats={liveStats} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte}
-                    onVentes={() => onNav && onNav('cat_ventes')}
+                    onVentes={() => onNav && onNav('cat_ventes')} onSemaine={onNav ? () => onNav('semaine') : null}
                     photosEntre={(de, a) => ordreRecent((sales.items || [])
                       .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
                       .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
@@ -50638,6 +50690,8 @@ function AppCoeur() {
       if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
       if(t==='settings'&&section==='signalements') DEMANDE_SIGNALEMENTS.on=true;
+      // (10 nov., lot BC) La notification du bilan porte le lundi de SA semaine.
+      if(t==='semaine'){ const l=p.get('lundi'); DEMANDE_SEMAINE.lundi=l&&/^\d{4}-\d{2}-\d{2}$/.test(l)?l:null; try{ window.dispatchEvent(new Event('vrm:semaine')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
@@ -54001,6 +54055,7 @@ function AppCoeur() {
         }}/></GardeEcran>}
         {tab==='sales'    &&<GardeEcran nom="sales"><Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/></GardeEcran>}
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
+        {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} onTrancher={trancherAT} Photo={PhotoVinted} entete={<ScreenHead icon="help" title="À trancher"/>}/></GardeEcran>}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}
