@@ -1,0 +1,47 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « ACHAT SAISI DEUX FOIS » (10 nov., lot BH) — src/AchatsEnDouble.jsx
+   Un widget de la DA6 (rayon 24, carte blanche / #1C1C1E), les fiches côte à côte
+   (deux colonnes même à 390 px), le geste en pilule ambre (le geste à faire, §7).
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-doubles {
+  --dbl-ambre: #B25000; --dbl-sur-ambre: #FFFFFF;
+  background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F); border-radius: 24px;
+  box-shadow: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10));
+  padding: 14px 14px 12px; margin: 0 0 14px; display: flex; flex-direction: column; gap: 12px;
+}
+:root[data-theme="dark"] .vrm-doubles { box-shadow: none; --dbl-ambre: #FFB340; --dbl-sur-ambre: #1D1D1F; }
+.vrm-doubles-tete { display: flex; align-items: center; gap: 10px; }
+.vrm-doubles-pastille {
+  min-width: 28px; height: 28px; padding: 0 8px; box-sizing: border-box; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--dbl-ambre); color: var(--dbl-sur-ambre); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.vrm-doubles-titre { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.vrm-doubles-groupe { display: flex; flex-direction: column; gap: 8px; }
+.vrm-doubles-groupe + .vrm-doubles-groupe { border-top: 1px solid var(--w-filet, rgba(60,60,67,.18)); padding-top: 12px; }
+.vrm-doubles-ref { margin: 0; font-size: 13px; color: var(--w-gris, #6E6E73); }
+.vrm-doubles-ref b { color: var(--w-encre, #1D1D1F); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-doubles-paire { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 900px) { .vrm-doubles-paire { grid-template-columns: repeat(auto-fill, minmax(200px, 260px)); } }
+.vrm-doubles-fiche {
+  min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 18px;
+  background: var(--w-carte-2, #F2F2F7);
+}
+.vrm-doubles-photo {
+  width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; margin-bottom: 6px;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-gris, #6E6E73);
+  display: flex; align-items: center; justify-content: center;
+}
+.vrm-doubles-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-doubles-nom { font-size: 14px; font-weight: 600; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.vrm-doubles-ou, .vrm-doubles-date { font-size: 12px; color: var(--w-gris, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-doubles-prix { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.vrm-doubles-garder {
+  margin-top: 8px; min-height: 44px; border: 0; border-radius: 999px; padding: 0 12px; cursor: pointer;
+  background: var(--dbl-ambre); color: var(--dbl-sur-ambre); font: inherit; font-size: 14px; font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-doubles-garder:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-doubles-masques summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--w-gris, #6E6E73); }
+.vrm-doubles-masque { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.vrm-doubles-masque-nom { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
