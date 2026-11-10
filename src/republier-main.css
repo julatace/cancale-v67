@@ -124,7 +124,8 @@ html body .vrm-fs.vrm-rm-feuille .vrm-b { min-height: 44px !important; }
 .vrm-kit-conseil-vue { margin: 0 0 10px; }
 .vrm-sel-barre.vrm-sel-barre-deux { display: flex; gap: 10px; }
 /* Le second bouton flotte sur la liste : opaque, sinon le texte dessous se lit à travers. */
-html body .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b:not(.vrm-b-primaire) { background: var(--vrm-surface, #fff) !important; }
+/* Dans la couche `vrm-premium` : un !important d'une couche bat un !important hors couche (styles-widgets-ios.css). */
+@layer vrm-premium { :root:root body .vrm-app-shell .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b.vrm-b-secondaire:not(.vrm-b-icone) { background: var(--w-carte, #fff) !important; box-shadow: inset 0 0 0 100px var(--w-remplir, rgba(118,118,128,.12)), 0 6px 18px rgba(0,0,0,.18) !important; } }
 @media (max-width: 767px) { .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b { flex: 1 1 0; min-width: 0; } }
 .vrm-kit-barre { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .vrm-kit-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }

@@ -152,7 +152,7 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           await clic(pg, '[data-selection-annonce="9102"] input'); await clic(pg, '[data-selection-annonce="9103"] input');
           const barre = await attendre(pg, () => { const m = document.querySelector('[data-republier-main-lancer]'); const v = document.querySelector('[data-republier-lancer]'); return m && v ? { m: m.getAttribute('data-republier-main-lancer'), mP: m.classList.contains('vrm-b-primaire'), v: v.getAttribute('data-republier-lancer'), vP: v.classList.contains('vrm-b-primaire') } : null; });
           dit(barre && barre.m === '2' && barre.mP && barre.v === '2' && !barre.vP, `C ${T} deux paires cochées : « À la main · 2 » principal, « Par VRM · 2 » en second`, JSON.stringify(barre));
-          await pg.screenshot({ path: nomF('1-vue') });
+          await pg.waitForTimeout(600); await pg.screenshot({ path: nomF('1-vue') });
           // ── K : le kit ──
           await clic(pg, '[data-republier-main-lancer]');
           await pg.waitForSelector('[data-kit-main="2"]', { timeout: 8000 });
