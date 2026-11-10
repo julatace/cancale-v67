@@ -22818,7 +22818,7 @@ function SortisDuStock({ plan, planLu, ecrire }) {
   return (
     <div data-stock-sortis={liste.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Sortis du stock car partis · {liste.length}</div>
-      <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Vinted, Leboncoin ou eBay dit que leur colis est parti : leur place est libérée, leur numéro reste. Si l'un d'eux est encore chez toi, remets-le.</div>
+      <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Colis partis : place libérée, N° gardé. Encore là ? Remets-le.</div>
       {liste.map(x => (
         <div key={x.cle} data-stock-sorti={x.num} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
           <span style={{ flex: '1 1 260px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.4 }}>
@@ -22949,7 +22949,7 @@ function PlanDessus({ room, poly, items, sel, onSelect, onPoly, onMove, cibles }
           if (dedans(tx + nx * 0.1, ty + ny * 0.1)) { nx = -nx; ny = -ny; }
           return <text key={'l' + i} x={tx + nx * 0.34} y={ty + ny * 0.34 + 0.09} textAnchor="middle" fontSize="0.26" fill={C.muted} style={{ pointerEvents: 'none' }}>{(Math.round(L * 100) / 100).toLocaleString('fr-FR')} m</text>; })}
       </svg>
-      <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Tire un coin pour donner sa forme à la pièce, « + » au milieu d'un mur pour en ajouter un. Glisse un meuble pour le placer : il ne traverse ni un mur ni un autre meuble.</div>
+      <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Tire un coin pour la forme, glisse un meuble pour le placer.</div>
     </div>
   );
 }
@@ -22992,8 +22992,8 @@ function FeuilleToutRanger({ plan, numeros, plusieursPieces, onValider, onClose 
         <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Tout ranger d'un geste</div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
           {n > 0
-            ? <>Je range {n} article{n > 1 ? 's' : ''} dans l'ordre des numéros, de la place la plus basse à la plus haute : les numéros qui se suivent restent côte à côte. Rien n'est rangé avant ton « Ranger », et aucun numéro ne change.</>
-            : <>Aucune place libre dans tes meubles : ajoute une étagère, une table ou un portant (Aménager).</>}
+            ? <>Je range {n} article{n > 1 ? 's' : ''} dans l'ordre des N°, côte à côte. Rien avant ton « Ranger ».</>
+            : <>Plus de place : ajoute un meuble (Aménager).</>}
         </div>
         {prop.sansPlace > 0 && n > 0 && <div data-tout-ranger-reste={prop.sansPlace} style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{prop.sansPlace} article{prop.sansPlace > 1 ? 's' : ''} n'{prop.sansPlace > 1 ? 'ont' : 'a'} pas de place : il manque un meuble.</div>}
         {n > 0 && (
@@ -23051,7 +23051,7 @@ function AssistantPiece({ room, vide, nbArticles, onCreer, onClose }) {
       <div data-assistant-piece="" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Créer ma pièce en 3 questions</div>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>Je te propose une disposition ; rien n'est créé avant ton « oui ». Tu pourras tout déplacer ensuite.{!vide ? ' Ta pièce actuelle ne change pas : c\'est une nouvelle pièce.' : ''}</div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>Une disposition proposée : rien créé avant ton « oui ».{!vide ? ' Ta pièce actuelle ne change pas : c\'est une nouvelle pièce.' : ''}</div>
         </div>
         <div>
           <span style={etiquette}>1. Ta pièce fait combien ? (en mètres)</span>
@@ -24115,7 +24115,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         ['Passe en mode Ranger', 'Sélectionne un article numéroté et une place libre pour enregistrer son emplacement.']
       ] : [
         ['Choisis un article', 'Sélectionne son numéro dans « À ranger ». Il doit déjà avoir un numéro VRM.'],
-        ['Choisis sa place', 'Touche une place libre dans la pièce ou utilise « Ranger ici » lorsqu’une place est proposée.'],
+        ['Choisis sa place', 'Touche une place libre, ou « Ranger ici ».'],
         ['Retrouve-le ensuite', 'Saisis son numéro dans la recherche : VRM indique le meuble et la case enregistrés.']
       ]}/>
       {hi && hi.notFound && <div data-stock-pas-range="" style={{ fontSize: 13, color: C.warn, fontWeight: 600 }}>Aucune case ne contient « {search} ».{!sansSourisStock && aRanger.some(x => x.sur && cleNum(x.numero) === cleNum(search)) ? <> Appuie sur <b>Entrée</b> pour la ranger à la prochaine place libre.</> : <> Range-le : choisis-le dans « À ranger » puis touche une place libre.</>}</div>}
@@ -24401,9 +24401,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             const p = ft.build === 'pile' ? null : prochainePlaceMeuble(selItem, ft, room.wallH || 3.4);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                {ft.cases && <span style={{ fontSize: 13, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
+                {ft.cases && <span style={{ fontSize: 13, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre pour ranger, une boîte pour la changer.</span>}
                 {ft.cases && p && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger un article ici'}</button>}
-                {ft.build === 'pile' && <span className="vrm-aide" style={{ fontSize: 13, color: C.muted }}>Touche une boîte pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
+                {ft.build === 'pile' && <span className="vrm-aide" style={{ fontSize: 13, color: C.muted }}>Touche une boîte pour la changer ou la retirer.</span>}
                 {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
                 <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto' }}>Régler ce meuble</button>
               </div>
@@ -24447,7 +24447,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 {plateauxReglables(ft) && nr > (ft.build === 'table' ? 2 : 1) && (
                   <details data-plateaux-3d="" style={{ flex: '1 1 100%' }}>
                     <summary className="vrm-repli" style={{ fontSize: 13, fontWeight: 700 }}>{ft.build === 'table' ? 'Plateaux sous la table, place par place' : ft.build === 'portant' ? 'Barres, cintre par cintre' : 'Plateaux, colonne par colonne'}</summary>
-                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>{ft.build === 'portant' ? 'Sans barre à un cintre, son vêtement descend sur la barre du dessous si elle est libre. Aucun numéro ne change. La barre du bas reste toujours là.' : <>{ft.bacs ? 'Sans plateau sous une case, son bac descend dans la case du dessous si elle est vide. Aucun numéro ne change.' : 'Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu\'elle a de la place. Aucun numéro ne change.'}{ft.build === 'table' ? ' Le dessus de la table reste toujours là.' : ''}</>}</div>
+                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>{ft.build === 'portant' ? 'Sans barre, le vêtement descend d’un cran. Aucun N° ne change.' : <>{ft.bacs ? 'Sans plateau, le bac descend d’un cran. Aucun N° ne change.' : 'Sans plateau, les boîtes descendent d’un cran. Aucun N° ne change.'}{ft.build === 'table' ? ' Le dessus de la table reste toujours là.' : ''}</>}</div>
                     <div style={{ textAlign: 'center' }}>
                       <ChoixPlanches plateau fixe={ft.build === 'table' ? 1 : 0} cols={nc} rows={nr} planches={Array.isArray(selItem.planches) ? selItem.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1)} setPlanches={(v) => { const u = planchesCases(v, nc, nr); if (ft.build === 'table') for (let c = 1; c <= nc; c++) u.add('1:' + c); updateItem(selItem.id, { planches: planchesRangees(u, nc, nr) }); }} />
                     </div>
@@ -24555,7 +24555,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 </div>
               ))}
             </div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>Touche une case pour ajouter un N°. Touche un N° pour le retirer. « + rangée / + colonne » ajuste la taille du meuble.</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>Touche une case : ajoute un N°. Touche un N° : retire-le.</div>
           </div>
         </div>
       )}
@@ -24688,7 +24688,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                     ? <div data-prochaine={`${prochaine.itemId}:${prochaine.key}`} style={{ fontSize: 13, color: C.text, lineHeight: 1.45, marginBottom: 10, padding: '9px 11px', borderRadius: 12, background: C.bg, border: `1px solid ${C.border}` }}>
                         Prochaine case libre : <b>{prochaine.itemName}</b>{plusieursPieces ? ` (${prochaine.roomName})` : ''} · {prochaine.nom}
                       </div>
-                    : <div data-prochaine="" style={{ fontSize: 13, color: C.text, lineHeight: 1.45, marginBottom: 10 }}>Plus aucune case libre : agrandis une grille ou ajoute un meuble (Ma pièce → Aménager la pièce).</div>}
+                    : <div data-prochaine="" style={{ fontSize: 13, color: C.text, lineHeight: 1.45, marginBottom: 10 }}>Plus de case libre : agrandis ou ajoute un meuble.</div>}
                   {placer && <div data-rgt-placer={placer} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: C.text, marginBottom: 10, padding: '8px 10px', borderRadius: 12, border: `1.5px solid ${C.accent}` }}>
                     <span style={{ flex: 1, minWidth: 0 }}>Touche une case entourée pour y ranger la <b>N°{placer}</b>.</span>
                     <Bouton variante="discret" onClick={() => setPlacer(null)}>Annuler</Bouton>
@@ -24784,7 +24784,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
               </React.Fragment>
             );
           })}
-          {meubles.length > 0 && <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4 }}>Vu de face · touche une case pleine pour la retrouver <Pourquoi label="Comment les boîtes se rangent">Comme dans la 3D : sur une étagère ou une table les boîtes s'empilent dans leur case ; dans un mur de boîtes elles tombent en bas de la colonne.</Pourquoi></div>}
+          {meubles.length > 0 && <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4 }}>Vu de face · touche une case pleine pour la retrouver <Pourquoi label="Comment les boîtes se rangent">Comme en 3D : empilées dans la case, ou en bas de colonne.</Pourquoi></div>}
         </div>
       </div>
     </div>
@@ -25101,7 +25101,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
         </div>
         
         <div style={{fontSize:12,color:C.muted,marginBottom:18,lineHeight:1.5}}>
-          Sauvegarde toutes tes données (catalogue, ventes, garage) dans un fichier JSON. Tu peux le restaurer plus tard ou sur un autre appareil.
+          Toutes tes données dans un fichier, à restaurer partout.
         </div>
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
