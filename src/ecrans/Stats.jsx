@@ -1776,7 +1776,7 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
   if (F.sites.every((x) => x.passu)) return (
     <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-tous-passu="" style={{ padding: '14px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px' }}>
       <h2 className="vrm-display" data-titre-section="" style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-.01em', color: C.text }}>Frais par site</h2>
-      <span style={{ fontSize: 13, color: C.muted }}>Pas encore calculés : ils se lisent dans le relevé de tes ventes, fait par l’écran Ventes. Ouvre-le une fois.</span>
+      <span style={{ fontSize: 13, color: C.muted }}>Pas encore calculés : ouvre l’écran Ventes une fois.</span>
     </section>
   );
   const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,96px) minmax(0,64px)', columnGap: 10, alignItems: 'center' };
@@ -1912,7 +1912,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
         <div style={sTitre}>{NOM_BENEFICE_BRUT} et marge</div>
         {M && <span style={{ fontSize: 13, color: C.muted }} data-stats-marges-couverture={`${M.nCout}/${M.n}`}>sur {pl(M.nCout, 'vente')} avec prix d'achat (sur {M.n})</span>}
       </div>
-      {!M ? <div style={{ ...sNote, marginTop: 8 }}>Le relevé de tes ventes n'est pas encore sur cet appareil : il se calcule quand Ma journée ou Ventes a lu toutes tes ventes (Vinted, Leboncoin, eBay). Ouvre Ventes une fois.</div> : (<>
+      {!M ? <div style={{ ...sNote, marginTop: 8 }}>Relevé de tes ventes pas encore ici : ouvre l’écran Ventes. <Pourquoi>Il se calcule quand Ma journée ou Ventes a lu toutes tes ventes (Vinted, Leboncoin, eBay).</Pourquoi></div> : (<>
         <Segmente label={`${NOM_BENEFICE_BRUT} par`} value={axeMarge} onChange={setAxeMarge} options={Object.entries(AXES_MARGE).map(([v, l]) => ({ v, l, data: { 'data-stats-marge-axe': v } }))} style={{ marginTop: 12 }}/>
         {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>Aucune vente finalisée à répartir.</div> : (
           <div role="table" aria-label={`${NOM_BENEFICE_BRUT} par ${AXES_MARGE[axeMarge].toLowerCase()}`} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
@@ -1933,7 +1933,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
           </div>
         )}
         <div style={{ ...sNote, marginTop: 10 }}>
-          Ventes finalisées, au jour de la vente — les mêmes que « Ton bénéfice » de Comptabilité. Bénéfice brut = vente − prix d'achat, sur les seules ventes au prix d'achat connu (« 3/5 » : 3 sur 5) ; « — » quand aucun n'est connu. Frais, boosts et charges : dans Comptabilité.{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? ` Relevé du ${quand(releve.at)}.` : ''}
+          « 3/5 » : prix d'achat connu pour 3 ventes sur 5.{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? ` Relevé du ${quand(releve.at)}.` : ''} <Pourquoi>Ventes finalisées, au jour de la vente — les mêmes que « Ton bénéfice » de Comptabilité. Bénéfice brut = vente − prix d'achat, sur les seules ventes au prix d'achat connu ; « — » quand aucun n'est connu. Frais, boosts et charges : dans Comptabilité.</Pourquoi>
         </div>
       </>)}
     </section>
@@ -1960,7 +1960,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
             );
           })}
         </div>
-        <div style={{ ...sNote, marginTop: 10 }}>Vinted seulement (Leboncoin et eBay ne donnent pas la date de mise en ligne). Médiane par groupe ; « 4/6 » = 4 ventes datées sur 6. Une annonce republiée après la vente n'est pas comptée.</div>
+        <div style={{ ...sNote, marginTop: 10 }}>Vinted seulement. Médiane ; « 4/6 » = 4 ventes datées sur 6. <Pourquoi>Leboncoin et eBay ne donnent pas la date de mise en ligne. Une annonce republiée après la vente n'est pas comptée.</Pourquoi></div>
       </>)}
     </section>
 
@@ -1992,7 +1992,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
         {/* (3 nov.) La LISTE, avec un geste par article : l'écran Annonces (« Articles qui dorment »). */}
         {onVoirDorment && stock && (stock.dort.seuils[30] || {}).n > 0 && <button type="button" className="vrm-lien-action" data-stats-voir-dorment="" onClick={onVoirDorment} style={{ minHeight: 44 }}>Voir la liste</button>}
       </div>
-      {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé sur cet appareil : ouvre Annonces une fois (il faut toutes tes annonces lues, avec leurs dates).</div> : (<>
+      {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé : ouvre l’écran Annonces une fois.</div> : (<>
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column' }}>
           {SEUILS_DORT.map((s) => { const b = stock.dort.seuils[s] || { n: 0, valeur: 0, nCout: 0, cout: 0 }; return (
             <div key={s} data-stats-dort-seuil={s} data-n={b.n} data-valeur={Math.round(b.valeur * 100)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.4fr)', gap: 8, padding: '9px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
@@ -2007,7 +2007,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
           {fig('Taux de vente du mois', tauxV == null ? '—' : `${tauxV}\u00a0%`, vintMois != null && enLigne != null ? `${vintMois} vendue${vintMois > 1 ? 's' : ''} ce mois sur ${vintMois + enLigne} (vendues + encore en ligne), Vinted` : 'ventes pas lues', { 'data-stat-taux-vente': tauxV == null ? '' : tauxV })}
           {fig('Annulations', annul && annul.taux != null ? `${String(annul.taux).replace('.', ',')}\u00a0%` : '—', annul ? `${annul.annulees} sur ${pl(annul.n, 'commande')} Vinted lue${annul.n > 1 ? 's' : ''}` : 'ventes pas lues', { 'data-stat-annulation': annul && annul.taux != null ? annul.taux : '' })}
         </div>
-        <div style={{ ...sNote, marginTop: 10 }}>Âge = date de mise en ligne lue sur l'annonce, connue pour {stock.dort.datesConnues} sur {stock.dort.total}{stock.dort.datesConnues < stock.dort.total ? ' — les autres ne sont dans aucune ligne' : ''}. Valeur = prix affichés ; coût = prix d'achat connus seulement. Calculé le {quand(stock.at)}.</div>
+        <div style={{ ...sNote, marginTop: 10 }}>Âge connu pour {stock.dort.datesConnues} sur {stock.dort.total}{stock.dort.datesConnues < stock.dort.total ? ' — les autres ne sont dans aucune ligne' : ''}. Calculé le {quand(stock.at)}. <Pourquoi>Âge = date de mise en ligne lue sur l'annonce. Valeur = prix affichés ; coût = prix d'achat connus seulement.</Pourquoi></div>
       </>)}
     </section>
   </>);
