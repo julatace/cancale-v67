@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { ordreRecent, quandEbay } from '../ordreRecent.js';
 import BilanSynchronisation from '../BilanSynchronisation.jsx';
 import { problemesAnnonce } from '../verifAnnonce.js';
 import FiabiliteVentes from '../FiabiliteVentes.jsx';
@@ -1905,12 +1906,14 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   if (!orders.length && !cible) return wrap(<>{head}{kpi}</>);
   const euro = formaterMontantEbay;
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
-  const visibles=orders.filter(o=>{
+  // (9 nov., soir, lot AJ) La commande la plus RÉCENTE en haut, TOUS COMPTES eBay MÉLANGÉS (avant : l'ordre
+  // de lecture, compte par compte) ; sans date en bas — la règle unique (src/ordreRecent.js).
+  const visibles=ordreRecent(orders.filter(o=>{
     if(cible)return String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte;
     const termes=[o.orderId,o.buyer?.username,o._pseudo,...(o.lineItems || []).flatMap(li=>[li.title,li.sku,li.legacyItemId])].filter(Boolean).join(' ').toLocaleLowerCase('fr-FR');
     const etat=etatCommandeEbay(o);
     return (!recherche.trim() || termes.includes(recherche.trim().toLocaleLowerCase('fr-FR'))) && (filtre==='all' || (filtre==='done'?etat.expedie:etat.peutExpedier));
-  });
+  }), quandEbay);
   return wrap(<>
     {head}
     {!cible && kpi}

@@ -343,6 +343,9 @@ export function nombreEpingle(p) {
 // disait 18 points sous un onglet « À retirer · 0 ».
 export const surLaCarte = (p) => !!p && !p.inconnu && Number(p.nComptes) > 0;
 
+// (9 nov., soir, lot AJ) `ordonner` : l'ordre des points et de leurs colis, donné par l'appelant —
+// Colis passe `ordreRecentPoints` (src/ordreRecent.js : le plus récent en haut, décision de Julien).
+// Sans lui, l'ordre de `regrouperRelais` (inchangé ; ce module reste sans import).
 // ── LA COLONNE « À RETIRER », PAR POINT (1er nov.) ──────────────────────────
 // Julien : « je crois qu'il n'y a pas tous les points relais, il ne doit pas y
 // avoir d'erreur et ça doit être un peu plus clair ». Chaque colis de la colonne
@@ -351,8 +354,9 @@ export const surLaCarte = (p) => !!p && !p.inconnu && Number(p.nComptes) > 0;
 // jamais écarté. Les points reçoivent un rang (`numero`, l'ordre de la liste),
 // le nombre de leur épingle (`nombreEpingle`) et, s'ils ne peuvent pas être sur
 // la carte, la raison en clair.
-export function pointsARetirer({ colis = [], attendus = [], pointsVinted = [] } = {}) {
-  const groupes = regrouperRelais({ arrives: colis, attendus });
+export function pointsARetirer({ colis = [], attendus = [], pointsVinted = [], ordonner = null } = {}) {
+  const groupes0 = regrouperRelais({ arrives: colis, attendus });
+  const groupes = typeof ordonner === 'function' ? ordonner(groupes0) : groupes0;
   let numero = 0;
   const points = groupes.map((g) => {
     if (g.inconnu) return { ...g, numero: null, repere: null, sansCarte: null, epingle: nombreEpingle(g) };

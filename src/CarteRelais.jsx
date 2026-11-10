@@ -388,7 +388,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const aCode = !!(x.code || x.qr || x.code2);
   const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
-    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined };
+    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '' };  // (lot AJ) l'arrivée lue qui range la ligne
   const basculer = () => setOuvert((o) => !o);
   return (
     <div className="vrm-rpf-ligne" {...attrs} data-ouvert={ouvert ? '1' : undefined}>

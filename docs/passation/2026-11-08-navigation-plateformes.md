@@ -30,3 +30,7 @@ Le refus `etat: illisible` du véritable parseur de prix est aussi transmis au c
 Le démarrage suit aussi un choix sans Vinted : eBay seul ne demande plus de relier Vinted ; le guide explique la connexion des sites choisis. Un seul site ne produit pas une barre de filtres inutile. L’icône d’Affichage devient un œil pour ne pas doubler celle de Mes plateformes. Les composants communs retrouvent le dernier import CSS. L’audit du raccordement des emails accepte la carte passée par son animation `P`, déjà présente sur main ; sa suppression reste refusée (12 mutations attrapées).
 
 Les lots d’audits ont été exécutés localement : les tests SQL n’ont pas pu tourner faute de PostgreSQL, et deux anciens audits d’extension cherchent un Chromium absent à leur emplacement par défaut. Aucun code SQL, d’authentification ou d’extension n’a été modifié par cette refonte. Les paquets régénérés par les audits ont été remis à leur version originale.
+
+## Mise à jour du 9 novembre (soir) — lot AL
+
+La colonne par tâches tient, avec une retouche décidée par Julien : « Republier » et « Favoris & offres » ne sont plus des entrées à part. « Favoris & offres » est une section de Messages, « Republier » une vue d'Annonces ; le groupe « Vendre » disparaît de la colonne (il ne portait plus qu'elles) et garde Messages dans « Plus » au téléphone. Les anciens chemins mènent au nouvel endroit. Récit : `2026-11-09-navigation-fusion.md`.
