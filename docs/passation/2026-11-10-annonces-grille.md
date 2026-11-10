@@ -70,7 +70,13 @@ première annonce (le compte de l'onglet, mis en tête par l'écran, reste en t�
 - Bancs Annonces (un à la fois, `BANC_PORT` aléatoire) : `annonces-coherence` 130 verts, `annonces-retirees`,
   `annonces-outils`, `baisse-prix` (57) verts ; `annonces-carte` mis à la grille (il ouvre chaque vignette avant
   de la lire, photo ≥ 150 px à deux colonnes) — ses 5 rouges restants sont ceux d'`origin/main` (saisie 18 €,
-  baisse eBay, G22 ×2, recherche). Les autres : voir le rapport de fin de session ci-dessous.
+  baisse eBay, G22 ×2, recherche). `note-achat-double` vert (il ouvre la vignette avant l'icône « ajouter une
+  note » ; la note écrite se lit sur la vignette fermée) ; `popups-propre` **239/0** (P3 lit la proposition sur sa
+  vignette : l'ancienne paire dans la bande + la vignette) ; `numero-ou-remise` **103/0** (boutons [Oui] [Non] de la
+  vignette à 44 px) ; `navigation-fusion` 45 verts.
+- Rouges hérités, **identiques sur `origin/main`** (arbre `git archive`, mesuré) : `annonces-actions` (A « deux
+  comptes mélangés », K « la masquée partie ⇒ N°45 ») et `annonces-ventes-brouillon` (23, dont « les annonces sont
+  rendues — 0 » : le banc n'arrive pas à l'écran Annonces).
 
 ## Planches
 
