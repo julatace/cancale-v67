@@ -5,7 +5,7 @@
 // INVENTÉES. Exige : aucun recouvrement aux trois largeurs, code copié tel quel
 // avec son zéro de tête.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, metaDe, filtreData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 4381);
@@ -48,6 +48,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    if (src === 'meta') { out[alias] = metaDe(row.data); continue; }
     let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
     out[alias] = v == null ? null : v;
   }
@@ -71,8 +72,10 @@ async function preparer(b, vp, opts = {}) {
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date(MAINTENANT).toISOString(), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(ROWS.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id) && filtreData(u)(r)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));

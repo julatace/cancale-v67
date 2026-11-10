@@ -28909,15 +28909,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [carriersOnly, setCarriersOnly] = useState(() => load('vrm_relais_carriers_only', true)); // casiers/transporteurs seulement
   // Géocode une adresse précise via l'API Adresse du gouvernement français
   // (data.gouv, gratuite, fiable) ; repli Nominatim. Renvoie {lat,lon} ou null.
-  const geocode = async (q) => {
+  const geocode = async (q, cp = '') => {
     try {
-      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(q)}`);
+      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(q)}${cp ? `&postcode=${cp}` : ''}`);
       const j = await r.json();
       const f = j && j.features && j.features[0];
       if (f && f.geometry) return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
     } catch (_) {}
     try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q + ', France')}`);
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q + (cp ? ' ' + cp : '') + ', France')}`);
       const j = await r.json();
       if (j && j[0]) return { lat: +j[0].lat, lon: +j[0].lon };
     } catch (_) {}
@@ -28984,7 +28984,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         continue;
       }
       // Géocode l'ADRESSE propre (fiable, API gouv) puis le libellé complet.
-      const hit = (c.adresse && await geocode(c.adresse)) || await geocode(c.display);
+      // (9 nov. au soir, « la carte des points relais doit être parfaite ») SEULEMENT avec un code postal LU :
+      // « 13 Rue Saint-Vincent » seul existe dans des dizaines de villes — l'API rendait la première, et le
+      // point était rangé (pour toujours) au mauvais endroit. Sans code postal : rien cherché, rien rangé ;
+      // la carte de Colis place le point par SA règle (src/CarteRelais.jsx, code postal exigé).
+      const cpLu = (String(c.adresse || '') + ' ' + String(c.display || '')).match(/\b\d{5}\b/);
+      if (!cpLu) continue;
+      const hit = (c.adresse && await geocode(c.adresse, cpLu[0])) || await geocode(c.display, cpLu[0]);
       setGeo(prev => { const u = { ...prev, [nom]: hit || { failedAt: Date.now() } }; save('vrm_geo_cache_v2', u); return u; });
       if (hit) ensureSavedPoint(nom, c.adresse, hit.lat, hit.lon);
       await new Promise(r2 => setTimeout(r2, 400));

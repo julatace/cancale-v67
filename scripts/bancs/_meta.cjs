@@ -37,4 +37,34 @@ function fichesDePage(u, details) {
   }
   return [out];
 }
-module.exports = { metaVersData, fichesDePage };
+// (9 nov. au soir, « transporteurs parfaits ») La colonne `meta` ENTIÈRE (`select=id,meta`, la lecture
+// des e-mails de suivi depuis le 8 nov.) : la même règle que `public.vrm_meta` — les scalaires de premier
+// niveau (≤ 600 octets) + `_pdf`. Un banc qui rendait `meta: null` faisait disparaître chaque e-mail de
+// suivi (5 bancs de la carte des relais rouges depuis le 8 nov. pour cette seule raison).
+function metaDe(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const m = {};
+  for (const [k, v] of Object.entries(data)) if ((typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') && Buffer.byteLength(JSON.stringify(v)) <= 600) m[k] = v;
+  if (data.pdfB64) m._pdf = true;
+  return m;
+}
+// Les filtres simples d'une requête sur `data->>k` (hors `or=`), comme PostgREST : eq, neq, is.null,
+// not.is.null. Un banc qui les ignorait rendait « avec QR et livré » TOUTES les lignes.
+function filtreData(u) {
+  const conds = [];
+  const q = String(u).split('?')[1] || '';
+  for (const part of q.split('&')) {
+    const m = /^data->>([A-Za-z_]+)=(eq|neq|is|not\.is)\.(.*)$/.exec(part);
+    if (m) conds.push({ k: m[1], op: m[2], v: m[3] });
+  }
+  return (row) => conds.every(({ k, op, v }) => {
+    const x = row && row.data ? row.data[k] : undefined;
+    const nul = x == null;
+    if (op === 'is') return v === 'null' ? nul : String(x) === v;
+    if (op === 'not.is') return v === 'null' ? !nul : String(x) !== v;
+    if (op === 'eq') return !nul && String(x) === v;
+    if (op === 'neq') return !nul && String(x) !== v;
+    return true;
+  });
+}
+module.exports = { metaVersData, fichesDePage, metaDe, filtreData };

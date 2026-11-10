@@ -19,7 +19,7 @@
 // carte, la carte cadrée sur TOUS les points placés (Vannes ET Dinan), et le
 // point non géocodable listé avec « pas sur la carte » + sa raison.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, metaDe, filtreData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 4417);
@@ -92,6 +92,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    if (src === 'meta') { out[alias] = metaDe(row.data); continue; }
     let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
     out[alias] = v == null ? null : (/->>/.test(src) && typeof v === 'object' ? JSON.stringify(v) : v);
   }
@@ -135,7 +136,7 @@ async function preparer(b, vp) {
     const lk = /id=like\.([^&]*)/.exec(u);
     const parS = /data->resume->>s=in\.\(([^)]*)\)/.exec(u);
     if (lk && parS) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); const ss = parS[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(ROWS.filter((r) => re.test(r.id) && r.data.resume && ss.includes(String(r.data.resume.s))).map(forme)); }
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id) && filtreData(u)(r)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
