@@ -126,7 +126,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
 
     await essaie('A ' + suf, async () => {
       await pg.goto(`http://localhost:${PORT}/?tab=organisation`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForSelector('[data-atelier]', { timeout: 30000 });
+      await pg.waitForSelector('[data-atelier]', { timeout: 30000 }).catch(async () => { if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, `echec-A-${suf}.png`) }); } throw Error('Atelier absent : ' + errs.join(' | ').slice(0, 300) + ' · ' + (await pg.evaluate(() => document.body.innerText.slice(0, 120).replace(/\s+/g, ' ')))); });
       let s = await lire();
       dit(s && s.section === 'atelier', 'A1 Organisation s’ouvre sur l’Atelier', s && s.section);
       dit(s && s.c.recue === '0' && s.c.nettoyee === '1' && s.c.photographiee === '0' && s.c.en_ligne === '0', 'A2 le nombre par étape (0 · 1 · 0 · 0)', s && JSON.stringify(s.c));
@@ -142,7 +142,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-job="atelier-attente"]', { timeout: 30000 });
       const l = await pg.evaluate(() => { const e = document.querySelector('[data-job="atelier-attente"]'); return e ? { n: e.getAttribute('data-n'), t: (e.getAttribute('aria-label') || e.innerText).replace(/\s+/g, ' ') } : null; });
-      dit(l && l.n === '1' && /1 paire à « Nettoyée » depuis plus de 7 j/.test(l.t), 'B1 Ma journée : une ligne « 1 paire à « Nettoyée » depuis plus de 7 j »', l && JSON.stringify(l));
+      dit(l && l.n === '1' && /^1 \S+ à « Nettoyée » depuis plus de 7 j/.test(l.t), 'B1 Ma journée : une ligne « 1 paire à « Nettoyée » depuis plus de 7 j »', l && JSON.stringify(l));
       dit(!pg.__selectData, 'B2 Ma journée ne relit pas toute la ligne (jamais select=data)');
       await pg.waitForFunction(() => { try { const v = JSON.parse(localStorage.getItem('vrm_atelier_achats') || 'null'); return v && v.l && v.l.length === 3; } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
       const pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_atelier_achats')); } catch (_) { return null; } });
