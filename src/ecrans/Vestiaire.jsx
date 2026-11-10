@@ -870,7 +870,7 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
 function PhotoOffreVc({ src, className }) {
   const [ko, setKo] = useState(false);
   const url = urlPhotoVc(src);
-  return url && !ko ? <img src={url} className={className} alt="" loading="lazy" onError={() => setKo(true)}/> : <span className={className} aria-hidden="true"/>;
+  return url && !ko ? <img src={url} className={className} alt="" loading="lazy" data-vrm-vignette="" onError={() => setKo(true)}/> : <span className={className} aria-hidden="true"/>;
 }
 function MessagesVestiaire() {
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet

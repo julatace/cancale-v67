@@ -458,7 +458,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
               <button key={b.id} type="button" data-achat-hors-id={b.id} onClick={() => ouvrirEdition(b)} title="Modifier ou supprimer"
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', minHeight: 64, border: 'none', borderTop: i > 0 ? `1px solid ${C.border}` : 'none', borderRadius: 0, background: editId === b.id ? (C.card2 || C.bg) : 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 <span style={{ width: 44, height: 44, borderRadius: 12, background: C.card2 || C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={17} style={{ color: C.muted, opacity: .6 }} />}
+                  {src ? <img src={src} alt="" data-vrm-vignette="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={17} style={{ color: C.muted, opacity: .6 }} />}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || 'Achat'}</span>

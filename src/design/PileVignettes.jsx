@@ -39,7 +39,7 @@ export function PileVignettes({ srcs, n = 0, Photo, icone = null, mortes, onMort
       {photos.length
         ? photos.map((src, k) => (
             <span key={src} className="vrm-pile-v" data-vignette-src={src} style={{ '--k': k, zIndex: PILE_MAX - k }}>
-              {Photo ? <Photo src={src} alt="" loading="lazy" decoding="async" onError={onMorte ? () => onMorte(src) : undefined}/> : <img src={src} alt="" loading="lazy"/>}
+              {Photo ? <Photo src={src} alt="" loading="lazy" decoding="async" onError={onMorte ? () => onMorte(src) : undefined}/> : <img src={src} alt="" data-vrm-vignette="" loading="lazy"/>}
             </span>
           ))
         : <span className="vrm-pile-v is-tuile">{icone}</span>}

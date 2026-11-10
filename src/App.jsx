@@ -533,6 +533,8 @@ import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from ".
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
+import Visionneuse from "./Visionneuse.jsx";          // (10 nov., lot AN) la photo en grand, partout
+import { enregistrerGaleries } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
@@ -9469,15 +9471,15 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
     if (onError) { try { onError(); } catch (_) {} }
   }, [definitive, src]);
   if (!vinted) {
-    return <img src={src} loading={loading} style={style} alt="" {...reste} onLoad={onLoad}
+    return <img src={src} loading={loading} style={style} alt="" data-vrm-vignette="" {...reste} onLoad={onLoad}
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
   }
   if (etat === 'ok') {
-    return <img src={photosVinted.blobDe(src)} decoding="async" style={style} alt="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
+    return <img src={photosVinted.blobDe(src)} decoding="async" style={style} alt="" data-vrm-vignette="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
-    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} decoding="async" style={style} alt="" {...reste} data-photo-vinted="natif"
+    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} decoding="async" style={style} alt="" data-vrm-vignette="" {...reste} data-photo-vinted="natif"
       onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
       onError={() => photosVinted.echecNatif(src)}/>;
   }
@@ -19803,7 +19805,7 @@ function PhotoVente({ src, size = 64, portrait = false }) {
   React.useEffect(() => {setKo(false);setSecours(null);}, [url]);
   React.useEffect(()=>{if(!ko || !url)return;let stop=false;photoViaServeur(url).then(data=>{if(!stop && data)setSecours(data);});return()=>{stop=true;};},[ko,url]);
   const box = { width:size, height:portrait ? Math.round(size*1.3) : size, flexShrink:0, borderRadius:12, overflow:'hidden', background:C.card2 || C.bg, display:'flex', alignItems:'center', justifyContent:'center' };
-  if (secours) return <img src={secours} alt="" style={{...box,objectFit:'cover'}} onError={()=>setSecours(null)}/>;
+  if (secours) return <img src={secours} alt="" data-vrm-vignette="" style={{...box,objectFit:'cover'}} onError={()=>setSecours(null)}/>;
   if (url && !ko) return <PhotoVinted src={url} alt="" loading="lazy" decoding="async" onError={()=>setKo(true)} style={{...box,objectFit:'cover'}}/>;
   return <span style={box} role="img" aria-label="Photo indisponible" title="Photo indisponible"><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>;
 }
@@ -21351,7 +21353,7 @@ const urlPhotoVc = (src) => { try { const u = new URL(src); if (u.protocol === '
 function PhotoVc({ src, style }) {
   const [ko, setKo] = useState(false);
   const url = urlPhotoVc(src);
-  return url && !ko ? <img src={url} alt="" loading="lazy" data-photo-vc="" onError={() => setKo(true)} style={{ objectFit: 'contain', background: '#fff', ...(style || {}) }}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty" style={style}>—</span>;
+  return url && !ko ? <img src={url} alt="" loading="lazy" data-photo-vc="" data-vrm-vignette="" onError={() => setKo(true)} style={{ objectFit: 'contain', background: '#fff', ...(style || {}) }}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty" style={style}>—</span>;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // VESTIAIRE : TES ANNONCES EN FICHES (1er nov., extension 5.296)
@@ -30865,6 +30867,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tout;
   };
   const [listings, setListings] = useState({ loading:false, items:null });
+  // (10 nov., lot AN) Les autres photos d'une annonce, pour la visionneuse (src/visionneuse.js) : par fichier, jamais par titre.
+  useEffect(() => { if (Array.isArray(listings.items)) enregistrerGaleries(listings.items); }, [listings.items]);
   const brVinted = useBrouillonsVinted(listings.brouillons, brouillonsOpen || actionsOpen || repubAction === 'enLigne' || annSort === 'selection' || annSort === 'brouillons' || actionsSelOpen, accounts, listings.brLectures);
   // (29 oct.) Les annonces présentes (en ligne, à confirmer, masquées) : un
   // brouillon qui y figure a été mis en ligne, à la main ou par VRM.
@@ -53455,6 +53459,8 @@ function AppCoeur() {
       <TopProgress/>
       <Toaster/>
       <PiluleAnnulerCoque/>
+      {/* (10 nov., lot AN) La photo d'un article en grand, depuis n'importe quel écran (src/Visionneuse.jsx). */}
+      <Visionneuse Photo={PhotoVinted} Retour={FermeAuRetour}/>
       <DefilementPartout/>
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}

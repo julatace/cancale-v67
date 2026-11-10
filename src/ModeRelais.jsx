@@ -139,7 +139,7 @@ export default function ModeRelais({ colis, onRetire, onAnnuler, onFermer, Retou
             </div>
             {c.suivi ? <p className="vrm-relais-suivi">n° {c.suivi}</p> : null}
             <div className="vrm-relais-achat">
-              {c.photo ? <img className="vrm-relais-photo" src={c.photo} alt="" referrerPolicy="no-referrer" decoding="async"/> : null}
+              {c.photo ? <img className="vrm-relais-photo" data-vrm-vignette="" src={c.photo} alt="" referrerPolicy="no-referrer" decoding="async"/> : null}
               <span className="vrm-relais-achat-titre" data-relais-titre="">{c.titre}</span>
             </div>
             <div className="vrm-relais-geste">
