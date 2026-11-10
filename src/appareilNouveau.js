@@ -12,6 +12,9 @@ export async function verifierAppareilUneFois({ uid, enTete, stockage, fetch: f 
   try {
     const r = await f('/api/compte?mode=appareils', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(enTete || {}) }, body: JSON.stringify({ action: 'verifier' }) });
     if (!r || !r.ok) return 'pas-su';
+    // Seule la réponse de la route compte (une page HTML de repli n'est pas un « fait »).
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) return 'pas-su';
     try { if (stockage) stockage.setItem(cle, String(Date.now())); } catch (_) {}
     return 'fait';
   } catch (_) { return 'pas-su'; }
