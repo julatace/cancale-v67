@@ -76,6 +76,7 @@ import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe } from './_lib/equipe.js';
 import { routeCommunaute } from './_lib/communaute.js';
+import { pagePublique } from './_lib/formateur.js';
 import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
@@ -1713,6 +1714,14 @@ export default async function handler(req, res) {
   if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  // (10 nov., lot AR) La page PUBLIQUE d'un formateur (vrm.center/f/<adresse>) : SANS session,
+  // clé publique ; la base (032) ne rend que nom, présentation et groupes montrés.
+  if (mode === 'formateur') {
+    if (m !== 'GET') return repondre(res, 405, { erreur: 'GET seulement' });
+    res.setHeader('Cache-Control', 'no-store');
+    const r = await pagePublique(req.query && req.query.f, ANON);
+    return repondre(res, r.code, r.corps);
+  }
   if (mode === 'discord-debut') return m === 'POST' ? discordDebut(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'discord-attente') return m === 'POST' ? discordAttente(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'discord') return m === 'GET' ? retourDiscord(req, res) : repondre(res, 405, { erreur: 'GET seulement' });

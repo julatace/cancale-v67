@@ -324,4 +324,4 @@ function FavorisLeboncoin() {
     </div>
   );
 }
-export { MessagesLeboncoin };
+export { MessagesLeboncoin, FilLeboncoin };

@@ -163,6 +163,9 @@ import { versementsDuReleve, completerVersementsParReleve } from "./versementRel
 import { aDaterParAnnee, anneeSureDeVente, tsVenteADater, periodeADater } from './aDaterAnnee.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
+import VueACompleter from "./AnnoncesACompleter.jsx";
+import AvisVente from "./AvisVente.jsx";
+import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
 import { nombreNonLues, marquerLues, fusionnerLus } from "./journalNotifs.js";
 import { masqueesParCompte } from "./annoncesMasquees.js";
@@ -259,6 +262,8 @@ const BrouillonsARefaire = aLaDemande(() => import('./ecrans/Republier.jsx').the
 const PublierVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.PublierVestiaire })));
 const AnnoncesVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.AnnoncesVestiaire })));
 const MessagesVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.MessagesVestiaire })));
+// (10 nov., lot AB) Messages · Tous : un fil par acheteur et par paire (src/filUnique.js).
+const FilsTous = aLaDemande(() => import('./ecrans/FilsTous.jsx').then((m) => ({ default: m.FilsTous })));
 const VentesVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.VentesVestiaire })));
 const ClePhotoroom = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.ClePhotoroom })));
 const Dashboard = aLaDemande(() => import('./ecrans/Stats.jsx').then((m) => ({ default: m.Dashboard })));
@@ -1373,6 +1378,17 @@ const detectSchema = async () => {
   return CLOISONNE;
 };
 
+// (10 nov., lot U) Les avis Vinted d'UN compte (≤ 20, rangés par l'extension) : une projection,
+// jamais `select=data`. Lecture ratée ou rien capté ⇒ `null` (« pas lus », jamais « aucun avis »).
+const lireAvisCompte = async (uid) => {
+  if (!/^\d{1,15}$/.test(String(uid || ''))) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_feedbacks&select=avis:data->payload->user_feedbacks`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) && j[0] && Array.isArray(j[0].avis) ? j[0].avis : null;
+  } catch (_) { return null; }
+};
 const sbAuth = (extra) => {
   // Le jeton du vendeur ne sert QUE si la base sait s'en servir. Avant la
   // migration on garde la clé publique : le rôle « connecté » n'a pas forcément
@@ -2450,6 +2466,9 @@ const ENTREPRISE_VIDE = {
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   'vrm_vc_etiquettes','vrm_lbc_dates',
+  // (10 nov., lot AB) Les fils de Messages qu'IL a reliés (« Oui, même fil ») ou refusés
+  // (« Non ») : { liens: { [a|b]: { a, b, at } }, refus: { [a|b]: at } } — src/filUnique.js.
+  'vrm_fils_relies',
   // (2 nov., soir) VESTIAIRE comme Vinted et Leboncoin : le N° donné à chaque
   // annonce Vestiaire qui n'en portait pas ({ [productId]: { numero, numberedAt,
   // auto } }, src/numerosVestiaire.js — fusionné comme les fiches, §5), « Colis
@@ -10064,6 +10083,9 @@ const mapWardrobeItem = (it) => (enregistrerGaleries([it]), ({
   brand: it.brand_title || (typeof it.brand === 'string' ? it.brand : (it.brand && it.brand.title)) || null,
   size: it.size_title || (typeof it.size === 'string' ? it.size : (it.size && it.size.title)) || null,
   condition: it.status || null,
+  // (10 nov., lot U) Le champ a-t-il été LU dans le dressing ? Un champ lu vide est un manque
+  // (« À compléter », src/annoncesACompleter.js) ; un champ jamais vu est « pas su ».
+  champsLus: { photos: Number.isFinite(it.nPhotos), marque: ['brand', 'brand_title'].some((k) => k in it), taille: ['size', 'size_title'].some((k) => k in it), etat: 'status' in it },
   // Pourquoi l'annonce est fermée, quand Vinted l'a dit ('sold' = vendue).
   closingAction: it.item_closing_action || null,
   reserved: !!it.is_reserved,
@@ -28380,7 +28402,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, filTous = false }) {
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
@@ -36072,6 +36094,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reafficherHorsDouble = (id) => gesteVrm('Achat réaffiché', [{ k: CLE_HORS_MASQUES, type: 'ensemble', id: String(id), apres: false, avant: true }], { [CLE_HORS_MASQUES]: setHorsMasques });
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
+  // (10 nov., lot J) « Importer un tableur » (src/importAchats.js) : le N° d'une ligne suit la remise à zéro
+  // (`numeroExterne`, par SA date ; sans date ⇒ pas su), et le prix du fichier ne devient le coût que d'une
+  // fiche UNIQUE sans aucun prix — jamais remplacé. Rien n'est écrit avant « Importer N achats ».
+  const fichesDuNumero = (k) => Object.values(numeros || {}).filter(e => e && e.numero != null && cleNum(e.numero) === k);
+  const importAchats = {
+    existants: { vinted: buys.items || [], hors: offBuysTous || [] },
+    numeroDe: (v, ms) => { const k = cleNum(v); if (!k) return ''; if (archiveNumeros() && /^\d+$/.test(k) && !(ms != null && isFinite(ms))) return null; return numeroExterne(k, null, null, ms); },
+    etatNumero: (k) => { const f = fichesDuNumero(k); return !f.length ? 'absent' : f.length > 1 ? 'deux' : prixAchatDe(f[0], buyByNum) != null ? 'prix' : 'libre'; },
+    onImporter: ({ achats, couts }) => {
+      setOffBuys(prev => { const u = [...achats, ...prev]; save('vinted_offvinted_buys', u); return u; });
+      const nums = Object.keys(couts || {});
+      if (nums.length) setBuyByNum(prev => { const u = { ...prev }; for (const k of nums) { const f = fichesDuNumero(k); if (f.length !== 1 || prixAchatDe(f[0], u) != null) continue; u[String(f[0].numero).trim()] = couts[k]; } save('vinted_buyprice_by_num', u); return u; });
+      toast(`${achats.length} achat${achats.length > 1 ? 's' : ''} importé${achats.length > 1 ? 's' : ''}`);
+    },
+  };
   // (10 nov., lot Y) Supprimer = à la corbeille 30 jours (pilule « Annuler » 5 s, puis Paramètres → Corbeille).
   // Sa photo (sa ligne `achat_hors_photo_{id}`) reste rangée : elle n'est vidée qu'à la purge.
   const delOffBuy = (id) => {
@@ -37024,6 +37061,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     : null),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.items, numeros, buyByNum, achatPlusTard]);
+  // (10 nov., lot U) « À COMPLÉTER » : les annonces en ligne (la base de « Sans achat relié ») à qui
+  // il manque quelque chose de LU — src/annoncesACompleter.js ; rien envoyé à Vinted.
+  const annACompleter = useMemo(() => {
+    if (!Array.isArray(listings.items)) return listings.loading ? undefined : null;
+    const ouN = ouNumeroEcrit();
+    const enLigne = listings.items.filter((it) => it && !acctOffOf(it));
+    const unCompte = new Set(enLigne.map((x) => String((x._acc && x._acc.vinted_user_id) || ''))).size <= 1;
+    return annoncesACompleter(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
+      return { id: it.id, titre: it.title, photo: photoArticle(it) || '', num: e.numero ? String(e.numero) : '', compte: unCompte ? '' : ((it._acc && (it._acc.login || it._acc.username)) || ''),
+        domaine: it._acc && it._acc.domain, prix: it.price, ts: it.createdTs, nPhotos: it.champsLus && it.champsLus.photos ? it.photoCount : null, marque: it.brand, taille: it.size, etat: it.condition, champsLus: it.champsLus,
+        descNumero: it.numEcritDesc, prixAchat: a != null && !isNaN(a) ? a : null }; }),
+      { numeroEcrit: numeroEcritActif() && (!Array.isArray(ouN) || ouN.includes('description')) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, listings.loading, numeros, buyByNum]);
   // ── (9 nov., lot AC) « À TRANCHER » : cet écran PUBLIE les doutes qu'il compte ──
   // (src/aTrancher.js). Les nombres de SES règles, tels que ses blocs les montrent :
   // `conflitsNum`, `aEcrireCarton`, `aVerifierCarton`, `remises`, `fileAchat`
@@ -41829,6 +41880,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <dl>
                     {acheteur ? <div className="vrm-recap-ligne"><dt>Acheteur</dt><dd>{acheteur}</dd></div> : null}
                     <div className="vrm-recap-ligne" data-vente-acces=""><dt>Compte</dt><dd><CompteVente compte={o._acc ? (accNameOf(o._acc) || null) : null} plateforme="vinted" ou="detail"/> · Vinted</dd></div>
+                    {/* (10 nov., lot U) L'avis de l'acheteur, relié par n° de transaction SEULEMENT (src/avisVente.js). */}
+                    {o.transaction_id != null && st !== 'cancelled' && o._acc ? <AvisVente uid={o._acc.vinted_user_id} tx={String(o.transaction_id)} lire={lireAvisCompte}/> : null}
                     {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{o.date ? dateFr(o.date, { weekday: 'short', day: 'numeric', month: 'short' }) : '— date pas lue'}</dd></div> : null}
                     {!bordGeste && (trRecap.cle || trRecap.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trRecap} C={C} seul data-recap-transporteur=""/></dd></div> : null}
                     {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
@@ -43424,7 +43477,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsEnDouble groupes={achatsDoubles} masques={(offBuysTous || []).filter((b) => b && horsMasques.includes(String(b.id)))}
           onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
           compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
-        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat}
+        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
           prochainNumero={nextNumero} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
@@ -43771,6 +43824,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
           {/* (6 nov., vague 2 · point 4) Les annonces numérotées dont l'achat n'est pas relié (src/achatsARelier.js). */}
           {((fileAchat && fileAchat.length > 0) || annSort==='sansachat') && <button type="button" data-vue-sans-achat={fileAchat ? fileAchat.length : ''} aria-pressed={annSort==='sansachat'} onClick={()=>setAnnSort('sansachat')}>Sans achat relié{fileAchat && fileAchat.length ? <span className="vrm-of-n">{fileAchat.length}</span> : null}</button>}
+          {((annACompleter && annACompleter.n>0) || annSort==='acompleter') && <button type="button" data-vue-a-completer={annACompleter && annACompleter.n!=null ? annACompleter.n : ''} aria-pressed={annSort==='acompleter'} onClick={()=>setAnnSort('acompleter')}>À compléter{annACompleter && annACompleter.n>0 ? <span className="vrm-of-n">{annACompleter.n}</span> : null}</button>}
           {(annStats.sleeping>0 || vueRelancer.favoris>0) && <button type="button" data-vue-relancer={annStats.sleeping} aria-pressed={annSort==='sleeping'} onClick={()=>{ if (!(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort('sleeping'); }}>À relancer</button>}
           {/* (6 nov.) Pour les conseils (src/accompagnement.js) : les nombres de cet écran, lus
               seulement (liste pas chargée ou en erreur ⇒ rien). */}
@@ -43780,7 +43834,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
-        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
+        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && annSort!=='acompleter' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
           <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Tout afficher</button>
         </div>}
@@ -43936,7 +43990,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {(()=>{
             const m = annBase.length;
             const n = m ? annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length : 0;
-            const vuePrix = !['selection','republier','brouillons','masquees','sleeping','sansachat'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
+            const vuePrix = !['selection','republier','brouillons','masquees','sleeping','sansachat','acompleter'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
             // (6 nov.) LE PROCHAIN GESTE EN TÊTE (src/prochainGesteAnnonces.js) : un geste, celui
             // qui compte le plus, avec son bouton — sur la liste de toujours (pas dans une vue filtrée).
             const geste = annSort === 'oldest' && !annSearch.trim() && listings.items && !listings.error
@@ -44039,6 +44093,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it)=>openPicker({ ...it, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
+        ) : annSort==='acompleter' ? (
+          <VueACompleter Photo={PhotoVinted} res={annACompleter} onPrixAchat={(id)=>{ const it=(listings.items||[]).find(x=>x&&String(x.id)===String(id)); if (it) saisirPrixAnnonce(it); }}/>
         ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
@@ -44740,7 +44796,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           piège de §5.55. */}
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
-      {curSub==='messages' && (<>
+      {/* (10 nov., lot AB) Messages · Tous : un fil par acheteur et par paire, toutes plateformes
+          (src/filUnique.js, src/ecrans/FilsTous.jsx). Les conversations Vinted y entrent avec LES
+          règles de la liste Vinted (compte retiré, écarté, conversation retirée) ; un fil Vinted
+          s'ouvre dans LE fil d'ici (`openConversation`, ses envois et ses offres). */}
+      {curSub==='messages' && filTous && <FilsTous
+        vinted={convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>({ c, paire: paireDeConv(String(c._acc.vinted_user_id), c.id, null), compte: accName(c._acc) }))}
+        vintedOuvert={openConv ? String(openConv.acc?.vinted_user_id||'')+':'+String(openConv.convId) : ''}
+        ouvrirVinted={(c)=>openConversation(c)} fermerVinted={()=>setOpenConv(null)} rendreVinted={()=>rendreConversation()}
+        lireVinted={async (c)=>{ const r=await fetchVintedConversationDetail(c._acc,c.id); if(!r||!r.ok) return null; return normalizeConversationMessages(r.conversation).filter(m=>m.kind==='message'||m.kind==='offer').map(m=>({ t: m.kind==='offer' ? `Offre ${String(m.offre&&m.offre.montant||'').replace('.',',')} €${m.offre&&m.offre.statut?' · '+m.offre.statut:''}` : m.body, at: m.ts, deMoi: m.kind==='message' ? m.mine===true : (m.offre&&m.offre.sens==='envoyee'?true:m.offre&&m.offre.sens==='recue'?false:null) })); }}/>}
+      {curSub==='messages' && !filTous && (<>
         {!dansPlateforme && <ScreenHead icon="chat" title="Messages" />}
         <NoAcc/>
         {/* (3 nov., critique #7) « Lecture par compte » passe sous la liste, avec les vérifications. */}
@@ -45061,7 +45126,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
       {/* (30 oct.) Les vérifications passent SOUS la liste, comme sur Ventes : avant, on ne voyait
           aucune annonce au premier écran. Rien n'est retiré, tout reste replié. */}
-      {curSub==='messages' && <section data-verifications-messages="" style={{marginTop:16}}><SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} onFavoris={uid=>{if(typeof setCompteSel==='function')setCompteSel(String(uid));setZoneMessages('favoris');}} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
+      {curSub==='messages' && !filTous && <section data-verifications-messages="" style={{marginTop:16}}><SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} onFavoris={uid=>{if(typeof setCompteSel==='function')setCompteSel(String(uid));setZoneMessages('favoris');}} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/><BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/></section>}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
@@ -51572,6 +51637,7 @@ function AppCoeur() {
       // (5 nov.) Un lien d'invitation à un groupe d'accompagnement : le code est
       // gardé pour l'écran Communauté (chargé ensuite), l'adresse est nettoyée.
       if(tt==='communaute'&&p.get('groupe')){ try{ sessionStorage.setItem('vrm_accomp_lien', String(p.get('groupe')).slice(0,20)); }catch(_){} }
+      if(tt==='communaute'&&p.get('formateur')&&p.get('g')){ try{ sessionStorage.setItem('vrm_form_lien', JSON.stringify({ a: String(p.get('formateur')).slice(0,30), g: String(p.get('g')).slice(0,36) })); }catch(_){} }
       setTab(tt); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -54043,7 +54109,9 @@ function AppCoeur() {
         {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div>}
         {/* (6 nov., filet 2) La section d'un site tombe seule : le titre et le filtre des sites restent, on change de site. */}
         <GardeEcran nom={t+':'+site} resetKey={platSub}>
-        {site==='toutes'
+        {/* (10 nov., lot AB) Messages · Tous : un fil par acheteur et par paire (src/filUnique.js). */}
+        {site==='toutes' && t==='messages' ? rendreVinted('messages', true)
+          : site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
             : <><VentesToutes sites={sitesPresents} ventesVinted={ventesCoqueEmail} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous} onPro={()=>voirAbonnement(setTab)}
                 onOuvrir={(l)=>{ if(l.site==='ebay'){ DEMANDE_EBAY_CIBLE.compte=l.compteRef||null; DEMANDE_EBAY_CIBLE.id=l.id; DEMANDE_EBAY_CIBLE.at=Date.now(); setTab('ebay_ventes'); return; } setPlatSub(l.site); }}/>
@@ -54061,7 +54129,7 @@ function AppCoeur() {
       </section>
     );
   };
-  const rendreVinted=(sec)=>{ const achats=sec==='achats'; return (<section className="vrm-market-space" aria-label="Vinted">
+  const rendreVinted=(sec,filTous)=>{ const achats=sec==='achats'; return (<section className="vrm-market-space" aria-label={filTous?'Tous les sites':'Vinted'}>
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
@@ -54070,7 +54138,7 @@ function AppCoeur() {
           {/* (3 nov.) Les montants du haut (CA finalisé, disponible, en attente) se choisissent
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
-          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
+          {!filTous && (sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
           {/* (9 nov., lot AG) La tête de Vinted ne dit plus la fraîcheur des comptes (« ✓ Ventes Vinted à jour »,
               « N comptes pas relus depuis N j ») : la ligne de fraîcheur UNIQUE du haut de l'app la dit, avec le
               geste (src/fraicheur.js). Sans montants (3 nov.) ni fraîcheur, `VintedResume` n'a plus rien à rendre ici. */}
@@ -54110,7 +54178,7 @@ function AppCoeur() {
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {/* (5 nov., chantier E2) « Retirer mon argent » et « À venir » passent SOUS la carte du mois,
               dans l'écran Ventes (Comptabilite) : le même ordre que « Tous » (la carte, puis l'argent). */}
-          <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} setCompteSel={setCompteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
+          <Comptabilite key={'pv_'+sec+(filTous?'_tous':'')} filTous={!!filTous} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} setCompteSel={setCompteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
         </section>); };
   const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
