@@ -407,7 +407,7 @@ import { registrePointsConnus, completerParPointConnu, lieuLePlusComplet, memePo
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais.jsx";
 import { delaiRetrait } from "./delaiRetrait.js";
-import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
+import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons } from "./colisEnvoyes.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
@@ -45559,7 +45559,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyes-filtres="" style={{display:'flex',gap:6,marginBottom:10}}>
                   <button type="button" aria-pressed={filtreT === 'tous'} data-envoyes-filtre-choix="tous" data-envoyes-filtre-n={L.length} onClick={() => setFiltreEnvoyes('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {L.length}</button>
                   {pastillesT.map((p) => (
-                    <button key={p.nom} type="button" aria-pressed={filtreT === p.nom} data-envoyes-filtre-choix={p.nom} data-envoyes-filtre-cle={p.cle || 'inconnu'} data-envoyes-filtre-n={p.n} onClick={() => setFiltreEnvoyes(filtreT === p.nom ? 'tous' : p.nom)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.nom} · {p.n}</button>
+                    <button key={p.nom} type="button" aria-pressed={filtreT === p.nom} data-envoyes-filtre-choix={p.nom} data-envoyes-filtre-cle={p.cle || 'inconnu'} data-envoyes-filtre-n={p.n} onClick={() => setFiltreEnvoyes(filtreT === p.nom ? 'tous' : p.nom)} aria-label={`${p.nom} : ${p.n}`} title={p.nom} style={{whiteSpace:'nowrap',flexShrink:0,padding:'5px 12px 5px 6px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:6}}>{p.cle ? <LogoTransporteur cle={p.cle} taille={22}/> : <LogoInconnu taille={22}/>}<span data-envoyes-filtre-nombre="">{p.n}</span></button>
                   ))}
                 </div>
               )}
@@ -45598,7 +45598,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                           <div style={{flex:'1 1 150px',minWidth:0}}>
                             <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? <><Numero n={x.num} taille="petit"/>{' '}</> : null}{x.titre}</span></div>
-                            <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{(filtreT !== 'tous' || so.t.includes(nomT(x))) ? so.t : <><span data-colis-envoye-transp="">{nomT(x)}</span>{' · '}{so.t}</>}</span>
+                            <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{so.t}</span>
                           </div>
                         </div>
                         <Frise etapes={frise} cle={x.cle} className="vrm-colis-frise" label="Où en est le colis"/>
