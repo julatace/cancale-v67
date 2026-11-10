@@ -78,7 +78,17 @@ s'ajoute à la fin, règle de `ordreDeSeance`).
 - Bancs mis à jour, DITS (ils exigeaient l'ordre d'avant) : `colis-envoyes-tri` (A : « À envoyer par
   urgence » ⇒ le plus récent d'abord ; 76 verts), `journee-photos` (J1 : vignettes « le plus pressé
   d'abord » ⇒ le plus récent ; C2 : « rangés par transporteur, un en-tête chacun » ⇒ pastilles ; 105 verts).
+  Aussi : `colis-envoi` (P : « limite, puis la plus ancienne » ⇒ la plus récente ; T : l'ordre dans un groupe
+  de la tournée ; 118 contrôles), `colis-colonnes` (« un en-tête par transporteur » ⇒ aucun en-tête),
+  `design-fusion` (même chose), `vestiaire-parite` C (« Chronopost » dans l'en-tête du groupe ⇒ porté par la
+  puce de la carte, au plus une fois).
   Audits mis à jour : `audit-colis-envoi` W et `audit-colis-trois` 2d (la liste filtrée `tousF`).
+- Bancs verts sur la branche : `tout-imprimer`, `lot-bordereaux`, `retirer-carte-delai`, `preparer-relais`,
+  `colis-villes`, `retraits-frais`, `colis-ventes-instantanes`, `colis`, `postes`. Rouges IDENTIQUES (ou
+  moins nombreux) sur `origin/main`, préexistants, pas touchés : `design-fusion` (frise des colis 0, colonne de
+  Ma journée, barre collée), `vestiaire-parite` B (« À expédier » / « À envoyer »), `colis-colonnes` (1 : 1re
+  carte sous la ligne de flottaison à 390 — 929 px ici, 981 sur main), `colis-heure` (16 = 16),
+  `transporteurs-logos` (8 ici, 12 sur main).
 - Audits verts : `npm run build`, `audit-variables`, `-tdz`, `-coherence`, `-identite`, `-statuts`,
   `-icones`, `-colis-trois` (31), `-relais-carte` (58), `-retrait-preuves` (26), `-villes-colis` (50).
   `audit-colis-envoi` : 1 rouge (« B la barre ne dépend pas de l'onglet ») IDENTIQUE sur `origin/main`.
