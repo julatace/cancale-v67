@@ -66,7 +66,34 @@ const montantsDe = (...vs) => [...new Set(vs.map(centimes).filter((x) => x != nu
 // Le nom de domaine d'une photo n'est pas l'article : seule l'adresse est gardée pour la vignette.
 const urlPhoto = (p) => { if (!p) return ''; if (typeof p === 'string') return p; return str(p.url || p.full_size_url || (p.thumbnails && p.thumbnails[0] && p.thumbnails[0].url) || ''); };
 
-export const TYPES = ['paire', 'vente', 'achat', 'colis', 'message', 'annonce', 'facture'];
+// (10 nov., lot AX) Les GROUPES de la loupe. Un colis du transporteur reste de type
+// `colis` (sa clé, sa destination) mais se range dans « Retraits » quand il VIENT
+// chez lui (tout ce qui n'est pas `sens: 'sortant'`) : `groupe` de l'entrée.
+export const TYPES = ['paire', 'vente', 'achat', 'colis', 'retrait', 'message', 'annonce', 'facture'];
+export const GROUPES_LOUPE = [['paire', 'Paires'], ['vente', 'Ventes'], ['achat', 'Achats'], ['colis', 'Colis'], ['retrait', 'Retraits'], ['message', 'Messages'], ['annonce', 'Annonces sans N°'], ['facture', 'Factures']];
+export const groupeDe = (e) => (e && e.groupe) || (e && e.type) || '';
+
+// (10 nov., lot AX) LES IDENTITÉS : une correspondance EXACTE sur l'une d'elles passe
+// EN TÊTE de la loupe et le DIT (« Correspondance exacte · par son n° de suivi »).
+// Le titre, le pseudo, le montant n'en sont PAS (22 % des ventes portent un titre en
+// double, un acheteur achète plusieurs fois, deux paires ont le même prix) : ils
+// trouvent, ils ne désignent jamais.
+export const IDENTITES_EXACTES = { numero: 'son N°', suivi: 'son n° de suivi', code: 'son code de retrait', transaction: 'son n° de transaction', commande: 'son n° de commande', facture: 'son n° de facture' };
+export const estIdentiteExacte = (r) => !!(r && r.exact === true && r.par !== 'titre' && Object.prototype.hasOwnProperty.call(IDENTITES_EXACTES, r.par));
+
+// (10 nov., lot AX) CE QUI N'EST PAS ENCORE LU : une source absente (null/undefined)
+// n'est pas « rien trouvé » — la loupe le DIT (« Achats pas encore lus »), jamais un
+// silence qui ferait croire que l'achat n'existe pas (§5 « rien lu ne vaut pas rien »).
+const SOURCES_LUES = [['ventes', 'Ventes', 'lues'], ['achats', 'Achats', 'lus'], ['colis', 'Colis et retraits', 'lus'], ['pseudos', 'Pseudos des acheteurs', 'lus'], ['bordereaux', 'N° de suivi des ventes', 'lus'], ['annonces', 'Annonces en ligne', 'lues'], ['messages', 'Messages', 'lus']];
+export function sourcesNonLues(sources) {
+  const S = sources || {};
+  return SOURCES_LUES.filter(([k]) => !Array.isArray(S[k])).map(([k]) => k);
+}
+// La phrase : « en cours » (la loupe lit encore) ou « pas lus » (la lecture n'a pas répondu).
+export function phraseNonLues(cles, { enCours = false } = {}) {
+  const l = SOURCES_LUES.filter(([k]) => (cles || []).includes(k));
+  return l.map(([, lib, acc]) => `${lib} ${enCours ? 'pas encore ' + acc : 'pas ' + acc + ' (la lecture n’a pas répondu)'}`);
+}
 
 // (9 nov., recherche universelle) CE QUE LA REQUÊTE A L'AIR D'ÊTRE — pour le
 // DIRE (« Je cherche : un N° · un n° de transaction »), jamais pour décider à la
@@ -156,7 +183,7 @@ export function indexRecherche(sources) {
     const k = s ? 'colis:' + s : 'colis:' + str(c.id);
     const p = parSuivi.get(k);
     if (p) { for (const x of codes) if (!p.codes.includes(x)) p.codes.push(x); if (!p.titre && c.art) { p.titre = str(c.art); p.t = normaliser(c.art); } if (str(c.at) > p.date) { p.date = str(c.at); p.c = c; } continue; }
-    const e = { type: 'colis', cle: k, tx: '', o: null, c, titre: str(c.art), t: normaliser(c.art), pseudos: [], pseudosAff: [], suivis: s.length >= 6 ? [s] : [], codes, date: str(c.at) };
+    const e = { type: 'colis', groupe: str(c.sens) === 'sortant' ? 'colis' : 'retrait', cle: k, tx: '', o: null, c, titre: str(c.art), t: normaliser(c.art), pseudos: [], pseudosAff: [], suivis: s.length >= 6 ? [s] : [], codes, date: str(c.at) };
     parSuivi.set(k, e); entrees.push(e);
   }
   for (const e of entrees) if (e.type === 'colis' && !e.montants) { e.montants = []; e.photo = ''; e.numero = ''; }
@@ -221,7 +248,7 @@ export function indexRecherche(sources) {
       numero: '', facture: str(x.number), nums: [x.number, ...(Array.isArray(x.refs) ? x.refs : [])].map(alnum).filter((v) => v.length >= 3), photo: '',
       pseudos: ach ? [normaliser(ach)] : [], pseudosAff: ach ? [ach] : [], suivis: [], codes: [], montants: montantsDe(x.montant), date: str(x.date) });
   }
-  return { entrees, n: entrees.length, annoncesLues: !!annoncesLues };
+  return { entrees, n: entrees.length, annoncesLues: !!annoncesLues, nonLues: sourcesNonLues(S) };
 }
 
 // Mémo : le même index tant que les sources sont les MÊMES objets.
@@ -243,12 +270,15 @@ const RANG = { code: 0, numero: 0.5, suivi: 1, transaction: 1, commande: 1, fact
 // chaque résultat = { e (l'entrée), par: 'code'|'numero'|'suivi'|'transaction'|'facture'|'montant'|'pseudo'|'titre', exact, valeur }.
 // `max` : un nombre (le même pour chaque groupe) ou { type: nombre } (« Voir les N autres »).
 // `numero` : la clé du N° tapé (`lireNumeroCherche` de l'app) — une fiche de CE N° est `exact`.
-export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null } = {}) {
+// (10 nov., lot AX) `exactesEnTete` : les correspondances EXACTES d'identité
+// (`estIdentiteExacte`) sortent de leur groupe et vont dans `exactes` (rendu en tête,
+// jamais deux fois) ; sans l'option, `exactes` est rempli aussi mais les groupes gardent tout.
+export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null, exactesEnTete = false } = {}) {
   const groupes = {}; for (const t of TYPES) groupes[t] = [];
   const totaux = {}; for (const t of TYPES) totaux[t] = 0;
   const qn = normaliser(q);
   const qa = alnum(q);
-  if (!index || !qn) return { q: qn, groupes, totaux, total: 0 };
+  if (!index || !qn) return { q: qn, groupes, totaux, total: 0, exactes: [] };
   const mots = qn.split(' ').filter(Boolean);
   const chiffres = /^\d+$/.test(qa);
   const cents = montantCherche(q);
@@ -275,8 +305,12 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null 
   const numVal = (e) => { const m = /(\d+)$/.exec(e.numK || ''); return m ? Number(m[1]) : Infinity; };
   trouve.sort((a, b) => a.rang - b.rang || (a.e.date < b.e.date ? 1 : a.e.date > b.e.date ? -1 : 0) || numVal(a.e) - numVal(b.e));
   const maxDe = (t) => (max && typeof max === 'object' ? (Number.isFinite(max[t]) ? max[t] : MAX_PAR_GROUPE) : max);
-  for (const t of trouve) { totaux[t.e.type] = (totaux[t.e.type] || 0) + 1; const g = groupes[t.e.type]; if (g && g.length < maxDe(t.e.type)) g.push(t); }
-  return { q: qn, groupes, totaux, total: trouve.length };
+  const exactes = [];
+  for (const t of trouve) {
+    if (estIdentiteExacte(t)) { exactes.push(t); if (exactesEnTete) continue; }
+    const k = groupeDe(t.e); totaux[k] = (totaux[k] || 0) + 1; const g = groupes[k]; if (g && g.length < maxDe(k)) g.push(t);
+  }
+  return { q: qn, groupes, totaux, total: trouve.length, exactes };
 }
 
 // (6 nov.) LES SUGGESTIONS du champ vide : tirées de l'index (des objets lus,
@@ -285,7 +319,7 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null 
 export function suggestions(index, { n = 3 } = {}) {
   const e = (index && index.entrees) || [];
   const parDate = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
-  const colis = e.filter((x) => x.type === 'colis' && x.codes.length && x.c && str(x.c.status) === 'available' && str(x.c.sens) !== 'sortant').sort(parDate).slice(0, n)
+  const colis = e.filter((x) => groupeDe(x) === 'retrait' && x.codes.length && x.c && str(x.c.status) === 'available' && str(x.c.sens) !== 'sortant').sort(parDate).slice(0, n)
     .map((x) => ({ e: x, par: 'code', exact: true, valeur: x.codes[0], rang: 0 }));
   const ventes = e.filter((x) => x.type === 'vente').sort(parDate).slice(0, n).map((x) => ({ e: x, par: 'recent', exact: false, valeur: '', rang: 0 }));
   return { colis, ventes };

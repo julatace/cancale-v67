@@ -380,7 +380,7 @@ import "./facture-pro.css";
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted, etapeRetourVinted } from "./retoursStock.js";
-import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE } from "./rechercheUnique.js";
+import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE, GROUPES_LOUPE, IDENTITES_EXACTES, phraseNonLues } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
 import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, voisinClavier } from "./rechercheEcran.js";
@@ -51377,16 +51377,19 @@ function AppCoeur() {
     // Liste des comptes pas encore lue ⇒ tous (pas su : rien n'est écarté).
     // §4.1 : une réponse VIDE pour les comptes cherchés n'est pas une réponse ⇒
     // relue par motif, puis filtrée comme avant.
+    // (10 nov., lot AX) Une lecture ratée rend `null` (« pas lus », dit dans la loupe),
+    // jamais `[]` (qui ferait croire « aucune vente »).
+    const motif=async(cote,sel)=>{ const l=await sb(`app_data?id=like.harvest_*_orders_${cote}${sel}`); return Array.isArray(l)?l.filter(duCompte):null; };
     const commandes=async(cote)=>{ const sel='&select=id,mo:data->payload->my_orders';
       const u=okUid?[...okUid].filter(x=>/^\d+$/.test(x)):null;
-      if(u&&u.length!==okUid.size) return (await sb(`app_data?id=like.harvest_*_orders_${cote}${sel}`)||[]).filter(duCompte);
+      if(u&&u.length!==okUid.size) return motif(cote,sel);
       if(u&&!u.length) return [];
       if(u){ const l=await sb(`app_data?id=in.(${u.map(x=>`harvest_${x}_orders_${cote}`).join(',')})${sel}`); if(Array.isArray(l)&&l.length) return l.filter(duCompte); }
-      return (await sb(`app_data?id=like.harvest_*_orders_${cote}${sel}`)||[]).filter(duCompte); };
+      return motif(cote,sel); };
     const so=await commandes('sold');
-    const seenS=new Set(); for(const r of so){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
+    const seenS=new Set(); for(const r of (so||[])){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
     const po=await commandes('purchased');
-    const seenP=new Set(); for(const r of po){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
+    const seenP=new Set(); for(const r of (po||[])){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
     const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=ids:data->ids'); ((lp&&lp[0]&&Array.isArray(lp[0].ids)&&lp[0].ids)||[]).forEach(x=>lbc.add(String(x)));   // (6 nov., v36) projetée : la liste seule (§4.4)
     // (3 nov.) LA RECHERCHE UNIQUE (src/rechercheUnique.js) : pseudo de l'acheteur et
     // n° de transaction écrits dans le MÊME e-mail de vente, n° de suivi du bordereau de
@@ -51412,7 +51415,7 @@ function AppCoeur() {
     const mr=messagesRetires();
     const messages=messagesPourRecherche(convRows,(u)=>!mr.has(String(u))&&(!okUid||okUid.has(String(u))));
     let vcVentes=null; try{ vcVentes=vcBrut?ventesVcDe(avecNumerosVc(vcBrut)):null; }catch(_){ vcVentes=null; }
-    setGsData({online,sold,bought,lbc,pseudos,bordereaux,colis,annonces,facturesPro,messages,vcVentes});
+    setGsData({online,sold:so?sold:null,bought:po?bought:null,lbc,pseudos,bordereaux,colis,annonces,facturesPro,messages,vcVentes});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
   // (6 nov., v36) LES E-MAILS DE LA LOUPE : le moteur de l'écran E-mails (côté base, sur
   // TOUTES ses lignes, `filtreRecherche`) — pas de second moteur. Une requête par
@@ -53887,8 +53890,10 @@ function AppCoeur() {
         let brutFiches = null; try { brutFiches = localStorage.getItem('vinted_annonce_numeros'); } catch (_) {}
         const fichesToutes = memoSur('gs-fiches', [brutFiches], () => load('vinted_annonce_numeros', {}) || {});
         const fiches = memoSur('gs-fiches-cpt', [fichesToutes, okUid], () => { if (!okUid) return fichesToutes; const o = {}; for (const [id, e] of Object.entries(fichesToutes)) if (!e || !e.accountId || okUid.has(String(e.accountId))) o[id] = e; return o; });
-        const soldCache = ((_acctCache['sold'] && _acctCache['sold'].items) || []).length ? _acctCache['sold'].items : (gsData && gsData.sold) || [];
-        const buyCache = ((_acctCache['purchased'] && _acctCache['purchased'].items) || []).length ? _acctCache['purchased'].items : (gsData && gsData.bought) || [];
+        // (10 nov., lot AX) Pas encore lu (ni le cache de l'app, ni la lecture de la loupe) ⇒ `null`,
+        // et la loupe le DIT (« Achats pas encore lus ») au lieu de se taire.
+        const soldCache = ((_acctCache['sold'] && _acctCache['sold'].items) || []).length ? _acctCache['sold'].items : gsData ? gsData.sold : null;
+        const buyCache = ((_acctCache['purchased'] && _acctCache['purchased'].items) || []).length ? _acctCache['purchased'].items : gsData ? gsData.bought : null;
         let brutOv = null; try { brutOv = localStorage.getItem('vinted_sale_overrides'); } catch (_) {}
         const numerosTx = memoSur('gs-ntx', [fichesToutes, numData && numData.txnItem, brutOv], () => numerosDesVentes(fichesToutes, numData && numData.txnItem, load('vinted_sale_overrides', {}) || {}));
         const factures = memoSur('gs-fac', [invoices, gsData && gsData.facturesPro], () => facturesPourRecherche(invoices, gsData && gsData.facturesPro));
@@ -53900,28 +53905,36 @@ function AppCoeur() {
         const autres = memoSur('gs-autres', [numData && numData.ebayCommandes, numData && numData.lbcVentes, numData && numData.lbcItems, gsData && gsData.vcVentes], () => ventesAutresPourRecherche(
           { ebay: numData && numData.ebayCommandes, lbc: numData && numData.lbcVentes, vc: gsData && gsData.vcVentes },
           { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, load('vrm_lbc_liens', {}) || {}) }));
-        const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData && gsData.pseudos, bordereaux: gsData && gsData.bordereaux, colis: gsData && gsData.colis, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx, autres, messages: gsData ? gsData.messages : null });
+        const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData ? gsData.pseudos : null, bordereaux: gsData ? gsData.bordereaux : null, colis: gsData ? gsData.colis : null, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx, autres, messages: gsData ? gsData.messages : null });
         const kNumQ = lireNumeroCherche(qBrut, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
         // Une seule recherche pour tout : N° (partiel), pseudo, n° de suivi, code de retrait,
         // n° de transaction, n° de facture, montant, titre / marque / taille. Le titre ne sert
         // qu'à CHERCHER : chaque ligne ouvre SON objet par son identité (src/rechercheUnique.js).
-        const trouve = q ? chercherPartout(idx, qBrut, { numero: kNumQ, max: { paire: gsMax.paire || 12, vente: gsMax.vente || 8, achat: gsMax.achat || 8, colis: gsMax.colis || 8, message: gsMax.message || 6, annonce: gsMax.annonce || 8, facture: gsMax.facture || 6 } }) : null;
+        // (10 nov., lot AX) `exactesEnTete` : une correspondance EXACTE d'identité (N°, suivi, code,
+        // transaction, commande, facture — jamais le titre) sort de son groupe et passe EN TÊTE.
+        const trouve = q ? chercherPartout(idx, qBrut, { numero: kNumQ, exactesEnTete: true, max: { paire: gsMax.paire || 12, vente: gsMax.vente || 8, achat: gsMax.achat || 8, colis: gsMax.colis || 8, retrait: gsMax.retrait || 8, message: gsMax.message || 6, annonce: gsMax.annonce || 8, facture: gsMax.facture || 6 } }) : null;
         // (9 nov.) Ce que la requête a l'air d'être — DIT, jamais décidé : tout est cherché.
         const compris = q ? reconnaitreRequete(qBrut, { numero: kNumQ }) : null;
         // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le N° » passe devant,
         // par identité (src/rechercheNumero.js). (3 nov.) Un nombre long (≥ 5 chiffres) qui EST un
         // code de retrait, un n° de suivi ou de transaction exact : « Tout sur le N°482913 — jamais
         // servi » ne s'affiche pas par-dessus.
-        const identiteExacte = !!(trouve && Object.values(trouve.groupes).some(g => g.some(r => r.exact && r.par !== 'pseudo' && r.par !== 'numero')));
+        const identiteExacte = !!(trouve && trouve.exactes.some(r => r.par !== 'numero'));
         // (6 nov.) Idem quand ce nombre long est trouvé dans un e-mail (un code de retrait lu).
         const mailsTrouves = !!(gsEmails && Array.isArray(gsEmails.liste) && gsEmails.liste.length && gsEmails.q === requeteEmails(qBrut.trim()));
         const estNumQ = !!kNumQ && !((identiteExacte || mailsTrouves) && /^\d{5,}$/.test(kNumQ));
-        // La fiche du N° exact est déjà dans « Tout sur le N° » : pas deux fois.
-        const groupe = (t) => !trouve ? [] : (t === 'paire' && estNumQ ? trouve.groupes.paire.filter(r => !(r.par === 'numero' && r.exact)) : trouve.groupes[t]);
-        const totalDe = (t) => !trouve ? 0 : (t === 'paire' && estNumQ ? trouve.totaux.paire - trouve.groupes.paire.filter(r => r.par === 'numero' && r.exact).length : trouve.totaux[t]);
+        // Les correspondances exactes sont EN TÊTE (`exactes`), plus dans leur groupe. La fiche du N°
+        // exact est déjà dans « Tout sur le N° » : pas deux fois (la tête le dit seulement).
+        const groupe = (t) => !trouve ? [] : trouve.groupes[t];
+        const totalDe = (t) => !trouve ? 0 : trouve.totaux[t];
+        const exactes = !trouve ? [] : trouve.exactes.filter(r => !(estNumQ && r.par === 'numero')).slice(0, 10);
+        const exacteNumero = !!(trouve && estNumQ && trouve.exactes.some(r => r.par === 'numero'));
+        // (10 nov., lot AX) Ce qui n'est pas lu, DIT : « Achats pas encore lus » (la loupe lit
+        // encore) ou « pas lus » (la lecture n'a pas répondu) — jamais un silence.
+        const nonLues = q && idx && idx.nonLues && idx.nonLues.length ? phraseNonLues(idx.nonLues, { enCours: !gsData }) : [];
         const mails = gsEmails && gsEmails.q === requeteEmails(qBrut.trim()) ? gsEmails : null;
         const listeMails = mails && Array.isArray(mails.liste) ? mails.liste : [];
-        const total = trouve ? ['paire','vente','achat','colis','message','annonce','facture'].reduce((n,t)=>n+groupe(t).length,0) + listeMails.length : 0;
+        const total = trouve ? GROUPES_LOUPE.reduce((n,[t])=>n+groupe(t).length,0) + exactes.length + listeMails.length : 0;
         const shipDoneGs = load('vinted_ship_done', {}) || {};
         const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
         const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
@@ -54005,7 +54018,15 @@ function AppCoeur() {
             </button>); };
         const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
         const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
-        const GROUPES = [['paire','Paires'],['vente','Ventes'],['achat','Achats'],['colis','Colis'],['message','Messages'],['annonce','Annonces sans N°'],['facture','Factures']];
+        // (10 nov., lot AX) Paires · Ventes · Achats · Colis · Retraits · … (src/rechercheUnique.js).
+        const GROUPES = GROUPES_LOUPE;
+        // La TÊTE : la correspondance exacte d'identité, et PAR QUOI (« par son n° de suivi »).
+        const parExacte = (l) => [...new Set(l.map(r => IDENTITES_EXACTES[r.par]).filter(Boolean))].join(', ');
+        const blocExactes = exactes.length ? <div data-recherche-groupe="exacte" data-recherche-exacte="" data-recherche-n={exactes.length}>
+          {entete('Correspondance exacte', null, 'exacte')}
+          <div data-recherche-exacte-par={exactes.map(r=>r.par).join(' ')} style={{fontSize:12,color:C.muted,margin:'-2px 2px 6px',lineHeight:1.4}}>Trouvé par {parExacte(exactes)} — pas par ressemblance.</div>
+          {exactes.map((r,i)=>ligne(r, r.e.type, i))}
+        </div> : null;
         // Champ vide : les recherches récentes (cet appareil — tues en mode stream, une
         // recherche tapée peut être un pseudo) et des suggestions tirées de ce qui est lu.
         const sugg = !q ? suggestionsRecherche(idx, { n: 3 }) : null;
@@ -54037,8 +54058,11 @@ function AppCoeur() {
               <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>Tape un N° (« b125 », « 007 »), un pseudo, un n° de suivi, de transaction ou de commande eBay, Leboncoin, Vestiaire, un code de retrait, un montant ou des mots du titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
             </div>}
             {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
+            {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues.join(' · ')}.</div>}
+            {q && blocExactes}
             {q && !estNumQ && blocActions}
             {q && total===0 && !estNumQ && !actionsGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« 125 », « B125 »), un pseudo, un n° de suivi, de transaction ou de commande, un code de retrait, un montant (« 52 € ») ou deux mots du titre.</>:'Je lis tes ventes, achats et colis…'}</div>}
+            {q && estNumQ && exacteNumero && <div data-recherche-exacte-numero="" style={{padding:'8px 2px 0',fontSize:12,color:C.muted,lineHeight:1.4}}>Correspondance exacte · trouvé par son N° — pas par ressemblance.</div>}
             {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {q && estNumQ && blocActions}
             {/* Les résultats, groupés par type : chaque ligne dit PAR QUOI elle a été trouvée et
@@ -54046,7 +54070,7 @@ function AppCoeur() {
             {q && GROUPES.map(([type,lib])=>{ const liste = groupe(type); if (!liste.length) return null; const n = totalDe(type);
               return (<div key={type} data-recherche-groupe={type} data-recherche-n={liste.length} data-recherche-total={n}>
                 {entete(lib, n, type)}
-                {liste.map((r,i)=>ligne(r,type,i))}
+                {liste.map((r,i)=>ligne(r,r.e.type,i))}
                 {plus(type, n - liste.length)}
               </div>); })}
             {q && mails && (mails.liste === undefined
