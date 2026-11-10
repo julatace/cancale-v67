@@ -30,7 +30,7 @@ import {
   contenuFacture, contenuApercu, estTrou, euros, emailValide, LOGO_MAX, MESSAGE_DEFAUT, nomFichier, jourParis,
   adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes,
 } from './facturePro/regle.js';
-import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/rattachement.js';
+import { preuveAcheteur, phraseRefus } from './facturePro/rattachement.js';
 import { useRechercheEntreprise, CarteVerifEntreprise } from './RechercheEntreprise.jsx';
 
 const ID_CFG = 'vrm_pro_facture';
@@ -235,7 +235,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   React.useEffect(() => { if (focus && cfg) { const el = document.querySelector(`[data-fp-champ="${focus}"] input, [data-fp-champ="${focus}"] select, [data-fp-champ="${focus}"] button`); if (el) { try { el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'center' }); } catch (_) {} } } }, [focus, !!cfg]);
 
   if (lu === undefined || (lu && !cfg)) return <div className="vrm-fp-carte" data-fp-fiche="charge">Lecture de ta fiche…</div>;
-  if (lu === null) return <div className="vrm-fp-carte" data-fp-fiche="passu"><b>Ma facture</b><p className="vrm-fp-muet">Ta fiche n'a pas pu être lue (la base n'a pas répondu). Rien n'est perdu et rien ne sera écrit par-dessus : rouvre cet écran dans un moment.</p></div>;
+  if (lu === null) return <div className="vrm-fp-carte" data-fp-fiche="passu"><b>Ma facture</b><p className="vrm-fp-muet">Fiche pas lue : rien n'est perdu, rien n'est écrit par-dessus. Rouvre plus tard.</p></div>;
 
   const manque = manquantsVendeur(cfg);
   const champManque = new Set(manque.map((m) => m.champ));
@@ -298,7 +298,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
               </button>
             ))}
           </div>
-          {!cfg.tva_regime ? <p className="vrm-fp-muet">VRM ne choisit pas à ta place : demande à ton comptable si tu as un doute. Micro-entreprise sous le seuil de TVA ⇒ en général « Franchise » (la facture porte alors « TVA non applicable, art. 293 B du CGI »).</p> : null}
+          {!cfg.tva_regime ? <p className="vrm-fp-muet">Micro sous le seuil de TVA : en général « Franchise ». Un doute ? Ton comptable.</p> : null}
           {cfg.tva_regime === 'normal' ? <div className="vrm-fp-champ" data-fp-champ="tva_taux" data-fp-manque={champManque.has('tva_taux') ? '1' : undefined}>
             <span>Taux de TVA</span>
             <select value={cfg.tva_taux || ''} onChange={(e) => upd('tva_taux', Number(e.target.value))} aria-label="Taux de TVA">
@@ -359,7 +359,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
       <aside className="vrm-fp-apercu-col" ref={apercuRef} data-fp-apercu-col="">
         <div className="vrm-fp-apercu-tete">
           <b>Aperçu</b>
-          <span>Une facture d'exemple (acheteur et article inventés), telle que la recevront tes acheteurs.</span>
+          <span>Ce que recevront tes acheteurs (exemple inventé).</span>
         </div>
         {apercu ? <ApercuFacture contenu={apercu} provisoire numeroLibelle={prochainN != null ? `N° ${numeroExemple}` : `N° ${numeroExemple} (exemple)`}/> : <p className="vrm-fp-muet">L'aperçu n'a pas pu se dessiner.</p>}
         <details className="vrm-fp-mentions" data-fp-mentions={MENTIONS_OBLIGATOIRES.length - mentionsKo.size}>
@@ -389,11 +389,11 @@ function EnvoiFacture({ deps, cfg, upd, etat }) {
       <div className="vrm-fp-choix" role="radiogroup" aria-label="Qui envoie la facture">
         <button type="button" role="radio" aria-checked={par === 'vrm'} data-fp-par="vrm" onClick={() => upd('envoiPar', 'vrm')}>
           <b>VRM l'envoie pour toi (conseillé)</b>
-          <span>L'e-mail part de l'adresse d'envoi de VRM, à ton nom (« {String(cfg.nom || 'Ta boutique').trim() || 'Ta boutique'} via VRM »). L'acheteur te répond à TON adresse, et tu reçois chaque facture en copie.</span>
+          <span>« {String(cfg.nom || 'Ta boutique').trim() || 'Ta boutique'} via VRM » ; réponses chez toi, copie pour toi.</span>
         </button>
         <button type="button" role="radio" aria-checked={par === 'boite'} data-fp-par="boite" onClick={() => upd('envoiPar', 'boite')}>
           <b>Depuis ma propre boîte e-mail</b>
-          <span>Gmail, iCloud, Orange… avec un « mot de passe d'application ». L'acheteur voit directement ton adresse.</span>
+          <span>Gmail, iCloud, Orange… L'acheteur voit ton adresse.</span>
         </button>
       </div>
       {par === 'vrm' ? (
@@ -445,7 +445,7 @@ export function BoiteEnvoi({ deps, cfg, upd }) {
             <button type="button" className="vrm-b vrm-b-discret" disabled={!!occupe} onClick={retirer}>Déconnecter</button>
           </div>
         </> : <>
-          <p className="vrm-fp-muet">L'acheteur reçoit un message de toi, avec la facture en PDF. VRM garde ton mot de passe d'application chiffré et ne te le montre plus jamais.</p>
+          <p className="vrm-fp-muet">Ton mot de passe d'application reste chiffré, jamais remontré.</p>
           <label className="vrm-fp-champ"><span>Ton adresse e-mail</span><input type="email" inputMode="email" autoComplete="email" value={form.adresse} onChange={(ev) => setForm({ ...form, adresse: ev.target.value.trim() })}/></label>
           <label className="vrm-fp-champ"><span>Ta boîte</span>
             <select value={fourEff || 'autre'} onChange={(ev) => setForm({ ...form, fournisseur: ev.target.value === 'autre' ? '' : ev.target.value })}>
@@ -700,12 +700,12 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
           <section className="vrm-fp-section" data-fp-destinataire="">
             <h3>Destinataire</h3>
             <p className="vrm-fp-dest vrm-sensible" data-stream-type="acheteur"><b>{preuve.acheteur.nom}</b><span>{preuve.acheteur.email}</span></p>
-            <p className="vrm-fp-muet" data-fp-preuve="ok">Acheteur prouvé : le même n° de transaction ({tx}) sur la vente Vinted et dans l'e-mail de vente Pro, arrivé {preuve.ecartS < 0 ? `${-preuve.ecartS} s avant` : preuve.ecartS < 120 ? `${preuve.ecartS} s après` : `${Math.round(preuve.ecartS / 60)} min après`} la vente (au plus {FENETRE_APRES_S / 60} min), au même montant.</p>
+            <p className="vrm-fp-muet" data-fp-preuve="ok">Acheteur prouvé : le même n° de transaction ({tx}) sur la vente et l'e-mail Pro, arrivé {preuve.ecartS < 0 ? `${-preuve.ecartS} s avant` : preuve.ecartS < 120 ? `${preuve.ecartS} s après` : `${Math.round(preuve.ecartS / 60)} min après`} la vente, même montant.</p>
           </section>
           <section className="vrm-fp-section">
             <h3>L'article</h3>
             <label className="vrm-fp-champ is-large"><span>Désignation</span><input value={designation} onChange={(e) => setDesignation(e.target.value)}/></label>
-            <p className="vrm-fp-muet">Prix : <b className="vrm-fp-chiffre">{euros(preuve.centimes)}</b> — celui de la vente Vinted (sans les frais de port ni la protection acheteur, payés à Vinted).</p>
+            <p className="vrm-fp-muet">Prix : <b className="vrm-fp-chiffre">{euros(preuve.centimes)}</b> — la vente Vinted, sans port ni protection acheteur.</p>
           </section>
           {mail ? <section className="vrm-fp-section" data-fp-mail="">
             <h3>L'e-mail</h3>
