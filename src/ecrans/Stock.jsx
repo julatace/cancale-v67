@@ -11,7 +11,8 @@ import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees } from '../stockAnnonces.js';
 import { LIGNE_INVENTAIRE } from '../inventaire.js';
-import { AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
+import { AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -176,6 +177,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const [meubles, setMeubles] = React.useState(() => { const m = load('vrm_meubles', []); return Array.isArray(m) ? m : []; });
   const [slots, setSlots] = React.useState(() => { const s = load('vrm_slots', {}); return s && typeof s === 'object' ? s : {}; });
   const [pairsLost, setPairsLost] = useStateCle('vinted_pairs_lost', () => load('vinted_pairs_lost', {}));
+  // (10 nov., lot BF) « Valeur du stock » : LUE (`vrm_valeur_stock`, propriétaire : Annonces), jamais recalculée ici.
+  const valeurStk = useValeurStock((AUTH.user && AUTH.user.id) || '');
+  const saisirPrixStock = () => { DEMANDE_SAISIE_PRIX.on = true; try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} };
   // Une demande venue d'ailleurs (Colis « où sont ces paires », la recherche
   // globale « Tout sur le N° ») : un seul N° remplit la recherche.
   const [demande] = React.useState(() => {
@@ -946,6 +950,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <ChiffreInventaire numeros={aa ? aa.articles.filter((a) => a.cle).length : (lecture === undefined ? undefined : null)}/>
     {elInventaire}
     {blocResume}
+    <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock}/>
     {blocCherche}
     {meubles.length === 0 && <StockExplication />}
     {blocVendues}
