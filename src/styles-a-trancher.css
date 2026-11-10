@@ -64,9 +64,8 @@
 }
 :root:root body .vrm-at .vrm-at-tuile small { font: 700 12px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--at-gris); letter-spacing: 0; }
 :root:root body .vrm-at .vrm-at-tuile b { font: 800 32px/1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.03em; }
-:root:root body .vrm-at .vrm-at-tuile[data-ton="geste"] { background: var(--at-ambre-fond); color: var(--at-ambre); }
 :root:root body .vrm-at .vrm-at-tuile[data-ton="rouge"] { background: var(--at-rouge-fond); color: var(--at-rouge); }
-:root:root body .vrm-at .vrm-at-tuile[data-ton] small { color: inherit; opacity: .8; }
+:root:root body .vrm-at .vrm-at-tuile[data-a-trancher-sans-photo] { color: var(--at-gris); }
 
 /* Le texte : le N° en grand, une question. */
 :root:root body .vrm-at .vrm-at-textes { display: flex !important; flex-direction: column !important; gap: 3px !important; min-width: 0 !important; }
@@ -87,8 +86,10 @@
   transition: transform 140ms cubic-bezier(.23,1,.32,1), filter 140ms ease; -webkit-tap-highlight-color: transparent;
 }
 :root:root body .vrm-at button.vrm-at-b:active { transform: scale(.97); }
-:root:root body .vrm-at button.vrm-at-b[data-role="oui"],
-:root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="geste"] { background: var(--at-ambre-fond) !important; color: var(--at-ambre) !important; }
+/* L'ambre reste RARE (§7) : le mot du geste en ambre sur un fond neutre ; seul « Oui »
+   (le geste qui tranche ici même) est rempli d'ambre. */
+:root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="geste"] { color: var(--at-ambre) !important; }
+:root:root body .vrm-at button.vrm-at-b[data-role="oui"] { background: var(--at-ambre-fond) !important; color: var(--at-ambre) !important; }
 :root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="rouge"] { background: var(--at-rouge-fond) !important; color: var(--at-rouge) !important; }
 :root:root body .vrm-at button.vrm-at-b:focus-visible, :root:root body .vrm-at .vrm-at-autres:focus-visible { outline: 3px solid var(--w-accent, #0071E3) !important; outline-offset: 2px !important; }
 :root:root body .vrm-at .vrm-at-chevron { flex: 0 0 auto; opacity: .7; }
@@ -96,7 +97,7 @@
 /* « + N » : la suite de la source, dans son écran. */
 :root:root body .vrm-at button.vrm-at-autres {
   display: flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important;
-  min-height: 48px !important; margin: 0 !important; padding: 0 16px !important; border: 0 !important; border-radius: 22px !important;
+  min-height: 48px !important; margin: 0 !important; padding: 0 16px !important; border: 0 !important; border-radius: 22px !important; align-self: center !important;
   background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--at-fond-tuile) !important; color: var(--at-gris) !important;
   font: 700 17px/1 var(--vrm-police, system-ui, sans-serif) !important; font-variant-numeric: tabular-nums; cursor: pointer;
 }

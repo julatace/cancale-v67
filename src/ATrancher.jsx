@@ -25,8 +25,11 @@ const Chevron = () => (
 function Vignette({ carte, ton, Photo }) {
   const P = Photo || ((p) => <img {...p} alt=""/>);
   const tuile = (contenu, attrs = {}) => <span className="vrm-at-tuile" data-ton={ton} {...attrs}>{contenu}</span>;
+  // Une chose sans photo (ou dont la photo ne vient pas) : une tuile neutre — le N° est
+  // déjà écrit à côté, une fois.
+  const neutre = (attrs) => tuile(<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 9"/></svg>, attrs);
   if (carte.photo) {
-    const repli = tuile(carte.num ? <><small>N°</small>{carte.num}</> : null);
+    const repli = neutre();
     return (
       <span className={'vrm-at-photos' + (carte.photo2 ? ' is-deux' : '')} data-a-trancher-photo="">
         <P src={carte.photo} alt="" loading="lazy" className="vrm-at-photo" repli={repli}/>
@@ -34,7 +37,7 @@ function Vignette({ carte, ton, Photo }) {
       </span>
     );
   }
-  if (carte.id) return tuile(carte.num ? <><small>N°</small>{carte.num}</> : <small>—</small>);
+  if (carte.id) return neutre({ 'data-a-trancher-sans-photo': '' });
   return tuile(<b>{carte.n}</b>, { 'data-a-trancher-nombre': carte.n });
 }
 
@@ -76,8 +79,9 @@ export default function ATrancher({ etat, onAller, onTrancher = null, Photo = nu
       {entete}
       {c.groupes.length ? (
         <div className="vrm-at-resume" data-a-trancher-resume={total}>
+          {partiel ? <span>Au moins</span> : null}
           <b className="vrm-at-total">{total}</b>
-          <span>{partiel ? 'au moins, à trancher' : 'à trancher'}</span>
+          <span>à trancher</span>
         </div>
       ) : null}
       {c.groupes.length ? c.groupes.map((g) => (
@@ -107,7 +111,7 @@ export default function ATrancher({ etat, onAller, onTrancher = null, Photo = nu
         <GroupeIos titre="Pas encore compté" data-a-trancher-groupe="pas-su" className="vrm-at-passu">
           {manque.map((l) => (
             <RangeeIos key={l.cle} data-a-trancher-passu={l.cle}
-              titre={l.nom} detail={l.raison} valeur="—"
+              titre={l.nom} detail={/^pas encore compté/.test(l.raison || '') ? `Ouvre ${l.ecran}` : l.raison} valeur="—"
               onClick={() => onAller && onAller(l)}/>
           ))}
         </GroupeIos>
