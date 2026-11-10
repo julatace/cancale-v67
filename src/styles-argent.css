@@ -1,0 +1,79 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — ARGENT (10 nov.) : Statistiques et Compta en UN endroit
+   docs/passation/2026-11-10-compta-stats.md · règle : src/argent.js
+
+   Julien : « L'onglet Compta est trop flou, tu peux peut-être le relier avec
+   Stats » ; pas de murs de texte, du visuel. Ce fichier dessine :
+   • les quatre segments sous le titre « Argent » (le contrôle segmenté de
+     toujours, pleine largeur) ;
+   • les quatre réponses en tête du Résumé : des widgets DA6 (src/styles-widgets-ios.css,
+     ses jetons `--w-*`), 2 × 2 au téléphone, 4 sur une ligne à l'ordinateur ;
+   • un segment caché reste monté (`hidden`) : il ne se dessine pas.
+   Rien de métier : aucun texte, aucun chiffre, aucun `data-*` n'est créé ici.
+   Accent bleu rare (aucun ici) ; ambre = geste ; pas de rouge (§7).
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* ── Un segment caché ne se dessine pas, quoi qu'en disent les couches d'avant ── */
+:root:root body .vrm-argent-partie[hidden] { display: none !important; }
+:root:root body .vrm-argent-partie { display: flex; flex-direction: column; gap: var(--w-ecart, 16px); min-width: 0; }
+
+/* ── Les segments : pleine largeur, sous le titre ──────────────────────────── */
+:root:root body .vrm-argent-nav { margin-top: 10px; width: 100%; }
+:root:root body .vrm-argent-nav .vrm-seg { width: 100%; }
+:root:root body .vrm-argent-nav .vrm-seg-btn { flex: 1 1 0; min-width: 0; min-height: 36px; }
+:root:root body .vrm-argent-nav .vrm-seg-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root body .vrm-argent-nav + .vrm-seg-cadre,
+:root:root body .vrm-argent-nav + * .vrm-seg { margin-top: 8px; }
+@media (min-width: 1024px) {
+  :root:root body .vrm-argent-nav { max-width: 640px; }
+}
+
+/* ── Les quatre réponses ─────────────────────────────────────────────────── */
+:root:root body .vrm-argent-q {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0;
+}
+@media (min-width: 900px) {
+  :root:root body .vrm-argent-q { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+}
+:root:root body .vrm-argent-w {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
+  gap: 4px; min-height: 118px; min-width: 0; padding: 14px 16px 14px; margin: 0;
+  background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F);
+  border: 0; border-radius: var(--w-r, 24px); box-shadow: var(--w-ombre, none);
+  font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: transform .16s cubic-bezier(.23,1,.32,1);
+}
+:root:root body .vrm-argent-w:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { :root:root body .vrm-argent-w:active { transform: none; } }
+:root:root body .vrm-argent-w:focus-visible { outline: 2px solid var(--w-accent, #0071E3); outline-offset: 2px; }
+:root:root body .vrm-argent-w-l {
+  font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--w-gris, #6E6E73);
+  padding-right: 18px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+:root:root body .vrm-argent-w-l::first-letter { text-transform: uppercase; }
+:root:root body .vrm-argent-w-n {
+  font-size: 28px; font-weight: 800; letter-spacing: -.025em; line-height: 1.1;
+  font-variant-numeric: tabular-nums; color: var(--w-encre, #1D1D1F);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: auto;
+}
+:root:root body .vrm-argent-w-n small { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--w-gris, #6E6E73); }
+:root:root body .vrm-argent-w-n[data-argent-pas-su] { color: var(--w-gris, #6E6E73); }
+:root:root body .vrm-argent-w-note {
+  font-size: 12px; font-weight: 500; line-height: 1.3; color: var(--w-gris, #6E6E73);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+:root:root body .vrm-argent-w-chev {
+  position: absolute; top: 12px; right: 14px; font-size: 20px; line-height: 1; color: var(--w-gris-2, #AEAEB2);
+}
+@media (min-width: 900px) {
+  :root:root body .vrm-argent-w { min-height: 132px; padding: 16px 18px; }
+  :root:root body .vrm-argent-w-n { font-size: 32px; }
+}
+
+/* ── Le détail : le bénéfice est un repli (« Ton bénéfice ») — sa question est le titre du repli ── */
+:root:root body .vrm-argent .vrm-compta-q-n { display: none !important; }
+:root:root body .vrm-argent #compta-benefice .vrm-compta-question { display: none !important; }
+:root:root body .vrm-argent #compta-benefice .vrm-compta-q-tete { justify-content: flex-start; }
+
+} /* @layer vrm-premium */

@@ -26,6 +26,9 @@ import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal } from '../App.jsx';
+import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';   // (10 nov., Argent) les 4 réponses du Résumé
+import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
+import { questionsArgent } from '../argent.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // ⟦← App.jsx #2⟧
 import PorteMonnaie from "../PorteMonnaie.jsx";
@@ -817,7 +820,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
 // ⟦← App.jsx #20⟧
 
 /* ── Factures ───────────────────────────────────────── */
-function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt}) {
+function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,argentNav=null}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -971,7 +974,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
-        <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
+        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:"Factures"} sous={argentNav} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
           right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
@@ -2475,10 +2478,17 @@ function ComptaRepli({ id, titre, resume, children, attrs }) {
     </details>
   );
 }
-const ouvrirRepliCompta = (id) => {
+const ouvrirRepliCompta = (id, essai = 0) => {
   try {
     const d = document.getElementById(id);
     if (!d) return;
+    // (10 nov., Argent) La carte est dans un AUTRE segment (caché) : on y va d'abord, puis on l'ouvre.
+    const part = d.closest('[data-argent-vue]');
+    if (part && part.hidden && essai < 10) {
+      try { window.dispatchEvent(new CustomEvent('vrm:argent-vue', { detail: part.getAttribute('data-argent-vue') })); } catch (_) {}
+      setTimeout(() => ouvrirRepliCompta(id, essai + 1), 60);
+      return;
+    }
     if (!d.open) d.open = true;
     requestAnimationFrame(() => { try { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} });
   } catch (_) {}
@@ -3351,16 +3361,64 @@ const copierPresse = async (texte) => {
 };
 // Le montant tel qu'il se tape dans un formulaire : chiffres et virgule, sans espace ni « € ».
 const montantARecopier = (v) => (v == null || !Number.isFinite(Number(v)) ? '' : (Math.round(Number(v) * 100) / 100).toFixed(2).replace(/\.00$/, '').replace('.', ','));
-function PrevisionUrssafCarte({ onNav }) {
+// (10 nov., Argent) La prévision de la prochaine échéance, lue UNE fois de la même façon par
+// la carte « Prochaine déclaration » et par le widget « À déclarer » du Résumé (§5 : une règle).
+function usePrevisionUrssaf() {
   const regime = useRegimeFiscal();
   const ligne = useLigneUrssaf();
   const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
   const [rythme, setRythme] = React.useState(() => load('vinted_urssaf_freq', null));
-  const [copie, setCopie] = React.useState('');
   React.useEffect(() => onCloudReady(() => setRythme(load('vinted_urssaf_freq', null))), []);
   React.useEffect(() => { const h = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setRythme(load('vinted_urssaf_freq', null)); }; window.addEventListener('vrm:save', h); return () => window.removeEventListener('vrm:save', h); }, []);
   const P = previsionUrssaf({ regime, rythme, now: new Date(), ligne, declare: regPret ? regLu : null, taux: tauxUrssaf(),
     regle: { nextUrssafDeadline, moisPeriodeUrssaf, montantPeriodeUrssaf, moisDeclare } });
+  return { P, ligne, regLu, regPret };
+}
+// ── (10 nov., Argent) LES QUATRE RÉPONSES EN TÊTE DU RÉSUMÉ ─────────────────
+// « Combien j'ai vendu ce mois ? », « Combien j'ai reçu ? », « Mon bénéfice ? »,
+// « Combien je dois déclarer, et quand ? ». Aucun calcul ici : `valeurChiffre` (les
+// MÊMES valeurs que la carte de Ma journée), `previsionUrssaf` (la carte « Prochaine
+// déclaration ») et `profilFiscal`, mis en mots par `questionsArgent` (src/argent.js).
+// Toucher un widget = son détail : Statistiques, « Vendu et reçu », « Ton bénéfice »,
+// « Déclarer ».
+const dateCourteFr = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+function ArgentQuestions({ liveStats, onNav, allerVue }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const S = useSourcesCarte(liveStats || liveCoque);
+  const { P } = usePrevisionUrssaf();
+  const profil = useProfilFiscal();
+  const sel = { site: 'toutes', compte: null, periode: null };
+  const v = (id) => valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE);
+  const mois = new Date().toLocaleDateString('fr-FR', { month: 'long' });
+  const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateCourteFr });
+  const aller = (q) => {
+    if (q.aller === 'stats') { if (onNav) onNav('dashboard'); return; }
+    if (q.aller === 'declarer') { if (allerVue) allerVue('declarer'); try { window.scrollTo({ top: 0 }); } catch (_) {} return; }
+    ouvrirRepliCompta(q.aller);
+  };
+  const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  return (
+    <section className="vrm-argent-q" aria-label="L’argent du mois" data-argent-questions="">
+      {Q.map((q) => (
+        <button key={q.id} type="button" className="vrm-argent-w" data-argent-q={q.id}
+          data-argent-valeur={q.valeur == null ? '' : String(Math.round(q.valeur * 100))} data-argent-partiel={q.partiel ? '1' : undefined}
+          data-argent-raison={q.raison || undefined} data-argent-echeance={q.echeance ? String(q.echeance) : undefined}
+          aria-label={`${q.question} ${q.valeur == null ? (q.texte || 'pas su') : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''}`}
+          onClick={() => aller(q)}>
+          <span className="vrm-argent-w-l">{q.libelle}</span>
+          <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
+            {q.valeur != null ? <>{q.partiel ? <small>au moins </small> : null}{somme(q.valeur)}</> : (q.texte || '—')}
+          </b>
+          {q.note ? <span className="vrm-argent-w-note">{q.note}</span> : null}
+          <span className="vrm-argent-w-chev" aria-hidden="true">›</span>
+        </button>
+      ))}
+    </section>
+  );
+}
+function PrevisionUrssafCarte({ onNav }) {
+  const { P, ligne, regLu, regPret } = usePrevisionUrssaf();
+  const [copie, setCopie] = React.useState('');
   // (5 nov., chantier F, revue 2.27) Statut pas choisi : rien ici — la question « Quel est ton
   // statut ? » est posée juste dessous, et c'est le SEUL endroit où il se choisit.
   if (P.etat === 'encours' || P.etat === 'horsMicro' || P.etat === 'aucune' || P.etat === 'statut') return null;
@@ -3759,7 +3817,7 @@ function DelaiPaiementCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, ac
     </div>
   );
 }
-function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false }) {
+function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false, vue = 'resume', allerVue = null, argentNav = null }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
     catch (_) { return { ...COMPTA_DEFAUT }; }
@@ -3872,9 +3930,16 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     return () => { mort = true; };
   }, []);
   const basculer = (k) => setOuvert(o => o === k ? '' : k);
-  // « Avancé » : replié à chaque ouverture de l'écran (jamais mémorisé). Le
-  // sommaire l'ouvre avant d'y descendre.
-  const [avance, setAvance] = React.useState(false);
+  // (10 nov., Argent) « Documents et réglages » (le repli « Avancé ») n'existe plus : ses
+  // cartes sont rangées dans le segment « Déclarer » (comptable, statut) et dans le détail
+  // du Résumé (packs). Un geste qui vise une carte d'un autre segment y mène (`allerVue`).
+  React.useEffect(() => {
+    const f = (e) => { const v = e && e.detail; if (allerVue && (v === 'resume' || v === 'declarer' || v === 'factures')) allerVue(v); };
+    window.addEventListener('vrm:argent-vue', f);
+    return () => window.removeEventListener('vrm:argent-vue', f);
+  }, [allerVue]);
+  // « Ajouter une dépense » (Ma journée) : les dépenses vivent dans le Résumé.
+  React.useEffect(() => { if (versDepense && vue !== 'resume' && allerVue) allerVue('resume'); }, [versDepense]);   // eslint-disable-line react-hooks/exhaustive-deps
   // (9 nov.) Le profil fiscal : en société, le livre des recettes et l'export comptable
   // passent DEVANT (sous « Combien je dois déclarer ? ») au lieu d'être rangés dans
   // « Documents et réglages » — les mêmes cartes, rendues à UN seul endroit.
@@ -3885,7 +3950,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   React.useEffect(() => {
     const montrer = () => {
       if (!DEMANDE_COMMANDE.export || Date.now() - DEMANDE_COMMANDE.export > 30000) return;
-      if (!exportDevant) setAvance(true);
+      if (allerVue) allerVue('declarer');
       let essais = 0;
       const viser = () => {
         const c = document.querySelector('[data-export-comptable]');
@@ -3992,10 +4057,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     } catch (_) {}
   };
 
-  // Factures reçues (reçus Vinted par email) : on consomme juste le NOMBRE pour
-  // renvoyer vers l'écran Factures, on ne duplique pas la liste (§7/§11).
-  const [nFactures, setNFactures] = React.useState(null);
-  React.useEffect(() => { let stop = false; fetchProInvoices({ metadata: true }).then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.filter((x) => x.number).length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
+  // (10 nov., Argent) La rangée « Factures — N reçues » qui menait à l'écran Factures est
+  // retirée : Factures est un segment d'Argent, la liste elle-même s'y lit.
 
   // ── Palette d'écran (§7 : neutre partout, UN accent rare) ──────────────────
   const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box', minHeight: 44 };
@@ -4019,10 +4082,12 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
   return (
-    <div className="vrm-finance-page vrm-fu-ecran" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* (5 nov., chantier F, revue 2.27) Plus de surtitre « Novembre 2026 » au-dessus du titre : la carte sombre dit déjà sa période. */}
-      <ScreenHead icon="euro" title={L.compta} phrase="compta" desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
-      {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
+    <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
+          « Argent » et ses quatre segments. Chaque segment montre SES cartes ; les autres restent
+          montées (`hidden` : mêmes lectures, mêmes états, mêmes data-*), jamais supprimées. */}
+      {vue !== 'factures' ? <ScreenHead icon="euro" title={L.argent} phrase="compta" sous={argentNav} desc="Ce que tu as vendu, reçu, gagné, et ce que tu dois déclarer." /> : null}
+      {vue !== 'factures' && !ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
             seulement quand la liste des comptes est LUE (pas su ≠ aucun). */}
@@ -4034,41 +4099,22 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>Ouvrir Ventes</Bouton>
         </>)}
       </div>}
-      {/* (2 nov.) Julien : « beaucoup d'incompréhension […] SURTOUT comptabilité. Je
-          veux que ce soit le plus simple possible ». L'écran répond à TROIS
-          questions, dans l'ordre : 1. Combien j'ai gagné ? (le bénéfice) ·
-          2. Combien je dois déclarer ? (l'URSSAF : la prochaine déclaration,
-          puis ce qu'il faut mettre de côté ce mois-ci) · 3. Le détail, replié
-          (vendu et reçu, dépenses, déclarations passées, micro-entreprise, puis
-          « Documents et réglages »). Le sommaire à pastilles est retiré (trois
-          questions se lisent d'un coup d'œil). Aucune règle de calcul ne change :
-          les cartes sont les mêmes, seuls leur ordre, leurs mots et leurs replis
-          changent (§5, §11). */}
-      <div id="compta-benefice" style={{ scrollMarginTop: 72 }}>
+      <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
+        {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
+        <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
+      {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
+      <ComptaFusion compta={data} onNav={onNav}/>
+        <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
+          <div className="vrm-compta-q-tete">
+            <h2 className="vrm-compta-question" data-compta-question="detail">Le détail</h2>
+          </div>
+          <div className="vrm-compta-replis">
+            {/* (10 nov.) Le bénéfice ligne par ligne : son chiffre est en tête (widget « Bénéfice »), son calcul ici. */}
+            <ComptaRepli id="compta-benefice" titre="Ton bénéfice" resume="Le calcul, ligne par ligne">
       <BeneficeCompta compta={data} onNav={onNav} sansCompte={comptesLus && Array.isArray(accounts) && accounts.length === 0}
         onSansDepenses={() => repondreSansDepenses(data, maj)}
         onAjouterDepense={() => { ouvrirRepliCompta('compta-charges'); setOuvert('dep'); setVersDepense((n) => n + 1); }} />
-      </div>
-      {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
-      <ComptaFusion compta={data} onNav={onNav}/>
-
-      <section id="compta-urssaf" className="vrm-compta-q" data-compta-q="declarer" data-cible="urssaf" style={{ scrollMarginTop: 72 }}>
-        <div className="vrm-compta-q-tete">
-          <h2 className="vrm-compta-question" data-compta-question="declarer"><span className="vrm-compta-q-n" aria-hidden="true">2</span>Combien je dois déclarer ?</h2>
-        </div>
-        <PrevisionUrssafCarte onNav={onNav} />
-        <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
-        {exportDevant ? <div data-compta-export-devant="" style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
-          <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
-          <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
-        </div> : null}
-      </section>
-
-      <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
-        <div className="vrm-compta-q-tete">
-          <h2 className="vrm-compta-question" data-compta-question="detail"><span className="vrm-compta-q-n" aria-hidden="true">3</span>Le détail</h2>
-        </div>
-        <div className="vrm-compta-replis">
+            </ComptaRepli>
           <ComptaRepli id="compta-ca" titre={TITRE_CARTE_CA} resume="Tes ventes par période : le jour de la vente, puis le jour où l'argent t'est versé">
             <CaParPeriodeCarte dansRepli lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
@@ -4083,11 +4129,6 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <ComptaRepli id="compta-porte-monnaie" titre="Porte-monnaie" resume="Disponible et en attente, compte par compte">
             <PorteMonnaieCompta accounts={accounts} panelOff={panelOff}/>
           </ComptaRepli>
-          {/* (5 nov.) DAC7 compte par compte : ventes N/30, montant / 2 000 €, le rapport de la plateforme, l'export (src/dac7Comptes.js). */}
-          <ComptaRepli id="compta-dac7" titre="DAC7" resume="Ce que chaque plateforme transmet aux impôts, compte par compte">
-            <Dac7ComptesCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
-          </ComptaRepli>
-
           <ComptaRepli id="compta-charges" titre="Tes dépenses" resume={(depenses.length || abonnements.length || packs.length || fixes.length)
               ? [depenses.length ? `${depenses.length} dépense${depenses.length > 1 ? 's' : ''}` : null, abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : null, packs.length ? `${packs.length} pack${packs.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ') + ' — cartons, abonnements, frais : ce que tu paies pour vendre'
               : 'Cartons, abonnements, frais : ce que tu paies pour vendre. Rien de noté pour l\'instant'}>
@@ -4214,22 +4255,74 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         </div>
           </div>
           </ComptaRepli>
+            <ComptaRepli id="compta-packs" titre="Packs & options" resume="Facultatif : ce que tu paies aux plateformes">
+          <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
+            {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
+                en compte du bénéfice ». ⚠️ Mesuré le 16 octobre : AUCUNE plateforme ne
+                transmet à VRM ce que tu lui paies (ni pack, ni option, ni boost
+                Leboncoin : aucune ligne captée). Un montant deviné serait un faux :
+                seul ce qui est saisi ici compte. Les boosts Vinted, eux, se notent
+                par annonce (champ « boost ») et sortent de la marge dans Statistiques. */}
+            <Section data="packs" titre="Packs & options (facultatif)" note={<>Rien d'obligatoire : si tu as payé un pack de photos ou une option, note son prix ici pour qu'il soit déduit de ton résultat. Leboncoin et eBay ne transmettent pas à VRM ce que tu leur paies. Les boosts Vinted se notent par annonce et sortent de ta marge dans {lienBtn('Statistiques', 'dashboard')}.</>} total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
+              {packLbc && <div className="vrm-set-ligne" data-pack-lbc={packLbc.actif ? 'actif' : 'aucun'}>
+                <span className="vrm-set-lib"><b style={{ color: C.text }}>Pack photo Leboncoin : {packLbc.actif ? 'pris' : 'aucun'}</b>
+                  <small style={{ color: C.muted }}>Détecté par l'extension{packLbc.at && !isNaN(Date.parse(packLbc.at)) ? ` le ${new Date(packLbc.at).toLocaleDateString('fr-FR')}` : ''}{packLbc.actif ? ' — son prix n’est pas transmis : ajoute-le ci-dessous si tu veux le déduire.' : ''}</small></span>
+              </div>}
+              {packs.length === 0 && ouvert !== 'pack'
+                ? (packLbc ? null : vide('Tu as acheté un pack de photos ou une option ? Tu peux le noter ici — ce n’est pas obligatoire.'))
+                : listeBox(packs.map((p) => <Ligne key={p.id} gauche={<><b style={{ color: C.text }}>{p.plateforme}</b><small style={{ color: C.muted }}>{p.compte ? `${p.compte} · ` : ''}{dateFr(p.date)}</small></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} />))}
+              <ComptaAjout ouvert={ouvert === 'pack'} onClick={() => basculer('pack')} libelle="Ajouter un pack ou une option" data={{ 'data-pack-ouvrir': '' }} />
+              {ouvert === 'pack' && <div style={formBox}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label="Plateforme" style={{ ...inp, flex: '1 1 130px' }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+                  <input type="text" placeholder="Compte (facultatif)" aria-label="Compte" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label="Date" style={{ ...inp, flex: '1 1 150px' }} />
+                  <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 96 }} />
+                  <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
+                </div>
+              </div>}
+            </Section>
 
+            {/* Les anciens COÛTS FIXES (sans date de début) : gardés tant qu'il en
+                reste, comptés comme avant ; on n'en ajoute plus — un abonnement daté
+                les remplace (rien n'est perdu, §4.11). */}
+            {fixes.length > 0 && (
+              <Section data="fixes" titre="Coûts fixes (sans date)" note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
+                {listeBox(fixes.map((f) => <Ligne key={f.id} gauche={<b style={{ color: C.text }}>{f.libelle}</b>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} />))}
+              </Section>
+            )}
+
+              </div>
+            </ComptaRepli>
+          </div>
+        </section>
+      </div>
+
+      <div className="vrm-argent-partie" data-argent-vue="declarer" hidden={vue !== 'declarer'}>
+      <section id="compta-urssaf" className="vrm-compta-q" data-compta-q="declarer" data-cible="urssaf" style={{ scrollMarginTop: 72 }}>
+        <div className="vrm-compta-q-tete">
+          <h2 className="vrm-compta-question" data-compta-question="declarer">Combien je dois déclarer ?</h2>
+        </div>
+        <PrevisionUrssafCarte onNav={onNav} />
+        <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
+        {exportDevant ? <div data-compta-export-devant="" style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+          <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+        </div> : null}
+      </section>
           <StatutFiscal partie="suivi" liveStats={liveStats} onNav={onNav} />
-
-      {/* DOCUMENTS ET RÉGLAGES (l'ancien « Avancé ») — rangé, replié : ce qu'on
-          ouvre rarement. Rendu même replié (les cartes gardent leur état et leurs
-          lectures), jamais supprimé. */}
-      <details id="compta-avance" className="vrm-repli vrm-compta-repli vrm-compta-avance" data-compta-avance={avance ? 'ouvert' : 'ferme'} open={avance}
-        onToggle={(e) => setAvance(e.currentTarget.open)} style={{ scrollMarginTop: 72 }}>
-        <summary>
-          <span className="vrm-compta-repli-tete">
-            <span className="vrm-compta-repli-titre">Documents et réglages</span>
-            <span className="vrm-compta-repli-resume">Statut, entreprise, factures, récap mensuel, résultat de l'année, packs, facturation électronique</span>
-          </span>
-        </summary>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 10 }}>
-          <StatutFiscal partie="statut" liveStats={liveStats} onNav={onNav} />
+          {/* (5 nov.) DAC7 compte par compte : ventes N/30, montant / 2 000 €, le rapport de la plateforme, l'export (src/dac7Comptes.js). */}
+          <ComptaRepli id="compta-dac7" titre="DAC7" resume="Ce que chaque plateforme transmet aux impôts, compte par compte">
+            <Dac7ComptesCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          </ComptaRepli>
+        {/* (10 nov.) Ce qui part chez le comptable, à un seul endroit. */}
+        <section className="vrm-compta-q" data-argent-groupe="comptable" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">Pour ton comptable</h2></div>
+          {!exportDevant && <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
+          {!exportDevant && <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
+          <RecapComptableMensuel />
           {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
               Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
               endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
@@ -4272,67 +4365,18 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
               )}
             </div>
           </Card>
+        </section>
+        <section id="compta-avance" className="vrm-compta-q" data-argent-groupe="statut" style={{ display: 'flex', flexDirection: 'column', gap: 16, scrollMarginTop: 72 }}>
+          <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">Ton statut</h2></div>
+          <StatutFiscal partie="statut" liveStats={liveStats} onNav={onNav} />
+          <ProfilFiscalCarte onNav={onNav} />
+        </section>
+      </div>
 
-          <RecapComptableMensuel />
-          {!exportDevant && <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
-          {!exportDevant && <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
-          <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
-            {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
-                en compte du bénéfice ». ⚠️ Mesuré le 16 octobre : AUCUNE plateforme ne
-                transmet à VRM ce que tu lui paies (ni pack, ni option, ni boost
-                Leboncoin : aucune ligne captée). Un montant deviné serait un faux :
-                seul ce qui est saisi ici compte. Les boosts Vinted, eux, se notent
-                par annonce (champ « boost ») et sortent de la marge dans Statistiques. */}
-            <Section data="packs" titre="Packs & options (facultatif)" note={<>Rien d'obligatoire : si tu as payé un pack de photos ou une option, note son prix ici pour qu'il soit déduit de ton résultat. Leboncoin et eBay ne transmettent pas à VRM ce que tu leur paies. Les boosts Vinted se notent par annonce et sortent de ta marge dans {lienBtn('Statistiques', 'dashboard')}.</>} total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
-              {packLbc && <div className="vrm-set-ligne" data-pack-lbc={packLbc.actif ? 'actif' : 'aucun'}>
-                <span className="vrm-set-lib"><b style={{ color: C.text }}>Pack photo Leboncoin : {packLbc.actif ? 'pris' : 'aucun'}</b>
-                  <small style={{ color: C.muted }}>Détecté par l'extension{packLbc.at && !isNaN(Date.parse(packLbc.at)) ? ` le ${new Date(packLbc.at).toLocaleDateString('fr-FR')}` : ''}{packLbc.actif ? ' — son prix n’est pas transmis : ajoute-le ci-dessous si tu veux le déduire.' : ''}</small></span>
-              </div>}
-              {packs.length === 0 && ouvert !== 'pack'
-                ? (packLbc ? null : vide('Tu as acheté un pack de photos ou une option ? Tu peux le noter ici — ce n’est pas obligatoire.'))
-                : listeBox(packs.map((p) => <Ligne key={p.id} gauche={<><b style={{ color: C.text }}>{p.plateforme}</b><small style={{ color: C.muted }}>{p.compte ? `${p.compte} · ` : ''}{dateFr(p.date)}</small></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} />))}
-              <ComptaAjout ouvert={ouvert === 'pack'} onClick={() => basculer('pack')} libelle="Ajouter un pack ou une option" data={{ 'data-pack-ouvrir': '' }} />
-              {ouvert === 'pack' && <div style={formBox}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label="Plateforme" style={{ ...inp, flex: '1 1 130px' }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
-                  <input type="text" placeholder="Compte (facultatif)" aria-label="Compte" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label="Date" style={{ ...inp, flex: '1 1 150px' }} />
-                  <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 96 }} />
-                  <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
-                </div>
-              </div>}
-            </Section>
-
-            {/* Les anciens COÛTS FIXES (sans date de début) : gardés tant qu'il en
-                reste, comptés comme avant ; on n'en ajoute plus — un abonnement daté
-                les remplace (rien n'est perdu, §4.11). */}
-            {fixes.length > 0 && (
-              <Section data="fixes" titre="Coûts fixes (sans date)" note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
-                {listeBox(fixes.map((f) => <Ligne key={f.id} gauche={<b style={{ color: C.text }}>{f.libelle}</b>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} />))}
-              </Section>
-            )}
-
-            <ProfilFiscalCarte onNav={onNav} />
-          </div>
-          {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
-          <section id="compta-factures" className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0, scrollMarginTop: 72 }}>
-            <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
-              <button type="button" className="vrm-set-ligne" onClick={() => onNav && onNav('invoices')}>
-                <IconeReglage name="receipt" />
-                <span className="vrm-set-lib"><b style={{ color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</b><small style={{ color: C.muted }}>Tes reçus Vinted arrivés par e-mail, et tes factures à émettre pour tes clients.</small></span>
-                <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted, fontSize: 20 }}>›</span>
-              </button>
-            </div>
-          </section>
-
+      <div className="vrm-argent-partie" data-argent-vue="factures" hidden={vue !== 'factures'}>
           {/* FACTURATION ÉLECTRONIQUE — Factur-X par vente + récap e-reporting du mois. */}
           <FacturationElectroniqueCarte data={data} maj={maj} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
-        </div>
-      </details>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
