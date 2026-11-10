@@ -87,7 +87,7 @@ export const genreDe = (tag) => { const t = String(tag || ''); return GENRES.fin
 const ACTION_CAT = {
   doublevente: { action: 'voir', title: 'Retirer l’annonce' },
   expedier: { action: 'voir', title: 'Voir les colis' },
-  soir: { action: 'voir', title: 'Voir les colis' },
+  soir: { action: 'voir', title: 'Ouvrir' },
   colis: { action: 'voir', title: 'Voir le colis' },
   offremini: { action: 'voir', title: 'Répondre' },
   action: { action: 'voir', title: 'Ouvrir' },
