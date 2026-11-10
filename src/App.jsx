@@ -376,7 +376,7 @@ import "./facture-pro.css";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
-import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted } from "./retoursStock.js";
+import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted, etapeRetourVinted } from "./retoursStock.js";
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
@@ -441,6 +441,10 @@ import { BoutonPhotoCarton, PhotoCartonVente } from "./PhotoCarton.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { auCentreDeVerification } from "./verificationArticle.js";
+import { preuvesFriseVinted, bifurcationVente, friseProuvee } from "./friseProuvee.js";   // (10 nov., lot BE) la frise d'une vente, étape par étape
+import FriseVente from "./FriseVente.jsx";
+import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js";   // (10 nov., lot BG) d'où viennent mes achats
+import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
 import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi, compteAImprimer } from "./prochainGesteColis.js";
 import "./styles-onglets-b.css";
@@ -30942,6 +30946,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp]);
   // Parti par UNE preuve sûre (Colis fait compris) : ce que chaque liste « à envoyer » de l'écran écarte.
   const estParti = (o) => isShipDone(o) || !!(o && o.transaction_id != null && partisVinted.has(String(o.transaction_id)));
+  // ── (10 nov., lot BE) LA FRISE D'UNE VENTE, ÉTAPE PAR ÉTAPE (src/friseProuvee.js) ──────
+  // Vendue → Bordereau → Déposée → En route → Livrée → Finalisée → Versée : chaque étape
+  // seulement si SA preuve est lue (jamais déduite d'une étape plus loin) ; les lectures
+  // sont celles de l'écran, passées telles quelles : le bordereau par la transaction, la
+  // règle du départ (`partisVinted`), le transporteur et les e-mails du n° de SON bordereau
+  // (`vcLoc0.departs`, `tracking`), l'état de la transaction, la date de versement. Un n°
+  // porté par deux ventes ou aussi par un achat est ambigu : rien n'en est lu.
+  const emailsParSuiviFrise = useMemo(() => {
+    if (!Array.isArray(tracking)) return null;
+    const m = new Map();
+    for (const l of tracking) { const k = normaliserSuivi(l && l.suivi); if (!k) continue; const a = m.get(k); if (a) a.push(l); else m.set(k, [l]); }
+    return m;
+  }, [tracking]);
+  const ambigusFrise = useMemo(() => suivisAmbigus(Object.entries(bordParTx).map(([tx, b]) => ({ cle: tx, suivi: b && (b.suivi || b.suiviPdf) })),
+    Array.isArray(transp) ? new Set(transp.map((t) => normaliserSuivi(t && t.suivi)).filter(Boolean)) : null), [bordParTx, transp]);
+  const friseProuveeDe = (o, litige) => {
+    const tx = String(o.transaction_id);
+    const bord = bordParTx[tx] || null, label = labelsCaptes[tx] || null;
+    const et = pdfEtiquettesParTx(); const pdf = et && et[tx];
+    const suivi = normaliserSuivi((bord && (bord.suivi || bord.suiviPdf)) || (pdf && pdf.s) || '');
+    const annulee = classifyOrderStatus(o.status) === 'cancelled';
+    const etat = etatTxn(tx);
+    const bif = bifurcationVente({ litige, retour: etapeRetourVinted(o, etat), etiquette: venteStage(o).label, annulee });
+    const preuves = preuvesFriseVinted({ vente: o, bord, label, suiviPdf: (pdf && pdf.s) || '', depart: partisVinted.get(tx) || null, departs: vcLoc0.departs,
+      emails: suivi && emailsParSuiviFrise ? (emailsParSuiviFrise.get(suivi) || []) : null, ambigus: ambigusFrise, etat, versement: versements ? (versements[tx] || null) : null, horsParcours: !!bif });
+    // Le geste attendu de LUI (la règle de la ligne : à expédier, pas encore parti).
+    const aExp = !isHidden(o) && !annulee && aExpedier(o) && !estParti(o);
+    const geste = aExp ? (preuves.bordereau.lu ? { cle: 'deposee', libelle: 'à déposer' } : { cle: 'bordereau', libelle: 'à générer' }) : null;
+    const frise = friseProuvee({ preuves, bifurcation: bif, geste, verification: !bif && auCentreDeVerification(o) });
+    const verse = annulee ? null : preuves.versee.lu ? 'date' : preuves.finalisee.lu ? 'oui' : 'non';
+    const cle = frise.etapes.map((e) => e.cle + ':' + e.etat + ':' + (e.t || '') + (e.cours ? ':c' : '') + (e.source ? ':' + e.source : '')).join(',') + '|' + (bif ? [bif.genre, bif.sous, bif.geste ? 1 : 0].join(':') : '') + '|' + verse;
+    return { frise, verse, bordereau: preuves.bordereau.lu, cle };
+  };
   const toggleShipDone = (o) => { const k = o && o.transaction_id!=null ? String(o.transaction_id) : null; if(!k) return; setShipDone(prev=>{ const u={...prev}; if(u[k]) delete u[k]; else u[k]=Date.now(); save('vinted_ship_done',u); return u; }); };
   // « ✓ Colis fait » : LE geste (la vente ET son bordereau). Le bouton de la
   // carte et le mode emballage appellent cette fonction — une seule écriture.
@@ -36867,6 +36904,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { ...r, achats, hors, rattachables, ventesLues, partielSites: !Array.isArray(autresBenefice) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub, asoOuvert, registreFo, sales.items, sales.error, numeros, saleOv, buyByNum, offBuys, autresBenefice, hiddenSales, hiddenAccts]);
+  // ── (10 nov., lot BG) D'OÙ VIENNENT MES ACHATS — publié pour Statistiques (src/sourceAchats.js) ──
+  // Les MÊMES ventes que le relevé de Statistiques (`vrm_stats_ventes` : finalisées, hors
+  // masquées ; Leboncoin, eBay, Vestiaire par `autresBenefice`), le bénéfice de la règle
+  // unique (`beneficeLigneVente` / `ventesAutresBenefice`), la source de LA paire par
+  // identité seulement (`sourceDeVente` : achat Vinted relié, achat en gros, N° d'un achat
+  // hors plateforme et la source QU'IL y a saisie). Rien n'est publié tant qu'une lecture
+  // manque (un compte de ventes raté, Leboncoin/eBay pas lus) : la dernière publication reste.
+  useEffect(() => {
+    if (!Array.isArray(sales.items)) return;
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
+    if (!Array.isArray(autresBenefice)) return;
+    try {
+      const reg = lireRegistre(registreFo);
+      const hors = horsParNumero(offBuys, cleNum);
+      const ctx = { hors, registre: reg, cleNum };
+      const lignes = [];
+      for (const o of sales.items) {
+        if (!o || isHidden(o) || o.transaction_id == null || classifyOrderStatus(o.status) !== 'completed') continue;
+        const t = o.date ? Date.parse(o.date) : NaN; if (!isFinite(t)) continue;
+        const e = effEntry(o);
+        const devise = o.price && o.price.currency_code;
+        const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
+        const src = e ? sourceDeVente(e, ctx) : null;
+        lignes.push({ id: String(o.transaction_id), ts: t, cle: src ? src.cle : '', libelle: src ? src.libelle : '', benefice: lb.benefice == null ? null : Math.round(lb.benefice * 100), partiel: lb.etat === 'partiel' });
+      }
+      for (const x of autresBenefice) {
+        if (!x || !isFinite(x.ts)) continue;
+        // Une commande eBay à plusieurs N° : aucune fiche unique ⇒ « achat pas relié » (jamais attribuée).
+        const f = x.num && !/\+/.test(x.num) ? ficheUniqueDuNumero(numeros, cleNum(x.num)) : null;
+        const src = f ? sourceDeVente(withBuyByNum(f), ctx) : null;
+        const b = x.achat != null && isFinite(x.eur) ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) : null;
+        lignes.push({ id: String(x.id), ts: x.ts, cle: src ? src.cle : '', libelle: src ? src.libelle : '', benefice: b, partiel: false });
+      }
+      publierSources(lignes, { owner: AUTH.user?.id || '' });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, offBuys, registreFo, autresBenefice, hiddenSales, hiddenAccts]);
   // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
   const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
   const articlesLus = (tx) => {
@@ -37862,7 +37936,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (3 nov.) Le litige / retour en cours de CETTE vente (src/litiges.js, par transaction ou conversation).
     const litige = litigeDeVente(litigesSuivis, o);
     deps.push(litige ? [litige.cle, litige.genre, litige.limite || '', litige.geste.url, litige.ancien ? 1 : 0].join('|') : '');
-    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige };
+    // (10 nov., lot BE) la frise prouvée du récapitulatif (ses preuves arrivent après le premier rendu).
+    const frisePv = friseProuveeDe(o, litige);
+    deps.push(frisePv.cle);
+    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv };
   };
   // ── (10 nov., lots BB et BI) « LITIGES EN COURS » ET « RETOURS PAR MODÈLE » ─────────────
   // Les lignes de VENTE de `litigesSuivis` (src/litiges.js, la règle unique) avec les preuves
@@ -41309,7 +41386,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const fraisConnus = !autreDevise && cv.frais != null && cv.frais > 0 ? cv.frais / 100 : null;
               const benefTexte = lb.benefice == null ? '—' : eurosRecap(lb.benefice);
               const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : '';
-              const verse = st === 'cancelled' ? null : finalisee ? (versement ? `le ${jourCourt(Date.parse(versement))}` : 'oui — date pas lue') : '— pas encore';
+              // (10 nov., lot BE) « Versé sur ton porte-monnaie » est l'étape « Versée » de la frise (sa date, une fois).
               const acheteur = o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login) || '';
               const aRelie = !hidden && st !== 'cancelled' && e && e.buyFromId ? achatRelie(e) : null;
               const saleItem = (() => { const idf = identiteAnnonce(o); return idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }; })();
@@ -41352,8 +41429,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <p className="vrm-recap-issue"><strong>{LIBELLE_LITIGE[l.genre] || 'Litige'}</strong>{' · '}{lim ? `avant le ${lim}` : 'délai non lu'}</p>
                       <Bouton variante="secondaire" className="vrm-b-petit" href={l.geste.url} target="_blank" rel="noreferrer" data-litige-geste={l.geste.url}>{l.geste.libelle} ↗</Bouton>
                     </div>); })() : null}
-                  {/* (3 nov., critique #6) La frise de la ligne, mêmes 4 étapes et mêmes mots ; « Bordereau » en détail. */}
-                  {etapes ? <RecapFrise etapes={etapes} cle={txL} verification={preuvesFrise.verification}/> : null}
+                  {/* (10 nov., lot BE) LA FRISE PROUVÉE : sept étapes, chacune seulement si SA preuve est lue
+                      (src/friseProuvee.js) — jamais déduite ; litige / retour / annulation en bifurcation.
+                      Elle remplace ici la frise de la ligne (4 segments, inchangée sur la ligne). */}
+                  {pre.frisePv ? <FriseVente frise={pre.frisePv.frise} transporteur={trRecap} verse={pre.frisePv.verse} bordereau={pre.frisePv.bordereau} cle={txL}/> : null}
                 </section>
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
@@ -41364,7 +41443,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt><PointCout cle="frais"/>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
                     {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/>Emballage</dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt><PointCout cle="benefice"/>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
-                    {verse != null ? <div className="vrm-recap-ligne vrm-recap-verse" data-recap-verse={finalisee ? (versement ? 'date' : 'oui') : 'non'}><dt>Versé sur ton porte-monnaie</dt><dd>{verse}</dd></div> : null}
                   </dl>
                 </section>
                 <section className="vrm-recap-details" aria-label="Détails">
