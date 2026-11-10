@@ -26,7 +26,9 @@ import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
 // ⟦← App.jsx #4⟧
 import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
-import SourcesAchats from "../SourcesAchats.jsx";   // (10 nov., lot BG) d'où viennent mes achats — un bloc isolé
+import SourcesAchats from "../SourcesAchats.jsx";
+import VitesseEnvoi from "../VitesseEnvoi.jsx";   // (10 nov., lot BM) vitesse d'envoi — un bloc isolé
+import AvisLus from "../AvisVinted.jsx";   // (10 nov., lot BN) les avis Vinted lus   // (10 nov., lot BG) d'où viennent mes achats — un bloc isolé
 // ⟦← App.jsx #5⟧
 import CarteOffres from "../design/CarteOffres.jsx";
 import { statsOffres } from "../statsOffres.js";
@@ -1206,16 +1208,17 @@ const lireProfilsNotes = async () => {
       fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_profile&select=${sel}`, { headers: sbAuth() }),
       // (À venir) la liste des avis, quand l'extension lira /api/v2/user_feedbacks :
       // tant que la ligne n'existe pas, la liste reste « pas encore lue ».
-      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_feedbacks&select=id,avis:data->payload->user_feedbacks`, { headers: sbAuth() }),
+      // (10 nov., lot BN) la ligne est petite (20 avis sans personne, < 1 Ko) : projetée, jamais `select=data`.
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_feedbacks&data->>type=eq.feedbacks&select=id,avis:data->payload->user_feedbacks,pag:data->payload->pagination`, { headers: sbAuth() }),
     ]);
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
-    const avis = {};
-    try { if (f.ok) { const fj = await f.json(); if (Array.isArray(fj)) for (const x of fj) { const u = ((x && x.id) || '').match(/^harvest_(\d+)_feedbacks$/); if (u && Array.isArray(x.avis)) avis[u[1]] = x.avis; } } } catch (_) {}
+    const avis = {}, pags = {};
+    try { if (f.ok) { const fj = await f.json(); if (Array.isArray(fj)) for (const x of fj) { const u = ((x && x.id) || '').match(/^harvest_(\d+)_feedbacks$/); if (u && Array.isArray(x.avis)) { avis[u[1]] = x.avis; pags[u[1]] = x.pag && typeof x.pag === 'object' ? x.pag : null; } } } } catch (_) {}
     return j.map((x) => {
       const uid = String((x && x.uid) || ((x && x.id) || '').match(/^harvest_(\d+)_profile$/)?.[1] || '');
-      return { uid, at: x.at, login: x.login, rep: x.rep, n: x.n, pos: x.pos, neu: x.neu, neg: x.neg, avis: avis[uid] };
+      return { uid, at: x.at, login: x.login, rep: x.rep, n: x.n, pos: x.pos, neu: x.neu, neg: x.neg, avis: avis[uid], pag: pags[uid] || null };
     });
   } catch (_) { return null; }
 };
@@ -1312,9 +1315,8 @@ function AnnulationsEtNotes({ b, panelOff }) {
               <span className="vrm-display vrm-sv-note-val">{c.etat !== 'lu' ? '—' : note(c.note)}</span>
             </div>
           ))}
-          {N.comptes.some((c) => c.liste) ? N.comptes.filter((c) => c.liste && c.liste.sousCinq.length).map((c) => (
-            <div key={'s' + c.uid} className="vrm-sv-note" data-sv-notes-sous5={c.uid} style={{ marginTop: 6 }}>{c.nom} · sous 5 étoiles : {c.liste.sousCinq.slice(0, 5).map((x) => `${x.note}★ ${jour(x.ts)}`).join(' · ')}</div>
-          )) : <div className="vrm-sv-note" data-sv-notes-liste="pas-lue" style={{ marginTop: 8 }}>Avis détaillés : pas encore lus</div>}
+          {/* (10 nov., lot BN) les avis LUS : moyenne, évolution, les 5 derniers (src/AvisVinted.jsx). */}
+          <AvisLus comptes={N.comptes}/>
         </div>),
     { 'data-sv-carte': 'notes', 'data-sv-etat': N.etat });
   return <div className="vrm-sv-rangee vrm-sv-rangee-2" data-sv-annul-notes="">{annul}{notes}</div>;
@@ -1589,6 +1591,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
       {/* (10 nov., lot BG) « D'où viennent mes achats » : lu dans `vrm_sources_ventes` (src/sourceAchats.js), sur la période. */}
       <SourcesAchats owner={(AUTH.user && AUTH.user.id) || ''} de={b.de} a={b.a}/>
+      {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
+      <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
       <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
