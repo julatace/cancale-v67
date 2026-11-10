@@ -997,4 +997,4 @@ function MessagesVestiaire() {
     </div>
   );
 }
-export { PublierVestiaire, AnnoncesVestiaire, MessagesVestiaire, VentesVestiaire, ClePhotoroom };
+export { PublierVestiaire, AnnoncesVestiaire, MessagesVestiaire, VentesVestiaire, ClePhotoroom, FilVestiaire, ficheDuNumero };
