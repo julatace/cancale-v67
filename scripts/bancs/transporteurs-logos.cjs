@@ -96,6 +96,10 @@ const projette = (row, sel) => {
 // Les pastilles d'un conteneur : clé, texte, images (visibles ou non, chargées ou non).
 const PASTILLES = `(racine) => [...racine.querySelectorAll('.vrm-transporteur')].map((p) => ({
   cle: p.getAttribute('data-transporteur'), txt: p.innerText.trim(),
+  // (9 nov. au soir) LES MARQUES : le nom n'est plus écrit (aria-label, title, data-transporteur-nom) ; la tuile
+  // dessinée (data-marque) le montre — un sigle SVG (« CH », « MR ») et le pictogramme neutre pour l'inconnu.
+  nom: p.getAttribute('data-transporteur-nom') || '', aria: p.getAttribute('aria-label') || '', marque: (p.querySelector('[data-marque]') || { getAttribute: () => '' }).getAttribute('data-marque'),
+  tuile: (() => { const m = p.querySelector('[data-marque]'); const r = m && m.getBoundingClientRect(); return !!(r && r.width >= 14 && r.height >= 14); })(),
   imgs: [...p.querySelectorAll('img')].map((i) => { const vis = !!i.closest('[data-transporteur-logo="charge"]') && i.getClientRects().length > 0; return { src: i.getAttribute('src'), vis, ok: i.complete && i.naturalWidth > 0 }; }),
 }))`;
 
@@ -171,7 +175,7 @@ const sain = async (pg, ecran) => {
             const p = rg && rg.querySelector(':scope > .vrm-transporteur');
             const bouton = rg && [...rg.children].find((x) => x !== p);
             let h = c.previousElementSibling; while (h && !h.hasAttribute('data-groupe-transp')) h = h.previousElementSibling;
-            const nomP = p ? ((p.querySelector('[data-transporteur-nom]') || p).textContent || '').trim() : '';
+            const nomP = p ? (p.getAttribute('data-transporteur-nom') || ((p.querySelector('[data-transporteur-nom]') || p).textContent || '')).trim() : '';
             const nomG = h ? h.getAttribute('data-groupe-transp') : '';
             return { tx: c.getAttribute('data-tx-colis'), carte: c.getAttribute('data-transporteur'), pastilles: P2(act || c),
               apresBouton: !!(p && bouton && (p.compareDocumentPosition(bouton) & Node.DOCUMENT_POSITION_FOLLOWING) && (bouton.matches('[data-imprime], [data-bouton-bord], .vrm-fu-principal, button') || bouton.querySelector('button'))),
@@ -186,13 +190,14 @@ const sain = async (pg, ecran) => {
           dit(p && p.cle === cle && c.apresBouton && c.memeRangee, `${T} E2 vente ${tx} : la puce à gauche du bouton bordereau, même rangée, sous l'en-tête de son transporteur`, JSON.stringify(c && { p, apres: c.apresBouton, rangee: c.memeRangee }));
         }
         const pasLu = r.find((x) => x.tx === '8003'), p3 = pasLu && pasLu.pastilles[0];
-        dit(p3 && /^Transporteur inconnu$/.test(p3.txt) && p3.imgs.length === 0, `${T} E3 « Transporteur pas lu », sans aucune image`, JSON.stringify(p3));
+        dit(p3 && p3.marque === 'inconnu' && p3.nom === 'Transporteur inconnu' && /Transporteur inconnu/.test(p3.aria) && p3.imgs.length === 0 && !/inconnu/i.test(p3.txt), `${T} E3 inconnu : le pictogramme NEUTRE (aucune marque devinée), « Transporteur inconnu » en aria-label, aucune image`, JSON.stringify(p3));
         const ch = r.find((x) => x.tx === '8001').pastilles[0];
         const poses = await pg.evaluate(() => [...new Set(window.__logos)]);
-        dit(ch && /Chronopost/.test(ch.txt) && poses.includes('https://www.chronopost.fr/favicon.ico') && poses.every((u) => /^https:\/\/(www\.)?(chronopost\.fr|mondialrelay\.fr|vintedgo\.com)\/favicon\.ico$/.test(u)), `${T} E4 logos demandés à leurs domaines officiels seulement`, JSON.stringify(poses));
-        dit(ch && /^Chronopost$/.test(ch.txt) && !ch.imgs.some((i) => i.vis && !i.ok), `${T} E4 logo Chronopost injoignable : « Chronopost » reste, aucune image cassée`, JSON.stringify(ch));
+        // (9 nov. au soir) Plus aucune image chargée chez un transporteur (aucune licence publiée, IP du vendeur
+        // donnée à chaque transporteur, échecs hors réseau) : la marque est dessinée ici, sans requête.
+        dit(ch && poses.length === 0 && ch.marque === 'chronopost' && ch.nom === 'Chronopost' && !/Chronopost/.test(ch.txt) && ch.imgs.length === 0, `${T} E4 Chronopost : SA marque dessinée (aucune image, aucune requête), le nom en aria-label seulement`, JSON.stringify({ ch, poses }));
         const mr = r.find((x) => x.tx === '8002').pastilles[0];
-        dit(mr && /Mondial Relay/.test(mr.txt) && !mr.imgs.some((i) => i.vis), `${T} E4 logo Mondial Relay coupé : le nom reste, aucune image cassée visible`, JSON.stringify(mr));
+        dit(mr && mr.marque === 'mondialrelay' && mr.nom === 'Mondial Relay' && !/Mondial/.test(mr.txt) && mr.imgs.length === 0, `${T} E4 Mondial Relay : SA marque dessinée, le nom plus écrit`, JSON.stringify(mr));
         const casses = await pg.evaluate(() => [...document.querySelectorAll('.vrm-transporteur img, [data-carrier-badge] img')].filter((i) => i.getClientRects().length && i.closest('[data-transporteur-logo]') && getComputedStyle(i.closest('[data-transporteur-logo]')).display !== 'none' && !(i.complete && i.naturalWidth > 0)).length);
         dit(casses === 0, `${T} E4 aucune image de logo cassée à l'écran`, String(casses));
         dit(envoyer.route === 0, `${T} A2 aucun achat en route sous « À envoyer »`, String(envoyer.route));
@@ -224,8 +229,8 @@ const sain = async (pg, ecran) => {
           dit(c && c.tr === tr && (tr === 'pas-lu' ? c.vu === null : c.vu === tr), `${T} A1 colis à retirer ${cle} : « ${tr} » porté${tr === 'pas-lu' ? ', pas écrit' : ' et montré'}`, JSON.stringify(c));
         }
         const vcA1 = r.vc && r.vc.find((x) => x.id === 'A1'), vcA3 = r.vc && r.vc.find((x) => x.id === 'A3');
-        dit(vcA1 && vcA1.tr === ATTENDU_VC.A1 && /Chronopost/.test(vcA1.p.txt), `${T} A2 achat Vestiaire en route sous « À retirer », Chronopost`, JSON.stringify(r.vc));
-        dit(vcA3 && vcA3.tr === 'pas-lu' && /Transporteur inconnu/.test(vcA3.p.txt) && !vcA3.p.imgs.length, `${T} A2 achat Vestiaire sans transporteur : « pas lu », sans logo`, JSON.stringify(vcA3));
+        dit(vcA1 && vcA1.tr === ATTENDU_VC.A1 && vcA1.p.nom === 'Chronopost' && vcA1.p.marque === 'chronopost', `${T} A2 achat Vestiaire en route sous « À retirer », Chronopost`, JSON.stringify(r.vc));
+        dit(vcA3 && vcA3.tr === 'pas-lu' && vcA3.p.nom === 'Transporteur inconnu' && vcA3.p.marque === 'inconnu' && !vcA3.p.imgs.length, `${T} A2 achat Vestiaire sans transporteur : « pas lu », sans logo`, JSON.stringify(vcA3));
         await sain(pg, T + ' À retirer');
         await pg.screenshot({ path: path.join(SHOTS, `transporteurs-retirer-${vp.width}.png`), fullPage: false });
       });
@@ -237,8 +242,8 @@ const sain = async (pg, ecran) => {
         const id = await t.getAttribute('aria-controls');
         await pg.locator(`[id="${id}"]`).waitFor({ state: 'visible', timeout: 8000 }); await pg.waitForTimeout(500);
         const r = await pg.evaluate((id) => { const d = document.getElementById(id); const p = d && d.querySelector('.vrm-recap-principal > .vrm-transporteur');
-          return { cle: p ? p.getAttribute('data-transporteur') : null, txt: p ? p.innerText : '', bouton: !!(p && p.parentElement.querySelector('button')) }; }, id);
-        dit(r.cle === 'mondialrelay' && /Mondial Relay/.test(r.txt) && r.bouton, `${T} R1 récapitulatif : « Mondial Relay » à côté du bouton bordereau`, JSON.stringify(r));
+          return { cle: p ? p.getAttribute('data-transporteur') : null, txt: p ? (p.getAttribute('data-transporteur-nom') || p.innerText) : '', marque: p ? (p.querySelector('[data-marque]') || { getAttribute: () => '' }).getAttribute('data-marque') : '', bouton: !!(p && p.parentElement.querySelector('button')) }; }, id);
+        dit(r.cle === 'mondialrelay' && /Mondial Relay/.test(r.txt) && r.marque === 'mondialrelay' && r.bouton, `${T} R1 récapitulatif : « Mondial Relay » à côté du bouton bordereau`, JSON.stringify(r));
         await pg.locator(`[id="${id}"]`).screenshot({ path: path.join(SHOTS, `transporteurs-recap-${vp.width}.png`) }).catch(() => {});
         const t5 = pg.locator('.vrm-sale-row[data-tx="8005"] .vrm-ledger-sale-toggle').first();
         const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer');
