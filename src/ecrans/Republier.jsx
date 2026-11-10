@@ -1185,10 +1185,10 @@ function usePhotosReglees(photos, reglage, numero) {
   };
   const nPh = photos.length;
   const libelle = ph && ph.encours ? `Photo ${Math.min(ph.total, ph.fait + ph.rate + 1)} sur ${ph.total}…`
-    : pretes && peutPartagerFichiers(ph.fichiers) ? (ph.enregistre ? 'Enregistrer à nouveau' : `Enregistrer les ${ph.fichiers.length} photo${ph.fichiers.length > 1 ? 's' : ''}`)
+    : pretes && peutPartagerFichiers(ph.fichiers) ? (ph.enregistre ? 'Enregistrer à nouveau' : ph.fichiers.length > 1 ? `Enregistrer les ${ph.fichiers.length} photos` : 'Enregistrer la photo')
     : pretes && ph.enregistre ? 'Télécharger à nouveau'
-    : partageFichiersPossible() ? `Préparer les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`
-    : `Télécharger les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`;
+    : partageFichiersPossible() ? (nPh > 1 ? `Préparer les ${nPh} photos réglées` : 'Préparer la photo réglée')
+    : (nPh > 1 ? `Télécharger les ${nPh} photos réglées` : 'Télécharger la photo réglée');
   return { ph, pretes, enregistrer, enregistrerUne, libelle };
 }
 // ══ « À LA MAIN » POUR PLUSIEURS ANNONCES D'UN COUP — LE KIT (10 nov., lot AP) ══════════

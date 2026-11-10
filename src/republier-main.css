@@ -123,7 +123,9 @@ html body .vrm-fs.vrm-rm-feuille .vrm-b { min-height: 44px !important; }
 .vrm-kit-conseil-icone { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--vrm-accent, #0071E3); background: var(--vrm-b-teinte, rgba(0,113,227,.08)); }
 .vrm-kit-conseil-vue { margin: 0 0 10px; }
 .vrm-sel-barre.vrm-sel-barre-deux { display: flex; gap: 10px; }
-.vrm-sel-barre.vrm-sel-barre-deux > .vrm-b { flex: 1 1 0; min-width: 0; }
+/* Le second bouton flotte sur la liste : opaque, sinon le texte dessous se lit à travers. */
+html body .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b:not(.vrm-b-primaire) { background: var(--vrm-surface, #fff) !important; }
+@media (max-width: 767px) { .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b { flex: 1 1 0; min-width: 0; } }
 .vrm-kit-barre { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .vrm-kit-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .vrm-kit-carte { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); min-width: 0; }
