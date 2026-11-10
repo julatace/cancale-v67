@@ -93,7 +93,9 @@ function verifier(M, dit) {
   // ── F
   const vr = corps(app, 'VintedResume');
   dit(/sansFraicheur\s*=\s*false/.test(vr) && /\{!sansFraicheur && \(\(\) =>/.test(vr), 'F', 'la tête de Vinted sait se taire sur la fraîcheur (`sansFraicheur`)');
-  dit(/<VintedResume [^>]*sansFraicheur=\{sec==='annonces'\}/.test(app), 'F', 'Annonces · Vinted : la tête se tait, `FraicheurAnnonces` est la seule voix');
+  // (9 nov., lot AG) Ventes non plus : la fraîcheur des comptes est dite par la ligne UNIQUE du haut de l'app
+  // (src/LigneFraicheur.jsx) ; la tête de Vinted n'est plus rendue sous les onglets Vinted.
+  dit(!/<VintedResume /.test(app) && /<LigneFraicheurParesseuse /.test(app), 'F', 'Annonces et Ventes · Vinted : la tête se tait, la ligne de fraîcheur unique du haut (et `FraicheurAnnonces` sur Annonces) parle');
 }
 
 const MUTATIONS = [

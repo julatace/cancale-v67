@@ -76,7 +76,8 @@ function verifier(M, dit) {
   dit(/const reattribueAEcrire = \(f\) => !!\(f && f\.reattribue && !f\.reattribue\.ecrit && cleNum\(f\.numero\) === cleNum\(f\.reattribue\.vers\)\);/.test(app) && /f\.reattribue\.archive \? 'Ancien numéro : il ne se redonne pas'/.test(app), 'N', 'la liste reste `reattribueAEcrire` ; la ligne dit « Ancien numéro : il ne se redonne pas »');
   // ── C (point 4)
   dit(!/vrm-colis-fraicheur/.test(app), 'C', 'Colis : la ligne de fraîcheur du bas n’est plus rendue');
-  dit(/data-comptes-a-relire=\{nRelire\}/.test(app), 'C', 'la seule voix reste la puce « N comptes à relire » (`data-comptes-a-relire`)');
+  // (9 nov., lot AG) La puce elle-même est partie : la seule voix est la ligne de fraîcheur UNIQUE du haut de l'app.
+  dit(!/data-comptes-a-relire=/.test(app) && /<LigneFraicheurParesseuse /.test(app), 'C', 'la seule voix est la ligne de fraîcheur unique du haut (plus de puce « N comptes à relire »)');
   const css = ['src/design/fusion.css', 'src/styles-colis-colonnes.css', 'src/styles-annonces-ventes.css'].map((f) => T[f].replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
   dit(!/vrm-colis-fraicheur/.test(css), 'C', 'aucune feuille ne cache plus une ligne rendue (plus de règle `.vrm-colis-fraicheur`)');
   // ── D (point 5)
