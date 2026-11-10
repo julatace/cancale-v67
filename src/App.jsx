@@ -33522,6 +33522,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Un total inconnu ne se juge pas (mieux vaut un blanc qu'un faux, §5).
     let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0;
     const prepaCompte = {};
+    // (10 nov., lot AW) « Qui dorment » : LA règle de la vue (`articlesQuiDorment`,
+    // src/quiDorment.js) au seuil du bilan (30 j) — ce nombre est celui que l'écran
+    // publie (`vrm_paires_dorment`) et que `dormentDe` (bilan de la semaine, Ma
+    // semaine) lit : une seule règle, jamais une seconde comparaison d'âge.
+    const qdBilan = articlesQuiDorment(arr.map((it) => ({ id: String(it.id), age: listedAgeDays(it) })), SLEEP_DAYS);
+    const dortIds = new Set(qdBilan ? qdBilan.liste.map((x) => x.id) : []);
+    sleeping = qdBilan ? qdBilan.n : 0;
     for (const it of arr) {
       if (it.promoted === true) boostees++;
       if (lbcAussi.has(String(it.id))) aussiLbc++;
@@ -33537,7 +33544,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // la grille, jamais recalculé par le bandeau qui l'annonce (§11).
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'lbc')) surLbc++;
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'ebay')) surEbay++;
-      const age = listedAgeDays(it); if (age!=null) datesKnown++; if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
+      const age = listedAgeDays(it); if (age!=null) datesKnown++;
+      if (dortIds.has(String(it.id))) sleepingVal+=p;
       // Prête pour Leboncoin : numérotée, toutes ses photos captées, une description.
       if (numeros[it.id]?.numero) {
         const total = Number(it.photoCount)||0, capt = Number(it.captPhotos)||0, descOk = (Number(it.descLen)||0) > 0;
