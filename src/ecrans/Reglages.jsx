@@ -335,9 +335,9 @@ const ImprimanteSetting = ({ nu = false }) => {
         options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', data: { 'data-imprimante-choix': v } }))}/>
       <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||`Format appliqué sur cet appareil : ${mode==='thermique'?'étiquettes 100 × 150 mm':'papier A4'}.`}</div>
       <GuideReglage titre="Avant d’imprimer" etapes={[
-        ['Choisis le papier', 'A4 pour une imprimante classique ; 100 × 150 mm pour une imprimante thermique.'],
-        ['Vérifie le document', 'Ouvre un aperçu reçu sur ta boutique et contrôle que les codes restent lisibles et que le N° et le titre sont posés hors des codes (ou dans la bande, ou sur la fiche colis).'],
-        ['Contrôle la fenêtre d’impression', 'Vérifie le papier et l’échelle. L’app prépare le PDF ; le pilote de ton imprimante décide du réglage final.']
+        ['Choisis le papier', 'A4 en classique, 100 × 150 mm en thermique.'],
+        ['Vérifie un aperçu', 'Codes lisibles, N° et titre hors des codes.'],
+        ['À l’impression', 'Vérifie le papier et l’échelle : ton imprimante décide.']
       ]}/>
       <div data-imprimante-phrase style={{fontSize:13,color:C.muted,marginTop:10,lineHeight:1.5}}>
         {mode === 'thermique'
@@ -348,13 +348,13 @@ const ImprimanteSetting = ({ nu = false }) => {
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
         {ap&&ap.etat!=='charge'&&<button type="button" onClick={charger} style={{marginTop:8,minHeight:44,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,padding:'8px 12px',font:'inherit',cursor:'pointer'}}>Actualiser les aperçus</button>}
         {!ap && <>
-          <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>Pour chaque type que l’app a reçu, ce qui sortira sur une imprimante normale et sur une thermique. Calculé sur tes {APERCU_MAX} derniers bordereaux.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>Ce qui sortira en A4 et en thermique · {APERCU_MAX} derniers bordereaux.</div>
           <button type="button" data-apercus-voir onClick={charger} style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 16px',minHeight:44,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir les aperçus</button>
         </>}
         {ap && ap.etat === 'charge' && <div data-apercus="charge" style={{fontSize:13,color:C.muted,marginTop:6}}>Je lis tes bordereaux…</div>}
-        {ap&&ap.etat==='erreur'&&<p role="alert" style={{color:C.warn,fontSize:12}}>Les aperçus n’ont pas pu être préparés. Aucun bordereau n’a été modifié. Utilise « Actualiser les aperçus » pour réessayer.</p>}
+        {ap&&ap.etat==='erreur'&&<p role="alert" style={{color:C.warn,fontSize:12}}>Aperçus pas préparés, rien modifié : touche « Actualiser les aperçus ».</p>}
         {ap && ap.etat === 'pasSu' && <div data-apercus="passu" style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>La base n’a pas répondu : je n’ai pas pu lire tes bordereaux. <button type="button" onClick={charger} style={{border:'none',background:'none',padding:0,color:C.text,textDecoration:'underline',cursor:'pointer',font:'inherit'}}>Réessayer</button></div>}
-        {ap && ap.etat === 'vide' && <div data-apercus="vide" style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>{ap.partiel ? 'Une partie de tes bordereaux n’a pas pu être lue, et aucun PDF n’est arrivé dans le reste.' : 'Aucun bordereau avec son PDF pour l’instant : les aperçus apparaîtront avec ta prochaine vente.'}</div>}
+        {ap && ap.etat === 'vide' && <div data-apercus="vide" style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>{ap.partiel ? 'Une partie de tes bordereaux n’a pas pu être lue, et aucun PDF n’est arrivé dans le reste.' : 'Pas encore de bordereau : aperçus à ta prochaine vente.'}</div>}
         {ap && ap.etat === 'lu' && <div data-apercus="lu" style={{marginTop:6}}>
           <div style={{fontSize:12,color:C.muted,lineHeight:1.5}} data-apercus-compte={ap.lus}>
             D’après tes {ap.lus} derniers bordereaux{ap.total > ap.lus + ap.rates ? ` (sur ${ap.total})` : ''}.{ap.rates > 0 ? ` ${ap.rates} n’ont pas pu être préparés ou vérifiés.` : ''}{ap.partiel ? ' Une partie de la liste n’a pas pu être lue.' : ''} Le N° montré est un exemple.
@@ -377,7 +377,7 @@ const ImprimanteSetting = ({ nu = false }) => {
           ))}
           {(() => { const jamais = TYPES_BORDEREAU.filter(([k]) => !vus.has(k)); return jamais.length ? (
             <div data-apercus-jamais={jamais.map(([k]) => k).join(',')} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:12,color:C.muted,lineHeight:1.5}}>
-              <b style={{color:C.text}}>Pas encore vus</b> dans tes derniers bordereaux : {jamais.map(([, l]) => l).join(' · ')}. Pas d’aperçu inventé : il apparaîtra avec le premier reçu. En thermique, l’app les découpera si elle repère l’étiquette, sinon la page partira entière.
+              <b style={{color:C.text}}>Pas encore vus</b> dans tes derniers bordereaux : {jamais.map(([, l]) => l).join(' · ')}. Aperçu au premier reçu.
             </div>) : null; })()}
         </div>}
       </div>
@@ -1072,7 +1072,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
       <GroupeComptes plateforme="vinted" n={accounts.length || null} attrs={{ 'data-comptes-actifs': nbActifs, 'data-comptes-bannis': nbBannis }}
         enfants={accounts.length === 0
           ? (baseKO
-            ? <LignePanne>Je n'ai pas pu lire la liste de tes comptes — elle est vide parce que la lecture a échoué, pas parce qu'aucun compte n'est lié. Rien n'est perdu.</LignePanne>
+            ? <LignePanne>Liste des comptes pas lue (pas vide) : rien n'est perdu.</LignePanne>
             : <div className="vrm-cl-vide" data-comptes-vide="vinted"><a className="vrm-b vrm-b-discret vrm-cl-bouton" href={URL_SITE_COMPTE.vinted} target="_blank" rel="noreferrer">Ouvrir Vinted</a></div>)
           : accounts.map(carteVinted)}/>
       <ComptesAutresSites lu={autres} relire={relireAutres}/>
@@ -1120,7 +1120,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
               <Case k="messages" titre="Messages" sous="Les conversations captées de ce compte."/>
               <Case k="compte" titre="Le compte et ses jetons" sous="Retire le compte de la liste. Tu le récupères en reconnectant l'extension dessus sur Vinted."/>
               <div style={{fontSize:12,color:C.muted,lineHeight:1.5,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginTop:4}}>
-                ↩︎ <b style={{color:C.text}}>Rien n'est perdu pour de bon</b> : ce que tu effaces ici revient tout seul à ta prochaine visite sur Vinted avec ce compte (l'extension recapte). Pour qu'un compte ne revienne <b>jamais</b> (fermé par Vinted), utilise le blocage ci-dessous.
+                ↩︎ <b style={{color:C.text}}>Revient à ta prochaine visite Vinted.</b> Pour <b>jamais</b> : le blocage ci-dessous.
               </div>
             </div>
             <div style={{borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}}>
@@ -1143,7 +1143,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                 return (
                 <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.text}}>Pour de bon <span style={{fontWeight:500,color:C.muted}}>— ne revient jamais, même recapté</span></div>
-                  <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.45,margin:'3px 0 8px'}}>Compte bloqué par Vinted ? Sors ses annonces ou ses messages pour de bon. Ses ventes, sa compta et ses achats restent (le CA et tes prix d'achat en dépendent).</div>
+                  <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.45,margin:'3px 0 8px'}}>Compte bloqué ? Sors annonces ou messages. Ventes, compta et achats restent.</div>
                   <div style={{display:'flex',gap:8}}>
                     <BtnPDB retire={annR} onRetirer={retirerAnnoncesPourDeBon} onRemettre={remettreAnnonces} label="Annonces" attr={{'data-retirer-annonces':true}}/>
                     <BtnPDB retire={msgR} onRetirer={retirerMessagesPourDeBon} onRemettre={remettreMessages} label="Messages" attr={{'data-retirer-messages':true}}/>
@@ -1234,7 +1234,7 @@ function RelancesEssaiSetting() {
       {r.proprietaire ? (
         <div className="vrm-np-relance" data-relances-proprio="">
           {r.configure
-            ? <>Prêts : chaque matin, les comptes en essai reçoivent au plus un e-mail (jour 1, jour 3, la veille de la fin). Jamais toi, jamais un abonné qui paie.</>
+            ? <>Prêts : un e-mail aux essais, jour 1, jour 3, veille de fin.</>
             : <><b>Pas configurés : aucun e-mail ne part.</b> À poser sur Vercel (Settings → Environment Variables), avec une boîte d’envoi de VRM : {(r.manque || []).map((m, i) => <React.Fragment key={m}>{i ? ', ' : ''}<code>{m}</code></React.Fragment>)}.</>}
         </div>
       ) : null}
@@ -1285,7 +1285,7 @@ function BilanMoisSetting() {
         <span className="vrm-np-lib">Bilan du mois par e-mail<small>{!r ? 'Pas su pour l’instant — réessaie plus tard.'
           : !r.configure ? 'L’envoi d’e-mails n’est pas encore configuré : aucun ne part.'
           : dernier ? `Le 1er du mois : ventes, vendu, reçu, bénéfice. Dernier envoyé : ${dernier}.`
-          : 'Le 1er du mois, à l’adresse de ton compte : ventes, vendu, reçu, bénéfice et ta plus belle vente.'}</small></span>
+          : 'Le 1er du mois : ventes, vendu, reçu, bénéfice, plus belle vente.'}</small></span>
         {etat === 'passu' ? <span className="vrm-np-relance">—</span>
           : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={`Bilan du mois par e-mail : ${r.actif ? 'activé' : 'désactivé'}`}/>}
       </div>
@@ -1418,7 +1418,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
         d'envoyer (api/_lib/notif-textes.js) — pas un filtre d'affichage. */}
     <div data-np-reglages="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
       <div className="vrm-np-ligne" data-np-calme={calme.actif?'on':'off'} style={{borderTop:0}}>
-        <span className="vrm-np-lib">Heures calmes<small>Rien ne sonne la nuit, sauf la double vente et ce qui expire avant 10 h. Au réveil, une seule notification dit ce qui est arrivé.</small></span>
+        <span className="vrm-np-lib">Heures calmes<small>La nuit : double vente et urgences (avant 10 h). Récap au réveil.</small></span>
         <Interrupteur on={calme.actif} onClick={()=>poserCalme({ actif: !calme.actif })} disabled={!prefs||busy} label={`Heures calmes : ${calme.actif?'activées':'désactivées'}`}/>
       </div>
       {calme.actif && (
@@ -1857,7 +1857,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'affichage', titre:'Affichage', items:[
       // (9 nov.) « Ma configuration » EN TÊTE du groupe : la configuration de départ, plein écran,
       // rejouable (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
-      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Tout en une fois : ce que tu vends, tes plateformes, ton statut, ton numéro, l’affichage, les notifications.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
+      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Ventes, plateformes, statut, numéro, affichage : tout en une fois.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
       { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
       { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
@@ -1913,10 +1913,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
-      <details data-aide-statut=""><summary>VRM semble en panne</summary><p>La page d’état dit, minute par minute, si la base, la réception des e-mails et les notifications fonctionnent, et les incidents connus. Si tout y fonctionne, le souci vient sans doute de cet appareil : recharge la page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
-      <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un e-mail absent d’un e-mail à vérifier.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
-      <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
-      <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
+      <details data-aide-statut=""><summary>VRM semble en panne</summary><p>Regarde la page d’état. Tout y marche ? Recharge cette page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
+      <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse du compte Vinted, sa confirmation, puis le transfert.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
+      <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte-le sur Vinted, extension reliée à ton VRM, puis actualise.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
+      <details><summary>Mon bordereau s’imprime mal</summary><p>Bon papier, aperçu, échelle. Lot raté : relance seulement les refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
     </div>}]},
   ];
   // « Mon compte » : la PERSONNE.
@@ -1931,7 +1931,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // relié » ou « pas pu lire »). Une seule ligne par compte : Google ici,
     // Discord par `DiscordCompte` (la liaison, qui ouvre aussi « Se connecter avec Discord »).
     AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
-      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS.filter(pr=>pr.id!=='discord')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM : « Se connecter avec Discord » ouvrira désormais ce compte-ci.':'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS.filter(pr=>pr.id!=='discord')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
       {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
@@ -2318,7 +2318,7 @@ function DoubleVerification({ onEtat } = {}) {
     <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''} data-mfa-nb={f ? verifies.length : ''}>
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
       {f === null && (<>
-        <div style={txt}>Je n'ai pas pu lire l'état de ta double vérification : le service de connexion ne répond pas. Rien n'a changé.</div>
+        <div style={txt}>Double vérification pas lue (connexion muette). Rien n'a changé.</div>
         <button type="button" data-mfa-relire="" onClick={relire} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>Réessayer</button>
       </>)}
       {f && !actif && !cours && (<>
@@ -2330,13 +2330,13 @@ function DoubleVerification({ onEtat } = {}) {
         <button type="button" data-mfa-activer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire" style={{marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
       </>)}
       {cours && cours.etape === 'qr' && (<>
-        {cours.ajout && <div data-mfa-ajout-consigne="" style={{...txt,marginBottom:6}}>Prends <b style={{color:C.text}}>l'autre appareil</b> (« {cours.nom} ») — pas celui qui te donne déjà les codes : s'il était perdu, les deux codes partiraient avec lui.</div>}
+        {cours.ajout && <div data-mfa-ajout-consigne="" style={{...txt,marginBottom:6}}>Prends <b style={{color:C.text}}>l'autre appareil</b> (« {cours.nom} »), pas celui des codes actuels.</div>}
         <div style={txt}><b style={{color:C.text}}>1.</b> Sur {cours.ajout ? 'cet appareil' : 'ton iPhone'}, ouvre l'app <b style={{color:C.text}}>Mots de passe</b> (ou Google Authenticator), touche « + » puis scanne ce code :</div>
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:12,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
         <details data-mfa-cle-manuelle="" style={{...txt,margin:'8px 0 12px'}}><summary style={{cursor:'pointer'}}>Configurer sans scanner le QR</summary>
-          <p>Dans ton app d’authentification, choisis « saisir une clé ». Garde cette clé privée : ne la partage pas et ne l’envoie pas en capture.</p>
+          <p>Choisis « saisir une clé ». Garde-la privée, jamais en capture.</p>
           <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:15,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
         </details>
         <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} className="vrm-b vrm-b-secondaire" style={{marginBottom:10}}>Remplacer cette configuration</button>
@@ -2348,7 +2348,7 @@ function DoubleVerification({ onEtat } = {}) {
         </div>
       </>)}
       {actif && cours && cours.etape === 'nom' && (<>
-        <div style={txt}>Un autre téléphone ou une tablette : son code fera entrer comme celui de ton appareil actuel.</div>
+        <div style={txt}>Un autre téléphone ou une tablette, en secours.</div>
         {champDuNom}
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
           <button type="button" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire">{busy ? 'Préparation…' : 'Afficher le code QR'}</button>
@@ -2372,12 +2372,12 @@ function DoubleVerification({ onEtat } = {}) {
             </div>
           ))}
         </div>
-        {seul && <div data-mfa-conseil-secours="" style={{...txt,marginTop:10}}>Un seul appareil : perdu, tu ne pourras plus entrer. Ajoute un appareil de secours, ou désactive avant de changer de téléphone.</div>}
+        {seul && <div data-mfa-conseil-secours="" style={{...txt,marginTop:10}}>Un seul appareil : perdu, plus d'accès. Ajoute un secours.</div>}
         <button type="button" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</button>
       </>)}
       {actif && cours && cours.etape === 'off' && (<>
         <div style={txt}>{seul
-          ? <>Pour désactiver la double vérification, tape le code actuel de ton app. Ton mot de passe suffira ensuite pour te connecter.</>
+          ? <>Tape le code actuel de ton app. Ton mot de passe suffira ensuite.</>
           : <>Pour retirer <b style={{color:C.text}}>« {cours.nom} »</b>, tape le code actuel de <b style={{color:C.text}}>l'un</b> de tes appareils — celui d'un autre si « {cours.nom} » est perdu. Les autres restent actifs.</>}</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-desactiver="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
@@ -2630,16 +2630,16 @@ function FermerCompte({ onExporter }) {
               <ul data-supprimer-liste="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
                 <li>Tes données VRM : ventes, annonces captées, numéros, compta, réglages, notifications ({nb(Math.max(0, n.donnees - n.facturesPro), 'élément', 'éléments')}).</li>
                 <li>{n.comptesVinted ? `Tes comptes Vinted liés (${n.comptesVinted}) et leurs connexions.` : 'Tes connexions aux sites de revente.'}</li>
-                <li>Tes adresses de réception et adresses VRM, tes photos, ton équipe, ta présence sur la carte{n.signalements ? `, tes signalements (${n.signalements})` : ''}.</li>
+                <li>Adresses, photos, équipe, présence sur la carte{n.signalements ? `, tes signalements (${n.signalements})` : ''}.</li>
                 <li>Ton compte de connexion, en dernier.</li>
                 {info.abonnement && info.abonnement.actif && <li data-supprimer-abonnement="">Ton abonnement est résilié d’abord : aucun nouveau prélèvement.</li>}
               </ul>
 
               <span style={titreBloc}>3. Ce qui est gardé, et pourquoi</span>
               <ul data-supprimer-garde="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
-                {n.facturesPro > 0 && <li data-supprimer-factures={n.facturesPro}>{nb(n.facturesPro, 'facture Pro émise', 'factures Pro émises')} : gardée{n.facturesPro > 1 ? 's' : ''} 10 ans, sans accès, parce que la loi l’exige (art. L123-22 du Code de commerce), puis effacée{n.facturesPro > 1 ? 's' : ''}. Exporte-les : c’est à toi de les conserver aussi.</li>}
+                {n.facturesPro > 0 && <li data-supprimer-factures={n.facturesPro}>{nb(n.facturesPro, 'facture Pro émise', 'factures Pro émises')} : gardée{n.facturesPro > 1 ? 's' : ''} 10 ans (loi), sans accès. Exporte-les aussi.</li>}
                 <li>Les factures de ton abonnement VRM, chez Stripe (même obligation de 10 ans).</li>
-                <li>Une ligne sans contenu — la date et des nombres, ni ton e-mail ni ton identifiant — qui prouve que la suppression a été faite ; effacée au bout de 3 ans.</li>
+                <li>Une ligne anonyme qui prouve la suppression, effacée après 3 ans.</li>
               </ul>
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la suppression, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
@@ -2657,8 +2657,8 @@ function FermerCompte({ onExporter }) {
               </label>
               <div style={{ ...txt, fontSize: 12, marginTop: 6 }}>
                 {avecMdp === false
-                  ? 'Compte ouvert avec Google ou Discord : laisse vide si tu t’es connecté il y a moins de 10 minutes ; sinon déconnecte-toi, reconnecte-toi, puis reviens ici.'
-                  : 'Sans mot de passe (compte Google ou Discord) : une connexion de moins de 10 minutes suffit.'}
+                  ? 'Google ou Discord : laisse vide si connecté il y a < 10 min, sinon reconnecte-toi.'
+                  : 'Google ou Discord : connexion de moins de 10 min suffit.'}
               </div>
               <Bouton variante="danger" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
                 {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
@@ -2788,7 +2788,7 @@ function MonAbonnement() {
         onChoisirPro={e && e.plan === 'solo' ? () => changerOffre('pro') : null}
         onChoisirSolo={e && e.plan === 'pro' && !e.proprietaire ? () => changerOffre('solo') : null}/>}
       {e && e.plan === 'solo' && (
-        <GroupeIos titre="Le compte qui vend sur chaque plateforme" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Tes autres comptes restent des comptes d’achat. Changement possible une fois tous les 30 jours.'}>
+        <GroupeIos titre="Le compte qui vend sur chaque plateforme" pied={e.compteVendeur && e.compteVendeur.prochainChangement ? `Prochain changement possible le ${dateLisible(e.compteVendeur.prochainChangement)}.` : 'Les autres : comptes d’achat. Changement tous les 30 jours.'}>
           <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Vinted · Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Vinted · Pas encore choisi</span>}
             detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
             onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
@@ -2807,7 +2807,7 @@ function MonAbonnement() {
         </GroupeIos>
       )}
       {e && e.plan === 'solo' && e.offres && e.offres.pro && e.offres.pro.ouvert && <CaseCgv cases={cases} onChange={setCases}/>}
-      {e && e.plan == null && e.planRaison === 'cgv-anterieures' && <div className="vrm-ios-groupe-pied" data-plan-raison="cgv-anterieures" style={{ margin: '8px 16px 0' }}>Ton abonnement a été pris avant les offres Solo et Pro : tous tes comptes vendent, comme le disaient tes conditions.</div>}
+      {e && e.plan == null && e.planRaison === 'cgv-anterieures' && <div className="vrm-ios-groupe-pied" data-plan-raison="cgv-anterieures" style={{ margin: '8px 16px 0' }}>Abonné avant Solo et Pro : tous tes comptes vendent.</div>}
     </div>
   );
   const pied = <div className="vrm-ios-groupe-pied" style={{ margin: '12px 16px 0' }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>;
@@ -2830,12 +2830,12 @@ function MonAbonnement() {
         )}
         {e.mentionsCompletes === null && (
           <div data-mentions-manquantes="pas-su" style={{ ...note, color: C.muted }}>
-            Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Marie d'Exemple' ») — écris-le entre guillemets droits (« "Marie d'Exemple" »).
+            Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : paiement fermé. Écris les textes entre guillemets droits (« "Marie d'Exemple" »).
           </div>
         )}
         {prixAcorriger && (
           <div data-prix-stripe="different" style={note}>
-            Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
+            Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) ≠ CGV (<b>{PRIX_CGV_LISIBLE}</b>) : paiement <b>fermé</b>. Stripe → Produits : prix {PRIX_CGV_LISIBLE.replace(' / ', ' par ')}, clé « vrm_mensuel » (« transférer la clé »).
           </div>
         )}
         {e.offres && e.offres.pro && !e.offres.pro.ouvert && (
@@ -2844,7 +2844,7 @@ function MonAbonnement() {
               ? <>L'offre Pro reste <b>fermée</b> : le prix réglé chez Stripe (<b data-pro-prix-stripe="">{e.offres.pro.texteStripe || 'un autre montant'}</b>) n'est pas celui des conditions de vente ({PRIX_PRO_MOIS} € / mois). Corrige le prix « VRM Pro » dans Stripe.</>
               : e.offres.pro.raison === 'prix-illisible'
                 ? <>L'offre Pro reste <b>fermée</b> : le prix posé dans <b>STRIPE_PRIX_PRO</b> est introuvable (ou archivé) chez Stripe.</>
-                : <>L'offre Pro ({PRIX_PRO_MOIS} € / mois) s'affiche « bientôt », sans paiement. Pour l'ouvrir : Stripe → Produits → « VRM Pro » → prix récurrent {PRIX_PRO_MOIS} € EUR mensuel, clé de recherche « vrm_pro_mensuel » → copie l'identifiant price_… dans Vercel, variable <b>STRIPE_PRIX_PRO</b>.</>}
+                : <>Pro ({PRIX_PRO_MOIS} € / mois) : « bientôt ». Pour l'ouvrir : prix Stripe « vrm_pro_mensuel », son price_… dans <b>STRIPE_PRIX_PRO</b> (Vercel).</>}
           </div>
         )}
       </Tete>
@@ -2898,7 +2898,7 @@ function MonAbonnement() {
         {!annule && (
           <GroupeIos titre="Résiliation" pied={enEssai
             ? `Pendant l'essai : rien n'est prélevé, VRM reste ouvert jusqu'au ${fin || 'dernier jour'}. ${apresFin}`
-            : `Effet à la fin de la période payée${fin ? `, le ${fin}` : ''} : aucun autre prélèvement. Tu peux changer d'avis jusque-là.`}>
+            : `Effet à la fin de la période payée${fin ? `, le ${fin}` : ''}, plus aucun prélèvement.`}>
             <RangeeIos titre={occupe === 'resilier' ? 'Un instant…' : 'Résilier'} onClick={occupe ? undefined : () => resilierOuReprendre(false)} data-rangee-resilier=""/>
           </GroupeIos>
         )}
@@ -2959,11 +2959,11 @@ function MonAbonnement() {
       <Tete etat="Pas encore d'abonnement" titre={e.essaiDispo ? `${e.essaiJours || 7} jours gratuits` : prixLisible(e.prix)}
         phrase={<span data-essai-dispo={e.essaiDispo ? '' : undefined}>
           {e.essaiDispo
-            ? <>Puis {prixLisible(e.prix)}, sans engagement : aucun prélèvement pendant l'essai, résiliable à tout moment. À la fin de l'essai, sans abonnement, tes données restent là.</>
-            : <>{prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.</>}
+            ? <>Puis {prixLisible(e.prix)}, sans engagement, résiliable à tout moment. Rien prélevé pendant l'essai.</>
+            : <>{prixLisible(e.prix)}, sans engagement, résiliable à tout moment.</>}
           {!e.obligatoire && <> Pour l'instant VRM reste gratuit pour toi.</>}
         </span>}>
-        {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+        {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu : ton abonnement arrive ici dans quelques secondes.</div>}
         <OffresSoloPro x={e} prixSolo={prixLisible(e.prix)} prixProAffiche={`${PRIX_PRO_MOIS} € / mois`}/>
         <CaseCgv cases={cases} onChange={setCases}/>
         <div className="vrm-abo-actions">
@@ -3038,7 +3038,7 @@ function Parrainage() {
   };
   return (
     <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes}
-      pied={`Un mois offert à ton ami et à toi quand il paie son premier mois : un crédit d'un mois déduit de la prochaine facture. Une fois par ami, pas pour toi-même ; au plus 12 mois offerts par an.${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
+      pied={`Un mois offert à vous deux à son premier paiement (12 par an max).${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
       <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }}>
         <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
         <div className="vrm-abo-actions" style={{ marginTop: 10 }}><button type="button" className="vrm-b vrm-b-secondaire" onClick={copier} data-copier-parrainage="">Partager mon lien</button></div>
@@ -3167,8 +3167,8 @@ function EquipeSetting() {
       <div>{EQUIPE_NON_INSTALLE_TXT}</div>
       <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
         {proprio
-          ? <>Il s’active quand la mise à jour <b style={{ color: C.text }}>016</b> de la base est appliquée (Supabase) : rien d’autre à préparer, l’invitation marchera aussitôt.</>
-          : <>Rien à faire de ton côté : dès qu’il est activé, tu inviteras ici la personne qui t’aide, par son e-mail.</>}
+          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base (Supabase).</>
+          : <>Rien à faire : bientôt, tu inviteras ici ton aide par e-mail.</>}
       </div>
       <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
     </div>
@@ -3278,7 +3278,7 @@ function AffichageSetting() {
         options={[['auto', 'Automatique'], ['simple', 'Simple'], ['complet', 'Complet']].map(([v, l]) => ({ v, l, data: { 'data-affichage-choix': v } }))}/>
       <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{r.choix === 'auto' ? phraseAffichageAuto(p) : r.choix === 'simple' ? 'Simple, choisi par toi.' : 'Complet, choisi par toi.'}</div>
       <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
-        En simple, le menu ne montre pas ce qui ne sert pas encore : Stock (sans meuble), Republier (jamais lancé), les fonctions jamais utilisées. Ma journée garde tous les gestes dus. <Pourquoi label="Rien n’est perdu ?">Aucun écran n’est supprimé et aucun chiffre ne change : chaque total compte toujours tout. Dès que tu ranges un meuble, relies Leboncoin ou republies, l’entrée revient d’elle-même. « Complet » remet les fonctions ; les plateformes se choisissent dans « Mes plateformes ».</Pourquoi>
+        Simple cache ce qui ne sert pas encore ; Ma journée garde tout. <Pourquoi label="Rien n’est perdu ?">Aucun écran supprimé, aucun total changé. L’entrée revient dès que tu t’en sers.</Pourquoi>
       </div>
     </div>
   );
@@ -3304,7 +3304,7 @@ function ObjectifMoisSetting() {
         <Bouton variante="principal" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="">Enregistrer</Bouton>
       </div>
       {obj ? <div style={{ marginTop: 10 }}><Bouton variante="discret" onClick={() => { poser(objectifAEnregistrer(obj, null)); setSaisie(''); toast('Objectif du mois retiré.'); }} data-reglage-objectif-retirer="">Retirer l’objectif</Bouton></div> : null}
-      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Le vendu compté est celui de la case « Vendu · mois » de Ma journée (tous tes comptes sélectionnés). Tu peux aussi toucher la barre dans Ma journée.</div>
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Compté sur « Vendu · mois » de Ma journée.</div>
     </div>
   );
 }
@@ -3466,7 +3466,7 @@ function NumeroEcritSetting({ onAnnonces }) {
             <input type="checkbox" checked={r.ou.includes(k)} onChange={() => cocher(k)} style={{width:20,height:20,accentColor:C.accent,flexShrink:0}}/>
             <span style={{flex:1,minWidth:0}}>
               <span style={{display:'block',fontSize:14,color:C.text}}>{NOM_OU[k]}</span>
-              <span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45}}>{k === 'description' ? '« N° 123 » sur la dernière ligne. Vinted, Leboncoin.' : k === 'titre' ? 'Une seule fois, n’importe où dans le titre. Vinted, Leboncoin, Vestiaire, eBay.' : 'eBay : le SKU · Leboncoin pro : la référence. Vinted et Vestiaire : pas de champ lu pour l’instant.'}</span>
+              <span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45}}>{k === 'description' ? '« N° 123 » sur la dernière ligne. Vinted, Leboncoin.' : k === 'titre' ? 'Une seule fois, n’importe où dans le titre. Vinted, Leboncoin, Vestiaire, eBay.' : 'eBay : le SKU · Leboncoin pro : la référence.'}</span>
             </span>
           </label>
         ))}
@@ -3489,7 +3489,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       </div>
       <GuideReglage titre="Numéroter dans tes annonces" etapes={[
         ['Écris le numéro là où tu ranges l’article', 'Sur le carton, l’étagère ou le bac, comme d’habitude.'],
-        ['Écris-le à la fin de la description', '« N° 123 » sur la dernière ligne. Sur Leboncoin, la référence pro marche aussi ; sur eBay, le SKU.'],
+        ['Écris-le à la fin de la description', '« N° 123 » sur la dernière ligne (ou SKU eBay, référence Leboncoin pro).'],
         ['Ouvre tes annonces dans VRM', 'Il lit le numéro et le range avec la paire. Si un numéro ne colle pas, il te demande.'],
       ]}/>
       <div data-numero-ecrit-apercu="" style={{marginTop:12}}>
@@ -3588,9 +3588,9 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
         {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
       <GuideReglage titre="Du numéro à l’emplacement" etapes={[
-        ['Choisis un format', 'Chiffres seuls ou lettres suivies de chiffres. Les exemples montrent un format, pas le prochain numéro disponible.'],
-        ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
-        ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
+        ['Choisis un format', 'Chiffres seuls, ou lettres puis chiffres (exemples, pas le prochain).'],
+        ['Identifie ton article', 'Écris son N° VRM là où il est rangé.'],
+        ['Indique où il est rangé', 'Stock 3D : choisis son N°, puis sa place libre.']
       ]}/>
       <NumeroSurVinted/>
       {onStock&&<div className="vrm-settings-next" style={{borderColor:C.border}}><b>Ensuite : indiquer l’emplacement</b><p style={{color:C.muted}}>Choisis la place de l’article dans le stock.</p><Bouton variante="secondaire" onClick={onStock}>Ouvrir mon stock</Bouton></div>}
@@ -3695,19 +3695,19 @@ function NumeroSurVinted() {
         <div style={{borderTop:`1px solid ${C.border}`,padding:'10px 12px'}}>
           <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}}>Dans une liste étroite (ventes, messages)</div>
           <div data-apercu-liste="" style={{maxWidth:240,fontSize:13,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{enTitre ? surligneEtiquette(ap.titre, etiq, aLaFin) : ap.titre}</div>
-          {enTitre && aLaFin && <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.45}}>En fin de titre, une liste étroite peut couper le N° : garde tes titres courts, ou mets-le au début.</div>}
+          {enTitre && aLaFin && <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.45}}>En fin de titre, le N° peut être coupé : titres courts.</div>}
         </div>
       </div>
       {ap.refus && <div data-num-vinted-refus="" style={{fontSize:12,color:C.text,marginTop:6}}>{ap.refus}.</div>}
 
       {r.place !== 'aucune' && (
         <div data-num-vinted-portee="" style={{fontSize:12,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          Aujourd'hui, VRM écrit « {etiquetteDe(numEx, r.forme)} » {place.ou} dans les textes qu'il te prépare à copier (« Rédiger une annonce »). Tes annonces déjà en ligne ne sont pas réécrites : sur vinted.fr, l'extension continue d'afficher la pastille N° dans ton navigateur.
+          VRM écrit « {etiquetteDe(numEx, r.forme)} » {place.ou} dans « Rédiger une annonce ». Annonces en ligne inchangées.
         </div>)}
       <GuideReglage titre="Bien placer ton N°" etapes={[
-        ['Pense au moment où tu le cherches', 'Une vente tombe : tu lis la liste (le titre) ou tu ouvres l’annonce (la description). Mets le N° là où ton œil va en premier.'],
-        ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… La même partout : tu la repères d’un coup d’œil, et elle ne change jamais le numéro écrit là où l’article est rangé.'],
-        ['Si tu changes un N°', 'Dans les textes que VRM te prépare, l’ancienne étiquette est remplacée, jamais empilée. Sur une annonce déjà en ligne, c’est à toi de la changer : VRM te dit quoi remplacer. L’ancien numéro passe dans « Nouveaux N° à écrire » jusqu’à « C’est écrit ».'],
+        ['Pense au moment où tu le cherches', 'Mets le N° là où ton œil va en premier.'],
+        ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… la même partout.'],
+        ['Si tu changes un N°', 'VRM remplace l’ancien ; en ligne, change-le toi-même.'],
       ]}/>
     </section>
   );
@@ -3930,9 +3930,7 @@ function ReglagesPasLus() {
         {noms.length > 1 ? `${noms.length} réglages n'ont pas pu être lus` : "Un réglage n'a pas pu être lu"}
       </div>
       <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
-        La base n'a pas répondu pour {liste}. <b>Rien n'est perdu</b>, et rien ne sera
-        écrit par-dessus : tant que je n'ai pas lu, je ne touche à rien. Rouvre cet
-        écran dans un moment.
+        Base muette pour {liste}. <b>Rien n'est perdu</b>, rien ne sera écrit par-dessus. Rouvre plus tard.
       </div>
     </div>
   );
@@ -4127,16 +4125,16 @@ function PushSetting() {
       setMsg(j.sent > 0
         ? `✅ Test envoyé à ${j.sent} appareil${j.sent>1?'s':''} — la notif doit apparaître.`
         : j.coupe === 'abonnement'
-        ? "Ton abonnement VRM n'est plus actif : les notifications sont en pause. Elles reviennent toutes seules dès que tu le reprends (Paramètres → Abonnement)."
+        ? "Abonnement inactif : notifications en pause jusqu'à sa reprise."
         : (j.erreur === 'VAPID_PRIVATE_KEY absente'
-            ? (proprio ? '⚠ Le serveur ne peut RIEN envoyer : la clé VAPID_PRIVATE_KEY n\'est pas configurée sur Vercel. Tant qu\'elle manque, aucune notification ne partira.' : 'Les notifications ne sont pas encore activées sur VRM : aucune ne peut partir pour l\'instant. Tu n\'as rien à faire.')
+            ? (proprio ? '⚠ Aucune notification ne part : pose VAPID_PRIVATE_KEY sur Vercel.' : 'Les notifications ne sont pas encore activées sur VRM : aucune ne peut partir pour l\'instant. Tu n\'as rien à faire.')
             : (j.total === 0 ? '⚠ Aucun appareil abonné. Active les notifications sur cet appareil d\'abord.'
             // ⚠️ Un abonnement scellé sur une ANCIENNE clé publique est mort pour
             // toujours (mesuré : 403 côté Chrome, VapidPkHashMismatch côté Apple).
             // Le serveur vient de le purger ; il faut rouvrir l'app sur chaque
             // appareil pour qu'il se réabonne sur la clé courante. Sans ce
             // message, on lisait « 2 abonnés, 0 joint » sans savoir quoi faire.
-               : j.perimes ? `⚠ ${j.perimes} appareil(s) étai(en)t abonné(s) avec une ancienne clé — ils viennent d\'être retirés. Rouvre l\'app sur chaque appareil : il se réabonnera tout seul, puis refais ce test.`
+               : j.perimes ? `⚠ ${j.perimes} appareil(s) sur une ancienne clé, retiré(s) : rouvre l\'app dessus, puis reteste.`
                              : `⚠ ${j.total} appareil(s) abonné(s), 0 joint. Réactive les notifications sur cet appareil.`)));
     } catch (e) { setMsg('Erreur test : ' + (e?.message || e)); }
   };
@@ -4147,7 +4145,7 @@ function PushSetting() {
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
         {/* (5 nov.) Sur un iPhone dans Safari, le guide illustré le dit (une phrase, une fois — §7). */}
-        {state==='unsupported' && !guideIphone && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
+        {state==='unsupported' && !guideIphone && ' — Non disponible ici : ajoute VRM à l\'écran d\'accueil (Partager), puis ouvre l\'icône.'}
       </div>
       {guideIphone && <GuideIphone onFermer={fermerGuideIphone}/>}
       {/* ⚠️ « Je ne reçois plus rien » a DEUX causes qui font le même silence :
@@ -4166,7 +4164,7 @@ function PushSetting() {
               <div>1. Ouvrir <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>Vercel → projet de l'installation → Settings → Environment Variables</a></div>
               <div>2. Ajouter la variable <code style={{fontSize:11}}>VAPID_PRIVATE_KEY</code> avec la clé privée que je t'ai donnée</div>
               <div>3. Redéployer (Deployments → ⋯ → Redeploy)</div>
-              <div style={{marginTop:4,color:C.muted}}>La clé privée ne peut pas vivre dans le code : le dépôt est public, n'importe qui pourrait envoyer des notifications sur ton téléphone.</div>
+              <div style={{marginTop:4,color:C.muted}}>Jamais dans le code : le dépôt est public.</div>
             </details>}
           </div>
         </div>
@@ -4608,7 +4606,7 @@ function EmailsSetting({onComptes}) {
     return ok === true;
   };
   const ajouter = async () => {
-    const a = await askText({ desc: "Tes adresses personnelles.\n\nIndique les adresses où Vinted t’écrit, avant leur transfert vers VRM. Tu peux en ajouter plusieurs, séparées par des virgules. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
+    const a = await askText({ desc: "Tes adresses personnelles, où Vinted t’écrit.\n\nPlusieurs : sépare-les par des virgules.", value: '', ok: 'Ajouter' });
     const adresses=[...new Set(String(a||'').split(/[,;\n]+/).map(normAdresse).filter(Boolean))];
     if(!adresses.length)return;
     if(adresses.some(adr=>!ADRESSE_RECEPTION_OK.test(adr))){toast('Une adresse est incorrecte — vérifie la liste avant de l’ajouter.');return;}
@@ -4680,16 +4678,16 @@ function EmailsSetting({onComptes}) {
   //    phrase suit ce que la règle d'arrivée fait vraiment (la route le dit) ;
   //    sans réponse, elle n'affirme rien sur l'attribution.
   const vide = (misDeCote && misDeCote.cloisonnee === false)
-      ? { t: "Aucune adresse déclarée. Cette installation n'a qu'une boutique : tous les e-mails reçus y sont rangés.", alerte: false }
+      ? { t: "Aucune adresse déclarée. Une seule boutique : tous les e-mails y vont.", alerte: false }
     : inst && inst.repli === true
-      ? { t: "Aucune adresse déclarée. Personne d'autre n'en a déclaré : pour l'instant, les e-mails reçus te reviennent (tu es le propriétaire de cette installation). Dès qu'un autre compte déclarera la sienne, un e-mail arrivé sur une adresse que tu n'as pas déclarée sera mis de côté — déclare les tiennes dès maintenant.", alerte: false }
+      ? { t: "Aucune adresse déclarée. Pour l'instant, les e-mails te reviennent : déclare les tiennes.", alerte: false }
     : inst && inst.repli === false
       // Le geste ne se dit qu'une fois (§7) : quand le nombre est écrit juste
       // dessous, c'est lui qui le porte.
-      ? { t: "Aucune adresse déclarée — et un autre compte a déclaré les siennes : un e-mail arrivé sur une adresse que tu n'as pas déclarée ne t'est plus attribué, il est mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
+      ? { t: "Aucune adresse déclarée, et un autre compte a déclaré les siennes : e-mails mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
     : misDeCote
-      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun e-mail ne t'est attribué. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: true }
-      : { t: "Aucune adresse déclarée. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: false };
+      ? { t: "Aucune adresse déclarée : aucun e-mail ne t'est attribué. Ajoute la tienne.", alerte: true }
+      : { t: "Aucune adresse déclarée. Ajoute celle où Vinted t’écrit.", alerte: false };
   // ── L'état de preuve de chaque adresse, tel que le SERVEUR le décide ──────
   const etatsPreuve = preuves && preuves.cloisonnee ? (preuves.adresses || {}) : null;
   const etatDe = (adr) => (etatsPreuve ? (etatsPreuve[normAdresse(adr)] || null) : null);
@@ -4699,7 +4697,7 @@ function EmailsSetting({onComptes}) {
   const boiteAge = boite && boite.at ? Date.now() - Date.parse(boite.at) : null;
   const dureeLisible = (ms) => { const h = ms / 3600e3; return h < 1 ? `${Math.max(1, Math.round(ms / 60000))} min` : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} jours`; };
   const phraseBoite = !enPreparation || !boite ? null
-    : !boite.at ? "La boîte d'envoi de VRM n'a pas encore tourné : le lien partira dès qu'elle sera en marche."
+    : !boite.at ? "La boîte d'envoi de VRM n'a pas encore tourné : le lien partira ensuite."
     : boiteAge > 30 * 60000 ? `La boîte d'envoi de VRM n'a pas tourné depuis ${dureeLisible(boiteAge)} : le lien partira dès qu'elle reprend.`
     : `Il part de la boîte VRM (${ADRESSE_COLLECTRICE}) dans les prochaines minutes — regarde aussi les indésirables.`;
   const quandLisible = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''; };
@@ -4747,8 +4745,8 @@ function EmailsSetting({onComptes}) {
           <div data-preuve-explication={preuves && preuves.installation ? 'installation' : 'vendeur'} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 8px'}}>
             Chaque adresse se confirme une fois : VRM envoie un lien <b style={{color:C.text}}>à cette adresse</b>, et tu l'ouvres en étant connecté à VRM.{' '}
             {preuves && preuves.installation
-              ? "Les tiennes restent reçues en attendant (tu es le propriétaire de cette installation) ; les confirmer les protège le jour où d'autres vendeurs rejoindront VRM."
-              : "Tant qu'une adresse n'est pas confirmée, ses e-mails sont mis de côté — rien n'est perdu, ils te sont proposés dès la confirmation."}
+              ? "Les tiennes restent reçues en attendant ; confirme-les pour les protéger."
+              : "Pas confirmée : ses e-mails sont mis de côté, rendus à la confirmation."}
             {phraseBoite ? <span data-preuve-boite={!boite.at ? 'jamais' : boiteAge > 30 * 60000 ? 'arretee' : 'active'}>{' '}{phraseBoite}</span> : null}
           </div>
         )}
@@ -4772,8 +4770,8 @@ function EmailsSetting({onComptes}) {
             )}
             {ep && estRelaisApple(adr) && !['prouvee', 'transition'].includes(ep.etat) && (
               <span data-relais-apple-aide={ep.etat} style={{display:'block',marginTop:4,fontSize:12,lineHeight:1.45,color:C.muted}}>
-                Pourquoi : Apple n'accepte en principe sur ce relais que les e-mails de Vinted — le lien de VRM risque de ne pas y arriver, et tant que l'adresse n'est pas confirmée, ses e-mails sont mis de côté (rien n'est perdu, ils te reviennent dès la confirmation).
-                {' '}<b style={{color:C.text}}>Le plus sûr</b> : sur Vinted, Paramètres → Compte → E-mail, mets ton adresse habituelle (Gmail, Outlook…), puis ajoute-la ici et confirme-la. Tu peux aussi essayer d'envoyer le lien quand même.
+                Le lien VRM risque de ne pas passer ce relais Apple.
+                {' '}<b style={{color:C.text}}>Le plus sûr</b> : ton adresse habituelle sur Vinted (Paramètres → Compte → E-mail), puis confirme-la ici.
               </span>
             )}
           </span>
@@ -4800,7 +4798,7 @@ function EmailsSetting({onComptes}) {
       )}
       {inst && inst.personne === null && (
         <div data-personne="pas-su" style={{marginTop:10,fontSize:12,color:C.muted,lineHeight:1.45}}>
-          Je n'ai pas pu compter les e-mails mis de côté que personne ne peut récupérer — rouvre cet écran dans un moment.
+          E-mails mis de côté pas comptés : rouvre dans un moment.
         </div>
       )}
       {/* ── SES ADRESSES DÉJÀ VUES, ajoutables d'un clic ──────────────────
@@ -4845,25 +4843,25 @@ function EmailsSetting({onComptes}) {
           <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
           <span data-adresses-promesse={promesse}>{promesse === 'confirmation'
-            ? "Une adresse manque, ou n'est pas encore confirmée ? Ses e-mails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'as ajoutée puis confirmée."
+            ? "Adresse absente ou pas confirmée ? E-mails gardés, proposés une fois confirmée."
             : promesse === 'directe'
-              ? "Une adresse manque ? Ses e-mails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes."
-              : "Une adresse manque ? Ses e-mails sont mis de côté, gardés entiers — rien n'est perdu."}</span>
+              ? "Adresse absente ? E-mails gardés, proposés dès que tu l'ajoutes."
+              : "Adresse absente ? E-mails gardés, rien n'est perdu."}</span>
         </div>
         <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} className="vrm-b vrm-b-secondaire vrm-b-petit">Copier l’adresse</button></div>
         <details style={{marginTop:8}}>
           <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.accentTexte,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes e-mails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
             <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les e-mails activés (ventes, bordereaux, messages).</li>
-            <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted et les transporteurs t’écrivent. La boîte collective VRM n’est pas ton adresse personnelle.</li>
-            <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis indique <b>{ADRESSE_COLLECTRICE}</b>. Dans Outlook ou iCloud, utilise une règle de transfert automatique vers cette même adresse.</li>
-            <li>Google peut demander une validation à la boîte VRM : tant qu’elle n’est pas faite, le transfert n’est pas actif. Une règle de transfert manuel qui masque ton adresse personnelle peut nécessiter une vérification.</li>
-            <li>Crée une règle pour <b>les e-mails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes e-mails personnels n’est pas nécessaire.</li>
-            <li>Après le prochain e-mail, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par e-mail</b>. Un reçu reçu par e-mail ne crée pas une commande synchronisée.</li>
+            <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted t’écrit.</li>
+            <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis <b>{ADRESSE_COLLECTRICE}</b>. Outlook, iCloud : une règle de transfert.</li>
+            <li>Google peut demander une validation : sans elle, rien ne part.</li>
+            <li>Transfère seulement <b>Vinted et tes transporteurs</b>, pièces jointes comprises.</li>
+            <li>Au prochain e-mail, vérifie qu’il arrive dans VRM.</li>
             <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
           </ol>
           <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginTop:8}}>
-            Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses e-mails dans ta boutique, et un e-mail dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
+            L'adresse d'arrivée décide : elle ne se falsifie pas.
           </div>
         </details>
       </div>
@@ -4881,7 +4879,7 @@ function EmailsSetting({onComptes}) {
       <SuiviReceptionEmails onAdresseGuide={setAdresseGuide} adresseGuide={adresseGuide} guideOuvert={guideOuvert} onFermerGuide={()=>setGuideOuvert(false)} onVoirReception={()=>setRubriqueEmail('reception')} onJournal={ouvrirJournal} onOnglet={setRubriqueEmail} section={rubriqueEmail==='adresses'?'configuration':'reception'} key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>{setRubriqueEmail('a-traiter');requestAnimationFrame(()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'}));}}/>
     </div>
     <div id={espaceId+'-a-traiter'} data-email-panneau="a-traiter" hidden={rubriqueEmail!=='a-traiter'} className="vrm-email-rattachement">
-      <h3>E-mails à rattacher</h3><p>Arrivés sur une adresse que VRM ne peut pas encore relier à toi : ils sont gardés entiers. Touche « C’est à moi » sur ceux qui sont à toi.</p>
+      <h3>E-mails à rattacher</h3><p>Adresse pas reliée : touche « C’est à moi » sur les tiens.</p>
       {quarantaine===undefined&&<p role="status">Lecture des e-mails mis de côté…</p>}
       {Array.isArray(quarantaine)&&quarantaine.length===0&&<div className="vrm-email-vide">Aucun e-mail à rattacher pour le moment.</div>}
       {/* Pas su ≠ aucun. Une seule phrase, et seulement si le registre, lui, a
@@ -5016,17 +5014,17 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
       <details><summary>Installer ou mettre à jour l’extension</summary>
         <div className="vrm-connexions-actions">{(()=>{const b=installerExtensionIci();return b.boutique?<a href={b.lien} target="_blank" rel="noreferrer" data-ext-boutique={b.nav}>{b.nomBoutique} · mises à jour automatiques</a>:null;})()}<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a>{boutiqueOrion()&&<a href={boutiqueOrion()} target="_blank" rel="noreferrer" data-orion-boutique="">Orion · depuis la boutique (mises à jour automatiques)</a>}<a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a><a href={`/VRM-Orion-dossier.zip?v=${EXT_ATTENDUE}`} download data-orion-dossier="">Orion · en dossier</a></div>
-        <p>Le zip se dézippe en un seul dossier « VRM-extension » : mets-le à la place de l'ancien, au même endroit, PUIS dans chaque navigateur où elle est installée, ouvre <code>chrome://extensions</code> et clique ⟳ sur VRM (sans ⟳, le navigateur garde l'ancien code). Sur Edge, utilise <code>edge://extensions</code>.</p>
-        <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
-        <p>Si Orion refuse le fichier : télécharge « Orion · en dossier », ouvre-le dans l'app Fichiers (le toucher donne un dossier « VRM-Orion »), puis dans Orion, Extensions → + → depuis un fichier, et choisis ce dossier (ou le fichier manifest.json qui est dedans).</p>
+        <p>Le zip se dézippe en un seul dossier : mets-le à la place de l'ancien, PUIS ⟳ sur VRM dans chaque navigateur (<code>chrome://extensions</code>, <code>edge://extensions</code>).</p>
+        <p>Orion : extensions Firefox autorisées, puis Extensions → + → le fichier XPI.</p>
+        <p>Refusé ? Prends « Orion · en dossier » et choisis ce dossier.</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
       </details>
-      <details><summary>Version qui a lu en dernier</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Celle de la dernière capture, peut-être faite ailleurs : elle ne confirme pas la version utilisée ici.</p></details>
+      <details><summary>Version qui a lu en dernier</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Dernière capture, peut-être d’un autre appareil.</p></details>
     </section>
     <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Ce que l’extension a lu</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Pour la rafraîchir : ouvre le compte sur sa plateforme, extension active.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
     {onPlateforme&&<div className="vrm-connexions-actions"><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_leboncoin')}>Comptes Leboncoin</Bouton><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_ebay')}>Comptes eBay</Bouton></div>}
-    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>E-mails reçus</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>La date du dernier arrivé, pas la preuve que chaque transfert marche. Détail : « Réception des e-mails ».</p></section>
+    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>E-mails reçus</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Le dernier arrivé. Détail : « Réception des e-mails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
       {Array.isArray(plantages)&&plantages.length>0&&<p data-plantages={plantages.length}>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
