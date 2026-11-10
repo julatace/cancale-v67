@@ -375,7 +375,7 @@ import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
-import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
+import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
@@ -410,7 +410,7 @@ import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU } from "./colisEnvoyes.js";
-import { ordreRecent, nbSansDate, debutSansDate, PHRASE_SANS_DATE, quandCommandeVinted, quandLeboncoin, quandEbay, quandVestiaire, quandColisAEnvoyer, quandARetirer } from "./ordreRecent.js";
+import { ordreRecent, nbSansDate, debutSansDate, PHRASE_SANS_DATE, quandCommandeVinted, quandLeboncoin, quandEbay, quandVestiaire, quandColisAEnvoyer, quandARetirer, ordreRecentPoints } from "./ordreRecent.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -36704,10 +36704,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (5 nov., chantier D) Les groupes « Prêts à imprimer » / « En attente de leur bordereau » n'existent
     // plus (la liste est rangée par transporteur, le plus pressé d'abord) : la phrase disait où
     // chercher dans des groupes absents. Elle dit l'ordre réel, une fois.
-    if (!u.presseAttente) return 'dans chaque transporteur, le plus pressé est en haut.';
+    // (9 nov., soir, lot AJ) La liste est rangée du plus récent au plus ancien (décision de Julien) :
+    // les pressés se lisent sur leur carte (date limite, ambre si proche), plus « en haut ».
+    if (!u.presseAttente) return 'sa date limite est écrite sur sa carte.';
     return u.presseAttente > 1
-      ? `dans chaque transporteur, le plus pressé est en haut ; ${u.presseAttente} attendent encore leur bordereau.`
-      : 'dans chaque transporteur, le plus pressé est en haut ; 1 attend encore son bordereau.';
+      ? `sa date limite est écrite sur sa carte ; ${u.presseAttente} attendent encore leur bordereau.`
+      : 'sa date limite est écrite sur sa carte ; 1 attend encore son bordereau.';
   };
 
   // La saisie en série : l'écriture de tout prix tapé (`ecrirePrixTape`, src/prixAuNumerotage.js).
@@ -37715,20 +37717,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
     // (5 nov.) L'ACHAT LEBONCOIN OU VESTIAIRE D'UN COLIS, PAR SON N° DE SUIVI (src/retraitQr.js, §5) :
     // jamais le titre, le prix ou le relais ; deux achats au même n° ⇒ personne.
+    // (9 nov., soir, lot AJ) LA DATE D'ARRIVÉE LUE d'un colis à retirer, pour l'ORDRE seulement (le plus
+    // récent en haut, src/ordreRecent.js) : l'arrivée de l'e-mail du colis (`arriveeColisEmail`), ou
+    // l'arrivée PROUVÉE d'un achat vu par Vinted (`arriveeSure` : message d'arrivée de la conversation,
+    // ligne « disponible » du transporteur) — jamais la borne « au plus tard ». Rien de lu ⇒ null (en bas).
+    const arriveeLueRetrait = ({ t = null, o = null } = {}) => {
+      try {
+        if (t) { const a = arriveeColisEmail(t); return a && Number.isFinite(a.ms) ? a.ms : null; }
+        if (o) { const e = etatColisVinted(o, maintenant, tpmC); return e && Number.isFinite(e.arriveeSure) ? e.arriveeSure : null; }
+      } catch (_) {}
+      return null;
+    };
     const achatsAutres = indexAchatsAutresSites({ lbcVentes: (lbcVentes && lbcVentes.achats) || [], vcAchats: ((vcEtat || vcBrut) && (vcEtat || vcBrut).achats) || null });
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
     for (const o of (pickupUnion.extra || [])) {
       const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -37743,11 +37756,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
+        arrivee: arriveeLueRetrait(x.kind === 'email' ? { t: x.t } : { o: x.o }),
         raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC) || colisInternational(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
+        arrivee: arriveeLueRetrait({ o }),
         raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, src: { o } }); }
     // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
     if (Array.isArray(sales.items)) {
@@ -37855,6 +37870,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [tourneeDepot, setTourneeDepot] = useState(false);
   // (9 nov.) Colis → Envoyés : la pastille de transporteur choisie (« tous » par défaut).
   const [filtreEnvoyes, setFiltreEnvoyes] = useState('tous');
+  // (lot AJ) La pastille de transporteur de « À envoyer » (un filtre, jamais un ordre).
+  const [filtreEnvoyer, setFiltreEnvoyer] = useState('tous');
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
   // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
   // (5 nov.) Leboncoin aussi (la tournée) : sa coche « Colis fait » de toujours (`vrm_lbc_colis_done`).
@@ -38330,11 +38347,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (5 nov.) Le compte d'un colis ne se dit que s'il y en a plusieurs (un seul compte : la même étiquette
   // sur chaque carte ne distingue rien, §7).
   const plusieursComptesColis = (accounts || []).length > 1;
-  // L'ordre de l'écran ET de « Tout imprimer » : la limite la plus proche d'abord (LUE dans l'e-mail du
-  // bordereau quand on l'a, sinon l'estimation vente + 7 j — `dl`), à limite égale la vente la plus
-  // ANCIENNE ; puis par transporteur, dans l'ordre de leur premier colis (src/lotTransporteurs.js).
-  const rangerColisEnvoi = (tous, trNom) => rangerParTransporteur(ordrePreparation(tous, { jours: (x) => x.dl, attente: attenteColis }), { trNom, jours: (x) => x.dl });
-  // Les colis à envoyer rangés comme l'écran : le plus pressé d'abord, puis par transporteur.
+  // ⚠️⚠️ (9 nov., soir, lot AJ — DÉCISION NOUVELLE de Julien : « du plus récent en haut au plus vieux en
+  // bas, peu importe le compte ») L'ORDRE DE L'ÉCRAN, DE « PRÉPARER MES COLIS » ET DE LA TOURNÉE : la vente
+  // la plus RÉCENTE en haut, tous comptes et sites mélangés, stable, sans date en bas (src/ordreRecent.js,
+  // `quandColisAEnvoyer` = date de la vente). Elle REMPLACE le tri par urgence (limite la plus proche
+  // d'abord, puis groupes par transporteur) des 8-9 nov. : la date limite reste écrite sur chaque carte
+  // (ambre si aujourd'hui/demain), le transporteur devient une pastille (filtre), jamais un ordre imposé.
+  // « Tout imprimer » (le PDF) garde ses groupes par transporteur (choix n° 2 du 3 nov.), chacun dans cet ordre.
+  const rangerColisEnvoi = (tous) => ordreRecent(tous, quandColisAEnvoyer);
+  // Les colis à envoyer rangés comme l'écran : le plus récent en haut (lot AJ).
   const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
   const listeEnvoyes = () => {
@@ -39602,7 +39623,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .sort((a, b) => (a.jours == null ? 9999 : a.jours) - (b.jours == null ? 9999 : b.jours));
             const colRet = colonnesColis(cartesColis(), 'toutes').colonnes.find(c => c.cle === 'retirer');
             const pointsVinted = ((dropOffs && dropOffs.carriers) || []).flatMap(c => c.points || []);
-            const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: [], pointsVinted });
+            const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: [], pointsVinted, ordonner: ordreRecentPoints });
             const minuit0 = new Date(); minuit0.setHours(0, 0, 0, 0); const m0 = minuit0.getTime();
             const t = etapesTournee({
               lignesImpr, nPrets, pretsAuMoins: !pretsExact, imprPasSu: emailBords === null,
@@ -44074,7 +44095,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const photoCarte = (src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(src)}/>;
           const colRet = vue.colonnes.find(c => c.cle === 'retirer');
           const pointsVinted = ((dropOffs && dropOffs.carriers) || []).flatMap(c => c.points || []);
-          const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: (groupesRelais && groupesRelais.attendus) || [], pointsVinted });
+          const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: (groupesRelais && groupesRelais.attendus) || [], pointsVinted, ordonner: ordreRecentPoints });
           // « Pas su » se DIT dans la colonne concernée, jamais un 0 muet (§5).
           const notes = {
             prets: ((sales.loading || accountsReady !== true || accounts.length > 0) && !sales.items) ? 'Je lis tes ventes…' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n’ont pas pu être lues.' : (!labelsPrets || emailBords===null) ? 'Je lis encore tes bordereaux : il y en a peut-être plus.' : null,
@@ -45081,8 +45102,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
                 // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
                 const tous = [...ex, ...autresColis];
-                const exT = rangerColisEnvoi(tous, trNomDe);
-                const nParT = {}; tous.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
+                // (9 nov., soir, lot AJ) UNE liste, la vente la plus récente en haut (tous comptes, tous sites) ;
+                // le transporteur est une PASTILLE (filtre, comme « Envoyés »), plus un groupe qui impose l'ordre.
+                const trDeColis = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
+                const pastillesEnv = filtresTransporteurs(tous, trDeColis);
+                const { liste: tousF, filtre: filtreEnvT } = filtrerEnvoyes(tous, filtreEnvoyer, trDeColis);
+                const exT = rangerColisEnvoi(tousF, trNomDe);
+                const iSansDateEnv = debutSansDate(exT, quandColisAEnvoyer), nSansDateEnv = nbSansDate(exT, quandColisAEnvoyer);
+                const pastillesEl = pastillesEnv.length > 1 ? (
+                  <div key="__filtres-env" className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyer-filtres="" data-envoyer-filtre={filtreEnvT} style={{display:'flex',gap:6,marginBottom:4}}>
+                    <button type="button" aria-pressed={filtreEnvT === 'tous'} data-envoyer-filtre-choix="tous" data-envoyer-filtre-n={tous.length} onClick={() => setFiltreEnvoyer('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {tous.length}</button>
+                    {pastillesEnv.map((p) => (
+                      <button key={p.nom} type="button" aria-pressed={filtreEnvT === p.nom} data-envoyer-filtre-choix={p.nom} data-envoyer-filtre-cle={p.cle || 'inconnu'} data-envoyer-filtre-n={p.n} onClick={() => setFiltreEnvoyer(filtreEnvT === p.nom ? 'tous' : p.nom)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.nom} · {p.n}</button>
+                    ))}
+                  </div>
+                ) : null;
                 const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
                   if (e.__autre === 'vc') return <CarteColisVc v={e.v} imprime={!!(vcCarte('vrm_vc_imprimes') || {})[e.v.id]} fait={null}/>;
@@ -45119,19 +45153,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
-                return (colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
-                const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
-                const trG = e.__autre ? e.tr : transporteurVente(e.b);
+                return [pastillesEl, ...(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
+                const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
                   <React.Fragment key={e.key}>
-                    {ouvreT && (
-                      <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                        <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                        <h3>{trNomDe(e)}</h3>
-                        <span>{nParT[trNomDe(e)]} colis</span>
-                      </div>
-                    )}
-                    {carteAutre(e)}
+                    {ouvreSansDate}
+                    <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-envoyer-site={e.__autre} style={{display:'contents'}}>{carteAutre(e)}</div>
                   </React.Fragment>);
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
@@ -45180,14 +45208,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
                 return (
                   <React.Fragment key={e.key}>
-                  {ouvreT && (
-                    <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                      <h3>{trNomDe(e)}</h3>
-                      <span>{nParT[trNomDe(e)]} colis</span>
-                    </div>
-                  )}
-                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  {ouvreSansDate}
+                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -45362,7 +45384,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   </React.Fragment>
                 );
-              }); })()}
+              })]; })()}
               </div>
               {/* (2 nov., colis clair) Sous la liste : ce n'est pas un geste du moment. */}
               {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur

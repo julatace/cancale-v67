@@ -110,3 +110,20 @@ export function quandColisAEnvoyer(x) {
 
 // Un colis « À retirer » (carte de Colis) : son arrivée lue au point.
 export const quandARetirer = (c) => msDe(c && c.arrivee);
+
+// ── « À RETIRER » : les points (src/relaisColis.js `pointsARetirer`, option `ordonner`) ──
+// Décision de Julien (« du plus récent en haut au plus vieux en bas, peu importe le compte ») : dans
+// « À retirer », UN POINT = UNE CARTE (§5) reste ; les colis d'un point vont de l'arrivée LUE la plus
+// récente à la plus ancienne (`arrivee`, posée par Colis ; sans date en bas), et les points dans l'ordre
+// de leur arrivée la plus récente (avant : la limite la plus proche d'abord). Les « à vérifier » restent
+// sous les comptés de leur point ; un point sans colis arrivé (seulement « en route ») passe après ;
+// « pas encore connu » reste à la fin. Les limites restent écrites (ambre si proches). Aucun colis écarté.
+const plusRecenteArrivee = (p) => { let m = null; for (const c of p.arrives || []) { const t = msDe(c && c.arrivee); if (t != null && (m == null || t > m)) m = t; } return m; };
+export function ordreRecentPoints(groupes) {
+  const L = (Array.isArray(groupes) ? groupes : []).map((p) => ({ ...p, arrives: [...ordreRecent((p.arrives || []).filter((c) => !c.aVerifier), (c) => c && c.arrivee), ...ordreRecent((p.arrives || []).filter((c) => c.aVerifier), (c) => c && c.arrivee)] }));
+  const rang = (p) => (p.inconnu ? 2 : (p.arrives.length ? 0 : 1));
+  const avecRang = L.map((p, i) => [p, i]);
+  const parRang = [0, 1, 2].map((r) => avecRang.filter(([p]) => rang(p) === r));
+  return [...ordreRecent(parRang[0], ([p]) => plusRecenteArrivee(p)), ...parRang[1], ...parRang[2]].map(([p]) => p);
+}
+
