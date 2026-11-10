@@ -1257,3 +1257,18 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Mois bouclé + Comparer deux mois (lots BK, BL)** : Argent → Déclarer → « Mois bouclé » : à dater, prix d'achat, comptes pas relus (ligne de fraîcheur PUBLIÉE), frais inconnus, chacun avec sa porte ; « prêt » + montant (`montantPeriodeUrssaf` du mois) seulement si tout est lu et complet (`src/moisBoucle.js`) ; Statistiques → Comparer : deux sélecteurs, vendu · reçu · bénéfice · ventes · achats (registre), flèche grise, aucune sur « au moins »/« — ». `docs/passation/2026-11-10-mois-boucle.md`. Geste : aucun.
+## Déplacé de CLAUDE.md §9 le 10 nov. (lot AB, taille)
+- **10 nov. · Dossier de litige PDF, vitesse d'envoi, avis (BJ, BM, BN)** : carte de Litiges → « Dossier PDF » fait DANS le navigateur (pdf-lib : N°, titre, compte, transaction, photos annonce + carton, n° de suivi, étapes PROUVÉES ; rien de l'acheteur ; page du bordereau seulement s'il coche) ; Statistiques + Ma semaine : « Vitesse d'envoi » vente → dépôt PROUVÉ (`partisVinted`), médiane par compte sur 30 j, « sur N colis », sans date nommés (`vrm_vitesse_envoi`) ; avis : forme mesurée SANS date désormais lue (20/compte, ordre de la page, évolution 10 vs 10, 5 derniers). `docs/passation/2026-11-10-litige-pdf-vitesse-avis.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Inventaire de fin d'année (lot W)** : Stock → « Inventaire de fin d'année » : paires de `annoncesPresentes` au prix SAISI, total = `valeurStock` (« au moins … sur N »), date choisie dite, « Je vérifie » = l'inventaire (+ caméra du lot V), écarts par N° seul, PDF/CSV ; rien changé. `docs/passation/2026-11-10-inventaire-annuel.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Recherche universelle (lot AX)** : la loupe / ⌘K met une correspondance EXACTE d'identité (N° `cleNum`, suivi normalisé, code, transaction, commande, facture — jamais titre, pseudo ni montant) EN TÊTE avec « Trouvé par son … », sortie de son groupe ; groupes Paires · Ventes · Achats · Colis · Retraits ; source pas lue DITE (« Achats pas encore lus » / « pas lus — la lecture n’a pas répondu », plus de `[]`) ; tout en mémoire. `docs/passation/2026-11-10-recherche-universelle.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot I)
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Siri / Raccourcis (lot AH)** : deux liens profonds que l'app Raccourcis ouvre — `?tab=achats&achat=1[&titre&prix&ou]` ouvre « Nouvel achat » pré-rempli (rien d'écrit sans son clic, prix illisible ⇒ vide) et `?tab=journee&q=` la loupe sur ce N° (dictée par `requeteDeLaVoix`) ; adresse effacée après lecture ; aide Paramètres → « Siri et Raccourcis » (`src/raccourcisSiri.js`). `docs/passation/2026-11-10-siri-raccourcis.md`. Geste : aucun.
+
+### Lignes déplacées de CLAUDE.md §9 (10 nov., lot AR)
+- **10 nov. · Textes courts, 3e série** : Argent (Super PDP, Factur-X, CFE, suivi des déclarations, rapport URSSAF), Colis/Achats/Messages de `Comptabilite`, Republier, Ma facture, Statistiques, Stock, page d'accueil : une phrase courte + le geste, détail sous « Pourquoi ? », sens et chiffres gardés ; banc `popups-propre` + Argent. `docs/passation/2026-11-10-textes-courts-3.md`. Geste : aucun.
