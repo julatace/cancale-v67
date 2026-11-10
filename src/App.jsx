@@ -39575,18 +39575,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // conversation / l'annonce ELLE-MÊME, ou celle reliée par son identifiant (n° de
         // transaction, n° de suivi ou code de retrait via `cmdParColis`, txId Leboncoin, vente
         // Vestiaire). Jamais un titre. Les MÊMES listes que les compteurs (aucun nombre ne change) ;
-        // l'ordre est celui de la liste (le plus pressé d'abord).
+        // l'ordre est celui de la liste de Colis (le plus récent d'abord depuis le lot AJ).
         const photosCase = (() => {
           const out = { envoyer: [], retirer: [], messages: [], prix: [] };
           try {
             const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
-            // `toShip` est déjà rangé du plus pressé au moins pressé (l'ordre de Colis).
-            out.envoyer = [
-              ...toShip.map((t) => orderPhoto(t.o)),
-              ...((colisEb && colisEb.aPoster) || []).map((x) => x.ordre ? photoCommande(x.ordre) : null),
-              ...((colisAutres.vestiaire) || []).map((v) => v && v.photo),
-              ...((colisAutres.leboncoin) || []).map((x) => photoArticle(lbcParTx.get(String(x.txId)))),
-            ];
+            // (9 nov., soir, lot AJ) L'ORDRE DE COLIS → « À envoyer » : la vente la plus RÉCENTE d'abord, tous
+            // sites et comptes mélangés (src/ordreRecent.js) — plus « le plus pressé d'abord ».
+            out.envoyer = ordreRecent([
+              ...toShip.map((t) => ({ p: orderPhoto(t.o), t: quandCommandeVinted(t.o) })),
+              ...((colisEb && colisEb.aPoster) || []).map((x) => ({ p: x.ordre ? photoCommande(x.ordre) : null, t: quandEbay(x.ordre) })),
+              ...((colisAutres.vestiaire) || []).map((v) => ({ p: v && v.photo, t: quandVestiaire(v) })),
+              ...((colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)); return { p: photoArticle(o), t: quandLeboncoin(o || x) }; }),
+            ], (x) => x.t).map((x) => x.p);
             out.retirer = [
               ...(pickupUnion.emailList || []).map((t) => { const o = pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)); return o ? orderPhoto(o) : null; }),
               ...(pickupUnion.extra || []).map((o) => orderPhoto(o)),
