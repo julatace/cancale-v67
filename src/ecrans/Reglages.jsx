@@ -103,8 +103,6 @@ import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
 const JournalEmails = aLaDemande(() => import('../JournalEmails.jsx'));
-// (8 nov.) « Ton adresse VRM » : l'adresse de réception unique (src/AdresseReception.jsx), à la demande.
-const CarteAdresseReception = aLaDemande(() => import('../AdresseReception.jsx'));
 // (10 nov., lot AQ) Paramètres → Mes e-mails → « Mon adresse VRM » : la MÊME feuille, ouverte d'une ligne.
 const FeuilleAdresseVrm = aLaDemande(() => import('../AdresseReception.jsx').then((m) => ({ default: m.FeuilleAdresseReception })), true);
 // ⟦← App.jsx #17⟧
@@ -4736,8 +4734,7 @@ function EmailsSetting({onComptes}) {
     <div ref={racine}>
     <EspaceEmails onglet={rubriqueEmail} onOnglet={(o)=>{if(o==='journal'){setJournalFiltre('');setJournalType('');}setRubriqueEmail(o);}} idBase={espaceId} theme={C}>
     <div id={espaceId+'-adresses'} data-email-panneau="adresses" hidden={rubriqueEmail!=='adresses'}>
-    {/* (8 nov.) L'adresse de réception UNIQUE, en tête : la plus simple (rien à prouver). */}
-    {rubriqueEmail==='adresses'&&<CarteAdresseReception headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioEmails===true} onBoite={()=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:'emails'}));}catch(_){}}}/>}
+    {/* (10 nov., soir) L'adresse VRM n'est plus répétée ici : LE parcours est en tête de « Relier ma boîte », juste au-dessus. */}
     <div data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       <p className="vrm-email-intro-adresses">Ajoute les adresses où Vinted t’écrit, puis configure leur transfert vers VRM.</p>
