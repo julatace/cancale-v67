@@ -73,8 +73,17 @@ de `stockValue`), `src/ecrans/Stock.jsx`, `src/ecrans/Stats.jsx`.
   0, « au moins » tu, aucune paire ni prix dit 0, porte rouge, porte retirée, second calcul
   dans Statistiques). Sur l'arbre d'`origin/main` (git archive) : rouge (module absent).
 - Banc `scripts/bancs/cout-vente.cjs` (données inventées ; 390 px tactile et 1512 px, clair
-  et sombre) : voir le résultat ci-dessous ; captures regardées
-  `<tmp>/cout-vente-{390,1512}-{clair,sombre}-{vente,emballage,stock,stats}.png`.
+  et sombre) : **60 verts** ; sur l'arbre d'`origin/main` rebâti : rouge dès le 390 px (pas
+  de barre, pas de ligne emballage) ; par mutation (emballage vide pris pour 0 + « sans
+  prix » compté comme saisi, rebâti) : rouge. Captures regardées
+  `<tmp>/cout-vente-{390,1512}-{clair,sombre}-{vente,emballage,stock,stats}.png`. Vu sur les
+  captures : la carte de Statistiques coupait « au moins 145,50 € » au téléphone (grille à
+  trois colonnes) ⇒ le montant seul en gros, « au moins · sur N paires · K sans prix »
+  dessous.
+- Bancs touchés relancés : `recap-vente` (68 verts), `plancher-stock` (40 verts), et
+  `stock-annonces`, `ventes-benefice-glisser`, `benefice-brut-net` (voir le rapport).
+- Taille de CLAUDE.md : la ligne §9 la plus ancienne (« DA4 suite ») déplacée telle quelle
+  dans `historique-divers.md`.
 - `npm run build` ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`, `urssaf`,
   `benefice`, `benefice-unique`, `plancher-stock`, `frais-plateformes`, `chiffres` : verts.
 

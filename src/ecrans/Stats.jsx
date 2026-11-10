@@ -712,8 +712,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             « N sans prix » ouvre la saisie en série. Jamais publiée ⇒ « — ». */}
         {(()=>{ const t = texteValeurStock(valeurStk, { partiel: !!(valeurStk && valeurStk.partiel) });
           return <div style={{display:'contents'}} data-stats-valeur-stock={valeurStk ? (valeurStk.centimes == null ? 'passu' : String(valeurStk.centimes)) : 'jamais'} data-stats-valeur-sans={valeurStk ? valeurStk.nSans : undefined}><StatCard icon="💰" label="Valeur du stock"
-            value={valeurStk && valeurStk.centimes != null ? `${t.auMoins ? 'au moins ' : ''}${t.montant}` : '—'} color={C.text}
-            sub={valeurStk ? [t.sur, t.sans].filter(Boolean).join(' · ') : 'annonces pas encore lues'}
+            value={valeurStk && valeurStk.centimes != null ? t.montant : '—'} color={C.text}
+            sub={valeurStk ? [t.auMoins && valeurStk.centimes != null ? 'au moins' : '', t.sur, t.sans].filter(Boolean).join(' · ') : 'annonces pas encore lues'}
             onClick={valeurStk && valeurStk.nSans ? versSaisiePrix : null} title={valeurStk && valeurStk.nSans ? 'Saisir les prix d’achat qui manquent' : null}/></div>; })()}
         {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}

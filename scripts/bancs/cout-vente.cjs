@@ -220,7 +220,7 @@ async function stock(b, tel, sombre) {
     await r.pg.waitForSelector('[data-stats-valeur-stock]', { timeout: 20000 }).catch(() => {});
     await r.pg.waitForTimeout(600);
     const s = await r.pg.evaluate(() => { const e = document.querySelector('[data-stats-valeur-stock]'); return e ? { v: e.getAttribute('data-stats-valeur-stock'), sans: e.getAttribute('data-stats-valeur-sans'), t: e.textContent.replace(/\s+/g, ' ') } : null; });
-    dit(s && s.v === '14550' && s.sans === '2' && /au moins 145,50\s€/.test(s.t) && /2 sans prix/.test(s.t), `${T} Statistiques : la MÊME valeur, lue (au moins 145,50 € · 2 sans prix)`, JSON.stringify(s));
+    dit(s && s.v === '14550' && s.sans === '2' && /145,50\s€/.test(s.t) && /au moins · sur 6 paires · 2 sans prix/.test(s.t), `${T} Statistiques : la MÊME valeur, lue (145,50 € · au moins · sur 6 paires · 2 sans prix)`, JSON.stringify(s));
     await r.pg.evaluate(() => { const e = document.querySelector('[data-stats-valeur-stock] .vrm-finance-metric'); const d = e && e.closest('details'); if (d) d.open = true; if (e) e.scrollIntoView({ block: 'center' }); });
     await r.pg.waitForTimeout(300);
     await r.pg.locator('[data-stats-valeur-stock] .vrm-finance-metric').first().screenshot({ path: path.join(CAP, `cout-vente-${tel ? 390 : 1512}-${sombre ? 'sombre' : 'clair'}-stats-carte.png`) }).catch(() => {});
