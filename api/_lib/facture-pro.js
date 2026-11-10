@@ -59,13 +59,21 @@ const JOURNAL_MAX = 60;
 // échanger) ; l'offre gratuite d'un fournisseur comme Brevo s'arrête à 300 / jour
 // pour TOUTE l'installation.
 export const PLAFOND_JOUR = 50;
+// (10 nov., lot Q) Le journal de l'envoi automatique (api/_lib/factures-auto.js).
+export const ID_AUTO = 'vrm_facture_auto';
+export const journalAutoPublic = (j) => ({
+  at: (j && j.at) || null,
+  pause: j && j.pause && typeof j.pause === 'object' ? { code: String(j.pause.code || ''), texte: String(j.pause.texte || '') } : null,
+  essais: Object.entries((j && j.essais) || {}).map(([tx, e]) => ({ tx, issue: String((e && e.issue) || ''), raison: String((e && e.raison) || ''), at: (e && e.at) || null }))
+    .sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 30),
+});
 export const ID_ENVOIS_JOUR = 'vrm_facture_envois_jour';
 const JOURNAL_ENVOIS_MAX = 20;
 
 const enTetes = (extra = {}) => ({ ...sbCle(sbKey()), ...extra });
 const url = (id, owner) => `${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&owner=eq.${encodeURIComponent(owner)}`;
 const repondre = (res, code, corps) => res.status(code).json(corps);
-const nouveauRev = () => crypto.randomBytes(9).toString('base64url');
+export const nouveauRev = () => crypto.randomBytes(9).toString('base64url');
 export const idFacture = (tx, avoir = false) => `email_invoice_${avoir ? 'av' : 'tx'}${tx}`;
 
 // ── Lectures en TROIS états : undefined pas su · null absente · data ────────
@@ -81,7 +89,7 @@ export async function lireLigne(id, owner, select = 'data') {
   } catch (_) { return undefined; }
 }
 // Créer seulement si absente : 'ok' · 'conflit' · 'ko'.
-async function creer(id, owner, data) {
+export async function creer(id, owner, data) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([{ owner, id, data }]) });
     if (r.ok) return 'ok';
@@ -90,7 +98,7 @@ async function creer(id, owner, data) {
 }
 // Modifier seulement si la ligne est encore celle qu'on a lue (filtre) :
 // 'ok' · 'conflit' · 'ko'.
-async function modifierSi(id, owner, filtre, data) {
+export async function modifierSi(id, owner, filtre, data) {
   try {
     const r = await fetch(`${url(id, owner)}&${filtre}&select=id`, { method: 'PATCH', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data }) });
     if (!r.ok) return 'ko';
@@ -100,7 +108,7 @@ async function modifierSi(id, owner, filtre, data) {
   } catch (_) { return 'ko'; }
 }
 // Une liste du vendeur (projection scalaire, jamais `select=data`) : undefined = pas su.
-async function lireListe(requete, owner) {
+export async function lireListe(requete, owner) {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
@@ -119,7 +127,14 @@ async function lireListe(requete, owner) {
 //   · le brouillon de facture déjà lu.
 // undefined = pas su (une lecture a échoué) ⇒ l'appelant répond 503, rien.
 export async function lirePreuve(owner, tx, brouillon) {
-  if (!/^\d{4,20}$/.test(String(tx))) return preuveAcheteur({ tx });
+  const r = await lirePreuveEtCommandes(owner, tx, brouillon);
+  return r === undefined ? undefined : r.preuve;
+}
+// (10 nov., lot Q) La même lecture, qui rend AUSSI les ventes Vinted portant ce n°
+// (leur état dit si la vente a été annulée : l'envoi automatique ne facture jamais
+// une vente annulée). undefined = pas su.
+export async function lirePreuveEtCommandes(owner, tx, brouillon) {
+  if (!/^\d{4,20}$/.test(String(tx))) return { preuve: preuveAcheteur({ tx }), commandes: [], mails: [] };
   const [mails, ventes] = await Promise.all([
     lireListe(`id=like.email_sale_*&data->>transaction=eq.${tx}&data->>pro=eq.true&select=id,transaction:data->>transaction,receivedAt:data->>receivedAt,prix:data->>prix,email:data->>email,nom:data->>nomComplet,adresse:data->>adresse,uid:data->>uid,designation:data->>designation`, owner),
     lireListe(`id=like.harvest_*_orders_sold&data->payload->my_orders=cs.${encodeURIComponent(JSON.stringify([{ transaction_id: Number(tx) }]))}&select=id,commandes:data->payload->my_orders`, owner),
@@ -130,10 +145,10 @@ export async function lirePreuve(owner, tx, brouillon) {
     const uid = (String((v && v.id) || '').match(/^harvest_(\d+)_orders_sold$/) || [])[1] || '';
     for (const c of Array.isArray(v && v.commandes) ? v.commandes : []) if (c && String(c.transaction_id) === String(tx)) commandes.push({ ...c, uid });
   }
-  return preuveAcheteur({ tx, mails, commandes, brouillon, adresseLisible: adresseVintedLisible });
+  return { preuve: preuveAcheteur({ tx, mails, commandes, brouillon, adresseLisible: adresseVintedLisible }), commandes, mails };
 }
 
-const condRev = (rev) => (rev == null || rev === '' ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(String(rev))}`);
+export const condRev = (rev) => (rev == null || rev === '' ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(String(rev))}`);
 
 // ── LE NUMÉRO ───────────────────────────────────────────────────────────────
 // Le compteur : un nombre (forme d'avant le 2 nov.) ou { n, journal:[{n,cle,at}] }.
@@ -167,7 +182,7 @@ export async function prendreNumero(owner, idCompteur, cle, essais = 12) {
 }
 
 // ── LA BOÎTE D'ENVOI (coffre) ──────────────────────────────────────────────
-async function lireBoite(owner) {
+export async function lireBoite(owner) {
   const b = await lireLigne(ID_BOITE, owner, 'data');
   if (b === undefined) return undefined;
   if (!b || !b.chiffre) return null;
@@ -255,7 +270,7 @@ export const facturePublique = (d, id) => (!d ? null : {
   envoi: d.envoi || null, envois: Array.isArray(d.envois) ? d.envois : [], retour: !!(d.retourNom), annuleePar: d.annuleePar || null, transaction: d.transaction || '',
   preuve: !!d.preuve,
 });
-async function emettre(owner, corps, res) {
+export async function emettre(owner, corps, res) {
   const tx = String(corps.tx || '');
   if (!TX_RE.test(tx)) return repondre(res, 400, { erreur: 'tx', message: 'Vente sans n° de transaction : pas de facture.' });
   if (corps.confirme !== true) return repondre(res, 400, { erreur: 'confirmation' });
@@ -364,7 +379,9 @@ async function reserverEnvoiJour(owner) {
   }
   return { etat: 'pas-su' };
 }
-async function envoyer(owner, corps, res, env = process.env) {
+// `opts.auto` : l'envoi AUTOMATIQUE (api/_lib/factures-auto.js) — jamais posé par le navigateur.
+export async function envoyer(owner, corps, res, env = process.env, opts = {}) {
+  const auto = !!(opts && opts.auto === true);
   const tx = String(corps.tx || '');
   if (!TX_RE.test(tx) || corps.confirme !== true) return repondre(res, 400, { erreur: 'tx' });
   const avoir = !!corps.avoir;
@@ -408,7 +425,7 @@ async function envoyer(owner, corps, res, env = process.env) {
   }
   // Marquer « en cours » AVANT d'envoyer (comparer-et-échanger) : deux clics,
   // deux appareils, un seul envoi. Écriture ratée ⇒ rien ne part.
-  const marque = { ...ligne, envoi: { etat: 'en-cours', at: new Date().toISOString(), a: c.acheteur.email, via }, rev: nouveauRev() };
+  const marque = { ...ligne, envoi: { etat: 'en-cours', at: new Date().toISOString(), a: c.acheteur.email, via, ...(auto ? { auto: true } : {}) }, rev: nouveauRev() };
   const w = await modifierSi(id, owner, condRev(ligne.rev), marque);
   if (w === 'conflit') return repondre(res, 409, { erreur: 'en-cours', message: "La facture a changé à l'instant (un autre appareil ?). Rouvre-la." });
   if (w !== 'ok') return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu : rien n'est parti. Réessaie." });
@@ -424,11 +441,11 @@ async function envoyer(owner, corps, res, env = process.env) {
     de: transport.de, nomDe: mail.nomExpediteur, a: c.acheteur.email, cc: transport.cc, replyTo: transport.replyTo, bcc: transport.bcc,
     sujet: mail.sujet, texte: mail.texte, html: mail.html, pieces });
   const at = new Date().toISOString();
-  const envoi = v.issue === 'envoye' ? { etat: 'envoyee', at, a: c.acheteur.email, de: transport.de, via, cc: transport.cc[0] || '', id: v.id, retour: pieces.length > 1 }
-    : v.issue === 'incertain' ? { etat: 'incertaine', at, a: c.acheteur.email, via, message: v.message }
-    : { etat: 'refusee', at, a: c.acheteur.email, via, message: `${MSG_ETAPE[v.etape] || "L'envoi a échoué."}${v.message ? ` (${v.message})` : ''}` };
+  const envoi = v.issue === 'envoye' ? { etat: 'envoyee', at, a: c.acheteur.email, de: transport.de, via, cc: transport.cc[0] || '', id: v.id, retour: pieces.length > 1, ...(auto ? { auto: true } : {}) }
+    : v.issue === 'incertain' ? { etat: 'incertaine', at, a: c.acheteur.email, via, message: v.message, ...(auto ? { auto: true } : {}) }
+    : { etat: 'refusee', at, a: c.acheteur.email, via, message: `${MSG_ETAPE[v.etape] || "L'envoi a échoué."}${v.message ? ` (${v.message})` : ''}`, ...(auto ? { auto: true } : {}) };
   // Le JOURNAL des envois (date, destinataire, chemin, issue) : seulement allongé.
-  const envois = [...(Array.isArray(ligne.envois) ? ligne.envois : []), { etat: envoi.etat, at, a: envoi.a, via, cc: envoi.cc || '' }].slice(-JOURNAL_ENVOIS_MAX);
+  const envois = [...(Array.isArray(ligne.envois) ? ligne.envois : []), { etat: envoi.etat, at, a: envoi.a, via, cc: envoi.cc || '', ...(auto ? { auto: true } : {}) }].slice(-JOURNAL_ENVOIS_MAX);
   const fin = { ...marque, envoi, envois, status: v.issue === 'envoye' ? 'sent' : marque.status, ...(v.issue === 'envoye' ? { sentAt: at, retourB64: '' } : {}), rev: nouveauRev() };
   let ecrit = await modifierSi(id, owner, condRev(marque.rev), fin);
   if (ecrit === 'ko') ecrit = await modifierSi(id, owner, condRev(marque.rev), fin);   // un hoquet : une fois encore
@@ -436,7 +453,7 @@ async function envoyer(owner, corps, res, env = process.env) {
 }
 
 async function etat(owner, res, env = process.env) {
-  const [b, compteur, jour] = await Promise.all([lireBoite(owner), lireLigne('vrm_invoice_counter', owner, 'data'), lireLigne(ID_ENVOIS_JOUR, owner, 'data')]);
+  const [b, compteur, jour, auto] = await Promise.all([lireBoite(owner), lireLigne('vrm_invoice_counter', owner, 'data'), lireLigne(ID_ENVOIS_JOUR, owner, 'data'), lireLigne(ID_AUTO, owner, 'data')]);
   if (b === undefined) return repondre(res, 503, { erreur: 'pas-su', message: "Je n'ai pas pu lire ta boîte d'envoi (la base n'a pas répondu)." });
   // Le prochain n° (lu, jamais deviné) : null = pas su.
   const cpt = compteur === undefined ? null : lireCompteur(compteur);
@@ -444,7 +461,10 @@ async function etat(owner, res, env = process.env) {
   const n = jour === undefined ? null : (jour && jour.jour === jourParisIso() && Number.isInteger(jour.n) ? jour.n : 0);
   return repondre(res, 200, { ok: true, coffre: coffrePret(), boite: boitePublique(b), fournisseurs: Object.fromEntries(Object.entries(FOURNISSEURS).map(([k, f]) => [k, { l: f.l, hote: f.hote, port: f.port }])), messageDefaut: MESSAGE_DEFAUT,
     prochain: cpt ? cpt.n + 1 : null,
-    vrm: { pret: conf.pret, manque: conf.manque, plafond: PLAFOND_JOUR, aujourdhui: n } });
+    vrm: { pret: conf.pret, manque: conf.manque, plafond: PLAFOND_JOUR, aujourdhui: n },
+    // (10 nov., lot Q) Le dernier passage de l'envoi automatique (aucun e-mail d'acheteur
+    // dedans : n° de transaction, issue, raison). undefined = pas su ⇒ null.
+    auto: auto === undefined ? null : auto ? journalAutoPublic(auto) : { at: null, pause: null, essais: [] } });
 }
 
 export async function routeFacturePro(req, res, { vendeur, corps, acces, cloisonnee }) {
