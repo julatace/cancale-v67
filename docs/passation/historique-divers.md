@@ -1218,3 +1218,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (corbeille lot Y, taille du dossier)
 - **10 nov. · Textes courts (lot AI)** : plus de murs de texte — états en pastilles d'une ligne, phrase ≤ 12 mots, détail sous « Pourquoi ? » (`src/composants/InfoPop.jsx`), « Même paire ? » en carte à deux photos [Oui] [Non], un seul « Tout imprimer », carte du compte ⇒ Paramètres, avatar au lieu du point. `docs/passation/2026-11-09-popups-propre.md`. Geste : regarder les planches.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Argent = Compta + Statistiques (lot AO)** : UNE entrée « Argent », quatre segments (Résumé · Statistiques · Déclarer · Factures) ; en tête du Résumé vendu · reçu · bénéfice · à déclarer, chiffres de leurs propriétaires (`valeurChiffre`, `previsionUrssaf`, `profilFiscal`), toucher = le détail ; « Documents et réglages » rangé dans Déclarer ; anciens liens (`dashboard`, `stats`, `invoices`, `argent_declarer`) redirigés ; règle `src/argent.js`, chiffres avant = après (banc `argent`). `docs/passation/2026-11-10-compta-stats.md`. Geste : aucun.
