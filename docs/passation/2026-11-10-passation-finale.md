@@ -57,7 +57,7 @@ Le pas à pas détaillé de chaque geste : `docs/passation/2026-11-10-guide-gest
 11. **Communauté pour formateurs** : migration **032** (Supabase → SQL Editor, fichier `032-communaute-formateurs.sql` → Run), puis Communauté → Groupes → « Créer ma page ».
 12. **Facultatif** : migration 016 (mode équipe), préfecture (livre de police, cerfa 11733).
 
-Mis en ligne après la rédaction (10 nov., 22 h–23 h) : annonces à compléter, avis par vente (pas relié, dit), Messages → « Tous » (un fil par acheteur), marge par plateforme, Communauté pour les formateurs (PR #1112–#1114).
+Mis en ligne après la rédaction (10 nov., 22 h–23 h) : annonces à compléter, avis par vente (pas relié, dit), Messages → « Tous » (un fil par acheteur), marge par plateforme, Communauté pour les formateurs (PR #1112–#1114), puis import tableur des achats + aide par écran (#1115), échéances dans l'agenda + alerte nouvel appareil (#1116).
 
 ## C. Ce que toi seul peux décider
 
@@ -84,8 +84,6 @@ Mis en ligne après la rédaction (10 nov., 22 h–23 h) : annonces à compléte
 |---|---|---|---|
 | Adresse VRM simple et belle (demande de Julien, 2 captures) | `claude/adresse-vrm-simple` | WIP 1 commit (3 fichiers) | voir le brief dans le récit de la session : UN parcours (compte → adresse → messagerie détectée → 3 étapes → « Reçu ✓ »), plus de spinner infini, code de confirmation Gmail affiché + bouton « Confirmer dans Gmail » (sur SON clic), cartes « Adresse sans compte » compactes, planches avant/après |
 | AP republication à la main | `claude/republier-main` | WIP 1 commit | tout le reste (voir file des lots) |
-| J import Excel + partage Photos + aide | `claude/import-partage-aide` | WIP 1 commit | tout le reste |
-| H agenda .ics + nouvel appareil | (rien de poussé) | — | tout (024 appliquée : `vrm_sessions_de`, `vrm_fermer_session`) |
 
 Pour reprendre : `git fetch origin && git checkout -B <lot> origin/claude/<lot>`, lire son récit
 s'il existe (`docs/passation/2026-11-10-<lot>.md`) et `git log origin/main..HEAD`, finir, vrai
