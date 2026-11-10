@@ -1475,7 +1475,7 @@ function DaterVentesLbc({ ventes, dates }) {
   return (
     <div data-dater-lbc={liste.length} style={{ padding: '10px 16px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
       <div style={{ fontWeight: 600 }}>Dater tes ventes Leboncoin</div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>Recopie la date de vente affichée dans « Mes transactions » sur leboncoin.fr : la vente compte alors dans son mois (CA, déclaration URSSAF).</div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>Recopie la date de « Mes transactions » : la vente entre dans son mois.</div>
       {liste.map((v) => {
         const tx = String(v.txId), cur = (dates || {})[tx] || '';
         const val = saisie[tx] != null ? saisie[tx] : cur;
@@ -1574,7 +1574,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
                 choix ne vaut que pour CETTE carte (le bénéfice a le sien).
                 (2 nov.) Dans « Le détail », le repli porte le titre. */}
             {!dansRepli && <div data-titre-carte-ca="" style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{TITRE_CARTE_CA}</div>}
-            <div data-ca-sa-periode="" style={{ fontSize: dansRepli ? 13 : 11, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{dansRepli ? <>Vendu : au jour de la vente. Reçu : au jour où la plateforme t'a versé l'argent (c'est lui qui se déclare). La période choisie ici ne vaut que pour cette carte.</> : 'Toutes plateformes · la période choisie ici ne vaut que pour cette carte.'}</div>
+            <div data-ca-sa-periode="" style={{ fontSize: dansRepli ? 13 : 11, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{dansRepli ? <>Vendu : jour de la vente. Reçu : jour du versement (il se déclare).</> : 'Toutes plateformes · la période choisie ici ne vaut que pour cette carte.'}</div>
           </div>
           {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des
               sous-onglets de plateforme) : plus de segment rempli d'accent. */}
@@ -1586,7 +1586,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
         </div>
         {calc.etat !== 'lu' ? (
           <div style={{ padding: '16px', fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
-            {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
+            {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre plutôt qu'un faux zéro."}
           </div>
         ) : (<>
           <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
@@ -1622,7 +1622,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
             <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
               {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
               {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
-              {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
+              {versements === null && <div>Dates de versement Vinted illisibles : « reçu » attend.</div>}
               {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
               {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période — tu peux la dater ci-dessous.</div>}
               {/* (2 nov., audit des données G1) La commande eBay au montant pas lu est dans « non comptées » ci-dessous (une phrase, §7). */}
@@ -1701,13 +1701,13 @@ function ProfilFiscalCarte({ onNav }) {
           <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, background: C.card2 || C.bg, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Ton entreprise</div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : VRM retrouve le nom et l'adresse. Ils figurent sur tes reçus et tes factures.</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : nom et adresse se remplissent.</div>
           </div>
           {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
         </div>
         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {cfg === undefined && <div style={{ fontSize: 13, color: C.muted }}>Je lis ton entité…</div>}
-          {cfg === null && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>La base n'a pas répondu : je ne te montre pas de champs vides à remplir (ils remplaceraient ton entité). Rouvre cet écran dans un moment.</div>}
+          {cfg === null && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>Base muette : rien à remplir pour ne rien écraser. Rouvre plus tard.</div>}
           {cfg && (<>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {PROFIL_CHAMPS.map(([k, ph, flex]) => (
@@ -1718,12 +1718,12 @@ function ProfilFiscalCarte({ onNav }) {
               ))}
             </div>
             <div data-siren={siren.etat} data-registre={registre ? registre.etat : undefined} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
-              {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres) : il figure sur ton avis de situation INSEE. Le nom de ton entreprise se remplit tout seul.'
-                : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`
+              {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres, avis INSEE) : le nom suit.'
+                : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Gardé tel quel : vérifie ton avis INSEE.`
                 : !registre || registre.etat === 'encours' ? `${siren.type} valide — je cherche ton entreprise au registre…`
                 : registre.etat === 'trouve' ? <>✓ Trouvée au registre des entreprises : <b className="vrm-sensible" data-stream-type="compte" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? ' — le registre la dit fermée, vérifie ton numéro.' : '.'}{cfg.nom && cfg.nom !== registre.nom ? ' Tu as gardé ton propre nom : VRM ne le remplace pas.' : ''}</>
                 : registre.etat === 'inconnu' ? `${siren.type} valide, mais aucune entreprise à ce numéro au registre public — tape le nom toi-même.`
-                : `${siren.type} valide. Le registre des entreprises ne répond pas pour l'instant — le nom se remplira à ta prochaine visite, ou tape-le.`}
+                : `${siren.type} valide. Registre muet : tape le nom, ou reviens plus tard.`}
             </div>
           </>)}
           {/* (5 nov., chantier F, revue 2.27) Le statut ne se choisit plus ICI : un seul endroit,
@@ -2228,7 +2228,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {chip('doc')}
           <div style={{ flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Facturation électronique</div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers. Connecte ton compte Super PDP pour que tes factures partent d'ici, ou dépose-les toi-même.</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Connecte Super PDP, ou dépose les fichiers toi-même.</div>
           </div>
           <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label="Mois" data-fe-mois
             style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
@@ -2287,7 +2287,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
           {!recap ? (
             <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
-              {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
+              {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total plutôt qu'un faux zéro."}
             </div>
           ) : (<div data-fe-recap data-recap-ym={ym} data-recap-total={eurDe(recap.centimes)} data-recap-n={recap.n} data-recap-partiel={recap.partiel ? '1' : '0'}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
@@ -2403,7 +2403,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
     <Card style={{ padding: 18 }}>
       <div data-statut-carte={regime ? 'changer' : 'question'}>
         <h3 className="vrm-titre-compta" style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: C.text }}>{regime ? 'Change ton statut' : 'Quel est ton statut ?'}</h3>
-        <p className="vrm-aide" style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>VRM adapte ta comptabilité à ta situation : il ne te parle d'URSSAF que si tu es micro-entrepreneur. Tu peux le changer à tout moment.</p>
+        <p className="vrm-aide" style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>L'URSSAF n'apparaît qu'en micro-entreprise. Modifiable à tout moment.</p>
         {choix}
         {!regime && pf.etat === 'inconnu' ? <AideStatutNeutre /> : null}
         {regime && <button type="button" className="vrm-lien-action" onClick={() => setChanger(false)} style={{ marginTop: 10, border: 'none', background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Annuler</button>}
@@ -2446,7 +2446,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
     // l'export comptable remontés juste en dessous (`pf.exportEnAvant`).
     const tvaTexte = { franchise: 'Franchise en base de TVA : tes factures portent « TVA non applicable ».', normale: 'TVA collectée : ton comptable la déclare à partir de ton export.', marge: 'TVA sur la marge.' };
     return <div className="vrm-compta-carte"><div data-statut-carte={regime} data-profil-fiscal={pf.etat || ''} style={{ fontSize: 15, color: C.text, lineHeight: 1.6 }}>{texte}
-      {pf.livre ? <div data-profil-tva={pf.tva || 'pasdit'} style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{pf.tva ? tvaTexte[pf.tva] : 'Ta TVA n’est pas dite : choisis-la dans Réglages → Ma configuration.'} Ton livre des recettes, ton registre des achats et l’export pour ton comptable sont juste en dessous.</div> : null}
+      {pf.livre ? <div data-profil-tva={pf.tva || 'pasdit'} style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{pf.tva ? tvaTexte[pf.tva] : 'Ta TVA n’est pas dite : choisis-la dans Réglages → Ma configuration.'} Livre, registre et export : juste en dessous.</div> : null}
     </div></div>;
   }
   return <CarteUrssafMois liveStats={liveStats} onNav={onNav} />;
