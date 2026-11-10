@@ -12,7 +12,7 @@
 // point sans repère dit comme tel, l'achat sans destination compté à part, le
 // repère cherché avec le code postal, et aucun écart à 390 px ni 1512 px.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, metaDe, filtreData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 4393);
@@ -62,6 +62,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    if (src === 'meta') { out[alias] = metaDe(row.data); continue; }
     let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
     out[alias] = v == null ? null : (/->>/.test(src) && typeof v === 'object' ? JSON.stringify(v) : v);
   }
@@ -94,8 +95,10 @@ async function preparer(b, vp) {
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date(MAINTENANT).toISOString(), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(ROWS.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id) && filtreData(u)(r)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -124,7 +127,9 @@ async function main() {
         const r = await pg.evaluate(() => { const d = document.querySelector('[data-colis-retraits="outils"]');
           return { col: document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]').length, cartesDetail: d ? d.querySelectorAll('[data-relais-carte], [data-relais-fond]').length : 0,
             codes: document.querySelectorAll('[data-cc-colonne="retirer"] [data-code-retrait]').length, redits: d ? d.querySelectorAll('.vrm-pickup-point, .vrm-pickup-card').length : 0, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }; });
-        dit(r.col >= 2, `${T} l'ancien lien mène à Colis → « À retirer » : la liste par point relais`, JSON.stringify(r));
+        // (9 nov. au soir) Depuis « retraits frais » (D1), seul un point où un colis COMPTÉ attend est un point ; l'achat
+        // en route vers « Tabac Inconnu » est dans le repli « En route » (jugé dans l'essai Colis).
+        dit(r.col >= 1, `${T} l'ancien lien mène à Colis → « À retirer » : la liste par point relais`, JSON.stringify(r));
         dit(r.cartesDetail === 0 && r.redits === 0, `${T} les outils de retrait ne redessinent ni la carte ni les colis`, JSON.stringify(r));
         dit(r.codes >= 1, `${T} les colis et leurs codes sont dans la liste par point`, JSON.stringify(r));
         dit(r.sw <= r.cw + 1, `${T} aucun débordement`, JSON.stringify(r));
@@ -152,15 +157,26 @@ async function main() {
         // raisons (en mots simples) seulement quand le fond s'affiche.
         const tel = vp.width < 600;
         const fondOk = await pg.evaluate(() => !!document.querySelector('[data-relais-fond="pret"]'));
-        dit(!!k && k.c === '2' && k.t === '1' && k.n === '1' && (tel ? k.rp === 'sans-carte' : k.rp === 'oui'), `${T} Colis : Kusmi Tea, point n° 1, 2 colis + 1 en route${tel ? ' (téléphone : sans carte)' : ', placé sur la carte'}`, JSON.stringify(pts.map((p) => [p.cle, p.n, p.c, p.t, p.rp])));
+        // (9 nov. au soir) Depuis « retraits frais », la carte est aussi dessinée au téléphone (deux doigts la
+        // déplacent, un doigt fait défiler la page) : le point y est placé comme à l'ordinateur.
+        dit(!!k && k.c === '2' && k.t === '1' && k.n === '1' && k.rp === 'oui', `${T} Colis : Kusmi Tea, point n° 1, 2 colis + 1 en route, placé sur la carte`, JSON.stringify(pts.map((p) => [p.cle, p.n, p.c, p.t, p.rp])));
         const ti = pts.find((p) => p.cle === 'tabacinconnu|29200');
-        if (tel || !fondOk) dit(!!ti && !/Pas sur la carte/.test(ti.txt) && !/Base Adresse/.test(ti.txt) && /date d’arrivée pas encore dite/.test(ti.txt), `${T} Colis : le point sans rue est listé, sans phrase sur une carte absente`, ti && ti.txt.slice(0, 220));
+        // (9 nov. au soir) La colonne refaite (« À retirer » au style de « À envoyer », 3 nov. ; « retraits frais » D1) :
+        // les achats EN ROUTE sont dans le repli « En route » — le point sans rue y est nommé sur la ligne de son achat,
+        // l'achat sans destination y est compté à part (`data-retirer-en-route-sans`). Ouvert ici avant d'être jugé.
+        const repli = await pg.evaluate(() => { const d = document.querySelector('[data-cc-colonne="retirer"] details[data-rp-section="route"]'); if (!d) return null; d.open = true;
+          return { n: d.getAttribute('data-rp-section-n'), sans: d.getAttribute('data-retirer-en-route-sans'), lignes: [...d.querySelectorAll('[data-en-route-achat]')].map((e) => e.innerText.replace(/\s+/g, ' ')), txt: d.innerText }; });
+        if (repli) {
+          dit(repli.lignes.some((t) => /Salomon XT-6/.test(t) && /Tabac Inconnu/.test(t)) && !/Pas sur la carte|Base Adresse/.test(repli.txt), `${T} Colis : l'achat en route vers le point sans rue est listé (repli « En route », son point nommé), sans phrase sur une carte`, JSON.stringify(repli.lignes));
+          dit(repli.sans === '1' && repli.n === '3' && repli.lignes.some((t) => /New Balance 550/.test(t) && /en route/.test(t)), `${T} Colis : l'achat sans destination est dit à part`, JSON.stringify(repli));
+        } else if (tel || !fondOk) dit(!!ti && !/Pas sur la carte/.test(ti.txt) && !/Base Adresse/.test(ti.txt) && /date d’arrivée pas encore dite/.test(ti.txt), `${T} Colis : le point sans rue est listé, sans phrase sur une carte absente`, ti && ti.txt.slice(0, 220));
         else dit(!!ti && ti.rp === 'non' && ti.raison === 'adresse' && /Pas sur la carte : .{10,}/.test(ti.txt) && !/Base Adresse/.test(ti.txt) && /date d’arrivée pas encore dite/.test(ti.txt), `${T} Colis : le point sans rue est listé, la raison dite en mots simples`, ti && ti.txt.slice(0, 220));
         const miens = ban.filter((u) => /[?&]postcode=/.test(u));
-        if (tel) dit(miens.length === 0, `${T} Colis : au téléphone (pas de carte), la carte ne cherche aucune adresse`, JSON.stringify(ban));
-        else dit(miens.length === 1 && /postcode=56000/.test(miens[0]) && !ban.some((u) => /Brest|29200/.test(decodeURIComponent(u))), `${T} Colis : une seule recherche d'adresse, avec le code postal ; aucune pour l'adresse incomplète`, JSON.stringify(ban));
-        const note = await pg.evaluate(() => (document.querySelector('[data-retirer-en-route-sans]') || {}).innerText || '');
-        dit(/1 achat en route dont Vinted ne dit pas encore le point/.test(note), `${T} Colis : l'achat sans destination est dit à part`, note);
+        // (9 nov. au soir) Et AUCUNE recherche sans code postal (« 13 Rue Saint-Vincent » seul existe dans des dizaines de villes).
+        dit(ban.every((u) => /[?&]postcode=\d{5}/.test(u)), `${T} Colis : aucune adresse cherchée sans son code postal`, JSON.stringify(ban));
+        dit(miens.length === 1 && /postcode=56000/.test(miens[0]) && !ban.some((u) => /Brest|29200/.test(decodeURIComponent(u))), `${T} Colis : une seule recherche d'adresse, avec le code postal ; aucune pour l'adresse incomplète`, JSON.stringify(ban));
+        if (!repli) { const note = await pg.evaluate(() => (document.querySelector('[data-retirer-en-route-sans]') || {}).innerText || '');
+          dit(/1 achat en route dont Vinted ne dit pas encore le point/.test(note), `${T} Colis : l'achat sans destination est dit à part`, note); }
         const tot = await pg.evaluate(() => { const c = document.querySelector('[data-cc-colonne="retirer"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { n: Number(c.getAttribute('data-cc-n')), pub: pub && pub.total }; });
         dit(tot.n === 2 && tot.pub === 2, `${T} Colis : le compteur « À retirer » = Ma journée (2)`, JSON.stringify(tot));
         const ep = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-epingle]')].map((e) => [e.getAttribute('data-relais-epingle'), e.getAttribute('data-relais-numero'), e.textContent]));

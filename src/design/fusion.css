@@ -426,6 +426,11 @@ html body .vrm-puce-transp {
 }
 html body .vrm-puce-transp > [data-transporteur-logo] { width: 20px !important; height: 20px !important; border-radius: 6px !important; margin: 0 !important; flex: none !important; background: #fff !important; box-shadow: 0 0 0 .5px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08) !important; }
 html body .vrm-puce-transp > [data-transporteur-logo] img { width: 16px !important; height: 16px !important; }
+/* (9 nov. au soir, Julien : « les LOGOS des transporteurs, et non les noms ») La puce ne porte plus que la
+   marque (src/PastilleTransporteur.jsx), le nom est en aria-label/title : une tuile de 26 px, centrée, 44 px de large. */
+html body .vrm-puce-transp { justify-content: center !important; padding: 0 9px !important; min-width: 44px !important; gap: 0 !important; }
+html body .vrm-puce-transp > [data-transporteur-logo] { width: 26px !important; height: 26px !important; border-radius: 7px !important; }
+html body .vrm-colis-carte .vrm-colis-actions > .vrm-rangee-bord > .vrm-puce-transp { padding: 0 9px !important; justify-content: center !important; }
 html body .vrm-puce-transp > [data-transporteur-nom] {
   font: 600 13px/1.2 var(--vrm-police) !important; letter-spacing: -.01em; color: var(--fu-encre) !important;
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0;

@@ -14,6 +14,8 @@ import { accesVendeur } from './_lib/abonnement.js';
 import { normaliserSuivi } from './_lib/etat-colis-email.js';
 import { passageTransporteurs, transpALire, appliquerReponseBrute, ENVOI_MAX, MAX_APP, BUDGET_APP_MS } from './_lib/transporteurs-lecture.js';
 import { corsExtension } from './_lib/cors-extension.js';
+import { etiquettesDuVendeur } from './_lib/etiquettes-vendeur.js';
+import { MAX_PDF_APP, BUDGET_PDF_APP_MS } from './_lib/transporteur-anciens.js';
 
 // ── (24 oct.) LE STATUT DES COLIS CHEZ LEUR TRANSPORTEUR (api/_lib/transporteurs*.js)
 // Trois modes, sans 13e fonction (le plan Hobby en permet 12) :
@@ -61,6 +63,29 @@ async function transp(req, res, mode) {
       if (!r.ok) { res.status(503).json({ error: 'pas-su' }); return; }
       res.status(200).json({ ok: true, lus: r.lus, departs: r.departs || [], besoinNavigateur: r.besoinNavigateur, pause: r.pause });
     } catch (e) { res.status(500).json({ error: 'panne' }); }
+  });
+}
+
+// ── (9 nov. au soir, « transporteurs parfaits ») POST ?mode=etiquettes ──────
+// Julien : « Ce n'est pas possible d'avoir "transporteur inconnu" sachant que tu as les
+// bordereaux en ta possession. » L'app ouverte demande : « lis les étiquettes (PDF) de MES
+// bordereaux pas encore lues » — un lot borné (MAX_PDF_APP, BUDGET_PDF_APP_MS), UN PDF par
+// requête, au nom du vendeur de la SESSION (jamais un identifiant envoyé par le navigateur),
+// même règle que le cron (api/_lib/etiquettes-vendeur.js). Réponse : des nombres seulement
+// (`restants` > 0 ⇒ l'app redemande). Lecture ratée ⇒ 503, rien écrit.
+async function etiquettes(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (String(req.method || 'GET').toUpperCase() !== 'POST') { res.status(405).json({ error: 'methode' }); return; }
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  if (!(await baseCloisonnee())) { res.status(503).json({ error: 'pas-su' }); return; }
+  if ((await accesVendeur(u.id)) === false) { res.status(402).json({ error: 'abonnement' }); return; }
+  await contexteVendeur.run({ owner: u.id }, async () => {
+    try {
+      const r = await etiquettesDuVendeur({ max: MAX_PDF_APP, budgetMs: BUDGET_PDF_APP_MS });
+      if (!r || !r.fait) { res.status(503).json({ error: 'pas-su' }); return; }
+      res.status(200).json({ ok: true, lus: r.lus || 0, ranges: r.ranges || 0, vus: r.vus || 0, restants: r.restants || 0 });
+    } catch (_) { res.status(500).json({ error: 'panne' }); }
   });
 }
 
@@ -135,6 +160,7 @@ export default async function handler(req, res) {
   if (corsExtension(req, res)) return;   // (8 nov.) Orion : préalable CORS des appels de l'extension
   const mode = String((req.query && req.query.mode) || '');
   if (mode === 'transp' || mode === 'transp-a-lire' || mode === 'transp-brut') { await transp(req, res, mode); return; }
+  if (mode === 'etiquettes') { await etiquettes(req, res); return; }
   if (!(await vendeurExige(req, res))) return;
   let city = (req.query && req.query.city ? String(req.query.city) : '').trim();
   const lat = req.query && req.query.lat, lon = req.query && req.query.lon;

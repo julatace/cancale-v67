@@ -49,6 +49,12 @@ export function requetesColisDus(maintenant = Date.now()) {
     `app_data?id=like.transp_*&meta->>etat=eq.disponible&${pasFini}&meta->>essai=lt.${avant(RYTHME_MS.disponible)}&select=owner`,
     `app_data?id=like.transp_*&meta->>etat=eq.en_route&${pasFini}&meta->>essai=lt.${avant(RYTHME_MS.en_route)}&select=owner`,
     `app_data?id=like.email_track_*&meta->>status=eq.available&meta->>arriveLe=gte.${encodeURIComponent(iso(maintenant - PREMIERE_LECTURE_MS))}&select=owner`,
+    // (9 nov. au soir, « suivi irréprochable ») Les autres lignes ACTIVES que seuls les crons de 6 h et 19 h
+    // relisaient app fermée : état inconnu, incident, retour en cours (rythme 2 h), et la ligne créée mais à
+    // laquelle le transporteur n'a encore jamais répondu (aucun état, dernier essai il y a plus de 30 min —
+    // le recul de `RECUL_MS` reste celui du passage : le visiter ne force aucune lecture).
+    `app_data?id=like.transp_*&meta->>etat=in.(inconnu,incident,retour_expediteur)&${pasFini}&meta->>essai=lt.${avant(RYTHME_MS.inconnu)}&select=owner`,
+    `app_data?id=like.transp_*&meta->>etat=is.null&${pasFini}&meta->>essai=lt.${avant(30 * 60000)}&select=owner`,
   ];
 }
 // Les vendeurs à visiter : l'union des réponses ; `null` si UNE requête n'a pas répondu.
@@ -83,4 +89,39 @@ export async function passageColisFrequent({ lire, traiter, exclus = [], mainten
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(parallele, aFaire.length)) }, ouvrier));
   return { fait: true, dus: owners.length, traites: bilans.length, restants: owners.length - bilans.length, echecs, budgetAtteint, bilans };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// (9 nov. au soir, « transporteurs parfaits ») LES ÉTIQUETTES PAS ENCORE LUES
+// Julien : « Ce n'est pas possible d'avoir "transporteur inconnu" sachant que tu
+// as les bordereaux en ta possession. » Au même passage de 15 min, APRÈS les
+// statuts : les vendeurs dont la ligne `vrm_bord_transporteurs` dit qu'il RESTE
+// des étiquettes à lire (`pdfReste` ≠ 0, posé par chaque passe — scalaire ⇒
+// `meta`, lu en `select=owner` : jamais `data`, §4.4). Chacun : la passe des
+// étiquettes (api/_lib/transporteur-anciens.js, UN PDF par requête), bornée en
+// nombre et en temps. Un vendeur jamais passé (aucune marque) l'est au cron du
+// matin ou à l'ouverture de l'app (POST /api/relais?mode=etiquettes).
+// Sélection pas lue ⇒ personne visité, dit (`fait: false`) — jamais « rien à lire ».
+// ═══════════════════════════════════════════════════════════════════════════
+export const REQ_ETIQUETTES_DUES = 'app_data?id=eq.vrm_bord_transporteurs&meta->>pdfReste=neq.0&select=owner';
+export const MAX_PDF_VENDEUR_FREQUENT = 40;
+export const BUDGET_ETIQUETTES_MS = 25000;
+export async function passageEtiquettes({ lire, traiter, exclus = [], maintenant = Date.now(), budgetMs = BUDGET_ETIQUETTES_MS, horloge = () => Date.now() }) {
+  const debut = horloge();
+  let rows = null;
+  try { rows = await lire(REQ_ETIQUETTES_DUES); } catch (_) { rows = null; }
+  const owners = vendeursDus([rows], { exclus });
+  if (owners === null) return { fait: false, raison: 'pas-su' };
+  const aFaire = ordreDuCreneau(owners, maintenant);
+  let traites = 0, lus = 0, ranges = 0, vus = 0, restants = 0, echecs = 0, budgetAtteint = false;
+  for (const o of aFaire) {
+    const reste = budgetMs - (horloge() - debut);
+    if (reste < 3000) { budgetAtteint = true; break; }
+    try {
+      const r = (await traiter(o, { budgetMs: reste - 1000 })) || {};
+      traites++; lus += Number(r.lus) || 0; ranges += Number(r.ranges) || 0; vus += Number(r.vus) || 0; restants += Number(r.restants) || 0;
+      if (!r.fait) echecs++;
+    } catch (_) { echecs++; }
+  }
+  return { fait: true, dus: owners.length, traites, lus, ranges, vus, restants, echecs, budgetAtteint };
 }
