@@ -30,6 +30,8 @@
 //   POST { action: 'discord-compte-retirer' }
 //   POST { action: 'accomp-…' }               (025 — les groupes d'accompagnement :
 //                                               api/_lib/accompagnement.js)
+//   POST { action: 'form-…' }                 (031 — l'espace formateur :
+//                                               api/_lib/formateur.js)
 // TROIS ÉTATS, JAMAIS DEUX :
 //   · 200 `ok: true`                — lu / fait ;
 //   · 503 `erreur: 'non-installe'`  — la base n'a pas la 018 (PGRST202) : « la
@@ -42,6 +44,7 @@ import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
 import { rpcEquipe } from './equipe.js';
 import { routeAccompagnement, effacerAccompagnement } from './accompagnement.js';
+import { routeFormateur, effacerFormateur } from './formateur.js';
 import { discordConfigure, lirePreuve } from './discord.js';
 import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord} from './avatar-discord.js';
 
@@ -235,6 +238,8 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   const action = String((corps && corps.action) || '');
   // (5 nov.) Les groupes d'accompagnement (025) : leur propre fichier, la même session.
   if (action.startsWith('accomp-')) return routeAccompagnement(req, res, { corps, qui, action });
+  // (10 nov., lot AR) L'espace formateur (031) : son propre fichier, la même session.
+  if (action.startsWith('form-')) return routeFormateur(req, res, { corps, qui, action });
   if (action === 'ville') {
     const g = await geocoderVille({ q: corps.q, lat: corps.lat, lon: corps.lon });
     if (!g.ok) return dire(503, { ok: false, erreur: 'geocodage', message: "Je n'ai pas pu chercher la ville (le service de carte ne répond pas). Réessaie dans un instant." });
@@ -398,7 +403,11 @@ export async function effacerCommunaute(owner, SERVICE) {
   if (r.etat !== 'absent' && r.etat !== 'ok') return null;
   const n = r.etat === 'absent' ? 0 : Number(r.data);
   if (!Number.isFinite(n)) return null;
+  // (10 nov.) + l'espace formateur (031) : page dépubliée et détachée, accords retirés —
+  // AVANT la 025 (qui détache ses groupes : la vitrine se lit par leur créateur).
+  const f = await effacerFormateur(owner, SERVICE);
+  if (f === null) return null;
   // (5 nov.) + les groupes d'accompagnement (025) : partages vidés, adhésions et groupes détachés.
   const a = await effacerAccompagnement(owner, SERVICE);
-  return a === null ? null : n + a;
+  return a === null ? null : n + f + a;
 }
