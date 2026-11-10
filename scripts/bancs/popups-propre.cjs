@@ -206,8 +206,9 @@ async function ecran(b, largeur, sombre, { nom, url, pret, apres, zone }) {
     const np = await pg.evaluate(() => { const main = [...document.querySelectorAll('.vrm-main')].find((m) => m.getClientRects().length); if (!main) return 0; let n = 0;
       const bloc = (d) => /^(block|flex|grid|list-item|table|table-cell|flow-root)$/.test(d);
       for (const el of main.querySelectorAll('*')) { if (el.closest('[data-feuille], button, a, svg, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary)')) continue; const s = getComputedStyle(el); if (!bloc(s.display) || !el.getClientRects().length || s.visibility === 'hidden') continue;
-        if ([...el.children].some((c) => bloc(getComputedStyle(c).display) && (c.innerText || '').trim())) continue; const t = (el.innerText || '').replace(/\s+/g, ' ').trim(); if (t.length > 30) n += t.length; }
+        if ([...el.children].some((c) => bloc(getComputedStyle(c).display) && (c.innerText || '').trim())) continue; const t = (el.innerText || '').replace(/\s+/g, ' ').trim(); if (t.length > 30) { n += t.length; (window.__phrases = window.__phrases || []).push(t); } }
       return n; });
+    if (process.env.PHRASES) console.log(await pg.evaluate(() => (window.__phrases || []).map((t) => '    · ' + t).join('\n')));
     console.log(`  CARACTÈRES ${largeur}-${sombre ? 'sombre' : 'clair'}-${nom} total=${nc} phrases=${np}`);
     const rg = await rouges(pg);
     dit(rg.length === 0, `${tag} : P6 — aucun rouge rendu`, rg.join(' | '));

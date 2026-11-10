@@ -34944,7 +34944,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const photoNouvelle = (id) => { const it = (listings.items || []).find((x) => String(x.id) === String(id)); return (it && it.photo) || ''; };
     const photoAncienne = (id) => { const f = numeros[id] || {}; return f.photo || ''; };
     const vignette = (src, num, alt) => (
-      <span className="vrm-remise-photo">{src && !imgMortes.has(src) ? <PhotoVinted src={src} alt={alt} loading="lazy" onError={() => noterImgMorte(src)}/> : <span aria-hidden="true">photo</span>}{num ? <span className="vrm-remise-num">N°{num}</span> : null}</span>
+      <span className="vrm-remise-photo">{src && !imgMortes.has(src) ? <PhotoVinted src={src} alt={alt} loading="lazy" onError={() => noterImgMorte(src)}/> : <PhotoVide taille={40}/>}{num ? <span className="vrm-remise-num">N°{num}</span> : null}</span>
     );
     return (
       <div className="vrm-remise-cartes" data-remise-bloc={remises.length} role="group" aria-label="Annonces remises en ligne : même paire ?">
