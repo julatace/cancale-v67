@@ -70,7 +70,11 @@ Validé par Julien (`2026-11-09-propositions.md` : « baisse de prix en série s
 - Banc `scripts/bancs/baisse-prix.cjs` (données inventées, faux pont qui RETIENT chaque commande) :
   **106 verts** (390 tactile et 1512, clair et sombre ; D arrêter, E plafond, F extension 5.335,
   G Sélectionner). Sur le build d'`origin/main` (git archive) : **9 rouges**. Mutations de l'app
-  rebâties (1512) : voir le résultat en bas.
+  rebâties (`git archive HEAD`, mutation, `vite build`, banc à 1512 avec `BANC_DIST`) :
+  « envoie pour un autre compte » (`lignesBaisse` sans le blocage) ⇒ 5 rouges (900005 envoyée) ;
+  « prix supposé sans relecture » (`issueBaisse` : incertain ⇒ fait au prix voulu) ⇒ 2 rouges
+  (« 60 € → 54 € relu ») ; « dépasse le plafond » (la série continue après `plafond-bordereaux`)
+  ⇒ 1 rouge (la 2ᵉ commande part).
 - Captures regardées (`BANC_CAPTURE`) : liste avec cases, feuille (aperçu, envoi, bilan),
   extension ancienne, depuis Sélectionner — 390 tactile et 1512, clair et sombre. Défaut vu et
   corrigé : la case cassait la grille de la ligne « Qui dorment » à 1512 (colonne ajoutée).
