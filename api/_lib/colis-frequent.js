@@ -49,6 +49,12 @@ export function requetesColisDus(maintenant = Date.now()) {
     `app_data?id=like.transp_*&meta->>etat=eq.disponible&${pasFini}&meta->>essai=lt.${avant(RYTHME_MS.disponible)}&select=owner`,
     `app_data?id=like.transp_*&meta->>etat=eq.en_route&${pasFini}&meta->>essai=lt.${avant(RYTHME_MS.en_route)}&select=owner`,
     `app_data?id=like.email_track_*&meta->>status=eq.available&meta->>arriveLe=gte.${encodeURIComponent(iso(maintenant - PREMIERE_LECTURE_MS))}&select=owner`,
+    // (9 nov. au soir, « suivi irréprochable ») Les autres lignes ACTIVES que seuls les crons de 6 h et 19 h
+    // relisaient app fermée : état inconnu, incident, retour en cours (rythme 2 h), et la ligne créée mais à
+    // laquelle le transporteur n'a encore jamais répondu (aucun état, dernier essai il y a plus de 30 min —
+    // le recul de `RECUL_MS` reste celui du passage : le visiter ne force aucune lecture).
+    `app_data?id=like.transp_*&meta->>etat=in.(inconnu,incident,retour_expediteur)&${pasFini}&meta->>essai=lt.${avant(RYTHME_MS.inconnu)}&select=owner`,
+    `app_data?id=like.transp_*&meta->>etat=is.null&${pasFini}&meta->>essai=lt.${avant(30 * 60000)}&select=owner`,
   ];
 }
 // Les vendeurs à visiter : l'union des réponses ; `null` si UNE requête n'a pas répondu.

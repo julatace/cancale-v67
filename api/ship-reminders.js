@@ -1326,7 +1326,7 @@ export default async function handler(req, res) {
     let et = null;
     try {
       const temps = Math.min(BUDGET_ETIQUETTES_MS, 128000 - (Date.now() - debutColis));
-      et = !clOk ?{ fait: false, raison: 'pas-su' } : temps < 4000 ? { fait: true, dus: null, raison: 'plus-de-temps' } : await passageEtiquettes({
+      et = !clOk ? { fait: false, raison: 'pas-su' } : temps < 4000 ? { fait: true, dus: null, raison: 'plus-de-temps' } : await passageEtiquettes({
         lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: temps,
         traiter: (o, { budgetMs }) => contexteVendeur.run({ owner: o }, () => etiquettesCron({ max: MAX_PDF_VENDEUR_FREQUENT, budgetMs })),
       });
