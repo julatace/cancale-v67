@@ -5,7 +5,7 @@
 // Données INVENTÉES (le jeu de `nouveau-vendeur` + deux versements lus et une
 // vente finalisée sans date de versement, la forme réelle). Trois statuts :
 //   A. jamais choisi · B. micro-entrepreneur, déclaration mensuelle · C. particulier.
-// Deux tailles : 390 px tactile SOMBRE et 1512 px clair.
+// Deux tailles, clair ET sombre : 390 px tactile et 1512 px (`TAILLES=390:sombre,1512:clair` restreint).
 //
 // 1. LES CHIFFRES AVANT = APRÈS. Le banc relève les data-* de Compta et de
 //    Statistiques (bénéfice, son calcul, prévision URSSAF, résultat de l'année,
@@ -41,7 +41,7 @@ const NV = require('./nouveau-vendeur.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const SHOTS = process.env.SHOTS || '';
 const SCEN = String(process.env.SCENARIOS || 'A,B,C').split(',');
-const TAILLES = String(process.env.TAILLES || '390:sombre,1512:clair').split(',').map((x) => { const [w, t] = x.split(':'); return { W: Number(w), sombre: t === 'sombre' }; });
+const TAILLES = String(process.env.TAILLES || '390:sombre,1512:clair,390:clair,1512:sombre').split(',').map((x) => { const [w, t] = x.split(':'); return { W: Number(w), sombre: t === 'sombre' }; });
 const JSON_OUT = process.env.BANC_JSON || '';
 const REF = process.env.BANC_REFERENCE ? JSON.parse(fs.readFileSync(process.env.BANC_REFERENCE, 'utf8')) : null;
 const STRUCTURE = process.env.BANC_STRUCTURE !== '0';
@@ -127,7 +127,7 @@ const lireStats = (pg) => pg.evaluate(() => {
           const vis = (e) => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().height > 0;
           const h1 = [...document.querySelectorAll('.vrm-main h1')].find(vis);
           const navA = document.querySelector('[data-argent-nav]');
-          const segs = navA ? [...navA.querySelectorAll('[data-section]')].map((b) => ({ id: b.getAttribute('data-section'), l: b.innerText.trim(), on: b.getAttribute('aria-current') === 'page', h: b.getBoundingClientRect().height })) : [];
+          const segs = navA ? [...navA.querySelectorAll('[data-section]')].map((b) => ({ id: b.getAttribute('data-section'), l: b.innerText.trim(), on: b.getAttribute('aria-current') === 'page', h: b.getBoundingClientRect().height, coupe: [b, ...b.querySelectorAll('*')].some((e) => e.scrollWidth > e.clientWidth + 1) })) : [];
           const entrees = [...document.querySelectorAll('[data-nav-entree]')].filter(vis).map((b) => ({ id: b.getAttribute('data-nav-entree'), l: (b.getAttribute('aria-label') || b.innerText || '').trim() }));
           const txt = document.querySelector('.vrm-main').innerText;
           const q = [...document.querySelectorAll('[data-argent-q]')].map((b) => { const r = b.getBoundingClientRect(); return { id: b.getAttribute('data-argent-q'), v: b.getAttribute('data-argent-valeur'), raison: b.getAttribute('data-argent-raison') || '', n: (b.querySelector('.vrm-argent-w-n') || {}).innerText || '', note: (b.querySelector('.vrm-argent-w-note') || {}).innerText || '', x: Math.round(r.left), y: Math.round(r.top), w: r.width, h: r.height }; });
@@ -144,6 +144,7 @@ const lireStats = (pg) => pg.evaluate(() => {
           dit(ids.filter((x) => x === 'compta').length >= 1 && !ids.includes('dashboard') && tete.entrees.some((e) => e.id === 'compta' && /^Argent$/.test(e.l)), `N1 ${T} : la colonne porte UNE entrée « Argent » (ni Statistiques ni Compta)`, JSON.stringify(tete.entrees.filter((e) => /compta|dashboard/.test(e.id))));
         }
         dit(tete.segs.map((s) => s.l).join('·') === 'Résumé·Statistiques·Déclarer·Factures', `N2 ${T} : quatre segments`, JSON.stringify(tete.segs));
+        dit(tete.segs.length === 4 && !tete.segs.some((x) => x.coupe), `N2 ${T} : aucun segment coupé (« Statisti… » en 1512, vu en capture)`, JSON.stringify(tete.segs.filter((x) => x.coupe).map((x) => x.l)));
         dit(tete.navHaut >= tete.h1bas - 1, `N2 ${T} : les segments sont sous le titre`, `${tete.navHaut} / ${tete.h1bas}`);
         dit((tete.segs.find((s) => s.on) || {}).id === 'resume' && tete.vueResume && !tete.vueDeclarer, `N2 ${T} : ?tab=compta ⇒ le Résumé (seul)`, JSON.stringify({ on: tete.segs.find((s) => s.on), r: tete.vueResume, d: tete.vueDeclarer }));
         const Q = Object.fromEntries(tete.q.map((x) => [x.id, x]));
@@ -164,7 +165,7 @@ const lireStats = (pg) => pg.evaluate(() => {
         } else dit(new Set(tete.q.map((x) => x.y)).size === 1, `N7 ${T} : les 4 widgets sur une ligne`, JSON.stringify(tete.q.map((x) => [x.x, x.y])));
         const longues = tete.resumes.filter((t) => t.split(/\s+/).length > 12);
         dit(!longues.length, `N7 ${T} : les phrases des replis font ≤ 12 mots`, longues.join(' ¦ '));
-        await capture(pg, `resume-${scen}-${W}`);
+        await capture(pg, `resume-${scen}-${W}${sombre ? '-sombre' : '-clair'}`);
         // ── N4 : toucher = le détail ──
         await pg.locator('[data-argent-q="benefice"]').click();
         await pg.waitForTimeout(500);
@@ -176,7 +177,7 @@ const lireStats = (pg) => pg.evaluate(() => {
         await pg.waitForTimeout(900);
         const dec = await pg.evaluate(() => { const vis = (e) => !!e && e.getClientRects().length > 0; return { d: vis(document.querySelector('[data-argent-vue="declarer"]')), r: vis(document.querySelector('[data-argent-vue="resume"]')), on: (document.querySelector('[data-argent-nav] [aria-current="page"]') || {}).getAttribute ? document.querySelector('[data-argent-nav] [aria-current="page"]').getAttribute('data-section') : '' }; });
         dit(dec.d && !dec.r && dec.on === 'declarer', `N4 ${T} : À déclarer ouvre « Déclarer »`, JSON.stringify(dec));
-        await capture(pg, `declarer-${scen}-${W}`);
+        await capture(pg, `declarer-${scen}-${W}${sombre ? '-sombre' : '-clair'}`);
         // N6 : « Les dater » (Déclarer) ⇒ le Résumé, « Vendu et reçu » ouvert.
         if (scen === 'B') {
           const b = pg.locator('[data-urssaf-dater]');
@@ -189,15 +190,15 @@ const lireStats = (pg) => pg.evaluate(() => {
         await aller(pg, 'compta', 2600);
         await pg.locator('[data-argent-q="vendu"]').click();
         await pg.waitForTimeout(2200);
-        const v = await pg.evaluate(() => ({ stats: !!document.querySelector('[data-comparer-ligne]') || !!document.querySelector('.vrm-stats-vitrine'), on: (document.querySelector('[data-argent-nav] [aria-current="page"]') || { getAttribute: () => '' }).getAttribute('data-section'), h1: ([...document.querySelectorAll('.vrm-main h1')].find((e) => e.getClientRects().length) || {}).innerText }));
-        dit(v.stats && v.on === 'stats' && v.h1 === 'Argent', `N4 ${T} : Vendu ouvre Statistiques (dans Argent)`, JSON.stringify(v));
-        await capture(pg, `stats-${scen}-${W}`);
+        const v = await pg.evaluate(() => ({ coupe: [...document.querySelectorAll('[data-argent-nav] [data-section], [data-argent-nav] [data-section] *')].filter((e) => e.scrollWidth > e.clientWidth + 1).length, stats: !!document.querySelector('[data-comparer-ligne]') || !!document.querySelector('.vrm-stats-vitrine'), on: (document.querySelector('[data-argent-nav] [aria-current="page"]') || { getAttribute: () => '' }).getAttribute('data-section'), h1: ([...document.querySelectorAll('.vrm-main h1')].find((e) => e.getClientRects().length) || {}).innerText }));
+        dit(v.stats && v.on === 'stats' && v.h1 === 'Argent' && !v.coupe, `N4 ${T} : Vendu ouvre Statistiques (dans Argent, aucun segment coupé)`, JSON.stringify(v));
+        await capture(pg, `stats-${scen}-${W}${sombre ? '-sombre' : '-clair'}`);
         // Factures, par son segment.
         await pg.locator('[data-argent-nav] [data-section="factures"]').click();
         await pg.waitForTimeout(2200);
-        const f = await pg.evaluate(() => ({ on: (document.querySelector('[data-argent-nav] [aria-current="page"]') || { getAttribute: () => '' }).getAttribute('data-section'), fx: !!document.querySelector('[data-argent-vue="factures"]:not([hidden])'), h1: ([...document.querySelectorAll('.vrm-main h1')].find((e) => e.getClientRects().length) || {}).innerText }));
-        dit(f.on === 'factures' && f.fx && f.h1 === 'Argent', `N2 ${T} : le segment Factures`, JSON.stringify(f));
-        await capture(pg, `factures-${scen}-${W}`);
+        const f = await pg.evaluate(() => ({ on: (document.querySelector('[data-argent-nav] [aria-current="page"]') || { getAttribute: () => '' }).getAttribute('data-section'), fx: !!document.querySelector('[data-argent-vue="factures"]:not([hidden])'), coupe: [...document.querySelectorAll('[data-argent-nav] [data-section], [data-argent-nav] [data-section] *')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.innerText.trim()), h1: ([...document.querySelectorAll('.vrm-main h1')].find((e) => e.getClientRects().length) || {}).innerText }));
+        dit(f.on === 'factures' && f.fx && f.h1 === 'Argent' && !f.coupe.length, `N2 ${T} : le segment Factures (aucun segment coupé par ses actions)`, JSON.stringify(f));
+        await capture(pg, `factures-${scen}-${W}${sombre ? '-sombre' : '-clair'}`);
         // ── N5 : les anciens liens ──
         if (scen === SCEN[0]) {
           for (const [q, seg, quoi] of [['tab=dashboard', 'stats', 'stats'], ['tab=stats', 'stats', 'stats'], ['tab=prixmarche', 'stats', 'prix'], ['tab=invoices', 'factures', 'factures'], ['tab=argent', 'resume', 'resume'], ['tab=compta&section=declarer', 'declarer', 'declarer'], ['tab=argent_declarer', 'declarer', 'declarer']]) {

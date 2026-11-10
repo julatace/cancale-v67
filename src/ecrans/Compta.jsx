@@ -974,7 +974,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
-        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:"Factures"} sous={argentNav} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
+        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:"Factures"} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
           right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
@@ -989,6 +989,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Ma facture</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages des factures</Btn>
         </div>}/>
+        {/* (10 nov., Argent) Les segments SOUS la ligne du titre, pas dedans : cinq actions y
+            tassaient la piste (« Statistiqu… », vu en capture à 1512 px). */}
+        {argentNav}
       </div>
       {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
       <ListeFacturesPro deps={DEPS_FACTURE}/>

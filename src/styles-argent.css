@@ -23,7 +23,7 @@
 /* La piste prend toute la largeur (le cadre de PlatSubNav ajoutait 16 px de chaque côté, déjà
    posés par le titre) ; les quatre segments se partagent la piste, sans défilement. */
 :root:root body .vrm-argent-nav > .vrm-seg-cadre { padding: 0 !important; }
-:root:root body .vrm-argent-nav .vrm-seg:not(#vrm-seg) { width: 100%; overflow: hidden !important; }
+:root:root body .vrm-argent-nav .vrm-seg:not(#vrm-seg) { width: 100% !important; max-width: none !important; overflow: hidden !important; }
 :root:root body .vrm-argent-nav .vrm-seg > .vrm-seg-btn:not(#vrm-seg) { flex: 1 1 0 !important; min-width: 0 !important; padding: 0 4px !important; }
 :root:root body .vrm-argent-nav .vrm-seg-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root:root body .vrm-argent-nav + .vrm-seg-cadre,
