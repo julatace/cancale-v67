@@ -40,7 +40,7 @@ redemande. Aucun raccourci ne valide, n'envoie, ne supprime ni n'écrit.
   focus dedans, **Tab et Maj+Tab tournent dedans (DA4 vérifié)**, Échap ferme, feuille
   ouverte ⇒ « g a » ne bouge pas, « / » ouvre la recherche, « n » ⇒ Nouvel achat ouvert,
   aucune écriture `main` pendant toute la séquence.
-  - Branche : **100 ✅ · 0 ❌** (après `git merge origin/main`).
+  - Branche : **132 ✅ · 0 ❌** (après `git merge origin/main`).
   - `origin/main` (git archive, banc copié dedans, 1512 px) : **18 ❌** — A4, A6, B1, B3, B5
     (clair et sombre).
   - Mesure de départ sur `main` : A1/A2/A3 déjà verts sur ces écrans avec ces données (les
