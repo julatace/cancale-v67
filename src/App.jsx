@@ -50763,22 +50763,24 @@ function AdressesSansCompte({ comptes }) {
   if (!liste.length && !marquees.length) return null;
   return (
     <section className="vrm-sans-compte" data-adresses-sans-compte={liste.length} aria-label="Adresses sans compte">
+      {liste.length ? <h3 className="vrm-sans-compte-entete">Adresses sans compte</h3> : null}
       {liste.map((x) => (
         <div key={x.adresse} className="vrm-sans-compte-ligne" data-adresse-sans-compte={x.adresse} data-adresse-sans-compte-n={x.n}>
+          {/* (10 nov., soir) Une ligne, deux boutons (DA6) : l'adresse, « N e-mails · date », Relier · Acheteur. */}
+          <span className="vrm-sans-compte-ic" aria-hidden="true">@</span>
           <div className="vrm-sans-compte-tete">
-            <span className="vrm-sans-compte-titre">Adresse sans compte : {x.n} e-mail{x.n > 1 ? 's' : ''}</span>
             <span className="vrm-sans-compte-adresse vrm-sensible" data-stream-type="adresse">{x.adresse}</span>
-            <span className="vrm-sans-compte-aide">Aucun compte Vinted ne porte cette adresse{x.dernier ? ` · dernier e-mail le ${jour(x.dernier)}` : ''} : ses ventes, bordereaux et messages ne disent pas de quel compte ils viennent.</span>
+            <span className="vrm-sans-compte-titre"><span className="vrm-boite-sr">Adresse sans compte : </span>{x.n} e-mail{x.n > 1 ? 's' : ''}{x.dernier ? ` · ${jour(x.dernier)}` : ''}</span>
           </div>
           <div className="vrm-sans-compte-gestes">
-            <Bouton variante="secondaire" data-relier-compte={x.adresse} aria-expanded={choix === x.adresse} onClick={() => setChoix((c) => (c === x.adresse ? '' : x.adresse))}>Relier un compte</Bouton>
-            <Bouton variante="discret" data-compte-acheteur={x.adresse} onClick={() => acheteur(x.adresse)}>C’est un compte acheteur</Bouton>
+            <Bouton variante="secondaire" data-relier-compte={x.adresse} aria-expanded={choix === x.adresse} onClick={() => setChoix((c) => (c === x.adresse ? '' : x.adresse))}>Relier</Bouton>
+            <Bouton variante="discret" data-compte-acheteur={x.adresse} aria-label="C’est un compte acheteur" onClick={() => acheteur(x.adresse)}>Acheteur</Bouton>
           </div>
           {choix === x.adresse && (
             <div className="vrm-sans-compte-choix" data-relier-choix-liste={libres.length}>
               {libres.length
                 ? <>
-                    <span className="vrm-sans-compte-aide">Quel compte Vinted reçoit ses e-mails sur cette adresse ?</span>
+                    <span className="vrm-sans-compte-aide">Quel compte ?</span>
                     {libres.map((a) => <Bouton key={a.vinted_user_id} variante="secondaire" data-relier-choix={String(a.vinted_user_id)} onClick={() => relier(x.adresse, a)}>{nomCompte(a)}</Bouton>)}
                   </>
                 : <span className="vrm-sans-compte-aide" data-relier-aucun="">Tous tes comptes Vinted ont déjà une adresse — change-la dans Comptes liés → Gérer.</span>}

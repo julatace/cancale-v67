@@ -212,9 +212,12 @@ const iso = (j) => new Date(NOW - j * J).toISOString();
     const lu = (f) => sansCommentaires(fs.readFileSync(path.join(R, f), 'utf8')).replace(/^import[^\n]*$/gm, '');
     const pages = lu('src/RelierCompte.jsx') + lu('src/relierCompte.js') + lu('src/RelierBoite.jsx');
     dit(!/\bfetch\s*\(|requeteJson|XMLHttpRequest|sendBeacon|['"`]\/api\//.test(pages), 'R6 le pas-à-pas n’appelle AUCUNE route (la preuve est lue par l’écran)');
-    dit(/messagerieInitiale=\{c\.messagerie\}/.test(lu('src/RelierCompte.jsx')) && (lu('src/RelierCompte.jsx').match(/<RelierBoite\b/g) || []).length === 1, 'R6 RelierCompte RÉUTILISE la scène animée (une fois), ouverte sur la messagerie suggérée');
+    // (10 nov., soir, lot adresse-vrm-simple — Julien : « un seul parcours ») Le compte choisi vit DANS le
+    // parcours unique (src/AdresseReception.jsx) ; l'ancienne scène animée ne revient que si l'adresse VRM
+    // n'est pas ouverte — jamais deux pas-à-pas à l'écran.
     const boite = lu('src/BoiteEmails.jsx');
-    dit(/\{!compteOuvert && <section className="vrm-boite-guide"/.test(boite), 'R6 un compte choisi ⇒ pas de seconde scène (jamais deux pas-à-pas)');
+    dit((boite.match(/<ParcoursAdresseVrm\b/g) || []).length === 1 && /uid=\{compteOuvert\}/.test(boite) && !/<RelierCompte\b/.test(boite) && (lu('src/RelierCompte.jsx').match(/<RelierBoite\b/g) || []).length === 0, 'R6 un compte choisi ouvre LE parcours (une fois), sur ce compte');
+    dit(/\{pret === false && <section className="vrm-boite-guide"/.test(boite) && (boite.match(/<RelierBoite\b/g) || []).length === 1, 'R6 l’ancienne scène seulement quand l’adresse VRM n’est pas ouverte (jamais deux pas-à-pas)');
   });
 
   // ── R7 — l'app ────────────────────────────────────────────────────────────

@@ -41,7 +41,7 @@
 //    pas demandé en mode stream (« Masqué en mode stream » : noms et adresses).
 // ⚠️ §5 : un geste (« Voir le colis… ») ne part QUE d'une identité lue.
 // ⚠️ Au téléphone, la feuille de lecture est OPAQUE dès sa première image.
-import CarteAdresseReception from './AdresseReception.jsx';
+import { ParcoursAdresseVrm } from './AdresseReception.jsx';
 import React, { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RUBRIQUES_BOITE, rubriqueEmail } from '../api/_lib/boite-email.js';
@@ -51,7 +51,6 @@ import { LogoSite } from './SelecteurSites.jsx';
 import { LogoTransporteur } from './PastilleTransporteur.jsx';
 import { cleTransporteur, nomDuTransporteur } from './transporteursVisuels.js';
 import RelierBoite from './RelierBoite.jsx';
-import RelierCompte from './RelierCompte.jsx';
 import { phraseARelier } from './relierCompte.js';
 import { EtatPanne } from './composants/EtatPanne.jsx';
 import CadreEmail from './CadreEmail.jsx';
@@ -720,6 +719,7 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
   const [vue, setVue] = useState(VUES.some(([k]) => k === vueInitiale) ? vueInitiale : (compteInitial ? 'relier' : 'boite'));
   const [compte, setCompte] = useState(String(compteInitial || ''));
   const [relies, setRelies] = useState(() => new Set());
+  const [pret, setPret] = useState(undefined);   // l'adresse VRM est-elle ouverte ? (undefined en cours · null pas su)
   const haut = useRef(null);
   const guide = useRef(null);
   useEffect(() => {
@@ -754,17 +754,16 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
       {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')} ecrireLus={ecrireLus} photoDe={photoDe}
         tete={<ARelier comptes={bandeau} onRelier={relierCompte}/>}/>}
       {vue === 'relier' && <div className="vrm-boite-relier" data-boite-relier="">
-        {/* (8 nov.) La voie la plus simple d'abord : SON adresse VRM (src/AdresseReception.jsx). */}
-        {!compteOuvert && <CarteAdresseReception headers={headers} FermeAuRetour={FermeAuRetour} onBoite={() => setVue('boite')}/>}
+        {/* (10 nov., soir) UN SEUL parcours (src/AdresseReception.jsx) : son adresse VRM, le compte
+            en puces, SA messagerie, 3 pas, l'essai « Reçu ✓ ». L'ancien pas-à-pas vers la boîte
+            collective ne revient que si l'adresse VRM n'est pas ouverte (`pret === false`). */}
         <div ref={guide}>
-          {compteOuvert
-            ? <RelierCompte comptes={aRelierListe} uid={compteOuvert} onChoisir={setCompte} boites={boites} lireDernier={lireDernier} onRelie={noterRelie} onAdresses={onAdresses ? versAdresses : undefined}/>
-            : <ARelier comptes={bandeau} onRelier={relierCompte}/>}
+          <ParcoursAdresseVrm headers={headers} onBoite={() => setVue('boite')} comptes={aRelierListe} uid={compteOuvert} onChoisir={setCompte} boites={boites} lireDernier={lireDernier} onRelie={noterRelie} onPret={setPret}/>
         </div>
         {reglages ? <div ref={haut} className="vrm-boite-reglages" data-boite-reglages="">{reglages}</div> : null}
-        {!compteOuvert && <section className="vrm-boite-guide" aria-label="Faire suivre tes e-mails, pas à pas" data-boite-guide="">
+        {pret === false && <section className="vrm-boite-guide" aria-label="Faire suivre tes e-mails, pas à pas" data-boite-guide="">
           {reglages ? <h2 className="vrm-boite-guide-titre">Faire suivre tes e-mails, pas à pas</h2> : null}
-          <RelierBoite onAdresses={onAdresses ? versAdresses : undefined}/>
+          <RelierBoite messagerieInitiale={(aRelierListe.find((c) => c.uid === compteOuvert) || {}).messagerie} onAdresses={onAdresses ? versAdresses : undefined}/>
         </section>}
       </div>}
     </section>
