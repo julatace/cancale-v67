@@ -23,7 +23,9 @@ const PHRASE_NUM = {
   litige: (n, c) => `L’e-mail du bordereau disait N°${c.litige ? c.litige.mail : '?'}, la vente dit N°${n} : on garde celui de la vente. Vérifie le carton.`,
 };
 
-export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex }) {
+// (10 nov., lot AZ + M) `photoCarton(c)` : le geste « Photo du carton » (facultatif) d'un colis FAIT, rangé avec
+// SA vente (src/photoCarton.js) — le même que celui du scanner ; l'écran le fournit, rien n'est décidé ici.
+export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex, photoCarton = null }) {
   const vivants = Array.isArray(colis) ? colis : [];
   // Ce que la séance a vu (un colis fait sort de « À envoyer » après ses 5 s : la
   // séance le garde, montré fait). Le dernier état vivant l'emporte.
@@ -149,6 +151,7 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
         </div>
         {fait ? <p className="vrm-prep-fait" data-preparer-fait-note="" role="status">{enAttente ? 'Colis fait · annulable quelques secondes' : 'Colis fait ✓'}</p>
           : sorti ? <p className="vrm-emb-aide" data-preparer-sorti="">Ce colis n’est plus dans « À envoyer ».</p> : null}
+        {fait && photoCarton ? photoCarton(c) : null}
       </div>
     );
   })();
