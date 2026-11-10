@@ -53,7 +53,8 @@ const sousDe = (x) => {
   if (!x) return '';
   if (x.valeur == null) return raisonCourte(x.raison === 'aDater' ? { ...x, raison: 'a-dater', aDater: x.nAd } : x);
   if (x.couverture) return `${x.couverture} prix d’achat`;
-  if (x.partiel && x.manque && x.manque.length) return `sans ${x.manque[0]}`;
+  // « envois pas notés » (colis sans geste « Colis fait ») n'est pas une source manquante : il se dit tel quel.
+  if (x.partiel && x.manque && x.manque.length) return /^envois /.test(x.manque[0]) ? `des ${x.manque[0]}` : `sans ${x.manque[0]}`;
   return '';
 };
 
@@ -117,7 +118,7 @@ export default function MaSemaine({ M, entete = null, onSemaine, onNav }) {
         <Widget cle="ventes" l="Ventes" x={c.ventes} t="n" e={e.ventes} onClick={onNav ? () => onNav('cat_ventes') : null}/>
         <Widget cle="brut" l="Bénéfice brut" x={c.brut} t="eur" e={e.brut}
           porte={brutPorte ? 'Saisir les prix d’achat' : ''} onClick={onNav ? () => onNav('cat_ventes') : null}/>
-        <Widget cle="recu" l="Reçu" x={c.recu} t="eur" e={e.recu}/>
+        <Widget cle="recu" l="Reçu" x={c.recu} t="eur" e={e.recu} onClick={onNav ? () => onNav(c.recu && c.recu.valeur != null ? 'compta' : 'cat_ventes') : null}/>
         <Widget cle="colis" l="Colis envoyés" x={c.colis} t="n" e={e.colis} onClick={onNav ? () => onNav('cat_bord') : null}/>
         <Widget cle="dorment" l="Paires qui dorment" large t="n"
           x={d.etat === 'su' ? { valeur: d.n, partiel: d.auMoins, manque: [] } : { valeur: null, hors: 'ouvre Annonces' }}
