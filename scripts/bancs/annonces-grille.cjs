@@ -140,9 +140,10 @@ const toucher = async (pg, sel, mobile) => { const l = pg.locator(sel).first(); 
 // Ce que la page montre d'une vignette (les éléments VISIBLES seulement).
 const LIRE = () => {
   const vis = (e) => { if (!e) return false; const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-  const grille = document.querySelector('[data-ann-grille="vignettes"]');
-  const cartes = [...document.querySelectorAll('[data-ann-grille="vignettes"] > [data-carte-annonce]')];
-  const tetes = [...document.querySelectorAll('[data-ann-grille="vignettes"] > [data-ann-compte]')];
+  // (sur le code d'avant, la grille sans `data-ann-grille` est lue quand même : chaque contrôle dit SON rouge)
+  const grille = document.querySelector('[data-ann-grille="vignettes"]') || document.querySelector('.vrm-ann-grid');
+  const cartes = grille ? [...grille.querySelectorAll(':scope > [data-carte-annonce]')] : [];
+  const tetes = grille ? [...grille.querySelectorAll(':scope > [data-ann-compte]')] : [];
   // Un texte coupé : une feuille de texte VISIBLE dont le contenu déborde de sa boîte (… ou rogné).
   const coupes = (racine) => [...racine.querySelectorAll('span,b,div,button,a')].filter((e) => vis(e) && e.getBoundingClientRect().width > 2 && !e.closest('[data-titre]') && !e.querySelector('*:not(svg):not(path):not(circle)') && e.textContent.trim().length > 1)
     .filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible')
@@ -183,9 +184,9 @@ async function scenario(b, largeur, sombre) {
   console.log(`\n── Annonces en grille (${tag})`);
   const { pg, ctx, errs, onglets } = await ouvrir(b, { largeur, sombre });
   try {
-    const vu = await pg.waitForSelector('[data-ann-grille="vignettes"] [data-carte-annonce]', { timeout: 20000 }).then(() => true).catch(() => false);
-    dit(vu, `${tag} G1 : la vue « Toutes » est une grille de vignettes`);
-    if (!vu) { await capture(pg, `grille-${nom}-absente`); return; }
+    const vu = await pg.waitForSelector('.vrm-ann-grid [data-carte-annonce]', { timeout: 20000 }).then(() => true).catch(() => false);
+    if (!vu) { dit(false, `${tag} : les annonces sont rendues`); await capture(pg, `grille-${nom}-absente`); return; }
+    dit(await pg.locator('[data-ann-grille="vignettes"]').count() === 1, `${tag} G1 : la vue « Toutes » est une grille de vignettes`);
     await pg.waitForTimeout(800);
     let L = await pg.evaluate(LIRE);
     // G1 — un en-tête par compte
@@ -216,7 +217,7 @@ async function scenario(b, largeur, sombre) {
     const v9303 = L.cartes.find((c) => c.id === '9303');
     dit(v9303 && v9303.remise && v9303.remiseOui === '7' && !L.remisesHorsGrille.includes('9303') && L.resume === '1', `${tag} G9 : « Même paire que N°7 ? » est sur la vignette de 9303 (une pastille en tête y mène)`, JSON.stringify({ v: v9303 && [v9303.remise, v9303.remiseOui], hors: L.remisesHorsGrille, resume: L.resume }));
     dit(L.sw <= L.cw + 1, `${tag} G11 : aucune page qui défile de côté`, `${L.sw} > ${L.cw}`);
-    await pg.locator('[data-ann-grille]').scrollIntoViewIfNeeded().catch(() => {});
+    await pg.locator('.vrm-ann-grid').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, `grille-${nom}-fermee`);
     // G8 — la photo ouvre la visionneuse
     await toucher(pg, '[data-carte-annonce="9402"] [data-fiche-photo] img', mobile);
@@ -238,7 +239,6 @@ async function scenario(b, largeur, sombre) {
     dit(o && o.coupes.length === 0 && o.libellesDeuxLignes.length === 0, `${tag} G6 : ouverte, aucun libellé coupé ni passé sur deux lignes (« Accepter dès », « Ranger au stock »)`, JSON.stringify(o && { coupes: o.coupes, deux: o.libellesDeuxLignes }));
     await pg.locator('[data-carte-annonce="9402"]').scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, `grille-${nom}-ouverte`);
-    if (process.env.BANC_DBG) console.log(await pg.evaluate(() => { const out = []; let e = document.querySelector('[data-carte-annonce="9402"] [data-chiffres] > .vrm-fiche-cell'); while (e && !e.matches('[data-carte-annonce]')) { const s = getComputedStyle(e); out.push(`${e.tagName}.${e.className} w=${Math.round(e.getBoundingClientRect().width)} disp=${s.display} maxw=${s.maxWidth} ml=${s.marginLeft} mr=${s.marginRight} gtc=${s.gridTemplateColumns} gc=${s.gridColumn}`); e = e.parentElement; } return out.join('\n'); }));
     // L'achat se modifie en place (la même écriture qu'avant).
     await toucher(pg, '[data-carte-annonce="9402"] [data-edition="achat"]', mobile);
     await pg.keyboard.type('30'); await pg.keyboard.press('Enter');
