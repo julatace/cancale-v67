@@ -13,7 +13,7 @@
 //      … », 4 cases = les ventes inventées de la semaine) ; le replier le garde
 //      replié après un rechargement.
 //   C. Statistiques → « Comparer » (ce mois au même point face au mois d'avant,
-//      puis « Il y a un an ») et « Frais par site » (frais saisis + pack).
+//      puis le même mois l'an dernier, choisi au second sélecteur — lot BL) et « Frais par site » (frais saisis + pack).
 //   D. Partout : aucune erreur, aucun débordement à 390 px, cibles ≥ 44 px.
 // `SHOTS=dossier` : les captures à REGARDER (§6.2).
 const path = require('path');
@@ -204,27 +204,20 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       const nA = semDansMoisA.length + 1, nB = avantVentes.length + VENTES.filter((v) => false).length;
       dit(meme && meme['comparer-meme-point'] === '1', 'C : ce mois en cours se compare au même point', JSON.stringify(meme));
       dit(C.ventes && Number(C.ventes.a) === nA && Number(C.ventes.b) === nB, `C : ventes ${nA} face à ${nB}`, JSON.stringify(C.ventes));
-      dit(C.vendu && C.vendu.ecart !== '' && C.recu && C.benefice, 'C : quatre lignes, l’écart du vendu écrit', JSON.stringify(C));
-      await pg.click('[data-comparer-choix="an"]'); await pg.waitForTimeout(400);
+      dit(C.vendu && C.vendu.ecart !== '' && C.recu && C.benefice && C.achats, 'C : cinq lignes (achats compris), l’écart du vendu écrit', JSON.stringify(C));
+      // (10 nov., lot BL) Deux sélecteurs : le mois d'en face se CHOISIT (le même mois l'an dernier).
+      await pg.selectOption('[data-comparer-mois="b"]', `${MAINT.getFullYear() - 1}-${String(MAINT.getMonth() + 1).padStart(2, '0')}`); await pg.waitForTimeout(400);
       const an = await attrs(pg, '[data-comparer]');
       dit(an && an.comparer === 'an' && an['comparer-b'] === `${MAINT.getFullYear() - 1}-${String(MAINT.getMonth() + 1).padStart(2, '0')}`, 'C : « Il y a un an » ⇒ le même mois l’an dernier', JSON.stringify(an));
       const L = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-comparer-ligne]')].map((e) => [e.getAttribute('data-comparer-ligne'), e.getAttribute('data-b')])));
       dit(L.ventes === '0' && L.benefice === '', 'C : l’an dernier, 0 vente ; bénéfice pas couvert ⇒ « — »', JSON.stringify(L));
       await capture(pg, `C-comparer-${T.nom}`, '[data-comparer]');
-      await pg.click('[data-comparer-choix="precedent"]'); await pg.waitForTimeout(300);
+      await pg.selectOption('[data-comparer-mois="b"]', `${moisAvant(1).getFullYear()}-${String(moisAvant(1).getMonth() + 1).padStart(2, '0')}`); await pg.waitForTimeout(300);
       const F = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-frais-site]')].map((e) => [e.getAttribute('data-frais-site'), { eur: e.getAttribute('data-frais-eur'), pct: e.getAttribute('data-frais-pct'), lus: e.getAttribute('data-frais-lus') }])));
       dit(!!(await pg.$('[data-frais-sites]')) && F.Leboncoin && F.Leboncoin.eur === '499' && F.Leboncoin.pct === '', 'C : « Frais par site » : le pack Leboncoin du mois (4,99 €), pas de % sans vente', JSON.stringify(F));
-      // Les choix de « Comparer » sont un `Segmente` : la règle commune du segmenté
-      // (styles-coque.css, chantier A du 5 nov. : « 36 px à la souris, 44 px au doigt »).
-      // Au doigt (390 tactile) : 44 px, la cible (§7). À la souris (1512) : la hauteur du
-      // segmenté commun, jamais une forme à part — le banc exigeait 44 partout, écrit le
-      // 4 nov. quand le segmenté faisait 44 px à la souris aussi.
-      const petits = await cibles(pg, '[data-comparer] button');
-      if (T.hasTouch) dit(!petits.length, 'C : au doigt, les choix font 44 px', JSON.stringify(petits));
-      else {
-        const seg = await pg.evaluate(() => [...document.querySelectorAll('[data-comparer] button')].filter((e) => e.offsetParent).map((e) => ({ t: (e.innerText || '').trim().slice(0, 30), h: Math.round(e.getBoundingClientRect().height), commun: e.matches('.vrm-seg > .vrm-seg-btn') })));
-        dit(seg.length >= 2 && seg.every((x) => x.commun && x.h >= 36), 'C : à la souris, les choix suivent le segmenté commun (≥ 36 px)', JSON.stringify(seg));
-      }
+      // (10 nov., lot BL) Les deux sélecteurs de mois : 44 px partout (au doigt comme à la souris).
+      const petits = await cibles(pg, '[data-comparer] select, [data-comparer] button');
+      dit(!petits.length, 'C : les sélecteurs de mois font 44 px', JSON.stringify(petits));
       dit(T.vp.width > 500 || (await deborde(pg)) <= 1, 'C : aucun débordement à 390 px', String(await deborde(pg)));
       await capture(pg, `C-frais-${T.nom}`, '[data-frais-sites]');
       // Le mois d'avant ENTIER : frais saisis (pack Vinted 2,30 €) sur la période « Mois » d'avant n'est pas affichée ici ;
