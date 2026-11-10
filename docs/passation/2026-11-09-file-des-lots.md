@@ -104,4 +104,14 @@ Troisième série du 10 nov. — Julien : « Vas-y tout est parfait, fais tout �
 | BH | achat saisi deux fois : par n° de transaction / reçu seulement (§5), jamais par ressemblance ; rien supprimé, il choisit | `claude/achat-double` | à lancer |
 | BI | retours et litiges par modèle (le modèle est une proposition de regroupement, pas une identité ; les comptes viennent des ventes prouvées) | `claude/retours-modele` | à lancer (avec BB) |
 
+Quatrième série du 10 nov. — Julien : « Vas-y fait toute ».
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| BJ | dossier de litige en un PDF (photo d'annonce, photo du carton, bordereau, suivi daté) depuis une carte Litiges, généré dans le navigateur | `claude/dossier-litige` | à lancer |
+| BK | « Mois bouclé » : ce qui manque avant de déclarer (ventes sans date de versement, prix d'achat, comptes pas relus) ⇒ « Novembre est prêt à déclarer » | `claude/mois-boucle` | en cours (avec BL) |
+| BL | comparer deux mois côte à côte (vendu, reçu, bénéfice, paires), même règle que Argent | `claude/mois-boucle` | en cours (avec BK) |
+| BM | vitesse d'envoi : délai vente → « Colis fait » par compte (dates prouvées seulement) | `claude/vitesse-avis` | à lancer |
+| BN | avis Vinted reçus : note moyenne et évolution par compte (capacité `avis`, 5.319), aucun rappel d'évaluation | `claude/vitesse-avis` | à lancer |
+
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
