@@ -54,6 +54,7 @@ const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
+const FacturesAEnvoyer = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FacturesAEnvoyer })));
 // ⟦← App.jsx #9⟧
 // Le taux est un RÉGLAGE, pas une constante : il dépend de l'activité et de
 // l'option pour le versement libératoire, et lui seul connaît le sien.
@@ -996,6 +997,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         {argentNav}
       </div>
       {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
+      <FacturesAEnvoyer deps={DEPS_FACTURE}/>
       <ListeFacturesPro deps={DEPS_FACTURE}/>
 
       {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
