@@ -135,3 +135,18 @@ le banc) ; `apres-*-remise-carte` (la carte « Même paire ? ») ; `apres-*-ente
   candidate à une pastille « Prix d'achat 0/3 ».
 - Les bancs enligne / supprimees / stock-annonces / vestiaire-fiches / indicateur-pro ont des rouges hérités de
   `main` (pas de ce chantier) : à remettre à la règle par leur propriétaire.
+
+## Reprise du 10 nov. (après-midi)
+
+- Deux vrais `git merge origin/main` (litiges, photo-colis-scan, coût d'une vente, colis propre + logos, À trancher en
+  cartes, navigation fusionnée, colis à réceptionner, Mon adresse VRM, Ma semaine). Conflits : la ligne « Prochain
+  geste » de Colis est **retirée par `main`** (forme de `main` gardée : « Tout imprimer » seul) ; la consigne courte
+  d'Annonces couvre aussi la vue « Republier » de `main` (« Coche des annonces en ligne d'un compte, puis
+  **Republier**. ») ; Stock garde l'import `ValeurStockCarte` de `main` + `InfoPop`.
+- Prochain geste d'Annonces en ≤ 12 mots (`src/prochainGesteAnnonces.js`) : « Prix d'achat 0/3 connus : bénéfice
+  minimum. », « Annonce(s) sans numéro : écris-le en fin de description. » (Annonces Vinted : 141 → 125 caractères de
+  phrases à 390 px) ; « 1 nouveau N° » seul n'a plus le cadre blanc pleine largeur autour de sa pastille.
+- Bancs (un à la fois, `BANC_PORT` aléatoire) : popups-propre 140/0, annonces-coherence 130 verts, numero-ecrit 48,
+  numero-ou-remise 103, navigation-fusion 45, a-trancher vert. Audits variables, tdz, coherence, identite, icones,
+  boutons, statuts, onglets-d, politique-hotes verts ; les ~24 autres audits rouges le sont **à l'identique sur
+  `origin/main`** (mesuré dans un arbre `git archive`).
