@@ -272,6 +272,9 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
             const [rr, gg, bb2] = (couleur.match(/\d+/g) || []).map(Number);
             dit(rr > 150 && gg > 60 && gg < 200 && bb2 < 90, '3. l’alerte est AMBRE (jamais rouge ni bleue)', couleur);
             if (SHOTS) { await s.scrollIntoViewIfNeeded(); await o.pg.screenshot({ path: path.join(SHOTS, `t-seuil-proche-${nf}.png`) }); }
+            const fond = await s.evaluate((e) => getComputedStyle(e).backgroundColor);
+            const lum = ((fond.match(/\d+/g) || []).slice(0, 3).map(Number).reduce((x, y) => x + y, 0)) / 3;
+            dit(sombre ? lum < 90 : lum > 200, '4. la carte suit le thème (sombre ⇒ fond sombre, jamais un blanc sous un texte clair)', fond);
             const porte = s.locator('[data-seuil-tva-porte="tva_regime"]');
             const bb = await porte.boundingBox();
             if (tel) dit(bb && bb.height >= 43.5, '4. la porte : cible de 44 px', bb && String(Math.round(bb.height)));

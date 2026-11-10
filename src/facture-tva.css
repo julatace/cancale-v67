@@ -3,7 +3,7 @@
    « Facture en anglais ». Style DA6 (widget blanc, rayon 24, ambre = geste).
    Seuls les jetons --vrm-* : le mode sombre suit tout seul.
    ════════════════════════════════════════════════════════════════════════════ */
-.vrm-stva { display: grid; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--vrm-card, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
+.vrm-stva { display: grid; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
 .vrm-stva-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .vrm-stva-titre { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
 .vrm-stva-chiffre { font-size: 13px; color: var(--vrm-muted, #6e6e73); font-variant-numeric: tabular-nums; }
@@ -20,7 +20,6 @@
 .vrm-stva-pourquoi summary { min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--vrm-muted, #6e6e73); cursor: pointer; }
 .vrm-stva-pourquoi p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6e6e73); }
 .vrm-stva-fiche { margin-top: 4px; }
-:root[data-theme="dark"] .vrm-stva-alerte { background: color-mix(in srgb, var(--vrm-warn, #ffb340) 14%, transparent); }
 
 /* « Facture en anglais » : une case, une cible de 44 px. */
 .vrm-fp-anglais { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; cursor: pointer; }
