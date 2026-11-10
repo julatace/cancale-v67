@@ -118,7 +118,13 @@ export const quandARetirer = (c) => msDe(c && c.arrivee);
 // de leur arrivée la plus récente (avant : la limite la plus proche d'abord). Les « à vérifier » restent
 // sous les comptés de leur point ; un point sans colis arrivé (seulement « en route ») passe après ;
 // « pas encore connu » reste à la fin. Les limites restent écrites (ambre si proches). Aucun colis écarté.
-const plusRecenteArrivee = (p) => { let m = null; for (const c of p.arrives || []) { const t = msDe(c && c.arrivee); if (t != null && (m == null || t > m)) m = t; } return m; };
+// L'arrivée la plus récente d'un point : parmi ses colis COMPTÉS (un « à vérifier » ne fait pas monter
+// le point) ; un point qui n'a que des « à vérifier » se range par eux.
+const plusRecenteArrivee = (p) => {
+  const tous = p.arrives || []; const comptes = tous.filter((c) => c && !c.aVerifier);
+  let m = null; for (const c of (comptes.length ? comptes : tous)) { const t = msDe(c && c.arrivee); if (t != null && (m == null || t > m)) m = t; }
+  return m;
+};
 export function ordreRecentPoints(groupes) {
   const L = (Array.isArray(groupes) ? groupes : []).map((p) => ({ ...p, arrives: [...ordreRecent((p.arrives || []).filter((c) => !c.aVerifier), (c) => c && c.arrivee), ...ordreRecent((p.arrives || []).filter((c) => c.aVerifier), (c) => c && c.arrivee)] }));
   const rang = (p) => (p.inconnu ? 2 : (p.arrives.length ? 0 : 1));
