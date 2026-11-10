@@ -108,7 +108,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Préparer l'annonce</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Brouillon conservé en quittant cet éditeur — <b>rien n'est envoyé à Vinted</b>. Le N° de l'article ne change pas.</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Gardé en brouillon : <b>rien n'est envoyé à Vinted</b>. Même N°.</div>
           </div>
           <button type="button" onClick={fermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
@@ -169,7 +169,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
           <label style={{display:'block'}}><span style={maj}>Description</span><ChipsModeles valeur={desc} surChange={setDesc} champ={refDescBr} vars={{ titre:title, prix:Number(String(price).replace(',','.')), numero:e&&e.numero, taille:it.size, marque:it.brand }}/><textarea ref={refDescBr} aria-label="Description du brouillon" value={desc} onChange={ev=>setDesc(ev.target.value)} rows={4} style={champ}/></label>
           <label style={{display:'block'}}><span style={maj}>Caractéristiques (marque, modèle, état…)</span><input aria-label="Caractéristiques du brouillon" value={caracteristiques} onChange={ev=>setCaracteristiques(ev.target.value)} style={champ}/></label>
           <label style={{display:'block'}}><span style={maj}>Dimensions — si utile, avec l’unité</span><input aria-label="Dimensions du brouillon" value={dimensions} onChange={ev=>setDimensions(ev.target.value)} placeholder="Ex. 30 × 20 × 10 cm" style={champ}/></label>
-          <p style={{fontSize:12,color:C.muted}}>Ces informations sont préparées dans VRM. Pour ajouter des photos ou renseigner les champs du catalogue Vinted, <a href={'https://www.vinted.fr/items/'+it.id+'/edit'} target="_blank" rel="noreferrer">compléter l’annonce sur Vinted ↗</a>.</p>
+          <p style={{fontSize:12,color:C.muted}}>Photos et champs du catalogue : <a href={'https://www.vinted.fr/items/'+it.id+'/edit'} target="_blank" rel="noreferrer">compléter l’annonce sur Vinted ↗</a>.</p>
           {erreurSauvegarde&&<p role="alert">{erreurSauvegarde}</p>}
           {manques.length > 0 && <div data-atelier-manque style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>À compléter avant de publier : {manques.join(', ')}.</div>}
           {draft && <div style={{ fontSize: 12, color: C.muted }}>Dernier brouillon{draft.updatedAt ? ` le ${new Date(draft.updatedAt).toLocaleDateString('fr-FR')}` : ''}{draft.versions && draft.versions.length ? ` · ${draft.versions.length} version${draft.versions.length > 1 ? 's' : ''} gardée${draft.versions.length > 1 ? 's' : ''}` : ''}.</div>}
@@ -245,7 +245,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Lots — titres &amp; prix</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Prépare une sélection d'un coup — <b>rien n'est envoyé à Vinted</b>, c'est gardé en brouillon. Les numéros ne changent pas.</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Gardé en brouillon : <b>rien n'est envoyé à Vinted</b>. Mêmes N°.</div>
           </div>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
@@ -325,7 +325,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
                 <option value="99">finir en ,99</option>
               </select>
             </div>}
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>Le prix ne descend jamais sous le prix d'achat (plancher). Chaque calcul part du prix actuel, sans s'empiler.</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>Jamais sous le prix d'achat ; chaque baisse part du prix actuel.</div>
           </div>
           <button type="button" data-lots-enregistrer onClick={enregistrer} disabled={!sel.size || (!changeT && !changeP) || done}
             style={{ border: `1px solid ${C.accent}`, background: done ? C.accent : `${C.accent}12`, color: done ? '#fff' : C.accent, borderRadius: 12, padding: '12px', fontSize: 15, fontWeight: 700, cursor: (sel.size && (changeT || changeP) && !done) ? 'pointer' : 'default', fontFamily: 'inherit', opacity: (!sel.size || (!changeT && !changeP)) ? 0.5 : 1 }}>
@@ -500,21 +500,21 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
               <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.muted }}>{q.esp.type === 'variable' ? 'de' : ''}<input data-file-esp-min value={q.esp.min} onChange={ev => setQ(p => ({ ...p, esp: { ...p.esp, min: fileClamp(ev.target.value) } }))} inputMode="numeric" style={{ ...champ, width: 70 }} />s</label>
               {q.esp.type === 'variable' && <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.muted }}>à<input data-file-esp-max value={q.esp.max} onChange={ev => setQ(p => ({ ...p, esp: { ...p.esp, max: fileClamp(ev.target.value) } }))} inputMode="numeric" style={{ ...champ, width: 70 }} />s</label>}
             </div>
-            <div style={{ fontSize: 11, color: C.muted }}>Borné à {FILE_ESP_MAX / 60} min. L'éligibilité de chaque article est revérifiée juste avant — une paire devenue vendue ou incomplète est sautée, jamais publiée.</div>
+            <div style={{ fontSize: 11, color: C.muted }}>{FILE_ESP_MAX / 60} min au plus. Une paire vendue ou incomplète entre-temps est sautée.</div>
           </div>
           {/* ── mode RÉEL : publier pour de vrai (baisser le prix sur Vinted) ── */}
           {typeof publier === 'function' && q.mode === 'idle' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, border: `1px solid ${reel ? C.warn : C.border}`, borderRadius: 12, padding: 10, background: reel ? `${C.warn}0c` : 'transparent' }}>
               <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', cursor: 'pointer' }}>
                 <input type="checkbox" data-file-reel checked={reel} onChange={ev => { setReel(ev.target.checked); if (!ev.target.checked) setReelOk(false); }} style={{ marginTop: 2, accentColor: C.warn, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: C.text }}><b>Publier pour de vrai sur Vinted</b> — baisser le prix de chaque annonce de la file. <span style={{ color: C.muted }}>En place : le N° ne change pas, rien n'est supprimé. L'extension revérifie chaque annonce (compte, sauvegarde, format) ; une qu'elle ne sait pas encore faire est sautée, jamais touchée.</span></span>
+                <span style={{ fontSize: 13, color: C.text }}><b>Publier pour de vrai sur Vinted</b> : baisser le prix de chaque annonce. <span style={{ color: C.muted }}>Même N°, rien supprimé ; une annonce douteuse est sautée.</span></span>
               </label>
-              {majExt && <div data-file-reel-maj style={{ fontSize: 12, color: C.warn, paddingLeft: 27 }}>Sur cet ordinateur, l'extension doit être à jour ({EXT_ATTENDUE}) et connectée au bon compte — sinon chaque annonce ressortira « échec », rien ne sera touché.</div>}
+              {majExt && <div data-file-reel-maj style={{ fontSize: 12, color: C.warn, paddingLeft: 27 }}>Mets l'extension à jour ({EXT_ATTENDUE}), connectée au bon compte : sinon rien ne part.</div>}
               {reel && <>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text }}>Baisser le prix de <input data-file-pct value={pct} onChange={ev => setPct(ev.target.value)} inputMode="numeric" style={{ ...champ, width: 64 }} /> % <span style={{ color: C.muted }}>(jamais sous le prix d'achat)</span></label>
                 <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', cursor: 'pointer', fontSize: 13, color: C.text }}>
                   <input type="checkbox" data-file-reel-confirme checked={reelOk} onChange={ev => setReelOk(ev.target.checked)} style={{ marginTop: 2, accentColor: C.warn, flexShrink: 0 }} />
-                  <span>Je confirme : le prix de chaque annonce de la file sera <b>baissé de {pctNum}&nbsp;%</b> sur mon compte Vinted.</span>
+                  <span>Je confirme : chaque prix de la file <b>baissé de {pctNum}&nbsp;%</b> sur Vinted.</span>
                 </label>
               </>}
             </div>
@@ -527,7 +527,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
             {q.mode !== 'idle' && <button type="button" data-file-arreter onClick={arreter} style={btn({ padding: '10px 16px', fontSize: 13, color: C.warn })}>■ Arrêter</button>}
             {q.mode === 'idle' && enFile.length > 0 && <button type="button" data-file-vider onClick={vider} style={btn({ marginLeft: 'auto', color: C.muted })}>Vider la file</button>}
           </div>
-          {q.mode === 'pause' && <div style={{ fontSize: 12, color: C.muted }}>En pause — reprise manuelle. Après un rechargement, la file revient toujours EN PAUSE (jamais relancée toute seule).</div>}
+          {q.mode === 'pause' && <div style={{ fontSize: 12, color: C.muted }}>En pause : reprends à la main. Jamais relancée toute seule.</div>}
         </div>
       </div>
     </VoileAtelier>
@@ -630,7 +630,7 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
           ? <>Compte ouvert {NAV.dansNu} : <b style={{ color: C.text }}>{nomChrome}</b>. Seuls ses brouillons se mettent en ligne d'ici.</>
           : uidChrome === null ? `Aucun compte Vinted ouvert ${NAV.dansNu} : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne.`
           : `Compte Vinted ouvert ${NAV.dansNu} pas encore connu : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne.`}</div>}
-        {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire tes brouillons enregistrés : « Mettre en ligne » attend, « Ouvrir sur Vinted » marche.</div>}
+        {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 13, color: C.muted }}>Brouillons pas lus : « Ouvrir sur Vinted » marche, « Mettre en ligne » attend.</div>}
         {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 13, color: C.muted }}>Mettre en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente.</div>}
         {brouillonOk && nPrets > 1 && onFile && <Bouton variante="primaire" data-brouillons-file onClick={onFile} style={{ alignSelf: 'flex-start', minHeight: 44 }}>En mettre plusieurs en ligne…</Bouton>}
         {liste && liste.map((it) => {
@@ -654,7 +654,7 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 {!e && place === 'a-verifier' && <div data-brouillon-a-verifier style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}>À vérifier sur Vinted : ouvre ton dressing sur ce compte, jusqu'en bas. <Pourquoi label="Pourquoi ?">VRM n'a pas de lecture complète et récente (moins de 24 h) des brouillons de {compte(it) || 'ce compte'} : il a pu être supprimé ou mis en ligne depuis.</Pourquoi></div>}
                 {!e && !horsCompte && place !== 'a-verifier' && publie && <div style={{ fontSize: 13, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
                 {!e && !horsCompte && place !== 'a-verifier' && it._etat === 'incomplet' && <div style={{ fontSize: 13, color: C.muted }}>Il lui manque {[!String((i && i.titre) || '').trim() && 'un titre', !(Number(i && i.prix) > 0) && 'un prix', !(Number(i && i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
-                {!e && !horsCompte && place !== 'a-verifier' && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Pas encore vu par l'extension : ouvre-le sur Vinted et fais « Enregistrer le brouillon » sans rien changer. <Pourquoi label="Pourquoi ?">Il a été fait avant l'extension, ou ailleurs. Une fois enregistré sur Vinted, il arrive ici tout de suite, prêt à mettre en ligne.</Pourquoi></div>}
+                {!e && !horsCompte && place !== 'a-verifier' && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Pas encore vu : sur Vinted, fais « Enregistrer le brouillon » sans rien changer. <Pourquoi label="Pourquoi ?">Il a été fait avant l'extension, ou ailleurs. Une fois enregistré sur Vinted, il arrive ici tout de suite, prêt à mettre en ligne.</Pourquoi></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                 {proposable && complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <Bouton data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ minHeight: 44 }}>Mettre en ligne</Bouton>}
@@ -1020,12 +1020,12 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         ))}
       </ol>
       {fiche === undefined && <div className="vrm-rm-muet" data-main-lecture="">Lecture de ce que VRM a enregistré…</div>}
-      {fiche === null && <div className="vrm-rm-note" data-main-passu="">VRM n’a pas pu lire ce qu’il a enregistré de cette annonce : le titre et le prix viennent de ton dressing, la description manque.</div>}
+      {fiche === null && <div className="vrm-rm-note" data-main-passu="">Fiche pas lue : titre et prix du dressing, description manquante.</div>}
 
       {section('reglages', <>
-        <p className="vrm-rm-memes" data-main-memes-reglages={resumeGardes(regs).join(' · ')}>
-          <b>Mêmes réglages que Republier.</b> La retouche des photos et la lettre valent aussi quand VRM republie pour toi, et l’inverse, sur tous tes appareils. Le prix et le titre repartent de « Garder » à chaque ouverture{rang ? ' (ils valent pour toutes les paires de cette série)' : ''}.
-        </p>
+        <div className="vrm-rm-memes" data-main-memes-reglages={resumeGardes(regs).join(' · ')}>
+          <b>Mêmes réglages que Republier.</b> Prix et titre repartent de « Garder ». <Pourquoi>La retouche des photos et la lettre valent aussi quand VRM republie pour toi, et l’inverse, sur tous tes appareils. Le prix et le titre repartent de « Garder » à chaque ouverture{rang ? ' (ils valent pour toutes les paires de cette série)' : ''}.</Pourquoi>
+        </div>
         <div className="vrm-rm-bloc" data-main-bloc="photos">
           <div className="vrm-rm-bloc-tete"><b>Photos</b><span>{regNeutre ? 'telles quelles' : 'retouchées'} · vaut pour toutes</span></div>
           {nPh ? <div className="vrm-rm-bande" data-main-apercu-photos={nPh}>{photos.slice(0, 4).map((u, i) => <div key={i} className="vrm-rm-vignette"><PhotoVinted src={u} alt="" style={cssPh}/></div>)}{nPh > 4 ? <div className="vrm-rm-vignette vrm-rm-plus">+{nPh - 4}</div> : null}</div> : null}
@@ -1135,7 +1135,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
             chez Vinted (vendue puis annulée, mesuré) — rien à supprimer, jamais deux fois en vente. */}
         {paire.annulee
           ? <div className="vrm-rm-muet" data-main-annulee={paire.tx || ''}>L’ancienne annonce est fermée chez Vinted (vente annulée) : rien à supprimer.</div>
-          : <div className="vrm-rm-note">Quand la nouvelle est en ligne, supprime l’ancienne sur Vinted : sinon la même paire est en vente deux fois. VRM ne supprime rien.</div>}
+          : <div className="vrm-rm-note">Nouvelle en ligne : supprime l’ancienne sur Vinted, sinon double vente.</div>}
       </>)}
 
       {section('relier', <>
@@ -1548,7 +1548,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 une fois, avec ce qui est gardé (une baisse gardée se voit avant tout geste). */}
             {partage && (() => { const neutre = regNeutre && !regs.lettre; return (
               <div className="vrm-repub-memes" data-republier-memes-reglages={neutre ? 'neutre' : resumeGardes(regs).join(' · ')}>
-                <span><b>Mêmes réglages que « Republier à la main »</b> : la retouche des photos et la lettre valent aussi là-bas, sur tous tes appareils ; le prix et le titre repartent de « Garder » à chaque ouverture.{neutre ? '' : <> Gardés : {resumeGardes(regs).join(' · ')}.</>}</span>
+                <span><b>Mêmes réglages que « Republier à la main »</b>.{neutre ? '' : <> Gardés : {resumeGardes(regs).join(' · ')}.</>} <Pourquoi>La retouche des photos et la lettre valent aussi là-bas, sur tous tes appareils ; le prix et le titre repartent de « Garder » à chaque ouverture.</Pourquoi></span>
                 {!neutre && <Bouton variante="discret" data-republier-reglages-zero onClick={() => poserR({ photo: { ...PHOTO_NEUTRE }, lettre: false })}>Tout remettre à zéro</Bouton>}
               </div>); })()}
             {recree && <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

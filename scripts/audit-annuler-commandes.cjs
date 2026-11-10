@@ -83,7 +83,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
     ['Vestiaire « Un seul N° »', /title: `Un seul N° : N°\$\{numVinted\}`/.test(A)],
   ];
   for (const [nom, c] of gardees) dit(c, `D la confirmation reste : ${nom}`);
-  dit(M.CONFIRMATIONS.filter((c) => c.decision === 'annuler').length === 8 && M.CONFIRMATIONS.every((c) => c.pourquoi && c.geste && ['annuler', 'gardee'].includes(c.decision)), 'D l’inventaire dit chaque décision et sa raison', String(M.CONFIRMATIONS.length));
+  dit(M.CONFIRMATIONS.filter((c) => c.decision === 'annuler').length === 8 && M.CONFIRMATIONS.every((c) => c.pourquoi && c.geste && ['annuler', 'gardee', 'corbeille'].includes(c.decision)), 'D l’inventaire dit chaque décision et sa raison', String(M.CONFIRMATIONS.length));
 
   // E. Les actions de la loupe n'écrivent rien, n'envoient rien
   const m = /const lancerActionRecherche = \(a, qBrut\) => \{([\s\S]*?)\n  \};/.exec(A);

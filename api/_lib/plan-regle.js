@@ -62,7 +62,7 @@ export function planDuPrix(prix, { prixPro = '', cleSolo = CLE_PRIX_SOLO } = {})
 // quantité 1. `{ plan, vendeur, vendeurLe, cgv }` ; `plan` vaut `null` quand ce
 // n'est pas sûr (plusieurs articles, prix inconnu, Solo aux CGV d'avant).
 export function planDeLAbonnement(sub, opts = {}) {
-  const vide = { plan: null, vendeur: null, vendeurLe: null, raison: 'illisible', autres: { leboncoin: null, ebay: null, vestiaire: null } };
+  const vide = { plan: null, vendeur: null, vendeurLe: null, raison: 'illisible', autres: { leboncoin: null, ebay: null, vestiaire: null }, pro: null, proAncien: false };
   if (!sub || typeof sub !== 'object') return vide;
   const articles = sub.items && Array.isArray(sub.items.data) ? sub.items.data : [];
   if (articles.length !== 1) return { ...vide, raison: 'articles' };
@@ -82,7 +82,16 @@ export function planDeLAbonnement(sub, opts = {}) {
     const k = META_VENDEUR[pl], id = idCompteVendeur(pl, m[k]);
     autres[pl] = id ? { id, le: Number.isFinite(Date.parse(m[k + '_le'] || '')) ? String(m[k + '_le']) : null } : null;
   }
-  return { plan, vendeur, vendeurLe, raison, autres, prixId: String(p.id || ''), articleId: String(a.id || '') };
+  // (10 nov.) Pro = 10 comptes vendeurs au total. Un Pro souscrit sous les CGV d'avant
+  // (« les ventes de tous tes comptes ») n'est jamais limité (`proAncien`).
+  let pro = null, proAncien = false;
+  if (plan === PLAN_PRO) {
+    if (String(m.cgv_version || '') >= CGV_PRO_DIX_DEPUIS) {
+      const liste = lireMetaPro(m);
+      pro = liste ? { liste, le: Number.isFinite(Date.parse(m[META_PRO + '_le'] || '')) ? String(m[META_PRO + '_le']) : null } : null;
+    } else proAncien = true;
+  }
+  return { plan, vendeur, vendeurLe, raison, autres, pro, proAncien, prixId: String(p.id || ''), articleId: String(a.id || '') };
 }
 
 // ── (9 nov., soir) SOLO PAR PLATEFORME — Julien : « fais absolument tout ».
@@ -120,8 +129,8 @@ export const META_VENDEUR = Object.freeze({
 // `proprietaire`). Sortie : `{ plan, vendeur, bride }`. `bride` n'est vrai QUE
 // pour un Solo sûr, avec un compte vendeur CHOISI, hors propriétaire.
 export function regleVentes(x) {
-  if (!x || typeof x !== 'object') return { plan: null, vendeur: null, bride: false, autres: AUTRES_LIBRES };
-  if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES };
+  if (!x || typeof x !== 'object') return { plan: null, vendeur: null, bride: false, autres: AUTRES_LIBRES, pro: null };
+  if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES, pro: null };
   const plan = x.plan === PLAN_PRO || x.plan === PLAN_SOLO ? x.plan : null;
   const cv = x.compteVendeur;
   const brut = cv && typeof cv === 'object' ? cv.uid : cv;
@@ -136,13 +145,23 @@ export function regleVentes(x) {
     const id = idCompteVendeur(p, v && typeof v === 'object' ? v.id : v);
     autres[p] = plan === PLAN_SOLO && id ? id : null;
   }
-  return { plan, vendeur, bride: plan === PLAN_SOLO && !!vendeur, autres: Object.freeze(autres) };
+  // (10 nov.) Pro : les 10 comptes vendeurs CHOISIS par lui (`comptesPro.liste` rendu par
+  // le serveur, ou `comptesVendeurs.pro` de la ligne `abonnements`). Pas choisi, illisible,
+  // plus de 10 ⇒ `null` : tous ses comptes comptent (« pas su » ne bride jamais).
+  let pro = null;
+  if (plan === PLAN_PRO) {
+    const src = x.comptesPro && typeof x.comptesPro === 'object' ? x.comptesPro.liste : cvs.pro;
+    const l = listeVendeursPro(src);
+    pro = l ? Object.freeze(l) : null;
+  }
+  return { plan, vendeur, bride: plan === PLAN_SOLO && !!vendeur, autres: Object.freeze(autres), pro };
 }
 
 // Une vente (ou une annonce, un colis à envoyer, une offre) de ce compte est-elle
 // HORS de l'offre ? Vrai seulement si la règle bride ET que le compte est connu
 // ET n'est pas le compte vendeur. Un compte inconnu n'est jamais écarté.
 export function venteHorsPlan(regle, uid) {
+  if (regle && regle.plan === PLAN_PRO && regle.pro) { const k = cleVendeurPro('vinted', uid); return !!k && !regle.pro.includes(k); }
   if (!regle || regle.bride !== true || !regle.vendeur) return false;
   const u = uidDe(uid);
   return uidValide(u) && u !== regle.vendeur;
@@ -155,6 +174,8 @@ export function venteHorsPlan(regle, uid) {
 // compte de la vente est connu et ce n'est pas lui. Compte inconnu, « non
 // identifié », pas su, Pro, propriétaire ⇒ jamais écartée.
 export function venteAutreHorsPlan(regle, plateforme, compte) {
+  // (10 nov.) Pro : hors offre = un compte CONNU qui n'est pas parmi ses 10 comptes vendeurs.
+  if (regle && regle.plan === PLAN_PRO && regle.pro && PLATEFORMES_SOLO.includes(plateforme)) { const k = cleVendeurPro(plateforme, compte); return !!k && !regle.pro.includes(k); }
   if (!regle || regle.plan !== PLAN_SOLO || !regle.autres || !PLATEFORMES_SOLO.includes(plateforme)) return false;
   const choisi = regle.autres[plateforme];
   if (!choisi) return false;
@@ -162,7 +183,8 @@ export function venteAutreHorsPlan(regle, plateforme, compte) {
   return !!c && c !== choisi;
 }
 // Une plateforme au moins est-elle bridée (Solo sûr, un compte vendeur choisi) ?
-export const brideAutres = (r) => !!r && r.plan === PLAN_SOLO && !!r.autres && PLATEFORMES_SOLO.some((p) => !!r.autres[p]);
+// (10 nov.) En Pro avec ses 10 comptes choisis : oui (un compte hors des 10 sort des totaux).
+export const brideAutres = (r) => !!r && ((r.plan === PLAN_PRO && !!r.pro) || (r.plan === PLAN_SOLO && !!r.autres && PLATEFORMES_SOLO.some((p) => !!r.autres[p])));
 // Le compte d'une plateforme PROPOSÉ (jamais appliqué) : le plus de ventes lues,
 // strictement. `ids` : les comptes de la plateforme ; `comptesDesVentes` : le
 // compte de chaque vente lue (`null` si pas lues ⇒ rien de proposé).
@@ -177,6 +199,7 @@ export function compteDefautAutre(plateforme, ids, comptesDesVentes) {
 }
 // La signature de la règle : change QUAND une plateforme change (l'app se remonte).
 export function signatureRegle(r) {
+  if (r && r.plan === PLAN_PRO && r.pro) return 'pro:' + [...r.pro].sort().join(',');
   if (!r || r.plan !== PLAN_SOLO) return 'libre';
   const parts = [];
   if (r.bride && r.vendeur) parts.push(r.vendeur);   // Vinted seul : « solo:7 », comme avant
@@ -186,7 +209,7 @@ export function signatureRegle(r) {
 
 // Les comptes Vinted dont les VENTES sont hors de l'offre (pour dire leurs noms).
 export function comptesHorsPlan(regle, comptes) {
-  if (!regle || !regle.bride) return [];
+  if (!regle || !(regle.bride || regle.pro)) return [];
   return (Array.isArray(comptes) ? comptes : []).filter((c) => c && venteHorsPlan(regle, c.uid != null ? c.uid : c.vinted_user_id));
 }
 
@@ -219,5 +242,82 @@ export function prochainChangement(vendeurLe, maintenant = Date.now()) {
 // d'accueil et (en substance) les CGV.
 export const OFFRES = Object.freeze({
   solo: Object.freeze({ nom: 'Solo', phrase: 'Un compte vendeur par plateforme (un Vinted, un Leboncoin, un eBay, un Vestiaire) — ventes, annonces, colis à envoyer, offres et compta de ce compte — et autant de comptes d’achat que tu veux (leurs achats et leurs retraits).' }),
-  pro: Object.freeze({ nom: 'Pro', phrase: 'Les ventes de tous tes comptes : chaque compte vend, tout entre dans tes totaux.' }),
+  pro: Object.freeze({ nom: 'Pro', phrase: 'Jusqu’à 10 comptes vendeurs, toutes plateformes confondues — leurs ventes entrent dans tes totaux — et autant de comptes d’achat que tu veux.' }),
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// (10 nov.) PRO = 10 COMPTES VENDEURS AU TOTAL — Julien : « Solo = un compte vendeur
+// par plateforme : oui, et 19,99 pour 10 comptes vendeurs ».
+// ══════════════════════════════════════════════════════════════════════════════
+// Lecture retenue : 10 comptes vendeurs AU TOTAL, toutes plateformes confondues
+// (Vinted + Leboncoin + eBay + Vestiaire). S'il voulait « 10 par plateforme », la
+// règle est ICI seulement (`MAX_VENDEURS_PRO`, `listeVendeursPro`).
+//   · Choisis par LUI (feuille « Quels 10 comptes vendent ? ») ; rien n'est deviné.
+//   · Pas encore choisis ⇒ TOUS ses comptes comptent (« pas su » ne bride jamais) ;
+//     l'app ne demande le choix qu'au-delà de 10 comptes.
+//   · Choisis ⇒ un compte hors des 10 est un compte d'ACHAT : ses ventes sortent
+//     des listes et des totaux (aperçu, rien supprimé), ses colis restent dans Colis.
+//   · Ajouter un compte dans une place libre : toujours permis. En RETIRER un :
+//     une fois tous les 30 jours (comme le compte vendeur de Solo).
+//   · Un Pro souscrit avant les CGV du 10 nov. garde « tous tes comptes ».
+// L'IDENTITÉ d'un compte est `plateforme:id` (`idCompteVendeur`) — jamais un pseudo.
+export const MAX_VENDEURS_PRO = 10;
+export const CGV_PRO_DIX_DEPUIS = '2026-11-10';
+export const PLATEFORMES_PRO = Object.freeze(['vinted', 'leboncoin', 'ebay', 'vestiaire']);
+// Les métadonnées de SON abonnement Stripe : `vrm_pro_vendeurs` (+ `_2` si la liste
+// dépasse 500 caractères, la limite de Stripe), `vrm_pro_vendeurs_le`.
+export const META_PRO = 'vrm_pro_vendeurs';
+const ABREGE_PRO = Object.freeze({ vinted: 'v', leboncoin: 'l', ebay: 'e', vestiaire: 'c' });
+const PLATEFORME_ABREGEE = Object.freeze({ v: 'vinted', l: 'leboncoin', e: 'ebay', c: 'vestiaire' });
+// L'identité d'un compte vendeur Pro, propre (`vinted:1007`, `leboncoin:8442001`…) ou `null`.
+export function cleVendeurPro(plateforme, id) {
+  if (!PLATEFORMES_PRO.includes(plateforme)) return null;
+  const i = idCompteVendeur(plateforme, id);
+  return i ? plateforme + ':' + i : null;
+}
+export const decouperCleVendeurPro = (k) => { const s = String(k || ''), i = s.indexOf(':'); return i > 0 ? { plateforme: s.slice(0, i), id: s.slice(i + 1) } : null; };
+// La liste choisie, relue sans confiance : `['vinted:1007', …]` ou `[{ plateforme, id }]`.
+// Une entrée illisible, une liste vide ou de plus de 10 ⇒ `null` (pas su : rien bridé).
+export function listeVendeursPro(l) {
+  if (!Array.isArray(l)) return null;
+  const out = [];
+  for (const x of l) {
+    let k = null;
+    if (typeof x === 'string') { const d = decouperCleVendeurPro(x); k = d && cleVendeurPro(d.plateforme, d.id); }
+    else if (x && typeof x === 'object') k = cleVendeurPro(x.plateforme, x.id);
+    if (!k) return null;
+    if (!out.includes(k)) out.push(k);
+  }
+  return out.length && out.length <= MAX_VENDEURS_PRO ? out : null;
+}
+// La liste → les métadonnées (morceaux de 500 caractères au plus, une entrée jamais coupée).
+export function metaVendeursPro(liste) {
+  const l = listeVendeursPro(liste);
+  if (!l) return null;
+  const morceaux = [''];
+  for (const k of l) {
+    const d = decouperCleVendeurPro(k), e = ABREGE_PRO[d.plateforme] + ':' + d.id;
+    const i = morceaux.length - 1;
+    if (morceaux[i] && morceaux[i].length + 1 + e.length > 500) morceaux.push(e); else morceaux[i] = morceaux[i] ? morceaux[i] + ',' + e : e;
+  }
+  if (morceaux.length > 2) return null;
+  return { [META_PRO]: morceaux[0], [META_PRO + '_2']: morceaux[1] || '' };
+}
+// Les métadonnées → la liste (`null` = pas choisie ou illisible).
+export function lireMetaPro(m) {
+  if (!m || typeof m !== 'object') return null;
+  const brut = [m[META_PRO], m[META_PRO + '_2']].map((x) => String(x == null ? '' : x).trim()).filter(Boolean).join(',');
+  if (!brut) return null;
+  return listeVendeursPro(brut.split(',').map((e) => { const d = decouperCleVendeurPro(e); return d && PLATEFORME_ABREGEE[d.plateforme] ? PLATEFORME_ABREGEE[d.plateforme] + ':' + d.id : '?'; }));
+}
+// Pro limité (CGV du 10 nov.) : ses comptes, à choisir ? `tous` : les identités de
+// TOUS ses comptes (toutes plateformes) ; `liste` : ses 10 choisis (ou `null`).
+// Rend `{ aChoisir, hors, places }` — jamais un choix fait à sa place.
+export function etatVendeursPro(tous, liste) {
+  const ids = [...new Set((Array.isArray(tous) ? tous : []).filter(Boolean))];
+  const l = listeVendeursPro(liste);
+  if (!l) return { aChoisir: ids.length > MAX_VENDEURS_PRO, hors: [], places: MAX_VENDEURS_PRO };
+  const hors = ids.filter((k) => !l.includes(k));
+  const places = MAX_VENDEURS_PRO - l.length;
+  return { aChoisir: hors.length > 0 && places > 0, hors, places };
+}
