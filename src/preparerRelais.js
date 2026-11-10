@@ -4,7 +4,8 @@
 //
 //  ⚠️ CE MODULE NE DÉCIDE RIEN QUE L'APP N'AIT DÉJÀ DÉCIDÉ (§11) :
 //   · Préparer : la liste et son ORDRE sont ceux de Colis → « À envoyer »
-//     (`colisAEnvoyerRanges` : le plus pressé d'abord, rangés par transporteur) —
+//     (`colisAEnvoyerRanges` : depuis le 9 nov. au soir, lot AJ, la vente la plus RÉCENTE en
+//     haut, tous comptes mélangés, src/ordreRecent.js — plus « le plus pressé d'abord ») —
 //     jamais triés par emplacement (refus du 11 octobre). La paire montrée est
 //     celle de la VENTE par son n° de transaction (§5) ; l'appelant dit si elle
 //     est sûre (`paire: 'sure' | 'a-verifier'`), ce module ne devine rien.

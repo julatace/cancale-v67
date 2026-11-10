@@ -28,6 +28,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { transporteurDuColis, cleTransporteur, nomDuTransporteur, PAS_LU } from './transporteursVisuels.js';
 import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
+import { ordreRecent } from './ordreRecent.js';
 
 export const INCONNU = PAS_LU;   // « Transporteur inconnu »
 
@@ -83,15 +84,9 @@ export function quandEnvoye({ depart = null, coche = null, vente = null } = {}) 
 }
 
 // Le plus récent en haut ; sans date en bas ; à égalité, l'ordre reçu (stable).
+// (9 nov., soir, lot AJ) La règle unique des listes (src/ordreRecent.js) : même comportement.
 export function rangerEnvoyes(liste, quand = (x) => x && x.quand && x.quand.ms) {
-  return (Array.isArray(liste) ? liste : []).map((x, i) => [x, i, quand(x)])
-    .sort((a, b) => {
-      const A = Number.isFinite(a[2]) ? a[2] : null, B = Number.isFinite(b[2]) ? b[2] : null;
-      if (A == null && B == null) return a[1] - b[1];
-      if (A == null) return 1;
-      if (B == null) return -1;
-      return (B - A) || (a[1] - b[1]);
-    }).map(([x]) => x);
+  return ordreRecent(liste, quand);
 }
 
 // Les pastilles : [{ nom, cle, n }] — le plus fourni d'abord, l'inconnu en dernier.
