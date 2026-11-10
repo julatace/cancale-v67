@@ -183,11 +183,13 @@ async function ventes(b, tel, sombre) {
         if (cas === 'mesure') {
           dit(a && a.etat === 'nonRelie' && a.note == null, `${T} forme mesurée : « pas relié », aucune note devinée`, JSON.stringify(a));
           dit(r.selects.length > 0 && r.selects.every((s) => s && s !== 'data' && !/(^|,)data(,|$)/.test(s)), `${T} les avis sont lus par projection (jamais select=data)`, JSON.stringify(r.selects));
+          await r.pg.locator(`[id="${id}"] [data-avis-vente]`).first().scrollIntoViewIfNeeded().catch(() => {});
           await r.pg.screenshot({ path: path.join(CAP, `annonces-avis-${T}-vente.png`) });
         } else if (cas === 'tx') {
           const id2 = await ouvrirVente(r.pg, 7102); const a2 = await lireAvis(r.pg, id2);
           dit(a && a.etat === 'relie' && a.note === '2' && a2 && a2.etat === 'aucun', `${T} avis avec n° de transaction : 7101 relié (2/5), 7102 aucun`, JSON.stringify([a, a2]));
-          await ouvrirVente(r.pg, 7101);
+          const id3 = await ouvrirVente(r.pg, 7101);
+          await r.pg.locator(`[id="${id3}"] [data-avis-vente]`).first().scrollIntoViewIfNeeded().catch(() => {});
           await r.pg.screenshot({ path: path.join(CAP, `annonces-avis-${T}-vente-relie.png`) });
         } else {
           dit(a == null, `${T} aucun avis capté : aucune ligne`, JSON.stringify(a));

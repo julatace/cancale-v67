@@ -32,7 +32,7 @@ export const MANQUES = ['photos', 'marque', 'taille', 'etat', 'numero', 'achat']
 // Où se fait le geste : 'vinted' (modifier l'annonce sur le site) · 'vrm'.
 export const OU_MANQUE = { photos: 'vinted', marque: 'vinted', taille: 'vinted', etat: 'vinted', numero: 'vinted', achat: 'vrm' };
 // Le nom court d'un manque (une pastille), et la phrase du « pas su ».
-export const NOM_MANQUE = { photos: 'photos', marque: 'Sans marque', taille: 'Sans taille', etat: 'Sans état', numero: 'Pas de N° à la fin', achat: 'Prix d’achat' };
+export const NOM_MANQUE = { photos: 'photos', marque: 'Sans marque', taille: 'Sans taille', etat: 'Sans état', numero: 'Pas de N° à la fin', achat: 'Sans prix d’achat' };
 export const NOM_PAS_SU = { photos: 'photos pas lues', marque: 'marque pas lue', taille: 'taille pas lue', etat: 'état pas lu', numero: 'description pas lue' };
 
 const vide = (v) => v == null || String(v).trim() === '';

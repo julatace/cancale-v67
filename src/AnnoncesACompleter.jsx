@@ -7,10 +7,10 @@
 // par manque (confort de l'écran, rien d'écrit). Ce qui n'est pas lu est DIT
 // (« Photos pas lues sur 2 annonces »), jamais compté comme un manque.
 import React from 'react';
-import { MANQUES, NOM_MANQUE, NOM_PAS_SU, texteManque } from './annoncesACompleter.js';
+import { MANQUES, NOM_PAS_SU, texteManque } from './annoncesACompleter.js';
 import './styles-a-completer.css';
 
-const NOM_FILTRE = { photos: 'Photos', marque: 'Marque', taille: 'Taille', etat: 'État', numero: 'N°', achat: NOM_MANQUE.achat };
+const NOM_FILTRE = { photos: 'Photos', marque: 'Marque', taille: 'Taille', etat: 'État', numero: 'N°', achat: 'Prix d’achat' };
 
 export default function AnnoncesACompleter({ res, Photo, onPrixAchat }) {
   const [filtre, setFiltre] = React.useState('');
