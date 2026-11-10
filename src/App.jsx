@@ -50789,11 +50789,7 @@ function AdressesSansCompte({ comptes }) {
           <span className="vrm-sans-compte-ic" aria-hidden="true">@</span>
           <div className="vrm-sans-compte-tete">
             <span className="vrm-sans-compte-adresse vrm-sensible" data-stream-type="adresse">{x.adresse}</span>
-<<<<<<< HEAD
             <span className="vrm-sans-compte-titre"><span className="vrm-boite-sr">Adresse sans compte : </span>{x.n} e-mail{x.n > 1 ? 's' : ''}{x.dernier ? ` · ${jour(x.dernier)}` : ''}</span>
-=======
-            <span className="vrm-sans-compte-aide">Aucun compte Vinted à cette adresse{x.dernier ? ` · dernier e-mail le ${jour(x.dernier)}` : ''} : ses e-mails restent sans compte.</span>
->>>>>>> origin/claude/textes-courts-4
           </div>
           <div className="vrm-sans-compte-gestes">
             <Bouton variante="secondaire" data-relier-compte={x.adresse} aria-expanded={choix === x.adresse} onClick={() => setChoix((c) => (c === x.adresse ? '' : x.adresse))}>Relier</Bouton>
