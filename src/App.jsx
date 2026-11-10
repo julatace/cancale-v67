@@ -457,6 +457,8 @@ import "./republier-main.css";
 import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : barre, carte, feuille Actions
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
+import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
+import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
 import { etatNumeroColis } from "./emballage.js";
 // (6 nov., vitesse 2) ModeEmballage : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-emballage.css";
@@ -31106,6 +31108,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   }, [listings.items, listings.aConfirmer, masqueesSurEtagere]);
   const presentesAnnonceIds = useMemo(() => new Set(annoncesPresentes.map(it => String(it.id))), [annoncesPresentes]);
+  // (10 nov., lot BF) LA VALEUR DU STOCK : Σ des prix d'achat SAISIS des paires PRÉSENTES
+  // (`annoncesPresentes`, jamais une autre définition), lus par la règle du bénéfice
+  // (`fusionEntreeVente` → `beneficePaire`, src/coutVente.js). Cet écran en est le seul
+  // propriétaire : il PUBLIE `vrm_valeur_stock` ; le Stock et Statistiques la lisent.
+  // Annonces pas lues (ou lecture en erreur) ⇒ rien publié (pas su ≠ 0).
+  const valeurDuStock = useMemo(() => (Array.isArray(listings.items) && !listings.error)
+    ? valeurStock(annoncesPresentes, (it) => fusionEntreeVente(numeros[it.id] || {}, null, buyByNum)) : null,
+  [annoncesPresentes, listings.items, listings.error, numeros, buyByNum]);
+  useEffect(() => {
+    if (!valeurDuStock || !AUTH.user?.id) return;
+    publierValeurStock(valeurDuStock, { owner: AUTH.user.id, partiel: !!listings.incomplet });
+  }, [valeurDuStock, listings.incomplet]);
   // (6 nov., vague 3) LA MÊME PAIRE EN LIGNE DEUX FOIS SUR VINTED (src/enLigneDeuxFois.js) :
   // deux annonces EN LIGNE (la règle <enligne-regle>, jamais « à confirmer » ni masquées)
   // de même PHOTO EXACTE ou reliées par `recreeDe` — risque de double vente. Un compte
@@ -38392,7 +38406,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   );
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
-    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Frais renseignés','Bénéfice avant charges générales','Statut','Boost','Commission','Port vendeur','Remboursement','Autres frais','Frais confirmés']];
+    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Frais renseignés','Bénéfice avant charges générales','Statut','Boost','Commission','Port vendeur','Remboursement','Autres frais','Emballage','Frais confirmés']];
     (sales.items||[]).filter(o=>!isHidden(o)).forEach(o=>{
       const st = classifyOrderStatus(o.status);
       const e = effEntry(o); const num = e?.numero || '';
@@ -40943,7 +40957,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const sousTitre = [taille && !tailleDansTitre(o.title, taille) ? `Taille ${taille}` : '', pre.etatArticle || ''].filter(Boolean).join(' · ');
               // L'argent : la règle de la ligne (`lb`), aucune autre.
               const autreDevise = !!(devise && devise !== 'EUR');
-              const fraisConnus = !autreDevise && bilan.valid && bilan.cents > 0 ? bilan.total : null;
+              // (10 nov., lot BA) LE COÛT RÉEL : la règle du bénéfice DÉCOMPOSÉE (src/coutVente.js) —
+              // vente − achat − frais − emballage = bénéfice, au centime ; l'emballage non saisi est NOMMÉ.
+              const cv = cascadeVente(o.price?.amount, e, { annulee: st === 'cancelled', autreDevise });
+              const fraisConnus = !autreDevise && cv.frais != null && cv.frais > 0 ? cv.frais / 100 : null;
               const benefTexte = lb.benefice == null ? '—' : eurosRecap(lb.benefice);
               const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : '';
               const verse = st === 'cancelled' ? null : finalisee ? (versement ? `le ${jourCourt(Date.parse(versement))}` : 'oui — date pas lue') : '— pas encore';
@@ -40994,11 +41011,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </section>
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
+                  {st !== 'cancelled' ? <BarreCoutVente c={cv}/> : null}
                   <dl>
                     <div className="vrm-recap-ligne"><dt>Prix de vente</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
-                    {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker({ ...saleItem, _dateRef: o.date })}/> : '—'}</dd></div> : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt><PointCout cle="achat"/>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker({ ...saleItem, _dateRef: o.date })}/> : '—'}</dd></div> : null}
+                    {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt><PointCout cle="frais"/>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
+                    {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/>Emballage</dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt><PointCout cle="benefice"/>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
                     {verse != null ? <div className="vrm-recap-ligne vrm-recap-verse" data-recap-verse={finalisee ? (versement ? 'date' : 'oui') : 'non'}><dt>Versé sur ton porte-monnaie</dt><dd>{verse}</dd></div> : null}
                   </dl>
                 </section>
@@ -51826,12 +51845,13 @@ function AppCoeur() {
     let stop=false;
     (async()=>{
       const now=new Date(); const ym=now.getFullYear()*100+now.getMonth();
-      // Prix d'achat par annonce (clé = id d'annonce wardrobe) pour la valeur du stock.
+      // Les fiches par annonce (clé = id d'annonce wardrobe) : les masquées déclarées parties.
       const numeros=load('vinted_annonce_numeros',{})||{};
       // caMois = CA finalisé du mois en cours · caEncaisse = CA finalisé TOUS mois
-      // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
-      // annonces réellement en ligne. online = nb d'annonces en ligne.
-      let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, soldTotal=0, ok=false;
+      // confondus (total de tous les comptes). online = nb d'annonces en ligne.
+      // (10 nov., lot BF) La valeur du stock n'est plus calculée ici : une règle,
+      // `vrm_valeur_stock` publiée par Annonces (src/coutVente.js).
+      let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, soldTotal=0, ok=false;
       const unreadConvs=[]; // (29 oct., revue) les non lues, pour suivre « Retirer » sans relire
       let nMasque=0, caMasque=0, prixPasLu=0;
       // VENTES DU JOUR : nombre de paires vendues aujourd'hui + leur montant.
@@ -52008,7 +52028,6 @@ function AppCoeur() {
             const id=String(it.id);
             if(soldIds.has(id)) continue;
             online++; nL++;
-            const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0;
           }
           // 5.165 : de quand date ce qu'on compte, et ce qui a été retiré parce
           // que supprimé depuis — la MÊME phrase que l'écran Annonces (§11).
@@ -52102,7 +52121,7 @@ function AppCoeur() {
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,prixPasLu,caFinaliseParJour,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,unreadConvs,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,comptesCa,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
+      setLiveStats({caMois,caEncaisse,prixPasLu,caFinaliseParJour,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,unreadConvs,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,comptesCa,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
         annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,annMasquees,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
