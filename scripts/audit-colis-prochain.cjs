@@ -91,10 +91,13 @@ const dit = (c, m, d = '') => { if (c) { ok++; console.log('  ✓ ' + m); } else
   dit(/compteAImprimer\(\{ local: bordereauxAImprimer\(lignesLot\(\)\)\.length/.test(fs.readFileSync(APP, 'utf8')), 'Ma journée compte « à imprimer » par la même fonction que la case de Colis (pas encore imprimés)');
   const src = fs.readFileSync(APP, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   dit(/const nPrets = bordereauxAImprimer\(lignesImpr\)\.length/.test(src), 'la case « à imprimer » compte les bordereaux PAS ENCORE imprimés (la même fonction)');
-  dit(/data-colis-prochain=\{g\.cle\}/.test(src) && /prochainGesteColis\(\{ onglet,/.test(src), 'la ligne du prochain geste est rendue en tête de Colis');
-  dit(/\(p\.arrives \|\| \[\]\)\.filter\(\(c\) => !c\.horsCompte\)/.test(src), 'seuls les colis COMPTÉS d’un point entrent dans la phrase (jamais « à vérifier » ni « peut-être en double »)');
-  dit(/function ComptesMuetsColis[\s\S]{0,200}useEtatEmailsComptes\(accounts\)/.test(src) && /onNav\('vintedaccounts'\)\}>Relier/.test(src), 'un compte muet (la règle de Comptes liés) mène à Comptes liés');
-  dit(/<ComptesMuetsColis accounts=\{accounts\} onNav=\{onNav\}\/>/.test(src), 'la ligne des comptes muets est rendue sur Colis');
+  // (10 nov., Julien sur captures iPhone : « Enlève imprime bordereaux … Et imprimer garde tout imprimer »,
+  // « Enlève ça, car c'est déjà marqué au-dessus ») : la ligne du prochain geste et celle des comptes muets
+  // ne sont PLUS rendues sur Colis (le bouton « Tout imprimer », la limite sur la carte, la ligne de
+  // fraîcheur unique les disent déjà, §7). La règle reste celle de Ma journée et des conseils.
+  dit(!/data-colis-prochain=\{g\.cle\}/.test(src) && !/prochainGesteColis\(\{ onglet,/.test(src), 'plus de ligne « prochain geste » en tête de Colis (doublon du bouton « Tout imprimer »)');
+  dit(/function ComptesMuetsColis[\s\S]{0,200}useEtatEmailsComptes\(accounts\)/.test(src) && !/n’envoient aucun e-mail à VRM` : `Le compte \$\{noms\[0\]/.test(src), 'la phrase des comptes muets n’est plus écrite sur Colis (seul le chiffre du conseil reste)');
+  dit(!/<ComptesARelierColis/.test(src) && /data-colis-sans-email=/.test(src), 'plus de bandeau « N colis de X : ses e-mails n’arrivent pas » ; une marque discrète sur la carte');
   dit(/l: 'd’ici demain', titre: 'À retirer aujourd’hui ou demain'/.test(src) && !/l: 'dernier jour'/.test(src), 'la case des retraits pressés dit « d’ici demain » (elle compte aussi demain)');
   fin();
 })();
