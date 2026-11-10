@@ -33,10 +33,10 @@ export function sourceDeLigne(t) {
   return 'email';
 }
 
-// Ce qu'UNE ligne dit du code : sa source, son ÉMETTEUR (le transporteur de la ligne, « vinted » pour un
-// e-mail de Vinted) — deux e-mails d'un même émetteur (un rappel qui redit le code) ne font qu'UNE voix.
+// Ce qu'UNE ligne dit du code : sa source, son ÉMETTEUR (le transporteur de la ligne — « vinted » pour la
+// consigne Vinted Go —, « vinted-commande » pour l'e-mail de Vinted « ton achat t'attend ») — deux e-mails d'un même émetteur (un rappel qui redit le code) ne font qu'UNE voix.
 export function codeLuDeLigne(t) {
-  return { source: sourceDeLigne(t), emetteur: t && t.source === 'vinted-commande' ? 'vinted' : String((t && t.carrier) || ''), code: t ? t.code : '', at: msDe(t && t.emailAt) ?? msDe(t && t.receivedAt) };
+  return { source: sourceDeLigne(t), emetteur: t && t.source === 'vinted-commande' ? 'vinted-commande' : String((t && t.carrier) || ''), code: t ? t.code : '', at: msDe(t && t.emailAt) ?? msDe(t && t.receivedAt) };
 }
 
 // Les codes LUS sur les lignes d'un colis : [{ source, code, at }]. Une ligne fusionnée (deux e-mails
