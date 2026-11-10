@@ -234,7 +234,7 @@
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-q { margin-top: 6px !important; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-q b { font-size: 14px !important; line-height: 1.25; color: var(--a-ambre-encre, #A65A00) !important; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons { gap: 6px !important; margin-top: 6px !important; }
-:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 36px !important; padding: 0 8px !important; font-size: 14px !important; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 44px !important; padding: 0 8px !important; font-size: 14px !important; }
 @media (pointer: coarse) {
   :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 44px !important; }
 }
