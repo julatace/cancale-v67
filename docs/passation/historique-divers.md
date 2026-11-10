@@ -1204,7 +1204,17 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Vérification au scan + photo du carton (lot AZ + M)** : au bordereau, la photo de la paire et son N° en très grand (plein écran au téléphone, identité du lot V) ; après « Colis fait », « Photo du carton » facultative, rangée avec la vente (`colis_photo_v_{tx}`, SA ligne, lue au toucher ; `photoCartonDe(tx)` pour Litiges), visible sur la fiche de la vente. `docs/passation/2026-11-10-photo-colis-scan.md`. Geste : aucun.
-
-## Ligne déplacée de CLAUDE.md §9 (10 nov., taille)
-
 - **10 nov. · Litiges en cours + Retours par modèle (BB, BI)** : écran `?tab=litiges` (entrée dans Ventes, groupe « Ventes » d'À trancher) — une carte par vente en litige/retour (photo, N° par identité, « Avant le … » LU sinon « Date limite non lue », preuves par transaction : photo · suivi + statut transporteur · bordereau · carton « bientôt » (lot AZ), un LIEN vers le site) ; Leboncoin/Vestiaire « ne se lit pas encore » (forme jamais vue) ; par modèle « 2 sur 15 » (retour = 440, remboursement seul ≠ retour, « au moins ») ; règle `src/litigesEcran.js`. `docs/passation/2026-11-10-litiges-retours.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lots BJ, BM, BN, taille du dossier)
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (mois bouclé, taille du dossier)
+- **10 nov. · « Ma semaine » (lot BC)** : un écran (`?tab=semaine&lundi=…`, notification du dimanche soir, Ma journée, Statistiques) : vendu + barre par jour, ventes, bénéfice brut, reçu, colis envoyés, qui dorment, flèche neutre vs la semaine d'avant AU MÊME MOMENT (aucune si « au moins » ou « — ») ; bornes et « qui dorment » = ceux du bilan (`api/_lib/bilan-semaine.js`), chiffres = `journalSemaine` (`src/maSemaine.js`). `docs/passation/2026-11-10-ma-semaine.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Mon adresse VRM (lot AQ, demande 6)** : Paramètres → Mes e-mails → « Mon adresse VRM » (juste avant SMS de colis) ouvre la feuille : le serveur crée SON adresse au 1er toucher, transfert pas à pas (7 messageries), e-mail d'essai « Reçu ✓ » par code ; Worker Cloudflare à coller, sans nouvelle fonction `api/`. `docs/passation/2026-11-10-emails-transfert.md`. Geste : `docs/emails-transfert-mise-en-service.md` (domaine, Worker, `DOMAINE_RECEPTION`).
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Colis à réceptionner irréprochables** : 97 colis croisés sur la vraie base (e-mails, transporteur, suivi et commandes Vinted, conversations ; 0 SMS) ; un faux « retiré » (changé de plan, perdu) ne retient plus l'arrivée (`retraitTenu`), colis redirigé relu chez le transporteur et gardant son nouveau point, carte : sources + « vérifié à », code « sûr » à deux voix, deux codes ⇒ ambre sans choix (`src/sourcesRetrait.js`, aussi mode relais). `docs/passation/2026-11-10-retraits-irreprochables.md`. Geste : `CRON_SECRET`, relier l'adresse des 17 moitiés sans compte.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (recherche universelle lot AX, taille du dossier)
+- **10 nov. · Textes courts (lot AI)** : plus de murs de texte — états en pastilles d'une ligne, phrase ≤ 12 mots, détail sous « Pourquoi ? » (`src/composants/InfoPop.jsx`), « Même paire ? » en carte à deux photos [Oui] [Non], un seul « Tout imprimer », carte du compte ⇒ Paramètres, avatar au lieu du point. `docs/passation/2026-11-09-popups-propre.md`. Geste : regarder les planches.

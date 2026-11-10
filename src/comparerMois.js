@@ -32,11 +32,13 @@ export const bornesMois = (ym) => {
   return { de: new Date(y, m - 1, 1).getTime(), a: new Date(y, m, 1).getTime() };
 };
 
+// (10 nov., lot BL) L'ordre de Julien : vendu, reçu, bénéfice, ventes, achats.
 const LIGNES = [
-  { cle: 'ventes', nom: 'Ventes', type: 'n' },
   { cle: 'vendu', nom: 'CA vendu', type: 'eur' },
   { cle: 'recu', nom: 'Reçu', type: 'eur' },
   { cle: 'benefice', nom: 'Bénéfice', type: 'eur' },
+  { cle: 'ventes', nom: 'Ventes', type: 'n' },
+  { cle: 'achats', nom: 'Achats', type: 'n' },
 ];
 
 const pasSu = (raison) => ({ valeur: null, partiel: false, manque: [], raison });
@@ -47,11 +49,14 @@ const pasSu = (raison) => ({ valeur: null, partiel: false, manque: [], raison })
 // quantième, à la même heure (borné à la fin de ce mois-là).
 export const bornesComparees = (ymA, ymB, maintenant = Date.now()) => {
   const A = bornesMois(ymA), B = bornesMois(ymB);
-  if (!(maintenant < A.a)) return { A: { ...A, complet: true }, B: { ...B, complet: true }, memePoint: false };
-  if (maintenant < A.de) return null;   // un mois à venir ne se compare pas
-  const t = new Date(maintenant), [yB, mB] = String(ymB).split('-').map(Number);
-  const coupe = new Date(yB, mB - 1, t.getDate(), t.getHours(), t.getMinutes(), t.getSeconds(), t.getMilliseconds()).getTime();
-  return { A: { de: A.de, a: maintenant, complet: false }, B: { de: B.de, a: Math.min(B.a, coupe), complet: coupe >= B.a }, memePoint: true };
+  if (maintenant < A.de || maintenant < B.de) return null;   // un mois à venir ne se compare pas
+  const enCoursA = maintenant < A.a, enCoursB = maintenant < B.a;
+  if (!enCoursA && !enCoursB) return { A: { ...A, complet: true }, B: { ...B, complet: true }, memePoint: false };
+  // (10 nov., lot BL) Deux mois CHOISIS : celui qui est en cours (A ou B) coupe l'autre au même quantième.
+  const t = new Date(maintenant);
+  const couper = (ym, b) => { const [y, m] = String(ym).split('-').map(Number); const coupe = new Date(y, m - 1, t.getDate(), t.getHours(), t.getMinutes(), t.getSeconds(), t.getMilliseconds()).getTime(); return { de: b.de, a: Math.min(b.a, coupe), complet: coupe >= b.a }; };
+  const cote = (ym, b, enCours) => (enCours ? { de: b.de, a: maintenant, complet: false } : couper(ym, b));
+  return { A: cote(ymA, A, enCoursA), B: cote(ymB, B, enCoursB), memePoint: true };
 };
 
 // Le vendu entre deux instants (nombre et montant), par la règle de « Vendu ».
@@ -66,23 +71,46 @@ const venduEntre = (V, b, R) => {
   return { ventes: un(r.n), vendu: un(r.eur) };
 };
 
-const cote = (x) => (x && typeof x === 'object' ? { valeur: x.valeur == null ? null : x.valeur, partiel: !!x.partiel, manque: x.manque || [], raison: x.valeur == null ? (x.raison || 'pasSu') : '' } : pasSu('pasSu'));
+const cote = (x) => (x && typeof x === 'object' ? { valeur: x.valeur == null ? null : x.valeur, partiel: !!x.partiel, manque: x.manque || [], raison: x.valeur == null ? (x.raison || 'pasSu') : '',
+  ...(x.n != null ? { n: x.n, nCout: x.nCout } : {}) } : pasSu('pasSu'));
+
+// (10 nov., lot BL) Les ACHATS entre deux instants : les lignes du REGISTRE DES ACHATS du mois
+// (`registreDesAchats`, src/registres.js — la carte « Registres » et l'export comptable : achats
+// Vinted hors annulés, achats hors plateforme, achats en gros ; comptes écartés exclus), datées.
+// Rien de recompté : on garde celles de l'intervalle. Achats Vinted pas lus ⇒ « au moins » (jamais
+// « au moins 0 ») ; des achats SANS date (dans aucun mois) ⇒ « au moins » aussi, nommés.
+export const achatsEntre = (reg, b) => {
+  if (reg === undefined) return pasSu('encours');
+  if (!reg || !Array.isArray(reg.lignes)) return pasSu('pasSu');
+  const n = reg.lignes.filter((l) => l && l.ts != null && l.ts >= b.de && l.ts < b.a).length;
+  const sansDate = Array.isArray(reg.horsPeriode) ? reg.horsPeriode.length : 0;
+  const manque = [...(reg.manque || []).filter((m) => m !== 'reçus d’achat'), ...(sansDate ? [`${sansDate} achat${sansDate > 1 ? 's' : ''} sans date`] : [])];
+  const partiel = manque.length > 0;
+  return partiel && !(n > 0) ? { ...pasSu('partiel'), manque } : { valeur: n, partiel, manque, raison: '' };
+};
 
 // → { ymA, ymB, memePoint, bornes, lignes: [{ cle, nom, type, a, b, ecart, pct }] }
 //   a = ce mois, b = le mois d'en face. `recuDe({ de, a, ym, complet })` et
 //   `beneficeDe({ ym, jusqua })` (jusqua : null = le mois entier).
-export function comparerMois({ ymA, mode = 'precedent', maintenant = Date.now(), vendu, recuDe, beneficeDe, R } = {}) {
-  const ymB = ymEnFace(ymA, mode);
+export function comparerMois({ ymA, mode = 'precedent', ...reste } = {}) {
+  const K = comparerDeuxMois({ ymA, ymB: ymEnFace(ymA, mode), ...reste });
+  return K ? { ...K, mode } : null;
+}
+// (10 nov., lot BL) Deux mois CHOISIS par lui (deux sélecteurs) ; `achatsDe({ de, a, ym, complet })`
+// rend le registre des achats du mois (facultatif : sans lui, « — »).
+export function comparerDeuxMois({ ymA, ymB, maintenant = Date.now(), vendu, recuDe, beneficeDe, achatsDe, R } = {}) {
   const bornes = bornesComparees(ymA, ymB, maintenant);
   if (!bornes) return null;
   const vA = venduEntre(vendu, bornes.A, R), vB = venduEntre(vendu, bornes.B, R);
   const recu = (ym, b) => cote(recuDe && recuDe({ de: b.de, a: b.a, ym, complet: b.complet }));
   const benef = (ym, b) => cote(beneficeDe && beneficeDe({ ym, jusqua: b.complet ? null : b.a }));
+  const achats = (ym, b) => (typeof achatsDe === 'function' ? achatsEntre(achatsDe({ de: b.de, a: b.a, ym, complet: b.complet }), b) : pasSu('pasSu'));
   const val = {
     ventes: [vA.ventes, vB.ventes],
     vendu: [vA.vendu, vB.vendu],
     recu: [recu(ymA, bornes.A), recu(ymB, bornes.B)],
     benefice: [benef(ymA, bornes.A), benef(ymB, bornes.B)],
+    achats: [achats(ymA, bornes.A), achats(ymB, bornes.B)],
   };
   const lignes = LIGNES.map((L) => {
     const [a, b] = val[L.cle];
@@ -90,7 +118,10 @@ export function comparerMois({ ymA, mode = 'precedent', maintenant = Date.now(),
     const ecart = complets ? (L.type === 'eur' ? Math.round((a.valeur - b.valeur) * 100) / 100 : a.valeur - b.valeur) : null;
     // Un pourcentage contre zéro ou contre un négatif ne veut rien dire : « — ».
     const pct = complets && b.valeur > 0 ? Math.round(((a.valeur - b.valeur) / b.valeur) * 1000) / 10 : null;
-    return { ...L, a, b, ecart, pct };
+    // La flèche (neutre) : seulement avec un écart, donc deux côtés sus ET complets.
+    const sens = ecart == null ? null : ecart > 0 ? 'hausse' : ecart < 0 ? 'baisse' : 'egal';
+    return { ...L, a, b, ecart, pct, sens };
   });
+  const mode = ymB === ymEnFace(ymA, 'precedent') ? 'precedent' : ymB === ymEnFace(ymA, 'an') ? 'an' : 'libre';
   return { ymA, ymB, mode, memePoint: bornes.memePoint, bornes, lignes };
 }
