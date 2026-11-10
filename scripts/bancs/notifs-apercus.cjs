@@ -35,7 +35,7 @@ const imp = (f) => import('file://' + path.join(R, f));
     ['Codes de retrait', 'colis', TR.texteNotifTransp({ carrier: 'chronopost', suivi: 'XY123456789FR', detail: 'quitte_relais', lieuNom: 'Tabac des Halles' }, { etat: 'incident' }), 'Voir le colis'],
     ['Offres', 'offre', A.texteOffre({ montant: '55', qui: 'acheteur_92', article: 'Nike Air Max 90 taille 42', compte: 'boutique_camille' }), 'Répondre'],
     ['Messages', 'message', A.texteMessage({ paire: 'Nike Air Max 90 taille 42', qui: 'acheteur_92', compte: 'boutique_camille', extrait: 'Bonjour, elles taillent grand ?' }), 'Répondre'],
-    ['Rappels', 'soir', A.texteSoir({ n: 3, auMoins: false, retard: 0, demain: 1, heureDemain: '12:00' }), 'Voir les colis'],
+    ['Rappels', 'soir', A.texteSoir({ colis: { demain: 2, heure: '12:00', retard: 0, aVerifier: 0 }, retraits: { n: 1, lieu: 'Tabac des Halles, 8 Rue des Lilas' }, offres: { n: 0 } }), 'Ouvrir'],
   ];
   const groupe = B.texteGroupe({ ...B.embellir(A.texteBordereau({ modele: 'Samba OG', numero: '131', tamponne: true, dateLimite: '13/11' }), 'expedier'), url: '/' }, B.GENRES.find((g) => g.id === 'bordereau'), 3);
   const items = brut.map(([fam, cat, t, action, photo]) => ({ fam, action, photo: !!photo, ...B.embellir(t, cat) }));
