@@ -27,6 +27,9 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //   /api/compte?mode=facture-pro  (GET/POST, session) LA FACTURE PRO : sa boîte
 //                                 d'envoi (chiffrée), émettre, envoyer, avoir —
 //                                 voir api/_lib/facture-pro.js
+//   /api/compte?mode=facture-autre (POST, session) la facture Pro d'une vente
+//                                 Leboncoin / eBay / Vestiaire : émettre —
+//                                 voir api/_lib/facture-autres.js
 //   /api/compte?mode=equipe       (GET/POST, session) LE MODE ÉQUIPE (migration
 //                                 016) : lister · inviter · accepter · révoquer ·
 //                                 quitter — voir api/_lib/equipe.js
@@ -68,6 +71,7 @@ import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
 import { routePhotoroom } from './_lib/photoroom-cle.js';
 import { routeFacturePro } from './_lib/facture-pro.js';
+import { routeFactureAutre } from './_lib/facture-autres.js';
 import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe } from './_lib/equipe.js';
@@ -1496,6 +1500,14 @@ async function facturePro(req, res) {
   return routeFacturePro(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
 }
 
+// ── (10 nov., lot S) La facture Pro des ventes Leboncoin / eBay / Vestiaire (api/_lib/facture-autres.js)
+async function factureAutre(req, res) {
+  const vendeur = await vendeurExige(req, res);
+  if (!vendeur) return;
+  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
+  return routeFactureAutre(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
+}
+
 // ── SIRET → nom de l'entreprise (api/_lib/entreprise.js) : la session d'abord ─
 async function entreprise(req, res) {
   const vendeur = await vendeurExige(req, res);
@@ -1757,6 +1769,7 @@ export default async function handler(req, res) {
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'facture-autre') return m === 'POST' ? factureAutre(req, res) : repondre(res, 405, { erreur: 'POST' });
   if (mode === 'facture-pro') return (m === 'GET' || m === 'POST') ? facturePro(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

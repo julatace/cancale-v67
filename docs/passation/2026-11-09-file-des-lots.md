@@ -36,6 +36,8 @@ libère son numéro (le dire ici).
 | R | livre de police | `claude/livre-police` | à lancer |
 | S | factures Pro Leboncoin/eBay/Vestiaire (forme à mesurer) | `claude/factures-autres` | à lancer |
 | T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | **fait** (à intégrer) |
+| S | factures Pro Leboncoin/eBay/Vestiaire (forme à mesurer) | `claude/factures-autres` | fait (Leboncoin + eBay ; Vestiaire refus dit) — `2026-11-10-factures-autres.md` |
+| T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | à lancer |
 
 | U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
 | V | scanner au dépôt (Colis) ET au retrait (Achats) | PR #1075 | **en ligne** |

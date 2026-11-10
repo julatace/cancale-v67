@@ -30,6 +30,10 @@ import {formaterMontantEbay} from '../montantsEbay.js';
 import { relanceProposable, numeroSorti } from '../ebayRelance.js';
 // ⟦← App.jsx #6⟧
 import { GroupeIos, RangeeIos } from "../composants/Ios.jsx";
+// (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
+import { DEPS_FACTURE } from '../App.jsx';
+const FactureEbayParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
+const FactureEbayVente = (props) => <React.Suspense fallback={null}><FactureEbayParesseuse {...props}/></React.Suspense>;
 
 // ⟦← App.jsx #7⟧
 
@@ -1944,7 +1948,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
           compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}</>}
-          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
+          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>} suite={<FactureEbayVente plateforme="ebay" vente={o} deps={DEPS_FACTURE}/>}/></div>;
 
       })}
     </div>

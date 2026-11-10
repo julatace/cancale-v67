@@ -22,6 +22,7 @@
 //    lisible vient après les datés, sans date inventée.
 // Module PUR : l'écran (FichePaire.jsx) et `audit-histoire-article.cjs`.
 import { parcoursPaire } from './fichePaire.js';
+import { seriePrix } from './historiquePrix.js';
 
 export const ORDRE_HISTOIRE = ['achat', 'numero', 'stock', 'annonces', 'prix', 'offres', 'favoris', 'vente', 'colis', 'argent', 'retour', 'benefice'];
 // (9 nov., fiche paire) LA FRISE DU COLIS, prouvée par la transaction de LA vente :
@@ -51,6 +52,7 @@ const parDate = (a, b) => { const ta = t(a.at), tb = t(b.at); if (ta == null && 
 // offres    [{ item, at, prix, sens: 'recue'|'faite', etat }] | null
 // journalPrix [{ at, prix, sites: [{ site, id, avant }] }] | null
 // prixVinted  `vinted_prix_historique` (Republier) [{ item, avant, apres, at }]
+// prixLus    `vrm_prix_lus` (lot L) { v, debut, a: { [item]: [[ms, centimes]] } } | null
 // recus     Set des n° de transaction d'achat qui ont un reçu | null
 // autresEnLigne [{ site, id, lien, prix }] (Leboncoin, Vestiaire, par identité) | null
 export function histoireArticle(rn, d = {}, o = {}) {
@@ -127,7 +129,14 @@ export function histoireArticle(rn, d = {}, o = {}) {
       .map((x) => ({ at: iso(x.at), texte: `Vinted · ${Number.isFinite(Number(x.avant)) ? eur(Number(x.avant)) + ' → ' : ''}${eur(Number(x.apres))}`, preuve: `annonce ${str(x.item)} · Republier`, cle: 'prix' }));
     const ev = evR.concat(d.journalPrix.filter((j) => j && Array.isArray(j.sites) && j.sites.length && Number.isFinite(Number(j.prix)))
       .map((j) => ({ at: iso(j.at), texte: `${j.sites.map((s) => NOM[s.site] || s.site).join(', ')} · ${j.sites[0].avant != null ? eur(j.sites[0].avant) + ' → ' : ''}${eur(Number(j.prix))}`, preuve: 'changé depuis VRM', cle: 'prix' })));
-    pose('prix', ev.length ? 'fait' : 'absent', 'Prix', ev, ev.length ? null : 'aucun changement fait depuis VRM');
+    // (10 nov., lot L) LES PRIX LUS dans le dressing (`vrm_prix_lus`, src/historiquePrix.js) :
+    // datés par LEUR lecture, par l'identifiant de l'annonce ; un prix lu égal au précédent
+    // n'ajoute rien. La série (escalier de la fiche) mêle lus et changés depuis VRM.
+    const serie = seriePrix(ids, { lus: d.prixLus, prixVinted: d.prixVinted });
+    for (const pt of serie.points) if (pt.source === 'lu') ev.push({ at: pt.at, texte: `Vinted · ${eur(pt.prix / 100)}`, preuve: `annonce ${pt.item} · lu dans le dressing`, cle: 'prix-lu' });
+    const depuis = serie.depuis ? `prix lus depuis le ${new Date(serie.depuis + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}` : null;
+    pose('prix', ev.length ? 'fait' : 'absent', 'Prix', ev, ev.length ? depuis : (depuis ? `aucun prix lu ni changé · ${depuis}` : 'aucun changement fait depuis VRM'));
+    etapes[etapes.length - 1].serie = serie.points;
   }
 
   // 6. OFFRES — par l'item_id de CETTE annonce (jamais le titre).

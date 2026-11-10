@@ -12,6 +12,8 @@ import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees } from '../stockAnnonces.js';
 import { LIGNE_INVENTAIRE } from '../inventaire.js';
 import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
+import { EmballagesCarte } from '../EmballagesCarte.jsx';   // (10 nov., lot L) le stock d'emballages
+import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
 import { NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
@@ -180,6 +182,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const [pairsLost, setPairsLost] = useStateCle('vinted_pairs_lost', () => load('vinted_pairs_lost', {}));
   // (10 nov., lot BF) « Valeur du stock » : LUE (`vrm_valeur_stock`, propriétaire : Annonces), jamais recalculée ici.
   const valeurStk = useValeurStock((AUTH.user && AUTH.user.id) || '');
+  const [emballagesR, setEmballagesR] = useStateCle(CLE_EMBALLAGES, () => load(CLE_EMBALLAGES, null));
   const saisirPrixStock = () => { DEMANDE_SAISIE_PRIX.on = true; try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} };
   // Une demande venue d'ailleurs (Colis « où sont ces paires », la recherche
   // globale « Tout sur le N° ») : un seul N° remplit la recherche.
@@ -975,6 +978,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {elInventaire}
     {blocResume}
     <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock}/>
+    {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
+    <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
+      lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
     <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>Inventaire de fin d’année</span><span aria-hidden="true">›</span></button>
     {annuel ? <InventaireAnnuel owner={AUTH.user?.id || ''} cle={cleNum} Feuille={SheetShell} lire={lireLigneInventaire} onFermer={() => setAnnuel(false)} onSaisirPrix={saisirPrixStock}
       onVerifier={() => { retourAnnuel.current = true; setAnnuel(false); setInventaire(true); }}

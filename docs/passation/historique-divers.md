@@ -1242,3 +1242,18 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Factures Pro, lot Q** : Argent → Factures « À envoyer » (prouvées ⇒ « Tout envoyer » confirmé ; sinon la raison ; vente annulée ⇒ avoir proposé), registre d'une période (trous dits) + zip PDF/CSV ; envoi auto ÉTEINT par défaut (`envoiAuto` + date, son geste ; `?moment=factures` /30 min, pause dite). `docs/passation/2026-11-10-factures-pro-2.md`. Geste : `RELANCES_SMTP_*`, `CRON_SECRET`.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (factures Pro lot S, taille du dossier)
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (Annonces en grille lot AM, taille du dossier)
+- **10 nov. · Textes courts, suite (lot AI)** : Réglages (hors « Sécurité des données »), eBay, Leboncoin, Vestiaire, Messages, Achats, Ventes et ~90 textes d'App.jsx réécrits en une phrase courte + son geste (≈ 270 textes > 90 car. en moins), sens gardé ; banc `popups-propre` étendu (239/0). `docs/passation/2026-11-10-textes-courts-suite.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Résumé du soir (lot AT)** : le rappel de la veille au soir (même cron, catégorie `soir`, UNE notification) ne dit plus que demain — colis à limite LUE demain (+ en retard, estimées passées), retraits au dernier jour lu demain, offres Vestiaire qui expirent ; rien demain ⇒ rien ne sonne ; lien vers le premier geste (`api/_lib/resume-soir.js`). `docs/passation/2026-11-10-resume-soir.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Revendu combien ? (lot AV)** : à la saisie d'un achat et dans ⋯ d'un achat Vinted, SES ventes finalisées du même modèle (`modeleSur`, ressemblance d'affichage) : prix médian, bénéfice médian (`beneficePaire`, « sur K des N »), délai, < 3 ⇒ « pas assez » ; le passé, jamais un conseil (`src/reventeModele.js`). `docs/passation/2026-11-10-revente-modele.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot L)
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Mois bouclé + Comparer deux mois (lots BK, BL)** : Argent → Déclarer → « Mois bouclé » : à dater, prix d'achat, comptes pas relus (ligne de fraîcheur PUBLIÉE), frais inconnus, chacun avec sa porte ; « prêt » + montant (`montantPeriodeUrssaf` du mois) seulement si tout est lu et complet (`src/moisBoucle.js`) ; Statistiques → Comparer : deux sélecteurs, vendu · reçu · bénéfice · ventes · achats (registre), flèche grise, aucune sur « au moins »/« — ». `docs/passation/2026-11-10-mois-boucle.md`. Geste : aucun.
