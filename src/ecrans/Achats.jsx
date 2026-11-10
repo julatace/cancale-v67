@@ -8,6 +8,7 @@ import { pairesDuModele } from '../dejaEnStock.js';
 import { cleFacture, verifierFichier } from '../factureAchat.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
 import { DejaEnStock } from '../DejaEnStock.jsx';
+import { prendreDemandeAchat, EVT_ACHAT_LIEN } from '../raccourcisSiri.js';
 import { ReventeModele } from '../ReventeModele.jsx';
 import { Bouton, C, FermeAuRetour, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
@@ -336,6 +337,21 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     return () => { vivant = false; };
   }, [ouvert, avecPhoto]);
   const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  // (10 nov., lot AH) Le raccourci Siri « Ajouter un achat » (src/raccourcisSiri.js) : le formulaire s'ouvre,
+  // pré-rempli de ce qu'il a dit — rien n'est écrit sans « Ajouter l'achat ». Consommé une fois.
+  useEffect(() => {
+    const servir = () => {
+      const d = prendreDemandeAchat(); if (!d) return;
+      setEditId(null); setErreur('');
+      setForm({ ...BROUILLON0(), title: d.titre || '', price: d.prix || '', source: d.lieu || '' });
+      // L'écran finit de se poser après (listes, défilement remis en haut) : le formulaire est ramené en vue tant qu'il n'y est pas.
+      [400, 1200, 2500].forEach((ms) => setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (!f) return; const r = f.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.6) f.scrollIntoView({ block: 'center' }); } catch (_) {} }, ms));
+      setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (f) f.scrollIntoView({ block: 'center' }); const vide = !d.titre ? 'titre' : !d.prix ? 'prix' : ''; const c = vide && document.querySelector(`[data-champ="${vide}"]`); if (c) c.focus({ preventScroll: true }); } catch (_) {} }, 80);
+    };
+    servir(); window.addEventListener(EVT_ACHAT_LIEN, servir);
+    return () => window.removeEventListener(EVT_ACHAT_LIEN, servir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const ouvrirEdition = (b) => {
     setEditId(b.id); setErreur('');
     setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo, facture: null });

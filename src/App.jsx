@@ -153,6 +153,7 @@ import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT,
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
 import { requeteDeLaVoix } from "./rechercheVocale.js";
+import { lireDemandeAchat, lireRechercheLien, poserDemandeAchat } from "./raccourcisSiri.js";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
 import QuiDorment from "./design/QuiDorment.jsx";
 import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
@@ -51394,6 +51395,9 @@ function AppCoeur() {
     // identité) et `vue` (src/cibleNotif.js, api/_lib/lien-notif.js). Une
     // `section` vaut aussi pour Comptabilité et Statistiques.
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab');
+      // (10 nov., lot AH) Siri / Raccourcis (src/raccourcisSiri.js) : `achat=1` ouvre « Nouvel achat » pré-rempli de ce
+      // qu'il a dit (rien d'écrit sans son clic) ; `q` ouvre la loupe sur ce N°. L'adresse est effacée ensuite.
+      { const da=lireDemandeAchat(p); if(da){ poserDemandeAchat(da); demanderVue('achats'); } const rq=lireRechercheLien(p); if(rq) setTimeout(()=>{ try{ window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:rq})); }catch(_){} },0); if((da||rq)&&!t){ window.history.replaceState(window.history.state,'',window.location.pathname); if(da) setTab('achats'); } }
       // (5 nov.) Une notification touchée porte `notif=<n°>` (public/sw.js) : son entrée du centre est marquée lue.
       { const nn=Number(p.get('notif')); if(Number.isSafeInteger(nn)&&nn>0){ marquerNotifLue(nn); if(!t) window.history.replaceState(window.history.state,'',window.location.pathname); } } if(p.get('print')==='bord') _pendingBordPrint=true;
       // (5 nov.) `cloche=1` (le récapitulatif du réveil) : ouvrir la cloche — tout de suite si elle est montée, sinon à son montage.
