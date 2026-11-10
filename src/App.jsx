@@ -36088,6 +36088,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reafficherHorsDouble = (id) => gesteVrm('Achat réaffiché', [{ k: CLE_HORS_MASQUES, type: 'ensemble', id: String(id), apres: false, avant: true }], { [CLE_HORS_MASQUES]: setHorsMasques });
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
+  // (10 nov., lot J) « Importer un tableur » (src/importAchats.js) : le N° d'une ligne suit la remise à zéro
+  // (`numeroExterne`, par SA date ; sans date ⇒ pas su), et le prix du fichier ne devient le coût que d'une
+  // fiche UNIQUE sans aucun prix — jamais remplacé. Rien n'est écrit avant « Importer N achats ».
+  const fichesDuNumero = (k) => Object.values(numeros || {}).filter(e => e && e.numero != null && cleNum(e.numero) === k);
+  const importAchats = {
+    existants: { vinted: buys.items || [], hors: offBuysTous || [] },
+    numeroDe: (v, ms) => { const k = cleNum(v); if (!k) return ''; if (archiveNumeros() && /^\d+$/.test(k) && !(ms != null && isFinite(ms))) return null; return numeroExterne(k, null, null, ms); },
+    etatNumero: (k) => { const f = fichesDuNumero(k); return !f.length ? 'absent' : f.length > 1 ? 'deux' : prixAchatDe(f[0], buyByNum) != null ? 'prix' : 'libre'; },
+    onImporter: ({ achats, couts }) => {
+      setOffBuys(prev => { const u = [...achats, ...prev]; save('vinted_offvinted_buys', u); return u; });
+      const nums = Object.keys(couts || {});
+      if (nums.length) setBuyByNum(prev => { const u = { ...prev }; for (const k of nums) { const f = fichesDuNumero(k); if (f.length !== 1 || prixAchatDe(f[0], u) != null) continue; u[String(f[0].numero).trim()] = couts[k]; } save('vinted_buyprice_by_num', u); return u; });
+      toast(`${achats.length} achat${achats.length > 1 ? 's' : ''} importé${achats.length > 1 ? 's' : ''}`);
+    },
+  };
   // (10 nov., lot Y) Supprimer = à la corbeille 30 jours (pilule « Annuler » 5 s, puis Paramètres → Corbeille).
   // Sa photo (sa ligne `achat_hors_photo_{id}`) reste rangée : elle n'est vidée qu'à la purge.
   const delOffBuy = (id) => {
@@ -43458,7 +43473,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsEnDouble groupes={achatsDoubles} masques={(offBuysTous || []).filter((b) => b && horsMasques.includes(String(b.id)))}
           onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
           compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
-        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat}
+        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
           prochainNumero={nextNumero} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}

@@ -1273,6 +1273,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ### Lignes déplacées de CLAUDE.md §9 (10 nov., lot AR)
 - **10 nov. · Textes courts, 3e série** : Argent (Super PDP, Factur-X, CFE, suivi des déclarations, rapport URSSAF), Colis/Achats/Messages de `Comptabilite`, Republier, Ma facture, Statistiques, Stock, page d'accueil : une phrase courte + le geste, détail sous « Pourquoi ? », sens et chiffres gardés ; banc `popups-propre` + Argent. `docs/passation/2026-11-10-textes-courts-3.md`. Geste : aucun.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot H)
 - **10 nov. (20 h) · Pro illimité** : Pro 19,99 € = tous les comptes vendeurs, sans limite (sa décision, annule les « 10 comptes » du lot BO, défait : règle, route `pro` refusée 409, feuille, rangée, textes ; 031 supprimée, jamais appliquée) ; Solo inchangé ; CGV 10 nov. `docs/passation/2026-11-10-pro-illimite.md`. Geste : relire les CGV.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (intégration)
 - **10 nov. · Livre de police (lot R)** : Argent → Déclarer, statut pro seulement ; n° d'ordre append-only sur SON clic (`vrm_livre_police`, CAS), lignes = registre des achats, pseudo Vinted côté acheteur, identité « à compléter », PDF/CSV, jamais « conforme » (`src/livrePolice.js`, sources citées). `docs/passation/2026-11-10-livre-police.md`. Geste : relire R321-3.
+
+## Lignes du §9 de CLAUDE.md déplacées telles quelles le 10 nov. (lot H)
+- **10 nov. · Corbeille 30 jours (lot Y)** : supprimer DANS VRM (achat hors plateforme, dépense/coût/pack/abonnement, modèle, réponse rapide, fiche à publier, note, fournisseur, achat en gros) ⇒ pilule « Mis à la corbeille · Annuler » 5 s, plus de « Tu es sûr ? » (fournisseur : confirmation gardée), puis Paramètres → Corbeille « Restaurer » 30 j ; UNE règle `src/corbeille.js` (`vrm_corbeille` dans `main`, morceaux conditionnels : ce qui a changé depuis est gardé, N° pris ⇒ refus, photo/ticket vidés à la purge seulement si pas revenus) ; sites, N°, factures : jamais. `docs/passation/2026-11-10-corbeille.md`. Geste : aucun.

@@ -14,6 +14,7 @@ import React from 'react';
 import { SheetShell as SheetShellBase } from './SheetShell.jsx';
 import { BoutonBase } from './Bouton.jsx';
 import { AIDE_ECRANS, ARTICLES_AIDE } from '../aideEcrans.js';
+import { ETAPES_ECRANS } from '../aideEtapes.js';
 import './aide-ecran.css';
 
 export const NOMS_ECRANS_AIDE = {
@@ -38,8 +39,15 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
   const a = AIDE_ECRANS[cle];
   if (!a) return null;
   const article = ARTICLES_AIDE[a.article];
+  const etapes = Array.isArray(ETAPES_ECRANS[cle]) ? ETAPES_ECRANS[cle] : [];
   return (
-    <Feuille onClose={onClose} titre={NOMS_ECRANS_AIDE[cle] || 'Aide'} sousTitre="Questions fréquentes" z={10400} maxWidth={520} data-aide-feuille={cle}>
+    <Feuille onClose={onClose} titre={NOMS_ECRANS_AIDE[cle] || 'Aide'} sousTitre={etapes.length ? 'En quelques gestes' : 'Questions fréquentes'} z={10400} maxWidth={520} data-aide-feuille={cle}>
+      {/* (10 nov., lot J) EN TÊTE : les 3 à 5 gestes de cet écran (sans vidéo), texte de scripts/aide-contenu.cjs. */}
+      {etapes.length ? (
+        <ol className="vrm-aide-etapes" data-aide-etapes={etapes.length}>
+          {etapes.map((e, i) => <li key={i} data-aide-etape={i + 1}><span className="vrm-aide-etape-n" aria-hidden="true">{i + 1}</span><span>{e}</span></li>)}
+        </ol>
+      ) : null}
       <ul className="vrm-aide-groupe" data-aide-questions={a.questions.length}>
         {a.questions.map(([q, r], i) => (
           <li key={i}>
