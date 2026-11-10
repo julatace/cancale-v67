@@ -46,19 +46,19 @@ export const SMS_EXEMPLE = 'Votre colis 80000001 est disponible au LOCKER 24/7 E
 // Le pas-à-pas illustré : `dessin` = le dessin (src/SmsColis.jsx), `mots` = les
 // mots exacts à toucher, dans l'ordre.
 export const ETAPES_RACCOURCI = [
-  { cle: 'automatisation', dessin: 'onglet', titre: 'Ouvre Raccourcis, onglet « Automatisation »',
+  { cle: 'automatisation', court: 'Ouvre Raccourcis → Automatisation → « + »', dessin: 'onglet', titre: 'Ouvre Raccourcis, onglet « Automatisation »',
     mots: ['Ouvre l’app Raccourcis', 'Touche l’onglet « Automatisation » en bas', 'Touche « + » (ou « Nouvelle automatisation »)'] },
-  { cle: 'declencheur', dessin: 'message', titre: 'Choisis « Message »',
+  { cle: 'declencheur', court: 'Choisis « Message », « Le message contient » : colis', dessin: 'message', titre: 'Choisis « Message »',
     mots: ['Dans la liste, touche « Message »', '« Le message contient » : touche « Choisir », écris « colis », touche « OK »', 'Laisse « Expéditeur » vide : MRELAY (Mondial Relay), Pickup, VintedGo et Chronopost ne sont pas des contacts, et leurs SMS contiennent tous « colis »'] },
-  { cle: 'immediat', dessin: 'immediat', titre: 'Coche « Exécuter immédiatement »',
+  { cle: 'immediat', court: 'Coche « Exécuter immédiatement », puis « Nouveau raccourci vide »', dessin: 'immediat', titre: 'Coche « Exécuter immédiatement »',
     mots: ['Coche « Exécuter immédiatement » (pas « Exécuter après confirmation »)', 'Touche « Suivant »', 'Touche « Nouveau raccourci vide »'] },
-  { cle: 'url', dessin: 'url', titre: 'Ajoute « Obtenir le contenu de l’URL »',
+  { cle: 'url', court: 'Ajoute « Obtenir le contenu de l’URL » et colle l’adresse copiée', dessin: 'url', titre: 'Ajoute « Obtenir le contenu de l’URL »',
     mots: ['Touche « Ajouter une action », cherche « Obtenir le contenu de l’URL » et touche-la', 'Touche « URL » et colle l’adresse copiée ci-dessus', 'Touche la flèche « › » de l’action pour voir ses réglages'] },
-  { cle: 'post', dessin: 'json', titre: 'Méthode « POST », corps « JSON »',
+  { cle: 'post', court: 'Méthode POST, corps JSON : champ « texte » = « Entrée du raccourci »', dessin: 'json', titre: 'Méthode « POST », corps « JSON »',
     mots: ['« Méthode » : choisis « POST »', '« Corps de la requête » : choisis « JSON »', '« Ajouter un nouveau champ » → « Texte » : clé texte, valeur : la variable « Entrée du raccourci »', 'Si Raccourcis le propose : un 2ᵉ champ « Texte », clé expediteur, valeur : « Entrée du raccourci » réglée sur « Expéditeur » (facultatif, VRM lit aussi le texte)', 'Touche « OK » en haut à droite'] },
   // (9 nov.) Les SMS de Vestiaire Collective (« VestiaireCo ») ne contiennent pas « colis » :
   // une 2ᵉ automatisation, identique, sur le mot « article ».
-  { cle: 'vestiaire', dessin: 'message', titre: 'Vestiaire : une 2ᵉ automatisation sur « article »',
+  { cle: 'vestiaire', court: 'Pour Vestiaire : refais-la avec le mot « article »', dessin: 'message', titre: 'Vestiaire : une 2ᵉ automatisation sur « article »',
     mots: ['Refais les étapes 1 à 5 avec « Le message contient » : « article »', 'Elle attrape les SMS de VestiaireCo (« Votre article … vient d’etre vendu », « N’oubliez pas d’expédier votre article … »)', 'Chronopost : quand tu en reçois un, copie-le à VRM (il n’est pas encore appris : seul son n° est gardé, « à vérifier »)'] },
 ];
 

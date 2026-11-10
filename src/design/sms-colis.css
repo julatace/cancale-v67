@@ -41,3 +41,11 @@
 .vrm-sc svg .sc-trait { stroke: var(--fu-gris3, #aeaeb2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .vrm-sc svg .sc-trait-accent { stroke: var(--fu-bleu, #0071e3); stroke-width: 1.6; stroke-linejoin: round; fill: none; }
 .vrm-sc svg .sc-rond { fill: none; stroke: var(--fu-gris3, #aeaeb2); stroke-width: 1.4; }
+/* (10 nov.) Les étapes en liste courte numérotée ; le détail replié. */
+.vrm-sc-court { margin: 4px 0 12px; padding-left: 22px; font-size: 14px; line-height: 1.5; color: var(--fu-encre, #1d1d1f); }
+.vrm-sc-court li { padding: 2px 0; }
+.vrm-sc-court li::marker { font-weight: 700; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-sc-jeton { margin-top: 2px; }
+.vrm-sc-detail { margin: 0 0 8px; }
+.vrm-sc-detail > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--fu-gris, #6e6e73); }
+.vrm-sc-detail[open] > summary { margin-bottom: 6px; }

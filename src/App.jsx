@@ -413,7 +413,7 @@ import AlerteRelaisChange from "./AlerteRelaisChange.jsx";
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
-import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons } from "./colisEnvoyes.js";
+import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons, libelleTransp } from "./colisEnvoyes.js";
 import { ordreRecent, nbSansDate, debutSansDate, PHRASE_SANS_DATE, quandCommandeVinted, quandLeboncoin, quandEbay, quandVestiaire, quandColisAEnvoyer, quandARetirer, ordreRecentPoints } from "./ordreRecent.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
@@ -44720,7 +44720,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             const ouvreT = il === 0 || L[il-1].trNom !== l.trNom;
                             return (
                               <React.Fragment key={l.cle}>
-                              {ouvreT ? <div className="vrm-fu-groupe-transp" data-lot-groupe={l.trNom} style={{marginTop:il?10:4}}><h3>{l.trNom}</h3><span>{L.filter(x=>x.trNom===l.trNom).length}</span></div> : null}
+                              {ouvreT ? <div className="vrm-fu-groupe-transp" data-lot-groupe={l.trNom} style={{marginTop:il?10:4}}><span className="vrm-fu-groupe-tuile" aria-hidden="true">{(() => { const c = cleTransporteur(l.trNom); return c ? <LogoTransporteur cle={c} taille={22}/> : <LogoInconnu taille={22}/>; })()}</span><h3 data-lot-groupe-libelle="">{libelleTransp(l.trNom)}</h3><span>{L.filter(x=>x.trNom===l.trNom).length}</span></div> : null}
                               <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} data-lot-pdf={l.pdf===false?'0':'1'} data-lot-cochable={l.cochable===false?'0':'1'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:l.cochable===false?'default':'pointer',opacity:l.cochable===false?0.55:1}}>
                                 <label className="vrm-preparation-selection"><input type="checkbox" aria-label={l.cochable===false?`${l.titre||'Commande'} : eBay`:`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy||l.cochable===false} checked={coche&&l.cochable!==false} onChange={()=>{ if(l.cochable!==false) basculer(l.cle); }} style={{width:18,height:18,flexShrink:0}}/></label>
                                 <PhotoVente src={photo} size={32} portrait/>
@@ -45077,8 +45077,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             return (
                               <section key={g.nom} className="vrm-tournee-groupe" data-tournee-groupe={g.nom} data-n={g.colis.length}>
                                 <div className="vrm-fu-groupe-transp">
-                                  <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                                  <h3>{g.nom}</h3>
+                                  <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <LogoInconnu taille={22}/>}</span>
+                                  <h3>{libelleTransp(g.nom)}</h3>
                                   <span>{g.colis.length} colis</span>
                                 </div>
                                 <ul className="vrm-tournee-liste">
@@ -45541,7 +45541,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const et = pdfEtiquettesParTx() || {}, vus = pdfVusParTx() || {};
                 const raisons = compterRaisons(inc.map((x) => { const t = String((x.b && x.b.transaction) || (x.o && x.o.transaction_id) || ''); return raisonInconnu({ bord: x.b || null, pdf: et[t] || null, vu: vus[t] || null }); }));
                 return <p className="vrm-colis-envoyes-inconnus" data-envoyes-inconnus={inc.length} style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>
-                  {inc.length} transporteur{inc.length > 1 ? 's' : ''} inconnu{inc.length > 1 ? 's' : ''} : {raisons.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-inconnu-raison={r.cle} data-inconnu-n={r.n}>{r.n} {r.texte}</span></React.Fragment>)}.
+                  {inc.length} colis sans transporteur lu : {raisons.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-inconnu-raison={r.cle} data-inconnu-n={r.n}>{r.n} {r.texte}</span></React.Fragment>)}.
                 </p>;
               })()}
               <div className="vrm-colis-grille" style={{display:'flex',flexDirection:'column',gap:6}}>
