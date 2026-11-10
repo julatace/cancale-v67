@@ -54,7 +54,9 @@ const PARTIS = [
   { tx: 9307, titre: 'Club C 44', suivi: 'XW323456789TS', num: '37', age: 6, status: 'Colis livré' },
 ];
 // L'ordre attendu de « À envoyer » (par transporteur, la plus pressée d'abord, à limite égale la plus ancienne).
-const ORDRE = ['9303', '9305', '9304', '9302', '9301'];
+// (9 nov., soir, lot AJ — décision de Julien) le plus RÉCENT en haut (âge 1, 2, 3, 6, 9 j) ; avant : la limite,
+// puis la plus ancienne. Banc mis à jour ; règle : src/ordreRecent.js.
+const ORDRE = ['9301', '9304', '9302', '9305', '9303'];
 const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
 const LIEU = 'MAISON DU QUAI, 40 RUE DU QUAI, 35260 CANCALE';
 const lignes = (sombre) => [
@@ -208,7 +210,7 @@ async function scenario(b, vp, sombre) {
     // ── P : temps de préparation.
     const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].map((c) => ({ tx: c.getAttribute('data-tx-colis'), att: c.getAttribute('data-attente-j'),
       txt: (c.querySelector('[data-colis-attente]') || {}).textContent || '', lim: (c.querySelector('[data-colis-limite-texte]') || {}).textContent || '' })));
-    dit(JSON.stringify(cartes.map((c) => c.tx)) === JSON.stringify(ORDRE), `${nom} : P ordre « À envoyer » (limite, puis la plus ancienne d'abord)`, JSON.stringify(cartes.map((c) => c.tx)));
+    dit(JSON.stringify(cartes.map((c) => c.tx)) === JSON.stringify(ORDRE), `${nom} : P ordre « À envoyer » (la vente la plus récente d'abord)`, JSON.stringify(cartes.map((c) => c.tx)));
     const ages = Object.fromEntries(V.map((v) => [String(v.tx), String(v.age)]));
     dit(cartes.length === 5 && cartes.every((c) => c.att === ages[c.tx] && /\d/.test(c.txt)), `${nom} : P chaque vente dit depuis combien de jours elle attend`, JSON.stringify(cartes.map((c) => `${c.tx}=${c.att}:${c.txt}`)));
     const c9303 = cartes.find((c) => c.tx === '9303');
@@ -249,7 +251,7 @@ async function scenario(b, vp, sombre) {
       dit(tous.length === 5 && new Set(tous).size === 5 && ORDRE.every((tx) => tous.includes('v:' + tx)), `${nom} : T chaque colis à envoyer une fois, par son identité`, JSON.stringify(t));
       dit(t.length === 3 && t.every((x) => x.n === x.colis.length), `${nom} : T regroupés par transporteur (3 groupes), le nombre de chaque groupe juste`, JSON.stringify(t.map((x) => x.g + ':' + x.n)));
       const mr = t.find((x) => /mondial/i.test(x.g));
-      dit(!!mr && JSON.stringify(mr.colis) === JSON.stringify(['v:9305', 'v:9304']), `${nom} : T dans un groupe, l'ordre de l'écran`, JSON.stringify(mr));
+      dit(!!mr && JSON.stringify(mr.colis) === JSON.stringify(['v:9304', 'v:9305']), `${nom} : T dans un groupe, l'ordre de l'écran (le plus récent d'abord)`, JSON.stringify(mr));
       await shot(pg, `colis-envoi-${nom}-tournee`);
       const petits = await pg.evaluate(() => [...document.querySelectorAll('[data-tournee-sheet] button, [data-tournee-sheet] a')].filter((x) => x.offsetParent).map((x) => ({ t: (x.getAttribute('aria-label') || x.textContent || '').trim().slice(0, 20), h: Math.round(x.getBoundingClientRect().height) })).filter((x) => x.h < 44));
       if (tel) dit(!petits.length, `${nom} : T toutes les cibles de la tournée ≥ 44 px`, JSON.stringify(petits));
