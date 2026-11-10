@@ -1012,7 +1012,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
       </div>
       {search&&<div style={{fontSize:12,color:C.warn}}>
-        🔍 Recherche « {search} » dans toutes les factures — {fullList.length} résultat{fullList.length>1?'s':''}. Tu peux supprimer directement avec 🗑.
+        🔍 « {search} » : {fullList.length} résultat{fullList.length>1?'s':''} dans toutes les factures.
       </div>}
       
       {/* Sous-onglets zones */}
@@ -1624,7 +1624,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
               {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
               {versements === null && <div>Dates de versement Vinted illisibles : « reçu » attend.</div>}
-              {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
+              {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : hors « reçu » pour l'instant.</div>}
               {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période — tu peux la dater ci-dessous.</div>}
               {/* (2 nov., audit des données G1) La commande eBay au montant pas lu est dans « non comptées » ci-dessous (une phrase, §7). */}
               {/* (1er nov., audits A2/A10) Des ventes faites dont l'argent ne se lit pas : dans AUCUNE colonne, dites (jamais 0 €). */}
@@ -2257,18 +2257,18 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div data-spdp data-spdp-etat={spdp === undefined ? 'encours' : spdp === null ? 'passu' : spdp.connecte ? 'connecte' : spdp.illisible ? 'illisible' : 'deconnecte'} style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Plateforme agréée · Super PDP</div>
           {spdp === undefined && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>Je lis ta connexion Super PDP…</div>}
-          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Je n'ai pas pu lire ta connexion Super PDP (le serveur n'a pas répondu) — je ne dis ni « connecté » ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
+          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Connexion Super PDP pas lue : ni « connecté », ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
           {spdp && spdp.connecte && <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
             <div style={{ flex: '1 1 220px', fontSize: 13, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
               <strong>Connecté à Super PDP</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? ' (rien ne part réellement aux impôts)' : ''}
-              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement. Tes identifiants restent sur le serveur, chiffrés.</div>
+              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>Tes identifiants restent chiffrés sur le serveur. <Pourquoi label="L'environnement ?">Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement.</Pourquoi></div>
             </div>
             <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : 'Déconnecter'}</button>
           </div>}
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
             {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
             {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant client et le secret client de TON compte Super PDP (espace développeur). Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais. Les envois sont facturés sur ton compte Super PDP, pas sur celui de VRM.</div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret client de TON compte Super PDP. Envois facturés par Super PDP, pas par VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
             <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
@@ -2306,12 +2306,12 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>
               Total partiel — il manque : {recap.manques.join(' ; ')}. Le fichier le dit aussi.
             </div>}
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>VRM ne sait pas si un acheteur est une entreprise : toutes tes ventes du mois y figurent. Retire celles faites à une entreprise (elles demandent une facture).</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Toutes tes ventes du mois y sont : retire celles faites à une entreprise. <Pourquoi>VRM ne sait pas si un acheteur est une entreprise. Une vente à une entreprise demande une facture, pas ce récapitulatif.</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
               <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récap en tableur</button>
               <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, au format JSON (pour un logiciel de compta)"><Icon name="save" size={14} />Récap JSON</button>
             </div>
-            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas encore tout seul vers Super PDP : la forme de son envoi par l'API n'a pas pu être vérifiée dans leur documentation officielle. Dépose ces fichiers toi-même d'ici là.</div>}
+            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas tout seul : dépose-le toi-même sur Super PDP. <Pourquoi>La forme de son envoi par l'API n'a pas pu être vérifiée dans la documentation officielle de Super PDP.</Pourquoi></div>}
           </div>)}
         </div>
 
@@ -2350,7 +2350,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             })}
           </div>}
           {msg && <div data-fe-msg role="status" style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{msg}</div>}
-          <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numérotation continue par année (FX-AAAA-0001) ; une vente garde toujours le même numéro. La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</div>
+          <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numéros FX-AAAA-0001, continus par année ; une vente garde le sien. <Pourquoi label="Fichier conforme ?">La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</Pourquoi></div>
         </div>
       </div>
     </Card>
@@ -2713,7 +2713,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
             <span style={sTitre}>Tes seuils {j.annee}</span>
             <span style={{ fontSize: 13, color: C.muted }}>Reçu en {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 17 }}>{am}{eurMicro(j.ca)}</b><SourceChiffre id="seuils-ca">La somme des mois de {j.annee} de ton chiffre d’affaires déclaré ({j.mois} mois portent des ventes), toutes plateformes, daté au jour du versement — la même ligne que « Déclarer »{j.aDaterSur ? <>, plus {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} pas encore datée{j.aDaterSur.n > 1 ? 's' : ''} ({eurMicro(j.aDaterSur.ca)})</> : null}.</SourceChiffre></span>
           </div>
-          {j.aDaterSur ? <div data-micro-adater-sur={String(j.aDaterSur.n)} style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Dont {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} sans date de versement ({eurMicro(j.aDaterSur.ca)}) : finalisée{j.aDaterSur.n > 1 ? 's' : ''}, donc reçue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee}, mais dans aucun mois.</div> : null}
+          {j.aDaterSur ? <div data-micro-adater-sur={String(j.aDaterSur.n)} style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Dont {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} sans date de versement ({eurMicro(j.aDaterSur.ca)}) : reçue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee}, dans aucun mois.</div> : null}
           {j.partiel ? <div data-micro-partiel-texte="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>C'est un minimum : {j.raisons.join(' · ')}.</div> : null}
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
@@ -2781,10 +2781,10 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
             {dr.liberatoire === 'oui' ? <>Ton impôt est déjà payé avec tes cotisations : ce chiffre est déclaré pour information (il compte dans ton revenu fiscal de référence).</>
               : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71&nbsp;% de la vente de marchandises.</>}
             {dr.partiel ? <> C'est un minimum : {dr.raisons.join(' · ')}.</> : null}
-            {' '}VRM ne compte que ce qu'il a capté sur tes plateformes reliées : compare avec le total de tes déclarations URSSAF de l'année.
+            {' '}Compare avec le total de tes déclarations URSSAF de l'année. <Pourquoi>VRM ne compte que ce qu'il a capté sur tes plateformes reliées.</Pourquoi>
           </div>
         </>)}
-        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, il est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000&nbsp;€.</div> : null}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, paie-le avant le <b>{cfe.limite}</b> sur impots.gouv.fr. <Pourquoi label="Pas d'avis ?">À payer dans ton espace professionnel. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000&nbsp;€.</Pourquoi></div> : null}
       </div>
     </Card>
   );
@@ -2857,7 +2857,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
               Noter mes {aNoter.length} mois à la suite
             </button>) : null;
         })()}
-        {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>À ajouter à ta prochaine déclaration : <b>{eur(suivi.aRegulariser)}</b> de ventes que VRM compte et qui ne sont dans aucune déclaration (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} de cotisations).</div> : null}
+        {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>À ajouter à ta prochaine déclaration : <b>{eur(suivi.aRegulariser)}</b> (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} de cotisations). <Pourquoi>Des ventes que VRM compte et qui ne sont dans aucune déclaration.</Pourquoi></div> : null}
         {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>Rien à suivre sur les 12 derniers mois.</div> : (
           <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
             {lignes.map((l) => {
@@ -2881,7 +2881,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
                       {l.ecart ? <div data-suivi-ecart-texte="" style={{ marginTop: 2 }}>{l.ecart < 0
                         ? <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(-l.ecart)}</b> de moins (des ventes déclarées ne sont plus dans VRM : compte retiré, vente annulée). Ta déclaration reste celle-là.</>
                         : <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(l.ecart)}</b> de plus : des ventes de cette période ne sont dans aucune déclaration — à ajouter à la prochaine (≈ {eur(l.aPayerEcart)} de cotisations).</>}</div> : null}
-                      {l.partiel && l.caCalc != null ? <div style={{ marginTop: 2 }}>VRM compte au moins {eur(l.caCalc)} aujourd'hui (des ventes sans date de versement) : pas d'écart affirmé.</div> : null}
+                      {l.partiel && l.caCalc != null ? <div style={{ marginTop: 2 }}>VRM compte au moins {eur(l.caCalc)} aujourd'hui (ventes sans date) : pas d'écart affirmé.</div> : null}
                     </div>
                   ) : (
                     <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
@@ -2904,7 +2904,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
                         <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>Enregistrer</button>
                         <button className="vrm-b vrm-b-discret" type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
                       </div>
-                      <div style={{ fontSize: 12, color: C.muted }}>Les ventes de la déclaration ne bougent pas : seuls ces deux chiffres sont gardés. Vide = pas noté.</div>
+                      <div style={{ fontSize: 12, color: C.muted }}>Seuls ces deux chiffres changent ; les ventes déclarées restent. Vide = pas noté.</div>
                     </div>
                   ) : null}
                   {!editeIci && ((l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 || l.aCompleter.length > 0 || (l.etat === 'declaree')) ? (
@@ -3023,7 +3023,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
           if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{phraseNonCompteesPar(ncInfo.par)} : dans aucun chiffre — ce total est un minimum</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>. VRM ne sait pas encore si le chiffre que Vestiaire écrit est le prix ou ce qu'il te verse : vérifie ces ventes sur Vestiaire avant de déclarer</> : null}</Puce>);
           if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que {adL.n>1?'leur date n\'est pas captée':'sa date n\'est pas captée'} — tu peux {adL.n>1?'les':'la'} dater dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois — date{adL.n>1?'-les':'-la'} dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         return (
