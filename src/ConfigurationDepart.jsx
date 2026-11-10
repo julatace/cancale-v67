@@ -374,7 +374,7 @@ function SiretConfiguration({ entreprise, statut, poser }) {
         <input type="text" inputMode="numeric" autoComplete="off" placeholder="14 chiffres" value={saisie} data-configuration-siret-champ=""
           onChange={(e) => { touche.current = true; setSaisie(e.target.value); }} />
       </label>
-      {fiche === null ? <p className="vrm-cfg-note" style={{ textAlign: 'left' }}>Fiche de facture pas lue : rien ne sera écrit. Elle est dans Argent → Factures → Ma facture.</p> : null}
+      {fiche === null ? <p className="vrm-cfg-note" style={{ textAlign: 'left' }}>Fiche de facture pas lue : rien écrit. Elle est dans Argent → Factures → Ma facture.</p> : null}
       <CarteVerifEntreprise recherche={recherche} actuel={fiche || {}} avecSiret enTete={enTete}
         onEcrire={(patch) => (fiche === null || fiche === undefined ? false : ecrireFiche(patch))} data={{ 'data-configuration-registre': '' }} />
     </div>
