@@ -48,12 +48,16 @@ Annonces n'est PAS touché (un autre lot la refait en grille) : sa sélection re
 ## Preuves
 
 - `scripts/bancs/vues-panneau.cjs` (données inventées, 390 tactile sombre/clair, 1512 clair/sombre) :
-  **80 verts**. Rouge sur `origin/main` (7/13, aucune sélection ni puce). Mutation « déposable = tout » ⇒
+  **80 verts**. Rouge sur `origin/main` construit (app chargée ; aucun « Sélectionner », aucune puce). Mutation « déposable = tout » ⇒
   S3/S4 rouges. Le panneau est jugé VISIBLE (`elementFromPoint` sur la ligne), pas seulement placé : la
   première version passait le contrôle géométrique avec un sol opaque par-dessus la liste — la capture l'a montré.
 - `scripts/audit-vues-filtres.cjs` : 23 verts ; mutation « mêmes filtres sans l'état » ⇒ 4b rouge.
 - Relancés un à un : `ordre-recent` 62, `vues-ventes`, `achats-fiche`, `colis-envoi` 118, `ventes-compte` 55,
-  `ventes-par-compte` ; audits variables, tdz, coherence, identite, icones et ceux de `SYNC_KEYS` verts.
+  `ventes-par-compte`, `ventes-colis-premium` 32, `colis-sortants` 30, `achats-en-route-ordre`, `ventes-une-phrase` ; audits variables, tdz, coherence, identite, icones et ceux de `SYNC_KEYS` verts.
+
+Rouges DÉJÀ sur `origin/main` (mêmes contrôles, même nombre, mesurés sur son build) — pas ce lot :
+`colis-ventes-instantanes` (6 : ordre de l'instantané « À envoyer » d'avant le lot AJ, CLS 0,011 de la ligne de
+fraîcheur), `achats-retraits` (8 : « Peut-être en double », retiré le 9 nov.), `colis-tous-sites` (3 : le rappel du soir).
 
 ## Reste
 
