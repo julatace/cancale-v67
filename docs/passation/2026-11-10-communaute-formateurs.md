@@ -73,7 +73,9 @@ rejoindre » ⇒ `/?tab=communaute&formateur=<adresse>&g=<groupe>` ; l'app garde
   de la page publique : **30 verts** ; `--prouve` **7/7**. Rouge sur origin/main (fichiers absents).
 - Banc `scripts/bancs/communaute-formateurs.cjs` (le vrai `api/compte.js`, faux PostgREST aux
   règles 025 + 032) — 1512 clair/sombre, 390 tactile clair/sombre, page publique 1512 clair et
-  390 sombre. Voir le résultat plus bas.
+  390 sombre : **46 verts**. Mutation de l'écran (un élève qui ne partage pas compté 0, total
+  jamais « — ») ⇒ **1 rouge** (« total « — » · 0 élève sur 1 partage »). Captures regardées
+  (feuille de la page, créateur, page publique clair/sombre, rejoindre, suivi privé, élève).
 - `audit-accompagnement` 40 · `audit-fermer-compte` · `audit-fonctions-api` · `audit-confiance`
   39/39 · variables · tdz · coherence · identite · icones verts ; `npm run build`.
 

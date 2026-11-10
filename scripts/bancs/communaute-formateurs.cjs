@@ -47,7 +47,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d && !c ? ' — ' + String(d).slice(0, 220) : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).split('\n')[0].slice(0, 200)); } };
+let PAGES_OUVERTES = [];
+const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).split('\n')[0].slice(0, 200)); if (CAPTURES) for (const [i, p] of PAGES_OUVERTES.entries()) await p.screenshot({ path: path.join(CAPTURES, 'echec-' + nom.replace(/\W+/g, '-') + '-' + i + '.png') }).catch(() => {}); } };
 
 // ── Les personnes (inventées) ────────────────────────────────────────────────
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Bu = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -194,10 +195,10 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: 'block' });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: `http://localhost:${PORT}` }).catch(() => {});
-  const pg = await ctx.newPage();
+  const pg = await ctx.newPage(); PAGES_OUVERTES.push(pg);
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript(({ s, sombre, local }) => {
-    try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
+    try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_session', JSON.stringify(s)); /* vendeur déjà configuré : « Ma configuration » ne couvre pas l'écran */ localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); } catch (_) {}
     try { if (!sessionStorage.getItem('banc_seme')) { for (const [k, v] of Object.entries(local)) localStorage.setItem(k, JSON.stringify(v)); sessionStorage.setItem('banc_seme', '1'); } } catch (_) {}
   }, { s: session(qui), sombre, local });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
@@ -349,7 +350,8 @@ function rpcForm(fn, a, uid) {
       await pgA.waitForSelector('[data-form-vitrine="oui"]', { timeout: 8000 });
       dit(F.vitrine[G] === true, '« Sur ma page publique » le montre');
       await capture(pgA, '2-createur-1512-clair');
-      const pc = await cibles(pgA); dit(pc.length === 0, 'cibles de 44 px', JSON.stringify(pc));
+      // (1512, souris : les segments font 36 px comme Carte/Classement/Groupes ; au doigt, 44 — jugé à 390.)
+      const pc = (await cibles(pgA)).filter((x) => !['Carte', 'Classement', 'Groupes', 'Suivi', 'Programme', 'Annonces'].includes(x.t)); dit(pc.length === 0, 'cibles de 44 px (hors segments à la souris)', JSON.stringify(pc));
     });
 
     console.log('\n── La page publique, SANS compte');
