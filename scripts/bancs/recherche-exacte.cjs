@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LA RECHERCHE UNIVERSELLE — lot AX (10 novembre)
 //        (node scripts/bancs/recherche-exacte.cjs — après le build)
-//        BANC_PORT=… pour un autre port · BANC_DIST=… pour un autre build
+//        BANC_PORT=… pour un autre port · BANC_DIST=… pour un autre build · BANC_SEUL=tenu|ko (les tours « pas lu » seuls)
 // ═══════════════════════════════════════════════════════════════════════════
 // Données INVENTÉES (le dépôt est public). Il exige, à 390 px tactile et 1512 px,
 // en clair et en sombre, dans LA loupe (⌘K / Ctrl+K sur ordinateur, la loupe au
@@ -88,6 +88,8 @@ async function preparer(b, vp, { sombre = false, mode = 'normal' } = {}) {
   const pg = await ctx.newPage();
   const errs = [], lectures = [];
   let relacher = () => {}; const tenue = new Promise((r) => { relacher = r; });
+  // On ne tient que ce que la LOUPE lit une fois ouverte (pas le démarrage de l'app, qui a sa propre attente).
+  const tenir = { actif: false };
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ s }) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { s: sombre });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
@@ -101,7 +103,7 @@ async function preparer(b, vp, { sombre = false, mode = 'normal' } = {}) {
     const peutAchats = (() => { const inn = /id=in\.\(([^)]*)\)/.exec(u); if (inn) return inn[1].split(',').includes('harvest_111_orders_purchased'); const lk = /id=like\.([^&]*)/.exec(u); return !!(lk && motif(lk[1]).test('harvest_111_orders_purchased')) || /id=eq\.harvest_111_orders_purchased/.test(u); })();
     if (mode === 'achats-ko' && peutAchats) return route.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"panne"}' });
     // La lecture des colis PROPRE à la loupe (projection code2 + artTitle) : tenue jusqu'à `relacher`.
-    if (mode === 'tenu' && /code2:data->>code2/.test(u) && /artTitle/.test(u)) await tenue;
+    if (mode === 'tenu' && tenir.actif && /code2:data->>code2/.test(u) && /artTitle/.test(u)) await tenue;
     if (/select=owner/.test(u)) return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
@@ -119,7 +121,7 @@ async function preparer(b, vp, { sombre = false, mode = 'normal' } = {}) {
     if (/email-rattacher\?mode=journal/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, page: 0, parPage: 20, suite: false, emails: [], compteurs: { sur: 0, plus: false, integre: 0, aVerifier: 0, erreur: 0, incompris: 0, parRubrique: {} }, adresses: [], cherche: new URL(u).searchParams.get('cherche') || '' }) });
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
   });
-  return { ctx, pg, errs, lectures, relacher };
+  return { ctx, pg, errs, lectures, relacher, tenir };
 }
 // Taper comme React le lit (événement `input`), puis attendre le sélecteur.
 const taper = (pg, q, sel) => pg.evaluate(async ({ q, sel }) => {
@@ -149,6 +151,9 @@ const etat = (pg) => pg.evaluate(() => {
   };
 });
 const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
+  // L'app d'abord DEMARRÉE : la loupe (ou la barre) est au-dessus de tout, plus l'écran de chargement.
+  const sel = tel ? 'button[aria-label="Rechercher une paire"]' : '[data-barre-recherche]';
+  for (let i = 0; i < 80; i++) { const ok = await pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); if (!r.width) return false; const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(t && (e === t || e.contains(t))); }, sel); if (ok) break; await pg.waitForTimeout(250); }
   if (tel) await pg.locator('button[aria-label="Rechercher une paire"]').first().tap();
   else { await pg.locator('body').click({ position: { x: 5, y: 400 } }).catch(() => {}); await pg.keyboard.press('ControlOrMeta+k'); }
   for (let i = 0; i < 60; i++) { const v = await pg.evaluate(() => { const p = document.querySelector('[data-recherche-panneau]'); return p ? p.getAttribute('data-recherche-pret') : null; }); if (v === '1' || (!attendre && v != null)) break; await pg.waitForTimeout(250); }
@@ -159,7 +164,7 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const tours = [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true]];
-    for (const [vp, sombre] of (process.env.BANC_SEUL === 'ko' ? [] : tours)) {
+    for (const [vp, sombre] of (process.env.BANC_SEUL ? [] : tours)) {
       const tel = vp.width < 600; const TT = `[${vp.width}${sombre ? ' sombre' : ''}]`; const suf = `${vp.width}${sombre ? '-sombre' : ''}`;
       console.log(`── ${vp.width} px${sombre ? ' · sombre' : ''}`);
       const { ctx, pg, errs, lectures } = await preparer(b, vp, { sombre });
@@ -254,9 +259,10 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
     // « pas encore lus » : la lecture des colis de la loupe TENUE.
     for (const vp of (process.env.BANC_SEUL === 'ko' ? [] : [{ width: 390, height: 844 }, { width: 1512, height: 950 }])) {
       const tel = vp.width < 600; const TT = `[${vp.width} tenu]`;
-      const { ctx, pg, errs, relacher } = await preparer(b, vp, { mode: 'tenu' });
+      const { ctx, pg, errs, relacher, tenir } = await preparer(b, vp, { mode: 'tenu' });
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(2500);
       await essaie('tenu', async () => {
+        tenir.actif = true;
         await ouvrirLoupe(pg, tel, { attendre: false });
         await taper(pg, '482913', '[data-recherche-non-lu]');
         await pg.waitForTimeout(250);
@@ -264,9 +270,13 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
         dit(x.nonLu && x.nonLu.encours === '1' && /colis/.test(x.nonLu.cles) && /Pas encore lus : .*colis et retraits/.test(x.nonLu.txt), `${TT} lecture des colis tenue ⇒ « Colis et retraits pas encore lus »`, JSON.stringify(x.nonLu));
         dit(!x.r.some((r) => r.cle === 'colis:MR7000123'), `${TT} … et aucun colis inventé pendant ce temps`, JSON.stringify(x.r));
         await pg.screenshot({ path: path.join(SHOTS, `pas-encore-lus-${vp.width}.png`) });
+        // VISIBLE = au-dessus de tout à l'endroit de la phrase (rien ne la recouvre).
+        const vu = await pg.evaluate(() => { const n = document.querySelector('[data-recherche-non-lu]'); if (!n) return false; const r = n.getBoundingClientRect(); const el = document.elementFromPoint(r.left + 8, r.top + r.height / 2); return !!(el && n.contains(el)); });
+        dit(vu, `${TT} la phrase est VISIBLE (rien ne la recouvre)`, String(vu));
         relacher();
         for (let i = 0; i < 40; i++) { x = await etat(pg); if (x.r.some((r) => r.cle === 'colis:MR7000123')) break; await pg.waitForTimeout(250); }
         dit(!x.nonLu && x.r[0] && x.r[0].cle === 'colis:MR7000123' && x.r[0].groupe === 'exacte', `${TT} lecture rendue ⇒ la phrase part, le colis arrive en tête`, JSON.stringify({ n: x.nonLu, r: x.r.slice(0, 1) }));
+        await pg.screenshot({ path: path.join(SHOTS, `lu-apres-tenue-${vp.width}.png`) });
       });
       dit(errs.length === 0, `${TT} aucune erreur de page`, errs.join(' | ').slice(0, 200));
       await ctx.close();
@@ -284,8 +294,8 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
         dit(x.nonLu && x.nonLu.encours === '0' && x.nonLu.cles.split(' ').includes('achats') && /Achats pas lus/.test(x.nonLu.txt) && /pas répondu/.test(x.nonLu.txt), `${TT} lecture des achats ratée ⇒ « Achats pas lus — la lecture n’a pas répondu »`, JSON.stringify(x.nonLu));
         dit(!x.groupes.includes('achat'), `${TT} … et aucun achat inventé`, JSON.stringify(x.groupes));
         await pg.screenshot({ path: path.join(SHOTS, `achats-pas-lus-${vp.width}${sombre ? '-sombre' : ''}.png`) });
-        const vu = await pg.evaluate(() => { const p = document.querySelector('[data-recherche-panneau]'); const r = p && p.getBoundingClientRect(); return !!(r && r.width > 100 && r.height > 40); });
-        dit(vu, `${TT} la loupe est VISIBLE sur la capture (pas l’écran de chargement)`, String(vu));
+        const vu = await pg.evaluate(() => { const n = document.querySelector('[data-recherche-non-lu]'); if (!n) return false; const r = n.getBoundingClientRect(); const el = document.elementFromPoint(r.left + 8, r.top + r.height / 2); return !!(el && n.contains(el)); });
+        dit(vu, `${TT} la phrase est VISIBLE (rien ne la recouvre)`, String(vu));
       });
       dit(errs.length === 0, `${TT} aucune erreur de page`, errs.join(' | ').slice(0, 200));
       await ctx.close();
