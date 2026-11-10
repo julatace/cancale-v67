@@ -152,3 +152,28 @@ html body .vrm-fp-apercu .vrm-fp-a-table th, html body .vrm-fp-apercu .vrm-fp-a-
 html body .vrm-fp-apercu .vrm-fp-a-table th:nth-child(n+2), html body .vrm-fp-apercu .vrm-fp-a-table td:nth-child(n+2) { white-space: nowrap; }
 html body .vrm-fp-apercu .vrm-fp-a-table th:first-child, html body .vrm-fp-apercu .vrm-fp-a-table td:first-child { width: auto; }
 html body .vrm-fp-apercu .vrm-fp-a-table { table-layout: auto; }
+
+/* ════ (10 nov., lot Q) À envoyer · envoi automatique · registre — DA6 : groupes rayon 24,
+   rangées entières qui s'ouvrent (chevron), pilules ; l'ambre seulement pour un geste à faire. ════ */
+.vrm-fp-a-envoyer, .vrm-fp-registre { border-radius: var(--w-r, 24px); border: 0; box-shadow: var(--w-ombre, 0 1px 3px rgba(0,0,0,.06)); padding: 16px; }
+.vrm-fp-tete-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.vrm-fp-tete-ligne > h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); }
+.vrm-fp-muet.is-ambre { color: var(--vrm-warn, #b25000); }
+.vrm-fp-rangees { list-style: none; margin: 0 -16px; padding: 0; display: grid; }
+.vrm-fp-rangees > li + li { border-top: 1px solid var(--vrm-line); margin-left: 16px; }
+.vrm-fp-rangees > li + li > .vrm-fp-rangee { padding-left: 0; }
+.vrm-fp-rangee { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; min-height: 56px; padding: 8px 16px; background: transparent; border: 0; color: var(--vrm-ink); font: inherit; text-align: left; min-width: 0; }
+button.vrm-fp-rangee { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button.vrm-fp-rangee:active { background: var(--w-remplir, rgba(120,120,128,.12)); }
+.vrm-fp-rangee-txt { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.vrm-fp-rangee-txt > b { font-size: 16px; font-weight: 600; letter-spacing: -.012em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-fp-rangee-txt > span { font-size: 13px; line-height: 1.4; color: var(--vrm-muted); overflow-wrap: anywhere; }
+.vrm-fp-rangee > .vrm-b { flex: none; }
+.vrm-fp-rangee.is-chevron::after { content: ""; flex: none; width: 7px; height: 12px; margin-left: 4px; background: var(--w-gris-2, #C7C7CC);
+  -webkit-mask: var(--w-chevron) center / contain no-repeat; mask: var(--w-chevron) center / contain no-repeat; }
+li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--vrm-warn, #b25000); }
+.vrm-fp-periode { min-height: 44px; max-width: 100%; padding: 8px 14px; border-radius: 999px; border: 0; background: var(--w-remplir, rgba(120,120,128,.12)); color: var(--vrm-ink); font: inherit; font-size: 15px; font-weight: 600; }
+.vrm-fp-registre-pied { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-muted); }
+.vrm-fp-registre-pied b { font-size: 17px; color: var(--vrm-ink); }
+.vrm-fp-registre-pied .vrm-b { margin-top: 8px; }
+.vrm-fp-auto { display: grid; gap: 4px; padding-top: 8px; border-top: 1px solid var(--vrm-line); }
