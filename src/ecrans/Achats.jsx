@@ -275,7 +275,8 @@ function FeuilleRecuAchat({ recu, fermer }) {
 //    ~200 Ko). Elle a SA ligne (`achat_hors_photo_{id}`, ~20 Ko), lue seulement
 //    quand la liste est ouverte. L'achat ne porte `photo:true` que si
 //    l'écriture a RÉUSSI ; sinon on le dit et l'achat est gardé sans photo.
-const SOURCES_ACHAT_HORS = ['Brocante', 'Vide-grenier', 'Fournisseur', 'Leboncoin (main propre)', 'Particulier'];
+// (10 nov., lot BG) + « Magasin » : la source se SAISIT ici (liste courte + libre), lue par Statistiques (src/sourceAchats.js).
+const SOURCES_ACHAT_HORS = ['Brocante', 'Vide-grenier', 'Magasin', 'Fournisseur', 'Leboncoin (main propre)', 'Particulier'];
 // ⟦← App.jsx #4⟧
 const idPhotoAchatHors = (id) => 'achat_hors_photo_' + String(id).replace(/[^\w-]/g, '');
 // Écrit la photo dans sa ligne. Rend true seulement si la base l'a acceptée.
