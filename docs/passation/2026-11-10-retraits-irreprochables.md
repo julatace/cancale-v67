@@ -101,7 +101,10 @@ lu ». Le logo du transporteur reste sur la vignette (src/transporteursVisuels.j
   (l'alerte lit aussi `transpMap`), `retrait-preuves`, `retraits-suivi`, `suivi-colis`, `colis-frequent`,
   `retrait-fiable`, `retrait`, `colis-retrait`, `retrait-conv`, `arrivee-colis`, `achat-attend-relais`,
   `colis-sens`, `variables`, `tdz`, `coherence`, `identite`, `icones`, `statuts`, `fonctions-api`. Bancs
-  relancés : voir §6.
+  relancés (un à la fois, port aléatoire) : `colis-retirer-propre` 129 verts, `retirer-carte-delai` 111,
+  `preparer-relais` 131, `retrait-relais-carte` vert ; `retraits-frais` 2 rouges (F6, texte de la ligne de
+  fraîcheur) et `codes-hors-ligne` 6 rouges (phase « réseau coupé » : porte d'accès) — **les mêmes sur le
+  build d'`origin/main`**, hors de ce chantier.
 
 ## 5. Ce qui reste
 
