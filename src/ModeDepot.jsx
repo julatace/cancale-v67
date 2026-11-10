@@ -130,7 +130,7 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
           <section key={g.cle} className="vrm-depot-groupe" data-depot-groupe={g.trCle || g.nom || 'inconnu'}>
             <h3 className="vrm-depot-groupe-tete">
               <span className="vrm-depot-logo" aria-hidden="true">{g.trCle ? <LogoTransporteur cle={g.trCle} taille={26} repli={<LogoInconnu taille={26}/>}/> : <LogoInconnu taille={26}/>}</span>
-              <span className="vrm-depot-groupe-nom">{g.nom || 'Transporteur inconnu'}</span>
+              <span className="vrm-depot-groupe-nom">{g.nom || 'Transporteur à identifier'}</span>
               <span className="vrm-depot-groupe-n">{g.colis.length}</span>
             </h3>
             <ul className="vrm-depot-liste">
