@@ -74,7 +74,7 @@ rien touché. Aucune migration, aucune fonction `api/` ajoutée, aucun service p
   0 avis lus). Sur un build MUTÉ (avis sans date écartés + case cochée + sans-date = 0 + vente entière +
   acheteur) : **44 rouges** (« 0 avis lus », « 10 h sur 4 colis », 3 pages, acheteur dans le PDF…).
 - Bancs touchés relancés un à un (BANC_PORT aléatoire) : `litiges-ecran` vert, `argent` 268/0,
-  `ma-semaine`, `annulations-notes` (voir rapport).
+  `ma-semaine` 0 échec, `annulations-notes` 30/0.
 - Audits : variables, tdz, coherence, identite, icones, politique-hotes, litiges-ecran (22/22),
   frise-source (40), notes-recues (10), avis-vinted : verts. `npm run build` vert.
 - Captures regardées (390/1512, clair/sombre) : carte Litiges avec « Dossier PDF » et la case, PDF converti
