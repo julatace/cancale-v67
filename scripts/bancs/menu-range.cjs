@@ -59,7 +59,10 @@ const actif = (pg) => pg.evaluate(() => {
   const el = document.querySelector('.vrm-sidebar [aria-current="page"]') || [...document.querySelectorAll('nav [aria-current="page"]')].pop();
   return el ? (el.getAttribute('aria-label') || el.innerText || '').trim() : '';
 });
-const rubriqueActive = (pg) => pg.evaluate(() => { const b = document.querySelector('.vrm-rubriques [aria-current="page"], .vrm-rubriques [aria-pressed="true"]'); return b ? b.innerText.trim() : ''; });
+// (10 nov., lot AO) La rubrique est le segment allumé SOUS la piste d'Argent (`[data-stats-sous-nav]`), ou le segment d'Argent lui-même.
+// (10 nov., lot AO) L'écran ouvert est Argent : son grand titre, sa piste de quatre segments.
+const argentOuvert = (pg) => pg.waitForFunction(() => !!document.querySelector('[data-argent-nav]') && [...document.querySelectorAll('.vrm-main h1')].some((h) => h.getClientRects().length && h.innerText.trim() === 'Argent'), null, { timeout: 10000 }).then(() => true, () => false);
+const rubriqueActive = (pg) => pg.evaluate(() => { const b = document.querySelector('.vrm-rubriques [aria-current="page"], .vrm-rubriques [aria-pressed="true"]') || [...document.querySelectorAll('[data-stats-sous-nav] [aria-current="page"]')].find((e) => !e.closest('[data-argent-nav]')) || document.querySelector('[data-argent-nav] [aria-current="page"]'); return b ? b.innerText.trim() : ''; });
 // Un banc ne meurt pas, il rapporte : un bouton absent (le code d'avant) rend
 // un contrôle rouge au lieu d'un « Timeout 30000ms » qui coupe le bilan.
 const clique = async (pg, sel, txt) => { const l = pg.locator(sel, { hasText: txt }); if (!(await l.count())) return false; try { await l.first().click({ timeout: 4000 }); await pg.waitForTimeout(500); return true; } catch (_) { return false; } };
@@ -75,7 +78,9 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       const { ctx, pg } = await page(nav, false, 'journee');
       const rail = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar button')].map((b) => b.getAttribute('aria-label') || b.innerText.trim()));
       for (const m of INTERDITS) dit(!rail.includes(m), `le rail ne porte plus « ${m} »`, rail.join(' · '));
-      for (const m of ['Statistiques', 'Compta', 'Colis', 'Stock']) dit(rail.includes(m), `le rail garde « ${m} »`, rail.join(' · '));
+      // (10 nov., lot AO) Statistiques et Compta sont UNE entrée « Argent » (src/argent.js).
+      for (const m of ['Argent', 'Colis', 'Stock']) dit(rail.includes(m), `le rail garde « ${m} »`, rail.join(' · '));
+      for (const m of ['Statistiques', 'Compta']) dit(!rail.includes(m), `le rail ne porte plus « ${m} » (fondu dans Argent)`, rail.join(' · '));
       await ctx.close();
     }
     for (const tel of [false, true]) {
@@ -84,29 +89,33 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       {
         const { ctx, pg } = await page(nav, tel, 'prixmarche');
         const t = await texte(pg);
-        dit(/Statistiques/.test(await actif(pg)) || /statistiques/i.test(t), `${qui} : ?tab=prixmarche ouvre Statistiques`, await actif(pg));
+        dit((await argentOuvert(pg)) && /Statistiques/.test(await pg.evaluate(() => (document.querySelector('[data-argent-nav] [aria-current="page"]') || {}).innerText || '')), `${qui} : ?tab=prixmarche ouvre Argent · Statistiques`, await actif(pg));
         dit(/Prix qui marche/.test(await rubriqueActive(pg)), `${qui} : la rubrique « Prix qui marche » est choisie`, await rubriqueActive(pg));
-        dit(/Le prix qui marche/.test(t), `${qui} : le contenu « Le prix qui marche » est rendu`, t.slice(0, 160));
+        // (10 nov., lot AO) Le titre est « Argent » : le contenu se reconnaît à sa phrase.
+        const prixRendu = (pg) => pg.waitForFunction(() => !!document.querySelector('[data-prix-marche]'), null, { timeout: 8000 }).then(() => true, () => false);   // (la rubrique se reconnaît à sa racine, `data-prix-marche`)
+        dit(await prixRendu(pg), `${qui} : le contenu « Le prix qui marche » est rendu`, t.slice(0, 160));
         // Revenir à la vue d'ensemble, puis rouvrir la rubrique : le geste existe.
-        const c1 = await clique(pg, '.vrm-rubriques button', 'Vue d’ensemble');
-        dit(c1 && !/Le prix qui marche/.test(await texte(pg)), `${qui} : « Vue d’ensemble » quitte la rubrique`, '');
-        const c2 = await clique(pg, '.vrm-rubriques button', 'Prix qui marche');
-        dit(c2 && /Le prix qui marche/.test(await texte(pg)), `${qui} : la rubrique se rouvre d’un tap`, '');
+        const c1 = await clique(pg, '[data-stats-sous-nav] button', 'Mes ventes');
+        dit(c1 && !(await prixRendu(pg)), `${qui} : « Mes ventes » quitte la rubrique`, '');
+        const c2 = await clique(pg, '[data-stats-sous-nav] button', 'Prix qui marche');
+        dit(c2 && (await prixRendu(pg)), `${qui} : la rubrique se rouvre d’un tap`, '');
         await ctx.close();
       }
       {
         const { ctx, pg } = await page(nav, tel, 'invoices');
         const t = await texte(pg);
-        dit(/Compta/.test(await actif(pg)) || /Compta/.test(t), `${qui} : ?tab=invoices ouvre Comptabilité`, await actif(pg));
+        dit((await argentOuvert(pg)), `${qui} : ?tab=invoices ouvre Argent`, await actif(pg));
         dit(/Factures/.test(await rubriqueActive(pg)), `${qui} : la rubrique « Factures » est choisie`, await rubriqueActive(pg));
-        dit(/Nouvelle facture/.test(t), `${qui} : l’écran des factures est rendu`, t.slice(0, 160));
+        // (10 nov.) Attendre l'ÉTAT (l'écran des factures monte après la vérification des données), pas un délai.
+        const facturesRendu = await pg.waitForFunction(() => /Nouvelle facture/.test(document.body.innerText || ''), null, { timeout: 10000 }).then(() => true, () => false);
+        dit(facturesRendu, `${qui} : l’écran des factures est rendu`, t.slice(0, 160));
         await ctx.close();
       }
       {
         const { ctx, pg } = await page(nav, tel, 'collectif');
         const t = await texte(pg);
         dit(!/Toutes tes plateformes réunies/.test(t), `${qui} : ?tab=collectif ne rouvre pas l’écran retiré`, '');
-        dit(/Statistiques/.test(await actif(pg)) || /Vue d’ensemble/.test(await rubriqueActive(pg)), `${qui} : ?tab=collectif mène aux Statistiques`, await actif(pg));
+        dit((await argentOuvert(pg)) && /Statistiques/.test(await pg.evaluate(() => (document.querySelector('[data-argent-nav] [aria-current="page"]') || {}).innerText || '')), `${qui} : ?tab=collectif mène à Argent · Statistiques`, await actif(pg));
         await ctx.close();
       }
     }
@@ -132,7 +141,10 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
       const feuille = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); return m ? m.innerText : ''; });
       dit(!!feuille, 'la feuille du menu s’ouvre', '');
       for (const m of INTERDITS) dit(!feuille.includes(m), `la feuille ne porte plus « ${m} »`, feuille.replace(/\n+/g, ' · '));
-      for (const m of ['Statistiques', 'Compta']) dit(feuille.includes(m), `la feuille garde « ${m} »`, '');
+      // (10 nov., lot AO) « Statistiques » et « Compta » sont fondues dans « Argent » (barre du bas ou feuille).
+      for (const m of ['Statistiques', 'Compta']) dit(!feuille.split('\n').some((l) => l.trim() === m), `la feuille ne porte plus « ${m} » (fondu dans Argent)`, feuille.replace(/\n+/g, ' · '));
+      const barre = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar'); return b ? b.innerText : ''; });
+      dit(/(^|\n)\s*Argent\s*($|\n)/.test(feuille + '\n' + barre), '« Argent » est joignable (barre du bas ou feuille)', barre.replace(/\n+/g, ' · '));
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }

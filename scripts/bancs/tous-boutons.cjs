@@ -116,7 +116,7 @@ const TRANSITOIRES = new Set([...APP.matchAll(/if\s*\(\s*tab\s*!==?\s*['"]([a-z_
 // LE NOM D'UN ÉCRAN, celui de la colonne de navigation (une source : la colonne).
 const NOMS = {
   journee: ['Ma journée', 'Journée'], annonces: ['Annonces'], ventes: ['Ventes'], messages: ['Messages'], cat_bord: ['Colis'],
-  garage: ['Stock'], achats: ['Achats'], dashboard: ['Statistiques'], compta: ['Compta']  /* (3 nov., Julien via la critique #2 : « Compta » partout) */, communaute: ['Communauté'], settings: ['Paramètres'],
+  garage: ['Stock'], achats: ['Achats'], dashboard: ['Argent'], compta: ['Argent']  /* (10 nov., lot AO) Statistiques et Compta = UNE entrée « Argent » (src/argent.js) */, communaute: ['Communauté'], settings: ['Paramètres'],
 };
 // Les autres noms d'un écran, à ne plus écrire (E8) — `ou` : le contexte qui
 // les rend légitimes (« Réglages » de l'iPhone, l'onglet « Réglages » DANS Paramètres).
