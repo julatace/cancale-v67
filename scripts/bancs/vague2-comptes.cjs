@@ -200,8 +200,10 @@ async function ventes(nav, { W, theme }) {
   const id = await t.getAttribute('aria-controls').catch(() => null);
   if (id) await pg.locator(`[id="${id}"]`).waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
   await attendre(600);
-  const rec = id ? await lire(`[id="${id}"] [data-recap-frise] [data-fu-frise]`) : null;
-  dit(rec && rec.map((e) => e.cle).join(',') === 'vendue,postee,centre,livree,payee', 'W3', `${T} le récapitulatif porte la même étape`, JSON.stringify(rec));
+  // (10 nov., lot BE) Le récapitulatif porte la frise PROUVÉE (sept étapes, src/friseProuvee.js) :
+  // l'étape « centre » y est aussi, entre En route et Livrée, jamais cochée.
+  const rec = id ? await pg.evaluate((id) => [...document.querySelectorAll(`[id="${id}"] [data-recap-frise] [data-frv-etape]`)].map((s) => ({ cle: s.getAttribute('data-frv-etape'), etat: s.getAttribute('data-frv-etat') })), id) : null;
+  dit(rec && rec.map((e) => e.cle).join(',') === 'vendue,bordereau,deposee,enroute,centre,livree,finalisee,versee' && (rec.find((e) => e.cle === 'centre') || {}).etat !== 'fait', 'W3', `${T} le récapitulatif porte la même étape (jamais cochée)`, JSON.stringify(rec));
   const phrase = id ? await pg.evaluate((id) => { const d = document.getElementById(id); return d ? d.innerText : ''; }, id) : '';
   dit(/centre de vérification/i.test(phrase), 'W3', `${T} la phrase d'état le dit`, phrase.slice(0, 200));
   await capture(pg, `v2-ventes-recap-${W}-${theme}`);

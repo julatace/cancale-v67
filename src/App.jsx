@@ -376,7 +376,7 @@ import "./facture-pro.css";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
-import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted } from "./retoursStock.js";
+import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted, etapeRetourVinted } from "./retoursStock.js";
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
@@ -441,6 +441,10 @@ import { BoutonPhotoCarton, PhotoCartonVente } from "./PhotoCarton.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { auCentreDeVerification } from "./verificationArticle.js";
+import { preuvesFriseVinted, bifurcationVente, friseProuvee } from "./friseProuvee.js";   // (10 nov., lot BE) la frise d'une vente, étape par étape
+import FriseVente from "./FriseVente.jsx";
+import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js";   // (10 nov., lot BG) d'où viennent mes achats
+import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
 import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi, compteAImprimer } from "./prochainGesteColis.js";
 import "./styles-onglets-b.css";
@@ -482,6 +486,7 @@ import { colisDepotHorsLigne } from "./modeDepot.js";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
+import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
@@ -532,6 +537,7 @@ import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
+import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
 import "./styles-popups.css";       // (9 nov., lot AI) l'avatar du compte Vinted ouvert (en haut à droite) — après la DA6
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {LignePlancher} from "./LignePlancher.jsx";
@@ -555,6 +561,11 @@ import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from ".
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
+import Visionneuse from "./Visionneuse.jsx";
+import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
+import { cleFacture } from "./factureAchat.js";
+import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
+import { enregistrerGaleries } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
@@ -9572,15 +9583,15 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
     if (onError) { try { onError(); } catch (_) {} }
   }, [definitive, src]);
   if (!vinted) {
-    return <img src={src} loading={loading} style={style} alt="" {...reste} onLoad={onLoad}
+    return <img src={src} loading={loading} style={style} alt="" data-vrm-vignette="" {...reste} onLoad={onLoad}
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
   }
   if (etat === 'ok') {
-    return <img src={photosVinted.blobDe(src)} decoding="async" style={style} alt="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
+    return <img src={photosVinted.blobDe(src)} decoding="async" style={style} alt="" data-vrm-vignette="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
-    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} decoding="async" style={style} alt="" {...reste} data-photo-vinted="natif"
+    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} decoding="async" style={style} alt="" data-vrm-vignette="" {...reste} data-photo-vinted="natif"
       onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
       onError={() => photosVinted.echecNatif(src)}/>;
   }
@@ -9896,7 +9907,9 @@ function raisonExtGlobale(sansSouris, opt) {
 // fonction, utilisée partout, pour ne plus jamais réécrire cette lecture.
 const orderPhoto = photoArticle;
 
-const mapWardrobeItem = (it) => ({
+// (10 nov., lot AN) Les photos d'une annonce ne sont pas gardées ici (seulement leur nombre) : on les
+// range au passage pour la visionneuse (src/visionneuse.js, par fichier), sans alourdir la liste.
+const mapWardrobeItem = (it) => (enregistrerGaleries([it]), ({
   id: String(it.id),
   title: it.title || '',
   price: it.price?.amount ?? (typeof it.price === 'number' ? it.price : null),
@@ -9964,7 +9977,7 @@ const mapWardrobeItem = (it) => ({
   // envoie `color1`/`catalog_id` à null sur des annonces qui en ont) — la règle
   // est `lusDuDressing` (src/annoncesActions.js).
   ...lusDuDressing(it),
-});
+}));
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
 // vendus/fermes (is_closed=true) : on ne veut garder que les actives.
@@ -14260,10 +14273,11 @@ const GROUPES_PLUS=[
     {id:'achats',     icon:'cart', label:'Achats'},
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
     {id:'emails',     icon:'mail', label:'E-mails'},
-  ]},
-  { titre:'Argent', items:[
-    {id:'dashboard', icon:'chart', label:'Statistiques'},
-    {id:'compta',    icon:'euro',  label:'Compta'},
+    // (10 nov., Julien : « L'onglet Compta est trop flou, tu peux peut-être le relier avec
+    // Stats ») UNE entrée « Argent » remplace « Statistiques » et « Compta » : un écran à quatre
+    // segments (Résumé · Statistiques · Déclarer · Factures, src/argent.js). Les deux écrans
+    // restent (`dashboard`, `compta`) : leurs liens mènent à leur segment.
+    {id:'compta',    icon:'euro',  label:'Argent'},
   ]},
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
@@ -14290,6 +14304,8 @@ const BAR_GROUPE={
   cat_expedition:'cat_bord',
   // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue est mise en avant.
   organisation:'settings',
+  // (10 nov.) Statistiques est un segment d'Argent : l'entrée « Argent » reste allumée.
+  dashboard:'compta',
   // (10 nov., lot BC) « Ma semaine » s'ouvre depuis Ma journée (et la notification du bilan).
   semaine:'journee',
   // (10 nov., lot BB) « Litiges en cours » s'ouvre depuis Ventes et À trancher.
@@ -14302,7 +14318,7 @@ function titreEcran(tab) {
   if (tab === 'semaine') return 'Ma semaine';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  return { dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
@@ -14319,13 +14335,15 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=[...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
   cat_msg: ['messages', 'vinted'], leboncoin: ['annonces', 'leboncoin'], ebay_annonces: ['annonces', 'ebay'],
   cat_achats: ['cat_bord', 'retirer'], retraits: ['cat_bord', 'retirer'], ebay_agent: ['ventes', 'ebay.agent'], vestiaire_ventes: ['ventes', 'vestiaire'],
   vestiaire_annonces: ['annonces', 'vestiaire'],
+  // (10 nov.) Argent : `?tab=argent`, `?tab=stats`, et la vue « Déclarer » (src/argent.js).
+  ...CHEMINS_ARGENT,
 };
 // La vue demandée par une entrée de « Plus » (Republier, Favoris…),
 // consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
@@ -19202,6 +19220,16 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
     </div>
   );
 }
+// (10 nov.) LES QUATRE SEGMENTS D'ARGENT (src/argent.js) : le même contrôle segmenté que
+// partout (`PlatSubNav`). Un segment = un nom passé à `setTab`, résolu par `ONGLETS_DEPLACES`
+// (même écran ⇒ seule la section change).
+function ArgentNav({ seg, setTab }) {
+  return (
+    <div className="vrm-argent-nav" data-argent-nav={seg}>
+      <PlatSubNav sub={seg} setSub={(id) => setTab(ONGLET_SEGMENT[id] || 'argent')} sections={SEGMENTS_ARGENT.map((x) => [x.id, x.l])}/>
+    </div>
+  );
+}
 // Résumé Vinted COMPACT, toujours visible en haut de l'onglet (Julien, 25 sept. :
 // « il n'y a pas direct les ventes et les achats »). Plus d'écran « Aperçu » à
 // traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
@@ -19968,7 +19996,7 @@ function PhotoVente({ src, size = 64, portrait = false }) {
   React.useEffect(() => {setKo(false);setSecours(null);}, [url]);
   React.useEffect(()=>{if(!ko || !url)return;let stop=false;photoViaServeur(url).then(data=>{if(!stop && data)setSecours(data);});return()=>{stop=true;};},[ko,url]);
   const box = { width:size, height:portrait ? Math.round(size*1.3) : size, flexShrink:0, borderRadius:12, overflow:'hidden', background:C.card2 || C.bg, display:'flex', alignItems:'center', justifyContent:'center' };
-  if (secours) return <img src={secours} alt="" style={{...box,objectFit:'cover'}} onError={()=>setSecours(null)}/>;
+  if (secours) return <img src={secours} alt="" data-vrm-vignette="" style={{...box,objectFit:'cover'}} onError={()=>setSecours(null)}/>;
   if (url && !ko) return <PhotoVinted src={url} alt="" loading="lazy" decoding="async" onError={()=>setKo(true)} style={{...box,objectFit:'cover'}}/>;
   return <span style={box} role="img" aria-label="Photo indisponible" title="Photo indisponible"><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>;
 }
@@ -21523,7 +21551,7 @@ const urlPhotoVc = (src) => { try { const u = new URL(src); if (u.protocol === '
 function PhotoVc({ src, style }) {
   const [ko, setKo] = useState(false);
   const url = urlPhotoVc(src);
-  return url && !ko ? <img src={url} alt="" loading="lazy" data-photo-vc="" onError={() => setKo(true)} style={{ objectFit: 'contain', background: '#fff', ...(style || {}) }}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty" style={style}>—</span>;
+  return url && !ko ? <img src={url} alt="" loading="lazy" data-photo-vc="" data-vrm-vignette="" onError={() => setKo(true)} style={{ objectFit: 'contain', background: '#fff', ...(style || {}) }}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty" style={style}>—</span>;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // VESTIAIRE : TES ANNONCES EN FICHES (1er nov., extension 5.296)
@@ -30943,6 +30971,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp]);
   // Parti par UNE preuve sûre (Colis fait compris) : ce que chaque liste « à envoyer » de l'écran écarte.
   const estParti = (o) => isShipDone(o) || !!(o && o.transaction_id != null && partisVinted.has(String(o.transaction_id)));
+  // ── (10 nov., lot BE) LA FRISE D'UNE VENTE, ÉTAPE PAR ÉTAPE (src/friseProuvee.js) ──────
+  // Vendue → Bordereau → Déposée → En route → Livrée → Finalisée → Versée : chaque étape
+  // seulement si SA preuve est lue (jamais déduite d'une étape plus loin) ; les lectures
+  // sont celles de l'écran, passées telles quelles : le bordereau par la transaction, la
+  // règle du départ (`partisVinted`), le transporteur et les e-mails du n° de SON bordereau
+  // (`vcLoc0.departs`, `tracking`), l'état de la transaction, la date de versement. Un n°
+  // porté par deux ventes ou aussi par un achat est ambigu : rien n'en est lu.
+  const emailsParSuiviFrise = useMemo(() => {
+    if (!Array.isArray(tracking)) return null;
+    const m = new Map();
+    for (const l of tracking) { const k = normaliserSuivi(l && l.suivi); if (!k) continue; const a = m.get(k); if (a) a.push(l); else m.set(k, [l]); }
+    return m;
+  }, [tracking]);
+  const ambigusFrise = useMemo(() => suivisAmbigus(Object.entries(bordParTx).map(([tx, b]) => ({ cle: tx, suivi: b && (b.suivi || b.suiviPdf) })),
+    Array.isArray(transp) ? new Set(transp.map((t) => normaliserSuivi(t && t.suivi)).filter(Boolean)) : null), [bordParTx, transp]);
+  const friseProuveeDe = (o, litige) => {
+    const tx = String(o.transaction_id);
+    const bord = bordParTx[tx] || null, label = labelsCaptes[tx] || null;
+    const et = pdfEtiquettesParTx(); const pdf = et && et[tx];
+    const suivi = normaliserSuivi((bord && (bord.suivi || bord.suiviPdf)) || (pdf && pdf.s) || '');
+    const annulee = classifyOrderStatus(o.status) === 'cancelled';
+    const etat = etatTxn(tx);
+    const bif = bifurcationVente({ litige, retour: etapeRetourVinted(o, etat), etiquette: venteStage(o).label, annulee });
+    const preuves = preuvesFriseVinted({ vente: o, bord, label, suiviPdf: (pdf && pdf.s) || '', depart: partisVinted.get(tx) || null, departs: vcLoc0.departs,
+      emails: suivi && emailsParSuiviFrise ? (emailsParSuiviFrise.get(suivi) || []) : null, ambigus: ambigusFrise, etat, versement: versements ? (versements[tx] || null) : null, horsParcours: !!bif });
+    // Le geste attendu de LUI (la règle de la ligne : à expédier, pas encore parti).
+    const aExp = !isHidden(o) && !annulee && aExpedier(o) && !estParti(o);
+    const geste = aExp ? (preuves.bordereau.lu ? { cle: 'deposee', libelle: 'à déposer' } : { cle: 'bordereau', libelle: 'à générer' }) : null;
+    const frise = friseProuvee({ preuves, bifurcation: bif, geste, verification: !bif && auCentreDeVerification(o) });
+    const verse = annulee ? null : preuves.versee.lu ? 'date' : preuves.finalisee.lu ? 'oui' : 'non';
+    const cle = frise.etapes.map((e) => e.cle + ':' + e.etat + ':' + (e.t || '') + (e.cours ? ':c' : '') + (e.source ? ':' + e.source : '')).join(',') + '|' + (bif ? [bif.genre, bif.sous, bif.geste ? 1 : 0].join(':') : '') + '|' + verse;
+    return { frise, verse, bordereau: preuves.bordereau.lu, cle };
+  };
   const toggleShipDone = (o) => { const k = o && o.transaction_id!=null ? String(o.transaction_id) : null; if(!k) return; setShipDone(prev=>{ const u={...prev}; if(u[k]) delete u[k]; else u[k]=Date.now(); save('vinted_ship_done',u); return u; }); };
   // « ✓ Colis fait » : LE geste (la vente ET son bordereau). Le bouton de la
   // carte et le mode emballage appellent cette fonction — une seule écriture.
@@ -31089,6 +31150,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tout;
   };
   const [listings, setListings] = useState({ loading:false, items:null });
+  // (10 nov., lot AN) Les autres photos d'une annonce, pour la visionneuse (src/visionneuse.js) : par fichier, jamais par titre.
+  useEffect(() => { if (Array.isArray(listings.items)) enregistrerGaleries(listings.items); }, [listings.items]);
   const brVinted = useBrouillonsVinted(listings.brouillons, brouillonsOpen || actionsOpen || repubAction === 'enLigne' || annSort === 'selection' || annSort === 'brouillons' || actionsSelOpen, accounts, listings.brLectures);
   // (29 oct.) Les annonces présentes (en ligne, à confirmer, masquées) : un
   // brouillon qui y figure a été mis en ligne, à la main ou par VRM.
@@ -34920,6 +34983,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [achatMenu, setAchatMenu] = useState(null);           // transaction_id du menu ouvert
   const [achatNotes, setAchatNotes] = useStateCle('vinted_achat_notes', () => load('vinted_achat_notes', {}) || {});
   const [noteEdit, setNoteEdit] = useState(null);             // { tid, title, val }
+  // (10 nov., lot AN) La facture d'achat JOINTE (src/factureAchat.js : sa ligne app_data, par identité).
+  const facturesAchat = useFacturesAchat({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: sbAuth, withOwner, conflit: SB_CONFLICT,
+    owner: (CLOISONNE && AUTH.user) ? AUTH.user.id : '', compresser: (fi) => compressImage(fi, 2000, 0.82),
+    ouvrirPdf: (u, nom) => ouvrirPdfOnglet(u, nom, 'Facture d’achat'), dire: (m, g) => toast(m, g) }, curSub === 'achats' && !modeRetraits);
+  // (10 nov.) Une photo d'achat qui ne se charge pas (hors CDN Vinted) : le pictogramme, jamais l'icône « image cassée ».
+  const [achatPhKo, setAchatPhKo] = useState(() => new Set());
   const saveAchatNote = (tid, val) => {
     setAchatNotes(prev => {
       const n = { ...prev }; const t = String(val || '').trim();
@@ -36867,6 +36936,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { ...r, achats, hors, rattachables, ventesLues, partielSites: !Array.isArray(autresBenefice) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub, asoOuvert, registreFo, sales.items, sales.error, numeros, saleOv, buyByNum, offBuys, autresBenefice, hiddenSales, hiddenAccts]);
+  // ── (10 nov., lot BG) D'OÙ VIENNENT MES ACHATS — publié pour Statistiques (src/sourceAchats.js) ──
+  // Les MÊMES ventes que le relevé de Statistiques (`vrm_stats_ventes` : finalisées, hors
+  // masquées ; Leboncoin, eBay, Vestiaire par `autresBenefice`), le bénéfice de la règle
+  // unique (`beneficeLigneVente` / `ventesAutresBenefice`), la source de LA paire par
+  // identité seulement (`sourceDeVente` : achat Vinted relié, achat en gros, N° d'un achat
+  // hors plateforme et la source QU'IL y a saisie). Rien n'est publié tant qu'une lecture
+  // manque (un compte de ventes raté, Leboncoin/eBay pas lus) : la dernière publication reste.
+  useEffect(() => {
+    if (!Array.isArray(sales.items)) return;
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
+    if (!Array.isArray(autresBenefice)) return;
+    try {
+      const reg = lireRegistre(registreFo);
+      const hors = horsParNumero(offBuys, cleNum);
+      const ctx = { hors, registre: reg, cleNum };
+      const lignes = [];
+      for (const o of sales.items) {
+        if (!o || isHidden(o) || o.transaction_id == null || classifyOrderStatus(o.status) !== 'completed') continue;
+        const t = o.date ? Date.parse(o.date) : NaN; if (!isFinite(t)) continue;
+        const e = effEntry(o);
+        const devise = o.price && o.price.currency_code;
+        const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
+        const src = e ? sourceDeVente(e, ctx) : null;
+        lignes.push({ id: String(o.transaction_id), ts: t, cle: src ? src.cle : '', libelle: src ? src.libelle : '', benefice: lb.benefice == null ? null : Math.round(lb.benefice * 100), partiel: lb.etat === 'partiel' });
+      }
+      for (const x of autresBenefice) {
+        if (!x || !isFinite(x.ts)) continue;
+        // Une commande eBay à plusieurs N° : aucune fiche unique ⇒ « achat pas relié » (jamais attribuée).
+        const f = x.num && !/\+/.test(x.num) ? ficheUniqueDuNumero(numeros, cleNum(x.num)) : null;
+        const src = f ? sourceDeVente(withBuyByNum(f), ctx) : null;
+        const b = x.achat != null && isFinite(x.eur) ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) : null;
+        lignes.push({ id: String(x.id), ts: x.ts, cle: src ? src.cle : '', libelle: src ? src.libelle : '', benefice: b, partiel: false });
+      }
+      publierSources(lignes, { owner: AUTH.user?.id || '' });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, offBuys, registreFo, autresBenefice, hiddenSales, hiddenAccts]);
   // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
   const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
   const articlesLus = (tx) => {
@@ -37862,7 +37968,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (3 nov.) Le litige / retour en cours de CETTE vente (src/litiges.js, par transaction ou conversation).
     const litige = litigeDeVente(litigesSuivis, o);
     deps.push(litige ? [litige.cle, litige.genre, litige.limite || '', litige.geste.url, litige.ancien ? 1 : 0].join('|') : '');
-    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige };
+    // (10 nov., lot BE) la frise prouvée du récapitulatif (ses preuves arrivent après le premier rendu).
+    const frisePv = friseProuveeDe(o, litige);
+    deps.push(frisePv.cle);
+    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv };
   };
   // ── (10 nov., lots BB et BI) « LITIGES EN COURS » ET « RETOURS PAR MODÈLE » ─────────────
   // Les lignes de VENTE de `litigesSuivis` (src/litiges.js, la règle unique) avec les preuves
@@ -41317,7 +41426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const fraisConnus = !autreDevise && cv.frais != null && cv.frais > 0 ? cv.frais / 100 : null;
               const benefTexte = lb.benefice == null ? '—' : eurosRecap(lb.benefice);
               const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : '';
-              const verse = st === 'cancelled' ? null : finalisee ? (versement ? `le ${jourCourt(Date.parse(versement))}` : 'oui — date pas lue') : '— pas encore';
+              // (10 nov., lot BE) « Versé sur ton porte-monnaie » est l'étape « Versée » de la frise (sa date, une fois).
               const acheteur = o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login) || '';
               const aRelie = !hidden && st !== 'cancelled' && e && e.buyFromId ? achatRelie(e) : null;
               const saleItem = (() => { const idf = identiteAnnonce(o); return idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }; })();
@@ -41360,8 +41469,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <p className="vrm-recap-issue"><strong>{LIBELLE_LITIGE[l.genre] || 'Litige'}</strong>{' · '}{lim ? `avant le ${lim}` : 'délai non lu'}</p>
                       <Bouton variante="secondaire" className="vrm-b-petit" href={l.geste.url} target="_blank" rel="noreferrer" data-litige-geste={l.geste.url}>{l.geste.libelle} ↗</Bouton>
                     </div>); })() : null}
-                  {/* (3 nov., critique #6) La frise de la ligne, mêmes 4 étapes et mêmes mots ; « Bordereau » en détail. */}
-                  {etapes ? <RecapFrise etapes={etapes} cle={txL} verification={preuvesFrise.verification}/> : null}
+                  {/* (10 nov., lot BE) LA FRISE PROUVÉE : sept étapes, chacune seulement si SA preuve est lue
+                      (src/friseProuvee.js) — jamais déduite ; litige / retour / annulation en bifurcation.
+                      Elle remplace ici la frise de la ligne (4 segments, inchangée sur la ligne). */}
+                  {pre.frisePv ? <FriseVente frise={pre.frisePv.frise} transporteur={trRecap} verse={pre.frisePv.verse} bordereau={pre.frisePv.bordereau} cle={txL}/> : null}
                 </section>
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
@@ -41372,7 +41483,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt><PointCout cle="frais"/>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
                     {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/>Emballage</dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt><PointCout cle="benefice"/>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
-                    {verse != null ? <div className="vrm-recap-ligne vrm-recap-verse" data-recap-verse={finalisee ? (versement ? 'date' : 'oui') : 'non'}><dt>Versé sur ton porte-monnaie</dt><dd>{verse}</dd></div> : null}
                   </dl>
                 </section>
                 <section className="vrm-recap-details" aria-label="Détails">
@@ -42967,11 +43077,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             « + Ajouter » est TOUJOURS là, en un tap. Le composant porte la
             règle ; ici on ne fait que brancher la clé synchronisée (§11). */}
         {/* (31 oct., soir) Un achat, pas un colis à aller chercher : sur « Achats » seulement. */}
+        {!modeRetraits && facturesAchat.champ}
         {/* (10 nov., lot BH) Un même achat saisi deux fois : les deux fiches côte à côte, « Garder celle-ci ». */}
         {!modeRetraits && <AchatsEnDouble groupes={achatsDoubles} masques={(offBuysTous || []).filter((b) => b && horsMasques.includes(String(b.id)))}
           onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
           compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
-        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
+        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
           prochainNumero={nextNumero} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
@@ -43029,12 +43140,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
             <div className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
-                {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
+                {orderPhoto(o)&&!achatPhKo.has(orderPhoto(o))?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>{ const u=orderPhoto(o); setAchatPhKo(s=>{ if(s.has(u)) return s; const n=new Set(s); n.add(u); return n; }); }}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
               </div>
               <div className="vrm-buy-main">
                 <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
+                {/* (10 nov., lot AN) Une rangée DA6 : titre · sous-ligne (compte, date, depuis, N°) · une rangée de
+                    pastilles (l'état, le reçu, la facture jointe). L'état n'est plus un point de couleur. */}
                 <div className="vrm-buy-meta" style={{color:C.muted}}>
-                  <span className="vrm-buy-statut" style={{color:C.text}}><i style={{background:st.color}}/>{st.label}</span>
                   {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
                   {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
@@ -43056,15 +43168,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     de transaction (une identité, jamais le titre, §5). Visible sur
                     la ligne — il n'était que dans le menu ⋯. Son contenu (et un
                     PDF joint) ne se lit qu'au clic. */}
-                {rc && (
-                  <div className="vrm-buy-facture">
-                    <button type="button" className="vrm-lien-action" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
-                      onClick={()=>setReceiptView(rc)} title="Ouvrir le reçu d'achat que Vinted t'a envoyé par e-mail"
-                      style={{display:'inline-flex',alignItems:'center',gap:5,border:'none',background:'transparent',padding:0,font:'inherit',fontSize:12,fontWeight:600,lineHeight:1.25,color:C.text,cursor:'pointer',textAlign:'left',minHeight:0}}>
-                      <Icon name="receipt" size={13} style={{color:C.muted,flexShrink:0}}/>{NOM_RECU_ACHAT}
-                    </button>
-                  </div>
-                )}
+                <div className="vrm-buy-pastilles">
+                  <span className="vrm-buy-statut" data-achat-etat={cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'}><i style={{background:st.color}}/>{st.label}</span>
+                  {rc && (
+                    <span className="vrm-buy-facture">
+                      <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
+                        onClick={()=>setReceiptView(rc)} title="Ouvrir le reçu d'achat que Vinted t'a envoyé par e-mail">
+                        <Icon name="receipt" size={13} style={{flexShrink:0}}/>{NOM_RECU_ACHAT}
+                      </button>
+                    </span>
+                  )}
+                  {(()=>{ const cf = cleFacture('tx', o.transaction_id); const fa = facturesAchat.factures && facturesAchat.factures[cf];
+                    return fa ? <PastilleFacture cle={cf} f={fa} onOuvrir={facturesAchat.ouvrir} enCours={facturesAchat.enCours===cf} Icon={Icon}/> : null; })()}
+                </div>
                 {/* (24 oct.) En route : ce que dit le transporteur, par le n° de CET achat. */}
                 {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
                   // (2 nov.) Le transporteur LU (logo + nom), puis ce qu'il dit.
@@ -43123,6 +43239,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?NOM_RECU_ACHAT:'Attestation d\'achat'}</button>
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
+                    {(()=>{ const cf = cleFacture('tx', o.transaction_id); if (!cf) return null; const a = !!(facturesAchat.factures && facturesAchat.factures[cf]);
+                      return <button type="button" role="menuitem" data-achat-joindre-facture={tid} style={item} onClick={()=>{ close(); facturesAchat.choisir(cf); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{a?'Remplacer la facture':'Joindre une facture'}</button>; })()}
                     {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>Étiquette N°{numA}</button>}
                     <div style={{height:1,background:C.border,margin:'4px 0'}}/>
                     <button type="button" role="menuitem" data-achat-masquer={tid} style={{...item,color:C.muted}} onClick={()=>{ close(); masquerAchat(o); }}><Icon name="eyeOff" size={15} style={{color:C.muted}}/>Masquer cet achat</button>
@@ -53289,14 +53407,14 @@ function AppCoeur() {
         // (27 oct.) Seulement pour un micro-entrepreneur (`urssafConcerne`) :
         // un particulier, une société ou un statut jamais choisi n'a rien à déclarer ici.
         const r=urssafConcerne() ? rappelUrssaf({ freq: load('vinted_urssaf_freq','trimestriel'), declare: lireDeclarations(), ligne: lireLigneUrssaf() }) : null;
-        if(r) items.push({icon:'🧾', ic:'receipt', text:r.text, sub:r.sub, n:1, tab:'compta', jr:true, job:'urssaf', urssaf:r});
+        if(r) items.push({icon:'🧾', ic:'receipt', text:r.text, sub:r.sub, n:1, tab:'argent_declarer', jr:true, job:'urssaf', urssaf:r});
       }
       {
         // (9 nov.) UN PARTICULIER : pas d'URSSAF, mais le rappel DAC7 (src/profilFiscal.js), rare —
         // seulement quand une plateforme APPROCHE le seuil sur des ventes LUES (la ligne publiée,
         // la règle de Comptabilité `dac7ParPlateforme`) ; atteint ou pas lu ⇒ rien ici.
         const d=rappelDac7Journee(profilFiscalLu(), dac7ParPlateforme({ ligne: lireLigneUrssaf(), annee: new Date().getFullYear() }));
-        if(d) items.push({icon:'🧾', ic:'info', text:`${d.plateforme} : bientôt transmis aux impôts (DAC7)`, sub:`Encore ${d.resteVentes} vente${d.resteVentes>1?'s':''} ou ${fmt(d.resteCentimes/100)} cette année. Vinted te demandera tes informations fiscales : c’est une déclaration, pas un impôt.`, n:1, tab:'compta', jr:true, job:'dac7', dac7:true});
+        if(d) items.push({icon:'🧾', ic:'info', text:`${d.plateforme} : bientôt transmis aux impôts (DAC7)`, sub:`Encore ${d.resteVentes} vente${d.resteVentes>1?'s':''} ou ${fmt(d.resteCentimes/100)} cette année. Vinted te demandera tes informations fiscales : c’est une déclaration, pas un impôt.`, n:1, tab:'argent_declarer', jr:true, job:'dac7', dac7:true});
       }
       // Une liste identique ne se repose pas : un tableau neuf re-rendait toute
       // la coque et l'écran ouvert pour rien à chaque recalcul (22 oct.).
@@ -53934,6 +54052,8 @@ function AppCoeur() {
       <TopProgress/>
       <Toaster/>
       <PiluleAnnulerCoque/>
+      {/* (10 nov., lot AN) La photo d'un article en grand, depuis n'importe quel écran (src/Visionneuse.jsx). */}
+      <Visionneuse Photo={PhotoVinted} Retour={FermeAuRetour}/>
       <DefilementPartout/>
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}
@@ -54371,9 +54491,9 @@ function AppCoeur() {
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
         {(tab==='communaute'||tab==='emails')&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
-        {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/>:null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={<><ArgentNav seg="stats" setTab={setTab}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}
-        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/>:null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={<><ArgentNav seg="stats" setTab={setTab}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -54396,7 +54516,7 @@ function AppCoeur() {
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} onTrancher={trancherAT} Photo={PhotoVinted} entete={<ScreenHead icon="help" title="À trancher"/>}/></GardeEcran>}
-        {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/></GardeEcran>}
+        {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab}/>}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}
         {tab==='communaute'&&<GardeEcran nom="communaute"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense></GardeEcran>}
         {/* (5 nov.) E-mails : les liens « Voir dans VRM » passent par `vrm:aller` (un chemin `?tab=…&cible=…`, src/cibleNotif.js). */}
@@ -54413,8 +54533,8 @@ function AppCoeur() {
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense></GardeEcran>}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
-        {tab==='compta'&&<GardeEcran nom="compta:rubriques"><div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={/* (30 oct.) « Comptabilité » était écrit deux fois en tête (segment + titre) : « Vue d’ensemble », comme Statistiques */ [['compta','Vue d’ensemble'],['factures','Factures']]}/></div></GardeEcran>}
-        {tab==='compta'&&platSub!=='factures'&&<GardeEcran nom="compta"><ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}
+        {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
+        {tab==='compta'&&<GardeEcran nom="compta"><ComptaPro vue={vueCompta(platSub)} allerVue={(v)=>setTab(ONGLET_SEGMENT[v]||'argent')} argentNav={<ArgentNav seg={segmentArgent('compta',platSub)} setTab={setTab}/>} liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}
         {/* (31 oct., soir) Colis · Leboncoin : la pastille « Leboncoin » de la rangée
             de filtres de Colis ouvre les colis Leboncoin (bordereau, QR — l'ancien
             « Leboncoin → Colis », `LeboncoinColis`) ; les autres pastilles

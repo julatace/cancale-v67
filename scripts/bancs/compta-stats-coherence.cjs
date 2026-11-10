@@ -34,6 +34,7 @@
 require('./_porte-banc.cjs');
 const path = require('path'), fs = require('fs');
 const NV = require('./nouveau-vendeur.cjs');
+const { allerSegment } = require('./_compta.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const SHOTS = process.env.SHOTS || '';
 const LARGEURS = String(process.env.LARGEURS || '390,1512').split(',').map(Number);
@@ -146,7 +147,8 @@ const capture = async (pg, nom) => {
           const vis = (e) => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().height > 0;
           const main = document.querySelector('.vrm-main');
           const h1 = [...main.querySelectorAll('h1')].find(vis);
-          const panneauxVides = [...main.querySelectorAll('.vrm-fu-panneau, .vrm-compta-carte, .vrm-sv-carte, .vrm-repartition-anneau')].filter(vis)
+          // (10 nov., lot AO) Un panneau dans un repli FERMÉ n'est pas à l'écran (Chrome lui garde une boîte, sans texte rendu).
+          const panneauxVides = [...main.querySelectorAll('.vrm-fu-panneau, .vrm-compta-carte, .vrm-sv-carte, .vrm-repartition-anneau')].filter(vis).filter((e) => !e.closest('details:not([open])'))
             .filter((e) => !e.innerText.trim() && !e.querySelector('svg circle[stroke-dasharray], svg rect, .vrm-fu-barre')).map((e) => e.className);
           // Les endroits où le statut se choisit (même replié : un endroit caché reste un endroit).
           const places = [];
@@ -154,8 +156,11 @@ const capture = async (pg, nom) => {
           if (main.querySelector('[data-statut-changer]')) places.push('changer');
           if (main.querySelector('[data-regime-choix]')) places.push('profil');
           if (main.querySelector('[data-prevision-geste="statut"]')) places.push('prevision');
-          const declarer = main.querySelector('[data-carte-chiffre="declarer"]');
-          const raison = main.querySelector('[data-declarer-raison]');
+          // (10 nov., lot AO) « À déclarer » se lit en tête du Résumé (le widget `data-argent-q`, sa raison en note) ;
+          // la carte sombre est rangée dans le repli « Ton bénéfice ». On juge celle qui est À L'ÉCRAN.
+          const w = main.querySelector('[data-argent-q="declarer"]');
+          const declarer = w && vis(w) ? w.querySelector('.vrm-argent-w-n') : main.querySelector('[data-carte-chiffre="declarer"]');
+          const raison = w && vis(w) ? w.querySelector('.vrm-argent-w-note') : main.querySelector('[data-declarer-raison]');
           return {
             h1: h1 ? h1.innerText.trim() : '', date: !!main.querySelector('[data-date-tete]'),
             panneauxVides, places, regimeFiscal: /Régime fiscal/.test(main.textContent),
@@ -168,7 +173,8 @@ const capture = async (pg, nom) => {
             })(),
           };
         });
-        dit(cp.h1 === 'Compta', `S4 ${T} : le titre est « Compta »`, cp.h1);
+        // (10 nov.) Compta et Statistiques sont devenues « Argent » (src/argent.js).
+        dit(cp.h1 === 'Argent', `S4 ${T} : le titre est « Argent »`, cp.h1);
         dit(!cp.date, `C4 ${T} : pas de date en surtitre au-dessus de « Compta »`);
         dit(!cp.panneauxVides.length, `C1 ${T} : aucun panneau vide (anneau sans données)`, cp.panneauxVides.join(' ¦ '));
         dit(cp.places.length === 1, `C2 ${T} : le statut se choisit à UN endroit`, cp.places.join(', '));
@@ -181,7 +187,8 @@ const capture = async (pg, nom) => {
           await capture(pg, `compta-A-${W}-${th}`);
         } else {
           dit(cp.places[0] === 'changer', `C2 ${T} : statut choisi ⇒ seulement « Changer »`, cp.places.join(','));
-          // U1 — « À recopier sur l'URSSAF ».
+          // U1 — « À recopier sur l'URSSAF » (segment « Déclarer » d'Argent).
+          await allerSegment(pg, 'declarer');
           await pg.evaluate(() => { window.__copie = null; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copie = String(t); } } }); } catch (_) {} });
           const u = await pg.evaluate(() => {
             const c = document.querySelector('[data-urssaf-geste="recopier"]');
@@ -205,7 +212,8 @@ const capture = async (pg, nom) => {
             dit(apres.copie === u.texte && /Copié/.test(apres.txt), `U1 ${T} : « Copier » met le montant dans le presse-papier et dit « Copié »`, JSON.stringify(apres));
           }
           if (W === LARGEURS[0] || !tel) await capture(pg, `compta-B-${W}-${th}`);
-          // B1 — Bilan du mois (ouvert d'un geste).
+          // B1 — Bilan du mois (ouvert d'un geste), dans le Résumé.
+          await allerSegment(pg, 'resume');
           await pg.evaluate(() => { const d = document.getElementById('compta-bilan'); if (d) d.open = true; });
           await pg.waitForTimeout(500);
           const bilan = await pg.evaluate(() => {

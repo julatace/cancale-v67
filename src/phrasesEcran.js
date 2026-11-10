@@ -23,7 +23,7 @@ export const PHRASES_ECRAN = {
   messages: 'Réponds à tes acheteurs et à leurs offres.',
   achats: 'Ce que tu as acheté : en route, reçu, prix payé.',
   emails: 'Les e-mails de tes plateformes, rangés : codes, bordereaux, ventes.',
-  compta: 'Ce que tu as gagné, et quoi déclarer à l’URSSAF.',
+  compta: 'Ce que tu as vendu, reçu, gagné, et à déclarer.',
   dashboard: 'Ce qui se vend le mieux, et à quel prix.',
   garage: 'Où est rangée chaque paire : cherche un N°.',
   settings: 'Relie tes comptes et ta boîte e-mail, règle VRM.',

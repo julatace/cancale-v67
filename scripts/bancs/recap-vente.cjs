@@ -6,13 +6,16 @@
 // Données INVENTÉES (le dépôt est public).
 //
 // Il juge la RÈGLE, pas l'orthographe (§6.4) — data-* et nombres rendus :
-//   1. la frise ne coche une étape que PROUVÉE (src/recapVente.js) :
-//      · 7002 payée, sans bordereau          ⇒ Vendue seule ;
-//      · 7001 bordereau reçu par email        ⇒ Vendue + Bordereau ;
-//      · 7011 « livré » + « Colis fait »      ⇒ jusqu'à Livrée, pas l'argent ;
-//      · 7005 finalisée (450, versée le 25)   ⇒ les cinq, date du versement dite ;
+//   1. la frise ne coche une étape que si SA preuve est lue — jamais déduite
+//      (10 nov., lot BE : src/friseProuvee.js, sept étapes) :
+//      · 7002 payée, sans bordereau          ⇒ Vendue seule, « Bordereau » ambre (geste) ;
+//      · 7001 bordereau reçu par email        ⇒ Vendue + Bordereau, « Déposée » ambre ;
+//      · 7011 « livré » + « Colis fait »      ⇒ Vendue, Bordereau, Déposée, Livrée —
+//                                              « En route » pas lu (aucun transporteur lu) ;
+//      · 7005 finalisée (450, versée le 25)   ⇒ Vendue, Finalisée, Versée : le reste
+//                                              « pas lu » (rien ne le prouve), date dite une fois ;
 //   2. la frise REMPLACE la pastille de statut : jamais les deux dans le tiroir ;
-//      une vente annulée n'a pas de frise, une phrase dit l'état ;
+//      une vente annulée porte la bifurcation « Annulée », une phrase dit l'état ;
 //   3. sans prix d'achat, le bénéfice est « — » (aucun `data-benef-vente`) et le
 //      geste « Saisir le prix d'achat » est là ; frais pas confirmés ⇒ « au plus » ;
 //   4. un nombre une seule fois (prix, N°), jamais « encaissé » ni « n/d » ;
@@ -140,13 +143,10 @@ const ouvrirVente = async (pg, tx) => {
 const lire = (pg, id) => pg.evaluate((id) => {
   const d = document.getElementById(id); if (!d) return null;
   const vw = window.innerWidth;
-  // (3 nov., critique #6) Le récapitulatif porte LA frise de la ligne (Frise.jsx : vendue · postee ·
-  // livree · payee) ; le bordereau est une ligne de détail (`data-recap-bordereau`). Les étapes
-  // relues sous leurs noms de `friseVente` pour juger la MÊME règle qu'avant (preuve par étape).
-  const VERS = { vendue: 'vendue', postee: 'deposee', livree: 'livree', payee: 'argent' };
+  // (10 nov., lot BE) Le récapitulatif porte LA FRISE PROUVÉE (src/FriseVente.jsx) : sept étapes,
+  // chacune cochée seulement par SA preuve (`data-frv-etat` : fait · paslu · geste).
   const fr = d.querySelector('[data-recap-frise]');
-  const segs = [...d.querySelectorAll('[data-recap-frise] [data-fu-etape]')].map((li) => ({ cle: VERS[li.getAttribute('data-fu-etape')] || li.getAttribute('data-fu-etape'), fait: li.getAttribute('data-fait') === '1', quand: li.getAttribute('data-fait') === '1' ? 'fait' : 'à venir' }));
-  const etapes = segs.length ? [segs[0], { cle: 'bordereau', fait: !!fr && fr.getAttribute('data-recap-bordereau') === '1', quand: '' }, ...segs.slice(1)] : [];
+  const etapes = [...d.querySelectorAll('[data-recap-frise] [data-frv-etape]')].map((li) => ({ cle: li.getAttribute('data-frv-etape'), fait: li.getAttribute('data-fait') === '1', etat: li.getAttribute('data-frv-etat'), quand: li.getAttribute('data-fait') === '1' ? 'fait' : 'à venir', sous: ((li.querySelector('.vrm-frv-sous') || {}).textContent || '').trim() }));
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('details:not([open]) > :not(summary)'); };
   const txt = d.innerText;
   const montantsCasses = [];
@@ -166,7 +166,7 @@ const lire = (pg, id) => pg.evaluate((id) => {
   const hors = [...d.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('svg') && e.getBoundingClientRect().right > vw + 1).map((e) => String(e.className || e.tagName).slice(0, 30));
   const benef = d.querySelector('[data-recap-benef-etat]');
   return {
-    etapes, frise: !!d.querySelector('[data-recap-frise]'),
+    etapes, frise: !!d.querySelector('[data-recap-frise]'), bif: fr ? fr.getAttribute('data-frv-bif') : null,
     pastille: d.querySelectorAll('[data-statut-vente], .vrm-statut').length,
     phrase: (d.querySelector('[data-recap-phrase]') || {}).textContent || '',
     benefEtat: benef ? benef.getAttribute('data-recap-benef-etat') : null, benefData: benef ? benef.getAttribute('data-benef-vente') : null,
@@ -178,6 +178,8 @@ const lire = (pg, id) => pg.evaluate((id) => {
   };
 }, id);
 const faits = (r) => r.etapes.filter((e) => e.fait).map((e) => e.cle).join(',');
+const etat = (r, c) => (r.etapes.find((e) => e.cle === c) || {}).etat;
+const sous = (r, c) => (r.etapes.find((e) => e.cle === c) || {}).sous || '';
 
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
@@ -190,11 +192,13 @@ const faits = (r) => r.etapes.filter((e) => e.fait).map((e) => e.cle).join(',');
       await essaie('7002 payée, sans bordereau', async () => {
         const r = await lire(pg, await ouvrirVente(pg, '7002'));
         dit(r.frise && faits(r) === 'vendue', 'payée sans bordereau : seule « Vendue » est cochée', faits(r));
+        dit(etat(r, 'bordereau') === 'geste' && r.etapes.filter((e) => e.etat === 'geste').length === 1, '… « Bordereau » est le geste attendu (ambre), une seule étape ambre', r.etapes.map((e) => e.cle + ':' + e.etat).join(' '));
       });
       await essaie('7001 bordereau reçu', async () => {
         const id = await ouvrirVente(pg, '7001');
         const r = await lire(pg, id);
         dit(faits(r) === 'vendue,bordereau', 'bordereau reçu par email : Vendue + Bordereau, rien de plus', faits(r));
+        dit(etat(r, 'deposee') === 'geste', '… « Déposée » est le geste attendu (ambre)', etat(r, 'deposee'));
         dit(r.benefEtat === 'achat' && r.benefData == null && r.benefTexte === '—', 'sans prix d’achat : bénéfice « — », aucun bénéfice publié', `${r.benefEtat} · ${r.benefData} · ${r.benefTexte}`);
         dit(r.saisir, 'le geste « Saisir le prix d’achat » est à la place du montant');
         dit(r.num === '', 'sans identité : « Sans N° VRM », aucun N° deviné', String(r.num));
@@ -203,8 +207,9 @@ const faits = (r) => r.etapes.filter((e) => e.fait).map((e) => e.cle).join(',');
       await essaie('7011 livrée', async () => {
         const id = await ouvrirVente(pg, '7011');
         const r = await lire(pg, id);
-        dit(faits(r) === 'vendue,bordereau,deposee,livree', 'livrée + colis fait : jusqu’à « Livrée », l’argent pas coché', faits(r));
-        dit(r.etapes.find((e) => e.cle === 'argent').quand !== '' && !r.etapes.find((e) => e.cle === 'argent').fait, '… « Argent reçu » à venir');
+        dit(faits(r) === 'vendue,bordereau,deposee,livree', 'livrée + colis fait : Vendue, Bordereau, Déposée, Livrée — rien d’autre', faits(r));
+        dit(etat(r, 'enroute') === 'paslu' && /pas lu/.test(sous(r, 'enroute')), '… « En route » : aucun transporteur lu ⇒ « pas lu », jamais déduit de « Livrée »', `${etat(r, 'enroute')} · ${sous(r, 'enroute')}`);
+        dit(!r.etapes.find((e) => e.cle === 'versee').fait && !r.etapes.some((e) => e.etat === 'geste'), '… « Versée » pas cochée, aucune étape ambre (rien à faire)');
         dit(r.frise && r.pastille === 0, 'la frise REMPLACE la pastille de statut (jamais les deux)', `pastilles ${r.pastille}`);
         dit(r.benefEtat === 'partiel' && /au plus/.test(r.benefTexte) && r.benefData === '42.05', 'frais pas confirmés : « au plus 42,05 € » (79 − 35 − 1,95)', `${r.benefEtat} · ${r.benefTexte} · ${r.benefData}`);
         dit(r.verse === 'non', 'pas finalisée : « Versé — pas encore »', String(r.verse));
@@ -223,7 +228,8 @@ const faits = (r) => r.etapes.filter((e) => e.fait).map((e) => e.cle).join(',');
       });
       await essaie('7005 finalisée', async () => {
         const r = await lire(pg, await ouvrirVente(pg, '7005'));
-        dit(faits(r) === 'vendue,bordereau,deposee,livree,argent', 'finalisée (450) : les cinq étapes', faits(r));
+        dit(faits(r) === 'vendue,finalisee,versee', 'finalisée (450), versée : Vendue, Finalisée, Versée — rien de déduit', faits(r));
+        dit(['bordereau', 'deposee', 'enroute', 'livree'].every((c) => etat(r, c) === 'paslu' && /pas lu/.test(sous(r, c))), '… bordereau, dépôt, route, livraison sans preuve : gris, « pas lu »', r.etapes.map((e) => e.cle + ':' + e.etat).join(' '));
         dit(r.verse === 'date' && /25 oct/.test(r.txt), 'versée : la date du versement lue (25 oct.)', `${r.verse}`);
         const dates = (r.txt.match(/25 oct/g) || []).length;
         dit(dates === 1, 'la date du versement n’est écrite qu’une fois', `×${dates}`);
@@ -240,7 +246,7 @@ const faits = (r) => r.etapes.filter((e) => e.fait).map((e) => e.cle).join(',');
         await pg.locator('button[aria-pressed]', { hasText: 'Annulées' }).first().click();
         await pg.locator('.vrm-sale-row[data-tx="7009"]').first().waitFor({ timeout: 8000 });
         const r = await lire(pg, await ouvrirVente(pg, '7009'));
-        dit(!r.frise && /Annul/.test(r.phrase) && r.pastille === 0, 'vente annulée : pas de frise, une phrase dit l’état', `${r.frise} · ${r.phrase.slice(0, 60)}`);
+        dit(r.frise && r.bif === 'annulee' && faits(r) === 'vendue' && /Annul/.test(r.phrase) && r.pastille === 0, 'vente annulée : la frise bifurque (« Annulée » après « Vendue »), une phrase dit l’état', `${r.bif} · ${faits(r)} · ${r.phrase.slice(0, 60)}`);
         dit(r.benefEtat == null && r.verse == null, '… ni bénéfice ni versement');
       });
       dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 200));

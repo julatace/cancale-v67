@@ -226,7 +226,7 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
       <div className={'vrm-scan-res' + (verif ? ' is-verif' : '')} role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
         {montrePaire ? (
           <div className="vrm-scan-paire" data-scan-paire={String(c.cle)} data-scan-paire-num={c.num || ''}>
-            <div className="vrm-scan-photo">{c.photo ? <img src={c.photo} alt="" referrerPolicy="no-referrer" decoding="async"/> : <span aria-hidden="true"/>}</div>
+            <div className="vrm-scan-photo">{c.photo ? <img src={c.photo} alt="" data-vrm-vignette="" referrerPolicy="no-referrer" decoding="async"/> : <span aria-hidden="true"/>}</div>
             <div className="vrm-scan-infos">
               <span className={'vrm-scan-kicker is-' + res.etat} data-scan-bon={attendu ? '1' : undefined}>{res.etat === 'deja' ? M.deja : res.etat === 'fait' ? M.fait + ' ✓' : attendu ? 'C’est le bon bordereau' : M.tete}</span>
               <span className="vrm-scan-ligne1">{c.num ? <b className="vrm-scan-num" data-scan-num={c.num}>N°{c.num}</b> : verif ? <b className="vrm-scan-num is-sans" data-scan-num="">Sans N°</b> : null}<span className="vrm-scan-titre" data-scan-titre="">{c.titre}</span></span>
