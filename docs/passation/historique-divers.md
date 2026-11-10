@@ -1272,3 +1272,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ### Lignes déplacées de CLAUDE.md §9 (10 nov., lot AR)
 - **10 nov. · Textes courts, 3e série** : Argent (Super PDP, Factur-X, CFE, suivi des déclarations, rapport URSSAF), Colis/Achats/Messages de `Comptabilite`, Republier, Ma facture, Statistiques, Stock, page d'accueil : une phrase courte + le geste, détail sous « Pourquoi ? », sens et chiffres gardés ; banc `popups-propre` + Argent. `docs/passation/2026-11-10-textes-courts-3.md`. Geste : aucun.
+
+- **10 nov. (20 h) · Pro illimité** : Pro 19,99 € = tous les comptes vendeurs, sans limite (sa décision, annule les « 10 comptes » du lot BO, défait : règle, route `pro` refusée 409, feuille, rangée, textes ; 031 supprimée, jamais appliquée) ; Solo inchangé ; CGV 10 nov. `docs/passation/2026-11-10-pro-illimite.md`. Geste : relire les CGV.

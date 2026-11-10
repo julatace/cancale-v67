@@ -1,0 +1,37 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   « IMPORTER UN TABLEUR » (10 nov., lot J — src/composants/ImportAchats.jsx)
+   DA6 : groupes iOS arrondis, pastilles ; ambre = une ligne écartée (à corriger
+   dans son fichier). Jetons seulement (clair/sombre suivent).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-imp { display: flex; flex-direction: column; gap: 14px; padding-bottom: 8px; min-width: 0; }
+.vrm-imp-phrase { margin: 0; font-size: 16px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imp-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
+.vrm-imp-erreur { margin: 0; font-size: 14px; line-height: 1.45; color: var(--vrm-warn, #B25E00); font-weight: 600; }
+.vrm-imp-puces { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-imp-puces li { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 14px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imp-colonnes { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.vrm-imp-col { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; min-width: 116px; max-width: 160px; }
+.vrm-imp-col-nom { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-imp-col select {
+  height: 44px; border-radius: 12px; border: 0; padding: 0 10px; font: inherit; font-size: 15px;
+  background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); color: var(--vrm-ink, #1D1D1F); -webkit-appearance: none; appearance: none;
+}
+.vrm-imp-col select[data-imp-champ=""] { color: var(--vrm-muted, #6E6E73); }
+.vrm-imp-resume { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-imp-pastille { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
+.vrm-imp-pastille b { font-weight: 800; }
+.vrm-imp-pastille.vrm-imp-ambre { background: var(--vrm-warn-soft, rgba(255,159,10,.16)); color: var(--vrm-warn, #B25E00); }
+.vrm-imp-lignes {
+  list-style: none; margin: 0; padding: 0; border-radius: 14px; overflow: hidden;
+  background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18));
+}
+.vrm-imp-ligne { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 14px; box-sizing: border-box; position: relative; }
+.vrm-imp-ligne + .vrm-imp-ligne::before { content: ''; position: absolute; top: 0; left: 44px; right: 0; height: .5px; background: var(--vrm-line, #E5E5EA); }
+.vrm-imp-n { flex: 0 0 22px; font-size: 12px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; text-align: right; }
+.vrm-imp-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-imp-titre { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-imp-meta { font-size: 12px; color: var(--vrm-muted, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-imp-prix { flex: 0 0 auto; font-size: 15px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imp-double .vrm-imp-titre, .vrm-imp-double .vrm-imp-prix { color: var(--vrm-muted, #6E6E73); font-weight: 500; }
+.vrm-imp-ecartee .vrm-imp-meta, .vrm-imp-ecartee .vrm-imp-prix { color: var(--vrm-warn, #B25E00); font-weight: 600; }
+.vrm-imp-pied { display: flex; flex-direction: column; gap: 8px; }
