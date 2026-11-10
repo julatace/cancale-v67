@@ -219,5 +219,5 @@ export function prochainChangement(vendeurLe, maintenant = Date.now()) {
 // d'accueil et (en substance) les CGV.
 export const OFFRES = Object.freeze({
   solo: Object.freeze({ nom: 'Solo', phrase: 'Un compte vendeur par plateforme (un Vinted, un Leboncoin, un eBay, un Vestiaire) — ventes, annonces, colis à envoyer, offres et compta de ce compte — et autant de comptes d’achat que tu veux (leurs achats et leurs retraits).' }),
-  pro: Object.freeze({ nom: 'Pro', phrase: 'Les ventes de tous tes comptes : chaque compte vend, tout entre dans tes totaux.' }),
+  pro: Object.freeze({ nom: 'Pro', phrase: 'Comptes vendeurs illimités : tous tes comptes vendent, tout entre dans tes totaux.' }),
 });

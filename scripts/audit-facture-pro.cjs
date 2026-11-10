@@ -485,6 +485,21 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   const mail = regle.emailFacture(CFG, plein, { via: 'vrm' });
   dit(mail.nomExpediteur === 'Boutique Banc EI via VRM' && /<p/.test(mail.html) && !/<script/i.test(regle.emailFacture({ ...CFG, message: '<script>x</script>' }, plein).html), 'M14 l’e-mail : « … via VRM », HTML échappé (aucune valeur n’écrit du HTML)', mail.nomExpediteur);
 
+  // ══ T : « FACTURE EN ANGLAIS » PAR LA VRAIE ROUTE (10 nov., lot T) ═══════
+  // Choisie à l'émission, FIGÉE dans l'instantané ; le français ne bouge pas.
+  raz(); base.set(cle(A, 'vrm_pro_facture'), CFG);
+  const ten = await appel(A, vente('23000000901', { langue: 'en' }));
+  const lten = base.get(cle(A, 'email_invoice_tx23000000901')) || {};
+  dit(ten.code === 200 && lten.contenu && lten.contenu.anglais && lten.contenu.mentions[0] === regle.MENTION_FRANCHISE && /^VAT not applicable, article 293 B/.test(lten.contenu.anglais.mentions[0]) && regle.mentionsManquantes(lten.contenu).length === 0,
+    'T1 émise « en anglais » : la traduction est figée dans l’instantané, la mention 293 B reste mot pour mot, les 14 mentions y sont', JSON.stringify(lten.contenu && lten.contenu.anglais));
+  const tfr = await appel(A, vente('23000000902'));
+  const ltfr = base.get(cle(A, 'email_invoice_tx23000000902')) || {};
+  dit(tfr.code === 200 && ltfr.contenu && !('anglais' in ltfr.contenu), 'T2 sans l’option : la facture est exactement celle d’avant (aucune clé « anglais »)', Object.keys(ltfr.contenu || {}).join(','));
+  const ten2 = await appel(A, vente('23000000901', { langue: 'fr' }));
+  dit(ten2.corps.deja === true && (base.get(cle(A, 'email_invoice_tx23000000901')).contenu || {}).anglais, 'T3 une facture émise ne change plus de langue (même numéro, même instantané)', JSON.stringify(ten2.corps.deja));
+  const tbad = await appel(A, vente('23000000903', { langue: 'de' }));
+  dit(tbad.code === 200 && !('anglais' in (base.get(cle(A, 'email_invoice_tx23000000903')).contenu || {})), 'T4 une langue inconnue n’invente rien : facture en français', '');
+
   serveur.close(); fs.rmSync(dossier, { recursive: true, force: true });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);

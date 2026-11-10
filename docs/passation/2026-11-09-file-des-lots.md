@@ -32,9 +32,11 @@ libère son numéro (le dire ici).
 | N | étapes d'atelier DANS Organisation | `claude/atelier-organisation` | à lancer |
 | O | mode vacances tous comptes (ext. 5.338) | `claude/mode-vacances` | à lancer |
 | P | raccourcis clavier + VoiceOver | `claude/clavier-voiceover` | à lancer |
-| Q | factures Pro : envoi auto (éteint), à envoyer, avoir, registre + zip | `claude/factures-pro-2` | à lancer |
+| Q | factures Pro : envoi auto (éteint), à envoyer, avoir, registre + zip | `claude/factures-pro-2` | **fait** (branche, sans PR) — `2026-11-10-factures-pro-2.md` |
 | R | livre de police | `claude/livre-police` | à lancer |
 | S | factures Pro Leboncoin/eBay/Vestiaire (forme à mesurer) | `claude/factures-autres` | à lancer |
+| T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | **fait** (à intégrer) |
+| S | factures Pro Leboncoin/eBay/Vestiaire (forme à mesurer) | `claude/factures-autres` | fait (Leboncoin + eBay ; Vestiaire refus dit) — `2026-11-10-factures-autres.md` |
 | T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | à lancer |
 
 | U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
@@ -103,5 +105,17 @@ Troisième série du 10 nov. — Julien : « Vas-y tout est parfait, fais tout �
 | BG | d'où viennent mes achats : bénéfice moyen par source (la source se SAISIT ou se lit, jamais devinée) | `claude/source-achats` | à lancer |
 | BH | achat saisi deux fois : par n° de transaction / reçu seulement (§5), jamais par ressemblance ; rien supprimé, il choisit | `claude/achat-double` | à lancer |
 | BI | retours et litiges par modèle (le modèle est une proposition de regroupement, pas une identité ; les comptes viennent des ventes prouvées) | `claude/retours-modele` | à lancer (avec BB) |
+
+Quatrième série du 10 nov. — Julien : « Vas-y fait toute ».
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| BJ | dossier de litige en un PDF (photo d'annonce, photo du carton, bordereau, suivi daté) depuis une carte Litiges, généré dans le navigateur | `claude/dossier-litige` | à lancer |
+| BK | « Mois bouclé » : ce qui manque avant de déclarer (ventes sans date de versement, prix d'achat, comptes pas relus) ⇒ « Novembre est prêt à déclarer » | `claude/mois-boucle` | en cours (avec BL) |
+| BL | comparer deux mois côte à côte (vendu, reçu, bénéfice, paires), même règle que Argent | `claude/mois-boucle` | en cours (avec BK) |
+| BM | vitesse d'envoi : délai vente → « Colis fait » par compte (dates prouvées seulement) | `claude/vitesse-avis` | à lancer |
+| BN | avis Vinted reçus : note moyenne et évolution par compte (capacité `avis`, 5.319), aucun rappel d'évaluation | `claude/vitesse-avis` | à lancer |
+
+| BO | ~~Pro 19,99 € = 10 comptes vendeurs~~ — **ANNULÉ** (Julien, 10 nov., 20 h : « on fait un nombre de comptes de vente illimité ») : défait et **remplacé par « Pro illimité »** (`docs/passation/2026-11-10-pro-illimite.md`) ; Solo inchangé (un compte vendeur par plateforme) | `claude/pro-illimite` | annulé, remplacé |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
