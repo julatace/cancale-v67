@@ -117,7 +117,8 @@ const S_ICI = 'a1b2c3d4-0000-4000-8000-000000000001', S_NEUF = 'c3d4e5f6-0000-40
             { id: S_NEUF, appareil: 'Windows · Firefox', actifLe: new Date(Date.now() - 5 * 60e3).toISOString(), ici: false },
           ] }) });
         });
-        await pg.goto(`http://localhost:${NV.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await attendre(2500);
+        await pg.goto(`http://localhost:${NV.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        for (let i = 0; i < 40 && !verifs.length; i++) await attendre(500);   // la demande part après la session (machine chargée : jusqu'à 20 s)
         await pg.goto(`http://localhost:${NV.PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' }); await attendre(1500);
         dit(verifs.length === 1, `G ${tag} : l’app demande la vérification UNE fois par session du navigateur`, verifs.length);
         await pg.goto(`http://localhost:${NV.PORT}/?tab=settings&section=appareils&session=${S_NEUF}`, { waitUntil: 'domcontentloaded' });
