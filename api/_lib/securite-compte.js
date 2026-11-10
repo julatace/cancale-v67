@@ -146,11 +146,14 @@ export const PREUVES_JOURNAL = {
   ebay_agent_journal: 'Noté dans le journal des actions eBay',
   bordereaux: 'Le bordereau est rangé dans ta base',
   relais: 'Résultat écrit par l’extension dans la commande',
+  extension: 'Noté par l’extension au moment du geste',
 };
 // Ce qu'aucune ligne de la base ne note — dit tel quel à l'écran.
 export const NON_JOURNALISE = [
-  ['offres', 'Offres Vinted acceptées ou refusées depuis l’ordinateur, ou par le réglage automatique : notées seulement dans la fenêtre de l’extension, pas en base. Depuis le téléphone, elles sont ci-dessus.'],
-  ['messages', 'Réponses aux acheteurs Vinted envoyées depuis l’ordinateur : pas notées en base. Depuis le téléphone, elles sont ci-dessus.'],
+  // (10 nov., lot G) L'extension 5.337 note ces gestes en base (`journal_vrm_*`) : ils sont ci-dessus.
+  // Ce qui reste dit : ce qu'une extension plus ancienne a fait.
+  ['offres', 'Offres Vinted acceptées ou refusées depuis l’ordinateur avec une extension avant 5.337 : pas notées en base.'],
+  ['messages', 'Réponses aux acheteurs Vinted envoyées depuis l’ordinateur avec une extension avant 5.337 : pas notées en base.'],
   ['lbc', 'Suppressions et réponses Leboncoin : pas notées en base.'],
   ['vestiaire', 'Réponses et offres Vestiaire : pas notées en base.'],
   ['relance', 'Remises en vente eBay : pas notées en base.'],
@@ -209,9 +212,50 @@ export function evenementsJournal(sources) {
     const ev = evenementRelais(c);
     if (ev) out.push(ev);
   }
+  // (10 nov., lot G) Les gestes notés par l'extension 5.337 (`journal_vrm_{uid}_{navigateur}`).
+  // Un geste déjà noté par sa propre ligne (commande du téléphone) n'est pas compté deux fois.
+  const duTelephone = out.filter((e) => e.source === 'relais');
+  for (const ev of evenementsExtension(s.extension)) {
+    if (duTelephone.some((r) => r.type === ev.type && String(r.compte || '') === String(ev.compte || '') && (r.cle.tx || null) === (ev.cle.tx || null) && Math.abs((r.at || 0) - ev.at) <= 15 * 60000)) continue;
+    out.push(ev);
+  }
   // La preuve, posée ici pour TOUS : une source sans preuve connue ne sort pas.
   return out.filter((e) => PREUVES_JOURNAL[e.source]).map((e) => ({ ...e, preuve: PREUVES_JOURNAL[e.source] }))
     .sort((a, b) => (b.at || Infinity) - (a.at || Infinity));
+}
+
+// ── Les gestes notés par l'extension (10 nov., lot G, extension 5.337) ──────────
+// `journal_vrm_{uid}_{navigateur}` : { e: [{ t, s, a?, b?, x?, p?, de?, vers?, auto? }] } —
+// une sorte, une heure, des numéros, des prix ; jamais un texte ni un pseudo (l'extension
+// rebâtit chaque entrée, ici on la rebâtit encore). Seules les sortes qu'AUCUNE autre
+// ligne ne note entrent : la republication (fiche de brouillon), le message à un favori
+// (file des favoris) et le bordereau (rangé dans la base) ont déjà leur preuve.
+// Le compte vient de l'IDENTIFIANT de la ligne, jamais d'un champ libre.
+const SORTES_EXTENSION = { offre_acceptee: 'offre_acceptee', offre_refusee: 'offre_refusee', contre_offre: 'offre_faite', reponse: 'message_envoye', baisse_prix: 'baisse_prix', modifiee: 'annonce_modifiee' };
+const numeroOk = (v) => (v != null && /^\d{1,20}$/.test(String(v)) ? String(v) : null);
+const prixOk = (v) => { const n = Number(v); return v != null && v !== '' && Number.isFinite(n) && n > 0 && n < 1e6 ? Math.round(n * 100) / 100 : null; };
+export function evenementsExtension(lignes) {
+  const out = [], vus = new Set();
+  for (const l of Array.isArray(lignes) ? lignes : []) {
+    const m = /^journal_vrm_(\d{1,20})_[0-9a-f]{16}$/.exec(String((l && l.id) || ''));
+    if (!m) continue;
+    for (const e of (Array.isArray(l.e) ? l.e : [])) {
+      const type = e && Object.prototype.hasOwnProperty.call(SORTES_EXTENSION, e.s) ? SORTES_EXTENSION[e.s] : null;
+      const at = e ? ms(e.t) : null;
+      if (!type || !at) continue;
+      const cle = { item: numeroOk(e.a), tx: numeroOk(e.x) };
+      const k = [m[1], at, type, cle.item || '', cle.tx || ''].join('|');
+      if (vus.has(k)) continue;
+      vus.add(k);
+      const ev = { at, type, site: 'vinted', compte: m[1], cle, resultat: 'ok', source: 'extension' };
+      if (e.auto === true) ev.auto = true;
+      const de = prixOk(e.de), vers = prixOk(e.vers), p = prixOk(e.p);
+      if (de != null && vers != null) ev.prix = { de, vers };
+      else if (p != null) ev.prix = { p };
+      out.push(ev);
+    }
+  }
+  return out;
 }
 
 // Une commande du téléphone (`cmd_relais_*`), projetée sans corps. Seuls les
@@ -274,5 +318,7 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   // (8 nov.) Les commandes du téléphone : le geste, jamais son corps (`args.body`
   // porte le texte d'un message) — projeté champ par champ.
   await lignes('relais', 'app_data?id=like.cmd_relais_*&select=cmd:data->>cmd,etat:data->>etat,demandeLe:data->>demandeLe,prisLe:data->>prisLe,finiLe:data->>finiLe,uid:data->args->>uid,tx:data->args->>tx,lbc:data->args->>id,methode:data->args->>method,endpoint:data->args->>endpoint&order=id.desc&limit=300', (r) => r);
+  // (10 nov., lot G) Les gestes notés par l'extension 5.337 : `e` seulement (jamais `data`).
+  await lignes('extension', 'app_data?id=like.journal_vrm_*&select=id,e:data->e&limit=200', (r) => r);
   return { evenements: evenementsJournal(sources), pasLu, nonJournalise: NON_JOURNALISE.map(([id, texte]) => ({ id, texte })) };
 }

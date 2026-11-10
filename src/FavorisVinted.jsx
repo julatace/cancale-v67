@@ -7,6 +7,7 @@ import {controleOuvertureFavori,echecVerificationFavori} from './favorisOuvertur
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
 import ModeAutoFavoris from './ModeAutoFavoris.jsx';
 import DiagnosticFavoris from './DiagnosticFavoris.jsx';
+import JaugeActions from './JaugeActions.jsx';   // (10 nov., lot G) les 50 actions/h de ce compte
 import {RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
 import {articlesFavoris,filtrerArticles,apercuMessageFavori,texteEtatPersonne,pseudoFavori,PERIODES_FAVORIS,FILTRES_ARTICLES} from './favorisEcran.js';
 import CarteMois from './design/CarteMois.jsx';
@@ -317,6 +318,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     </CarteMois>
 
     {sansCompte&&<p className="vrm-fa-ligne" data-fav-vide="compte">Choisis un compte Vinted au-dessus.</p>}
+    {!sansCompte&&<div className="vrm-fa-jauge"><JaugeActions uid={uid}/></div>}
 
     {!sansCompte&&<div className="vrm-fa-message vrm-fu-blanc" data-fav-message={!reglages.prets?(reglages.erreur?'erreur':'lecture'):messageAffiche?'pret':'vide'}>
       <div className="vrm-fa-message-tete"><h4>Ton message</h4><button type="button" className="vrm-fa-lien" data-fav-message-modifier disabled={preparation||fileActive} onClick={modifierMessage}>Modifier</button></div>

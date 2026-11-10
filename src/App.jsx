@@ -237,6 +237,7 @@ const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
 const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 // (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
 const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
+const JaugeActions = aLaDemande(() => import('./JaugeActions.jsx'));   // (10 nov., lot G) « 12/50 cette heure »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // ⟦→ ecrans/Reglages.jsx #10⟧
 // (8 nov., démarrage léger) Écrans sortis d’App.jsx vers src/ecrans/ (découpe mécanique) : chargés
@@ -43750,6 +43751,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
               </button>
             </div>
+            {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
                 <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
