@@ -52813,7 +52813,7 @@ function AppCoeur() {
   // chaque vente lue — pour « Quel compte vend sur … ? » (rien n'est lu hors d'un Solo).
   const [aboCoque, setAboCoque] = useState(() => abonnementPublie());
   useEffect(() => suivreAbonnement(setAboCoque), []);
-  const [autresSitesSolo] = useComptesAutresSites(!!(aboCoque && aboCoque.plan === 'solo'));
+  const [autresSitesSolo] = useComptesAutresSites(!!(aboCoque && (aboCoque.plan === 'solo' || aboCoque.proLimite === true)));
   const autresSolo = useMemo(() => {
     const out = {};
     const sources = {

@@ -32,3 +32,13 @@
 .vrm-plan-offre-prix { font-size: var(--d-t-15, 15px); font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-plan-pastille { font-size: var(--d-t-11, 11px); font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--d-remplir, rgba(0,0,0,.06)); color: var(--d-gris, #6e6e73); }
 .vrm-plan-offre .vrm-b { margin-top: auto; }
+/* (10 nov.) Pro = 10 comptes vendeurs : cases à cocher, compteur, un groupe par plateforme. */
+.vrm-plan-case { grid-row: span 2; width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--d-gris, #8e8e93); box-sizing: border-box; position: relative; }
+.vrm-plan-case[data-coche] { border-color: var(--d-accent, #0071E3); background: var(--d-accent, #0071E3); }
+.vrm-plan-case[data-coche]::after { content: ''; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.vrm-plan-compteur { margin-top: 12px; font-size: var(--d-t-15, 15px); color: var(--d-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-plan-compteur b { font-size: var(--d-t-20, 20px); color: var(--d-encre, #1d1d1f); }
+.vrm-plan-meilleurs { display: block; min-height: 44px; padding: 0; }
+.vrm-plan-groupe { margin-top: 8px; }
+.vrm-plan-groupe-titre { font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, #6e6e73); margin-top: 8px; }
+.vrm-plan-groupe .vrm-plan-comptes { margin: 6px 0 10px; }
