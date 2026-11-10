@@ -108,7 +108,7 @@ export function PanneauFiche({ ouvert, titre, sur = '', onFermer, children, ecra
   }, [ouvert, ecran]);
   if (!ouvert) return null;
   return createPortal(
-    <div className="vrm-app-shell vrm-panneau-hote">
+    <div className="vrm-panneau-hote">
       <aside className="vrm-panneau-fiche" data-panneau-fiche={ecran} role="dialog" aria-modal="false" aria-labelledby={id}
         onKeyDown={(e) => { if (e.key === 'Escape' && !e.defaultPrevented && !(e.target && e.target.matches && e.target.matches('input,textarea,select'))) { e.preventDefault(); onFermer && onFermer(); } }}>
         <header className="vrm-panneau-tete">
