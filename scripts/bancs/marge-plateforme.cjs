@@ -150,7 +150,7 @@ const lireCarte=(pg)=>pg.evaluate(()=>{ const c=document.querySelector('[data-st
         dit(vi && vi.med==='3500' && vi.total==='17000' && vi.connu==='5' && vi.sans==='3','Vinted : médiane 35 €, total 170 € sur 5, prix d’achat manquant pour 3',vi&&JSON.stringify(vi));
         dit(vi && /prix d’achat manquant pour 3/.test(vi.texte) && /sur 5 ventes finalisées/.test(vi.texte),'la couverture est DITE sur la ligne',vi&&vi.texte);
         for(const x of (r?r.lignes:[]).filter(x=>x.plat!=='Vinted')){
-          if(x.etat==='lu') dit(x.n==='0' && x.med==='',' '+x.plat+' lu sans vente : 0 vente, bénéfice « — »',x.texte);
+          if(x.etat==='lu') dit(x.n==='0' && x.med==='' && /Aucune vente sur la période/.test(x.texte),' '+x.plat+' lu sans vente : 0 vente, bénéfice « — »',x.texte);
           else dit(x.med==='' && /—/.test(x.texte) && /pas lu|lecture/.test(x.texte),' '+x.plat+' pas lu : « — » et la raison',x.texte);
         }
         dit(r && !/au moins[^·\n]*médiane|au moins[^·\n]*en tout/.test(r.texte),'jamais « au moins » sur un bénéfice',r&&r.texte.replace(/\s+/g,' ').slice(0,300));

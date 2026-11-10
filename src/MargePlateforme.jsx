@@ -37,10 +37,14 @@ export default function MargePlateforme({ liveStats, releve = null, de, a, onSai
               <span className="vrm-mp-nom">{NOM[p.plat]}</span>
               <span className="vrm-mp-med"><b className="vrm-display">{t.mediane}</b>{p.mediane != null ? <small> médiane</small> : null}</span>
               <span className="vrm-mp-piste" aria-hidden="true"><span data-plus={R.meilleur === p.plat ? '1' : undefined} style={{ width: `${w}%` }}/></span>
-              {p.etat === 'lu' ? (
-                <span className="vrm-mp-chiffres">{t.ventes} · {t.vendu} vendu{p.total != null ? <> · {t.total} en tout</> : null}</span>
-              ) : null}
-              <span className="vrm-mp-sur" data-mp-raison={p.etat !== 'lu' ? (p.raison || p.etat) : undefined}>{t.sur}</span>
+              {p.etat === 'lu' && p.n === 0 && !p.nFin ? (
+                <span className="vrm-mp-sur" data-mp-aucune="">Aucune vente sur la période</span>
+              ) : (<>
+                {p.etat === 'lu' ? (
+                  <span className="vrm-mp-chiffres">{t.ventes} · {t.vendu} vendu{p.total != null ? <> · {t.total} en tout</> : null}</span>
+                ) : null}
+                <span className="vrm-mp-sur" data-mp-raison={p.etat !== 'lu' ? (p.raison || p.etat) : undefined}>{t.sur}</span>
+              </>)}
               {t.manques && t.manques.length ? <span className="vrm-mp-manque">{t.manques.join(' · ')}</span> : null}
             </li>
           );
