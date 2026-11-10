@@ -72,6 +72,12 @@ première annonce (le compte de l'onglet, mis en tête par l'écran, reste en t�
   de la lire, photo ≥ 150 px à deux colonnes) — ses 5 rouges restants sont ceux d'`origin/main` (saisie 18 €,
   baisse eBay, G22 ×2, recherche). Les autres : voir le rapport de fin de session ci-dessous.
 
+## Planches
+
+`docs/passation/planches-annonces-grille/` (données inventées) : `avant-390-clair` (la grille d'`origin/main`, les
+défauts de la capture de Julien), `apres-390-{clair,sombre}-{fermee,ouverte}`, `apres-390-clair-meme-paire`,
+`apres-1512-{clair,sombre}-fermee`, `apres-1512-clair-achat-saisi` (vignette ouverte), `apres-1512-clair-menu` (« … »).
+
 ## Ce qui reste
 
 - Julien : regarder Annonces au téléphone (grille, vignette ouverte, « Même paire ? »). Aucun geste technique.
