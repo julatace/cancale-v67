@@ -409,6 +409,7 @@ import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur, lieuTrans
 import { registrePointsConnus, completerParPointConnu, lieuLePlusComplet, memePoint, completudeLieu, cleTransporteurLieu } from "./villeRelais.js";
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais.jsx";
+import AlerteRelaisChange from "./AlerteRelaisChange.jsx";
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
@@ -25123,15 +25124,10 @@ function ComptesMuetsColis({ accounts, onNav }) {
   const muets = etat && etat.etat === 'lu' ? (etat.muets || []) : [];
   // (6 nov.) Pour le conseil « Un compte sans e-mail » : le nombre LU seulement (« pas su » ⇒ rien).
   const chiffre = <ChiffreConseil cle="colis.comptesMuets" valeur={etat === undefined ? undefined : etat && etat.etat === 'lu' ? muets.length : null}/>;
-  if (!muets.length) return chiffre;
-  const noms = muets.map((l) => l.login).filter(Boolean);
-  return (
-    <div className="vrm-colis-prochain is-second" data-colis-comptes-muets={muets.length}>
-      {chiffre}
-      <span className="vrm-colis-prochain-txt">{muets.length > 1 ? `${muets.length} comptes n’envoient aucun e-mail à VRM` : `Le compte ${noms[0] || 'Vinted'} n’envoie aucun e-mail à VRM`}<span className="vrm-colis-prochain-sous"> — {muets.length > 1 ? 'leurs' : 'ses'} codes de retrait et bordereaux n’arrivent pas ici</span></span>
-      {onNav ? <button type="button" className="vrm-lien-action" data-colis-comptes-muets-ouvrir="" onClick={() => onNav('vintedaccounts')}>Relier {muets.length > 1 ? 'leurs boîtes' : 'sa boîte'}</button> : null}
-    </div>
-  );
+  // (10 nov., Julien : « Enlève ça, car c'est déjà marqué au-dessus ») La phrase « N comptes n'envoient
+  // aucun e-mail à VRM » n'est plus écrite sur Colis : la ligne de fraîcheur unique du haut de l'app
+  // (src/fraicheur.js) nomme déjà les e-mails absents avec leur geste. Reste le chiffre du conseil.
+  return chiffre;
 }
 // ⟦→ ecrans/Reglages.jsx #33⟧
 
@@ -39087,7 +39083,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov., onglets C) LES COMPTES DONT LES E-MAILS N'ARRIVENT PAS, sur Ma journée : UNE carte (la
   // règle des comptes muets, src/relierCompte.js), dite une fois par jour — touchée, elle s'efface
   // jusqu'au lendemain (préférence de cet appareil ; E-mails et Comptes liés la redisent).
-  const { liste: aRelierListe } = useComptesARelier(accounts, only === 'journee');
+  const { liste: aRelierListe } = useComptesARelier(accounts, only === 'journee' || only === 'bordereaux');
+  // (10 nov.) Les comptes dont les e-mails n'arrivent pas : la marque discrète sur LEURS cartes de Colis.
+  const uidsSansEmail = new Set(only === 'bordereaux' && Array.isArray(aRelierListe) ? aRelierListe.map((c) => String(c.uid)) : []);
   const jourRelier = dateLocale(new Date(), 'fr-CA', { timeZone: 'Europe/Paris' });
   const [aRelierVus, setARelierVus] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_relier_vus') || '{}'); return v && v.j === new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) && Array.isArray(v.uids) ? v.uids : []; } catch (_) { return []; } });
   const comptesARelierJour = only === 'journee' && Array.isArray(aRelierListe) ? aRelierListe.filter((c) => !aRelierVus.includes(c.uid)) : [];
@@ -41641,6 +41639,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const colis = achatsAffiches.filter(({st}) => st && st.step>=1 && st.step<4 && !st.retour).map(({o,tk}) => { const su = (tk && tk.suivi) || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? { suivi: su, carrier: (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '' } : null; }).filter(Boolean);
           return <TeteTransporteurs transp={transp} colis={colis} relire={lireTransp}/>;
         })()}
+        {/* (10 nov.) « Votre colis a changé de plan » : POINT RELAIS CHANGÉ, en ambre, avec le
+            nouveau point LU dans l'e-mail et son itinéraire (src/AlerteRelaisChange.jsx). */}
+        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C}/>}
         {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
             des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
@@ -44400,34 +44401,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     onClick={() => setOutilsColis((v) => !v)}/>
                 </div>
               }/>
-            {/* (6 nov., onglets B) LE PROCHAIN GESTE, EN UNE PHRASE ET UN BOUTON (src/prochainGesteColis.js) :
-                les MÊMES listes que les nombres de l'écran — les points de « À retirer » (`parPoint`, colis
-                comptés seulement), le lot « Tout imprimer » (`lignesLot`, avec SA limite), « À envoyer »
-                (`vrm_colis_aposter`). L'urgent passe devant, quel que soit l'onglet. Rien tant que c'est en cours. */}
-            {!baseKO && (() => {
-              const vinted = voitSite('vinted');
-              const imp = vinted ? bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null, limite: l.e && l.e.lim ? texteEnvoiColis(texteLimiteEnvoi(l.e.lim) || '') : '' })) : [];
-              const sansBord = vinted && labelsPrets && emailBords !== null ? expeditions().filter((e) => !e.pret && !(e.o && isShipDone(e.o))).length : 0;
-              const pts = ((parPoint && parPoint.points) || []).filter((p) => !p.inconnu).map((p) => ({ cle: p.cle, nom: p.nom || p.adresseCourte || '', colis: (p.arrives || []).filter((c) => !c.horsCompte).map((c) => ({ code: !!(c.code || c.qr || c.code2), jours: Number.isFinite(c.jours) ? c.jours : null })) }));
-              const g = prochainGesteColis({ onglet,
-                envoi: { total: nEnv, partiel: envPartiel, aImprimer: imp, aDeposer: vinted ? nDejaImpr : 0, sansBordereau: sansBord },
-                retrait: { total: nRet, partiel: retPartiel, points: pts } });
-              if (!g) return null;
-              const agir = () => {
-                if (g.onglet && g.onglet !== onglet && onOngletColis) onOngletColis(g.onglet);
-                if (g.action === 'imprimer' && nLot > 0) { ouvrirLot(); return; }
-                if (g.action === 'tournee') { setTourneeDepot(true); return; }
-                if (g.point) setTimeout(() => { const el = [...document.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === g.point); if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } } }, 80);
-              };
-              // (8 nov., clarté) Un verbe qui dit le geste : « Ouvrir la tournée » (« Tournée » seul n'était pas un geste).
-              const verbe = g.action === 'imprimer' ? 'Imprimer' : g.action === 'tournee' ? 'Ouvrir la tournée' : g.onglet && g.onglet !== onglet ? 'Voir' : g.point ? 'Voir le point' : null;
-              return (
-                <div className={'vrm-colis-prochain' + (g.ambre ? ' is-ambre' : '')} data-colis-prochain={g.cle} data-colis-prochain-onglet={g.onglet || ''} data-colis-prochain-point={g.point || undefined} role="status">
-                  <span className="vrm-colis-prochain-txt">{g.partiel ? 'Au moins ' : ''}{g.texte}{g.sous ? <span className="vrm-colis-prochain-sous"> · {g.sous}</span> : null}</span>
-                  {/* (7 nov., revue UX) « Tout imprimer » (en haut) est déjà le bouton bleu de ce geste : un seul accent par écran (§7). */}
-                  {verbe ? <Bouton variante={g.action === 'imprimer' && nLot > 0 ? 'secondaire' : g.action === 'imprimer' ? 'primaire' : 'secondaire'} data-colis-prochain-agir="" onClick={agir} disabled={g.action === 'imprimer' && (batchBusy || nLot === 0)}>{verbe}</Bouton> : null}
-                </div>);
-            })()}
+            {/* (10 nov., Julien sur captures iPhone : « Enlève imprime bordereaux … Et imprimer garde tout
+                imprimer ») LA LIGNE « PROCHAIN GESTE » N'EST PLUS RENDUE : « N bordereaux à imprimer — Imprimer »
+                redisait le bouton « Tout imprimer » du haut, « 1 à envoyer en priorité » la limite déjà écrite sur
+                la carte du colis, et le point à retirer la liste « À retirer » (une information, une fois, §7).
+                La règle (src/prochainGesteColis.js) reste celle de Ma journée et des conseils. */}
             {!baseKO ? <ComptesMuetsColis accounts={accounts} onNav={onNav}/> : null}
             {/* (2 nov., style « Fusion ») LA CARTE « AUJOURD'HUI ». Le grand chiffre est le
                 nombre de colis À ENVOYER publié par cet écran (`vrm_colis_aposter`, celui de Ma
@@ -44921,8 +44899,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (3 nov.) Les ventes Vestiaire à envoyer sont dans LA liste ci-dessous (« tout va être ensemble ») ;
             leurs « Colis fait » sont dans l'onglet « Envoyés ». Reste ici : Vestiaire illisible, dit. */}
         {only === 'bordereaux' && voitSite('vestiaire') && colisVestiaire(vcEtat) === null ? <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><EtatPanne compact quoi="Tes colis Vestiaire" raison="Rien n’est perdu : rouvre Colis dans un moment."/></div> : null}
-        {/* (6 nov., onglets C) Un compte dont les e-mails n'arrivent pas, avec des colis à envoyer : dit ici, avec LE geste. */}
-        {only === 'bordereaux' && <ComptesARelierColis comptes={accounts}/>}
+        {/* (10 nov.) « 1 colis de X : ses e-mails n'arrivent pas » n'est plus un bandeau (déjà dit par la ligne de
+            fraîcheur du haut) : une petite marque sur la carte du colis concerné (`data-colis-sans-email`). */}
         {/* (31 oct.) Les emails reçus et ce que VRM en a fait — l'ambre quand un
             email attend un geste (bordereau au N° deviné, reçu sans n°…). */}
         {/* (2 nov., colis clair) « Tes emails, ce que VRM en a fait » n'est pas un geste
@@ -45289,6 +45267,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(urgTxt)}</span>}
                             {att != null ? <span data-colis-attente={att}>{urgTxt ? ' · ' : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
+                          {acc && uidsSansEmail.has(String(acc.vinted_user_id)) ? <button type="button" className="vrm-colis-sans-email" data-colis-sans-email={String(acc.vinted_user_id)} title={`Les e-mails de ${acc.login || 'ce compte'} n’arrivent pas à VRM : bordereau, date limite et codes de retrait ne viennent pas par e-mail. Toucher pour relier sa boîte.`}
+                            onClick={() => relierBoiteDe(String(acc.vinted_user_id))} style={{flexShrink:0,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',fontSize:12,color:C.muted,display:'inline-flex',alignItems:'center',gap:3}}>
+                            <Icon name="mail" size={12}/> sans e-mail</button> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
                             /* ⚠️ Même règle que sur les Ventes (§11) : « pas rangée »
@@ -49673,26 +49654,8 @@ function EcranEmails({ comptes, ...props }) {
   useEffect(() => { DEMANDE_ADRESSES.compte = ''; const f = () => { DEMANDE_ADRESSES.compte = ''; }; window.addEventListener('vrm:relier-compte', f); return () => window.removeEventListener('vrm:relier-compte', f); }, []);
   return <BoiteEmails {...props} Photo={PhotoVinted} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}/>;
 }
-// Colis : une ligne quand un compte dont les e-mails n'arrivent pas a des colis À ENVOYER
-// (`aExpedier`, la règle unique) : leur bordereau et leur date limite ne viennent pas par
-// e-mail. Seulement ces comptes-là ; rien si la lecture n'a pas abouti.
-function ComptesARelierColis({ comptes }) {
-  const { liste } = useComptesARelier(comptes);
-  const { ventes } = useVentesCoque();
-  if (!Array.isArray(liste) || !liste.length || !Array.isArray(ventes)) return null;
-  const parCompte = liste.map((c) => ({ c, n: ventes.filter((o) => o && o._acc && String(o._acc.vinted_user_id) === c.uid && aExpedier(o) && !raisonDepartPubliee(o.transaction_id)).length })).filter((x) => x.n > 0);
-  if (!parCompte.length) return null;
-  return (
-    <div className="vrm-colis-arelier" data-colis-a-relier={parCompte.length} role="note">
-      {parCompte.map(({ c, n }) => (
-        <div key={c.uid} className="vrm-colis-arelier-ligne" data-colis-a-relier-compte={c.uid} data-n={String(n)}>
-          <span className="vrm-colis-arelier-txt"><b>{n} colis de {c.login}</b> : ses e-mails n’arrivent pas (bordereau, date limite, codes de retrait).</span>
-          <button type="button" className="vrm-lien-action" data-colis-relier={c.uid} onClick={() => relierBoiteDe(c.uid)}>Relier la boîte de {c.login}</button>
-        </div>
-      ))}
-    </div>
-  );
-}
+// (10 nov.) `ComptesARelierColis` (le bandeau « N colis de X : ses e-mails n'arrivent pas ») est retiré :
+// une marque discrète sur la carte du colis (`data-colis-sans-email`), la ligne de fraîcheur dit le reste.
 
 // ── « ADRESSE SANS COMPTE » (6 nov., vague 2, point 5) ──────────────────────
 // En tête de E-mails → Relier ma boîte. La règle est dans src/adressesSansCompte.js :
