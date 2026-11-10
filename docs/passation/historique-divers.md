@@ -1165,4 +1165,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **9 nov. · Retraits frais** : plus de « peut-être en double » — un témoin = un carton (compté avec, fini avec, ou à retirer) ; carte = ce que l'onglet compte ; statut relu /15 min (`?moment=colis`). `docs/passation/2026-11-09-retraits-frais.md`. Geste : `CRON_SECRET` GitHub.
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot AQ, taille du dossier)
+## Ligne déplacée de CLAUDE.md §9 le 10 nov. (taille, Ma semaine)
 - **9 nov. · À trancher (lot AC)** : un écran (Gérer, badge) + une ligne dans Ma journée ; 13 sources publiées par leur écran (`vrm_a_trancher`, local), un geste qui ouvre ; pas su = « — ». `docs/passation/2026-11-09-a-trancher.md`. Geste : décider des ventes à dater.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **9 nov. · Préparer mes colis + mode relais (lot AD)** : Colis → À envoyer pas à pas (ordre de la liste, paire par n° de transaction, « Colis fait » = `deposeScan`, reprise) ; mode relais = `vrm_colis_retirer` exactement, code géant fond blanc, Wake Lock, « Retiré » + Annuler, hors ligne. `docs/passation/2026-11-09-preparer-relais.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **9 nov. · Hors ligne à froid + « déjà relié »** : sans réseau, VRM s'ouvre en LECTURE SEULE si CE compte et CETTE session ont été vérifiés sur l'appareil il y a < 7 j (`vrm_porte_ok_{uid}`, garde : aucune requête base/`/api/`, aucun message à l'extension ; refus serveur au retour ⇒ refermé, drapeau effacé ; sans abonnement ⇒ aperçu) ; le refus `vrm_vinted_litige_*` dit dans Comptes liés et Ma journée (pseudo, geste, jamais l'autre compte). `docs/passation/2026-11-09-hors-ligne-relie.md` (modèle de menace). Geste : aucun.

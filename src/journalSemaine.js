@@ -64,7 +64,9 @@ export function journalSemaine({ maintenant = Date.now(), vendu, joursBenef, col
 
   if (!joursBenef || !joursBenef.jours) out.brut = pasSu('publication');
   else {
-    const B = R.beneficeDesJours(joursBenef.jours, new Date(debut), new Date(fin));
+    // (10 nov., Ma semaine) `finJours` : la publication est AU JOUR ; une semaine EN COURS (fin =
+    // maintenant) compte son jour entamé entier — sinon le bénéfice d'aujourd'hui manquerait.
+    const B = R.beneficeDesJours(joursBenef.jours, new Date(debut), new Date(S.finJours || fin));
     const CB = R.chiffreBrut(B);
     out.brut = CB.valeur == null ? { ...pasSu('achats'), n: CB.n, nCout: CB.nCout }
       : { valeur: CB.valeur, partiel: !!CB.partiel, manque: [], raison: '', n: CB.n, nCout: CB.nCout, couverture: CB.partiel ? `${CB.nCout} sur ${CB.n}` : '' };
