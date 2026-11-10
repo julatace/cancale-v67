@@ -163,9 +163,9 @@ function ConversationsLeboncoin() {
       <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>Pas encore de messages relevés</div>
         <div style={{ color: C.muted }}>
-          {cap === 'ok' ? <>Ouvre <b>leboncoin.fr</b> une fois, connecté à ton compte : l'extension relèvera combien de messages t'attendent, compte par compte.</>
-            : cap === 'retard' ? <>L'extension installée ne relève pas encore les messages : il lui faut la <b>{EXT_CAPACITES.lbcmsg}</b>. Mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
-            : <>C'est l'extension, là où elle est installée, qui relève tes messages Leboncoin quand tu passes sur leboncoin.fr.</>}
+          {cap === 'ok' ? <>Ouvre <b>leboncoin.fr</b> une fois, connecté : les non-lus arrivent.</>
+            : cap === 'retard' ? <>L'extension installée ne relève pas encore les messages : il lui faut la <b>{EXT_CAPACITES.lbcmsg}</b>. Mets-la à jour.</>
+            : <>L'extension les relève quand tu passes sur leboncoin.fr.</>}
         </div>
         {ouvrir}
       </div>
@@ -234,8 +234,8 @@ function ConversationsLeboncoin() {
             <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div data-lbc-fil-texte="absent" style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '24px 8px' }}>
                 {/* Le nombre est sur la ligne du compte (une fois, §7) : ici, seulement ce que VRM ne sait pas. */}
-                {choisi.c ? 'Leboncoin ne donne à VRM que le nombre de non-lus de ce compte, jamais le texte des messages : VRM ne les montre pas et n’y répond pas d’ici.'
-                  : 'Ce compte n’a pas encore été lu. Et même lu, Leboncoin ne donne à VRM que le nombre de non-lus, jamais le texte des messages : VRM n’y répond pas d’ici.'}
+                {choisi.c ? 'Leboncoin donne le nombre de non-lus, jamais le texte : réponds là-bas.'
+                  : 'Pas encore lu. Leboncoin donne le nombre, jamais le texte.'}
               </div>
             </div>
             <PiedSansEnvoi raison="Pour lire et répondre, ouvre ta messagerie Leboncoin." lien="https://www.leboncoin.fr/messages" texteLien="Répondre sur Leboncoin ↗"/>
@@ -281,8 +281,8 @@ function FavorisLeboncoin() {
   return (
     <div data-favoris-lbc={ads.length ? String(connus.length) : 'aucune'}>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
-        Leboncoin donne le <b>nombre</b> de favoris de chaque annonce, jamais <b>qui</b> les a mis : VRM ne peut donc écrire à personne, et il ne le fait pas.{' '}
-        {capStats === 'ok' ? <>Pour qu'une annonce ait son chiffre, ouvre ses <b>statistiques</b> sur Leboncoin (« Mes annonces » → l'annonce → Statistiques) : l'extension le relève toute seule.</>
+        Leboncoin donne le <b>nombre</b> de favoris, jamais <b>qui</b> : VRM n'écrit à personne.{' '}
+        {capStats === 'ok' ? <>Ouvre les <b>statistiques</b> de l'annonce sur Leboncoin : le chiffre suit.</>
           : capStats === 'retard' ? <>Pour relever ce chiffre, il faut l'extension <b>{EXT_CAPACITES.lbcstats}</b> : mets-la à jour depuis Paramètres → État des connexions, puis ouvre les <b>statistiques</b> de l'annonce sur Leboncoin.</>
           : <>C'est l'extension, là où elle est installée, qui relève ce chiffre quand tu ouvres les <b>statistiques</b> d'une annonce sur Leboncoin.</>}
       </div>

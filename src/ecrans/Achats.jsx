@@ -8,7 +8,9 @@ import { pairesDuModele } from '../dejaEnStock.js';
 import { cleFacture, verifierFichier } from '../factureAchat.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
 import { DejaEnStock } from '../DejaEnStock.jsx';
-import { Bouton, C, FermeAuRetour, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lirePdfLigne, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
+import { prendreDemandeAchat, EVT_ACHAT_LIEN } from '../raccourcisSiri.js';
+import { ReventeModele } from '../ReventeModele.jsx';
+import { Bouton, C, FermeAuRetour, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
 
 // ⟦← App.jsx #1⟧
@@ -335,6 +337,21 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     return () => { vivant = false; };
   }, [ouvert, avecPhoto]);
   const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  // (10 nov., lot AH) Le raccourci Siri « Ajouter un achat » (src/raccourcisSiri.js) : le formulaire s'ouvre,
+  // pré-rempli de ce qu'il a dit — rien n'est écrit sans « Ajouter l'achat ». Consommé une fois.
+  useEffect(() => {
+    const servir = () => {
+      const d = prendreDemandeAchat(); if (!d) return;
+      setEditId(null); setErreur('');
+      setForm({ ...BROUILLON0(), title: d.titre || '', price: d.prix || '', source: d.lieu || '' });
+      // L'écran finit de se poser après (listes, défilement remis en haut) : le formulaire est ramené en vue tant qu'il n'y est pas.
+      [400, 1200, 2500].forEach((ms) => setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (!f) return; const r = f.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.6) f.scrollIntoView({ block: 'center' }); } catch (_) {} }, ms));
+      setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (f) f.scrollIntoView({ block: 'center' }); const vide = !d.titre ? 'titre' : !d.prix ? 'prix' : ''; const c = vide && document.querySelector(`[data-champ="${vide}"]`); if (c) c.focus({ preventScroll: true }); } catch (_) {} }, 80);
+    };
+    servir(); window.addEventListener(EVT_ACHAT_LIEN, servir);
+    return () => window.removeEventListener(EVT_ACHAT_LIEN, servir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const ouvrirEdition = (b) => {
     setEditId(b.id); setErreur('');
     setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo, facture: null });
@@ -374,12 +391,11 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     else toast(editId ? 'Achat modifié' : 'Achat ajouté');
     fermer();
   };
-  const supprimer = async () => {
+  // (10 nov., lot Y) Plus de « Ça ne se rattrape pas » : il part à la corbeille 30 jours (pilule
+  // « Annuler » 5 s, puis Paramètres → Corbeille) ; sa photo n'est vidée qu'à la purge (src/corbeille.js).
+  const supprimer = () => {
     const b = liste.find(x => x.id === editId); if (!b) return;
-    const ok = await askConfirm({ title: `Supprimer « ${b.title || 'cet achat'} » ?`, desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price}\u00a0€)` : ''}. Ça ne se rattrape pas.`, ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
-    if (!ok) return;
     onSupprimer(b.id);
-    if (b.photo) ecrirePhotoAchatHors(b.id, null);
     fermer();
   };
   const lab = { fontSize: 12, color: C.muted, fontWeight: 600 };
@@ -410,6 +426,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
           {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
           {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
+          {/* (10 nov., lot AV) Ce que tu as revendu ce modèle : le passé, jamais un conseil (src/reventeModele.js). */}
+          {titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             {champ('Prix payé', <div style={{ position: 'relative' }}><input data-champ="prix" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" placeholder="0,00" autoComplete="off" style={{ ...inp, paddingRight: 30 }} /><span aria-hidden="true" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span></div>)}
             {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
@@ -591,7 +609,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
               {nFiltres ? <Bouton variante="discret" data-filtres-effacer onClick={() => { setPrixMin(''); setPrixMax(''); setRecuDu(''); setRecuAu(''); setMarque(''); setTaille(''); }} style={{ minHeight: 44, gridColumn: '1 / -1', justifySelf: 'start' }}>Effacer les filtres</Bouton> : null}
             </div>
           )}
-          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? 'Je lis les dates de réception de tes achats…' : 'Je n’ai pas pu lire les dates de réception — seules celles cochées « Je l’ai retiré » comptent ; réessaie dans un moment.'}</div> : null}
+          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? 'Je lis les dates de réception de tes achats…' : 'Dates de réception pas lues : seules « Je l’ai retiré » comptent.'}</div> : null}
           {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{detail.sansReception} achat{detail.sansReception > 1 ? 's' : ''} sans date de réception lue, pas dans cette liste.</div>}
           {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
         </div>

@@ -1,0 +1,66 @@
+/* L'inventaire de fin d'année (10 nov., lot W) — widgets DA6 : blanc, rayon 24,
+   jetons de la coque seulement ; ambre = geste, rouge seulement pour deux paires
+   sous un même N° ; cibles 44 px. */
+.vrm-ia { display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
+.vrm-ia-date { display: flex; align-items: center; gap: 10px; font: 600 17px var(--vrm-police, inherit); color: var(--vrm-ink, #1D1D1F); }
+.vrm-ia-date input {
+  flex: 1; min-width: 0; height: 44px; box-sizing: border-box; border-radius: 12px; padding: 0 12px;
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  font: 500 17px var(--vrm-police, inherit); font-variant-numeric: tabular-nums; color-scheme: light dark;
+}
+.vrm-ia-lue { margin: -4px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-ia-carte {
+  box-sizing: border-box; border-radius: 24px; padding: 16px 18px;
+  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-ia-tete { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); letter-spacing: .01em; }
+.vrm-ia-montant { margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.vrm-ia-montant b { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+.vrm-ia-montant span { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-ia-borne { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-ia-jauge { height: 6px; border-radius: 999px; overflow: hidden; margin: 12px 0 6px; background: var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-ia-jauge > span { display: block; height: 100%; border-radius: 999px; background: var(--vrm-ink, #1D1D1F); opacity: .82; }
+.vrm-ia-sous { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; font-size: 15px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; margin: 0; }
+.vrm-ia-sous > span { min-height: 32px; display: inline-flex; align-items: center; }
+p.vrm-ia-sous { margin-top: 6px; font-size: 13px; }
+.vrm-ia-aide { margin: 8px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-ia-large { width: 100%; min-height: 44px; margin-top: 12px; }
+.vrm-ia-exports { display: flex; gap: 10px; }
+.vrm-ia-exports > button { min-height: 44px; }
+.vrm-ia-exports > button:first-child { flex: 1; }
+.vrm-ia-ecart { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-ia-ecart h4 { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: 15px; font-weight: 700; }
+.vrm-ia-ecart h4 b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.vrm-ia-ecart h4 b[data-ia-ton="geste"] { color: var(--vrm-warn, #B25000); }
+.vrm-ia-ecart h4 b[data-ia-ton="doublon"] { color: var(--vrm-doublon, #D70015); }
+.vrm-ia ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.vrm-ia-l { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; border-top: 1px solid var(--vrm-line, rgba(0,0,0,.06)); }
+.vrm-ia-l:first-child { border-top: 0; }
+.vrm-ia-l-t { flex: 1; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-ia-l-t small { display: block; font-size: 12px; color: var(--vrm-muted, #6E6E73); overflow: hidden; text-overflow: ellipsis; }
+.vrm-ia-l-prix { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-ia-l-coche { width: 18px; text-align: center; font-weight: 700; color: var(--vrm-ink, #1D1D1F); }
+.vrm-ia-sans-n { font-size: 12px; color: var(--vrm-muted, #6E6E73); min-width: 44px; }
+.vrm-ia-lien {
+  appearance: none; border: 0; background: transparent; padding: 0; margin-top: 4px; min-height: 44px; cursor: pointer;
+  font: 600 15px var(--vrm-police, inherit); color: var(--vrm-accent, #0071E3);
+}
+.vrm-ia-lien:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent, #0071E3)); outline-offset: 2px; border-radius: 8px; }
+/* Le scanner dans le mode inventaire (src/InventaireStock.jsx) */
+.vrm-inv-scan { position: relative; border-radius: 18px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; max-height: 42vh; }
+.vrm-inv-scan video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-inv-scan-viseur { position: absolute; inset: 22% 14%; border: 2px solid rgba(255,255,255,.85); border-radius: 14px; pointer-events: none; }
+.vrm-inv-scan-sans { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; margin: 0; text-align: center; color: #fff; font-size: 15px; }
+/* L'entrée, dans le Stock, sous « Valeur du stock » : une rangée DA6 à chevron. */
+.vrm-ia-entree {
+  appearance: none; display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box;
+  min-height: 52px; margin: -4px 0 12px; padding: 0 18px; border: 0; border-radius: 24px; cursor: pointer; text-align: left;
+  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+  font: 600 17px var(--vrm-police, inherit);
+}
+.vrm-ia-entree > span:last-child { font-size: 22px; color: var(--vrm-muted, #6E6E73); }
+.vrm-ia-entree:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent, #0071E3)); outline-offset: 2px; }
+/* Un code qui n'est pas un N° (souvent long, lu par la caméra) : sur toute la largeur, jamais écrasé. */
+.vrm-inv-retour[data-inv-retour="illisible"] > span { grid-column: 1 / -1; grid-row: auto; }
+.vrm-inv-retour[data-inv-retour="illisible"] .vrm-inv-retour-n { font-size: 17px; overflow-wrap: anywhere; color: var(--vrm-muted); }

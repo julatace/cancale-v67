@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { segmentsCascade, texteValeurStock, lireValeurStock, EVT_VALEUR_STOCK, CLE_VALEUR_STOCK } from './coutVente.js';
 import { centimes } from './beneficePaire.js';
+import { emballagesAvecCout, CLE_EMBALLAGES } from './emballages.js';   // (10 nov., lot L)
+import './styles-calculette-emballages.css';
 import './styles-cout-vente.css';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -33,8 +35,16 @@ export const PointCout = ({ cle }) => <span className={`vrm-cv-point is-${cle}`}
 
 // « Emballage · non saisi » : la porte (ambre, un geste à faire) ouvre un champ.
 // Un montant illisible n'est jamais enregistré (§2.5) ; rien n'est deviné.
-export function SaisieEmballage({ onSaisir }) {
+// (10 nov., lot L) SES emballages à coût (`vrm_emballages`, src/emballages.js), lus à
+// l'ouverture du champ — une puce REMPLIT le champ, son « OK » l'enregistre : le coût ne
+// va dans la vente que sur son clic, jamais posé tout seul.
+export function SaisieEmballage({ onSaisir, types: typesDonnes = null }) {
   const [edit, setEdit] = useState(false);
+  const types = React.useMemo(() => {
+    if (!edit) return null;
+    if (typesDonnes) return typesDonnes;
+    try { return emballagesAvecCout(JSON.parse(localStorage.getItem(CLE_EMBALLAGES) || 'null')); } catch (_) { return null; }
+  }, [edit, typesDonnes]);
   const [txt, setTxt] = useState('');
   const [err, setErr] = useState(false);
   if (!edit) return <button type="button" className="vrm-cv-porte" data-cv-emballage-saisir="" onClick={() => setEdit(true)}>non saisi</button>;
@@ -51,6 +61,7 @@ export function SaisieEmballage({ onSaisir }) {
         onKeyDown={(e) => { if (e.key === 'Escape') { setEdit(false); setTxt(''); setErr(false); } }}/>
       <span aria-hidden="true">€</span>
       <button type="submit" className="vrm-cv-ok" data-cv-emballage-ok="">OK</button>
+      {Array.isArray(types) && types.length ? <span className="vrm-cv-champ-puces">{types.map((t) => <button key={t.id} type="button" className="vrm-calc-puce" data-cv-emballage-type={t.id} onClick={() => { setTxt(t.cout); setErr(false); }}>{t.nom} · {t.cout} €</button>)}</span> : null}
     </form>
   );
 }

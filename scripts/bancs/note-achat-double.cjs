@@ -140,6 +140,12 @@ async function main() {
         dit(lues.length === 1 && lues[0].carte === '8101' && lues[0].t.includes(NOTE7), `${T} trois annonces au même titre : la note du N°7 est sur SA carte seulement`, JSON.stringify(lues));
         const ajouts = await pg.$$eval('[data-note-paire="ajout"]', (l) => l.map((x) => x.closest('[data-carte-annonce]').getAttribute('data-carte-annonce')).sort());
         dit(JSON.stringify(ajouts) === '["8102","8103"]', `${T} les autres paires portent l'icône discrète « ajouter une note »`, JSON.stringify(ajouts));
+        // (10 nov., lot AM) Annonces « Toutes » est une grille de vignettes : sur une vignette FERMÉE, une note
+        // écrite se lit, l'icône « ajouter » seule ne s'affiche pas (retour de Julien : « l'icône note isolée ») ;
+        // toucher la vignette l'ouvre en place, et l'icône y est.
+        dit(await pg.locator('[data-carte-annonce="8101"] [data-note-paire="lue"]').isVisible(), `${T} vignette fermée : la note écrite se lit`);
+        await tap(pg, '[data-carte-annonce="8102"] [data-fiche-plus-bouton]');
+        await pg.locator('[data-carte-annonce="8102"][data-fiche-ouverte="1"]').waitFor({ timeout: 4000 });
         dit((await haut(pg, '[data-carte-annonce="8102"] [data-note-paire="ajout"]')) >= 44, `${T} l'icône « note » se touche sur 44 px`);
         await pg.locator('[data-carte-annonce="8101"]').scrollIntoViewIfNeeded();
         await capture(pg, `annonces-${nomC}`);

@@ -1,3 +1,5 @@
+-- ✅ APPLIQUÉE le 10 nov. 2026 par Julien (éditeur SQL de Supabase), en UN bloc SANS `concurrently`
+--    (l'éditeur enveloppe tout dans une transaction ; app_data = 11 777 lignes, ~1 s de verrou).
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 6 novembre 2026 — PAS ENCORE APPLIQUÉE (geste de Julien, voir
 -- docs/passation/2026-11-06-charge.md). Le code marche SANS elle (chemin filtré

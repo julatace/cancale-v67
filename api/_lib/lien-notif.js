@@ -43,6 +43,8 @@ export const DESTINATIONS = {
   // (5 nov.) Une offre reçue : SA conversation ouverte, la carte de l'offre en évidence.
   offre: ({ conv, compte } = {}) => lienNotif('messages', { site: 'vinted', compte, ...(conv ? { cible: 'offre', conv } : {}) }),
   offres: () => lienNotif('messages', { site: 'vinted', cible: 'offres' }),
+  // (10 nov., lot AT) Messages · Vestiaire, où vivent les cartes d'offres reçues (le résumé du soir).
+  vcOffres: () => lienNotif('messages', { site: 'vestiaire' }),
   // Ventes · Vinted · la vente ouverte.
   vente: ({ tx } = {}) => lienNotif('ventes', { site: 'vinted', ...(tx ? { cible: 'vente', tx } : {}) }),
   // (5 nov.) Ventes · Vestiaire · la vente (identité = le productId de l'annonce).

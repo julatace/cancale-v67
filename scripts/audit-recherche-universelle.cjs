@@ -155,10 +155,10 @@ function sansCommentaires(t) {
     r = ch('XW300000777FR');
     dit(cles(r, 'vente').join() === 'vente:22000000777' && r.groupes.vente[0].par === 'suivi', 'n° de suivi ⇒ SA vente', cles(r, 'vente'));
     r = ch('500123');
-    dit(cles(r, 'colis').join() === 'colis:MR7000123' && r.groupes.colis[0].par === 'code', 'code de retrait ⇒ LE bon colis (parmi 400)', cles(r, 'colis'));
-    const d = R.destinationResultat(r.groupes.colis[0]);
+    dit(cles(r, 'retrait').join() === 'colis:MR7000123' && r.groupes.retrait[0].par === 'code', 'code de retrait ⇒ LE bon colis (parmi 400)', cles(r, 'retrait'));
+    const d = R.destinationResultat(r.groupes.retrait[0]);
     dit(d && d.tab === 'cat_bord' && d.cible.type === 'retrait' && d.cible.suivi === 'MR7000123' && d.cible.grand === true, 'le colis trouvé par son code s’ouvre « En grand » (sa carte, par son n° de suivi)', d);
-    const d2 = R.destinationResultat(ch('MR7000123').groupes.colis[0]);
+    const d2 = R.destinationResultat(ch('MR7000123').groupes.retrait[0]);
     dit(d2 && !d2.cible.grand, 'trouvé par son n° de suivi : la carte, sans « En grand »', d2);
     r = ch('22000002999');
     dit(cles(r, 'vente').join() === 'vente:22000002999' && r.groupes.vente[0].exact, 'n° de transaction ⇒ SA vente', cles(r, 'vente'));

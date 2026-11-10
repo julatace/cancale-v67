@@ -75,7 +75,8 @@ function Widget({ cle, l, x, t, e = null, large = false, onClick = null, porte =
     : <div {...attrs}>{contenu}</div>;
 }
 
-export default function MaSemaine({ M, entete = null, onSemaine, onNav }) {
+// `vitesse` (10 nov., lot BM) : le widget « Vitesse d'envoi » (src/VitesseEnvoi.jsx, 30 jours), passé tel quel.
+export default function MaSemaine({ M, entete = null, onSemaine, onNav, vitesse = null }) {
   const { chiffres: c, ecarts: e } = M;
   const max = Math.max(0, ...M.jours.map((j) => (j.valeur > 0 ? j.valeur : 0)));
   const periode = periodeCourte(M.lundi, M.dimanche);
@@ -124,6 +125,7 @@ export default function MaSemaine({ M, entete = null, onSemaine, onNav }) {
           x={d.etat === 'su' ? { valeur: d.n, partiel: d.auMoins, manque: [] } : { valeur: null, hors: 'ouvre Annonces' }}
           sous="en ligne depuis plus de 30 jours"
           onClick={onNav ? () => onNav('annonces') : null}/>
+        {vitesse}
       </div>
       <p className="vrm-ms-pied">Vendu : jour de la vente. Reçu : jour du versement.</p>
     </div>
