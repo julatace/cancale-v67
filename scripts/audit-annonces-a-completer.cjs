@@ -86,7 +86,7 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
   const sansCom = app.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
   const vue = /annSort==='acompleter'\s*\?\s*\(\s*<VueACompleter[^>]*res=\{annACompleter\}/.test(sansCom) && /setAnnSort\('acompleter'\)/.test(sansCom);
   const ligneAvis = /<AvisVente\s+uid=\{o\._acc\.vinted_user_id\}\s+tx=\{String\(o\.transaction_id\)\}/.test(sansCom);
-  const lus = /champsLus: \{ marque: \['brand', 'brand_title'\]\.some/.test(sansCom);
+  const lus = /champsLus: \{ photos: Number\.isFinite\(it\.nPhotos\), marque: \['brand', 'brand_title'\]\.some/.test(sansCom);
   const proj = /harvest_\$\{uid\}_feedbacks&select=avis:data->payload->user_feedbacks/.test(sansCom);
   dit(vue && ligneAvis && proj && lus, 'B1 · branchement (vue, ligne du récap, projection, champs lus)', JSON.stringify({ vue, ligneAvis, proj, lus }));
   const comp = fs.readFileSync(path.join(RACINE, 'src', 'AvisVente.jsx'), 'utf8') + fs.readFileSync(path.join(RACINE, 'src', 'avisVente.js'), 'utf8');

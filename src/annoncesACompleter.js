@@ -9,7 +9,8 @@
 //
 // ⚠️ « Pas su » ne vaut pas « manque » (§5) : un manque n'est dit que s'il est LU.
 //   · photos : `nPhotos` posé par l'extension (mesuré : 681 annonces sur 683) ;
-//     absent ⇒ pas su, jamais « 0 photo » ;
+//     absent ⇒ pas su, jamais « 0 photo » (ni le « 1 » déduit de la seule photo
+//     gardée par l'allègement : l'appelant ne passe que le nombre LU) ;
 //   · marque / taille / état : le CHAMP doit avoir été lu dans le dressing
 //     (`champsLus`, posé par `mapWardrobeItem`) ; un champ lu VIDE est un manque,
 //     un champ jamais vu est « pas su » ;

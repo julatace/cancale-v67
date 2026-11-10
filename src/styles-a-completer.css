@@ -11,3 +11,4 @@
   .vrm-ac-gestes { grid-column: 2; flex-direction: row; flex-wrap: wrap; }
   .vrm-ac-agir { font-size: 14px; }
 }
+.vrm-qd.vrm-ac .vrm-ac-agir { min-height: 44px; height: auto; }

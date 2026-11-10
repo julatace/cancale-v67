@@ -9946,7 +9946,7 @@ const mapWardrobeItem = (it) => (enregistrerGaleries([it]), ({
   condition: it.status || null,
   // (10 nov., lot U) Le champ a-t-il été LU dans le dressing ? Un champ lu vide est un manque
   // (« À compléter », src/annoncesACompleter.js) ; un champ jamais vu est « pas su ».
-  champsLus: { marque: ['brand', 'brand_title'].some((k) => k in it), taille: ['size', 'size_title'].some((k) => k in it), etat: 'status' in it },
+  champsLus: { photos: Number.isFinite(it.nPhotos), marque: ['brand', 'brand_title'].some((k) => k in it), taille: ['size', 'size_title'].some((k) => k in it), etat: 'status' in it },
   // Pourquoi l'annonce est fermée, quand Vinted l'a dit ('sold' = vendue).
   closingAction: it.item_closing_action || null,
   reserved: !!it.is_reserved,
@@ -36817,7 +36817,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const unCompte = new Set(enLigne.map((x) => String((x._acc && x._acc.vinted_user_id) || ''))).size <= 1;
     return annoncesACompleter(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
       return { id: it.id, titre: it.title, photo: photoArticle(it) || '', num: e.numero ? String(e.numero) : '', compte: unCompte ? '' : ((it._acc && (it._acc.login || it._acc.username)) || ''),
-        domaine: it._acc && it._acc.domain, prix: it.price, ts: it.createdTs, nPhotos: it.photoCount, marque: it.brand, taille: it.size, etat: it.condition, champsLus: it.champsLus,
+        domaine: it._acc && it._acc.domain, prix: it.price, ts: it.createdTs, nPhotos: it.champsLus && it.champsLus.photos ? it.photoCount : null, marque: it.brand, taille: it.size, etat: it.condition, champsLus: it.champsLus,
         descNumero: it.numEcritDesc, prixAchat: a != null && !isNaN(a) ? a : null }; }),
       { numeroEcrit: numeroEcritActif() && (!Array.isArray(ouN) || ouN.includes('description')) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
