@@ -370,7 +370,7 @@ export function EbayAchats({compte='principal',headers,theme:C,sansTitre=false})
    // jamais affiché : eBay ne le dit pas à l'acheteur dans cette réponse.
    const st=a.expedieLe?{label:'Expédié',color:C.blue || C.accent}:(a.payeLe || /^complete$/i.test(a.statut || ''))?{label:'Payé',color:C.muted}:/incomplete|pending/i.test(a.statut || '')?{label:'À payer',color:C.warn}:null;
    return <div key={a.itemId+':'+i} className="vrm-buy-row" data-ebay-achat={a.itemId}>
-    <div className="vrm-buy-ph" style={{background:C.card2 || C.bg}}>{a.photo?<img src={a.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:null}</div>
+    <div className="vrm-buy-ph" style={{background:C.card2 || C.bg}}>{a.photo?<img src={a.photo} alt="" data-vrm-vignette="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:null}</div>
     <div className="vrm-buy-main">
      <div className="vrm-buy-title" style={{color:C.text}} title={a.titre || ''}>{a.titre || 'Annonce '+a.itemId}</div>
      <div className="vrm-buy-meta" style={{color:C.muted}}>

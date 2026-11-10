@@ -5,6 +5,8 @@ import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAcha
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { pairesDuModele } from '../dejaEnStock.js';
+import { cleFacture, verifierFichier } from '../factureAchat.js';
+import { PastilleFacture } from '../FactureAchat.jsx';
 import { DejaEnStock } from '../DejaEnStock.jsx';
 import { Bouton, C, FermeAuRetour, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lirePdfLigne, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
@@ -303,8 +305,10 @@ const lirePhotosAchatsHors = async () => {
 };
 // ⟦← App.jsx #5⟧
 
-function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null }) {
-  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false });
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null }) {
+  // (10 nov., lot AN) `facture` (src/FactureAchat.jsx) : joindre une facture d'achat (PDF ou photo) à l'achat saisi.
+  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false, facture: null });
+  const factureRef = useRef(null);
   const [form, setForm] = useState(null);       // null = fermé ; sinon le brouillon
   const [editId, setEditId] = useState(null);
   const [erreur, setErreur] = useState('');
@@ -332,7 +336,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
   const ouvrirEdition = (b) => {
     setEditId(b.id); setErreur('');
-    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo });
+    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo, facture: null });
   };
   const fermer = () => { setForm(null); setEditId(null); setErreur(''); };
   const choisirPhoto = async (ev) => {
@@ -360,6 +364,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     }
     const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: String(form.numero || '').trim(), ref: String(form.ref || '').trim().slice(0, 40) || undefined, photo: photoOk || undefined };
     if (editId) onModifier(editId, rec); else onAjouter({ id, ...rec });
+    // La facture jointe part dans SA ligne, par l'identité de l'achat (jamais son titre).
+    if (form.facture && facture) await facture.joindre(cleFacture('hors', id), form.facture);
     if (rec.numero && rec.price && onPrixParNumero) onPrixParNumero(rec.numero, rec.price);
     setEnvoi(false);
     if (!ouvert) onBasculer(true);
@@ -427,6 +433,22 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))}>Retirer la photo</Bouton>}
             <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
           </div>
+          {facture ? (() => {
+            const cf = editId ? cleFacture('hors', editId) : '';
+            const deja = cf && facture.factures ? facture.factures[cf] : null;
+            return (
+              <div data-achat-hors-facture="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                {deja && !form.facture ? <PastilleFacture cle={cf} f={deja} onOuvrir={facture.ouvrir} enCours={facture.enCours === cf} Icon={Icon} /> : null}
+                {form.facture ? <span data-achat-hors-facture-choisie="" style={{ fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{form.facture.name}</span> : null}
+                <Bouton variante="secondaire" icone="doc" data-achat-hors-facture-bouton onClick={() => factureRef.current && factureRef.current.click()} style={{ minHeight: 44 }}>
+                  {form.facture || deja ? 'Changer la facture' : 'Facture (facultatif)'}
+                </Bouton>
+                {form.facture && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, facture: null }))}>Retirer</Bouton>}
+                <input data-achat-hors-facture-input ref={factureRef} type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                  onChange={(e) => { const fi = e.target.files && e.target.files[0]; e.target.value = ''; if (!fi) return; const v = verifierFichier({ type: fi.type, taille: fi.size, nom: fi.name }); if (!v.ok) { setErreur(v.message); return; } setErreur(''); setForm(d => d && ({ ...d, facture: fi })); }} />
+              </div>
+            );
+          })() : null}
           <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} open={!!(editId && form.numero) || undefined}>
             <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 13 }}>Relier à un article (facultatif)</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
@@ -460,13 +482,14 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
               <button key={b.id} type="button" data-achat-hors-id={b.id} onClick={() => ouvrirEdition(b)} title="Modifier ou supprimer"
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', minHeight: 64, border: 'none', borderTop: i > 0 ? `1px solid ${C.border}` : 'none', borderRadius: 0, background: editId === b.id ? (C.card2 || C.bg) : 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 <span style={{ width: 44, height: 44, borderRadius: 12, background: C.card2 || C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={17} style={{ color: C.muted, opacity: .6 }} />}
+                  {src ? <img src={src} alt="" data-vrm-vignette="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={17} style={{ color: C.muted, opacity: .6 }} />}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || 'Achat'}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginTop: 2, minWidth: 0 }}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{meta || '—'}</span>
                     {b.numero && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 6, padding: '1px 6px' }}>N°{b.numero}</span>}
+                    {facture && facture.factures && facture.factures[cleFacture('hors', b.id)] ? <span data-achat-hors-a-facture="" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, color: C.text }}><Icon name="doc" size={12} />Facture</span> : null}
                   </span>
                 </span>
                 <span data-achat-hors-prix style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>{p != null ? `${p.toFixed(2).replace('.', ',')}\u00a0€` : '—'}</span>

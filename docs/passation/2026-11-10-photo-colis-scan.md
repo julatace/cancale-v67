@@ -88,5 +88,7 @@ encore.
   la remplace).
 - La visionneuse du lot AN (`claude/photos-achats`, pas sur main au moment du chantier) : `VuePhotoCarton` est
   simple ; à fondre dans la leur quand elle arrive.
+  **Fait le 10 nov. (lot AN, reprise)** : `VuePhotoCarton` retirée, la photo du carton s'ouvre dans LA
+  visionneuse (`ouvrirVisionneuse`, légende) — `docs/passation/2026-11-10-photos-achats.md` « Reprise ».
 - Fiches Vestiaire / Leboncoin : montrer la photo (la clé existe).
 - Geste de Julien : aucun.

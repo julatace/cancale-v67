@@ -17,6 +17,8 @@
 //     aucune autre ligne ne reçoit d'image (ni `main`, ni une ligne lue souvent), rien vers un autre hôte ;
 //  P3 relire le même bordereau pendant la photo ne remplace pas l'écran (« Annuler » et la photo restent) ;
 //  P4 écriture refusée par la base ⇒ dit en ambre, jamais « rangée » ;
+//  P5 l'aperçu de la photo rangée ⇒ LA visionneuse de l'app (une seule, lot AN), devant le scanner ;
+//     Échap ferme la photo seule ;
 //  F1 fiche de la vente : « Photo du carton » ⇒ « Voir » ⇒ la photo, lue par SON id, en projection
 //     (`data->>b64`), jamais `select=data` ; une vente sans photo ⇒ « Ajouter » ; lecture ratée ⇒ « — » ;
 //  E1 « Préparer mes colis » : après « Colis fait », le même geste, pour la vente de l'étape ;
@@ -212,7 +214,7 @@ async function vue(b, nom, vp, sombre) {
     dit(r && r.etat === 'inconnu' && !r.verif && !r.bouton && /aucune vente/.test(r.message), `${nom} : V3 n° inconnu ⇒ « relié à aucune vente », rien`, JSON.stringify(r && { etat: r.etat, verif: r.verif }));
     dit(cles(await lireLS(pg, 'vinted_ship_done')).length === 0 && ecrits.length === 0, `${nom} : V4 rien n'est écrit au scan`, JSON.stringify(ecrits));
     // P1 : son toucher sur 9203, puis « Photo du carton ».
-    r = await scanner(pg, 'XA100000003FR', 5);
+    r = await scanner(pg, 'XA100000003FR', 5); const tScanP1 = Date.now();
     await pg.click('[data-scan-confirmer="v:9203"]');
     await pg.waitForTimeout(400);
     r = await etat(pg);
@@ -228,13 +230,34 @@ async function vue(b, nom, vp, sombre) {
     dit(r && r.photoCartonEtat === 'range', `${nom} : P2 « Photo du carton rangée ✓ »`, r && r.photoCartonEtat);
     const e1 = ecrits.filter((x) => x.id === 'colis_photo_v_9203');
     dit(ecrits.length === 1 && e1.length === 1 && e1[0].jpeg && e1[0].taille <= 480 * 1024 && e1[0].tx === '9203' && e1[0].site === 'v', `${nom} : P2 UNE écriture, SA ligne colis_photo_v_9203 (JPEG ≤ 480 Ko, tx 9203)`, JSON.stringify(ecrits.map((x) => ({ id: x.id, t: x.taille, j: x.jpeg, tx: x.tx }))));
-    await shot('4-photo-rangee');
-    // P3 : le bordereau relu pendant qu'il photographie (après la fenêtre anti-répétition de 2,5 s du scanner).
-    await pg.waitForTimeout(2700);
+    // P3 : le bordereau relu pendant qu'il photographie (après la fenêtre anti-répétition de 2,5 s du scanner,
+    // comptée depuis SON scan, et DANS les 5 s d'« Annuler » : sous charge, une capture prise avant faisait
+    // dépasser ces 5 s — le banc jugeait alors un autre état ; la capture « 4 » est prise après).
+    await pg.waitForTimeout(Math.max(0, 2700 - (Date.now() - tScanP1)));
     r = await scanner(pg, 'XA100000003FR', 99).catch(() => null);
     await pg.waitForTimeout(800);
     r = await etat(pg);
     dit(r && r.verif === 'fait' && r.n === 5 && r.photoCartonEtat === 'range', `${nom} : P3 relire SON bordereau ne remplace pas l'écran (fait, photo rangée)`, JSON.stringify(r && { verif: r.verif, n: r.n, pc: r.photoCartonEtat }));
+    await shot('4-photo-rangee');
+    // P5 (10 nov., visionneuse unique) : toucher l'aperçu ouvre LA visionneuse de l'app (plus de vue à part),
+    // DEVANT le scanner, légende « Photo du carton · N°… » ; Échap ferme la photo SEULE (le scanner reste).
+    await pg.click('[data-scan-sheet] [data-photo-carton-voir]');
+    await pg.waitForSelector('[data-visionneuse] [data-visionneuse-img]', { timeout: 6000 }).catch(() => {});
+    await pg.waitForTimeout(300);
+    const pv = await pg.evaluate(() => {
+      const v = document.querySelector('[data-visionneuse]'); if (!v) return null;
+      const i = v.querySelector('[data-visionneuse-img]'); const r = i.getBoundingClientRect();
+      const dessus = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+      return { n: document.querySelectorAll('[data-visionneuse]').length, jpeg: /^data:image\/jpeg;base64,/.test(i.getAttribute('src') || ''), ok: i.complete && i.naturalWidth > 0,
+        devant: !!(dessus && dessus.closest('[data-visionneuse]')), legende: (v.querySelector('[data-visionneuse-legende]') || {}).textContent || '', large: r.width >= innerWidth * 0.9 && r.height >= innerHeight * 0.8,
+        autreVue: !!document.querySelector('[data-photo-carton-vue]') };
+    });
+    dit(pv && pv.n === 1 && pv.jpeg && pv.ok && pv.devant && !pv.autreVue, `${nom} : P5 l'aperçu ⇒ LA visionneuse (une seule), devant le scanner, la photo chargée`, JSON.stringify(pv));
+    dit(pv && /Photo du carton/.test(pv.legende) && /N°33/.test(pv.legende) && pv.large, `${nom} : P5 légende « Photo du carton · N°33 », photo en grand`, JSON.stringify(pv));
+    await shot('4b-visionneuse-scan');
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(350);
+    const apres = await pg.evaluate(() => ({ vis: !!document.querySelector('[data-visionneuse]'), scan: !!document.querySelector('[data-scan-sheet]') }));
+    dit(!apres.vis && apres.scan, `${nom} : P5 Échap ferme la photo seule, le scanner reste ouvert`, JSON.stringify(apres));
     await pg.waitForTimeout(5200);
     dit(JSON.stringify(cles(await lireLS(pg, 'vinted_ship_done'))) === '["9203"]', `${nom} : P1 « Colis fait » : 9203 seulement`, JSON.stringify(await lireLS(pg, 'vinted_ship_done')));
     // P4 : la base refuse l'écriture (9207).
@@ -286,13 +309,13 @@ async function vue(b, nom, vp, sombre) {
     await pg.locator(`[id="${id}"] [data-photo-carton-vente-voir]`).scrollIntoViewIfNeeded();
     await shot('7-fiche');
     await pg.click(`[id="${id}"] [data-photo-carton-vente-voir]`);
-    await pg.waitForSelector('[data-photo-carton-vue] img', { timeout: 6000 }).catch(() => {});
-    const v = await pg.evaluate(() => { const i = document.querySelector('[data-photo-carton-vue] img'); return i ? { jpeg: /^data:image\/jpeg;base64,/.test(i.getAttribute('src') || ''), ok: i.complete && i.naturalWidth > 0 } : null; });
-    dit(v && v.jpeg && v.ok, `${nom} : F1 « Voir » ⇒ la photo du carton en grand`, JSON.stringify(v));
+    await pg.waitForSelector('[data-visionneuse] [data-visionneuse-img]', { timeout: 6000 }).catch(() => {});
+    const v = await pg.evaluate(() => { const x = document.querySelector('[data-visionneuse]'); const i = x && x.querySelector('[data-visionneuse-img]'); return i ? { jpeg: /^data:image\/jpeg;base64,/.test(i.getAttribute('src') || ''), ok: i.complete && i.naturalWidth > 0, legende: (x.querySelector('[data-visionneuse-legende]') || {}).textContent || '' } : null; });
+    dit(v && v.jpeg && v.ok && /Photo du carton/.test(v.legende), `${nom} : F1 « Voir » ⇒ la photo du carton en grand, dans LA visionneuse de l'app`, JSON.stringify(v));
     const lu = lectures.filter((x) => x.id === 'colis_photo_v_9203');
     dit(lectures.length && lectures.every((x) => x.sel && !/(^|,)data(,|$)/.test(x.sel)) && lu.some((x) => /data->>b64/.test(x.sel)), `${nom} : F1 lue par SON id, en projection (data->>b64), jamais select=data`, JSON.stringify(lectures.map((x) => x.id + '?' + x.sel)));
     await shot('8-vue');
-    await pg.click('[data-photo-carton-vue-fermer]'); await pg.waitForTimeout(300);
+    await pg.click('[data-visionneuse-fermer]'); await pg.waitForTimeout(300);
     id = await ouvrirVente(9205);
     l = await ligne(id);
     dit(l && l.etat === 'non' && l.ajouter && !l.voir, `${nom} : F1 une vente sans photo (9205) ⇒ « Ajouter »`, JSON.stringify(l));

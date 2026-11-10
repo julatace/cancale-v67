@@ -9,7 +9,7 @@ const euros = n => n != null && n !== '' && /^\d+(\.\d+)?$/.test(String(n)) && N
 function Photo({src}) {
  const [ko,setKo]=useState(false);
  let url='';try {const u=new URL(src);if(u.protocol==='https:'&&!u.username&&!u.password)url=u.href;}catch{}
- return url&&!ko ? <img src={url} alt="" loading="lazy" onError={()=>setKo(true)}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty">—</span>;
+ return url&&!ko ? <img src={url} alt="" data-vrm-vignette="" loading="lazy" onError={()=>setKo(true)}/> : <span aria-label="Photo indisponible" className="vrm-lbc-catalog-photo-empty">—</span>;
 }
 // (28 oct.) Le N° d'une annonce est celui de la règle de tout l'écran
 // (`numeroLbcIdentite` : lien posé à la main, sinon référence VRM traduite par la

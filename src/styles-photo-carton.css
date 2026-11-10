@@ -23,14 +23,5 @@
 .vrm-pc.is-clair .vrm-pc-note.is-ambre { color: #B25000; }
 .vrm-pc-ligne dd { display: flex; align-items: center; gap: 10px; justify-content: flex-end; min-width: 0; }
 .vrm-pc-date { color: var(--d-gris, #6E6E73); font-size: 13px; }
-.vrm-pc-vue { position: fixed; inset: 0; background: rgba(0,0,0,.96); display: flex; align-items: center; justify-content: center;
-  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); box-sizing: border-box; }
-.vrm-pc-vue-cadre { width: min(720px, 100%); height: min(860px, 100%); display: flex; flex-direction: column; gap: 12px; color: #fff; min-height: 0; }
-.vrm-pc-vue-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.vrm-pc-vue-tete span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.vrm-pc-vue-tete b { font-size: 17px; }
-.vrm-pc-vue-tete small { font-size: 13px; color: #aeaeb2; }
-.vrm-pc-vue-tete button { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 22px; border: 0; background: #2c2c2e; color: #fff; display: grid; place-items: center; cursor: pointer; }
-.vrm-pc-vue-cadre img { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; border-radius: 16px; }
 .vrm-pc-voir { min-height: 44px; min-width: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--vrm-accent-texte, #0066CC); font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
 .vrm-pc-ligne .vrm-pc { flex: 0 0 auto; }
