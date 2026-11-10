@@ -48,6 +48,8 @@ const MUTATIONS = {
   'code-a-peu-pres': ['src', 'const c = e.codes.find((x) => x === qa); if (c) { par = \'code\'; exact = true; valeur = c; }', 'const c = e.codes.find((x) => x.includes(qa)); if (c) { par = \'code\'; exact = true; valeur = c; }'],
   // Un suivi partiel compterait comme exact.
   'suivi-partiel-exact': ['src', "if (s) { par = 'suivi'; exact = s === qa; valeur = s; }", "if (s) { par = 'suivi'; exact = true; valeur = s; }"],
+  // Un suivi recopié par blocs redevient « des mots du titre ».
+  'suivi-blocs': ['src', "const blocs = un || (/^[a-z0-9\\s-]+$/i.test(brut) && /\\d/.test(brut));", 'const blocs = un;'],
   // L'app ne demande plus la tête.
   'app-sans-tete': ['app', 'chercherPartout(idx, qBrut, { numero: kNumQ, exactesEnTete: true,', 'chercherPartout(idx, qBrut, { numero: kNumQ,'],
   // L'app : une lecture ratée redevient « aucun achat ».
@@ -125,6 +127,8 @@ const essaie = (nom, f) => { try { f(); } catch (e) { dit(false, nom + ' — le 
     dit(cles(r.exactes).join() === 'vente:22999990107' && r.exactes[0].par === 'suivi', 'n° de suivi tapé avec espaces et minuscules ⇒ SA vente, en tête, « par son n° de suivi »', cles(r.exactes));
     dit(partout(r).filter((c) => c === 'vente:22999990107').length === 1, 'la vente en tête n’est pas répétée dans « Ventes »', partout(r));
     dit(!cles(r.exactes).includes('paire:piege') && cles(r.groupes.paire).includes('paire:piege') && r.groupes.paire.find((x) => x.e.cle === 'paire:piege').par === 'titre', 'la paire dont le TITRE porte ce suivi : trouvée par le titre, jamais « exacte »', { ex: cles(r.exactes), p: cles(r.groupes.paire) });
+    const g = R.reconnaitreRequete('xw 300 000 007 fr').genres;
+    dit(g.includes('suivi') && !R.reconnaitreRequete('nike dunk low').genres.includes('suivi'), '« Je cherche un n° de suivi » dit aussi pour un suivi recopié par blocs (et pas pour des mots)', g);
     const p = ch('XW30000000');
     dit(!p.exactes.length && p.groupes.vente.length === 10, 'un suivi PARTIEL trouve, mais n’est jamais « exact »', [p.exactes.length, p.groupes.vente.length]);
   });

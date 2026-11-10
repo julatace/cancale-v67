@@ -114,9 +114,12 @@ export function reconnaitreRequete(q, { numero = null } = {}) {
   if (/^\d{2}-\d{5}-\d{5}$/.test(brut.replace(/\s+/g, ''))) g.push('commande-ebay');
   if (numero) g.push('numero');
   const un = !/\s/.test(brut);
-  if (un && /^\d{8,}$/.test(qa)) g.push('transaction');
-  if (un && qa.length >= 10 && /[A-Z]/.test(qa) && /\d/.test(qa)) g.push('suivi');
-  else if (un && /^\d{10,}$/.test(qa)) g.push('suivi');
+  // (10 nov., lot AX) Un n° recopié par blocs (« XW 300 000 007 FR », « 2299 9990 120 ») reste
+  // une identité : lettres et chiffres seulement, au moins un chiffre — normalisé comme l'index.
+  const blocs = un || (/^[a-z0-9\s-]+$/i.test(brut) && /\d/.test(brut));
+  if (blocs && /^\d{8,}$/.test(qa)) g.push('transaction');
+  if (blocs && qa.length >= 10 && /[A-Z]/.test(qa) && /\d/.test(qa)) g.push('suivi');
+  else if (blocs && /^\d{10,}$/.test(qa)) g.push('suivi');
   if (un && qa.length >= 4 && qa.length <= 8 && !numero) g.push('code');
   if (un && /^[a-z0-9._-]{3,}$/i.test(brut) && /[a-z]/i.test(brut)) g.push('pseudo');
   if (/[a-z]/i.test(brut)) g.push('mots');
