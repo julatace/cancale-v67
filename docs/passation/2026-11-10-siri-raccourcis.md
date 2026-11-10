@@ -35,7 +35,7 @@ Sur iPhone, « Ouvrir les URL » ouvre Safari, pas l'icône de l'écran d'accuei
 connecté à VRM dans Safari une fois.
 
 ## Preuves
-- `scripts/audit-raccourcis-siri.cjs` : 46 contrôles (lecture des liens, liens exacts, 3 étapes
+- `scripts/audit-raccourcis-siri.cjs` : 40 contrôles (lecture des liens, liens exacts, 3 étapes
   ≤ 12 mots, branchement `goto`/Achats/Paramètres, rien d'écrit dans le chemin du lien) ;
   `--prouve` : 8 mutations toutes rouges (prix deviné, sans `achat=1`, sans la règle de la voix,
   sans bornes, sans nettoyage, demande non consommée, lien bavard).
