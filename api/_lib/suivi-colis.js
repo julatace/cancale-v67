@@ -548,7 +548,11 @@ export const RATTRAPAGE_J = 1;
 // ne disait rien. Un tel colis coché « Je l'ai retiré » sur sa COMMANDE
 // (`cocheTx` : `vinted_pickup_done`, relié par `liens` — une identité) est
 // sauté, comme dans l'app.
-export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = [], finis = [], maintenant = Date.now(), aujourdhui = null, finParCommande = null, transp = null, cocheTx = null, liens = null } = {}) {
+// (10 nov., lot AT) `jourCible` : 0 = le rappel du matin (« dernier jour » aujourd'hui, « à vérifier ») ;
+// 1 = le résumé du soir (« demain » : la date limite LUE dans l'e-mail tombe demain — jamais
+// une garde estimée, jamais « à vérifier »). La même règle, un autre jour.
+export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = [], finis = [], maintenant = Date.now(), aujourdhui = null, finParCommande = null, transp = null, cocheTx = null, liens = null, jourCible = 0 } = {}) {
+  const cible = jourCible === 1 ? 1 : 0;
   // (revue du 23 oct., n° 2) Chaque ligne relue avec la règle de l'app : un
   // colis « en transit » pour l'app ne reçoit jamais « à vérifier — va le
   // chercher » le matin.
@@ -601,7 +605,8 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
     const transporteur = (l.carrier != null ? l.carrier : l.c) || '';
     const e = leverGarde(etatRetrait({ limite, arriveeMs, transporteur, limiteAt }, maintenant, aujourdhui), l, maintenant, aujourdhui);
     let etat = null;
-    if (e.etat === 'a_retirer' && limite && e.jours === 0) etat = 'dernier';
+    if (e.etat === 'a_retirer' && limite && e.jours === cible) etat = cible ? 'demain' : 'dernier';
+    else if (cible) etat = null;
     else if (e.etat === 'delai_depasse' && e.jours >= -(1 + RATTRAPAGE_J)) etat = 'a_verifier';
     else if (e.etat === 'trop_long' && Number.isFinite(e.age) && e.age <= e.garde + 1 + RATTRAPAGE_J) etat = 'a_verifier';
     if (!etat) continue;

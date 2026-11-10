@@ -62,7 +62,10 @@ export const CONFIRMATIONS = [
   { cle: 'num', geste: 'N° déjà servi, nouveau N°, N° porté par un autre, donner un N° libre, reprendre un ancien N°, remise en ligne « même paire », Vestiaire « Un seul N° » / défaire', ou: 'Annonces, Stock, Vestiaire', decision: 'gardee', pourquoi: 'un N° posé ou changé s’écrit là où l’article est rangé : jamais « annulé » en silence' },
   { cle: 'num-perdu', geste: 'Déclarer perdu, « n’est plus chez toi », « je m’en sépare »', ou: 'Ventes, Annonces, Ma journée', decision: 'gardee', pourquoi: 'sort la paire du stock et vide sa case au garage ; Ma journée est le chantier d’un autre agent' },
   // Gardées — suppressions et prix d'achat (il les saisit lui-même, §2.5).
-  { cle: 'suppr', geste: 'Supprimer une fiche neuve, un achat hors plateforme, une dépense, une vente saisie, un brouillon eBay, un modèle, un meuble, une pièce, un article d’inventaire ; vider une grille', ou: 'partout', decision: 'gardee', pourquoi: 'destructif (« ça ne se rattrape pas ») — la corbeille 30 jours est le lot Y' },
+  // (10 nov., lot Y) La corbeille 30 jours (src/corbeille.js) : ces suppressions DANS VRM se rattrapent
+  // désormais — pilule « Annuler » 5 s, puis Paramètres → Corbeille. Plus de « Tu es sûr ? ».
+  { cle: 'corbeille', geste: 'Supprimer un achat hors plateforme, une dépense, un coût, un pack, un abonnement, un modèle, une réponse rapide, une note ; retirer une fiche à publier', ou: 'Achats, Compta, Paramètres, Messages, fiche paire', decision: 'corbeille', pourquoi: 'va à la corbeille 30 jours (restaurable d’un toucher) : la valeur d’avant revient exactement, même id, même N°' },
+  { cle: 'suppr', geste: 'Supprimer une vente saisie, un brouillon eBay, un meuble, une pièce, un article d’inventaire ; vider une grille', ou: 'Compta (ancienne saisie), eBay, Stock', decision: 'gardee', pourquoi: 'pas encore dans la corbeille : ligne à part (brouillons eBay, plan du Stock) ou écran ancien non relié au menu' },
   { cle: 'prix-achat', geste: 'Valider N prix d’achat, répartir un lot, annuler une répartition, poser N prix, remplacer un prix saisi, retirer un fournisseur ou un achat en gros, prix mini', ou: 'Achats, Annonces', decision: 'gardee', pourquoi: 'plusieurs prix d’achat d’un coup : il relit la liste avant (il les saisit lui-même)' },
   { cle: 'stock-plan', geste: 'Retirer un N° d’une case, libérer une case', ou: 'Stock', decision: 'gardee', pourquoi: 'le plan du Stock a sa propre ligne et sa relecture (`planLu`) : pas branché sur la file du geste (à faire avec le lot X)' },
   { cle: 'restaurer', geste: 'Importer / restaurer une sauvegarde, début de l’import', ou: 'Réglages', decision: 'gardee', pourquoi: 'remplace des données entières' },
@@ -79,6 +82,8 @@ export const ACTIONS_RECHERCHE = [
   { id: 'export-comptable', libelle: 'Exporter pour mon comptable', sous: 'Compta → tableur et PDF d’une période', icone: 'doc', mots: ['exporter', 'export', 'comptable', 'comptabilite', 'compta', 'csv', 'excel', 'tableur', 'pdf'] },
   { id: 'ma-configuration', libelle: 'Ma configuration', sous: 'Plateformes, statut, numéro, affichage, notifications', icone: 'gear', mots: ['configuration', 'configurer', 'config', 'statut', 'plateformes', 'demarrage'] },
   { id: 'ma-journee', libelle: 'Ma journée', sous: 'Ce qu’il y a à faire aujourd’hui', icone: 'home', mots: ['journee', 'aujourd', 'accueil', 'ma journee'] },
+  // (10 nov., lot L) La calculette d'achat : elle OUVRE une feuille qui n'écrit rien.
+  { id: 'calculette', libelle: 'Calculette d’achat', sous: 'Combien je gagne si je l’achète X € ?', icone: 'euro', mots: ['calculette', 'calculer', 'calcul', 'combien', 'gagner', 'gagne', 'benefice', 'marge', 'rentable', 'acheter'] },
   { id: 'achats', libelle: 'Mes achats', sous: 'Achats', icone: 'bag', mots: ['achats', 'achat', 'acheter'] },
   { id: 'reglages', libelle: 'Réglages', sous: 'Paramètres de VRM', icone: 'gear', mots: ['reglages', 'parametres', 'preferences', 'settings', 'options'] },
   { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, sous: 'La fiche de la paire', icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire'] },
@@ -150,6 +155,7 @@ export function destinationAction(a) {
     case 'ma-configuration': return { feuille: 'configuration' };
     case 'ma-journee': return { tab: 'journee' };
     case 'achats': return { tab: 'achats' };
+    case 'calculette': return { feuille: 'calculette' };
     case 'reglages': return { tab: 'settings' };
     case 'ouvrir-num': return a.num ? { feuille: 'fiche', num: a.num } : null;
     case 'baisser-prix': return a.num ? { feuille: 'prix', num: a.num } : null;

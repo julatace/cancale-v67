@@ -223,7 +223,10 @@ const ouvrirFiche = async (pg, n, attendre = null) => {
         const v = r.r.find((x) => x.type === 'vente'), m = r.r.find((x) => x.type === 'message');
         dit(v && v.par === 'transaction' && v.cle === 'vente:22999990226', `B ${TT} n° de transaction ⇒ SA vente`, r.r);
         dit(m && m.par === 'transaction' && m.conv === '80017' && r.r.filter((x) => x.type === 'message').length === 1, `B ${TT} n° de transaction ⇒ SA conversation (une seule, sur 50 au même titre)`, r.r);
-        dit(r.groupes.includes('vente') && r.groupes.includes('message') && r.groupes.indexOf('vente') < r.groupes.indexOf('message'), `B ${TT} résultats groupés par type (Ventes, puis Messages)`, r.groupes);
+        // (10 nov., lot AX) Le n° de transaction EXACT : sa vente puis sa conversation passent EN TÊTE
+        // (« Correspondance exacte »), dans cet ordre ; sinon chacune dans son groupe.
+        const ordre = r.r.map((x) => x.type);
+        dit((r.groupes.includes('exacte') && ordre.indexOf('vente') >= 0 && ordre.indexOf('vente') < ordre.indexOf('message')) || (r.groupes.includes('vente') && r.groupes.includes('message') && r.groupes.indexOf('vente') < r.groupes.indexOf('message')), `B ${TT} résultats rangés (Ventes, puis Messages ; en tête quand le n° est exact)`, r.groupes);
         dit(/transaction/.test(r.compris || ''), `B ${TT} « Je cherche un n° de transaction » est dit`, r.compris);
         await pg.screenshot({ path: path.join(SHOTS, `rf-transaction-${suf}.png`) });
         await taper(pg, 'pseudo17');

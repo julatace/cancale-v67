@@ -1,4 +1,5 @@
 import { gabaritMail } from '../../api/_lib/mail-gabarit.js';
+import { traductionContenu, MESSAGE_DEFAUT_EN, PIED_VRM_EN } from './anglais.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  LA FACTURE PRO — la règle (2 novembre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -175,7 +176,7 @@ export const anneeParis = (t) => Number(jourParis(t).slice(-4)) || new Date(t).g
 // Tout ce que le PDF dessine, et rien d'autre : il se refait à l'identique des
 // années plus tard. Lève une erreur (avec la liste) si quelque chose manque —
 // l'appelant vérifie AVANT avec `manquantsVendeur` / `manquantsVente`.
-export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', origine = null }) {
+export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', origine = null, langue = 'fr' }) {
   const mv = manquantsVendeur(cfg); const mvt = manquantsVente(vente);
   if (mv.length || mvt.length) { const e = new Error('incomplet'); e.manquants = [...mv, ...mvt]; throw e; }
   const c = cfg;
@@ -195,6 +196,9 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
   if (c.tva_regime === 'franchise') mentions.push(MENTION_FRANCHISE);
   if (c.tva_regime === 'marge') mentions.push(MENTION_MARGE);
   const venteLe = Date.parse(vente.venteLe);
+  // (10 nov., lot T) « Facture en anglais » : la traduction est FIGÉE dans
+  // l'instantané (./anglais.js) ; le français reste, mot pour mot.
+  const anglais = langue === 'en' ? { anglais: traductionContenu({ mentions, venteJour: jourParis(venteLe), plateforme: txt(vente.plateforme) }) } : {};
   return {
     v: 1,
     type,
@@ -228,6 +232,7 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
     note: String(c.note || '').slice(0, 600).trim(),
     couleur: COULEURS.includes(c.couleur) ? c.couleur : COULEURS[0],
     logo: typeof c.logo === 'string' && /^data:image\/(png|jpeg);base64,/.test(c.logo) && c.logo.length <= LOGO_MAX ? c.logo : '',
+    ...anglais,
   };
 }
 // Le logo : une image PNG ou JPEG, réduite par l'app avant d'être rangée.
@@ -241,10 +246,13 @@ export const nomFichier = (contenu) => `${contenu.type === 'avoir' ? 'Avoir' : '
 // remplacements : {numero}, {acheteur}, {article}, {boutique}.
 export const MESSAGE_DEFAUT = 'Bonjour {acheteur},\n\nVous trouverez ci-joint la facture {numero} pour votre achat « {article} ».\n\nMerci pour votre confiance,\n{boutique}';
 export function messageEmail(cfg, contenu) {
-  const modele = String((cfg && cfg.message) || '').trim() || MESSAGE_DEFAUT;
+  // (10 nov.) Facture en anglais : le message par défaut est anglais PUIS français ;
+  // un message écrit par le vendeur reste le sien, jamais traduit.
+  const modele = String((cfg && cfg.message) || '').trim() || (contenu.anglais ? `${MESSAGE_DEFAUT_EN}\n\n—\n\n${MESSAGE_DEFAUT}` : MESSAGE_DEFAUT);
   const r = { numero: contenu.numero, acheteur: contenu.acheteur.nom, article: (contenu.lignes[0] || {}).designation || '', boutique: contenu.vendeur.nom };
   const corps = modele.replace(/\{(numero|acheteur|article|boutique)\}/g, (_, k) => r[k] || '').slice(0, 3000);
-  const sujet = `${contenu.type === 'avoir' ? 'Avoir' : 'Facture'} ${contenu.numero} — ${contenu.vendeur.nom}`.slice(0, 200);
+  const libDoc = contenu.type === 'avoir' ? 'Avoir' : 'Facture';
+  const sujet = `${contenu.anglais ? `${libDoc} / ${contenu.type === 'avoir' ? 'Credit note' : 'Invoice'}` : libDoc} ${contenu.numero} — ${contenu.vendeur.nom}`.slice(0, 200);
   return { sujet, corps };
 }
 
@@ -360,18 +368,18 @@ export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
   const { sujet, corps } = messageEmail(cfg, contenu);
   const nom = contenu.vendeur.nom;
   const pied = via === 'vrm'
-    ? `Cette facture vous est envoyée par VRM pour le compte de ${nom}. Pour toute question, répondez simplement à cet e-mail : votre réponse arrive chez ${nom}.`
+    ? `Cette facture vous est envoyée par VRM pour le compte de ${nom}. Pour toute question, répondez simplement à cet e-mail : votre réponse arrive chez ${nom}.${contenu.anglais ? ` ${PIED_VRM_EN(nom)}` : ''}`
     : '';
   const texte = pied ? `${corps}\n\n—\n${pied}` : corps;
   // (8 nov.) Le HTML passe par le gabarit commun des e-mails (api/_lib/mail-gabarit.js) :
   // le NOM du vendeur en tête (c'est SA facture, pas un e-mail de VRM), son texte
   // échappé, la pièce jointe dite, aucun bouton. Le texte brut reste exactement le sien.
-  const doc = contenu.type === 'avoir' ? 'Avoir' : 'Facture';
+  const doc = contenu.type === 'avoir' ? (contenu.anglais ? 'Avoir / Credit note' : 'Avoir') : (contenu.anglais ? 'Facture / Invoice' : 'Facture');
   const { html } = gabaritMail({
     titre: `${doc} ${contenu.numero}`,
-    preentete: `${doc} ${contenu.numero} en pièce jointe (PDF).`,
+    preentete: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
     paras: corps.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean),
-    apres: `${doc} ${contenu.numero} en pièce jointe (PDF).`,
+    apres: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
     pied: pied ? { texte: pied } : null,
     marque: { nom },
   });

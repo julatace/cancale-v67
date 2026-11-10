@@ -28,7 +28,7 @@ const MUTATIONS = {
   memo: ['  if (_memo.cles && _memo.cles.length === cles.length && _memo.cles.every((x, i) => x === cles[i])) return _memo.index;', ''],
   'colis-double': ['    const p = parSuivi.get(k);', '    const p = null;'],
   'mots-ordre': ['if (!par && e.t && mots.every((m) => e.t.includes(m)))', 'if (!par && e.t && e.t.includes(qn))'],
-  max: ['if (g && g.length < maxDe(t.e.type)) g.push(t);', 'if (g) g.push(t);'],
+  max: ['if (g && g.length < maxDe(k)) g.push(t);', 'if (g) g.push(t);'],
   // Le pseudo d'un e-mail attaché par TITRE (la jumelle reçoit aussi le pseudo).
   'pseudo-titre': ["  for (const o of Array.isArray(S.ventes) ? S.ventes : []) commande('vente', o);",
     "  { const vs = Array.isArray(S.ventes) ? S.ventes : []; for (const o of vs) { const tx = alnum(o && o.transaction_id); for (const j of vs) if (j !== o && str(j.title) === str(o.title) && pseudosTx.get(alnum(j.transaction_id))) { if (!pseudosTx.has(tx)) pseudosTx.set(tx, new Set()); for (const p of pseudosTx.get(alnum(j.transaction_id))) pseudosTx.get(tx).add(p); } } for (const o of vs) commande('vente', o); }"],
@@ -88,11 +88,11 @@ if (arg.includes('--prouve')) {
     const s = cherche('xw309277125jf');
     dit(cles(s, 'vente').join() === 'vente:22314280002' && s.groupes.vente[0].par === 'suivi' && s.groupes.vente[0].exact, 'n° de suivi du bordereau ⇒ SA vente', cles(s, 'vente'));
     const s2 = cherche('1Z999 AA10 1234');
-    dit(cles(s2, 'colis').join() === 'colis:1Z999AA10123456784', 'n° de suivi partiel, espaces compris ⇒ le colis', cles(s2, 'colis'));
+    dit(cles(s2, 'retrait').join() === 'colis:1Z999AA10123456784', 'n° de suivi partiel, espaces compris ⇒ le colis (groupe « Retraits », il vient chez lui)', cles(s2, 'retrait'));
     dit(idx.entrees.filter((e) => e.type === 'colis').length === 2, 'le même n° de suivi reçu deux fois = UN colis', idx.entrees.filter((e) => e.type === 'colis').map((e) => e.cle));
     const c = cherche('482913');
-    dit(cles(c, 'colis').join() === 'colis:1Z999AA10123456784' && c.groupes.colis[0].par === 'code', 'code de retrait ⇒ le colis', c.groupes.colis.map((r) => r.par));
-    dit(cles(cherche('k7q2'), 'colis').join() === 'colis:1Z999AA10123456784', 'le second code du même colis est gardé');
+    dit(cles(c, 'retrait').join() === 'colis:1Z999AA10123456784' && c.groupes.retrait[0].par === 'code', 'code de retrait ⇒ le colis', c.groupes.retrait.map((r) => r.par));
+    dit(cles(cherche('k7q2'), 'retrait').join() === 'colis:1Z999AA10123456784', 'le second code du même colis est gardé');
     dit(cherche('4829').total === 0, 'un code se compare EXACTEMENT (« 4829 » ne sort pas « 482913 »)', cherche('4829').total);
     const t = cherche('22314280003');
     dit(cles(t, 'vente').join() === 'vente:22314280003' && t.groupes.vente[0].par === 'transaction', 'n° de transaction ⇒ SA vente', cles(t, 'vente'));
@@ -106,12 +106,12 @@ if (arg.includes('--prouve')) {
     const d = t.groupes.vente.map((r) => R.destinationResultat(r));
     dit(d.length === 2 && d[0].cible.tx !== d[1].cible.tx && d.every((x) => x.tab === 'ventes' && x.cible.type === 'vente'), 'chaque jumelle ouvre SA transaction', d);
     dit(cles(cherche('legere'), 'vente').join() === 'vente:22314280003', 'sans accents : « legere » trouve « Légère »');
-    dit(cles(cherche('salomon'), 'achat').join() === 'achat:23705320001' && cles(cherche('salomon'), 'colis').length === 1, 'un même mot trouve l’achat ET le colis, en deux groupes');
+    dit(cles(cherche('salomon'), 'achat').join() === 'achat:23705320001' && cles(cherche('salomon'), 'retrait').length === 1, 'un même mot trouve l’achat ET le colis, en deux groupes');
     dit(cherche('   ').total === 0 && cherche('').total === 0, 'une recherche vide ne rend rien');
   });
 
   essaie('destinations', () => {
-    const r = cherche('482913').groupes.colis[0];
+    const r = cherche('482913').groupes.retrait[0];
     const d = R.destinationResultat(r);
     dit(d && d.tab === 'cat_bord' && d.cible.type === 'retrait' && d.cible.suivi === '1Z999AA10123456784', 'un colis à retirer ouvre Colis → À retirer, sa carte (n° de suivi)', d);
     const r2 = cherche('mr55512345').groupes.colis[0];
@@ -145,7 +145,7 @@ if (arg.includes('--prouve')) {
     const lot = R.chercherPartout(I1, 'nike');
     dit(lot.groupes.vente.length === R.MAX_PAR_GROUPE && lot.total === N, `un mot fréquent : ${R.MAX_PAR_GROUPE} lignes par groupe au plus, le total gardé`, [lot.groupes.vente.length, lot.total]);
     const c = R.chercherPartout(I1, '101499');
-    dit(c.groupes.colis.length === 1 && c.groupes.colis[0].par === 'code', 'le code exact sort en tête parmi 1 500 colis');
+    dit(c.groupes.retrait.length === 1 && c.groupes.retrait[0].par === 'code', 'le code exact sort en tête parmi 1 500 colis');
   });
 
   console.log(`\n${n - ko}/${n} contrôles verts.`);
