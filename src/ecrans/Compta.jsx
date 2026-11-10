@@ -18,6 +18,7 @@ import { prendreDemande } from '../rechercheEcran.js';
 import { recuPublieEntre } from '../design/carteChiffres.js';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre } from '../registres.js';
+import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
 import { lireFactures } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
@@ -28,6 +29,7 @@ import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal } from '../App.jsx';
+import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
@@ -53,9 +55,11 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
+import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
+const FacturesAEnvoyer = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FacturesAEnvoyer })));
 // ⟦← App.jsx #9⟧
 // Le taux est un RÉGLAGE, pas une constante : il dépend de l'activité et de
 // l'option pour le versement libératoire, et lui seul connaît le sien.
@@ -999,6 +1003,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       </div>
       <SeuilTvaFactures deps={DEPS_FACTURE}/>
       {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
+      <FacturesAEnvoyer deps={DEPS_FACTURE}/>
       <ListeFacturesPro deps={DEPS_FACTURE}/>
 
       {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
@@ -1015,7 +1020,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
       </div>
       {search&&<div style={{fontSize:12,color:C.warn}}>
-        🔍 Recherche « {search} » dans toutes les factures — {fullList.length} résultat{fullList.length>1?'s':''}. Tu peux supprimer directement avec 🗑.
+        🔍 « {search} » : {fullList.length} résultat{fullList.length>1?'s':''} dans toutes les factures.
       </div>}
       
       {/* Sous-onglets zones */}
@@ -1479,7 +1484,7 @@ function DaterVentesLbc({ ventes, dates }) {
   return (
     <div data-dater-lbc={liste.length} style={{ padding: '10px 16px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
       <div style={{ fontWeight: 600 }}>Dater tes ventes Leboncoin</div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>Recopie la date de vente affichée dans « Mes transactions » sur leboncoin.fr : la vente compte alors dans son mois (CA, déclaration URSSAF).</div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>Recopie la date de « Mes transactions » : la vente entre dans son mois.</div>
       {liste.map((v) => {
         const tx = String(v.txId), cur = (dates || {})[tx] || '';
         const val = saisie[tx] != null ? saisie[tx] : cur;
@@ -1578,7 +1583,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
                 choix ne vaut que pour CETTE carte (le bénéfice a le sien).
                 (2 nov.) Dans « Le détail », le repli porte le titre. */}
             {!dansRepli && <div data-titre-carte-ca="" style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{TITRE_CARTE_CA}</div>}
-            <div data-ca-sa-periode="" style={{ fontSize: dansRepli ? 13 : 11, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{dansRepli ? <>Vendu : au jour de la vente. Reçu : au jour où la plateforme t'a versé l'argent (c'est lui qui se déclare). La période choisie ici ne vaut que pour cette carte.</> : 'Toutes plateformes · la période choisie ici ne vaut que pour cette carte.'}</div>
+            <div data-ca-sa-periode="" style={{ fontSize: dansRepli ? 13 : 11, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{dansRepli ? <>Vendu : jour de la vente. Reçu : jour du versement (il se déclare).</> : 'Toutes plateformes · la période choisie ici ne vaut que pour cette carte.'}</div>
           </div>
           {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des
               sous-onglets de plateforme) : plus de segment rempli d'accent. */}
@@ -1590,7 +1595,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
         </div>
         {calc.etat !== 'lu' ? (
           <div style={{ padding: '16px', fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
-            {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
+            {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre plutôt qu'un faux zéro."}
           </div>
         ) : (<>
           <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
@@ -1626,8 +1631,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
             <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
               {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
               {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
-              {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
-              {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
+              {versements === null && <div>Dates de versement Vinted illisibles : « reçu » attend.</div>}
+              {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : hors « reçu » pour l'instant.</div>}
               {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période — tu peux la dater ci-dessous.</div>}
               {/* (2 nov., audit des données G1) La commande eBay au montant pas lu est dans « non comptées » ci-dessous (une phrase, §7). */}
               {/* (1er nov., audits A2/A10) Des ventes faites dont l'argent ne se lit pas : dans AUCUNE colonne, dites (jamais 0 €). */}
@@ -1705,13 +1710,13 @@ function ProfilFiscalCarte({ onNav }) {
           <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, background: C.card2 || C.bg, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Ton entreprise</div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : VRM retrouve le nom et l'adresse. Ils figurent sur tes reçus et tes factures.</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : nom et adresse se remplissent.</div>
           </div>
           {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
         </div>
         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {cfg === undefined && <div style={{ fontSize: 13, color: C.muted }}>Je lis ton entité…</div>}
-          {cfg === null && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>La base n'a pas répondu : je ne te montre pas de champs vides à remplir (ils remplaceraient ton entité). Rouvre cet écran dans un moment.</div>}
+          {cfg === null && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>Base muette : rien à remplir pour ne rien écraser. Rouvre plus tard.</div>}
           {cfg && (<>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {PROFIL_CHAMPS.map(([k, ph, flex]) => (
@@ -1722,12 +1727,12 @@ function ProfilFiscalCarte({ onNav }) {
               ))}
             </div>
             <div data-siren={siren.etat} data-registre={registre ? registre.etat : undefined} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
-              {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres) : il figure sur ton avis de situation INSEE. Le nom de ton entreprise se remplit tout seul.'
-                : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`
+              {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres, avis INSEE) : le nom suit.'
+                : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Gardé tel quel : vérifie ton avis INSEE.`
                 : !registre || registre.etat === 'encours' ? `${siren.type} valide — je cherche ton entreprise au registre…`
                 : registre.etat === 'trouve' ? <>✓ Trouvée au registre des entreprises : <b className="vrm-sensible" data-stream-type="compte" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? ' — le registre la dit fermée, vérifie ton numéro.' : '.'}{cfg.nom && cfg.nom !== registre.nom ? ' Tu as gardé ton propre nom : VRM ne le remplace pas.' : ''}</>
                 : registre.etat === 'inconnu' ? `${siren.type} valide, mais aucune entreprise à ce numéro au registre public — tape le nom toi-même.`
-                : `${siren.type} valide. Le registre des entreprises ne répond pas pour l'instant — le nom se remplira à ta prochaine visite, ou tape-le.`}
+                : `${siren.type} valide. Registre muet : tape le nom, ou reviens plus tard.`}
             </div>
           </>)}
           {/* (5 nov., chantier F, revue 2.27) Le statut ne se choisit plus ICI : un seul endroit,
@@ -2235,7 +2240,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {chip('doc')}
           <div style={{ flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Facturation électronique</div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers. Connecte ton compte Super PDP pour que tes factures partent d'ici, ou dépose-les toi-même.</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Connecte Super PDP, ou dépose les fichiers toi-même.</div>
           </div>
           <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label="Mois" data-fe-mois
             style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
@@ -2245,8 +2250,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
-            ['Ce que VRM prépare', 'Une facture Factur-X (PDF + données lisibles par machine) par vente, et le récapitulatif mensuel de tes ventes aux particuliers (e-reporting).'],
-            ["Où l'envoyer", "Super PDP (plateforme agréée) : connecte TON compte ci-dessous, les factures partent d'ici. Ailleurs (Indy, Pennylane, Tiime…) : dépose les fichiers toi-même."],
+            ['Ce que VRM prépare', 'Une facture Factur-X par vente, le récap mensuel aux particuliers (e-reporting).'],
+            ["Où l'envoyer", "Super PDP : connecte TON compte ci-dessous. Ailleurs : dépose-les toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
             <div key={t} data-fe-explique={i} style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, marginTop: -1 }}>
@@ -2260,18 +2265,18 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div data-spdp data-spdp-etat={spdp === undefined ? 'encours' : spdp === null ? 'passu' : spdp.connecte ? 'connecte' : spdp.illisible ? 'illisible' : 'deconnecte'} style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Plateforme agréée · Super PDP</div>
           {spdp === undefined && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>Je lis ta connexion Super PDP…</div>}
-          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Je n'ai pas pu lire ta connexion Super PDP (le serveur n'a pas répondu) — je ne dis ni « connecté » ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
+          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Connexion Super PDP pas lue : ni « connecté », ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
           {spdp && spdp.connecte && <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
             <div style={{ flex: '1 1 220px', fontSize: 13, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
               <strong>Connecté à Super PDP</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? ' (rien ne part réellement aux impôts)' : ''}
-              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement. Tes identifiants restent sur le serveur, chiffrés.</div>
+              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>Tes identifiants restent chiffrés sur le serveur. <Pourquoi label="L'environnement ?">Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement.</Pourquoi></div>
             </div>
             <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : 'Déconnecter'}</button>
           </div>}
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
             {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
             {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant client et le secret client de TON compte Super PDP (espace développeur). Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais. Les envois sont facturés sur ton compte Super PDP, pas sur celui de VRM.</div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret client de TON compte Super PDP. Envois facturés par Super PDP, pas par VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
             <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
@@ -2294,7 +2299,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
           {!recap ? (
             <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
-              {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
+              {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total plutôt qu'un faux zéro."}
             </div>
           ) : (<div data-fe-recap data-recap-ym={ym} data-recap-total={eurDe(recap.centimes)} data-recap-n={recap.n} data-recap-partiel={recap.partiel ? '1' : '0'}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
@@ -2309,12 +2314,12 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>
               Total partiel — il manque : {recap.manques.join(' ; ')}. Le fichier le dit aussi.
             </div>}
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>VRM ne sait pas si un acheteur est une entreprise : toutes tes ventes du mois y figurent. Retire celles faites à une entreprise (elles demandent une facture).</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Toutes tes ventes du mois y sont : retire celles faites à une entreprise. <Pourquoi>VRM ne sait pas si un acheteur est une entreprise. Une vente à une entreprise demande une facture, pas ce récapitulatif.</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
               <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récap en tableur</button>
               <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, au format JSON (pour un logiciel de compta)"><Icon name="save" size={14} />Récap JSON</button>
             </div>
-            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas encore tout seul vers Super PDP : la forme de son envoi par l'API n'a pas pu être vérifiée dans leur documentation officielle. Dépose ces fichiers toi-même d'ici là.</div>}
+            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas tout seul : dépose-le toi-même sur Super PDP. <Pourquoi>La forme de son envoi par l'API n'a pas pu être vérifiée dans la documentation officielle de Super PDP.</Pourquoi></div>}
           </div>)}
         </div>
 
@@ -2353,7 +2358,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             })}
           </div>}
           {msg && <div data-fe-msg role="status" style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{msg}</div>}
-          <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numérotation continue par année (FX-AAAA-0001) ; une vente garde toujours le même numéro. La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</div>
+          <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numéros FX-AAAA-0001, continus par année ; une vente garde le sien. <Pourquoi label="Fichier conforme ?">La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</Pourquoi></div>
         </div>
       </div>
     </Card>
@@ -2410,7 +2415,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
     <Card style={{ padding: 18 }}>
       <div data-statut-carte={regime ? 'changer' : 'question'}>
         <h3 className="vrm-titre-compta" style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: C.text }}>{regime ? 'Change ton statut' : 'Quel est ton statut ?'}</h3>
-        <p className="vrm-aide" style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>VRM adapte ta comptabilité à ta situation : il ne te parle d'URSSAF que si tu es micro-entrepreneur. Tu peux le changer à tout moment.</p>
+        <p className="vrm-aide" style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>L'URSSAF n'apparaît qu'en micro-entreprise. Modifiable à tout moment.</p>
         {choix}
         {!regime && pf.etat === 'inconnu' ? <AideStatutNeutre /> : null}
         {regime && <button type="button" className="vrm-lien-action" onClick={() => setChanger(false)} style={{ marginTop: 10, border: 'none', background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Annuler</button>}
@@ -2453,7 +2458,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
     // l'export comptable remontés juste en dessous (`pf.exportEnAvant`).
     const tvaTexte = { franchise: 'Franchise en base de TVA : tes factures portent « TVA non applicable ».', normale: 'TVA collectée : ton comptable la déclare à partir de ton export.', marge: 'TVA sur la marge.' };
     return <div className="vrm-compta-carte"><div data-statut-carte={regime} data-profil-fiscal={pf.etat || ''} style={{ fontSize: 15, color: C.text, lineHeight: 1.6 }}>{texte}
-      {pf.livre ? <div data-profil-tva={pf.tva || 'pasdit'} style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{pf.tva ? tvaTexte[pf.tva] : 'Ta TVA n’est pas dite : choisis-la dans Réglages → Ma configuration.'} Ton livre des recettes, ton registre des achats et l’export pour ton comptable sont juste en dessous.</div> : null}
+      {pf.livre ? <div data-profil-tva={pf.tva || 'pasdit'} style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{pf.tva ? tvaTexte[pf.tva] : 'Ta TVA n’est pas dite : choisis-la dans Réglages → Ma configuration.'} Livre, registre et export : juste en dessous.</div> : null}
     </div></div>;
   }
   return <CarteUrssafMois liveStats={liveStats} onNav={onNav} />;
@@ -2716,7 +2721,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
             <span style={sTitre}>Tes seuils {j.annee}</span>
             <span style={{ fontSize: 13, color: C.muted }}>Reçu en {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 17 }}>{am}{eurMicro(j.ca)}</b><SourceChiffre id="seuils-ca">La somme des mois de {j.annee} de ton chiffre d’affaires déclaré ({j.mois} mois portent des ventes), toutes plateformes, daté au jour du versement — la même ligne que « Déclarer »{j.aDaterSur ? <>, plus {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} pas encore datée{j.aDaterSur.n > 1 ? 's' : ''} ({eurMicro(j.aDaterSur.ca)})</> : null}.</SourceChiffre></span>
           </div>
-          {j.aDaterSur ? <div data-micro-adater-sur={String(j.aDaterSur.n)} style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Dont {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} sans date de versement ({eurMicro(j.aDaterSur.ca)}) : finalisée{j.aDaterSur.n > 1 ? 's' : ''}, donc reçue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee}, mais dans aucun mois.</div> : null}
+          {j.aDaterSur ? <div data-micro-adater-sur={String(j.aDaterSur.n)} style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Dont {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} sans date de versement ({eurMicro(j.aDaterSur.ca)}) : reçue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee}, dans aucun mois.</div> : null}
           {j.partiel ? <div data-micro-partiel-texte="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>C'est un minimum : {j.raisons.join(' · ')}.</div> : null}
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
@@ -2784,10 +2789,10 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
             {dr.liberatoire === 'oui' ? <>Ton impôt est déjà payé avec tes cotisations : ce chiffre est déclaré pour information (il compte dans ton revenu fiscal de référence).</>
               : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71&nbsp;% de la vente de marchandises.</>}
             {dr.partiel ? <> C'est un minimum : {dr.raisons.join(' · ')}.</> : null}
-            {' '}VRM ne compte que ce qu'il a capté sur tes plateformes reliées : compare avec le total de tes déclarations URSSAF de l'année.
+            {' '}Compare avec le total de tes déclarations URSSAF de l'année. <Pourquoi>VRM ne compte que ce qu'il a capté sur tes plateformes reliées.</Pourquoi>
           </div>
         </>)}
-        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, il est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000&nbsp;€.</div> : null}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, paie-le avant le <b>{cfe.limite}</b> sur impots.gouv.fr. <Pourquoi label="Pas d'avis ?">À payer dans ton espace professionnel. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000&nbsp;€.</Pourquoi></div> : null}
       </div>
     </Card>
   );
@@ -2860,7 +2865,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
               Noter mes {aNoter.length} mois à la suite
             </button>) : null;
         })()}
-        {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>À ajouter à ta prochaine déclaration : <b>{eur(suivi.aRegulariser)}</b> de ventes que VRM compte et qui ne sont dans aucune déclaration (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} de cotisations).</div> : null}
+        {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>À ajouter à ta prochaine déclaration : <b>{eur(suivi.aRegulariser)}</b> (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} de cotisations). <Pourquoi>Des ventes que VRM compte et qui ne sont dans aucune déclaration.</Pourquoi></div> : null}
         {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>Rien à suivre sur les 12 derniers mois.</div> : (
           <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
             {lignes.map((l) => {
@@ -2884,7 +2889,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
                       {l.ecart ? <div data-suivi-ecart-texte="" style={{ marginTop: 2 }}>{l.ecart < 0
                         ? <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(-l.ecart)}</b> de moins (des ventes déclarées ne sont plus dans VRM : compte retiré, vente annulée). Ta déclaration reste celle-là.</>
                         : <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(l.ecart)}</b> de plus : des ventes de cette période ne sont dans aucune déclaration — à ajouter à la prochaine (≈ {eur(l.aPayerEcart)} de cotisations).</>}</div> : null}
-                      {l.partiel && l.caCalc != null ? <div style={{ marginTop: 2 }}>VRM compte au moins {eur(l.caCalc)} aujourd'hui (des ventes sans date de versement) : pas d'écart affirmé.</div> : null}
+                      {l.partiel && l.caCalc != null ? <div style={{ marginTop: 2 }}>VRM compte au moins {eur(l.caCalc)} aujourd'hui (ventes sans date) : pas d'écart affirmé.</div> : null}
                     </div>
                   ) : (
                     <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
@@ -2907,7 +2912,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
                         <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>Enregistrer</button>
                         <button className="vrm-b vrm-b-discret" type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
                       </div>
-                      <div style={{ fontSize: 12, color: C.muted }}>Les ventes de la déclaration ne bougent pas : seuls ces deux chiffres sont gardés. Vide = pas noté.</div>
+                      <div style={{ fontSize: 12, color: C.muted }}>Seuls ces deux chiffres changent ; les ventes déclarées restent. Vide = pas noté.</div>
                     </div>
                   ) : null}
                   {!editeIci && ((l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 || l.aCompleter.length > 0 || (l.etat === 'declaree')) ? (
@@ -3026,7 +3031,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
           if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{phraseNonCompteesPar(ncInfo.par)} : dans aucun chiffre — ce total est un minimum</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>. VRM ne sait pas encore si le chiffre que Vestiaire écrit est le prix ou ce qu'il te verse : vérifie ces ventes sur Vestiaire avant de déclarer</> : null}</Puce>);
           if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que {adL.n>1?'leur date n\'est pas captée':'sa date n\'est pas captée'} — tu peux {adL.n>1?'les':'la'} dater dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois — date{adL.n>1?'-les':'-la'} dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         return (
@@ -4044,12 +4049,16 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     majFraiche((cur) => ({ ...cur, abonnements: (cur.abonnements || []).map(x => x.id === id ? { ...x, fin: auj } : x) }));
     toast('✓ Abonnement arrêté ce mois-ci');
   };
-  const retirer = async (cle, id) => {
-    const x = (data[cle] || []).find((y) => y.id === id);
-    if (!(await askConfirm({ title: `Supprimer « ${nomLigneCompta(cle, x)} » ?`, desc: `${x && Number(x.montant) ? fmt(Number(x.montant)) + ' sortent' : 'Elle sort'} de tes charges et de tes rapports.`, ok: 'Supprimer', cancel: 'Annuler', danger: true }))) return;
-    majFraiche((cur) => ({ ...cur, [cle]: (cur[cle] || []).filter(y => y.id !== id) }));
-    if (cle === 'depenses' && x && x.ticket) ecrireTicket(id, null);   // (3 nov.) la ligne du ticket est vidée (un DELETE ne supprime rien)
-    toast('Supprimé de tes charges');
+  // (10 nov., lot Y) Supprimer = à la corbeille 30 jours : la pilule dit « Mis à la corbeille » et offre
+  // « Annuler » 5 s ; Paramètres → Corbeille la restaure ensuite. Le ticket n'est vidé qu'à la purge.
+  const retirer = (cle, id) => {
+    const rangee = load('vrm_compta', null);
+    const L = (rangee && Array.isArray(rangee[cle]) ? rangee[cle] : data[cle]) || [];
+    const i = L.findIndex((y) => y && y.id === id); const x = i >= 0 ? L[i] : null;
+    if (!x) return;
+    gesteCorbeille({ type: cle === 'depenses' ? 'depense' : cle === 'packs' ? 'pack' : cle === 'abonnements' ? 'abonnement' : 'cout', libelle: nomLigneCompta(cle, x),
+      lignes: cle === 'depenses' && x.ticket ? [idTicket(id)] : [],
+      morceaux: [{ k: 'vrm_compta', type: 'element', sous: cle, idCle: 'id', id, index: i, avant: x }] }, { vrm_compta: setData });
   };
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
   const exporterCharges = () => {
@@ -4318,6 +4327,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <h2 className="vrm-compta-question" data-compta-question="declarer">Combien je dois déclarer ?</h2>
         </div>
         <PrevisionUrssafCarte onNav={onNav} />
+        {/* (10 nov., lot BK) « Mois bouclé » : ce qui manque avant de déclarer le mois choisi (src/moisBoucle.js). */}
+        <MoisBoucle portes={portesMoisBoucle({ onNav, ouvrirRepli: ouvrirRepliCompta })} />
         <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
         {exportDevant ? <div data-compta-export-devant="" style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
           <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
@@ -4335,6 +4346,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           {!exportDevant && <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
           {!exportDevant && <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
           <RecapComptableMensuel />
+          {/* (10 nov., lot R) Le livre de police : un bloc isolé, statut pro seulement (src/livrePolice.js). */}
+          <LivrePoliceCarte lireAchats={lireAchatsRegistre} registreDe={registreAchatsDe} panelOff={panelOff} />
           {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
               Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
               endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
@@ -4350,7 +4363,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
                     {etatCa === 'encours'
                       ? 'Je lis ton CA déclaré…'
-                      : <>Ton CA déclaré n'a encore été calculé sur aucun de tes appareils : il se calcule dans {lienBtn('Ventes', 'cat_ventes')}. Ouvre-le une fois, et tes charges y seront déduites ici.</>}
+                      : <>CA déclaré pas encore calculé : ouvre {lienBtn('Ventes', 'cat_ventes')} une fois.</>}
                   </div>
                 </div>
               ) : (
@@ -4392,4 +4405,4 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     </div>
   );
 }
-export { ComptaPro, Invoices, Catalog, Sales };
+export { ComptaPro, Invoices, Catalog, Sales, registreAchatsDe, lireAchatsRegistre };

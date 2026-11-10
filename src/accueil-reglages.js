@@ -27,8 +27,8 @@ export const VESTIAIRE_BRANCHE = false;
 // compare les deux : la page ne peut pas dire un autre prix.
 export const PRIX_MOIS = '16,99';
 // (9 nov.) Deux offres. Solo = `PRIX_MOIS` (un compte vendeur par plateforme + comptes d'achat).
-// Pro = les ventes de tous les comptes, 19,99 € / mois (décision de Julien du
-// 9 nov.) — le même montant que `PRIX_PRO_CGV` (api/compte.js) et les CGV. Le
+// Pro = 10 comptes vendeurs au total, toutes plateformes (décision de Julien du
+// 10 nov. ; avant : tous les comptes), 19,99 € / mois (9 nov.) — le même montant que `PRIX_PRO_CGV` (api/compte.js) et les CGV. Le
 // paiement Pro reste fermé tant que son prix Stripe n'est pas posé
 // (`STRIPE_PRIX_PRO`) : la page dit « bientôt ».
 export const PRIX_PRO_MOIS = '19,99';
