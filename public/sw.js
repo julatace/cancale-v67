@@ -248,7 +248,7 @@ self.addEventListener('fetch', event => {
           ok = true;
         }
       } catch (_) {}
-      return Response.redirect('/?tab=achats&achat=1' + (ok ? '&photo=partage' : ''), 303);
+      return Response.redirect(new URL('/?tab=achats&achat=1' + (ok ? '&photo=partage' : ''), self.location.origin).href, 303);
     })());
     return;
   }

@@ -37,7 +37,7 @@ export const NOMS_CHAMPS = { date: 'Date', titre: 'Description', prix: 'Prix', o
 
 // ── Les colonnes ──────────────────────────────────────────────────────────────
 const net = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/°/g, ' n ').replace(/[^a-z0-9]+/g, ' ').trim();
+  .replace(/°/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 // L'ordre COMPTE : « N° de commande » est une référence, pas un N° de rangement.
 const MOTS = [
   ['ref', /^(ref|refs|reference|references|ref achat|n commande|no commande|num commande|numero commande|numero de commande|n de commande|no de commande|commande|n facture|no facture|numero facture|numero de facture|n de facture|facture|transaction|n transaction|numero de transaction|id transaction|order|order id)$/],
