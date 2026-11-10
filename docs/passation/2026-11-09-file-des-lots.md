@@ -60,7 +60,7 @@ libère son numéro (le dire ici).
 | AH | Siri / Raccourcis (ajouter un achat, où est le N°) | `claude/siri-raccourcis` | à lancer |
 
 | AI | textes d'explication ⇒ pop-ups ; bouton « Imprimer » en double ; carte du compte ⇒ Paramètres ; point du compte Vinted refait (demandes 1, 2, 13, 14 du 9 nov. 21 h) | `claude/popups-propre` | en cours |
-| AJ | ordre partout : plus récent en haut, tous comptes (3) | `claude/ordre-recent` | en cours |
+| AJ | ordre partout : plus récent en haut, tous comptes (3) | PR #1087 | **en ligne** |
 | AK | zéro « Transporteur inconnu » (tous les PDF), logos des transporteurs, carte des relais parfaite, suivi irréprochable (4, 5, 11) | PR #1086 | **en ligne** |
 | AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | en cours |
 | AM | Annonces « Toutes » en grille comme Vinted, propositions lisibles (15) | `claude/annonces-grille` | à lancer |
