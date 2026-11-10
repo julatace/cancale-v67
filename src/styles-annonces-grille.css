@@ -1,0 +1,261 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — ANNONCES EN GRILLE DE VIGNETTES, RANGÉES PAR COMPTE (10 nov., lot AM)
+   docs/passation/2026-11-10-annonces-grille.md
+
+   Julien (9 nov., 21 h, demande 15) : « la disposition par compte de Vinted me
+   plaît (grille de cartes : photo, N°, titre, état, prix) ⇒ la même pour Toutes,
+   en gardant toutes les fonctions ».
+   · Fermée, une VIGNETTE : la photo carrée en grand, le N° en pastille, « À
+     confirmer » / « Boostée » / « En double » sur la photo, le titre (2 lignes),
+     le prix, une ligne de petites marques (état · vues · favoris · âge · sites).
+   · Touchée, elle s'OUVRE EN PLACE sur toute la largeur : la fiche d'avant,
+     entière (photo à gauche sur ordinateur). Mêmes éléments, mêmes data-* :
+     rien n'est retiré du DOM, seulement replié.
+   · Un en-tête par compte : l'initiale dans un rond (comme la carte du compte
+     de la colonne), le nom, le nombre.
+   2 colonnes à 390 px, 5–6 à 1512 px. Une seule couleur d'accent, rare (§7) :
+   l'ambre ne sert qu'à « En double » et à la proposition « Même paire ? ».
+   Même couche (`@layer vrm-premium`), importé APRÈS styles-widgets-ios.css :
+   un `!important` en couche gagne sur ceux, hors couche, de styles-annonces-fiche.
+   Rien de métier : aucun texte, chiffre ni `data-*` n'est décidé ici.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+@layer vrm-premium {
+
+/* ── La grille ─────────────────────────────────────────────────────────────── */
+:root:root body .vrm-main .vrm-ann-grid.vrm-fiches.vrm-ann-vignettes {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)) !important;
+  gap: 18px 14px !important; align-items: start !important;
+}
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-grid.vrm-fiches.vrm-ann-vignettes { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 14px 10px !important; }
+}
+/* L'ancien en-tête de colonnes « Article · stock / Prix » n'a pas de sens sur une grille. */
+:root:root body .vrm-main .vrm-ann-ledger-heading:has(+ .vrm-ann-vignettes) { display: none !important; }
+
+/* ── L'en-tête d'un compte (une rangée entière) ───────────────────────────── */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-ann-compte-tete {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 6px 2px 0; margin: 0;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-ann-compte-tete:not(:first-child) { margin-top: 14px; }
+:root:root body .vrm-main .vrm-ann-compte-avatar {
+  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--w-remplir-fort, rgba(118,118,128,.16)); color: var(--w-encre, #1D1D1F);
+  font: 600 14px/1 var(--vrm-police, system-ui); letter-spacing: 0;
+}
+:root:root body .vrm-main .vrm-ann-compte-nom {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 700 17px/1.25 var(--vrm-police, system-ui); letter-spacing: -.01em; color: var(--w-encre, #1D1D1F);
+}
+:root:root body .vrm-main .vrm-ann-compte-n {
+  flex: 0 0 auto; font: 400 14px/1.2 var(--vrm-police, system-ui); color: var(--w-gris, #6E6E73);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── La vignette FERMÉE ───────────────────────────────────────────────────── */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-ann-card.vrm-vignette {
+  border: 0 !important; border-radius: 16px !important; background: var(--w-carte, #fff) !important;
+  box-shadow: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04)) !important; overflow: hidden !important; min-width: 0 !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-ann-card.vrm-vignette[data-fiche-ouverte="0"] { cursor: pointer; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette .vrm-ann-overview > a.vrm-fiche-photo {
+  aspect-ratio: 1 / 1 !important; border-radius: 0 !important; width: 100% !important; height: auto !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-ledger-info {
+  position: relative !important; padding: 9px 10px 10px !important; gap: 4px !important;
+}
+/* Le titre : deux lignes au plus, la place du chevron réservée à droite. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-titre] {
+  font: 500 14px/1.3 var(--vrm-police, system-ui) !important; letter-spacing: -.005em !important;
+  white-space: normal !important; overflow: hidden !important; text-overflow: clip !important;
+  display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important;
+  padding-right: 34px !important; min-height: 0 !important; color: var(--w-encre, #1D1D1F) !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-prix] {
+  font: 700 17px/22px var(--vrm-police, system-ui) !important; letter-spacing: -.012em !important;
+}
+/* Ce qui ne se lit qu'OUVERTE (la fiche entière) : replié, jamais retiré. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] :is([data-chiffres], [data-fiche-plus], [data-fiche-duo], [data-fiche-etat], .vrm-note-ajout, [data-stats-compte], [data-fiche-infos], .vrm-note-rangee:not(:has(.vrm-note))) {
+  display: none !important;
+}
+/* Les petites marques d'état : une ligne grise, l'état en mots compris. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-etat-court { display: inline !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] {
+  display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 2px 8px !important;
+  font: 400 12px/16px var(--vrm-police, system-ui) !important; color: var(--w-gris, #6E6E73) !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-stats-annonce] { gap: 2px 8px !important; min-height: 0 !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-etat-court {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-plateformes] { margin-left: auto !important; }
+/* « Détails et gestes » : sur une vignette fermée, un rond discret (chevron) en haut à droite du texte ;
+   toute la vignette se touche aussi. Le libellé reste le nom du bouton (lecteur d'écran). */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette .vrm-fiche-plus-bouton { display: flex !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-plus-bouton {
+  position: absolute !important; top: 4px !important; right: 2px !important; width: 36px !important; height: 36px !important;
+  min-height: 36px !important; min-width: 36px !important; padding: 0 !important; margin: 0 !important;
+  border: 0 !important; border-radius: 50% !important; background: transparent !important; color: var(--w-gris, #6E6E73) !important;
+  justify-content: center !important; align-items: center !important; order: 0 !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-plus-bouton > span {
+  position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important;
+  clip: rect(0 0 0 0) !important; white-space: nowrap !important;
+}
+@media (pointer: coarse) {
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-plus-bouton { width: 44px !important; height: 44px !important; min-height: 44px !important; min-width: 44px !important; top: 0 !important; right: 0 !important; }
+}
+@media (max-width: 767px) {
+  /* le contenu est à 80 % (`.vrm-main { zoom:.8 }`) : 55 px CSS = 44 px sous le doigt */
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-plus-bouton { width: 55px !important; height: 55px !important; min-height: 55px !important; min-width: 55px !important; top: -2px !important; right: -6px !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-titre] { padding-right: 40px !important; font-size: 15px !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-prix] { font-size: 19px !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] { font-size: 13px !important; line-height: 18px !important; }
+}
+@media (hover: hover) and (pointer: fine) {
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"]:hover { box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 26px -10px rgba(0,0,0,.18) !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-plus-bouton:hover { background: var(--w-remplir, rgba(118,118,128,.12)) !important; color: var(--w-encre, #1D1D1F) !important; }
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette .vrm-fiche-plus-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: 2px; }
+
+/* Les marques posées SUR la photo (« En double » ; « À confirmer » et « Boostée » existaient). */
+:root:root body .vrm-main .vrm-vignette .vrm-vignette-marque {
+  position: absolute; right: 8px; bottom: 8px; z-index: 1; white-space: nowrap;
+  font: 600 11px/1 var(--vrm-police, system-ui); padding: 5px 9px; border-radius: 999px;
+  background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F);
+}
+:root:root body .vrm-main .vrm-vignette .vrm-vignette-marque.is-ambre { background: var(--a-ambre-fond, rgba(255,149,0,.16)); color: var(--a-ambre-encre, #A65A00); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette [data-ann-a-confirmer] { right: 8px !important; top: 8px !important; }
+
+/* ── La vignette OUVERTE : la fiche entière, sur toute la largeur ─────────── */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-ann-card.vrm-vignette[data-fiche-ouverte="1"] {
+  grid-column: 1 / -1 !important;
+  box-shadow: 0 0 0 1px var(--w-filet, rgba(60,60,67,.18)), var(--w-ombre, 0 1px 2px rgba(0,0,0,.04)) !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-plus-bouton {
+  position: static !important; width: 100% !important; justify-content: space-between !important; align-items: center !important;
+  min-height: 44px !important; margin: 0 !important; padding: 0 2px !important; box-sizing: border-box !important;
+  border: 0 !important; border-top: .5px solid var(--w-filet, rgba(60,60,67,.18)) !important; border-radius: 0 !important;
+  background: transparent !important; color: var(--w-encre, #1D1D1F) !important; font: 600 14px/1.2 var(--vrm-police, system-ui) !important; cursor: pointer;
+}
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-plus-bouton { min-height: 55px !important; }
+}
+@media (min-width: 768px) {
+  /* Ordinateur : la photo à gauche, tout le reste à droite, les gestes dessous. */
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-ann-overview {
+    display: grid !important; grid-template-columns: minmax(240px, 340px) minmax(0, 1fr) !important; align-items: start !important;
+  }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-ann-overview > a.vrm-fiche-photo { grid-column: 1; grid-row: 1; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-ann-ledger-info { grid-column: 2; grid-row: 1; padding: 16px 18px 12px !important; gap: 10px !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-titre] { font: 600 19px/1.3 var(--vrm-police, system-ui) !important; white-space: normal !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-prix] { font: 700 26px/30px var(--vrm-police, system-ui) !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-fiche-duo] { max-width: 520px; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-chiffres] { max-width: 640px; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-plus { padding: 12px 18px 16px !important; }
+}
+
+/* Ouverte, le DÉTAIL se lit en RANGÉES pleine largeur (retour de Julien du 10 nov., capture 390 px :
+   « Accepter / dès » coupé, des « — » isolés qui prennent une case entière, « Ranger au stoc » tronqué).
+   Une rangée = le libellé à gauche (jamais coupé), la valeur à droite ; toute la rangée se touche. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] :is([data-fiche-duo], [data-chiffres]) {
+  display: flex !important; flex-direction: column !important; gap: 0 !important; margin: 0 !important; padding: 0 !important;
+  border: 0 !important; border-top: .5px solid var(--w-filet, rgba(60,60,67,.18)) !important; background: transparent !important;
+  width: 100% !important; max-width: 560px !important; box-sizing: border-box !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] :is([data-fiche-duo], [data-chiffres]) > .vrm-fiche-cell {
+  position: relative !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-between !important;
+  gap: 12px !important; min-height: 48px !important; height: auto !important; padding: 0 2px !important; margin: 0 !important; box-sizing: border-box !important;
+  border: 0 !important; border-bottom: .5px solid var(--w-filet, rgba(60,60,67,.18)) !important; border-radius: 0 !important;
+  background: transparent !important; box-shadow: none !important; overflow: visible !important; white-space: nowrap !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] :is([data-fiche-duo], [data-chiffres]) > .vrm-fiche-cell > span:first-child,
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-etat-haut > span:first-child {
+  font: 400 15px/1.25 var(--vrm-police, system-ui) !important; color: var(--w-encre, #1D1D1F) !important; letter-spacing: 0 !important;
+  white-space: nowrap !important; overflow: visible !important; text-decoration: none !important; border: 0 !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] :is([data-fiche-duo], [data-chiffres]) > .vrm-fiche-cell::before { display: none !important; content: none !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-ann-ledger-info { width: 100% !important; max-width: none !important; align-self: stretch !important; box-sizing: border-box !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell [data-edition] > span { border-bottom: 0 !important; text-decoration: none !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-etat-haut {width: auto !important; flex: 1 1 auto; gap: 8px !important; justify-content: flex-start !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-fiche-etat] .vrm-fiche-etat-val { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-fiche-etat] .vrm-fiche-etat-mot { font: 600 15px/1.25 var(--vrm-police, system-ui) !important; text-align: right; -webkit-line-clamp: 1 !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell [data-edition] {
+  position: static !important; inset: auto !important; display: flex !important; justify-content: flex-end !important; align-items: center !important;
+  width: auto !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important; background: transparent !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell [data-edition]::after { content: '' !important; position: absolute !important; inset: 0 !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell :is([data-edition] span, [data-marge]) { font: 600 15px/1.25 var(--vrm-police, system-ui) !important; min-height: 0 !important; text-decoration: none !important; }
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] :is([data-fiche-duo], [data-chiffres]) > .vrm-fiche-cell { min-height: 56px !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] :is([data-fiche-duo], [data-chiffres]) > .vrm-fiche-cell > span:first-child,
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-etat-haut > span:first-child,
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell :is([data-edition] span, [data-marge]) { font-size: 17px !important; }
+}
+/* Les gestes : des boutons pleine largeur, libellé jamais coupé, icône entière (§7 : jamais inline-flex). */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] {
+  display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important; gap: 8px !important; max-width: 560px !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste {
+  display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 8px !important;
+  flex: 0 0 auto !important; width: 100% !important; min-width: 0 !important; white-space: normal !important; overflow: visible !important; text-align: center !important;
+  padding: 0 14px !important; box-sizing: border-box !important;
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste-prix { flex-direction: column !important; gap: 1px !important; }
+@media (min-width: 768px) {
+  /* ordinateur : une rangée de boutons à leur largeur (libellé entier), qui revient à la ligne */
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] { flex-direction: row !important; flex-wrap: wrap !important; max-width: none !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste { width: auto !important; white-space: nowrap !important; }
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-fiche-duo] + [data-chiffres] { border-top: 0 !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste svg { flex: 0 0 auto !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste-plus::after { content: 'Autres gestes'; font-weight: 600; }
+/* Fermée : le logo Vinted est porté par l'en-tête du compte (la grille est déjà rangée par compte) ;
+   les autres sites (Leboncoin, eBay) restent : ils disent une présence prouvée ailleurs. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-plateformes] [data-marque="vinted"] { display: none !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-plateformes]:not(:has([data-marque]:not([data-marque="vinted"]))) { display: none !important; }
+
+/* ── La proposition « Même paire ? » SUR sa vignette ─────────────────────────
+   (« les propositions collées entre elles cachent le produit ») La photo de la
+   nouvelle annonce est la vignette elle-même ; la bande montre l'ANCIENNE paire
+   (sa photo et son N°), la question, [Oui] [Non]. */
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette {
+  width: auto !important; flex: none !important; margin: 2px 0 0 !important; padding: 8px !important;
+  border-radius: 12px !important; box-shadow: none !important;
+  background: var(--a-ambre-fond, rgba(255,149,0,.16)) !important;
+}
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos { display: flex !important; align-items: center; gap: 8px; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos > .vrm-remise-photo:first-child { width: 56px; flex: 0 0 56px; border-radius: 10px; }
+/* la nouvelle annonce EST la vignette : sa petite photo (et le « = ») ne se répètent pas */
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos > :not(:first-child) { display: none !important; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photo .vrm-remise-num { left: 3px; top: 3px; padding: 1px 6px; font-size: 11px; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-q { margin-top: 6px !important; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-q b { font-size: 14px !important; line-height: 1.25; color: var(--a-ambre-encre, #A65A00) !important; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons { gap: 6px !important; margin-top: 6px !important; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 44px !important; padding: 0 8px !important; font-size: 14px !important; }
+@media (pointer: coarse) {
+  :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 44px !important; }
+}
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 55px !important; font-size: 15px !important; }
+}
+/* La pastille de tête « N · Même paire ? » (elle mène à la première vignette concernée). */
+:root:root body .vrm-pop-puce.is-ambre { color: var(--a-ambre-encre, #A65A00) !important; background: var(--a-ambre-fond, rgba(255,149,0,.16)) !important; }
+
+/* UN SEUL GABARIT (retour du 10 nov. : « les deux cartes n'ont pas la même hauteur ni la même structure ») :
+   le titre réserve ses deux lignes, l'état prend sa ligne, les chiffres (vues, favoris, jours) la suivante. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-titre] { min-height: calc(2 * 1.3em) !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] { min-height: 34px !important; align-content: flex-start !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-stats-annonce] { flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; flex-wrap: wrap !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-etat-court { flex: 0 0 100% !important; }
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] { min-height: 38px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette { transition: none !important; }
+}
+
+} /* fin @layer vrm-premium */

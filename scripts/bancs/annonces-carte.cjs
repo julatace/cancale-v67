@@ -134,7 +134,9 @@ const projette = (row, sel) => {
       const stock=pg.locator('.vrm-ann-stock-tools');if(await stock.count())await stock.evaluate(e=>e.open=true);
       // (1er nov., maquette Vitrine) Au téléphone, achat (connu), boost, marge et les gestes sont sous
       //  « Plus d'actions » : on le déplie comme la personne avant de lire la carte (les MÊMES éléments).
-      if (vp.width < 600) { const bts = pg.locator('[data-carte-annonce] [data-fiche-plus-bouton][aria-expanded="false"]'); dit(await bts.count() > 0, 'au téléphone, chaque fiche replie le reste sous « Plus d’actions »', String(await bts.count())); while (await bts.count()) await bts.first().click(); }
+      // (10 nov., lot AM) La vue « Toutes » est une GRILLE DE VIGNETTES aux deux tailles : chaque vignette
+      //  replie sa fiche, et la touche l'ouvre EN PLACE (mêmes éléments) — on les ouvre toutes avant de lire.
+      { const bts = pg.locator('[data-carte-annonce] [data-fiche-plus-bouton][aria-expanded="false"]'); dit(await bts.count() > 0, 'chaque vignette replie sa fiche (« Détails et gestes »)', String(await bts.count())); while (await bts.count()) await bts.first().click(); }
       const c = await pg.evaluate(() => {
         const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: (() => { const k = el.cloneNode(true); k.querySelectorAll('[data-marque]').forEach((m) => m.remove()); return k.outerHTML; })(), marques: [...el.querySelectorAll('[data-marque]')].map((m) => m.getAttribute('data-marque')).join(','), boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
         return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -310,7 +312,9 @@ const projette = (row, sel) => {
           // (8 nov., design passage 2, brief de Julien : « la zone photo vide de ~400 px » à
           // l'ordinateur) La grille passe à cinq colonnes : la photo reste un CARRÉ sur toute la
           // largeur de la fiche (la règle), à sa nouvelle mesure (≈ 220 px à 1512).
-          const plancher = vp.width < 600 ? 180 : 200;
+          // (10 nov., lot AM) Au téléphone, la grille « comme le dressing Vinted » a DEUX colonnes (demande 15 de
+          // Julien) : la photo reste un carré sur toute la largeur de sa vignette (≈ 176 px à 390).
+          const plancher = vp.width < 600 ? 150 : 200;
           dit(photo && photo.height>=plancher && photo.width>=premier.width-2, `la première photo occupe toute la largeur de la fiche, en grand (≥ ${plancher} px)`, photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
         }
 

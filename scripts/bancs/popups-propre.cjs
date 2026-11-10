@@ -225,9 +225,12 @@ const ECRANS = [
     await popup(pg, mobile, tag, { ligne: '[data-ann-fraicheur]', nom: 'fraicheur-annonces', quoi: 'fraîcheur des annonces',
       attendu: [/annonces lues/i, /ce que tu as supprimé ou mis en ligne depuis n'y est pas/] });
     // P3 — la proposition : une carte VISUELLE (deux photos, « Même paire ? », [Oui] [Non]), sans paragraphe.
-    const carte = pg.locator('[data-remise-bloc] [data-remise-ligne="9303"]');
+    // (10 nov., lot AM — « les propositions collées entre elles cachent le produit ») La proposition vit SUR la
+    // vignette de la nouvelle annonce : ses deux photos = l'ancienne paire (dans la bande, avec son N°) et la
+    // vignette elle-même ; une proposition hors de la grille garde sa carte à deux photos en tête.
+    const carte = pg.locator('[data-remise-ligne="9303"]').first();
     const la = await carte.count() > 0;
-    const m = la ? await carte.evaluate((e) => ({ photos: e.querySelectorAll('.vrm-remise-photo').length, q: (e.querySelector('.vrm-remise-q b') || {}).innerText || '', oui: e.querySelectorAll('[data-remise-oui]').length, non: e.querySelectorAll('[data-remise-non]').length,
+    const m = la ? await carte.evaluate((e) => ({ photos: [...e.querySelectorAll('.vrm-remise-photo')].filter((p) => p.getBoundingClientRect().width > 0).length + (e.closest('[data-carte-annonce="9303"]') && e.closest('[data-carte-annonce="9303"]').querySelector('[data-fiche-photo]') ? 1 : 0), q: (e.querySelector('.vrm-remise-q b') || {}).innerText || '', oui: e.querySelectorAll('[data-remise-oui]').length, non: e.querySelectorAll('[data-remise-non]').length,
       txt: [...e.childNodes].map((c) => c.querySelector && c.querySelector('.vrm-pourquoi') ? (c.querySelector('b') || {}).innerText || '' : c.innerText || '').join(' ').replace(/\s+/g, ' ').trim() })) : null;
     dit(!!m && m.photos === 2 && /Même paire/.test(m.q) && /N°7/.test(m.q) && m.oui === 1 && m.non === 1, `${tag} : P3 — la proposition est une carte : deux photos, « Même paire que N°7 ? », [Oui] [Non]`, JSON.stringify(m));
     dit(!!m && m.txt.length <= 60, `${tag} : P3 — aucun paragraphe sur la carte (${m && m.txt.length} caractères)`, m && m.txt);
