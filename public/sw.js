@@ -11,6 +11,10 @@ const CACHE = 'vrm-shell-v6';
 const CACHE_QR = 'vrm-hl-qr';
 // Au plus autant de QR dans la réserve (une journée en porte quelques-uns).
 const QR_MAX = 60;
+// (10 nov., lot J) La photo partagée depuis l'app Photos, le temps que l'app l'ouvre.
+// `vrm-hl-` : la purge d'activation la garde, la déconnexion la vide.
+const CACHE_PARTAGE = 'vrm-hl-partage';
+const CLE_PARTAGE = '/__vrm_partage_photo';
 // Repère de la version servie : le nom du script principal de la page.
 const REPERE = '/__vrm_build';
 const pdfStore = {};
@@ -222,6 +226,29 @@ self.addEventListener('fetch', event => {
         }
       } catch (_) {}
       return new Response('', { status: 404 });
+    })());
+    return;
+  }
+
+  // 1 ter) (10 nov., lot J) PARTAGER UNE PHOTO VERS VRM (`share_target` du manifeste) :
+  //    l'app Photos envoie la photo en POST ici. Rien n'est écrit en base : la photo
+  //    attend dans la réserve de l'appareil (`CACHE_PARTAGE`, une seule, 15 Mo au plus,
+  //    une image seulement) et l'app ouvre « Nouvel achat » avec elle
+  //    (`?tab=achats&achat=1&photo=partage`, src/partagePhoto.js) ; l'app la retire dès
+  //    qu'elle l'a lue. Pas d'image ⇒ « Nouvel achat » sans photo.
+  if (url.pathname === '/partage-achat' && req.method === 'POST') {
+    event.respondWith((async () => {
+      let ok = false;
+      try {
+        const fd = await req.formData();
+        const f = fd.getAll('photo').find((x) => x && typeof x === 'object' && /^image\//.test(x.type || '') && x.size > 0 && x.size <= 15 * 1024 * 1024);
+        if (f) {
+          const c = await caches.open(CACHE_PARTAGE);
+          await c.put(CLE_PARTAGE, new Response(f, { headers: { 'content-type': f.type, 'x-vrm-partage-at': String(Date.now()) } }));
+          ok = true;
+        }
+      } catch (_) {}
+      return Response.redirect('/?tab=achats&achat=1' + (ok ? '&photo=partage' : ''), 303);
     })());
     return;
   }
