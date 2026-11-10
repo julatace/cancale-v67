@@ -31,6 +31,9 @@ import { placeCase } from './stockSortie.js';
 import { SegmenteBase } from './composants/Bouton.jsx';
 import { Numero } from './composants/Numero.jsx';
 import './styles-inventaire.css';
+import { useLectureCamera, creerBip } from './ScannerColis.jsx';   // (10 nov., lot W) la caméra du lot V
+import { numeroDuScan } from './inventaireAnnuel.js';
+import './styles-inventaire-annuel.css';
 
 const plur = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
 const cleLocale = (owner) => 'vrm_inventaire_local_' + (owner || 'anon');
@@ -80,6 +83,23 @@ export function motJugement(j) {
 }
 const etatAffiche = (j, deuxieme = false) => (j && j.etat !== 'illisible' && (j.doublon || deuxieme) ? 'doublon' : (j ? j.etat : ''));
 
+// (10 nov., lot W) LE SCANNER : la caméra du lot V (`useLectureCamera`) lit le code collé
+// sur un carton ; un N° (« 125 », « B125 ») ou le SKU « VRM-125 » passe par la MÊME saisie
+// que le clavier (`valider`) ; tout autre code ⇒ « Pas un N° », rien n'est compté.
+function ScanNumeros({ onLu }) {
+  const video = React.useRef(null);
+  const lu = React.useRef(onLu); lu.current = onLu;
+  const bip = React.useRef(null); if (!bip.current) bip.current = creerBip();
+  const traiter = React.useCallback((brut) => { const ok = lu.current(brut); bip.current(!!ok); }, []);
+  const camera = useLectureCamera(video, traiter);
+  return (
+    <div className="vrm-inv-scan" data-inv-scan={camera}>
+      <video ref={video} playsInline muted autoPlay aria-hidden="true"/>
+      {camera === 'sans' ? <p className="vrm-inv-scan-sans" data-inv-scan-sans="">Pas de caméra ici : tape le N°.</p> : <span className="vrm-inv-scan-viseur" aria-hidden="true"/>}
+    </div>
+  );
+}
+
 // (9 nov.) `horsLigne` : { at } — l'inventaire est fait HORS CONNEXION contre la liste des
 // paires figée à cette heure (src/inventaireHorsLigne.js) ; dit en tête, une fois.
 // `pave` : true/false force le pavé géant (sinon : au doigt).
@@ -95,6 +115,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
   const [caseIdx, setCaseIdx] = React.useState(0);
   const [revoir, setRevoir] = React.useState(null);    // l'id d'un inventaire précédent relu
   const [auDoigt] = React.useState(() => (paveForce == null ? doigt() : !!paveForce));
+  const [scan, setScan] = React.useState(false);   // (10 nov., lot W) la caméra ouverte
   const champ = React.useRef(null);
   const enVol = React.useRef(false), encore = React.useRef(false), minuteur = React.useRef(null), vivant = React.useRef(true);
 
@@ -174,6 +195,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
     if (t === '⌫') { setTexte((x) => x.slice(0, -1)); return; }
     setTexte((x) => (x.length >= 12 ? x : (t === 'B' ? (/^[A-Za-z]*$/.test(x) && x.length < 3 ? x + 'B' : x) : x + t)));
   };
+  const scanne = (brut) => { const n = numeroDuScan(brut, cle); if (!n) { setDernier({ s: String(brut || '').slice(0, 20), j: { etat: 'illisible' } }); vibrer('illisible'); return false; } valider(n); return true; };
   const voix = (t) => { const r = requeteDeLaVoix(t); if (r.numero) valider(r.requete); else setDernier({ s: String(t || ''), j: { etat: 'illisible' } }); };
 
   // ── ce qui manque aux lectures, NOMMÉ (pas su ≠ manque) ─────────────────────
@@ -227,6 +249,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
           )}
         </div>
       )}
+      {scan ? <ScanNumeros onLu={scanne}/> : null}
       {(() => { const etR = dernier ? (dernier.annule ? 'annule' : (dernier.deja ? 'deja' : etatAffiche(dernier.j, dernier.deuxieme))) : 'vide'; return (
       <div className={'vrm-inv-retour' + (etR === 'doublon' ? ' vrm-inv-double' : '')} role="status" aria-live="polite" data-inv-retour={etR}>
         {!dernier ? <span className="vrm-inv-retour-vide">Tape le premier N°</span>
@@ -246,6 +269,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       <div className="vrm-inv-gestes">
         <button type="button" className="vrm-b vrm-b-secondaire" data-inv-annuler="" disabled={!vivantes.length} onClick={annuler}>{vivantes.length ? `Annuler N°${vivantes[vivantes.length - 1].k}` : 'Annuler le dernier'}</button>
         {Micro ? <Micro titre="Dire le N° (« numéro 125 », « B 125 »)" onText={voix}/> : null}
+        <button type="button" className="vrm-b vrm-b-secondaire" data-inv-scanner={scan ? '1' : '0'} aria-pressed={scan} onClick={() => setScan((x) => !x)}>{scan ? 'Fermer la caméra' : 'Scanner'}</button>
         <span style={{ flex: 1 }}/>
         <button type="button" className="vrm-b vrm-b-secondaire" data-inv-terminer="" onClick={terminer}>Terminer</button>
       </div>
