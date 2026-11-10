@@ -1699,7 +1699,7 @@ export default async function handler(req, res) {
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (10 nov., lot AR) La page PUBLIQUE d'un formateur (vrm.center/f/<adresse>) : SANS session,
-  // clé publique ; la base (031) ne rend que nom, présentation et groupes montrés.
+  // clé publique ; la base (032) ne rend que nom, présentation et groupes montrés.
   if (mode === 'formateur') {
     if (m !== 'GET') return repondre(res, 405, { erreur: 'GET seulement' });
     res.setHeader('Cache-Control', 'no-store');

@@ -21,7 +21,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { NIVEAUX, STATUTS, codeLisible, codeTape, CODE_RE, lienInvitation, serieVue, etatVue, noterNiveau, publierPartage } from './accompagnement.js';
-// (10 nov., lot AR) L'espace formateur (031) : page publique, suivi, programme, annonces.
+// (10 nov., lot AR) L'espace formateur (032) : page publique, suivi, programme, annonces.
 import { MaPage, FeuillePage, OutilsFormateur, OutilsEleve, RejoindrePage } from './Formateur.jsx';
 
 const PAS_SU = "Je n'ai pas pu lire tes groupes — rien n'est perdu, c'est la lecture qui a échoué.";
@@ -253,7 +253,7 @@ export default function Accompagnement({ api, headers, prenom = '', codeLien = '
   const [etat, setEtat] = useState('charge'), [msg, setMsg] = useState('');
   const [d, setD] = useState(null);
   const [feuille, setFeuille] = useState(lienFormateur ? { type: 'rejoindre-page' } : codeLien ? { type: 'rejoindre', code: codeLien } : null);
-  // L'espace formateur (031) : undefined en cours · 'non-installe' · 'pas-su' · { page, crees, rejoints }.
+  // L'espace formateur (032) : undefined en cours · 'non-installe' · 'pas-su' · { page, crees, rejoints }.
   const [form, setForm] = useState(undefined);
   const vivantForm = useRef(true);
   const lireForm = useCallback(async () => {

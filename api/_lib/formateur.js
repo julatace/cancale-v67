@@ -1,5 +1,5 @@
 // ── LA COMMUNAUTÉ POUR LES FORMATEURS, CÔTÉ SERVEUR (10 nov., lot AR) ─────────
-// Migration 031 (supabase/migrations/031-communaute-formateurs.sql), PAS
+// Migration 032 (supabase/migrations/032-communaute-formateurs.sql), PAS
 // APPLIQUÉE tant que Julien ne l'a pas collée. Elle s'appuie sur la 025 (les
 // groupes d'accompagnement) sans la changer. Toutes les garanties vivent dans la
 // BASE (identité tirée du jeton, page publique seulement publiée, étapes d'un
@@ -17,7 +17,7 @@
 //   POST { action: 'form-accord', adhesion, etapes }                      (l'élève, révocable)
 //   ?mode=formateur&f=<adresse>, GET SANS session : la page PUBLIQUE (clé publique,
 //   la base ne rend que nom, présentation, groupes montrés).
-// TROIS ÉTATS : 200 lu/fait · 503 `non-installe` (la 031 n'est pas appliquée) ·
+// TROIS ÉTATS : 200 lu/fait · 503 `non-installe` (la 032 n'est pas appliquée) ·
 // 503 `pas-su` (la base n'a pas répondu) · 4xx un refus RÉEL, dit en clair.
 import { rpcEquipe } from './equipe.js';
 import { sbCle } from './cle.js';
@@ -147,7 +147,7 @@ export async function pagePublique(adresse, ANON) {
   return { code: 200, corps: { ok: true, page: { adresse: a, nom: String(d.nom || ''), presentation: String(d.presentation || ''), groupes } } };
 }
 
-// « Fermer mon compte » (clé de service) : 0 si la base n'a pas la 031, `null`
+// « Fermer mon compte » (clé de service) : 0 si la base n'a pas la 032, `null`
 // si la base n'a pas répondu. À appeler AVANT `vrm_accomp_effacer` (025).
 export async function effacerFormateur(owner, SERVICE) {
   if (!UUID_RE.test(String(owner || '')) || !SERVICE) return null;

@@ -252,7 +252,7 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-communaute .vrm-cm-onglet:active { opacity: .7; }
 .vrm-communaute > .vrm-etat-panne { margin: 0 0 12px; }
 
-/* ── (10 nov., lot AR) L'espace formateur (031) ─────────────────────────────── */
+/* ── (10 nov., lot AR) L'espace formateur (032) ─────────────────────────────── */
 .vrm-cm-form { margin: 12px 0 4px; padding-top: 12px; border-top: 1px solid var(--cm-bord); display: grid; gap: 10px; }
 .vrm-cm-form h4 { margin: 4px 0 2px; font-size: 13px; font-weight: 700; color: var(--cm-doux); }
 .vrm-cm-inter { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-size: 15px; font-weight: 600; cursor: pointer; }

@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  L'ESPACE FORMATEUR — règles de l'app (10 novembre, lot AR, migration 031)
+//  L'ESPACE FORMATEUR — règles de l'app (10 novembre, lot AR, migration 032)
 //  Module PUR : exécuté par scripts/audit-formateurs.cjs.
 //
 //  Le TABLEAU DE SUIVI du formateur ne refait aucune règle (§11) : il lit
 //   · les chiffres d'un élève tels que la BASE les rend (025, `vrm_accomp_vue`) :
 //     présents seulement si l'élève est accepté ET partage ses chiffres ;
-//   · ses étapes cochées telles que la BASE les rend (031, `vrm_form_progres_vu`) :
+//   · ses étapes cochées telles que la BASE les rend (032, `vrm_form_progres_vu`) :
 //     présentes seulement si l'élève a DONNÉ son accord.
 //  « Pas su » ≠ 0 (§5) : un élève qui ne partage pas, ou dont les chiffres ne
 //  sont pas encore arrivés, n'est JAMAIS compté à zéro ; le total se dit
@@ -41,7 +41,7 @@ export const moisCle = (t = Date.now()) => { const d = new Date(t); return `${d.
 
 // ── LE TABLEAU DE SUIVI D'UN GROUPE ──────────────────────────────────────────
 // membres : `crees[i].membres` de la 025 (vues rendues par la base) ;
-// form    : `crees[j]` de la 031 pour CE groupe ({ etapes, progres }) ou null.
+// form    : `crees[j]` de la 032 pour CE groupe ({ etapes, progres }) ou null.
 // Rend une ligne par élève ACCEPTÉ et le total du mois, honnête.
 export function suiviGroupe(membres, form, maintenant = Date.now()) {
   const mois = moisCle(maintenant);

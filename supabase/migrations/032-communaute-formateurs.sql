@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 031 — LA COMMUNAUTÉ POUR LES CRÉATEURS DE FORMATION (10 novembre 2026)
+-- 032 — LA COMMUNAUTÉ POUR LES CRÉATEURS DE FORMATION (10 novembre 2026)
 --       PAS APPLIQUÉE (geste de Julien, docs/passation/2026-11-10-communaute-formateurs.md).
 -- ════════════════════════════════════════════════════════════════════════════
 -- Demande de Julien (9 nov., 21 h, docs/passation/2026-11-09-propositions.md, n° 7) :

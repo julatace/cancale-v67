@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════════════════
-//  AUDIT DE LA MIGRATION 031 — LA COMMUNAUTÉ POUR LES FORMATEURS (10 novembre)
+//  AUDIT DE LA MIGRATION 032 — LA COMMUNAUTÉ POUR LES FORMATEURS (10 novembre)
 //  node scripts/audit-formateurs-sql.cjs              (le contrôle)
 //  node scripts/audit-formateurs-sql.cjs --prouve     (chaque règle réaffaiblie ⇒ ROUGE)
 //  node scripts/audit-formateurs-sql.cjs --mutation=nom
 //  node scripts/audit-formateurs-sql.cjs --forme      (imprime l'empreinte des tables)
 //
-//  La 031 (supabase/migrations/031-communaute-formateurs.sql) est EXÉCUTÉE pour
+//  La 032 (supabase/migrations/032-communaute-formateurs.sql) est EXÉCUTÉE pour
 //  de vrai sur un Postgres JETABLE (socle supabase-min + 005-007 + 018, 019, 020,
 //  025 telles quelles). Aucune donnée réelle, aucune connexion à la vraie base.
 //  Rôles joués comme PostgREST (`set role` + `request.jwt.claims`).
@@ -19,14 +19,14 @@
 //  révocable), et jamais d'un élève pas accepté ou retiré ; seul le formateur
 //  écrit programme et annonces ; seuls les membres ACCEPTÉS lisent les annonces ;
 //  10 annonces / 24 h ; une adresse ne se vole pas ; abonnement coupé ⇒ rien ;
-//  « Fermer mon compte » dépublie et détache ; la 031 refuse sans la 025.
+//  « Fermer mon compte » dépublie et détache ; la 032 refuse sans la 025.
 //  ⚠️ S'il ne trouve pas Postgres, il le DIT et sort en 1.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync, execFileSync, spawn } = require('child_process');
 const RACINE = path.join(__dirname, '..');
 const M = (f) => path.join(RACINE, 'supabase/migrations', f);
-const MIG = M('031-communaute-formateurs.sql');
+const MIG = M('032-communaute-formateurs.sql');
 const MIN = path.join(__dirname, 'agent-sql/supabase-min.sql');
 const SOCLE = ['005-abonnements.sql', '006-acces-abonnement.sql', '007-droits-minimaux.sql'].map(M);
 const AVANT = ['018-communaute.sql', '019-communaute-discord-classement.sql', '020-communaute-groupes.sql', '025-communaute-accompagnement.sql'].map(M);
@@ -204,8 +204,8 @@ const progresDe = (l, gid, mid) => ((l.crees.find((g) => g.groupe === gid) || {}
   await essaie('le fichier', () => {
     const brut = fs.readFileSync(MIG, 'utf8');
     const sansComm = brut.replace(/--[^\n]*/g, '');
-    dit(!/\bdelete\b/i.test(sansComm) && !/\bdrop\b/i.test(sansComm) && !/\btruncate\b/i.test(sansComm), "la 031 ne contient AUCUNE suppression (elle se colle d'un bloc)");
-    dit(!/app_data|vinted_accounts|harvest_|vrm_accomp_partages/i.test(sansComm), "la 031 ne lit AUCUNE donnée d'un vendeur ni ses chiffres partagés (025)");
+    dit(!/\bdelete\b/i.test(sansComm) && !/\bdrop\b/i.test(sansComm) && !/\btruncate\b/i.test(sansComm), "la 032 ne contient AUCUNE suppression (elle se colle d'un bloc)");
+    dit(!/app_data|vinted_accounts|harvest_|vrm_accomp_partages/i.test(sansComm), "la 032 ne lit AUCUNE donnée d'un vendeur ni ses chiffres partagés (025)");
     dit(!/@@EMPREINTE@@/.test(brut), "l'empreinte des tables est posée (pas un gabarit)");
     dit(/^-- ── ESSAI[\s\S]*?--     begin;[\s\S]*?--     rollback;/m.test(brut.split('\nbegin;')[0]), "l'essai BEGIN … ROLLBACK est en tête du fichier");
   });

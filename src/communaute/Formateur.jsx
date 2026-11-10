@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  COMMUNAUTÉ → GROUPES : L'ESPACE FORMATEUR (10 nov., lot AR, migration 031)
+//  COMMUNAUTÉ → GROUPES : L'ESPACE FORMATEUR (10 nov., lot AR, migration 032)
 //  Pour les créateurs de formation, posé SUR les groupes d'accompagnement (025) :
 //   · Ma page : vrm.center/f/<adresse> (nom, présentation, groupes montrés) —
 //     éteinte par défaut, « Publier » est SON geste ;
@@ -8,7 +8,7 @@
 //     « au moins … · N sur M »), le programme (étapes), les annonces ;
 //   · côté élève : annonces, programme à cocher, « Mon formateur voit mes
 //     étapes » (NON par défaut, révocable).
-//  Tant que la 031 manque : une ligne le dit, rien n'est proposé.
+//  Tant que la 032 manque : une ligne le dit, rien n'est proposé.
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useEffect, useState } from 'react';
 import { adresseDepuisNom, adresseOk, lienPage, suiviGroupe } from './formateur.js';

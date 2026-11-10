@@ -1,6 +1,6 @@
 // ── vrm.center/f/<adresse> : la page PUBLIQUE d'un formateur (10 nov., lot AR) ─
 // Lit UNE route, sans session : /api/compte?mode=formateur&f=<adresse>
-// (api/_lib/formateur.js → la fonction `vrm_form_page` de la migration 031, qui
+// (api/_lib/formateur.js → la fonction `vrm_form_page` de la migration 032, qui
 // ne rend que ce que le formateur a PUBLIÉ). Trois états : la page · « pas en
 // ligne » (inconnue, dépubliée, formateur sans abonnement : la même phrase,
 // rien n'est deviné) · « pas pu lire » (réseau, base) avec « Réessayer ».
