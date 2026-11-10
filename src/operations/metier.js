@@ -1,4 +1,5 @@
 // Montants en centimes, quantités entières, aucun appel à une plateforme.
+import {atelierDe,etapesProposees,ID_PAIRE} from './atelier.js';
 export const VIDE = () => ({version:1,revision:0,missions:[],reservations:[],lots:[],consommables:[],veilles:[],receptions:[],dossiers:[],journal:[],commandes:[]});
 export class Refus extends Error { constructor(message,status=400){super(message);this.status=status;} }
 const exige=(v,m)=>{if(!v)throw new Refus(m);};
@@ -165,6 +166,26 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   const x=trouve(d.receptions,p.cible),recu=entier(p.recu,0,x.attendu),controle=entier(p.controle,0,recu);exige(x.evenements.length<100,'Historique de réception plein.');
   if(recu<x.recu||controle<x.controle)exige(typeof p.note==='string'&&p.note.trim(),'Précise la raison de la correction.');
   x.evenements.push({...commun,recu,controle,note:texte(p.note||'',1000,true)});x.recu=recu;x.controle=controle;x.etat=controle===x.attendu?'controlee':recu===x.attendu?'a_controler':'partielle';break;
+ }
+ // (10 nov., lot N) L'ATELIER (src/operations/atelier.js) : ses étapes, ses paires par IDENTITÉ.
+ // Réservé au responsable : la garde « membre » plus haut ne laisse passer que mission.*.
+ case 'atelier.etapes':{
+  const a=atelierDe(d),r=etapesProposees(p.etapes,a.etapes,commande.id);exige(!r.erreur,r.erreur);
+  const gardes=new Set(r.etapes.map(e=>e.id)),perdue=a.etapes.find(e=>!gardes.has(e.id)&&a.paires.some(x=>x.etape===e.id));
+  exige(!perdue,`Des paires sont encore à « ${perdue&&perdue.nom} » : avance-les d’abord.`);
+  d.atelier={etapes:r.etapes,paires:a.paires};break;
+ }
+ case 'atelier.placer':{
+  const a=atelierDe(d),id=texte(p.cible,60);exige(ID_PAIRE.test(id),'Paire non reconnue.');
+  const etape=texte(p.etape,80);exige(a.etapes.some(e=>e.id===etape),'Étape inconnue : actualise.');
+  const x=a.paires.find(y=>y.id===id);
+  if(x){exige(x.etape!==etape,'Cette paire est déjà à cette étape.');(x.evenements??=[]).push({le:maintenant,auteur:acteur,de:x.etape,vers:etape});if(x.evenements.length>50)x.evenements.splice(0,x.evenements.length-50);x.etape=etape;x.depuis=maintenant;}
+  else{const photo=texte(p.photo||'',500,true);exige(!photo||/^https:\/\//.test(photo),'Photo invalide.');ajoute(a.paires,{id,titre:texte(p.titre||'',160,true),photo,etape,depuis:maintenant,ajoute:maintenant,evenements:[{le:maintenant,auteur:acteur,de:null,vers:etape}]});}
+  d.atelier={etapes:a.etapes,paires:a.paires};break;
+ }
+ case 'atelier.sortir':{
+  const a=atelierDe(d),i=a.paires.findIndex(y=>y.id===p.cible);exige(i>=0,'Élément introuvable.');
+  a.paires.splice(i,1);d.atelier={etapes:a.etapes,paires:a.paires};break;
  }
  default:throw new Refus('Action inconnue.');
  }
