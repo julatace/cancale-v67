@@ -8,6 +8,7 @@ import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
+import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
 import { ACTIONS_REPUB, AUTH, Avancement, Bouton, C, ChipsModeles, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FermeAuRetour, Icon, NAV, PhotoVinted, Pourquoi, SUPABASE_URL, Segmente, SheetShell, askConfirm, chargerPhotoBoite, demanderQuestionRepub, ecrireJournalRepub, extSait, ilYaBr, load, onCloudReady, poserRepubVivant, prixCourt, questionRepubOk, save, sbAuth, toast, verifierAvantPublication } from '../App.jsx';
 
 // (9 nov., direction artistique 4) LE VOILE DES ATELIERS : un PORTAIL sur <body> (§7 :
@@ -897,7 +898,6 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
   const [ouvert, setOuvert] = useState(!!suivi);
   const [copies, setCopies] = useState(() => new Set());
   const [copie, setCopie] = useState('');
-  const [ph, setPh] = useState(null);   // { fichiers, fait, rate, total, encours, enregistre }
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
   const f = fiche || {};
   const photos = (Array.isArray(f.photos) && f.photos.length ? f.photos : (paire.photo ? [paire.photo] : [])).map((p) => (typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '')).filter(Boolean).slice(0, 20);
@@ -908,66 +908,20 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
   const marque = String(f.brand || paire.marque || ''), taille = String(f.size || paire.taille || ''), etatA = String(f.etat || paire.condition || '');
   const placeN = (PLACES_ETIQUETTE.find((x) => x.v === etq.place) || PLACES_ETIQUETTE[0]);
   const cssPh = { width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(regs.photo) };
-  // Des photos préparées valent pour UN réglage : un réglage changé les refait.
-  const clePhoto = JSON.stringify(regs.photo);
-  useEffect(() => { setPh((p) => (p && p.pour !== clePhoto ? null : p)); }, [clePhoto]);
   const aller = (k) => { setVues((v) => new Set(v).add(etape)); setEtape(k); };
   const iE = ETAPES_MAIN.findIndex((x) => x.k === etape);
   const copier = async (k, t) => {
     try { await navigator.clipboard.writeText(String(t || '')); setCopie(k); setCopies((s) => new Set(s).add(k)); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1600); }
     catch (_) { toast('Copie impossible ici : sélectionne le texte et copie-le.'); }
   };
-  // ── Les photos : le MÊME dessin que l'atelier (`dessinerPhotoReglee`), une par une.
-  const preparer = async () => {
-    const total = photos.length, pour = clePhoto, r = regs.photo; const fichiers = []; let rate = 0;
-    setPh({ fichiers: [], fait: 0, rate: 0, total, encours: true, pour });
-    for (let i = 0; i < total; i++) {
-      try {
-        const data = await chargerPhotoBoite(photos[i]);
-        if (!data) throw new Error('pas lue');
-        const img = new Image(); img.src = data; await img.decode();
-        const w = img.naturalWidth, h = img.naturalHeight;
-        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-        const ctx = cv.getContext('2d');
-        if (dessinerPhotoReglee(ctx, img, w, h, r) === 'pixels') { ctx.setTransform(1, 0, 0, 1, 0, 0); const id = ctx.getImageData(0, 0, w, h); appliquerCouleursPixels(id.data, r); ctx.putImageData(id, 0, 0); }
-        const blob = await new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.92));
-        if (!blob) throw new Error('toile');
-        fichiers.push(new File([blob], nomPhotoReglee(paire.numero, i), { type: 'image/jpeg' }));
-      } catch (_) { rate++; }
-      setPh({ fichiers: fichiers.slice(), fait: fichiers.length, rate, total, encours: i < total - 1, pour });
-    }
-    return fichiers;
-  };
-  const telecharger = (fichiers) => fichiers.forEach((fi) => { const u = URL.createObjectURL(fi); const a = document.createElement('a'); a.href = u; a.download = fi.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); });
-  const enregistrer = async () => {
-    const pretes = ph && !ph.encours && ph.pour === clePhoto && ph.fichiers.length ? ph.fichiers : null;
-    if (pretes) {
-      // Le menu de partage s'ouvre DANS le geste (Safari l'exige) : sur iPhone, « Enregistrer les images ».
-      if (peutPartagerFichiers(pretes)) {
-        try { await navigator.share({ files: pretes, title: paire.numero ? `N°${paire.numero}` : 'Photos' }); setPh((p) => ({ ...p, enregistre: 'partage' })); }
-        catch (e) { if (!(e && e.name === 'AbortError')) { telecharger(pretes); setPh((p) => ({ ...p, enregistre: 'telecharge' })); } }
-        return;
-      }
-      telecharger(pretes); setPh((p) => ({ ...p, enregistre: 'telecharge' })); return;
-    }
-    const fichiers = await preparer();
-    if (!fichiers.length) return;
-    // Partage possible : le bouton dit maintenant « Enregistrer » — un second toucher ouvre le menu.
-    if (peutPartagerFichiers(fichiers)) return;
-    telecharger(fichiers); setPh((p) => ({ ...p, enregistre: 'telecharge' }));
-  };
+  // ── Les photos : le MÊME dessin que l'atelier (`dessinerPhotoReglee`), une par une (`usePhotosReglees`, plus bas).
   const nPh = photos.length;
-  const pretes = ph && !ph.encours && ph.pour === clePhoto && ph.fichiers.length > 0;
-  const libellePhotos = ph && ph.encours ? `Photo ${Math.min(ph.total, ph.fait + ph.rate + 1)} sur ${ph.total}…`
-    : pretes && peutPartagerFichiers(ph.fichiers) ? (ph.enregistre ? 'Enregistrer à nouveau' : `Enregistrer les ${ph.fichiers.length} photo${ph.fichiers.length > 1 ? 's' : ''}`)
-    : pretes && ph.enregistre ? 'Télécharger à nouveau'
-    : partageFichiersPossible() ? `Préparer les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`
-    : `Télécharger les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`;
+  const { ph, pretes, enregistrer, enregistrerUne, libelle: libellePhotos } = usePhotosReglees(photos, regs.photo, paire.numero);
   // ── Ce qui est fait (la progression en tête) : un geste fait, jamais deviné.
   const champsTexte = [['titre', ann.titre], ['description', ann.description], ['prix', prixACopier(ann.prix)]].filter(([, v]) => v);
   const fait = {
     reglages: vues.has('reglages'),
-    photos: !!(ph && ph.enregistre),
+    photos: !!(ph && (ph.enregistre || (ph.fait > 0 && ph.unes && ph.unes.size >= ph.fait))),
     texte: champsTexte.length > 0 && champsTexte.every(([k]) => copies.has(k)),
     vinted: ouvert,
     relier: etatSuivi === 'lie' || etatSuivi === 'fait',
@@ -1089,10 +1043,14 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
       </>)}
 
       {section('photos', <>
-        {nPh ? <div className="vrm-main-photos" data-main-photos={nPh}>{photos.map((u, i) => <div key={i}><PhotoVinted src={u} alt={`Photo ${i + 1}`} style={cssPh}/></div>)}</div>
+        {/* (10 nov., lot AP — demande 17) Une photo PRÉPARÉE s'enregistre aussi seule (son bouton sur la vignette). */}
+        {nPh ? <div className="vrm-main-photos" data-main-photos={nPh}>{photos.map((u, i) => <div key={i} className="vrm-rm-photo">
+          <PhotoVinted src={u} alt={`Photo ${i + 1}`} style={cssPh}/>
+          {pretes && ph.parIndice[i] ? <button type="button" className="vrm-rm-photo-une" data-main-photo-une={i} data-main-photo-une-fait={ph.unes.has(i) ? '1' : undefined} aria-label={`Enregistrer la photo ${i + 1}`} onClick={() => enregistrerUne(i)}><Icon name={ph.unes.has(i) ? 'check' : 'save'} size={18}/></button> : null}
+        </div>)}</div>
           : <div className="vrm-rm-note" data-main-sans-photo="">VRM n’a aucune photo de cette annonce : ouvre-la sur Vinted pour qu’il les lise.</div>}
         {nPh > 0 && <>
-          <p className="vrm-rm-muet">{regNeutre ? 'Les photos telles qu’enregistrées' : 'Les photos avec ta retouche (Réglages)'}, nommées {nomPhotoReglee(paire.numero, 0)}{nPh > 1 ? `, ${nomPhotoReglee(paire.numero, 1)}${nPh > 2 ? '…' : ''}` : ''}.{partageFichiersPossible() ? ' Sur iPhone : « Enregistrer les images » les met dans Photos.' : ''}</p>
+          <p className="vrm-rm-muet">{regNeutre ? 'Les photos telles qu’enregistrées' : 'Les photos avec ta retouche (Réglages)'}, nommées {nomPhotoReglee(paire.numero, 0)}{nPh > 1 ? `, ${nomPhotoReglee(paire.numero, 1)}${nPh > 2 ? '…' : ''}` : ''}.{partageFichiersPossible() ? ' Sur iPhone : « Enregistrer les images » les met dans Photos.' : ''}{pretes ? ' Ou une seule : son bouton sur la photo.' : ''}</p>
           <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={pretes && !ph.enregistre ? 'primaire' : 'secondaire'} icone="image" data-main-telecharger={nPh} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libellePhotos}</Bouton></div>
         </>}
         {ph && !ph.encours && <div className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate} role="status">
@@ -1167,6 +1125,174 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         {suivante ? <Bouton variante={suivante.k === 'relier' ? 'secondaire' : 'primaire'} data-main-suivant={suivante.k} onClick={() => aller(suivante.k)}>{`Suivant : ${suivante.l}`}</Bouton>
           : !derniere && onSuivante ? <Bouton variante="primaire" data-main-suivante={`${rang.i + 2}/${rang.n}`} onClick={() => onSuivante({ prix: regs.prix, titre: regs.titre })}>{`Paire suivante · ${rang.i + 2}/${rang.n}`}</Bouton>
           : <Bouton variante={fait.relier ? 'primaire' : 'secondaire'} data-main-terminer="" onClick={onClose}>{fait.relier ? 'Terminer' : 'Fermer'}</Bouton>}
+      </div>
+    </SheetShell>
+  );
+}
+// (10 nov., lot AP) LES PHOTOS RÉGLÉES D'UNE PAIRE, prêtes pour la galerie du téléphone : une
+// source pour « Republier à la main » (pas à pas) et « Préparer plusieurs » (le kit). Le MÊME dessin
+// que l'atelier (`dessinerPhotoReglee`) ; un réglage changé les refait. Toutes d'un coup
+// (`enregistrer`) ou une seule (`enregistrerUne`) : iPhone ⇒ le menu de partage avec des FICHIERS
+// (« Enregistrer les images » les met dans Photos), ouvert DANS le geste (Safari l'exige : préparer,
+// puis toucher « Enregistrer ») ; ailleurs, le téléchargement `VRM-{N°}-01.jpg…`.
+function usePhotosReglees(photos, reglage, numero) {
+  const [ph, setPh] = useState(null);   // { fichiers, parIndice, unes, fait, rate, total, encours, enregistre, pour }
+  const clePhoto = JSON.stringify(reglage);
+  useEffect(() => { setPh((p) => (p && p.pour !== clePhoto ? null : p)); }, [clePhoto]);
+  const preparer = async () => {
+    const total = photos.length, pour = clePhoto, r = reglage; const fichiers = []; const parIndice = []; let rate = 0;
+    setPh({ fichiers: [], parIndice: [], unes: new Set(), fait: 0, rate: 0, total, encours: true, pour });
+    for (let i = 0; i < total; i++) {
+      try {
+        const data = await chargerPhotoBoite(photos[i]);
+        if (!data) throw new Error('pas lue');
+        const img = new Image(); img.src = data; await img.decode();
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        if (dessinerPhotoReglee(ctx, img, w, h, r) === 'pixels') { ctx.setTransform(1, 0, 0, 1, 0, 0); const id = ctx.getImageData(0, 0, w, h); appliquerCouleursPixels(id.data, r); ctx.putImageData(id, 0, 0); }
+        const blob = await new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.92));
+        if (!blob) throw new Error('toile');
+        const fi = new File([blob], nomPhotoReglee(numero, i), { type: 'image/jpeg' });
+        fichiers.push(fi); parIndice[i] = fi;
+      } catch (_) { rate++; parIndice[i] = null; }
+      setPh({ fichiers: fichiers.slice(), parIndice: parIndice.slice(), unes: new Set(), fait: fichiers.length, rate, total, encours: i < total - 1, pour });
+    }
+    return fichiers;
+  };
+  const telecharger = (fichiers) => fichiers.forEach((fi) => { const u = URL.createObjectURL(fi); const a = document.createElement('a'); a.href = u; a.download = fi.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); });
+  const pretes = !!(ph && !ph.encours && ph.pour === clePhoto && ph.fichiers.length > 0);
+  const envoyer = async (files, titre) => {
+    if (peutPartagerFichiers(files)) {
+      try { await navigator.share({ files, title: titre }); return 'partage'; }
+      catch (e) { if (e && e.name === 'AbortError') return ''; }
+    }
+    telecharger(files); return 'telecharge';
+  };
+  const titre = numero ? `N°${numero}` : 'Photos';
+  const enregistrer = async () => {
+    if (pretes) { const m = await envoyer(ph.fichiers, titre); if (m) setPh((p) => ({ ...p, enregistre: m })); return; }
+    const fichiers = await preparer();
+    if (!fichiers.length) return;
+    // Partage possible : le bouton dit maintenant « Enregistrer » — un second toucher ouvre le menu.
+    if (peutPartagerFichiers(fichiers)) return;
+    telecharger(fichiers); setPh((p) => ({ ...p, enregistre: 'telecharge' }));
+  };
+  const enregistrerUne = async (i) => {
+    const fi = pretes && ph.parIndice[i]; if (!fi) return;
+    const m = await envoyer([fi], `${titre} · ${i + 1}`);
+    if (m) setPh((p) => (p ? { ...p, unes: new Set(p.unes).add(i) } : p));
+  };
+  const nPh = photos.length;
+  const libelle = ph && ph.encours ? `Photo ${Math.min(ph.total, ph.fait + ph.rate + 1)} sur ${ph.total}…`
+    : pretes && peutPartagerFichiers(ph.fichiers) ? (ph.enregistre ? 'Enregistrer à nouveau' : `Enregistrer les ${ph.fichiers.length} photo${ph.fichiers.length > 1 ? 's' : ''}`)
+    : pretes && ph.enregistre ? 'Télécharger à nouveau'
+    : partageFichiersPossible() ? `Préparer les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`
+    : `Télécharger les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`;
+  return { ph, pretes, enregistrer, enregistrerUne, libelle };
+}
+// ══ « À LA MAIN » POUR PLUSIEURS ANNONCES D'UN COUP — LE KIT (10 nov., lot AP) ══════════
+// Julien (9 nov., demande 17) : « la conseiller (moins risquée) et la rendre attirante ;
+// transmettre les photos retouchées à la galerie du téléphone ; … comment gérer les descriptions
+// en sélection multiple ». Une carte par paire cochée : sa photo, son N°, son titre, sa
+// description TELLE QU'ELLE PARTIRA (la règle de l'atelier, `annonceRepubliee` : lettre et N°
+// selon Réglages → Numéros) ; trois gestes : copier le N°, copier la description, enregistrer
+// les photos réglées (`usePhotosReglees`, une à une dans « Pas à pas »). « Tout copier » : N° +
+// titre + description de chacune (src/republierKit.js). « Pas à pas » ouvre la feuille en cinq
+// étapes sur la même liste (prix, titre, relier). « Ouvrir Vinted » note le début du suivi de
+// chaque paire numérotée : la vue Republier demande ensuite de désigner la nouvelle annonce
+// (SON clic : le N° suit la paire, jamais deviné). Rien ne part chez Vinted d'ici.
+// Une fiche pas lue est DITE (« pas lue »), jamais copiée vide.
+function CarteKit({ x, regs, copie, copies, copier }) {
+  const { p, ann, photos, lue } = x;
+  const nPh = photos.length;
+  const { ph, pretes, enregistrer, libelle } = usePhotosReglees(photos, regs.photo, p.numero);
+  const num = numeroACopier(p.numero, ann.etiquette);
+  const kN = 'num:' + x.k, kD = 'desc:' + x.k;
+  const descOk = lue === true;
+  const cssPh = { width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(regs.photo) };
+  const bouton = (k, lab, val, icone, extra) => <Bouton variante={copies.has(k) ? 'discret' : 'secondaire'} icone={copie === k ? 'check' : icone} onClick={() => copier(k, val)} {...extra}>{copie === k ? 'Copié' : lab}</Bouton>;
+  return (
+    <li className="vrm-kit-carte" data-kit-paire={p.id} data-kit-lue={lue === undefined ? 'encours' : lue ? '1' : '0'}>
+      <div className="vrm-kit-tete">
+        <span className="vrm-kit-photo">{photos[0] ? <PhotoVinted src={photos[0]} alt="" style={cssPh}/> : <PhotoVide remplir/>}{nPh > 1 ? <span className="vrm-rm-apercu-n">{nPh}</span> : null}</span>
+        <div className="vrm-kit-texte">
+          <div className="vrm-rm-paire-nom">{p.numero ? <Numero n={p.numero} taille="petit"/> : null}<span>{ann.titre || 'Sans titre'}</span></div>
+          <div className="vrm-rm-paire-sous">{p.compte}{ann.prix != null ? <> · <b>{montant(ann.prix)}</b></> : null}</div>
+          <div className="vrm-kit-desc" data-kit-desc="">{lue === undefined ? <span className="vrm-rm-muet">Lecture…</span> : descOk ? (ann.description || <span className="vrm-rm-muet">Pas de description.</span>) : <span className="vrm-rm-ambre">Description pas lue : copie-la depuis Vinted.</span>}</div>
+        </div>
+      </div>
+      <div className="vrm-kit-gestes">
+        {num ? bouton(kN, num, num, 'copy', { 'data-kit-copier-num': p.id, 'aria-label': `Copier le ${num}` }) : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-num="">Sans N°</span>}
+        {descOk ? bouton(kD, 'Description', ann.description, 'copy', { 'data-kit-copier-desc': p.id, 'aria-label': 'Copier la description' }) : null}
+        {nPh > 0 ? <Bouton variante={pretes && !ph.enregistre ? 'primaire' : 'secondaire'} icone={ph && ph.enregistre ? 'check' : 'image'} data-kit-photos={p.id} data-kit-photos-n={nPh} data-kit-photos-fait={ph && ph.enregistre ? ph.enregistre : undefined} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libelle}</Bouton>
+          : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-photo="">Photos pas lues</span>}
+      </div>
+      {ph && !ph.encours && ph.rate ? <div className="vrm-rm-ambre vrm-kit-rate">{ph.rate} photo{ph.rate > 1 ? 's' : ''} pas lue{ph.rate > 1 ? 's' : ''} : réessaie.</div> : null}
+    </li>
+  );
+}
+function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
+  const liste = Array.isArray(paires) ? paires : [];
+  const cle = (p) => String(p.uid || '') + ':' + String(p.id);
+  const cles = liste.map(cle).join(',');
+  // La fiche de chaque paire (coffre) : projection des scalaires et des photos, jamais `select=data`.
+  const [fiches, setFiches] = useState({});   // cle → undefined lecture · null pas su · objet lu
+  useEffect(() => {
+    let vivant = true;
+    for (const p of liste) {
+      const k = cle(p);
+      (async () => {
+        try {
+          if (!/^\d{1,15}$/.test(String(p.uid || '')) || !/^\d{4,15}$/.test(String(p.id || ''))) throw new Error('identité');
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.coffre_${p.uid}_${p.id}&select=title:data->>title,desc:data->>desc,price:data->>price,photos:data->photos`, { headers: sbAuth() });
+          if (!r.ok) throw new Error('lecture');
+          const j = await r.json(); if (!Array.isArray(j)) throw new Error('forme');
+          if (vivant) setFiches((f) => ({ ...f, [k]: j[0] || {} }));
+        } catch (_) { if (vivant) setFiches((f) => ({ ...f, [k]: null })); }
+      })();
+    }
+    return () => { vivant = false; };
+  }, [cles]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const [regs] = useReglagesRepub();
+  const [etq, setEtq] = useState(lireEtiquetteVinted);
+  useEffect(() => { const f = () => setEtq(lireEtiquetteVinted()); const off = onCloudReady(f); window.addEventListener('vrm-num-vinted', f); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm-num-vinted', f); }; }, []);
+  const [lettres] = useState(() => { const o = {}; for (const p of liste) o[cle(p)] = tirerLettre(); return o; });
+  const [copie, setCopie] = useState('');
+  const [copies, setCopies] = useState(() => new Set());
+  const copier = async (k, t) => {
+    try { await navigator.clipboard.writeText(String(t || '')); setCopie(k); setCopies((s) => new Set(s).add(k)); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1600); }
+    catch (_) { toast('Copie impossible ici : sélectionne le texte et copie-le.'); }
+  };
+  const items = liste.map((p) => {
+    const k = cle(p); const f = fiches[k]; const fo = f || {};
+    // Une fiche LUE mais sans description : la description vient de la règle (N°, lettre) ; pas lue ⇒ dite.
+    const lue = f === undefined ? undefined : f === null ? false : !!String(fo.desc || '').trim();
+    const prixLu = fo.price != null && fo.price !== '' && Number(fo.price) > 0 ? Number(fo.price) : (p.prix != null && Number(p.prix) > 0 ? Number(p.prix) : null);
+    const ann = annonceRepubliee({ titre: String(fo.title || p.titre || ''), description: String(fo.desc || ''), prix: prixLu, floor: p.floor, numero: p.numero }, regs, { lettre: lettres[k], etiquette: etq });
+    const photos = (Array.isArray(fo.photos) && fo.photos.length ? fo.photos : (p.photo ? [p.photo] : [])).map((u) => (typeof u === 'string' ? u : (u && (u.url || u.full_size_url)) || '')).filter(Boolean).slice(0, 20);
+    return { k, p, f, ann, photos, lue };
+  });
+  const kit = items.map((x) => ({ numero: x.p.numero, etiquette: x.ann.etiquette, titre: x.ann.titre, description: x.lue === true ? x.ann.description : '', lue: x.lue }));
+  const cv = couvertureKit(kit);
+  const n = liste.length;
+  const domaine = (liste[0] && liste[0].domain) || 'www.vinted.fr';
+  return (
+    <SheetShell onClose={onClose} maxWidth={640} className="vrm-rm-feuille vrm-kit-feuille" titre="Republier à la main" sousTitre={`${n} annonce${n > 1 ? 's' : ''}`} data-kit-main={n}>
+      {/* Le conseil, en tête : une phrase, trois gestes. */}
+      <div className="vrm-kit-conseil" data-kit-conseil="">
+        <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
+        <div><b>Le plus sûr : tu publies toi-même.</b><span>Photos, N° et description sont prêts.</span></div>
+      </div>
+      <div className="vrm-kit-barre">
+        <span className="vrm-rm-muet" data-kit-couverture={`${cv.lues}/${cv.n}`}>{cv.enCours ? 'Lecture des fiches…' : cv.lues === cv.n ? `${n} description${n > 1 ? 's' : ''} prête${n > 1 ? 's' : ''}` : `Descriptions lues : ${cv.lues} sur ${cv.n}`}</span>
+        {n > 1 ? <Bouton variante={copies.has('tout') ? 'discret' : 'secondaire'} icone={copie === 'tout' ? 'check' : 'copy'} data-kit-tout-copier={n} onClick={() => copier('tout', texteKit(kit))}>{copie === 'tout' ? 'Copié' : 'Tout copier'}</Bouton> : null}
+      </div>
+      <ul className="vrm-kit-liste">{items.map((x) => <CarteKit key={x.k} x={x} regs={regs} copie={copie} copies={copies} copier={copier}/>)}</ul>
+      <p className="vrm-rm-muet" data-kit-relier="">Publiée ? Désigne la nouvelle dans Republier : le N° la suit.</p>
+      <div className="vrm-rm-pied">
+        <Bouton variante="secondaire" data-kit-pas-a-pas={n} onClick={onUneParUne}>Pas à pas</Bouton>
+        <Bouton variante="primaire" data-kit-ouvrir-vinted="" href={`https://${domaine}/items/new`} target="_blank" rel="noopener noreferrer" onClick={() => onOuvrirVinted && onOuvrirVinted()}>Ouvrir Vinted ↗</Bouton>
       </div>
     </SheetShell>
   );
@@ -1755,4 +1881,4 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     </VoileAtelier>
   );
 }
-export { RepublierVinted, AtelierFile, AtelierLots, AtelierBrouillon, RepublierALaMain, BrouillonsVinted, BrouillonsARefaire };
+export { RepublierVinted, AtelierFile, AtelierLots, AtelierBrouillon, RepublierALaMain, PreparerALaMain, BrouillonsVinted, BrouillonsARefaire };
