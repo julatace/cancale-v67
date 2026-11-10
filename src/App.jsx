@@ -533,7 +533,10 @@ import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from ".
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
-import Visionneuse from "./Visionneuse.jsx";          // (10 nov., lot AN) la photo en grand, partout
+import Visionneuse from "./Visionneuse.jsx";
+import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
+import { cleFacture } from "./factureAchat.js";
+import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
 import { enregistrerGaleries } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
@@ -34692,6 +34695,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [achatMenu, setAchatMenu] = useState(null);           // transaction_id du menu ouvert
   const [achatNotes, setAchatNotes] = useStateCle('vinted_achat_notes', () => load('vinted_achat_notes', {}) || {});
   const [noteEdit, setNoteEdit] = useState(null);             // { tid, title, val }
+  // (10 nov., lot AN) La facture d'achat JOINTE (src/factureAchat.js : sa ligne app_data, par identité).
+  const facturesAchat = useFacturesAchat({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: sbAuth, withOwner, conflit: SB_CONFLICT,
+    owner: (CLOISONNE && AUTH.user) ? AUTH.user.id : '', compresser: (fi) => compressImage(fi, 2000, 0.82),
+    ouvrirPdf: (u, nom) => ouvrirPdfOnglet(u, nom, 'Facture d’achat'), dire: (m, g) => toast(m, g) }, curSub === 'achats' && !modeRetraits);
+  // (10 nov.) Une photo d'achat qui ne se charge pas (hors CDN Vinted) : le pictogramme, jamais l'icône « image cassée ».
+  const [achatPhKo, setAchatPhKo] = useState(() => new Set());
   const saveAchatNote = (tid, val) => {
     setAchatNotes(prev => {
       const n = { ...prev }; const t = String(val || '').trim();
@@ -42534,7 +42543,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             « + Ajouter » est TOUJOURS là, en un tap. Le composant porte la
             règle ; ici on ne fait que brancher la clé synchronisée (§11). */}
         {/* (31 oct., soir) Un achat, pas un colis à aller chercher : sur « Achats » seulement. */}
-        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
+        {!modeRetraits && facturesAchat.champ}
+        {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
           prochainNumero={nextNumero} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
@@ -42590,12 +42600,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
             <div key={o.transaction_id} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
-                {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
+                {orderPhoto(o)&&!achatPhKo.has(orderPhoto(o))?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>{ const u=orderPhoto(o); setAchatPhKo(s=>{ if(s.has(u)) return s; const n=new Set(s); n.add(u); return n; }); }}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
               </div>
               <div className="vrm-buy-main">
                 <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
+                {/* (10 nov., lot AN) Une rangée DA6 : titre · sous-ligne (compte, date, depuis, N°) · une rangée de
+                    pastilles (l'état, le reçu, la facture jointe). L'état n'est plus un point de couleur. */}
                 <div className="vrm-buy-meta" style={{color:C.muted}}>
-                  <span className="vrm-buy-statut" style={{color:C.text}}><i style={{background:st.color}}/>{st.label}</span>
                   {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
                   {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
@@ -42617,15 +42628,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     de transaction (une identité, jamais le titre, §5). Visible sur
                     la ligne — il n'était que dans le menu ⋯. Son contenu (et un
                     PDF joint) ne se lit qu'au clic. */}
-                {rc && (
-                  <div className="vrm-buy-facture">
-                    <button type="button" className="vrm-lien-action" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
-                      onClick={()=>setReceiptView(rc)} title="Ouvrir le reçu d'achat que Vinted t'a envoyé par e-mail"
-                      style={{display:'inline-flex',alignItems:'center',gap:5,border:'none',background:'transparent',padding:0,font:'inherit',fontSize:12,fontWeight:600,lineHeight:1.25,color:C.text,cursor:'pointer',textAlign:'left',minHeight:0}}>
-                      <Icon name="receipt" size={13} style={{color:C.muted,flexShrink:0}}/>{NOM_RECU_ACHAT}
-                    </button>
-                  </div>
-                )}
+                <div className="vrm-buy-pastilles">
+                  <span className="vrm-buy-statut" data-achat-etat={cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'}><i style={{background:st.color}}/>{st.label}</span>
+                  {rc && (
+                    <span className="vrm-buy-facture">
+                      <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
+                        onClick={()=>setReceiptView(rc)} title="Ouvrir le reçu d'achat que Vinted t'a envoyé par e-mail">
+                        <Icon name="receipt" size={13} style={{flexShrink:0}}/>{NOM_RECU_ACHAT}
+                      </button>
+                    </span>
+                  )}
+                  {(()=>{ const cf = cleFacture('tx', o.transaction_id); const fa = facturesAchat.factures && facturesAchat.factures[cf];
+                    return fa ? <PastilleFacture cle={cf} f={fa} onOuvrir={facturesAchat.ouvrir} enCours={facturesAchat.enCours===cf} Icon={Icon}/> : null; })()}
+                </div>
                 {/* (24 oct.) En route : ce que dit le transporteur, par le n° de CET achat. */}
                 {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
                   // (2 nov.) Le transporteur LU (logo + nom), puis ce qu'il dit.
@@ -42684,6 +42699,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?NOM_RECU_ACHAT:'Attestation d\'achat'}</button>
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
+                    {(()=>{ const cf = cleFacture('tx', o.transaction_id); if (!cf) return null; const a = !!(facturesAchat.factures && facturesAchat.factures[cf]);
+                      return <button type="button" role="menuitem" data-achat-joindre-facture={tid} style={item} onClick={()=>{ close(); facturesAchat.choisir(cf); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{a?'Remplacer la facture':'Joindre une facture'}</button>; })()}
                     {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>Étiquette N°{numA}</button>}
                     <div style={{height:1,background:C.border,margin:'4px 0'}}/>
                     <button type="button" role="menuitem" data-achat-masquer={tid} style={{...item,color:C.muted}} onClick={()=>{ close(); masquerAchat(o); }}><Icon name="eyeOff" size={15} style={{color:C.muted}}/>Masquer cet achat</button>
