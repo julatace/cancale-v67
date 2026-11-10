@@ -84,4 +84,13 @@ Validé par Julien le 10 nov. (« Parfait fait tout ») :
 | AX | recherche universelle : N°, pseudo, n° de suivi, code de retrait (proposition 7 ; étendre ⌘K et la loupe « Tout sur le N° », pas un 3e outil) | `claude/recherche-universelle` | à lancer |
 | AY | hors ligne au point relais : codes et colis à déposer lisibles sans réseau (proposition 8 ; prolonge D et le mode relais AD) | `claude/hors-ligne-relais` | à lancer |
 
+Deuxième série du 10 nov. — Julien : « Semaine … c'est bien, [coût réel] d'une vente c'est bien, litige en cours c'est bien … OK pour le deux et OK pour le un » ; **refusés : objectif par compte, rangement guidé, mode « photo »** (ne pas reproposer).
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| AZ | photo du carton fermé avant dépôt, rangée avec la vente (preuve en litige) + au scan du bordereau la photo de la paire et son N° EN GRAND (le scan dit déjà la paire depuis le lot V : le rendre impossible à rater) ; fusionne avec M (photos d'emballage) ; après AK2 (mêmes fichiers Colis) | `claude/photo-colis-scan` | à lancer après AK2 |
+| BA | coût réel d'une vente : prix d'achat SAISI + frais connus + emballage ⇒ bénéfice net, le manque nommé (règle `beneficePaire`, jamais deviné) ; fusionne avec la « marge par plateforme » de I | `claude/cout-vente` | à lancer |
+| BB | litiges en cours : un écran, date limite de réponse, preuves déjà rangées (photo du carton AZ, suivi) ; fusionne avec les « délais de litige » de I (forme à mesurer) | `claude/litiges-marge` | à lancer |
+| BC | « Ma semaine » : un ÉCRAN le dimanche (ventes, bénéfice, colis envoyés, paires qui dorment, comparaison semaine d'avant) — même source que le bilan de la semaine en notification (`api/_lib/bilan-semaine.js`), jamais une 2e règle | `claude/ma-semaine` | à lancer |
+
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
