@@ -40,7 +40,7 @@ libère son numéro (le dire ici).
 | U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
 | V | scanner au dépôt (Colis) ET au retrait (Achats) | PR #1075 | **en ligne** |
 | W | inventaire de fin d'année | `claude/inventaire-annuel` | à lancer |
-| X | sélection multiple + filtres enregistrés + fiche à côté de la liste | `claude/lots-vues-panneau` | à lancer |
+| X | sélection multiple + filtres enregistrés + fiche à côté de la liste | `claude/lots-vues-panneau` | **fait, à intégrer** (`2026-11-10-lots-vues-panneau.md`) |
 | Y | corbeille 30 jours | `claude/corbeille` | à lancer |
 | Z | pastille sur l'icône (colis à envoyer) | `claude/pastille-icone` | fait (session principale) |
 | AA | sur vinted.fr : infos sous SES annonces + calculette pendant un achat (ext. 5.339) | `claude/extension-infos` | à lancer |
