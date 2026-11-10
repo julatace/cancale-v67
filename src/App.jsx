@@ -26939,7 +26939,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
       {/* (3 nov.) La règle de main (src/beneficeNoms.js) : « Bénéfice » = la notion de Compta,
           « — » quand elle dit « pas su » (jamais un brut partiel, jamais « ≥ »). */}
       <span>{NOM_BENEFICE} du mois</span>
-      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne="net">{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
+      <b className={valeur == null ? 'is-vide' : undefined} style={{ '--nc': valeur == null ? 1 : Math.round(valeur).toLocaleString('fr-FR').length + 2 }} data-journee-benef-ligne="net">{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
     </button>
   );
   return place === 'integre'
