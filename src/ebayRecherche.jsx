@@ -21,6 +21,7 @@
 //     `moyennesParModele`), dit comme tel — jamais le prix de cette paire.
 import React,{useEffect,useRef,useState} from 'react';
 import {appelerEbay} from './ebayRequetes.js';
+import Pourquoi from './composants/PourquoiReplie.jsx';
 import {veillesDuFil,MAX_VEILLES_ACTIVES} from './operations/metier.js';
 
 export const RELIRE_MS = 15 * 60 * 1000;
@@ -341,7 +342,7 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
   return <section data-ebay-recherche="" style={{ display: 'grid', gap: 18, marginBottom: 18 }}>
     <div>
       <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>Chercher des paires sur eBay</h3>
-      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Les annonces les plus récentes d’abord. VRM ne fait que lire : pour acheter, tu ouvres l’annonce sur eBay.</p>
+      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Les plus récentes d’abord. Pour acheter, ouvre l’annonce sur eBay.</p>
       <form onSubmit={chercher} data-ebay-form-recherche="" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', alignItems: 'end' }}>
         <label style={{ ...S.label, gridColumn: '1 / -1' }}>Modèle, marque…<input aria-label="Mots à chercher" value={f.mots} onChange={(e) => setF({ ...f, mots: e.target.value })} placeholder="ex. salomon xt-6" style={S.input} /></label>
         <label style={S.label}>Pointure<input aria-label="Pointure" inputMode="decimal" value={f.pointure} onChange={(e) => setF({ ...f, pointure: e.target.value })} placeholder="42 ou 42,5" style={S.input} /></label>
@@ -365,13 +366,13 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
 
     <div data-ebay-fil={veilles === undefined ? 'en-cours' : veilles === null ? 'pas-su' : dansFil.length} data-ebay-fil-nouveaux={nbNouveaux}>
       <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>Ton fil{nbNouveaux > 0 ? <span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}> · {nbNouveaux} nouvelle{nbNouveaux > 1 ? 's' : ''}</span> : null}</h3>
-      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Tes recherches enregistrées, relues à l’ouverture de cet onglet puis au plus toutes les 15 minutes tant que VRM est ouvert et visible. « Nouveau » = pas vue depuis ta dernière visite.</p>
+      <div style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Tes recherches, relues ici. « Nouveau » = pas vue depuis ta visite. <Pourquoi>Tes recherches enregistrées, relues à l’ouverture de cet onglet puis au plus toutes les 15 minutes tant que VRM est ouvert et visible. « Nouveau » = pas vue depuis ta dernière visite.</Pourquoi></div>
       {veilles === undefined && <p style={{ fontSize: 13, color: C.muted }}>Lecture de tes recherches enregistrées…</p>}
       {veilles === null && <p data-ebay-fil-etat="pas-su" style={{ fontSize: 13, color: C.muted }}>Je n’ai pas pu lire tes recherches enregistrées — rien n’est perdu. <button type="button" onClick={() => { lireVeilles(); try { window.dispatchEvent(new Event('vrm:operations-relire')); } catch (_) {} }} style={{ ...S.bouton, marginLeft: 6 }}>Réessayer</button></p>}
-      {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 13, color: C.muted }}>Ton fil est vide : cherche une paire ci-dessus puis « Ajouter au fil », ou ajoute une recherche plus bas.</p>}
+      {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 13, color: C.muted }}>Fil vide : cherche une paire, puis « Ajouter au fil ».</p>}
       {horsFil > 0 && <p data-ebay-hors-fil={horsFil} style={{ fontSize: 12, color: C.muted }}>{horsFil > 1 ? `${horsFil} autres recherches actives ne sont pas relues` : '1 autre recherche active n’est pas relue'} : {MAX_FIL} au plus, les plus récentes d’abord — archive celles qui ne servent plus.</p>}
       {plafondAuj && <p data-ebay-plafond="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Tes recherches eBay du jour sont faites : le fil s’arrête jusqu’à minuit (heure de Paris).</p>}
-      {plafondFilAuj && <p data-ebay-plafond-fil="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Ton fil a fait ses {(ap && ap.plafondFil) || 150} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main, ci-dessus.</p>}
+      {plafondFilAuj && <div data-ebay-plafond-fil="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Fil arrêté jusqu’à minuit : {(ap && ap.plafondFil) || 150} relectures du jour faites. <Pourquoi>Ton fil a fait ses {(ap && ap.plafondFil) || 150} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main, ci-dessus.</Pourquoi></div>}
       {!filArrete && arret && <p data-ebay-fil-panne={arret.raison} style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{arret.message}{arret.raison !== 'session' && arret.raison !== 'session-renouvel' ? ` Prochain essai vers ${heureMs(arret.ici + RELIRE_MS)}, ou « Relire maintenant ».` : ''}</p>}
       {premieres > 0 && <p data-ebay-fil-premiere={premieres} style={{ fontSize: 12, color: C.muted, margin: '0 0 8px' }}>{premieres > 1 ? `Première lecture de ${premieres} recherches` : 'Première lecture d’une recherche'} : rien n’y est marqué « nouveau ».</p>}
       <div style={{ display: 'grid', gap: 14 }}>{dansFil.map((v) => { const e = fil[v.id] || {}; const nv = e.r ? nouveauxV(v, e.r) : null; const aff = etatAffiche(e);

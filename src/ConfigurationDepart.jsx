@@ -16,6 +16,7 @@ import { useRechercheEntreprise, CarteVerifEntreprise } from './RechercheEntrepr
 import { statutProposeEntreprise } from './entrepriseRecherche.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, seuilsActivite, regimeLu } from './profilFiscal.js';
 import './configuration-depart.css';
+import Pourquoi from './composants/PourquoiReplie.jsx';
 
 const pct = (n) => `${String(n).replace('.', ',')} %`;
 const euros = (n) => `${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
@@ -256,7 +257,7 @@ function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) 
         <div className="vrm-cfg-taux-ligne"><span>Ton taux</span><b>{pct(tauxMicro({ activite, liberatoire: lib, acre }))}</b></div>
         {detailTaux({ activite, liberatoire: lib, acre }).map((l) => <div key={l.quoi} className="vrm-cfg-taux-detail"><span>{l.quoi} · {l.note}</span><span>{pct(l.taux)}</span></div>)}
         {c.liberatoire == null ? <p className="vrm-cfg-note">Sans réponse sur le versement libératoire, le taux est compté sans lui.</p> : null}
-        {s ? <p className="vrm-cfg-note">Plafond {euros(s.plafond)} · TVA au-delà de {euros(s.tvaBase)}. Taux et seuils officiels 2026, à vérifier sur autoentrepreneur.urssaf.fr. Un taux posé à la main n’est jamais remplacé.</p> : null}
+        {s ? <div className="vrm-cfg-note">Plafond {euros(s.plafond)} · TVA au-delà de {euros(s.tvaBase)} (2026). <Pourquoi>Taux et seuils officiels 2026, à vérifier sur autoentrepreneur.urssaf.fr. Un taux posé à la main n’est jamais remplacé.</Pourquoi></div> : null}
       </div>
     </>);
   }
@@ -279,7 +280,7 @@ function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) 
           {CHOIX_OU.map((x) => <Carte key={x.v} multi choisi={ou.includes(x.v)} onClick={() => basculer(x.v)} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `ou:${x.v}` }} />)}
         </Groupe>
       </> : null}
-      <p className="vrm-cfg-note">Changer de méthode ne renumérote aucun article : les numéros déjà écrits là où tu ranges tes articles restent.</p>
+      <p className="vrm-cfg-note">Changer de méthode ne renumérote aucun article.</p>
     </>);
   }
   if (cle === 'affichage') {
@@ -297,7 +298,7 @@ function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) 
   }
   if (cle === 'notifs') {
     if (lus.pushPrefs === undefined) return <p className="vrm-cfg-note" data-configuration-notifs="encours">Je lis tes réglages de notifications…</p>;
-    if (!lus.pushPrefs || !c.familles) return <p className="vrm-cfg-note" data-configuration-notifs="passu">Tes réglages de notifications n’ont pas pu être lus : rien n’est changé. Tu les retrouves dans Réglages → Notifications.</p>;
+    if (!lus.pushPrefs || !c.familles) return <p className="vrm-cfg-note" data-configuration-notifs="passu">Notifications pas lues : rien changé. Elles sont dans Réglages → Notifications.</p>;
     const micro = c.statut === 'micro-vente' || c.statut === 'micro-services';
     return (
       <Groupe label="Notifications" multi colonnes="2">
@@ -317,7 +318,7 @@ function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) 
           <button type="button" className="vrm-cfg-lien" onClick={() => aller(l.etape)} aria-label={`Modifier : ${l.titre}`}>Modifier</button>
         </li>)}
       </ul>
-      {c.statut === 'inconnu' ? <p className="vrm-cfg-note">Ton statut n’est pas choisi : VRM ne calcule aucune cotisation. Comptabilité te reposera la question.</p> : null}
+      {c.statut === 'inconnu' ? <p className="vrm-cfg-note">Statut pas choisi : aucune cotisation calculée. Argent te le redemandera.</p> : null}
     </>);
   }
   return null;
@@ -369,11 +370,11 @@ function SiretConfiguration({ entreprise, statut, poser }) {
     <div className="vrm-cfg-siret" data-configuration-siret={fiche === undefined ? 'lecture' : fiche === null ? 'passu' : 'lu'}>
       <h2 className="vrm-cfg-question">Ton SIRET (facultatif)</h2>
       <label className="vrm-cfg-libre">
-        <span>VRM cherche ton entreprise au registre public, puis te demande de vérifier. Rien n’est écrit sans ton accord.</span>
+        <span>VRM cherche ton entreprise au registre public. Rien écrit sans ton accord.</span>
         <input type="text" inputMode="numeric" autoComplete="off" placeholder="14 chiffres" value={saisie} data-configuration-siret-champ=""
           onChange={(e) => { touche.current = true; setSaisie(e.target.value); }} />
       </label>
-      {fiche === null ? <p className="vrm-cfg-note" style={{ textAlign: 'left' }}>Ta fiche de facture n’a pas pu être lue : la recherche marche, mais rien ne sera écrit. Tu retrouveras tout dans Comptabilité → Factures → Ma facture.</p> : null}
+      {fiche === null ? <p className="vrm-cfg-note" style={{ textAlign: 'left' }}>Fiche de facture pas lue : rien ne sera écrit. Elle est dans Argent → Factures → Ma facture.</p> : null}
       <CarteVerifEntreprise recherche={recherche} actuel={fiche || {}} avecSiret enTete={enTete}
         onEcrire={(patch) => (fiche === null || fiche === undefined ? false : ecrireFiche(patch))} data={{ 'data-configuration-registre': '' }} />
     </div>
