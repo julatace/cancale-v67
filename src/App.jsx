@@ -409,7 +409,7 @@ import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
-import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU } from "./colisEnvoyes.js";
+import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons } from "./colisEnvoyes.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -5014,6 +5014,19 @@ const ecrireLiensSms = async (data) => {
 // (9 nov.) Ce que l'étiquette (PDF) de chaque vente nomme, relu au cron : { tx: { t, s? } } (null = pas lu).
 let _pdfEtiquettes = null;
 const pdfEtiquettesParTx = () => _pdfEtiquettes;
+function lireEtiquetteIci(tx, octets) {
+  if ((_pdfEtiquettes && _pdfEtiquettes[tx]) || (_pdfVus && _pdfVus[tx])) return;
+  import('../api/_lib/transporteur-pdf.js').then((m) => m.transporteurDuPdf(octets)).then((d) => {
+    if (!d) return;
+    if (d.etat === 'ok') _pdfEtiquettes = { ...(_pdfEtiquettes || {}), [tx]: { t: d.t, ...(d.s ? { s: d.s } : {}) } };
+    else _pdfVus = { ...(_pdfVus || {}), [tx]: { r: d.etat } };
+    try { window.dispatchEvent(new Event('vrm:etiquette-lue-ici')); } catch (_) {}
+  }).catch(() => {});
+}
+// (9 nov. au soir) Les étiquettes LUES qui ne nomment personne ({ tx: { r } } : aucun nom lisible, deux noms,
+// illisible, sans PDF) — pour COMPTER et DIRE pourquoi un transporteur reste inconnu (jamais pour deviner).
+let _pdfVus = null;
+const pdfVusParTx = () => _pdfVus;
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
 const fetchEmailBordereaux = async () => {
@@ -5043,13 +5056,14 @@ const fetchEmailBordereaux = async () => {
     // il ne remplace JAMAIS un transporteur rangé. Illisible ⇒ rien de fusionné.
     const [rows, relus] = await Promise.all([
       lireTout(`id=like.email_bord_*&select=id,${champs}`, { strict: true }),
-      lireTout(`id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx,pdf:data->pdf`, { strict: true }).catch(() => null),
+      lireTout(`id=eq.${ID_BORD_TRANSPORTEURS}&select=parTx:data->parTx,pdf:data->pdf,pdfVus:data->pdfVus`, { strict: true }).catch(() => null),
     ]);
     if (!Array.isArray(rows)) return null;
     const ligneRelue = ligneRelueDe(relus);
     // (9 nov.) Les étiquettes relues au cron pour les ventes SANS bordereau e-mail (PDF capté par
     // l'extension) : gardées à part, par n° de transaction (`pdfEtiquettesParTx`).
-    _pdfEtiquettes = ligneRelue && ligneRelue.pdf ? ligneRelue.pdf : (_pdfEtiquettes || null);
+    _pdfEtiquettes = ligneRelue && ligneRelue.pdf ? { ...(_pdfEtiquettes || {}), ...ligneRelue.pdf } : (_pdfEtiquettes || null);
+    { const r0 = Array.isArray(relus) && relus[0]; if (r0 && r0.pdfVus && typeof r0.pdfVus === 'object') _pdfVus = { ...(_pdfVus || {}), ...r0.pdfVus }; }
     // `filename` est présent exactement quand un PDF l'est (vérifié : 50/50,
     // aucun écart) — il sert donc de témoin sans télécharger le PDF.
     return rows.filter(r => r && r.filename && r.filename !== 'None')
@@ -5094,6 +5108,11 @@ const lirePdfLigne = async (rowId, avec = '', entetes) => {
     // (9 nov.) Un bordereau déjà ouvert est gardé pour le hors connexion (src/bordereauxHorsLigne.js) :
     // au nom de CE vendeur, jamais pour l'équipe (`entetes` : la ligne d'un autre), jamais `label_latest`.
     if (!entetes && AUTH.user && AUTH.user.id && estLigneBordereau(rowId)) { try { garderPdf(AUTH.user.id, rowId, octets).catch(() => {}); } catch (_) {} }
+    // (9 nov. au soir, « transporteurs parfaits ») L'étiquette qu'on vient de télécharger est lue ICI aussi,
+    // par la MÊME règle que le serveur (api/_lib/transporteur-pdf.js, sans Buffer, chargée à la demande) :
+    // le transporteur apparaît tout de suite pour CETTE transaction (en mémoire, par son n°) ; le serveur
+    // range le même résultat en base à son passage. Jamais `label_latest` (sa transaction peut changer).
+    if (!entetes) { const mTx = /^(?:email_bord_|harvest_\d+_label_)(\d{6,20})$/.exec(String(rowId)); if (mTx) lireEtiquetteIci(mTx[1], octets); }
     return { octets, ...scalaires };
   } catch (_) { return null; }
 };
@@ -20678,6 +20697,59 @@ function relireTransporteursSiVieux({ force = false } = {}) {
   _relectureTranspVol.finally(() => { _relectureTranspVol = null; });
   return _relectureTranspVol;
 }
+// ── (9 nov. au soir, « transporteurs parfaits ») LES ÉTIQUETTES PAS ENCORE LUES ──
+// Julien : « Ce n'est pas possible d'avoir "transporteur inconnu" sachant que tu as les
+// bordereaux en ta possession. » Quand un bordereau a son PDF et que personne ne l'a encore
+// lu (ni à la réception, ni par le cron : `etiquetteALire`), l'app DEMANDE au serveur de les
+// lire (`POST /api/relais?mode=etiquettes`, la session) par lots, jusqu'à ce qu'il n'en reste
+// plus (6 lots au plus par visite). Un seul en vol ; au plus une série toutes les 10 min
+// (commodité d'appareil) ; refus ⇒ recul. Une étiquette lue ⇒ `vrm:etiquettes-lues` (Colis,
+// Ventes, Ma journée relisent leurs bordereaux). Le serveur décide (même règle que le cron).
+const etiquetteALire = (b) => {
+  if (!b || !b.hasPdf || b.pdfLu != null && b.pdfLu !== '' && b.pdfLu !== 'None') return false;
+  if (b.transporteurPdf || (b.transporteur && String(b.suivi || '').trim())) return false;   // la règle de `candidatsPdf`
+  const tx = String(b.transaction || '');
+  if (!tx) return false;
+  const et = pdfEtiquettesParTx(), vus = pdfVusParTx();
+  return !(et && et[tx]) && !(vus && vus[tx]);
+};
+let _etiquettesVol = null;
+function lireEtiquettesManquantes(bords) {
+  if (!Array.isArray(bords) || !bords.some(etiquetteALire)) return Promise.resolve({ fait: false, raison: 'rien' });
+  if (_etiquettesVol) return _etiquettesVol;
+  _etiquettesVol = (async () => {
+    try {
+      if (!AUTH.session || !AUTH.session.access_token) return { fait: false, raison: 'session' };
+      const maintenant = Date.now();
+      const vol = lireLocalJson('vrm_etiquettes_vol');
+      if (Number(vol.prochain) > maintenant) return { fait: false, raison: 'recul' };
+      ecrireLocalJson('vrm_etiquettes_vol', { at: maintenant, prochain: maintenant + 10 * 60 * 1000 });
+      let ranges = 0, vus = 0;
+      for (let tour = 0; tour < 6; tour++) {
+        let r = null, j = null;
+        try {
+          r = await fetch('/api/relais?mode=etiquettes', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }), vrmInvalideSiChange: true });
+          j = await r.json().catch(() => null);
+        } catch (_) { r = null; }
+        if (!r || !r.ok || !j || j.ok !== true) {
+          const st = r ? r.status : 0;
+          ecrireLocalJson('vrm_etiquettes_vol', { at: maintenant, prochain: maintenant + ((st === 402 || st === 404 || st === 405) ? 6 * 3600 * 1000 : 15 * 60 * 1000) });
+          break;
+        }
+        ranges += Number(j.ranges) || 0; vus += Number(j.vus) || 0;
+        if (!(Number(j.restants) > 0) || !(Number(j.lus) > 0)) break;
+      }
+      if (ranges || vus) {
+        try { if (window.__vrmLecturesPartagees) window.__vrmLecturesPartagees.invalider(); } catch (_) {}
+        try { viderLecturesMemo(); } catch (_) {}
+        try { window.dispatchEvent(new Event('vrm:etiquettes-lues')); } catch (_) {}
+      }
+      return { fait: true, ranges, vus };
+    } catch (_) { return { fait: false, raison: 'erreur' }; }
+  })();
+  _etiquettesVol.finally(() => { _etiquettesVol = null; });
+  return _etiquettesVol;
+}
 function useRelectureTransporteurs() {
   React.useEffect(() => {
     const tic = () => { try { if (document.visibilityState === 'hidden') return; } catch (_) {} relireTransporteursSiVieux(); };
@@ -30401,7 +30473,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la ligne de départ lue chez le transporteur pour son n°, le transporteur NOMMÉ dans l'e-mail
   // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
   // (9 nov.) `tx` : la vente sans bordereau e-mail prend ce que SON étiquette captée nomme (relu au cron, par n°).
-  const transporteurVente = (b, tx) => { const k = String((b && b.transaction) || tx || ''); const et = pdfEtiquettesParTx(); return transporteurDeVente({ bord: b || null, pdf: (!b && k && et && et[k]) || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }); };
+  const transporteurVente = (b, tx) => { const k = String((b && b.transaction) || tx || ''); const et = pdfEtiquettesParTx(); return transporteurDeVente({ bord: b || null, pdf: (k && et && et[k]) || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }); };
   // (9 nov., lot AD) L'IDENTITÉ PUBLIÉE d'un colis à retirer (`vrm_colis_retirer.colis[i][3]`) : le n°
   // de suivi (`e:`), sinon la transaction Vinted (`v:{compte}:{tx}`), sinon la clé de l'e-mail (`k:`).
   // Une seule écriture de cette règle : la publication ci-dessous ET le mode relais (même liste).
@@ -34082,6 +34154,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     /* eslint-disable-next-line */
   }, [sub, convs.items, cleComptes]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && (emailBords===null || emailBordsDeMemoire.current)) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
+  // (9 nov. au soir, « transporteurs parfaits ») Des étiquettes jamais lues ⇒ le serveur les lit (par lots) ;
+  // une étiquette lue ⇒ les bordereaux sont relus (le transporteur apparaît sans recharger la page).
+  useEffect(() => { if (Array.isArray(emailBords) && (curSub==='bordereaux'||curSub==='ventes'||curSub==='journee')) lireEtiquettesManquantes(emailBords); /* eslint-disable-next-line */ }, [emailBords, sub]);
+  useEffect(() => {
+    const relire = () => { fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } }); };
+    const redessiner = () => setEmailBords((v) => (Array.isArray(v) ? v.slice() : v));
+    window.addEventListener('vrm:etiquettes-lues', relire);
+    window.addEventListener('vrm:etiquette-lue-ici', redessiner);
+    return () => { window.removeEventListener('vrm:etiquettes-lues', relire); window.removeEventListener('vrm:etiquette-lue-ici', redessiner); };
+    /* eslint-disable-next-line */
+  }, []);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
   useEffect(() => { (async () => {
@@ -45481,6 +45564,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               )}
               <p className="vrm-colis-envoyes-tri" data-envoyes-phrase="" style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>Le plus récent en haut : prise en charge lue, sinon « Colis fait », sinon date de vente.</p>
+              {(() => {
+                // (9 nov. au soir, « transporteurs parfaits ») Ce qui reste inconnu est COMPTÉ et DIT (src/colisEnvoyes.js `raisonInconnu`) :
+                // une raison lue par colis Vinted (étiquette en cours de lecture, sans nom lisible, deux noms…), jamais un transporteur deviné.
+                const inc = L.filter((x) => x.site === 'vinted' && !(x.tr && (x.tr.cle || x.tr.nom)));
+                if (!inc.length) return null;
+                const et = pdfEtiquettesParTx() || {}, vus = pdfVusParTx() || {};
+                const raisons = compterRaisons(inc.map((x) => { const t = String((x.b && x.b.transaction) || (x.o && x.o.transaction_id) || ''); return raisonInconnu({ bord: x.b || null, pdf: et[t] || null, vu: vus[t] || null }); }));
+                return <p className="vrm-colis-envoyes-inconnus" data-envoyes-inconnus={inc.length} style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>
+                  {inc.length} transporteur{inc.length > 1 ? 's' : ''} inconnu{inc.length > 1 ? 's' : ''} : {raisons.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-inconnu-raison={r.cle} data-inconnu-n={r.n}>{r.n} {r.texte}</span></React.Fragment>)}.
+                </p>;
+              })()}
               <div className="vrm-colis-grille" style={{display:'flex',flexDirection:'column',gap:6}}>
                 {LT.map((x, ix) => {
                   const so = sousDe(x);
