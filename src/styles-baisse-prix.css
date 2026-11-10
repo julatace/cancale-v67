@@ -60,3 +60,6 @@
 }
 .vrm-qd-baisser:disabled { opacity: .4; cursor: default; }
 .vrm-qd-baisser:focus-visible, .vrm-qd-tout:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+/* La case ajoute une colonne devant la photo (la grille de outils-stats.css en a trois). */
+.vrm-qd-ligne[data-qd-coche] { grid-template-columns: 44px 52px minmax(0, 1fr) auto; gap: 10px; }
+@media (max-width: 520px) { .vrm-qd-ligne[data-qd-coche] { grid-template-columns: 36px 44px minmax(0, 1fr) auto; gap: 8px; } .vrm-qd-ligne[data-qd-coche] .vrm-qd-coche-zone { min-width: 36px; } }
