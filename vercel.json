@@ -52,6 +52,10 @@
       "destination": "/statut.html"
     },
     {
+      "source": "/f/([a-z0-9-]+)",
+      "destination": "/formateur.html"
+    },
+    {
       "source": "/api/stripe-webhook",
       "destination": "/api/compte?mode=webhook"
     },
