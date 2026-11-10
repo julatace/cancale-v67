@@ -62,12 +62,46 @@ libère son numéro (le dire ici).
 | AI | textes d'explication ⇒ pop-ups ; bouton « Imprimer » en double ; carte du compte ⇒ Paramètres ; point du compte Vinted refait (demandes 1, 2, 13, 14 du 9 nov. 21 h) | `claude/popups-propre` | en cours |
 | AJ | ordre partout : plus récent en haut, tous comptes (3) | PR #1087 | **en ligne** |
 | AK | zéro « Transporteur inconnu » (tous les PDF), logos des transporteurs, carte des relais parfaite, suivi irréprochable (4, 5, 11) | PR #1086 | **en ligne** |
-| AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | en cours |
+| AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | fait (à fusionner) — `2026-11-09-navigation-fusion.md` |
 | AM | Annonces « Toutes » en grille comme Vinted, propositions lisibles (15) | `claude/annonces-grille` | à lancer |
 | AN | photo en grand partout + Achats plus beaux + facture d'achat hors Vinted (9, 10, 16) | `claude/photos-achats` | en cours |
 | AO | Compta reliée à Statistiques (8) | `claude/compta-stats` | en cours |
 | AP | republication à la main conseillée et attirante, photos vers la galerie, N° et descriptions en sélection multiple (17) | `claude/republier-main` | à lancer |
-| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | à lancer |
+| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | en cours |
 | AR | Communauté pour les créateurs de formation (7) | `claude/communaute-formateurs` | à lancer |
+
+
+Validé par Julien le 10 nov. (« Parfait fait tout ») :
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| AK2 | vrais logos Mondial Relay/Chronopost partout, rangée « Imprimer » en double retirée, bandeaux e-mails doublons retirés, « Votre colis a changé de plan » = changement de point (jamais livré), SMS Mondial Relay avec les e-mails ; + alerte ambre « point changé » avec le nouveau point et l'itinéraire (proposition 2) | `claude/colis-propre-logos` | en cours |
+| AS | À trancher : une carte par doute, photo de la paire, deux gros boutons (proposition 1, « Améliore ça stp ») | `claude/a-trancher-cartes` | en cours |
+| AT | résumé du soir 20 h : ce qu'il y a à faire demain (proposition 3 ; ≠ « rappel la veille au soir » déjà retenu le 11 oct. : le relier, une seule notification) | `claude/resume-soir` | à lancer |
+| AU | mode « dépôt » au point relais : les colis à déposer, scannés un à un, coche quand tout est déposé (proposition 4 ; s'appuie sur le scanner V et Préparer AD) | `claude/mode-depot` | à lancer |
+| AV | prix de revente réel par modèle sur la fiche d'achat (SES ventes seulement, ressemblance = proposition, jamais une identité) (proposition 5) | `claude/revente-modele` | à lancer |
+| AW | paires qui dorment > 30 j + baisse de prix en série en un geste (proposition 6 ; fusionne avec C) | `claude/baisse-prix-serie` | à lancer avec C |
+| AX | recherche universelle : N°, pseudo, n° de suivi, code de retrait (proposition 7 ; étendre ⌘K et la loupe « Tout sur le N° », pas un 3e outil) | `claude/recherche-universelle` | à lancer |
+| AY | hors ligne au point relais : codes et colis à déposer lisibles sans réseau (proposition 8 ; prolonge D et le mode relais AD) | `claude/hors-ligne-relais` | à lancer |
+
+Deuxième série du 10 nov. — Julien : « Semaine … c'est bien, [coût réel] d'une vente c'est bien, litige en cours c'est bien … OK pour le deux et OK pour le un » ; **refusés : objectif par compte, rangement guidé, mode « photo »** (ne pas reproposer).
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| AZ | photo du carton fermé avant dépôt, rangée avec la vente (preuve en litige) + au scan du bordereau la photo de la paire et son N° EN GRAND (le scan dit déjà la paire depuis le lot V : le rendre impossible à rater) ; fusionne avec M (photos d'emballage) ; après AK2 (mêmes fichiers Colis) | `claude/photo-colis-scan` | à lancer après AK2 |
+| BA | coût réel d'une vente : prix d'achat SAISI + frais connus + emballage ⇒ bénéfice net, le manque nommé (règle `beneficePaire`, jamais deviné) ; fusionne avec la « marge par plateforme » de I | `claude/cout-vente` | **fait, à intégrer** (`2026-11-10-cout-vente-valeur-stock.md`) |
+| BB | litiges en cours : un écran, date limite de réponse, preuves déjà rangées (photo du carton AZ, suivi) ; fusionne avec les « délais de litige » de I (forme à mesurer) | `claude/litiges-marge` | à lancer |
+| BC | « Ma semaine » : un ÉCRAN le dimanche (ventes, bénéfice, colis envoyés, paires qui dorment, comparaison semaine d'avant) — même source que le bilan de la semaine en notification (`api/_lib/bilan-semaine.js`), jamais une 2e règle | `claude/ma-semaine` | à lancer |
+
+Troisième série du 10 nov. — Julien : « Vas-y tout est parfait, fais tout ».
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| BD | note privée sur une paire, visible partout où la paire apparaît (annonce, vente, colis, scan) ; rangée dans SES données, jamais envoyée à une plateforme | `claude/note-privee` | à lancer |
+| BE | frise d'une vente : vendue → bordereau → déposée → livrée → versée, chaque étape PROUVÉE (sinon « pas su », jamais devinée) | `claude/frise-vente` | à lancer |
+| BF | valeur du stock : somme des prix d'achat SAISIS des paires présentes, couverture dite (« au moins … sur N, M sans prix ») | `claude/cout-vente` (avec BA) | **fait, à intégrer** (`2026-11-10-cout-vente-valeur-stock.md`) |
+| BG | d'où viennent mes achats : bénéfice moyen par source (la source se SAISIT ou se lit, jamais devinée) | `claude/source-achats` | à lancer |
+| BH | achat saisi deux fois : par n° de transaction / reçu seulement (§5), jamais par ressemblance ; rien supprimé, il choisit | `claude/achat-double` | à lancer |
+| BI | retours et litiges par modèle (le modèle est une proposition de regroupement, pas une identité ; les comptes viennent des ventes prouvées) | `claude/retours-modele` | à lancer (avec BB) |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.

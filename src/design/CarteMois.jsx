@@ -121,7 +121,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
         <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
           {cases.map((c) => {
             if (c.raison) raisonsVues.current.add(c.cle);
-            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : <ChiffreRoule valeur={c.n} />}</b><span>{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
+            const corps = <><b className={c.n == null ? 'is-vide' : undefined} style={{ '--nc': Math.max(1, texteDe(c.n).length) }}>{c.n == null ? '—' : <ChiffreRoule valeur={c.n} />}</b><span>{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;

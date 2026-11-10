@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// « RECEVOIR LES SMS MONDIAL RELAY » — Réglages → Notifications (6 novembre)
+// « RECEVOIR LES SMS MONDIAL RELAY » — Réglages → Mes e-mails (6 novembre ; avec les e-mails le 10 nov.)
 // ══════════════════════════════════════════════════════════════════════════════
 // Les colis en casier (« LOCKER 24/7 ») que Mondial Relay n'annonce que par SMS.
 // Le jeton (afficher / copier / régénérer / couper), l'adresse exacte, le
@@ -95,64 +95,68 @@ export default function SmsColisSetting({ jeton = '', onJeton, toast = () => {},
     } catch (_) { setEssai(texteEssai(0, null)); }
   };
   const masque = jeton ? `${String(jeton).slice(0, 4)}${'•'.repeat(12)}${String(jeton).slice(-4)}` : '';
+  // (10 nov., Julien : « Pour les SMS Mondial Relay, fais quelque chose de plus clair et mets ça avec
+  // les e-mails ») UNE phrase, le bouton qui copie, les étapes en liste courte numérotée ; le détail
+  // (dessins, mots exacts de chaque écran, expéditeurs lus) replié, à la demande. Rien de retiré.
   return (
     <div className="vrm-sc" data-sms-colis={etat}>
       <p className="vrm-sc-intro">
-        Les colis en <b>casier Mondial Relay</b> (« LOCKER 24/7 ») ne sont parfois annoncés que par SMS. Un iPhone ne laisse aucune app lire tes SMS :
-        c’est <b>une automatisation Raccourcis</b> qui envoie à VRM les SMS qui parlent de colis. Le colis apparaît alors dans Colis → À retirer, avec son code.
-        Les codes de vérification ne sont jamais rangés ; un SMS d’un autre expéditeur est ignoré.
+        Tes <b>SMS de colis</b> (Mondial Relay en casier, Vinted Go, Pickup) arrivent dans VRM comme tes e-mails : une automatisation de ton iPhone les transfère, le colis apparaît dans Colis → À retirer avec son code.
       </p>
-      <ul className="vrm-sc-mots" data-sms-expediteurs="">{EXPEDITEURS_SMS.map((x) => <li key={x.nom} data-sms-expediteur={x.nom}><b>{x.nom}</b> — {x.quoi}</li>)}</ul>
       {etat !== 'actif' ? (
         <div className="vrm-sc-bloc">
           <div className="vrm-sc-etat" data-sms-etat={etat}>{etat === 'coupe' ? 'Réception coupée : aucun SMS n’est accepté.' : 'Pas encore activé.'}</div>
-          <Bouton variante="primaire" data-sms-creer="" onClick={creer}>{etat === 'coupe' ? 'Créer un nouveau jeton' : 'Créer mon jeton'}</Bouton>
+          <Bouton variante="primaire" data-sms-creer="" onClick={creer}>{etat === 'coupe' ? 'Créer une nouvelle adresse' : 'Créer mon adresse SMS'}</Bouton>
         </div>
       ) : (
         <div className="vrm-sc-bloc">
-          <div className="vrm-sc-lib">Ton jeton <small>(il suffit pour ranger des colis chez toi : ne le partage pas)</small></div>
-          <div className="vrm-sc-code" data-sms-jeton={voir ? 'visible' : 'masque'}>{voir ? jeton : masque}</div>
           <div className="vrm-sc-gestes">
+            <Bouton variante="primaire" data-sms-copier-url="" onClick={() => copier(url, 'Adresse')}>Copier l’adresse</Bouton>
+            <Bouton variante="secondaire" data-sms-tester="" occupe={!!(essai && essai.busy)} disabled={!!(essai && essai.busy)} onClick={tester}>{essai && essai.busy ? 'Essai…' : 'Tester'}</Bouton>
+          </div>
+          <div className="vrm-sc-code" data-sms-url="">{voir ? url : url.replace(jeton, masque)}</div>
+          {essai && !essai.busy ? <div className={'vrm-sc-essai' + (essai.ok ? '' : ' is-ambre')} role="status" data-sms-essai={essai.ok ? 'ok' : 'ko'}>{essai.t}</div> : null}
+          <div className="vrm-sc-gestes vrm-sc-jeton" data-sms-jeton={voir ? 'visible' : 'masque'}>
             <Bouton variante="discret" data-sms-voir="" onClick={() => setVoir((v) => !v)}>{voir ? 'Masquer' : 'Afficher'}</Bouton>
-            <Bouton variante="discret" data-sms-copier-jeton="" onClick={() => copier(jeton, 'Jeton')}>Copier</Bouton>
+            <Bouton variante="discret" data-sms-copier-jeton="" onClick={() => copier(jeton, 'Jeton')}>Copier le jeton</Bouton>
             <Bouton variante="discret" data-sms-regenerer="" onClick={() => setConfirme('regenerer')}>Régénérer</Bouton>
             <Bouton variante="discret" data-sms-couper="" onClick={() => setConfirme('couper')}>Couper</Bouton>
           </div>
           {confirme ? (
             <div className="vrm-sc-confirme" role="alertdialog" aria-label="Confirmer" data-sms-confirme={confirme}>
-              <span>{confirme === 'regenerer' ? 'L’ancien jeton ne marchera plus : il faudra recoller la nouvelle adresse dans Raccourcis.' : 'Plus aucun SMS ne sera accepté tant que tu ne crées pas de nouveau jeton.'}</span>
+              <span>{confirme === 'regenerer' ? 'L’ancienne adresse ne marchera plus : il faudra recoller la nouvelle dans Raccourcis.' : 'Plus aucun SMS ne sera accepté tant que tu ne crées pas de nouvelle adresse.'}</span>
               <div className="vrm-sc-gestes">
                 <Bouton variante="danger" data-sms-confirmer="" onClick={confirme === 'regenerer' ? creer : couper}>{confirme === 'regenerer' ? 'Régénérer' : 'Couper'}</Bouton>
                 <Bouton variante="discret" onClick={() => setConfirme('')}>Annuler</Bouton>
               </div>
             </div>
           ) : null}
-          <div className="vrm-sc-lib">L’adresse à coller dans Raccourcis</div>
-          <div className="vrm-sc-code" data-sms-url="">{voir ? url : url.replace(jeton, masque)}</div>
-          <div className="vrm-sc-gestes">
-            <Bouton variante="primaire" data-sms-copier-url="" onClick={() => copier(url, 'Adresse')}>Copier l’adresse</Bouton>
-            <Bouton variante="secondaire" data-sms-tester="" occupe={!!(essai && essai.busy)} disabled={!!(essai && essai.busy)} onClick={tester}>{essai && essai.busy ? 'Essai…' : 'Tester'}</Bouton>
-          </div>
-          {essai && !essai.busy ? <div className={'vrm-sc-essai' + (essai.ok ? '' : ' is-ambre')} role="status" data-sms-essai={essai.ok ? 'ok' : 'ko'}>{essai.t}</div> : null}
-          <div className="vrm-sc-sous">« Tester » envoie un SMS d’exemple inventé (colis 80000001, LOCKER 24/7 EXEMPLE) : VRM le lit et ne range rien.</div>
+          <div className="vrm-sc-sous">L’adresse contient ton jeton : elle suffit pour ranger des colis chez toi, ne la partage pas. « Tester » envoie un SMS d’exemple inventé : rien n’est rangé.</div>
         </div>
       )}
-      <ol className="vrm-sc-etapes" aria-label="Créer l’automatisation Raccourcis">
-        {ETAPES_RACCOURCI.map((e, i) => {
-          const D = DESSINS[e.dessin];
-          return (
-            <li key={e.cle} className="vrm-sc-etape" data-sms-etape={e.cle}>
-              <div className="vrm-sc-dessin">{D ? <D /> : null}</div>
-              <div className="vrm-sc-texte">
-                <span className="vrm-sc-n" aria-hidden="true">{i + 1}</span>
-                <b className="vrm-sc-etape-titre">{e.titre}</b>
-                <ul className="vrm-sc-mots">{e.mots.map((m) => <li key={m}>{m}</li>)}</ul>
-              </div>
-            </li>
-          );
-        })}
+      <ol className="vrm-sc-court" aria-label="Transférer les SMS en 5 étapes" data-sms-court="">
+        {ETAPES_RACCOURCI.map((e) => <li key={e.cle} data-sms-etape={e.cle}>{e.court || e.titre}</li>)}
       </ol>
-      <p className="vrm-sc-sous">Il faut iOS 17 ou plus récent : avant, une automatisation « Message » demandait de confirmer à chaque SMS. Si un mot de l’écran diffère un peu, c’est le même réglage. Si le colis arrive sans texte, touche la variable « Entrée du raccourci » dans le champ et choisis « Contenu ».</p>
+      <details className="vrm-sc-detail" data-sms-detail="">
+        <summary>Voir chaque écran en détail</summary>
+        <ol className="vrm-sc-etapes" aria-label="Créer l’automatisation Raccourcis">
+          {ETAPES_RACCOURCI.map((e, i) => {
+            const D = DESSINS[e.dessin];
+            return (
+              <li key={e.cle} className="vrm-sc-etape" data-sms-etape-detail={e.cle}>
+                <div className="vrm-sc-dessin">{D ? <D /> : null}</div>
+                <div className="vrm-sc-texte">
+                  <span className="vrm-sc-n" aria-hidden="true">{i + 1}</span>
+                  <b className="vrm-sc-etape-titre">{e.titre}</b>
+                  <ul className="vrm-sc-mots">{e.mots.map((m) => <li key={m}>{m}</li>)}</ul>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="vrm-sc-sous">Il faut iOS 17 ou plus récent. Si le colis arrive sans texte, touche la variable « Entrée du raccourci » dans le champ et choisis « Contenu ». Les codes de vérification ne sont jamais rangés ; un SMS d’un autre expéditeur est ignoré.</p>
+        <ul className="vrm-sc-mots" data-sms-expediteurs="">{EXPEDITEURS_SMS.map((x) => <li key={x.nom} data-sms-expediteur={x.nom}><b>{x.nom}</b> — {x.quoi}</li>)}</ul>
+      </details>
     </div>
   );
 }

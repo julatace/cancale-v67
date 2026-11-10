@@ -1,6 +1,6 @@
 // ── BANC : « À TRANCHER » (9 nov. 2026, lot AC) ─────────────────────────────────
 //        npm run build && node scripts/bancs/a-trancher.cjs [dist]
-//        SHOTS=dossier  BANC_PORT=4497  AT_SEUL=S|G|T|J|Z (une partie)
+//        SHOTS=dossier  BANC_PORT=4497  AT_SEUL=S|G|T|C|J|Z (une partie)
 // Données INVENTÉES (le dépôt est public). Un compte Vinted `compte_banc` (111) dont
 // la dernière lecture date de 3 jours (⇒ « 1 compte à relire », la règle de la puce
 // de Colis), une adresse de réception sans compte (`achat@exemple.test`), et — rangés
@@ -21,6 +21,15 @@
 //  T  Trancher une chose la fait sortir : l'adresse est comptée par SON écran (1), puis
 //     « C'est un compte acheteur » (son geste, confirmé) ⇒ elle sort, total et badge
 //     baissent d'autant ; l'écriture part sur ce geste-là seulement.
+//  C  (10 nov., cartes) 390 tactile clair + sombre et 1512 sombre : une CARTE par chose
+//     publiée (`ex`), photo de l'annonce + N°, question ≤ 12 mots, chaque geste ≥ 44 px,
+//     groupes par type (titre + compte) ; « + N » pour le reste ; le rouge sur la seule
+//     source « deux paires sous un N° ». « Supprimé de Vinted » N°12 (VRAIE carte de la
+//     coque : fiche 7002 vue en ligne il y a 2 j, absente de la lecture complète) :
+//     « Oui, chez moi » ⇒ AUCUNE confirmation, la carte sort tout de suite, total et
+//     badge −1, la pilule « Annuler » ; l'écriture `vrm_cycle_decisions[7002].choix =
+//     chez-moi` part sur ce geste seul ; « Annuler » ⇒ la carte revient, la décision est
+//     retirée (valeur d'avant exacte : absente). « Non » n'écrit rien (il ouvre Ma journée).
 //  J  Ma journée (390 sombre) : la ligne « N choses à trancher » porte la somme des
 //     sources rangées à cet instant ; la toucher ouvre À trancher.
 //  Z  Rien à trancher (tout à 0, lecture fraîche) : « Rien à trancher », aucun badge,
@@ -43,20 +52,36 @@ const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 
 const lignesBase = (ageMs, zero = false) => [
   // Les annonces : lues il y a une minute (une annonce en ligne, pour que la barre d'Annonces existe) ;
   // seules les VENTES ont l'âge voulu (la fraîcheur « compte à relire » se lit sur `orders_sold`).
-  { id: 'harvest_111_listings', data: { capturedAt: iso(MAINTENANT - 60000), payload: { items: zero ? [] : [{ id: 800001, title: 'Nike Dunk Low taille 42', price: { amount: '60', currency_code: 'EUR' }, created_at_ts: Math.floor((MAINTENANT - 5 * 86400e3) / 1000), promoted: false }] } } },
+  { id: 'harvest_111_listings', data: { capturedAt: iso(MAINTENANT - 60000), uid: '111', payload: { items: zero ? [] : [{ id: 800001, title: 'Nike Dunk Low taille 42', price: { amount: '60', currency_code: 'EUR' }, created_at_ts: Math.floor((MAINTENANT - 5 * 86400e3) / 1000), promoted: false }], pagination: { total_entries: zero ? 0 : 1, total_pages: 1, current_page: 1 } } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(MAINTENANT - ageMs), payload: { my_orders: [] } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: iso(MAINTENANT - ageMs), payload: { my_orders: [] } } },
   { id: 'email_reception_1', data: { at: iso(MAINTENANT - 3600e3), adresses: ['achat@exemple.test'] } },
   { id: 'vrm_email_owners', data: { adresses: {} } },
 ];
 // Ce que les écrans propriétaires ont rangé sur l'appareil (forme réelle, src/aTrancher.js).
-const SEMIS = { 'numeros-double': 1, 'colis-postes': 2, 'numeros-a-ecrire': 1, 'numeros-a-verifier': 3, 'sms-vestiaire': 1, 'sms-pickup': 1, 'supprimes-vinted': 1, 'remise-en-ligne': 1, 'achats-sans-prix': 4 };
+// (10 nov., lot BB) « Litiges en cours » publiée à 0 : comptée, sans ligne (la source vit dans scripts/bancs/litiges-ecran.cjs).
+const SEMIS = { 'numeros-double': 1, 'colis-postes': 2, 'numeros-a-ecrire': 1, 'numeros-a-verifier': 3, 'sms-vestiaire': 1, 'sms-pickup': 1, 'supprimes-vinted': 1, 'remise-en-ligne': 1, 'achats-sans-prix': 4, 'litiges-en-cours': 0 };
+// (10 nov., cartes) Les CHOSES publiées avec certains nombres (`ex`, forme réelle) : photo
+// (adresse inventée, servie par le banc), N°. « supprimes-vinted » n'est PAS semé : la coque
+// le publie de sa vraie carte (fiche 7002, N°12, `vrm_vus_en_ligne`).
+const PH = (k) => `https://images.exemple.test/paire-${k}.svg`;
+const SEMIS_EX = {
+  'numeros-double': [{ id: 'n31', num: '31', photo: PH(31), photo2: PH(32) }],
+  'numeros-a-ecrire': [{ id: '800101', num: '44', photo: PH(44) }],
+  'remise-en-ligne': [{ id: '800102', photo: PH(9), de: '9' }],
+  'achats-sans-prix': [{ id: '800103', num: '51', photo: PH(51) }, { id: '800104', num: '52', photo: PH(52) }, { id: '800105', num: '53' }],
+};
+const FICHE_SUPPR = { numero: '12', accountId: '111', title: 'Nike Air Max taille 42', photo: PH(12), photoK: 'pk12', price: '60', auto: true, numberedAt: iso(MAINTENANT - 10 * 86400e3) };
+const VU_SUPPR = iso(MAINTENANT - 48 * 3600e3);
+const SVG_PAIRE = (k) => { const h = (Number(k) * 47) % 360; return `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="hsl(${h},35%,86%)"/><path d="M30 130c10-30 40-40 60-42 18-2 26-24 40-24 10 0 12 14 26 22 14 8 24 16 24 34v10H30z" fill="hsl(${h},45%,38%)"/><rect x="30" y="140" width="140" height="12" rx="6" fill="#fff"/></svg>`; };
 const RETIRER = { total: 0, prets: 0, sansCode: 0, aVerifier: 2, urgents: 0, enVerification: 0 };
 const ADATER = 5;
 // Attendu À LA MAIN : 1+2+2+1+3+1+1+1+1+4 + 1 compte à relire + 5 à dater = 23.
 const TOTAL_MAIN = 23;
 const PUBLIEES = JSON.parse((/export const CLES_PUBLIEES = (\[[^\]]*\])/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'fileEnvoi.js'), 'utf8')) || [, '[]'])[1].replace(/'/g, '"'));
-const ORDRE = ['numeros-double', 'colis-postes', 'colis-retirer', 'numeros-a-ecrire', 'numeros-a-verifier', 'sms-vestiaire', 'sms-pickup', 'supprimes-vinted', 'remise-en-ligne', 'achats-sans-prix', 'comptes-a-relire', 'ventes-a-dater'];
+// (10 nov., cartes) L'ordre affiché : par TYPE (Numéros, Colis, Paires, Comptes, Compta), le
+// rouge « deux paires sous un N° » toujours en tête.
+const ORDRE = ['numeros-double', 'numeros-a-ecrire', 'numeros-a-verifier', 'colis-postes', 'colis-retirer', 'sms-vestiaire', 'sms-pickup', 'supprimes-vinted', 'remise-en-ligne', 'achats-sans-prix', 'comptes-a-relire', 'ventes-a-dater'];
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d != null && d !== '' ? ' — ' + d : '')); };
@@ -89,9 +114,11 @@ const projette = (row, sel) => {
 async function contexte(b, vp, { theme = 'light', zero = false } = {}) {
   const ctx = await b.newContext({ viewport: vp, colorScheme: theme, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   // L'annonce porte déjà son N° (posé à la main) : aucun écran n'a à la numéroter pendant le banc.
-  const MAIN = { vinted_dark: theme === 'dark', vinted_account_emails: {}, ...(zero ? {} : { vinted_annonce_numeros: { '800001': { numero: '7', title: 'Nike Dunk Low taille 42', auto: false, manuelAt: iso(MAINTENANT - 86400e3) } } }) };
+  // (10 nov.) + la fiche 7002 (N°12) vue en ligne il y a 2 jours, absente de la lecture complète :
+  // la VRAIE carte « supprimé de Vinted » de la coque (`cycleCartes`), qui la publie.
+  const MAIN = { vinted_dark: theme === 'dark', vinted_account_emails: {}, ...(zero ? {} : { vinted_annonce_numeros: { '800001': { numero: '7', title: 'Nike Dunk Low taille 42', auto: false, manuelAt: iso(MAINTENANT - 86400e3) }, '7002': FICHE_SUPPR }, vrm_vus_en_ligne: { '7002': VU_SUPPR } }) };
   const ROWS = lignesBase(zero ? 60000 : 3 * 86400e3, zero);
-  const semis = { uid: UID, s: Object.fromEntries(Object.entries(SEMIS).map(([k, n]) => [k, { n: zero ? 0 : n, at: MAINTENANT }])) };
+  const semis = { uid: UID, s: Object.fromEntries(Object.entries(SEMIS).filter(([k]) => zero || k !== 'supprimes-vinted').map(([k, n]) => [k, { n: zero ? 0 : n, at: MAINTENANT, ...(!zero && SEMIS_EX[k] ? { ex: SEMIS_EX[k] } : {}) }])) };
   if (zero) semis.s['adresses-sans-compte'] = { n: 0, at: MAINTENANT };
   const retirer = { ...RETIRER, aVerifier: zero ? 0 : RETIRER.aVerifier, at: MAINTENANT };
   const urssaf = { mois: [], aDater: { n: zero ? 0 : ADATER, ca: 0, par: {} }, at: MAINTENANT };
@@ -129,6 +156,8 @@ async function contexte(b, vp, { theme = 'light', zero = false } = {}) {
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await ctx.route('**/rest/v1/**', servir);
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  // Les photos inventées (enregistrée en dernier : Playwright la prend en premier).
+  await ctx.route('https://images.exemple.test/**', (r) => { const k = (/paire-(\d+)/.exec(r.request().url()) || [])[1] || '0'; return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: SVG_PAIRE(k) }); });
   return { ctx, ecritures, MAIN };
 }
 const shot = (pg, nom) => pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: false }).catch(() => {});
@@ -201,7 +230,7 @@ const actif = (pg) => pg.evaluate(() => {
     const pg = await ctx.newPage();
     await aller(pg, 'trancher'); await ecranTrancher(pg);
     const avantMain = JSON.parse(JSON.stringify(MAIN));
-    const sel = cle === 'adresses-sans-compte' ? `[data-a-trancher-passu="${cle}"] button` : `[data-a-trancher-ligne="${cle}"] button`;
+    const sel = cle === 'adresses-sans-compte' ? `[data-a-trancher-passu="${cle}"] button` : `[data-a-trancher-ligne="${cle}"] [data-a-trancher-ouvrir]`;
     const e0 = ecritures.length;
     await pg.click(sel);
     const A = ATTENDU_G[cle];
@@ -266,6 +295,93 @@ const actif = (pg) => pg.evaluate(() => {
     dit(!r.lignes.some((l) => l.cle === 'adresses-sans-compte') && !r.passu.some((l) => l.cle === 'adresses-sans-compte'), 'T : tranchée, la ligne SORT', JSON.stringify(r.lignes.map((l) => l.cle)));
     dit(r.total === TOTAL_MAIN && r.badge === TOTAL_MAIN && r.partiel === '0', 'T : total et badge reviennent (et plus rien n\'est « pas su »)', `${r.total} / ${r.badge} / ${r.partiel}`);
     await shot(pg, 'T-apres');
+    await ctx.close();
+  });
+
+  // ── C (10 nov., cartes) ─────────────────────────────────────────────────────────
+  const CARTE_SUPPR = '[data-a-trancher-carte="supprimes-vinted"][data-a-trancher-id="7002"]';
+  const lireCartes = (pg) => pg.evaluate(() => {
+    const motsDe = (t) => String(t || '').replace(/[«»?.:,;!]/g, ' ').split(/\s+/).filter(Boolean).length;
+    const sources = {};
+    for (const s of document.querySelectorAll('[data-a-trancher-ligne]')) {
+      sources[s.getAttribute('data-a-trancher-ligne')] = {
+        n: Number(s.getAttribute('data-n')),
+        cartes: [...s.querySelectorAll('[data-a-trancher-carte]')].map((c) => ({ id: c.getAttribute('data-a-trancher-id'), num: c.getAttribute('data-num'), ton: c.getAttribute('data-ton'),
+          photos: [...c.querySelectorAll('img')].map((i) => i.naturalWidth), nombre: (c.querySelector('[data-a-trancher-nombre]') || { getAttribute: () => null }).getAttribute('data-a-trancher-nombre'),
+          oui: !!c.querySelector('[data-a-trancher-oui]'), non: !!c.querySelector('[data-a-trancher-non]') })),
+        autres: (s.querySelector('[data-a-trancher-autres]') || { getAttribute: () => null }).getAttribute('data-a-trancher-autres'),
+      };
+    }
+    const groupes = [...document.querySelectorAll('[data-a-trancher-type]')].map((g) => ({ type: g.getAttribute('data-a-trancher-type'), n: Number(g.getAttribute('data-n')),
+      somme: [...g.querySelectorAll('[data-a-trancher-ligne]')].reduce((t, s) => t + Number(s.getAttribute('data-n')), 0) }));
+    const questions = [...document.querySelectorAll('.vrm-at-question')].map((q) => ({ t: q.textContent, m: motsDe(q.textContent) }));
+    const boutons = [...document.querySelectorAll('.vrm-at button')].filter((b) => b.offsetParent).map((b) => ({ t: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height) }));
+    const rouges = [...document.querySelectorAll('.vrm-at [data-ton="rouge"]')].map((e) => (e.closest('[data-a-trancher-ligne]') || { getAttribute: () => '' }).getAttribute('data-a-trancher-ligne'));
+    return { sources, groupes, questions, boutons, rouges, deborde: document.scrollingElement.scrollWidth > innerWidth + 1 };
+  });
+  if (!SEUL || SEUL === 'C') for (const [nom, vp, theme] of [['390-clair', TEL, 'light'], ['390-sombre', TEL, 'dark'], ['1512-sombre', PC, 'dark']]) await essaie('C ' + nom, async () => {
+    const { ctx } = await contexte(b, vp, { theme });
+    const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    await aller(pg, 'trancher'); await ecranTrancher(pg);
+    await pg.waitForSelector(CARTE_SUPPR + ' img', { timeout: 30000 }).catch(() => {});
+    await pg.waitForTimeout(800);
+    const c = await lireCartes(pg);
+    const S = c.sources;
+    const sup = S['supprimes-vinted'] && S['supprimes-vinted'].cartes[0];
+    dit(!!sup && sup.id === '7002' && sup.num === '12' && sup.photos.length === 1 && sup.photos[0] > 0, `C ${nom} : « supprimé de Vinted » = la vraie carte de la coque, photo de SA fiche et N°12`, JSON.stringify(S['supprimes-vinted']));
+    dit(!!sup && sup.oui && sup.non, `C ${nom} : geste binaire ⇒ deux boutons (oui / non)`);
+    const dbl = S['numeros-double'] && S['numeros-double'].cartes;
+    dit(!!dbl && dbl.length === 1 && dbl[0].num === '31' && dbl[0].photos.length === 2 && dbl[0].photos.every((w) => w > 0) && dbl[0].ton === 'rouge', `C ${nom} : deux paires sous N°31 : une carte, ses deux photos, en rouge`, JSON.stringify(dbl));
+    const asp = S['achats-sans-prix'];
+    dit(!!asp && asp.cartes.length === 3 && asp.autres === '1' && asp.cartes.map((x) => x.num).join(',') === '51,52,53', `C ${nom} : 4 sans prix d'achat ⇒ 3 cartes (N°51, 52, 53) et « + 1 »`, JSON.stringify(asp));
+    dit(!!asp && asp.cartes[2].photos.length === 0, `C ${nom} : une chose sans photo publiée n'en reçoit aucune (pas de ressemblance)`, JSON.stringify(asp && asp.cartes[2]));
+    const cp = S['colis-postes'];
+    dit(!!cp && cp.cartes.length === 1 && cp.cartes[0].nombre === '2' && !cp.cartes[0].id, `C ${nom} : une source sans choses publiées = UNE carte, son nombre dans la vignette`, JSON.stringify(cp));
+    dit(JSON.stringify(c.groupes.map((g) => g.type)) === JSON.stringify(['numeros', 'colis', 'paires', 'comptes', 'compta']) && c.groupes.every((g) => g.n === g.somme), `C ${nom} : groupes par type, dans l'ordre, chacun compte ses sources`, JSON.stringify(c.groupes));
+    const longues = c.questions.filter((q) => q.m > 12);
+    dit(c.questions.length >= 12 && !longues.length, `C ${nom} : chaque question tient en 12 mots`, `${c.questions.length} questions ; trop longues : ${JSON.stringify(longues)}`);
+    const petits = c.boutons.filter((x) => x.h < 44);
+    dit(c.boutons.length >= 14 && !petits.length, `C ${nom} : chaque geste fait 44 px au moins`, `${c.boutons.length} boutons ; petits : ${JSON.stringify(petits)}`);
+    dit(c.rouges.length >= 1 && c.rouges.every((x) => x === 'numeros-double'), `C ${nom} : le rouge sur « deux paires sous un N° » seulement`, JSON.stringify(c.rouges));
+    dit(!c.deborde, `C ${nom} : rien ne déborde en largeur`);
+    dit(!errs.length, `C ${nom} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
+    await shot(pg, 'C-' + nom);
+    await pg.evaluate(() => { const g = document.querySelector('[data-a-trancher-type="paires"]'); if (g) g.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300);
+    await shot(pg, 'C-' + nom + '-paires');
+    await pg.evaluate(() => { const g = document.querySelector('[data-a-trancher-groupe="pas-su"]'); if (g) g.scrollIntoView({ block: 'end' }); }); await pg.waitForTimeout(300);
+    await shot(pg, 'C-' + nom + '-bas');
+    await ctx.close();
+  });
+  if (!SEUL || SEUL === 'C') await essaie('C geste', async () => {
+    const { ctx, ecritures, MAIN } = await contexte(b, TEL, { theme: 'light' });
+    const pg = await ctx.newPage(); let dialogue = false; pg.on('dialog', (d) => { dialogue = true; d.dismiss().catch(() => {}); });
+    await aller(pg, 'trancher'); await ecranTrancher(pg);
+    await pg.waitForSelector(CARTE_SUPPR, { timeout: 30000 });
+    await pg.waitForTimeout(1500);
+    const avant = await lire(pg);
+    const avantMain = JSON.parse(JSON.stringify(MAIN));
+    const e0 = ecritures.length;
+    dit(!(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']), 'C geste : aucune décision avant SON geste');
+    await pg.click(CARTE_SUPPR + ' [data-a-trancher-oui]');
+    await pg.waitForTimeout(250);
+    const v1 = await pg.evaluate((sel) => ({ carte: !!document.querySelector(sel), total: Number((document.querySelector('[data-a-trancher]') || { getAttribute: () => NaN }).getAttribute('data-a-trancher')),
+      confirmation: !!document.querySelector('.vrm-confirmation'), annuler: !!document.querySelector('[data-pilule-annuler]') }), CARTE_SUPPR);
+    dit(!v1.carte && v1.total === avant.total - 1, 'C geste : « Oui, chez moi » ⇒ la carte sort TOUT DE SUITE, total −1', JSON.stringify({ ...v1, avant: avant.total }));
+    dit(!v1.confirmation && !dialogue && v1.annuler, 'C geste : aucune confirmation, la pilule « Annuler » est là', JSON.stringify(v1));
+    if (avant.badge != null) dit(Number(await pg.getAttribute('[data-badge-nav="trancher"]', 'data-badge-n').catch(() => NaN)) === avant.total - 1, 'C geste : le badge baisse aussi');
+    for (let i = 0; i < 40 && !(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']); i++) await pg.waitForTimeout(200);
+    const dec = MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002'];
+    dit(!!dec && dec.choix === 'chez-moi' && dec.numero === '12', 'C geste : SON geste écrit `vrm_cycle_decisions[7002]` = chez-moi (la réponse de Ma journée)', JSON.stringify(dec));
+    const autresCles = Object.keys({ ...avantMain, ...MAIN }).filter((k) => !['rev', 'vrm_cycle_decisions', 'vrm_vus_en_ligne'].includes(k) && !PUBLIEES.includes(k) && JSON.stringify(avantMain[k]) !== JSON.stringify(MAIN[k]));
+    const autresLignes = ecritures.slice(e0).filter((w) => !w.ids.includes('main') && !/id=eq\.main/.test(w.url)).map((w) => w.ids.join(','));
+    dit(!autresCles.length && !autresLignes.length, 'C geste : rien d\'autre n\'est écrit (ni vendu, ni sorti du stock)', JSON.stringify({ autresCles, autresLignes }));
+    await shot(pg, 'C-geste-apres-oui');
+    await pg.click('[data-pilule-annuler]');
+    await pg.waitForSelector(CARTE_SUPPR, { timeout: 15000 }).catch(() => {});
+    for (let i = 0; i < 40 && MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']; i++) await pg.waitForTimeout(200);
+    const v2 = await pg.evaluate((sel) => ({ carte: !!document.querySelector(sel), total: Number(document.querySelector('[data-a-trancher]').getAttribute('data-a-trancher')) }), CARTE_SUPPR);
+    dit(v2.carte && v2.total === avant.total, '« Annuler » ⇒ la carte revient, le total aussi', JSON.stringify(v2));
+    dit(!(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']), '« Annuler » ⇒ la décision est retirée (valeur d\'avant exacte : absente)', JSON.stringify(MAIN.vrm_cycle_decisions || null));
     await ctx.close();
   });
 

@@ -141,15 +141,18 @@ async function scenario(b, scen, largeur, sombre) {
       dit(s.etat === 'a-jour' && /^Tout est à jour · vérifié (à l’instant|il y a \d+ min)$/.test(s.texte), `${nom} : tout frais ⇒ « Tout est à jour · vérifié … »`, JSON.stringify(s));
       dit(!/255, 1[0-9]{2}, 0|rgb\(2[0-9]{2}, 1[0-9]{2}, [0-9]{1,2}\)/.test(s.ton), `${nom} : aucun point ambre quand tout est à jour`, s.ton);
     } else if (scen === 'vieux') {
-      dit(s.etat === 'retard' && s.source === 'compte' && /compte_a/.test(s.texte) && /pas relu depuis 3 j/.test(s.texte) && /ouvre vinted\.fr sur ce compte/.test(s.texte), `${nom} : compte_a vieux de 3 j ⇒ nommé avec son geste`, s.texte);
+      dit(s.etat === 'retard' && s.source === 'compte' && /compte_a/.test(s.texte) && /pas relu depuis 3 j/.test(s.texte) && !/ouvre vinted\.fr/.test(s.texte), `${nom} : compte_a vieux de 3 j ⇒ nommé, état court, sans phrase d'instruction (10 nov., « je trouve ça moche »)`, s.texte);
       dit(!/compte_b/.test(s.texte), `${nom} : compte_b relu il y a 40 min n’est pas nommé`, s.texte);
       dit(!s.toutAJour, `${nom} : jamais « Tout est à jour » avec un compte en retard`);
       await photo();
       await pg.locator('[data-fraicheur-deplier]').click();
+      const det0 = await pg.evaluate(() => { const d = document.querySelector('[data-fraicheur-detail]'); return d ? d.innerText : ''; });
+      dit(!/navigateur où est l’extension VRM/.test(det0), `${nom} : déplié, une ligne par source, l'instruction n'est pas étalée`, det0.slice(0, 200));
+      await pg.locator('.vrm-fraicheur-rangee-tete').first().click();
       const det = await pg.evaluate(() => { const d = document.querySelector('[data-fraicheur-detail]'); return d ? d.innerText : ''; });
-      dit(/navigateur où est l’extension VRM/.test(det), `${nom} : au toucher, le geste entier (le navigateur où est l’extension)`, det.slice(0, 200));
+      dit(/navigateur où est l’extension VRM/.test(det), `${nom} : rangée touchée ⇒ le geste entier (le navigateur où est l’extension)`, det.slice(0, 200));
     } else if (scen === 'deux') {
-      dit(s.etat === 'retard' && s.source === 'extension' && s.nRet === 2 && /Extension pas vue depuis 2 j/.test(s.texte) && /\+ 1 autre/.test(s.texte), `${nom} : deux retards ⇒ l’extension d’abord, « + 1 autre »`, s.texte);
+      dit(s.etat === 'retard' && s.source === 'extension' && s.nRet === 2 && /2 choses à revoir/.test(s.texte), `${nom} : deux retards ⇒ « 2 choses à revoir » (la plus grave en tête du détail)`, s.texte);
       await pg.locator('[data-fraicheur-deplier]').click();
       const ordre = await pg.evaluate(() => [...document.querySelectorAll('[data-fraicheur-rangee]')].map((x) => x.getAttribute('data-fraicheur-rangee-cle') || x.getAttribute('data-fraicheur-rangee')));
       dit(ordre[0] === 'extension:muette' && ordre[1] === 'compte:vinted:111', `${nom} : le détail dans l’ordre de gravité`, ordre.join(','));
