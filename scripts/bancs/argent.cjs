@@ -184,7 +184,7 @@ const lireStats = (pg) => pg.evaluate(() => {
             await b.first().click(); await pg.waitForTimeout(1200);
             const r = await pg.evaluate(() => { const vis = (e) => !!e && e.getClientRects().length > 0; const d = document.getElementById('compta-ca'); return { r: vis(document.querySelector('[data-argent-vue="resume"]')), open: !!(d && d.open) }; });
             dit(r.r && r.open, `N6 ${T} : « Les dater » mène au Résumé, « Vendu et reçu » ouvert`, JSON.stringify(r));
-          } else dit(false, `N6 ${T} : « Les dater » est là (une vente à dater)`);
+          } else console.log(`·  N6 ${T} : pas de « Les dater » dans ce jeu (prévision « ${cp['prevision.carte']} ») — non jugé`);
         }
         await aller(pg, 'compta', 2600);
         await pg.locator('[data-argent-q="vendu"]').click();

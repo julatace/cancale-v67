@@ -34,6 +34,7 @@
 require('./_porte-banc.cjs');
 const path = require('path'), fs = require('fs');
 const NV = require('./nouveau-vendeur.cjs');
+const { allerSegment } = require('./_compta.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const SHOTS = process.env.SHOTS || '';
 const LARGEURS = String(process.env.LARGEURS || '390,1512').split(',').map(Number);
@@ -168,7 +169,8 @@ const capture = async (pg, nom) => {
             })(),
           };
         });
-        dit(cp.h1 === 'Compta', `S4 ${T} : le titre est « Compta »`, cp.h1);
+        // (10 nov.) Compta et Statistiques sont devenues « Argent » (src/argent.js).
+        dit(cp.h1 === 'Argent', `S4 ${T} : le titre est « Argent »`, cp.h1);
         dit(!cp.date, `C4 ${T} : pas de date en surtitre au-dessus de « Compta »`);
         dit(!cp.panneauxVides.length, `C1 ${T} : aucun panneau vide (anneau sans données)`, cp.panneauxVides.join(' ¦ '));
         dit(cp.places.length === 1, `C2 ${T} : le statut se choisit à UN endroit`, cp.places.join(', '));
@@ -181,7 +183,8 @@ const capture = async (pg, nom) => {
           await capture(pg, `compta-A-${W}-${th}`);
         } else {
           dit(cp.places[0] === 'changer', `C2 ${T} : statut choisi ⇒ seulement « Changer »`, cp.places.join(','));
-          // U1 — « À recopier sur l'URSSAF ».
+          // U1 — « À recopier sur l'URSSAF » (segment « Déclarer » d'Argent).
+          await allerSegment(pg, 'declarer');
           await pg.evaluate(() => { window.__copie = null; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copie = String(t); } } }); } catch (_) {} });
           const u = await pg.evaluate(() => {
             const c = document.querySelector('[data-urssaf-geste="recopier"]');
@@ -205,7 +208,8 @@ const capture = async (pg, nom) => {
             dit(apres.copie === u.texte && /Copié/.test(apres.txt), `U1 ${T} : « Copier » met le montant dans le presse-papier et dit « Copié »`, JSON.stringify(apres));
           }
           if (W === LARGEURS[0] || !tel) await capture(pg, `compta-B-${W}-${th}`);
-          // B1 — Bilan du mois (ouvert d'un geste).
+          // B1 — Bilan du mois (ouvert d'un geste), dans le Résumé.
+          await allerSegment(pg, 'resume');
           await pg.evaluate(() => { const d = document.getElementById('compta-bilan'); if (d) d.open = true; });
           await pg.waitForTimeout(500);
           const bilan = await pg.evaluate(() => {

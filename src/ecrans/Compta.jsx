@@ -26,7 +26,7 @@ import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal } from '../App.jsx';
-import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';   // (10 nov., Argent) les 4 réponses du Résumé
+import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
@@ -3381,7 +3381,7 @@ function usePrevisionUrssaf() {
 // déclaration ») et `profilFiscal`, mis en mots par `questionsArgent` (src/argent.js).
 // Toucher un widget = son détail : Statistiques, « Vendu et reçu », « Ton bénéfice »,
 // « Déclarer ».
-const dateCourteFr = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+const dateArgentCourte = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const S = useSourcesCarte(liveStats || liveCoque);
@@ -3389,8 +3389,8 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const profil = useProfilFiscal();
   const sel = { site: 'toutes', compte: null, periode: null };
   const v = (id) => valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE);
-  const mois = new Date().toLocaleDateString('fr-FR', { month: 'long' });
-  const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateCourteFr });
+  const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });   // « nov. » : le libellé tient sur une ligne au téléphone
+  const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
   const aller = (q) => {
     if (q.aller === 'stats') { if (onNav) onNav('dashboard'); return; }
     if (q.aller === 'declarer') { if (allerVue) allerVue('declarer'); try { window.scrollTo({ top: 0 }); } catch (_) {} return; }
@@ -4115,7 +4115,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         onSansDepenses={() => repondreSansDepenses(data, maj)}
         onAjouterDepense={() => { ouvrirRepliCompta('compta-charges'); setOuvert('dep'); setVersDepense((n) => n + 1); }} />
             </ComptaRepli>
-          <ComptaRepli id="compta-ca" titre={TITRE_CARTE_CA} resume="Tes ventes par période : le jour de la vente, puis le jour où l'argent t'est versé">
+          <ComptaRepli id="compta-ca" titre={TITRE_CARTE_CA} resume="Par période : jour de la vente, puis jour du versement">
             <CaParPeriodeCarte dansRepli lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
           {/* (5 nov., chantier F) Le bilan du mois en une page, et le délai de paiement par site. */}
@@ -4130,8 +4130,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             <PorteMonnaieCompta accounts={accounts} panelOff={panelOff}/>
           </ComptaRepli>
           <ComptaRepli id="compta-charges" titre="Tes dépenses" resume={(depenses.length || abonnements.length || packs.length || fixes.length)
-              ? [depenses.length ? `${depenses.length} dépense${depenses.length > 1 ? 's' : ''}` : null, abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : null, packs.length ? `${packs.length} pack${packs.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ') + ' — cartons, abonnements, frais : ce que tu paies pour vendre'
-              : 'Cartons, abonnements, frais : ce que tu paies pour vendre. Rien de noté pour l\'instant'}>
+              ? [depenses.length ? `${depenses.length} dépense${depenses.length > 1 ? 's' : ''}` : null, abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : null, packs.length ? `${packs.length} pack${packs.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')
+              : 'Cartons, abonnements, frais : rien de noté'}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Deux repères : le mois et l'année (les data-compta-kpi restent ; l'abonnement
                 du mois n'est plus redit en tête : il est sur sa ligne, juste en dessous). */}
