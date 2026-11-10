@@ -219,6 +219,9 @@ const LigneFraicheurParesseuse = lazy(() => import('./LigneFraicheur.jsx'));
 const AccueilComptesReliesParesseux = lazy(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
 const FactureVenteLigneParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
 const FactureVenteLigne = (props) => <Suspense fallback={null}><FactureVenteLigneParesseuse ligne {...props}/></Suspense>;
+// (10 nov., lot S) La facture Pro d'une vente Leboncoin / eBay / Vestiaire, dans le détail de la vente.
+const FactureAutreParesseuse = lazy(() => import('./FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
+const FactureAutreVente = (props) => <Suspense fallback={null}><FactureAutreParesseuse {...props}/></Suspense>;
 // (8 nov.) Le refus de facture commun à plusieurs lignes, dit une fois en tête de la liste (§7).
 const FactureRaisonsTeteParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureRaisonsTete })));
 const FactureRaisonsTete = (props) => <Suspense fallback={null}><FactureRaisonsTeteParesseuse {...props}/></Suspense>;
@@ -20208,7 +20211,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', compte = undefined, ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null }) {
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', compte = undefined, ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null, suite = null }) {
   return <LigneVenteCompacte {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} compte={compte} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
@@ -20219,6 +20222,7 @@ function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = nu
       <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}><span className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{montant}</span>{actions}</div>
     </div>
     {details}
+    {suite /* (10 nov., lot S) sous le détail : la facture Pro d'une vente d'un autre site */}
   </LigneVenteCompacte>;
 }
 // (5 nov.) L'ÉCRAN RESTE ALLUMÉ tant que le code / QR est affiché en grand (Screen Wake Lock) :
@@ -20304,6 +20308,7 @@ function CarteLbc({ o, num = '', benef = null, floute = false, compte = undefine
   // « Postée » = expédiée, « Livrée » et « Payée » = finalisée (Leboncoin verse à la finalisation).
   const friseLbc = lbcAnnulee(o) ? null : <Frise etapes={friseVenteLue({ vendue: true, postee: lbcExpediee(o) || lbcFinalisee(o), livree: lbcFinalisee(o), payee: lbcFinalisee(o) }, { geste: ton === 'action' })} cle={'lbc' + o.txId} className="vrm-fu-ligne-frise" label="Où en est la vente"/>;
   return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} compte={compte} ton={ton} montant={montant(o.price != null && String(o.price).trim() !== '' ? Number(o.price) / 100 : null)} etat={motEtatVente(etatCourt)}
+    suite={o.isSeller === true ? <FactureAutreVente plateforme="leboncoin" vente={o} deps={DEPS_FACTURE}/> : null}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que

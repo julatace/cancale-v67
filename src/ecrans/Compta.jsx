@@ -52,6 +52,7 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 // ⟦← App.jsx #4⟧
+const ListeFacturesAutres = aLaDemande(() => import('../FactureAutres.jsx').then((m) => ({ default: m.ListeFacturesAutres })));
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
 // ⟦← App.jsx #9⟧
@@ -997,6 +998,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       </div>
       {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
       <ListeFacturesPro deps={DEPS_FACTURE}/>
+      <ListeFacturesAutres deps={DEPS_FACTURE}/>
 
       {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
