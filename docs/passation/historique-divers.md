@@ -1158,3 +1158,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (Litiges en cours)
 - **9 nov. (soir) · Direction artistique 6 « Widgets » (à valider)** : les cases de la carte sombre sortent en widgets blancs (bento ; Ma journée au téléphone : 3 sur une ligne, règle du 27 oct.), groupes rayon 24 + chevrons (plus de « Voir » gris), pilules, ronds, titres 34/800 ; `src/styles-widgets-ios.css`, banc `direction-artistique-6`, planches `docs/passation/planches-da6/`. `docs/passation/2026-11-09-direction-artistique-6.md`. Geste : regarder les planches.
+## Ligne déplacée de CLAUDE.md §9 (10 nov., taille du dossier)
+- **9 nov. · Lot B : « Annuler » 5 s + ⌘K qui agit** : gestes réversibles dans VRM (masquer un achat, marquer vendue, délier LBC/gros, relier un achat…) sans confirmation, pilule « Annuler » ; l'extérieur garde sa confirmation ; ⌘K propose des actions qui OUVRENT seulement. `docs/passation/2026-11-09-annuler-commandes.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **9 nov. · Retraits frais** : plus de « peut-être en double » — un témoin = un carton (compté avec, fini avec, ou à retirer) ; carte = ce que l'onglet compte ; statut relu /15 min (`?moment=colis`). `docs/passation/2026-11-09-retraits-frais.md`. Geste : `CRON_SECRET` GitHub.

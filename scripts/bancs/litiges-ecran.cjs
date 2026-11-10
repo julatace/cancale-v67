@@ -178,7 +178,7 @@ const attendre = async (pg, sel, ms = 20000) => { await pg.waitForSelector(sel, 
           dit(c1 && c1.lue === '0' && /Date limite non lue/.test(c1.phrase), '9401 : aucune date écrite par Vinted ⇒ « Date limite non lue »', c1 && c1.phrase);
           dit(c1 && c1.preuves.suivi && c1.preuves.suivi.etat === 'ok' && c1.preuves.suivi.suivi === '3SBXAA000401' && /Colis en route/.test(c1.preuves.suivi.txt), '9401 : le suivi de SON bordereau et le statut lu chez le transporteur', JSON.stringify(c1 && c1.preuves.suivi));
           dit(c1 && c1.preuves.bordereau.etat === 'ok' && c1.preuves.photo.etat === 'ok', '9401 : bordereau et photo de l’annonce rangés', JSON.stringify(c1 && c1.preuves));
-          dit(c1 && c1.preuves.carton && c1.preuves.carton.etat === 'a-venir' && /bientôt/.test(c1.preuves.carton.txt), 'l’emplacement de la photo du carton est là (« bientôt », lot AZ)', JSON.stringify(c1 && c1.preuves.carton));
+          dit(c1 && c1.preuves.carton && ['aucun', 'ok', 'passu'].includes(c1.preuves.carton.etat), 'la photo du carton est lue pour CETTE vente (lot AZ) : ✓, — ou « pas lu », jamais « bientôt »', JSON.stringify(c1 && c1.preuves.carton));
           dit(c1 && c1.geste && /^https:\/\/www\.vinted\.fr\/inbox\/24618679401$/.test(c1.geste.href) && c1.geste.cible === '_blank' && c1.geste.h >= 44, 'le geste est un LIEN vers SA conversation sur Vinted, 44 px et plus', JSON.stringify(c1 && c1.geste));
           const c2 = carte(a, 'v:9402');
           dit(c2 && c2.genre === 'probleme' && c2.preuves.bordereau.etat === 'aucun' && c2.preuves.suivi.etat === 'aucun', '9402 : « Litige » relié par la conversation ; aucun bordereau ni suivi inventé', JSON.stringify(c2 && [c2.genre, c2.num, c2.preuves.bordereau]));

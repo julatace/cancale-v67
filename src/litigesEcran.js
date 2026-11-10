@@ -66,7 +66,10 @@ export function preuvesVente({ bord = null, label = null, suivi = '', transp, ph
     const statut = t ? str(t.libelle).trim() : '';
     p.suivi = statut ? { etat: 'ok', n, statut, at: t.etatAt || null } : { etat: 'ok', n, statut: '', at: null };
   }
-  p.carton = carton && carton.photo ? { etat: 'ok', src: str(carton.photo), at: carton.at || null } : { etat: 'a-venir' };
+  // (10 nov., lot AZ livré) `carton` vient de `aPhotoCarton` (src/photoCarton.js) : { at } une photo
+  // rangée · false aucune · null pas su · undefined lecture en cours. Jamais « aucune » sur un pas-su.
+  p.carton = carton && (carton.photo || carton.at) ? { etat: 'ok', at: carton.at || null }
+    : carton === false ? { etat: 'aucun' } : carton === null ? { etat: 'passu' } : { etat: 'encours' };
   return p;
 }
 

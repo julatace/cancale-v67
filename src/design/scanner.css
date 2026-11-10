@@ -72,3 +72,26 @@
 .vrm-scan-vue.is-fait .vrm-scan-viseur { border-color: #FFFFFF; }
 @media (max-height: 700px) { .vrm-scan.a-paire .vrm-scan-vue { flex-basis: 22vh; min-height: 110px; } }
 .vrm-achats-scan { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+/* (10 nov., lot AZ) « VÉRIFICATION AU SCAN » : au bordereau, la paire attendue occupe toute la feuille sous
+   la tête (la croix reste) — sa photo et son N° en très grand, impossibles à rater. Fond noir plein, N° en
+   pastille blanche (encre noire), UN geste bleu (l'accent rare), « Photo du carton » ensuite. */
+.vrm-scan-res.is-verif { position: absolute; left: 0; right: 0; bottom: 0; top: calc(max(14px, env(safe-area-inset-top)) + 54px); z-index: 2;
+  background: #000; border-radius: 0; padding: 4px 16px max(16px, env(safe-area-inset-bottom)); justify-content: flex-start; gap: 12px; overflow-y: auto; overscroll-behavior: contain; }
+.vrm-scan-res.is-verif .vrm-scan-paire { display: flex; flex-direction: column; align-items: stretch; gap: 12px; flex: 1 1 auto; min-height: 0; }
+.vrm-scan-res.is-verif .vrm-scan-photo { position: relative; width: 100%; height: auto; flex: 1 1 auto; min-height: 150px; max-height: 50vh; border-radius: 24px; background: #1c1c1e; }
+.vrm-scan-res.is-verif .vrm-scan-photo img { position: absolute; inset: 0; }
+.vrm-scan-res.is-verif .vrm-scan-infos { gap: 8px; flex: 0 0 auto; }
+.vrm-scan-res.is-verif .vrm-scan-kicker { font-size: 15px; color: #aeaeb2; }
+.vrm-scan-res.is-verif .vrm-scan-kicker.is-fait { color: #fff; }
+.vrm-scan-res.is-verif .vrm-scan-ligne1 { flex-direction: column; align-items: flex-start; gap: 8px; }
+.vrm-scan-res.is-verif .vrm-scan-num { min-height: 0; padding: 6px 20px 8px; border-radius: 24px; font-size: clamp(64px, 21vw, 108px); line-height: .95; font-weight: 800; letter-spacing: -.035em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-scan-res.is-verif .vrm-scan-num.is-sans { background: #2c2c2e; color: #fff; font-size: 34px; padding: 8px 16px; }
+.vrm-scan-res.is-verif .vrm-scan-titre { font-size: 21px; }
+.vrm-scan-res.is-verif .vrm-scan-sous { font-size: 15px; }
+.vrm-scan-res.is-verif .vrm-scan-geste { min-height: 56px; font-size: 18px; border-radius: 16px; flex: 0 0 auto; }
+.vrm-scan-res.is-verif > .vrm-scan-annuler { align-self: stretch; min-height: 48px; }
+.vrm-scan-suivant { flex: 0 0 auto; min-height: 48px; border: 0; border-radius: 14px; background: transparent; color: #d1d1d6; font-size: 16px; font-weight: 600; font-family: inherit; cursor: pointer; }
+.vrm-scan-suivant:active { background: #1c1c1e; }
+@media (max-height: 700px) { .vrm-scan-res.is-verif .vrm-scan-photo { min-height: 110px; } .vrm-scan-res.is-verif .vrm-scan-num { font-size: 60px; } }
+@media (prefers-reduced-motion: no-preference) { .vrm-scan-res.is-verif .vrm-scan-paire { animation: vrmScanVerif .22s ease-out; } }
+@keyframes vrmScanVerif { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
