@@ -69,7 +69,9 @@ export default function AgendaEcheances({ enTete = () => ({}), toast = () => {},
           <div className="vrm-sec-liste"><div className="vrm-sec-ligne" data-agenda-erreur=""><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{etat.erreur}</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); appel().then(setEtat); }}>Réessayer</button></div></div>
         ) : (
           <div className="vrm-agenda-actions">
-            <Bouton variante="primaire" plein icone="calendar" occupe={occupe === 'creer'} onClick={ajouter} data-agenda-ajouter="">Ajouter à mon agenda</Bouton>
+            {actif
+              ? <Bouton variante="primaire" plein icone="calendar" href={webcal(etat.url)} data-agenda-ajouter="">Ajouter à mon agenda</Bouton>
+              : <Bouton variante="primaire" plein icone="calendar" occupe={occupe === 'creer'} onClick={ajouter} data-agenda-ajouter="">Ajouter à mon agenda</Bouton>}
             {actif && <Bouton variante="secondaire" plein href={googleAgenda(etat.url)} target="_blank" rel="noopener noreferrer" data-agenda-google="">Google Agenda</Bouton>}
             {actif && (
               <div className="vrm-agenda-gestes">
