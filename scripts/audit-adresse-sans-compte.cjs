@@ -82,7 +82,8 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m + '
     dit(/'vrm_adresses_acheteur',/.test(APP) && /save\(CLE_ADRESSES_ACHETEUR, n\)/.test(comp) && /annulerAcheteur/.test(comp), 'A4 « compte acheteur » est synchronisé (SYNC_KEYS) et réversible (« Annuler »)');
     dit(/liste === null\) return <div className="vrm-sans-compte" data-adresses-sans-compte="pas-su"><EtatPanne/.test(comp), 'A4 pas su ⇒ `EtatPanne` avec « Réessayer », jamais un silence présenté comme « aucune »');
     dit(/reglages=\{<><AdressesSansCompte comptes=\{vintedAccounts\}\/><EmailsSetting/.test(APP), 'A4 posé en tête de E-mails → Relier ma boîte');
-    dit(/Adresse sans compte : \{x\.n\} e-mail/.test(comp) && /data-relier-compte=/.test(comp) && /data-compte-acheteur=/.test(comp), 'A4 la phrase « adresse sans compte : N e-mails » et ses deux gestes');
+    // (10 nov., soir, lot adresse-vrm-simple) Une ligne par adresse : « N e-mails » (le nom du groupe dit « sans compte »).
+    dit(/Adresses sans compte<\/h3>/.test(comp) && /Adresse sans compte : <\/span>\{x\.n\} e-mail/.test(comp) && /data-relier-compte=/.test(comp) && /data-compte-acheteur=/.test(comp), 'A4 la phrase « adresse sans compte : N e-mails » et ses deux gestes');
   });
 
   console.log(ko ? `\n❌ audit-adresse-sans-compte : ${ko} rouge(s)` : '\n✅ audit-adresse-sans-compte : tout est vert');

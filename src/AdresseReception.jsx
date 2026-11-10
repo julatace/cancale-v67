@@ -77,7 +77,7 @@ const heure = (ms) => (ms ? new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-
 const espaceCode = (c) => String(c || '').replace(/(\d{3})(?=\d)/g, '$1 ');
 
 // ── La lecture de l'adresse (et sa relecture, page visible) ─────────────────
-function useAdresseVrm(headers, rapide) {
+function useAdresseVrm(headers) {
   const [d, setD] = useState(undefined);
   const [luA, setLuA] = useState(0);
   const [manuel, setManuel] = useState(false);
@@ -110,12 +110,6 @@ function useAdresseVrm(headers, rapide) {
     document.addEventListener('visibilitychange', retourPage);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', retourPage); enCours.current?.abort(); };
   }, [lire]);
-  // Pendant l'attente (essai ou code) : relue toutes les 5 s, page visible — sans roue.
-  useEffect(() => {
-    if (!rapide) return undefined;
-    const t = setInterval(() => { if (document.visibilityState === 'visible') lire(); else setMaintenant(Date.now()); }, 5000);
-    return () => clearInterval(t);
-  }, [rapide, lire]);
   return { d, setD, lire, appeler, luA, manuel, maintenant, setMaintenant };
 }
 
@@ -212,15 +206,20 @@ export function ParcoursAdresseVrm({ headers, proprio = false, onBoite, comptes 
   const [voirAutres, setVoirAutres] = useState(false);
   const [boiteApple, setBoiteApple] = useState('');
   const [relies, setRelies] = useState(() => new Set());
-  const essaiAttendu = useRef(false);
-  const { d, setD, lire, appeler, luA, manuel, maintenant, setMaintenant } = useAdresseVrm(headers, essaiAttendu.current);
+  const { d, setD, lire, appeler, luA, manuel, maintenant, setMaintenant } = useAdresseVrm(headers);
 
   const pret = !!(d && d.pret);
   const adresse = pret ? d.adresse : '';
   useEffect(() => { if (d !== undefined && onPret) onPret(d === null ? null : !!(d && d.pret)); }, [d, onPret]);
   const eEssai = etatEssai(d, essai, maintenant);
   const code = codeAMontrer(d, maintenant) ? d.code : null;
-  essaiAttendu.current = eEssai.etat === 'attente' || eEssai.etat === 'passu' || (voulue === 2 && !code);
+  const attend = eEssai.etat === 'attente' || eEssai.etat === 'passu' || (voulue === 2 && !code);
+  // Pendant l'attente (essai ou code de la messagerie) : relue toutes les 5 s, page visible — sans roue.
+  useEffect(() => {
+    if (!attend) return undefined;
+    const t = setInterval(() => { if (document.visibilityState === 'visible') lire(); else setMaintenant(Date.now()); }, 5000);
+    return () => clearInterval(t);
+  }, [attend, lire, setMaintenant]);
 
   const liste = Array.isArray(comptes) ? comptes : [];
   const c = liste.find((x) => x.uid === String(uid)) || null;
@@ -405,8 +404,8 @@ export function ParcoursAdresseVrm({ headers, proprio = false, onBoite, comptes 
         {etape === 4 && (
           <section className="vrm-pv-carte vrm-pv-fini" data-bloc="recu" role="status" data-essai-recu={essai ? essai.code : ''}>
             <span className="vrm-pv-fini-rond" aria-hidden="true"><IconeCoche t={34}/></span>
-            <h2 className="vrm-pv-fini-titre">Reçu ✓</h2>
-            <p className="vrm-pv-phrase">{relie && c ? `Les e-mails de ${c.login} arrivent.` : 'Ton adresse VRM marche.'}{eEssai.at ? ` ${ilYa(eEssai.at, maintenant)}` : ''}</p>
+            <h2 className="vrm-pv-fini-titre">Reçu</h2>
+            <p className="vrm-pv-phrase">{relie && c ? `Les e-mails de ${c.login} arrivent` : 'Ton adresse VRM marche'}{eEssai.at ? ` · ${ilYa(eEssai.at, maintenant)}` : ''}</p>
             <div className="vrm-pv-actions">
               {onBoite ? <button type="button" className="vrm-b vrm-b-primaire vrm-pv-gros" onClick={() => { onFermer && onFermer(); onBoite(); }} data-ouvrir-boite="">Voir mes e-mails</button> : null}
               <button type="button" className="vrm-b vrm-b-secondaire vrm-pv-gros" onClick={recommencerEssai} data-essai-refaire="">Refaire un essai</button>
@@ -445,7 +444,7 @@ export function ParcoursAdresseVrm({ headers, proprio = false, onBoite, comptes 
 export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, proprio = false, onBoite }) {
   const [etat, setEtat] = useState('lecture');
   return (
-    <SheetShell onClose={onFermer} FermeAuRetour={FermeAuRetour} titre="Ton adresse VRM" maxWidth={560} z={9000} className="vrm-ar-feuille" data-feuille-adresse-reception="" data-etat={etat}>
+    <SheetShell onClose={onFermer} FermeAuRetour={FermeAuRetour} titre="Recevoir tes e-mails" maxWidth={560} z={9000} className="vrm-ar-feuille" data-feuille-adresse-reception="" data-etat={etat}>
       <ObservateurEtat onEtat={setEtat}>
         <ParcoursAdresseVrm headers={headers} proprio={proprio} onBoite={onBoite} onFermer={onFermer}/>
       </ObservateurEtat>

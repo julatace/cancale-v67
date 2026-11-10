@@ -160,9 +160,20 @@
 .vrm-pv-gros { min-height: 50px !important; font-size: 17px !important; font-weight: 600 !important; }
 .vrm-pv-petit { flex: 0 0 auto !important; min-height: 44px; }
 
-/* La barre 1 · 2 · 3 · ✓ */
-.vrm-pv-barre { list-style: none; margin: 0; padding: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; background: var(--w-carte, #FFF); border-radius: 999px; box-shadow: var(--w-ombre); }
-.vrm-pv-barre li { min-width: 0; }
+/* Les boutons maison du parcours ne prennent pas l'habit des boutons de l'app
+   (bordure, fond blanc) : remis à zéro ici, puis dessinés plus bas. */
+html body .vrm-pv-barre-btn, html body .vrm-pv-changer, html body .vrm-pv-verifier, html body .vrm-pv-compte { border: 0 !important; box-shadow: none !important; outline-offset: 2px; }
+html body .vrm-pv-barre-btn, html body .vrm-pv-changer { background: transparent !important; }
+html body .vrm-pv .vrm-ar-lien { border: 0 !important; box-shadow: none !important; background: transparent !important; padding: 0 !important; }
+html body .vrm-pv-barre li[aria-current="step"] .vrm-pv-barre-btn { background: var(--w-remplir, rgba(118,118,128,.12)) !important; }
+html body .vrm-pv-verifier { background: var(--w-carte, #FFF) !important; }
+html body .vrm-pv-compte { background: var(--w-remplir, rgba(118,118,128,.12)) !important; }
+html body .vrm-pv-compte[aria-checked="true"] { background: var(--w-encre, #1D1D1F) !important; color: var(--w-carte, #FFF) !important; }
+
+/* La barre 1 · 2 · 3 · ✓ (l'étape en cours, plus large, porte son mot) */
+.vrm-pv-barre { list-style: none; margin: 0; padding: 6px; display: flex; gap: 4px; background: var(--w-carte, #FFF); border-radius: 999px; box-shadow: var(--w-ombre); }
+.vrm-pv-barre li { min-width: 0; flex: 1 1 0; }
+.vrm-pv-barre li[aria-current="step"] { flex-grow: 2.4; }
 .vrm-pv-barre-btn { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; background: transparent; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: var(--w-gris, #6E6E73); cursor: pointer; padding: 0 4px; }
 .vrm-pv-barre-btn:disabled { cursor: default; }
 .vrm-pv-barre-rond { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-gris, #6E6E73); }
@@ -193,12 +204,12 @@
 .vrm-pv-source-mot { flex: 1 1 100%; font-size: 12px; font-weight: 600; color: var(--w-gris, #6E6E73); }
 .vrm-pv-source code { flex: 1 1 0; min-width: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; overflow-wrap: anywhere; word-break: break-all; }
 .vrm-pv-source em { flex: 1 1 0; font-size: 13px; color: var(--w-gris, #6E6E73); }
-.vrm-pv-tuile { display: grid; grid-template-columns: 56px minmax(0, 1fr); grid-template-areas: 'logo nom' 'logo changer'; align-items: center; column-gap: 14px; padding: 14px 16px; border-radius: 20px; background: var(--w-carte-2, #F2F2F7); min-width: 0; }
-.vrm-pv-tuile-logo { grid-area: logo; width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; font-weight: 800; background: var(--w-carte, #FFF); color: var(--w-encre, #1D1D1F); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-.vrm-pv-tuile-nom { grid-area: nom; display: grid; min-width: 0; }
+.vrm-pv-tuile { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 14px 16px; border-radius: 20px; background: var(--w-carte-2, #F2F2F7); min-width: 0; }
+.vrm-pv-tuile-logo { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; font-weight: 800; background: var(--w-carte, #FFF); color: var(--w-encre, #1D1D1F); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.vrm-pv-tuile-nom { flex: 1 1 140px; display: grid; min-width: 0; }
 .vrm-pv-tuile-nom b { font-size: 19px; font-weight: 700; letter-spacing: -0.015em; }
 .vrm-pv-tuile-nom span { font-size: 13px; color: var(--w-gris, #6E6E73); }
-.vrm-pv-changer { grid-area: changer; justify-self: start; min-height: 44px; display: flex; align-items: center; background: none; border: 0; padding: 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #0066CC); cursor: pointer; }
+.vrm-pv-changer { flex: 0 0 auto; margin-left: auto; min-height: 44px; display: flex; align-items: center; background: none; border: 0; padding: 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #0066CC); cursor: pointer; }
 .vrm-pv-pas-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; min-width: 0; }
 .vrm-pv-pas { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; min-width: 0; }
 .vrm-pv-pas-num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--w-encre, #1D1D1F); color: var(--w-carte, #FFF); }
