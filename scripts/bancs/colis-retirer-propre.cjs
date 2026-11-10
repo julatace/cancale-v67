@@ -167,6 +167,8 @@ const ouvrir = async (b, vp, sombre) => {
         if (process.env.JR_DBG) console.log(await pg.evaluate(() => [document.querySelector('[data-colis-retraits="outils"]'), document.querySelector('[data-colis-retraits="outils"] .vrm-achats'), ...document.querySelectorAll('[data-colis-retraits="outils"] .vrm-achats > *'), document.querySelector('.vrm-rpf-verifier'), document.querySelector('.vrm-rpf')].filter((e) => e && e.getBoundingClientRect().height > 0).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mt${getComputedStyle(e).marginTop} pt${getComputedStyle(e).paddingTop} ${e.tagName}.${String(e.className).slice(0, 30)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')} :: ${e.innerText.slice(0, 90).replace(/\n/g, ' ')}`).join('\n')));
         if (process.env.JR_DBG) console.log('GAP2', await pg.evaluate(() => { const q = (x) => { const e = document.querySelector(x); if (!e) return x + ' —'; const c = getComputedStyle(e), r = e.getBoundingClientRect(); return `${x} top${Math.round(r.top)} h${Math.round(r.height)} mt${c.marginTop} mb${c.marginBottom} pt${c.paddingTop} pb${c.paddingBottom}`; }; return ['.vrm-rpf', '.vrm-colis-retirer', '[data-colis-retraits]', '[data-colis-retraits] > *', '.vrm-achats', '.vrm-achats > *', '.vrm-colis-fraicheur', '.vrm-rpf-verifier'].map(q).join('\n'); }));
         if (process.env.JR_DBG) console.log('GAP', await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); const y0 = d ? d.getBoundingClientRect().bottom : 0; return [...document.querySelectorAll('.vrm-main *')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.top >= y0 - 1 && r.top < y0 + 90 && !e.closest('[data-colis-retraits]'); }).slice(0, 12).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mb${getComputedStyle(e).marginBottom} ${e.tagName}.${String(e.className).slice(0, 40)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')}`).join('\n'); }));
+        // (9 nov., lot AG) la fraîcheur des comptes : la ligne UNIQUE du haut de l'app (plus de puce sur Colis).
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-fraicheur-unique]'); return e && !['encours', 'charge'].includes(e.getAttribute('data-fraicheur-unique')); }, null, { timeout: 25000 }).catch(() => {});
         const m = await pg.evaluate(() => {
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
           const main = document.querySelector('.vrm-main');
@@ -184,7 +186,8 @@ const ouvrir = async (b, vp, sombre) => {
             air: (() => { const t = [...document.querySelectorAll('[data-rp-section]')]; return t.slice(1).map((x, i) => Math.round(x.getBoundingClientRect().top - t[i].getBoundingClientRect().bottom)); })(),
             verif: (() => { const d = document.querySelector('.vrm-rpf-verifier'); return d ? { n: d.getAttribute('data-retirer-a-verifier'), ouvert: d.open } : null; })(),
             enRoute: (document.querySelector('[data-retirer-en-route-sans]') || { getAttribute: () => null }).getAttribute('data-retirer-en-route-sans'),
-            relire: (document.querySelector('[data-comptes-a-relire]') || { getAttribute: () => null }).getAttribute('data-comptes-a-relire'),
+            relire: (document.querySelector('[data-fraicheur-a-relire]') || { getAttribute: () => null }).getAttribute('data-fraicheur-a-relire'),
+            puce: document.querySelectorAll('[data-comptes-a-relire]').length,
             reparti: [...document.querySelectorAll('.vrm-repartis-courts .vrm-reparti-court')].filter(vis).map((x) => { const p = x.querySelector('.vrm-rpf-puce.is-ambre'), mt = x.querySelector('[data-montant]'); return (p ? p.textContent : '') + ' · ' + (mt && vis(mt) ? mt.textContent : ''); }),
             texte: main ? main.innerText : '', deb: document.documentElement.scrollWidth - window.innerWidth,
             hors: [...document.querySelectorAll('.vrm-main *')].filter((e) => vis(e) && !e.closest('svg,.vrm-rangee,.vrm-filtres,[data-defile],.maplibregl-map') && getComputedStyle(e).position !== 'fixed' && e.getBoundingClientRect().right > window.innerWidth + 1).map((e) => String(e.className).slice(0, 40)).slice(0, 4),
@@ -252,7 +255,7 @@ const ouvrir = async (b, vp, sombre) => {
           dit(f.memo === 'cancale', 'le choix de ville est retenu', f.memo);
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-ville-cancale-${nom}.png`) });
           await pg.locator('[data-retirer-villes] [data-ville=""]').first().click(); await pg.waitForTimeout(400);
-          dit(m.relire === '1', '« 1 compte à relire » en puce', m.relire);
+          dit(m.relire === '1' && m.puce === 0, '« 1 compte à relire » : nommé par la ligne du haut, plus en puce sur Colis (lot AG)', `${m.relire} · puce ×${m.puce}`);
           // (6 nov., v36-visuel-2) La RÈGLE : la ligne dit « Remboursement à vérifier » (puce) ET son montant (`montantCommande`,
           // écrit par `montant()`), visible — la puce et le montant vivent à part (une puce ne se coupe plus sur 2 lignes).
           dit(m.reparti.some((t) => /^Remboursement à vérifier · 19,64\u00a0?\s?€$/.test(t.replace(/\u202f/g, ' '))), '« Remboursement à vérifier » et son montant 19,64 €', m.reparti.join(' | '));

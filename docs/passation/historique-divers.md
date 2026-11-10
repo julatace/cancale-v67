@@ -1107,6 +1107,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · RGPD** : « Supprimer mon compte », clients partis (e-mail 11 mois, suppression 12 mois), export de ses données ouvert sans abonnement (sa décision). `docs/passation/2026-11-09-rgpd-compte.md`. Geste : relire la politique.
 
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (fraîcheur unique)
+- **9 nov. · Sécurité** : revue (aucune fuite entre vendeurs ; `/api/ai` exige une session) puis liaison Vinted prouvée (029) et carte en iframe hors Orion (5.332). `docs/passation/2026-11-09-securite.md`, `-securite-2.md`. Geste : requêtes SQL de contrôle, 029 avant 023.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (fraîcheur unique)
+- **9 nov. · Offres Solo 16,99 € / Pro 19,99 €** : un compte vendeur Vinted en Solo (ventes des autres en aperçu, hors totaux) ; plan lu du prix Stripe ; migration 028. `docs/passation/2026-11-09-plans-solo-pro.md`. Geste : prix Pro Stripe + `STRIPE_PRIX_PRO`, 028.
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Sécurité** : revue (aucune fuite entre vendeurs ; `/api/ai` exige une session) puis liaison Vinted prouvée (029) et carte en iframe hors Orion (5.332). `docs/passation/2026-11-09-securite.md`, `-securite-2.md`. Geste : requêtes SQL de contrôle, 029 avant 023.
 
@@ -1128,5 +1133,15 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Direction artistique 5 (à valider)** : colonne de gauche refaite (panneau qui flotte, matière floutée, marque, pastille qui glisse, carte du compte, rail d'icônes 1024–1199 px) + boutons plus soignés + recherche du haut ; `src/styles-nav-v2.css`, banc `nav-v2`. `docs/passation/2026-11-09-direction-artistique-5.md`. Branche `claude/direction-artistique-5`. Geste : regarder les planches.
 
-## Lignes du §9 de CLAUDE.md déplacées telles quelles (10 nov., lot AJ)
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (fraîcheur unique, intégration)
 - **9 nov. · Suites serveur** : l'offre Solo appliquée aussi par les bilans (semaine, mois), le repli e-mails du widget et le rappel des offres mini (`compteEcarteRegle`, recopiée d'App.jsx ; propriétaire = Pro ; pas su ⇒ rien bridé ; colis jamais bridés) ; double vente Leboncoin serveur seulement si vue en ligne < 24 h (`src/enLigneLbc.js`). `docs/passation/2026-11-09-suites-serveur.md`. Geste : aucun (028 pour que l'offre soit lue).
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (fraîcheur unique, intégration)
+- **9 nov. · Pastille de l'icône (lot Z)** : l'icône de VRM (écran d'accueil, Dock) porte le nombre de colis à envoyer = le badge de Colis (`vrm_colis_aposter`, frais < 12 h) ; pas su ou 0 ⇒ effacée (`src/pastilleIcone.js`, banc `navigation-tache` Z, rouge par mutation). File des lots : `docs/passation/2026-11-09-file-des-lots.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (transporteurs parfaits)
+- **9 nov. · Direction artistique 4** : feuilles et ateliers (Republier) en portail à la forme unique (groupes blancs, croix ronde, pied plein), confirmations à deux gestes égaux, toasts en carte sans rouge, états vides centrés, « pas su » en carte au bouton gris, barre du bas pleine (styles-premium.css §12). `docs/passation/2026-11-09-direction-artistique-4.md`. Geste : regarder les planches.
+
+## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (ordre récent, lot AJ)
+- **9 nov. (soir) · Transporteurs inconnus + e-mails Vestiaire + SMS** : le transporteur LU sur l'étiquette (PDF du bordereau, sans IA, un seul nom sinon rien ; réception + 6 PDF/jour au cron ; source `pdf`) ; e-mails Vestiaire rappel/annonce/offres ; SMS MRELAY (formes réelles), VintedGo (code = identité), Pickup et VestiaireCo (informations, jamais reliées seules), Chronopost prudent. `docs/passation/2026-11-09-transporteurs-emails.md` (requêtes SQL). Geste : 2ᵉ automatisation « article », copier un SMS Chronopost.
+- **9 nov. · Scanner (lot V)** : le scan d'un bordereau MONTRE la paire attendue (identité seule), rien écrit sans « Colis fait » ; au retrait, n° de suivi ou code ⇒ l'achat, « Retiré ». `docs/passation/2026-11-09-scanner.md`. Geste : aucun.

@@ -23,34 +23,38 @@
 //  e-mails : ce n'est pas une preuve face à un transporteur NOMMÉ du même n°, ni
 //  face à un n° de forme Chronopost stricte (la règle de `carrierLisible`).
 //
-//  ⚠️ LES LOGOS : jamais redessinés ici. L'image affichée est celle que le
-//  transporteur publie lui-même sur SON domaine (son icône de site). Non
-//  mesurées d'ici (le réseau de la machine est fermé) : chaque image peut
-//  échouer, et la pastille retombe alors sur le nom seul, sans image cassée
-//  (`PastilleTransporteur`). Un transporteur sans adresse sûre n'a pas de logo.
+//  ⚠️ LES LOGOS (9 nov. au soir, Julien : « je veux que ce soient les LOGOS des
+//  transporteurs qui soient affichés à côté des colis et non les noms »). Les logos
+//  officiels sont des marques déposées SANS licence d'usage publiée (aucun des
+//  transporteurs ne publie de kit libre) ; les icônes de site chargées avant depuis
+//  leurs domaines (favicon) n'avaient pas de licence non plus, échouaient hors réseau
+//  et révélaient l'adresse du vendeur à chaque transporteur. Donc : une MARQUE MAISON
+//  (`marque`) — une tuile aux couleurs du transporteur et son sigle, dessinée en SVG
+//  ici, sans aucun fichier ni requête — qui le désigne sans copier son logo.
+//  Inconnu ⇒ un pictogramme neutre (un carton gris), jamais une fausse marque.
 // ════════════════════════════════════════════════════════════════════════════
 import { transporteurDeForme, colisInternational } from '../api/_lib/suivi-colis.js';
 import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
 
 export const PAS_LU = 'Transporteur inconnu';  // (3 nov., critique #15) des mots simples, pas « pas lu »
 
-// `logos` : adresses sur le domaine officiel du transporteur, essayées dans
-// l'ordre (la première qui se charge gagne).
+// `marque` : { fond, encre, sigle } — la tuile maison (src/PastilleTransporteur.jsx).
+// Couleurs : celles que chaque transporteur montre sur ses colis et ses points (repères
+// publics), jamais son dessin. `logos` reste (vide) pour les anciens appelants.
 export const TRANSPORTEURS = Object.freeze({
-  chronopost:   { nom: 'Chronopost',    logos: ['https://www.chronopost.fr/favicon.ico'] },
-  mondialrelay: { nom: 'Mondial Relay', logos: ['https://www.mondialrelay.fr/favicon.ico'] },
-  colissimo:    { nom: 'Colissimo',     logos: ['https://www.laposte.fr/favicon.ico'] },
-  vinted:       { nom: 'Vinted Go',     logos: ['https://vintedgo.com/favicon.ico'] },
-  relaiscolis:  { nom: 'Relais Colis',  logos: ['https://www.relaiscolis.com/favicon.ico'] },
-  dpd:          { nom: 'DPD',           logos: ['https://www.dpd.fr/favicon.ico'] },
-  ups:          { nom: 'UPS',           logos: ['https://www.ups.com/favicon.ico'] },
-  gls:          { nom: 'GLS',           logos: ['https://gls-group.com/favicon.ico'] },
-  colisprive:   { nom: 'Colis Privé',   logos: ['https://www.colisprive.com/favicon.ico'] },
-  // Shop2Shop (réseau Chronopost) : aucune adresse de logo sûre ⇒ le nom seul.
-  shop2shop:    { nom: 'Shop2Shop',     logos: [] },
-  inpost:       { nom: 'InPost',        logos: ['https://inpost.fr/favicon.ico'] },
-  dhl:          { nom: 'DHL',           logos: ['https://www.dhl.com/favicon.ico'] },
-  fedex:        { nom: 'FedEx',         logos: ['https://www.fedex.com/favicon.ico'] },
+  chronopost:   { nom: 'Chronopost',    logos: [], marque: { fond: '#0057A8', encre: '#FFFFFF', sigle: 'CH' } },
+  mondialrelay: { nom: 'Mondial Relay', logos: [], marque: { fond: '#C8102E', encre: '#FFFFFF', sigle: 'MR' } },
+  colissimo:    { nom: 'Colissimo',     logos: [], marque: { fond: '#FFD100', encre: '#1D2C5E', sigle: 'CO' } },
+  vinted:       { nom: 'Vinted Go',     logos: [], marque: { fond: '#007782', encre: '#FFFFFF', sigle: 'VG' } },
+  relaiscolis:  { nom: 'Relais Colis',  logos: [], marque: { fond: '#7A1F6B', encre: '#FFFFFF', sigle: 'RC' } },
+  dpd:          { nom: 'DPD',           logos: [], marque: { fond: '#DC0032', encre: '#FFFFFF', sigle: 'DPD' } },
+  ups:          { nom: 'UPS',           logos: [], marque: { fond: '#351C15', encre: '#FFB500', sigle: 'UPS' } },
+  gls:          { nom: 'GLS',           logos: [], marque: { fond: '#061AB1', encre: '#FFD100', sigle: 'GLS' } },
+  colisprive:   { nom: 'Colis Privé',   logos: [], marque: { fond: '#EE7203', encre: '#FFFFFF', sigle: 'CP' } },
+  shop2shop:    { nom: 'Shop2Shop',     logos: [], marque: { fond: '#00A0DF', encre: '#FFFFFF', sigle: 'S2' } },
+  inpost:       { nom: 'InPost',        logos: [], marque: { fond: '#FFCD00', encre: '#1D1D1B', sigle: 'IP' } },
+  dhl:          { nom: 'DHL',           logos: [], marque: { fond: '#FFCC00', encre: '#D40511', sigle: 'DHL' } },
+  fedex:        { nom: 'FedEx',         logos: [], marque: { fond: '#4D148C', encre: '#FFFFFF', sigle: 'FX' } },
 });
 
 const sansAccents = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -79,6 +83,15 @@ export function cleTransporteur(raw) {
 
 export const nomDuTransporteur = (cle) => (cle && TRANSPORTEURS[cle] ? TRANSPORTEURS[cle].nom : '');
 export const logosDuTransporteur = (cle) => (cle && TRANSPORTEURS[cle] ? TRANSPORTEURS[cle].logos.slice() : []);
+export const marqueDuTransporteur = (cle) => (cle && TRANSPORTEURS[cle] ? TRANSPORTEURS[cle].marque : null);
+// La même tuile en SVG texte, pour un élément créé hors de React (l'épingle de la carte des relais).
+// Les valeurs viennent de la table figée ci-dessus (jamais d'une donnée lue) : rien à échapper.
+export function svgMarque(cle, taille = 18) {
+  const m = marqueDuTransporteur(cle);
+  if (!m) return '';
+  const fs = m.sigle.length >= 3 ? 11.5 : 14.5;
+  return `<svg viewBox="0 0 32 32" width="${taille}" height="${taille}" aria-hidden="true" focusable="false" style="display:block;border-radius:${Math.round(taille * 0.26)}px;flex:none"><rect width="32" height="32" rx="8" fill="${m.fond}"/><text x="16" y="16.5" text-anchor="middle" dominant-baseline="central" fill="${m.encre}" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="${fs}">${m.sigle}</text></svg>`;
+}
 
 const CHRONO_STRICT = /^[A-Z]{2}\d{9}[A-Z]{2}$/;
 // Un transporteur NOMMÉ l'emporte sur « vinted » (le défaut d'un e-mail shipping@).

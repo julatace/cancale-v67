@@ -208,8 +208,39 @@ export function candidatsPdf(bords, labels, cur) {
   return out.sort((a, b) => b.at - a.at || (a.tx < b.tx ? 1 : -1));
 }
 
+// (9 nov. au soir, « transporteurs parfaits ») Julien : « Ce n'est pas possible d'avoir
+// "transporteur inconnu" sachant que tu as les bordereaux en ta possession. » Le rattrapage
+// n'est plus de 6 PDF par jour : il lit TOUT ce qui reste, par lots, jusqu'à épuisement —
+//   · le cron du matin (chaque vendeur) : `MAX_PDF_MATIN` / `BUDGET_PDF_MATIN_MS` ;
+//   · le passage « colis » toutes les 15 min (api/_lib/colis-frequent.js `passageEtiquettes`) :
+//     les vendeurs dont la ligne dit qu'il en RESTE (`pdfReste` ≠ 0, scalaire ⇒ `meta`) ;
+//   · l'app ouverte (POST /api/relais?mode=etiquettes, la session du vendeur) : par lots de
+//     `MAX_PDF_APP` tant qu'il en reste.
+// Toujours UN PDF par requête (`data->>pdfB64`), jamais `select=data` en masse (§4.4).
+// Écrit par paquets (`ECRIRE_TOUS`) : une fonction coupée par le délai ne perd que le
+// dernier paquet. Avant chaque écriture, la ligne est RELUE et fusionnée (deux passages en
+// même temps — l'app et le cron — ne s'effacent pas) ; relue illisible ⇒ rien écrit.
+// `pdfReste` = ce qui reste après ce passage (0 = tout est lu) ; `pdfBilan` = les comptes
+// par raison (nommé, aucun nom lisible, deux noms, illisible, sans PDF) — des nombres seulement.
+export const MAX_PDF_MATIN = 60;
+export const BUDGET_PDF_MATIN_MS = 15000;
+export const MAX_PDF_APP = 25;
+export const BUDGET_PDF_APP_MS = 7000;
+export const ECRIRE_TOUS = 10;
+
+export function bilanPdf(cur) {
+  const pdf = (cur && cur.pdf) || {}, vus = (cur && cur.pdfVus) || {};
+  const b = { nommes: Object.keys(pdf).length, aucun: 0, plusieurs: 0, illisible: 0, sansPdf: 0 };
+  for (const k of Object.keys(vus)) {
+    const r = vus[k] && vus[k].r;
+    if (r === 'aucun') b.aucun++; else if (r === 'plusieurs') b.plusieurs++; else if (r === 'sans-pdf') b.sansPdf++; else b.illisible++;
+  }
+  return b;
+}
+
 // `lirePdf(id)` → base64 | '' (la ligne n'a pas/plus de PDF) | null (pas su).
-export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf, max = MAX_PDF_PAR_PASSAGE, maintenant = Date.now() }) {
+export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf, max = MAX_PDF_PAR_PASSAGE, budgetMs = Infinity, horloge = () => Date.now(), maintenant = Date.now() }) {
+  const debut = horloge();
   const [bords, labels] = await Promise.all([lireTout(REQ_BORDS_PDF), lireTout(REQ_LABELS_PDF)]);
   if (!Array.isArray(bords) || !Array.isArray(labels)) return { fait: false, raison: 'lecture ratée — rien écrit' };
   const memo = await getRow(ID_BORD_TRANSPORTEURS);
@@ -217,20 +248,40 @@ export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf,
   const cur = memo && typeof memo === 'object' ? memo : {};
   const cands = candidatsPdf(bords, labels, cur);
   const lot = cands.slice(0, Math.max(0, max));
-  if (!lot.length) return { fait: true, ranges: 0, vus: 0, restants: 0 };
-  const pdf = { ...(cur.pdf || {}) }, pdfVus = { ...(cur.pdfVus || {}) };
   const at = new Date(maintenant).toISOString();
-  let ranges = 0, nVus = 0, rates = 0;
+  // Ce que CE passage a appris (fusionné dans la ligne RELUE à chaque écriture).
+  const neufsPdf = {}, neufsVus = {};
+  let ranges = 0, nVus = 0, rates = 0, lus = 0, ecrits = 0, budgetAtteint = false, ecritureRatee = false, depuisEcriture = 0;
+  const resteApres = () => Math.max(0, cands.length - ranges - nVus);
+  const ecrirePaquet = async () => {
+    const frais = await getRow(ID_BORD_TRANSPORTEURS);
+    if (frais === undefined) return false;                      // relue illisible ⇒ rien écrit
+    const f = frais && typeof frais === 'object' ? frais : {};
+    const pdf = { ...(f.pdf || {}), ...neufsPdf }, pdfVus = { ...(f.pdfVus || {}), ...neufsVus };
+    for (const k of Object.keys(neufsPdf)) delete pdfVus[k];
+    const ligne = { ...f, v: 1, pdf, pdfVus, at, pdfReste: resteApres(), pdfAt: at };
+    ligne.pdfBilan = bilanPdf(ligne);
+    const ok = await ecrire(ID_BORD_TRANSPORTEURS, ligne);
+    if (ok) { ecrits++; depuisEcriture = 0; }
+    return ok;
+  };
   for (const c of lot) {
+    if (horloge() - debut >= budgetMs) { budgetAtteint = true; break; }
     const b64 = await lirePdf(c.id);
+    lus++;
     if (b64 == null) { rates++; continue; }
-    if (!b64) { pdfVus[c.tx] = { r: 'sans-pdf', at }; nVus++; continue; }
-    const d = await transporteurDuPdf(b64);
-    if (d.etat === 'ok') { pdf[c.tx] = { t: d.t, ...(d.s ? { s: d.s } : {}) }; ranges++; }
-    else { pdfVus[c.tx] = { r: d.etat, at }; nVus++; }
+    if (!b64) { neufsVus[c.tx] = { r: 'sans-pdf', at }; nVus++; }
+    else {
+      const d = await transporteurDuPdf(b64);
+      if (d.etat === 'ok') { neufsPdf[c.tx] = { t: d.t, ...(d.s ? { s: d.s } : {}) }; ranges++; }
+      else { neufsVus[c.tx] = { r: d.etat, at }; nVus++; }
+    }
+    depuisEcriture++;
+    if (depuisEcriture >= ECRIRE_TOUS && !(await ecrirePaquet())) { ecritureRatee = true; break; }
   }
-  if (!ranges && !nVus) return { fait: true, ranges: 0, vus: 0, rates, restants: cands.length };
-  const ok = await ecrire(ID_BORD_TRANSPORTEURS, { ...cur, v: 1, pdf, pdfVus, at });
-  if (!ok) return { fait: false, raison: 'écriture ratée', ranges: 0, vus: 0, restants: cands.length };
-  return { fait: true, ranges, vus: nVus, rates, restants: cands.length - ranges - nVus };
+  // Rien de neuf depuis la dernière écriture : on n'écrit que pour remettre `pdfReste` d'aplomb.
+  const marqueur = Number(cur.pdfReste || 0) !== resteApres();
+  if (!ecritureRatee && (depuisEcriture > 0 || (!ecrits && marqueur))) { if (!(await ecrirePaquet())) ecritureRatee = true; }
+  if (ecritureRatee && !ecrits) return { fait: false, raison: 'écriture ratée', ranges: 0, vus: 0, lus, restants: cands.length };
+  return { fait: true, ranges, vus: nVus, rates, lus, restants: resteApres(), budgetAtteint, ...(ecritureRatee ? { ecritureRatee: true } : {}) };
 }
