@@ -150,6 +150,8 @@ async function main() {
           dit((await pg.evaluate(() => window.location.search)) === '', `${T} l’adresse est effacée après lecture`);
           await pg.waitForTimeout(2200);
           dit(achatsEcrits(ecrits).length === 0, `${T} rien n’est écrit sans son clic`);
+          const vu = await pg.evaluate(() => { const f = document.querySelector('[data-achat-hors-form]'); if (!f) return null; const r = f.getBoundingClientRect(); return { top: Math.round(r.top), h: window.innerHeight }; });
+          dit(!!vu && vu.top >= 0 && vu.top < vu.h * 0.7, `${T} le formulaire est en vue, sans défiler`, JSON.stringify(vu));
           dit((await deborde(pg)) <= 1, `${T} aucun débordement horizontal`);
           await capture(pg, `achat-${suffixe}`);
           await tap(pg, '[data-achat-hors-enregistrer]');

@@ -343,6 +343,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
       const d = prendreDemandeAchat(); if (!d) return;
       setEditId(null); setErreur('');
       setForm({ ...BROUILLON0(), title: d.titre || '', price: d.prix || '', source: d.lieu || '' });
+      // L'écran finit de se poser après (listes, défilement remis en haut) : le formulaire est ramené en vue tant qu'il n'y est pas.
+      [400, 1200, 2500].forEach((ms) => setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (!f) return; const r = f.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.6) f.scrollIntoView({ block: 'center' }); } catch (_) {} }, ms));
       setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (f) f.scrollIntoView({ block: 'center' }); const vide = !d.titre ? 'titre' : !d.prix ? 'prix' : ''; const c = vide && document.querySelector(`[data-champ="${vide}"]`); if (c) c.focus({ preventScroll: true }); } catch (_) {} }, 80);
     };
     servir(); window.addEventListener(EVT_ACHAT_LIEN, servir);
