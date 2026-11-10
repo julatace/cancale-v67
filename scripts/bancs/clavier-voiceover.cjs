@@ -10,7 +10,8 @@
 //      A2 aucune image non décorative sans nom ;
 //      A3 rien de focalisable caché au lecteur (`aria-hidden` au-dessus d'un focalisable) ;
 //      A4 Annonces : chaque vignette se lit « N°, titre, prix » (son nom contient le prix) ;
-//      A5 aucune erreur de page.
+//      A5 aucune erreur de page ;
+//      A6 Ma journée : un widget se lit « libellé : valeur », « pas su » pour un « — ».
 //  B. CLAVIER (1512 px) :
 //      B1 « g » puis « a » ⇒ Annonces ; « g v » ⇒ Ventes ; « g c » ⇒ Colis ; « g j » ⇒ Ma journée ;
 //      B2 dans un champ de saisie, « g a » s'écrit et ne change pas d'écran ;
@@ -200,6 +201,11 @@ async function main() {
             dit(r.nSansNom === 0, `${T} ${nom} · A1 chaque contrôle a un nom lu`, `${r.nSansNom} sans nom : ${r.sansNom.join(' ║ ')}`);
             dit(r.nImages === 0, `${T} ${nom} · A2 chaque image a un nom (ou est décorative)`, `${r.nImages} : ${r.images.join(' ║ ')}`);
             dit(r.cachesFocalisables.length === 0, `${T} ${nom} · A3 rien de focalisable caché au lecteur`, r.cachesFocalisables.slice(0, 4).join(' ║ '));
+            if (tab === 'journee') {
+              // A6 : un widget se lit « libellé : valeur » et un « — » se dit « pas su » (§5).
+              const n = await nomLu(pg, 'button[data-fu-case]');
+              dit(!!n && /^[^:]+ : /.test(n.nom) && !/^—/.test(n.nom) && (!/pas su/.test(n.nom) || !/—/.test(n.nom)), `${T} Ma journée · A6 un widget se lit « libellé : valeur » (« pas su » pour —)`, JSON.stringify(n));
+            }
             if (tab === 'annonces') {
               const n = await nomLu(pg, '[data-carte-annonce="9401"] [data-fiche-plus-bouton]');
               dit(!!n && /12/.test(n.nom) && /65/.test(n.nom) && /Adidas/i.test(n.nom), `${T} Annonces · A4 « Détails et gestes » dit sa paire « N°, titre, prix »`, JSON.stringify(n));
