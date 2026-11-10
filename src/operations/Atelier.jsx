@@ -76,7 +76,7 @@ export default function Atelier({donnees,envoyer,occupe,maintenant,uid}){
       </div>
       <div className="atl-carte-actions">
        {suivante?<button disabled={occupe} onClick={()=>placer(p,suivante.id)} data-atelier-avancer="">→ {suivante.nom}</button>:<button disabled={occupe} onClick={()=>placer(p,SORTIR)} data-atelier-sortir="">Sortir de l’atelier</button>}
-       <label className="atl-choix"><span className="ops-sr">Changer d’étape</span><select aria-label="Changer d’étape" disabled={occupe} value={e.id} onChange={ev=>placer(p,ev.target.value)}>{etapes.map(x=><option key={x.id} value={x.id}>{x.nom}</option>)}<option value={SORTIR}>Sortir de l’atelier</option></select></label>
+       <label className="atl-choix"><span className="ops-sr">Changer d’étape</span><select aria-label="Changer d’étape" disabled={occupe} value="" onChange={ev=>{if(ev.target.value&&ev.target.value!==e.id)placer(p,ev.target.value);}}><option value="" disabled>⋯</option>{etapes.map(x=><option key={x.id} value={x.id} disabled={x.id===e.id}>{x.nom}</option>)}<option value={SORTIR}>Sortir de l’atelier</option></select></label>
       </div>
      </article>;})}
    </section>;})}</div>

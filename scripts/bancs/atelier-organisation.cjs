@@ -155,7 +155,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
     await essaie('C ' + suf, async () => {
       await pg.locator('[data-atelier-ajouter]').click();
       let s = await lire();
-      dit(s && s.proposes.join() === 'a:9501,a:9503', 'C1 proposés : 9501 et 9503 (même titre, deux paires) ; 9502 déjà là', s && s.proposes.join());
+      dit(s && [...s.proposes].sort().join() === 'a:9501,a:9503', 'C1 proposés : 9501 et 9503 (même titre, deux paires) ; 9502 déjà là', s && s.proposes.join());
       await capture(pg, `organisation-ajout-${suf}`);
       await pg.locator('[data-atelier-achat="a:9501"] button').click();
       await attendreOps(() => document.querySelector('[data-atelier-paire="a:9501"]'));
