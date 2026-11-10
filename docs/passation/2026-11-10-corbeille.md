@@ -81,10 +81,20 @@ l'élément restauré).
   purge 30 j / 300 ; photo d'un élément revenu jamais vidée ; branchements, confirmations des
   sites gardées). Sur `origin/main` : tombe (module absent). Mutations : champs non
   conditionnels ⇒ C1 rouge ; purge sans vérifier le retour ⇒ F3 rouge.
-- Bancs mis à la règle (l'ancienne confirmation était leur contrôle) :
-  `achats-hors-plateforme` (pilule, corbeille dans `main` avec la valeur exacte, photo pas
-  vidée, « Annuler », Paramètres → Corbeille → « Restaurer ») et `compta-abonnements`
-  (pilule, « Annuler », entrée dans `vrm_corbeille`).
+- Banc `achats-hors-plateforme` (390 tactile et 1512, la ligne `main` écrite PATCH `rev`) :
+  **tout vert** après le merge d'origin/main — plus de « Tu es sûr ? », pilule « Mis à la
+  corbeille », entrée dans `vrm_corbeille` (valeur d'avant exacte, ligne photo nommée), photo
+  PAS vidée, « Annuler » ⇒ l'achat revient exact et la corbeille se vide, Paramètres →
+  Corbeille (ligne, date, « encore 30 j ») → « Restaurer » ⇒ même id, corbeille vide. Sur
+  `origin/main` (archive, banc copié dedans) : **4 rouges**. Il a attrapé un vrai défaut en
+  route : la base « distante » posée après une écriture de la corbeille faisait que la fusion
+  à trois voies défaisait « Annuler » et « Restaurer » (deux entrées, capture regardée) —
+  corrigé (`delete _avantDistant[k]` avant chaque écriture de la corbeille).
+- Banc `compta-abonnements` mis à la règle (pilule, « Annuler » exact, entrée dans la
+  corbeille) ; ⚠️ il tombe AVANT cette section, avec les MÊMES 8 rouges sur origin/main
+  (le formulaire d'abonnement n'est plus visible depuis le lot AO « Argent ») : à reprendre
+  par le propriétaire de l'écran Argent.
+- Captures regardées : Paramètres → Corbeille à 390 px et 1512 px (clair).
 - `npm run build`, audits variables, tdz, coherence, identite, icones, annuler-commandes,
   geste-annulable, fournisseurs, registres, fusion-nuage verts.
 
