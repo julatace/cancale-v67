@@ -83,6 +83,10 @@ const ligneRetrait = (r) => ({
   titre: txt(r.titre), lieu: txt(r.lieu, 120), code: txt(r.code, 16), qr: qrPropre(r.qr), compte: txt(r.compte, 40),
   transporteur: txt(r.transporteur, 30), suivi: txt(r.suivi, 40), limite: jourValide(r.limite),
   ...(cleGeste(r.cle) ? { cle: cleGeste(r.cle) } : {}), ...(txValide(r.tx) ? { tx: txValide(r.tx) } : {}),
+  // (10 nov., lot AY) L'identité publiée (`vrm_colis_retirer`) et, quand deux sources donnent deux codes, les
+  // deux avec leur source (le verdict de src/sourcesRetrait.js) — le mode relais hors ligne n'en choisit aucun.
+  ...(cleGeste(r.id) ? { id: cleGeste(r.id) } : {}),
+  ...(Array.isArray(r.desaccord) && r.desaccord.length > 1 ? { desaccord: r.desaccord.slice(0, 4).map((d) => ({ code: txt(d && d.code, 16), source: ['email', 'sms', 'message', 'transporteur', 'vinted'].includes(d && d.source) ? d.source : 'email' })).filter((d) => d.code) } : {}),
 });
 export function construirePhoto({ uid, at, envoyer = [], retirer = [], aVerifier = [], nAVerifier = null, nePasPoster = 0 }) {
   if (!uidValide(uid) || !Number.isFinite(at)) return null;
@@ -92,6 +96,10 @@ export function construirePhoto({ uid, at, envoyer = [], retirer = [], aVerifier
       titre: txt(e.titre), numero: txt(e.numero, 12), compte: txt(e.compte, 40), plateforme: e.plateforme === 'ebay' ? 'ebay' : 'vinted',
       // (6 nov., v36) La vente Vinted, pour « Colis fait » hors réseau (`vinted_ship_done`).
       ...(e.plateforme !== 'ebay' && txValide(e.tx) ? { tx: txValide(e.tx) } : {}),
+      // (10 nov., lot AY) Le n° de suivi du bordereau (le scan du mode « dépôt » hors ligne : égalité exacte)
+      // et le transporteur lu (sa marque) — ce que le mode affiche, rien de plus.
+      ...(e.plateforme !== 'ebay' && /^[A-Za-z0-9-]{4,40}$/.test(String(e.suivi || '')) ? { suivi: String(e.suivi) } : {}),
+      ...(/^[a-z0-9_-]{2,30}$/.test(String(e.tr || '')) ? { tr: String(e.tr), trNom: txt(e.trNom, 30) } : {}),
       // (9 nov.) Les lignes de bordereau de CETTE vente (son identité, jamais le titre) :
       // hors connexion, le PDF déjà ouvert ici s'affiche (src/bordereauxHorsLigne.js).
       ...(e.plateforme !== 'ebay' && Array.isArray(e.pdf) && e.pdf.length ? { pdf: e.pdf.map((r) => cleGeste(r)).filter((r) => /^(email_bord_|harvest_)[A-Za-z0-9_.-]+$/.test(r) && !/_label_latest$/.test(r)).slice(0, 2) } : {}),

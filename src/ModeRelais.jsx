@@ -18,11 +18,13 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ordreDeSeance, ordreRelais, pointsDeSeance, cleDuPoint, sensGlisse } from './preparerRelais.js';
+import { heureVue } from './modeDepot.js';
 
 const DUREE_ANNULER = 5000;
 
 // Garder l'écran allumé pendant le mode (Wake Lock), le rendre en sortant.
-function useEcranAllume() {
+// (10 nov., lot AU) Exporté : le mode « dépôt » (src/ModeDepot.jsx) garde l'écran allumé de la même façon.
+export function useEcranAllume() {
   const [etat, setEtat] = React.useState(() => (typeof navigator !== 'undefined' && navigator.wakeLock && typeof navigator.wakeLock.request === 'function') ? 'demande' : 'absent');
   React.useEffect(() => {
     if (!(typeof navigator !== 'undefined' && navigator.wakeLock && typeof navigator.wakeLock.request === 'function')) return undefined;
@@ -44,7 +46,9 @@ function useEcranAllume() {
   return etat;
 }
 
-export default function ModeRelais({ colis, onRetire, onAnnuler, onFermer, Retour, Icon, horsLigne = false, note = '', zIndex }) {
+// (10 nov., lot AY) `vueA` : hors ligne, l'instant où ces codes ont été lus pour la dernière fois (« codes vus à 14:02 ») —
+// jamais présentés comme frais.
+export default function ModeRelais({ colis, onRetire, onAnnuler, onFermer, Retour, Icon, horsLigne = false, note = '', vueA = null, zIndex }) {
   const vivants = React.useMemo(() => ordreRelais(Array.isArray(colis) ? colis : []), [colis]);
   // Un colis « Retiré » sort de « à retirer » tout de suite (le geste est optimiste) :
   // la séance le garde à sa place, montré retiré, avec « Annuler » 5 s.
@@ -114,6 +118,7 @@ export default function ModeRelais({ colis, onRetire, onAnnuler, onFermer, Retou
           <span className="vrm-relais-titre">{n ? `${idx + 1} sur ${n}` : 'Mode relais'}{nRetires ? <span className="vrm-relais-sous"> · {nRetires} retiré{nRetires > 1 ? 's' : ''}</span> : null}</span>
           <span className="vrm-relais-rond-vide" aria-hidden="true"/>
         </header>
+        {horsLigne ? <p className="vrm-relais-lum vrm-relais-vue" data-relais-vue={vueA || ''}>Hors ligne · codes {heureVue(vueA, Date.now(), 'vus') || 'gardés ici'}</p> : null}
         <p className="vrm-relais-lum" data-relais-luminosite="">Monte la luminosité au maximum : VRM ne peut pas la régler.{veille === 'actif' ? ' L’écran reste allumé.' : ''}</p>
         {points.length > 1 ? (
           <div className="vrm-relais-points" role="group" aria-label="Le point où tu es">

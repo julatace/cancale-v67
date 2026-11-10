@@ -476,6 +476,9 @@ import "./styles-emballage.css";
 // s'ouvrir au comptoir sans réseau (codes de retrait hors ligne).
 import "./styles-preparer-relais.css";
 import ModeRelais from "./ModeRelais.jsx";
+// (10 nov., lots AU/AY) Le mode « dépôt » — pas paresseux : il s'ouvre sans réseau.
+import ModeDepot from "./ModeDepot.jsx";
+import { colisDepotHorsLigne } from "./modeDepot.js";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
@@ -16917,7 +16920,9 @@ const rechaufferQr = async (photo) => {
 };
 // Les codes de retrait gardés en local (G9) : lisibles même quand la base ne
 // répond pas (au point relais, réseau faible). Une liste non vide, ou null.
-const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
+// (10 nov., lot AY) Une copie qui nomme un AUTRE compte VRM n'est jamais lue (celle d'avant sans `uid` est
+// celle de ce compte : `vrm_*` est effacé à chaque changement de compte).
+const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); const u = (AUTH.user && AUTH.user.id) || ''; if (c && c.uid && u && c.uid !== u) return null; return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
 // Les codes de retrait gardés en local (G9), rendus par la coque quand la base
 // ne répond pas ET (3 nov.) par « Ma journée hors ligne » quand le réseau est
 // coupé et qu'aucune photo de la journée n'existe : mesuré au banc
@@ -16929,7 +16934,7 @@ function BlocCodesHorsLigne() {
         const [relais, setRelais] = useState(false);
         const c = codesHorsLigne(); if (!c) return null;
         const comptes = c.codes.filter((x) => x && x.compte === true);
-        const h = Math.max(0, Math.round((Date.now() - (c.at || 0)) / 3600000));
+        const h = Math.max(0, Math.round((Date.now() - (c.vu || c.at || 0)) / 3600000));
         const quand = h < 1 ? 'à l’instant' : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
         return (
           <div data-codes-hors-ligne style={{marginTop:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'16px 16px 10px'}}>
@@ -16937,7 +16942,7 @@ function BlocCodesHorsLigne() {
             <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
             {comptes.length ? <Bouton variante="secondaire" icone="qr" data-relais-ouvrir="hors-ligne" onClick={() => setRelais(true)} style={{ minHeight: 44, marginBottom: 8 }}>Mode relais</Bouton> : null}
             {relais ? <ModeRelais horsLigne colis={comptes.map((x, i) => ({ cle: 'hl:' + (x.id || i), ident: x.id || '', titre: x.titre || (x.carrier ? carrierName(x.carrier) : 'Colis'), lieu: x.lieu || '', code: x.code || '', desaccord: x.desaccord || null, suivi: x.suivi || '', qr: '', sansQrHorsLigne: !!x.qr }))}
-              note={`Codes gardés sur cet appareil, mis à jour ${quand}.`} onFermer={() => setRelais(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
+              note={`Codes gardés sur cet appareil, mis à jour ${quand}.`} vueA={c.vu || c.at || null} onFermer={() => setRelais(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
             {c.codes.map((x, i) => (
               <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
                 <div style={{flex:1,minWidth:0}}>
@@ -17199,7 +17204,9 @@ function LigneRetraitHorsLigne({ r, i, quand, maintenant, verifier = false, sans
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || (sansLieu ? '' : r.lieu) || (r.transporteur ? `Colis ${r.transporteur}` : 'Colis')}</div>
         <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[(r.titre && !sansLieu) ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte, delai].filter(Boolean).join(' · ')}</div>
-        {r.code
+        {!r.code && Array.isArray(r.desaccord) && r.desaccord.length > 1
+          ? <div className="vrm-sensible" data-stream-type="code" data-hl-desaccord="" style={{marginTop:6,fontSize:13,fontWeight:700,color:C.warn}}>2 codes : {r.desaccord.map((d) => d.code).join(' / ')} — vérifie sur place</div>
+          : r.code
           ? <div className="vrm-sensible" data-stream-type="code" data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:20,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 12px'}}>{r.code}</div>
           : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas lu à {quand}.</div>}
         <div style={{marginTop:8,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
@@ -17352,6 +17359,10 @@ function JourneeHorsLigne({ uid, tab }) {
   const photo = React.useMemo(() => { try { return lirePhoto(uid, localStorage); } catch (_) { return null; } }, [uid]);
   const gestes = useGestesHorsLigne();
   const [enGrand, setEnGrand] = React.useState(null);
+  // (10 nov., lots AU/AY) Le mode « dépôt » et le mode relais SANS réseau : la photo gardée sur CET appareil
+  // pour CE compte (datée « vue à hh:mm »), les gestes de toujours (« Déposé » ⇒ file d'envoi).
+  const [depotHL, setDepotHL] = React.useState(false);
+  const [relaisHL, setRelaisHL] = React.useState(false);
   const colis = ONGLETS_COLIS_HL.includes(tab);
   const pdfs = usePdfsHorsLigne(uid, photo ? photo.envoyer : []);
   // (9 nov.) Le Stock hors connexion : l'inventaire contre la dernière liste gardée.
@@ -17389,8 +17400,14 @@ function JourneeHorsLigne({ uid, tab }) {
     if (j === 1) return 'à poster demain au plus tard';
     return 'à poster avant le ' + new Date(e.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
   };
+  const colisDepotHL = colisDepotHorsLigne(photo);
+  const etatDepotHL = (c) => { const ef = c && c.tx ? gestes.etatFait({ tx: c.tx }) : ''; return ef === 'attente' ? 'attente' : ef === 'note' ? 'fait' : ''; };
   const blocEnvoyer = (<>
     {tete('À déposer', photo.nEnvoyer)}
+    {colisDepotHL.some((c) => c.peutFaire) ? <div className="vrm-pas-a-pas-rangee" data-depot-rangee="hors-ligne"><Bouton variante="secondaire" icone="scan" data-depot-ouvrir="hors-ligne" onClick={() => setDepotHL(true)} style={{ minHeight: 44 }}>Je dépose</Bouton></div> : null}
+    {depotHL ? <ModeDepot horsLigne vueA={photo.at} colis={colisDepotHL} etatDe={etatDepotHL}
+      onDeposer={(c) => { if (c && c.tx && !etatDepotHL(c)) gestes.faire({ tx: c.tx }, true); }} onAnnuler={(c) => { if (c && c.tx) gestes.faire({ tx: c.tx }, false); }}
+      onFermer={() => setDepotHL(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
     <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
       {photo.envoyer.length === 0
         ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à envoyer à {quand}.</div>
@@ -17428,6 +17445,10 @@ function JourneeHorsLigne({ uid, tab }) {
         {titre}
         <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
         {tete('À retirer', photo.nRetirer)}
+        {photo.retirer.length ? <div className="vrm-pas-a-pas-rangee" data-relais-rangee="hors-ligne"><Bouton variante="secondaire" icone="qr" data-relais-ouvrir="photo" onClick={() => setRelaisHL(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
+        {relaisHL ? <ModeRelais horsLigne vueA={photo.at} colis={photo.retirer.map((r, i) => ({ cle: 'hl:' + (r.id || r.cle || r.tx || i), ident: r.id || '', titre: r.titre || (r.transporteur ? `Colis ${r.transporteur}` : 'Colis'), lieu: r.lieu || '', code: r.code || '',
+            desaccord: r.desaccord || null, suivi: r.suivi || '', qr: /^data:image\//i.test(String(r.qr || '')) ? r.qr : '', sansQrHorsLigne: !!r.qr && !/^data:image\//i.test(String(r.qr || '')) }))}
+          note={`Aucun colis à retirer à ${quand}.`} onFermer={() => setRelaisHL(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
         <div data-hl-retirer={photo.nRetirer}>
           {points.length === 0
             ? <div style={{...carte,fontSize:13,color:C.muted,padding:'12px 14px'}}>Aucun colis à retirer à {quand}.</div>
@@ -30786,7 +30807,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       if (codes.length) {
         const avantC = load('vrm_codes_hors_ligne', null);
-        if (!avantC || JSON.stringify(avantC.codes) !== JSON.stringify(codes)) save('vrm_codes_hors_ligne', { at: Date.now(), codes });
+        // (10 nov., lot AY) + `uid` : la copie ne se lit que pour CE compte VRM ; `vu` = la dernière lecture
+        // complète qui l'a confirmée (« vue à hh:mm »), redatée au plus une fois par 5 min.
+        const uidC = (AUTH.user && AUTH.user.id) || '';
+        if (!avantC || JSON.stringify(avantC.codes) !== JSON.stringify(codes) || avantC.uid !== uidC) save('vrm_codes_hors_ligne', { at: Date.now(), vu: Date.now(), uid: uidC, codes });
+        else if (!(Date.now() - (Number(avantC.vu) || 0) < 300000)) save('vrm_codes_hors_ligne', { ...avantC, vu: Date.now() });
       }
     } catch (_) {}
   }, [pickupUnion, tracking, buys.items, colisRelaisLu, suivisVinted, suivisManuels, transpMap]);
@@ -36250,8 +36275,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (9 nov.) `pdf` : les lignes de bordereau de CETTE vente (par sa transaction : le capté,
         // puis l'e-mail) — hors connexion, celui déjà ouvert ici s'affiche (src/bordereauxHorsLigne.js).
         const cap = tid ? labelsCaptes[tid] : null;
+        // (10 nov., lot AY) + le n° de suivi du bordereau (le scan du mode « dépôt » hors ligne, identité exacte)
+        // et le transporteur LU (son logo) — rien d'autre.
+        let trV = null; try { trV = transporteurVente(b, tid); } catch (_) { trV = null; }
         return { titre: o.title, numero: (o && o._venteEmail) ? ((effEntry(o) || {}).numero || '') : (((saleOv[tid] || {}).numero) || (b && b.numero) || ''), compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee', tx: tid,
-          pdf: lignesPdfPhoto([cap && cap.row, b && b.hasPdf ? b._row : null]) };
+          pdf: lignesPdfPhoto([cap && cap.row, b && b.hasPdf ? b._row : null]), suivi: (b && b.suivi) || '', tr: (trV && trV.cle) || '', trNom: (trV && trV.cle && trV.nom) || '' };
       }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
       // ⚠️ (revue du 23 oct.) « À RETIRER » = EXACTEMENT ce que la tuile compte
       // en ligne (`pickupUnion.emailList` + `extra`, §11). Les colis « à
@@ -36260,14 +36288,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // compte hors ligne disait 5 quand la tuile disait 2. Ils ont leur liste,
       // avec leur VRAIE raison ; ceux qui ont encore leur code ou leur QR
       // seulement (peut-être encore au relais), vus par e-mail OU par Vinted.
-      const ligneEmail = (t) => ({
-        titre: t.artTitle || '', lieu: (cleanLieu(t.lieu).nom || '').trim(), code: codeRetrait(t.code), qr: qrImage(t) || '',
+      // (10 nov., lot AY) LE MÊME VERDICT QUE LA CARTE (src/sourcesRetrait.js) : le code de la conversation de SA
+      // commande compte ; deux codes différents ⇒ aucun choisi, les deux gardés avec leur source.
+      const verdictE = (t) => { try { const oV = pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(colisKey(t)) : null; const rV = oV ? colisRelais[String(oV.transaction_id)] : null;
+        return verdictCode({ lignes: codesDesLignes(t, codeRetrait), message: rV ? codeRetrait(rV.code) : '' }); } catch (_) { return { code: '', desaccord: null }; } };
+      const ligneEmail = (t) => { const vC = verdictE(t); return {
+        titre: t.artTitle || '', lieu: (cleanLieu(t.lieu).nom || '').trim(), code: vC.desaccord ? '' : (codeRetrait(vC.code) || codeRetrait(t.code)), ...(vC.desaccord ? { desaccord: vC.desaccord } : {}), id: identRetraitEmail(t), qr: qrImage(t) || '',
         transporteur: t.carrier ? carrierName(t.carrier) : '', suivi: t.suivi || '', limite: t.limite || '', compte: compteDuColisEmail(t) || '',
         cle: colisKey(t),   // (6 nov., v36) « J'ai retiré » hors réseau : la clé de `vrm_colis_collected`
-      });
+      }; };
       const ligneVinted = (o) => {
         const r = relaisDe(o);
-        return { titre: o.title || '', lieu: (r && r.lieu) || '', code: r ? codeRetrait(r.code) : '', qr: r ? (qrImage(r) || '') : '', compte: o._acc ? accNameOf(o._acc) : '', tx: String((o && o.transaction_id) ?? '') };
+        return { titre: o.title || '', lieu: (r && r.lieu) || '', code: r ? codeRetrait(r.code) : '', qr: r ? (qrImage(r) || '') : '', compte: o._acc ? accNameOf(o._acc) : '', tx: String((o && o.transaction_id) ?? ''), id: identRetraitVinted(o) };
       };
       const retirer = pickupUnion.emailList.map(ligneEmail).concat(pickupUnion.extra.map(ligneVinted));
       const aVerifier = pickupUnion.aVerifier.filter(aEncoreCode)
@@ -36276,7 +36308,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (photo && ecrirePhoto(uid, photo, localStorage)) rechaufferQr(photo);
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseKO, accountsReady, cleComptes, sales, buys, tracking, emailBords, colisRelaisLu, colisEb, toShip, pickupUnion, labelsCaptes]);
+  }, [baseKO, accountsReady, cleComptes, sales, buys, tracking, emailBords, colisRelaisLu, colisEb, toShip, pickupUnion, labelsCaptes, colisRelais, transpMap]);
 
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
@@ -38400,7 +38432,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const x of ranges) {
       if (x.__autre === 'vc') {
         const v = x.v; if (!v || faitsVc[v.id]) continue; const num = v.num || ''; const titre = v.titre || 'Article Vestiaire';
-        L.push({ cle: 'vc:' + v.id, site: 'vestiaire', num, etatNum: etatN(num), titre, taille: v.taille || '', compte: 'Vestiaire', transporteur: nomTr(x),
+        L.push({ cle: 'vc:' + v.id, site: 'vestiaire', num, etatNum: etatN(num), titre, taille: v.taille || '', compte: 'Vestiaire', transporteur: nomTr(x), trCle: (x.tr && x.tr.cle) || '',
           limite: limiteVcTexte({ ...v, aExpedier: true }) || '', limiteAmbre: x.dl != null && x.dl <= 1, photo: v.photo || null, paire: 'sure', pdf: false,
           imprimerEl: v.bordereau ? <BoutonImprimerVc v={v} carte/> : null,
           sansBordereau: v.bordereau ? '' : v.etiquette === true ? 'Le bordereau est sur Vestiaire.' : 'Pas encore de bordereau sur Vestiaire.',
@@ -38420,7 +38452,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const o = x.o || {}; const sure = Object.keys(o).length > 0;
         const f = x.x.itemId ? numD[x.x.itemId] : null; const num = (f && f.numero != null) ? String(f.numero).trim() : '';
         const titre = x.x.titre || o.title || '(sans titre)';
-        L.push({ cle: 'lbc:' + x.x.txId, site: 'leboncoin', num, etatNum: etatN(num), titre, compte: 'Leboncoin', transporteur: nomTr(x), limite: '', limiteAmbre: false,
+        L.push({ cle: 'lbc:' + x.x.txId, site: 'leboncoin', num, etatNum: etatN(num), titre, compte: 'Leboncoin', transporteur: nomTr(x), trCle: (x.tr && x.tr.cle) || '', limite: '', limiteAmbre: false,
           photo: sure ? (photoArticle(o) || null) : null, paire: sure ? 'sure' : 'a-verifier', raisonPaire: sure ? '' : 'Cette vente Leboncoin n’a pas encore été relue : VRM ne montre pas de photo devinée. Vérifie la paire sur le carton.',
           pdf: false, sansBordereau: o.label && o.label.voucherUrl ? 'Le bordereau Leboncoin s’imprime, tamponné, depuis l’écran Colis Leboncoin.' : 'Bordereau à générer sur Leboncoin.',
           suivi: '', peutFaire: true, geste: { site: 'leboncoin', cle: 'lbc:' + x.x.txId, txId: x.x.txId, num, titre } });
@@ -38437,7 +38469,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // fausse ») : la photo reste celle de la VENTE (identité), le N° est à vérifier, dit en clair.
       const litige = b && !x.venteEmail ? numLitige(b) : null;
       L.push({ cle: 'v:' + (x.txn || x.key), site: 'vinted', num, etatNum: litige && etatN(num) === 'ok' ? 'litige' : etatN(num), litige, titre,
-        taille: (e && e.taille ? String(e.taille) : '') || (o ? String(o.size_title || o.size || '') : ''), compte: o && o._acc ? accNameOf(o._acc) : '', transporteur: nomTr(x),
+        taille: (e && e.taille ? String(e.taille) : '') || (o ? String(o.size_title || o.size || '') : ''), compte: o && o._acc ? accNameOf(o._acc) : '', transporteur: nomTr(x), trCle: (() => { try { return (transporteurVente(b, x.txn) || {}).cle || ''; } catch (_) { return ''; } })(),
         limite: texteEnvoiColis(texteLimiteEnvoi(x.lim) || ''), limiteAmbre: x.dl != null && x.dl <= 1,
         photo: sure ? (orderPhoto(o) || null) : null, paire: sure ? 'sure' : 'a-verifier',
         raisonPaire: sure ? '' : 'Ce bordereau n’est relié à aucune vente par son n° de transaction : VRM ne montre pas de photo devinée. Vérifie la paire sur le bordereau et sur son carton.',
@@ -38446,6 +38478,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return L;
   };
+  // ── (10 nov., lot AU) LE MODE « DÉPÔT » ────────────────────────────────────────────────────
+  // EXACTEMENT les colis de « Préparer » (= « À envoyer », `colisAEnvoyerRanges`, même ordre), avec le n° de
+  // suivi de SON bordereau (le scan trouve le colis par égalité exacte, §5) et la marque de son transporteur.
+  // « Déposé » = `deposeScan` (le « Colis fait » des cartes, annulable 5 s) ; eBay : suivi dans eBay.
+  const colisDepot = () => colisPreparer().map((c) => ({ cle: c.cle, site: c.site, num: c.num || '', titre: c.titre, photo: c.photo || null,
+    trCle: c.trCle || '', trNom: c.transporteur || '', suivis: c.suivi ? [c.suivi] : [], peutFaire: !!(c.peutFaire && c.geste), raison: c.site === 'ebay' ? 'ebay' : '',
+    sansBordereau: c.site === 'vinted' && !c.pdf, geste: c.geste }));
+  const [depotOuvert, setDepotOuvert] = useState(false);
   // Imprimer CE bordereau seul : la règle du bouton de la carte (le PDF capté par l'extension d'abord,
   // l'e-mail en secours ; tamponné du N° et du titre ; + la facture pro quand elle existe).
   const imprimerColisVinted = async (e) => {
@@ -44884,6 +44924,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {onglet === 'envoyer' && (nEnv || 0) > 0 ? (
               <div className="vrm-pas-a-pas-rangee" data-preparer-rangee="">
                 <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton>
+                {/* (10 nov., lot AU) Au point relais : les colis à déposer, scannés un à un. */}
+                <Bouton variante="secondaire" icone="scan" data-depot-ouvrir={nEnv} onClick={() => setDepotOuvert(true)} style={{ minHeight: 44 }}>Je dépose</Bouton>
               </div>) : null}
             {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
@@ -45995,7 +46037,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null)}/> : null}
       {(curSub==='bordereaux' || curSub==='achats') && relaisOuvert ? <ModeRelais colis={colisModeRelais()} onRetire={retirerRelais} onAnnuler={(id) => _gestes.annuler(id)}
           onFermer={() => setRelaisOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
-      {curSub==='bordereaux' && !scanOuvert && !tourneeDepot ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
+      {curSub==='bordereaux' && depotOuvert ? <ModeDepot colis={colisDepot()} etatDe={(c) => (deposeScan.attente && String(deposeScan.attente.cle) === c.cle ? 'attente' : '')}
+          onDeposer={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={() => deposeScan.annuler()}
+          onFermer={() => setDepotOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
+      {curSub==='bordereaux' && !scanOuvert && !tourneeDepot && !depotOuvert ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
