@@ -10,7 +10,7 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
   const valo = data && data.valo;
   const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div data-prix-marche="" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="euro" title="Argent" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}
         desc="Ce que tes ventes disent du prix — par modèle et taille, pour tarifer et racheter juste." />
       {baseKO ? (

@@ -1726,7 +1726,7 @@ function ProfilFiscalCarte({ onNav }) {
             </div>
           </>)}
           {/* (5 nov., chantier F, revue 2.27) Le statut ne se choisit plus ICI : un seul endroit,
-              « Statut » (la question 2 tant qu'il n'est pas choisi, puis Documents et réglages →
+              « Statut » (la question 2 tant qu'il n'est pas choisi, puis Déclarer →
               Statut · Changer). Reste le taux de cotisations, pour un micro-entrepreneur. */}
           {regime === 'micro' ? (
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -2436,7 +2436,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   if (!regime) return carteChoix;
   if (regime !== 'micro') {
     const texte = regime === 'particulier'
-      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000&nbsp;€</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Documents et réglages → Statut).</>
+      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000&nbsp;€</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Argent → Déclarer → Ton statut).</>
       : regime === 'marge'
         ? <>Régime de la marge : VRM calcule la TVA sur ta marge dans le rapport comptable (Ventes → Outils). Tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas — ton comptable s'en charge.</>
         : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent sur cet écran, pour ton comptable.</>;
@@ -3268,7 +3268,7 @@ function RecapComptableMensuel() {
           <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
             {urssafMois
               ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
-              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')}&nbsp;% (taux réglable dans Documents et réglages → Ton entreprise). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')}&nbsp;% (taux réglable dans Argent → Déclarer → Ton entreprise). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </details></Card>
       )}
@@ -4363,7 +4363,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                       {couvertureCa.aDater && <div>Des ventes finalisées attendent leur date de versement (détail dans « URSSAF »).</div>}
                     </div>
                   )}
-                  <div style={{ marginTop: 10 }}><Pourquoi label="Ce que ce résultat compte">Le CA déclaré de l'année (toutes plateformes) moins tes charges. Il ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est dans la carte « Ton bénéfice », en haut de l'écran.</Pourquoi></div>
+                  <div style={{ marginTop: 10 }}><Pourquoi label="Ce que ce résultat compte">Le CA déclaré de l'année (toutes plateformes) moins tes charges. Il ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est dans « Ton bénéfice », dans le Résumé.</Pourquoi></div>
                 </div>
               )}
             </div>
