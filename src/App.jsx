@@ -14674,7 +14674,7 @@ function BlocComptesMuets({ muets }) {
           l'email du bordereau, la date limite de leurs colis est ESTIMÉE (vente
           + 7 jours, sans l'heure — 90 bordereaux sur 205 disent « avant 10 h »). */}
       <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.45}} data-effet-muets>
-        {n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par e-mail&nbsp;: <b style={{color:C.text}}>la date limite de {n>1?'leurs':'ses'} colis est estimée (vente + 7 jours, sans l’heure)</b>, et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.
+        Sans e-mail&nbsp;: <b style={{color:C.text}}>date limite estimée</b> (vente + 7 j), pas d’alerte sur ton téléphone. <Pourquoi>{n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par e-mail&nbsp;: la date limite de {n>1?'leurs':'ses'} colis est estimée (vente + 7 jours, sans l’heure), et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.</Pourquoi>
       </div>
       <div style={{fontSize:12,color:C.text,marginTop:6,lineHeight:1.5}} data-geste-muets>
         <b>Pour {n>1?'chacun':'ce compte'}&nbsp;:</b> 1. sur Vinted, connecté sur {n>1?'ce compte':muets[0].login}&nbsp;: <b>Paramètres → Notifications</b>, active les e-mails (messages, offres, ventes).
@@ -16080,7 +16080,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       {etape === 'choix' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>{deja ? 'Ce Discord est déjà sur ton compte VRM' : 'Nouveau compte VRM ?'}</h1>
         {deja
-          ? <p data-nouveau-oauth-deja={deja.email} style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>{deja.pseudo ? `« ${deja.pseudo} »` : 'Ce compte Discord'} est affiché sur ton compte VRM <strong style={{ color: C.text }}>{deja.email}</strong>, mais seulement comme pseudo pour la carte — pas pour te connecter. VRM vient donc de créer un second compte, vide.</p>
+          ? <p data-nouveau-oauth-deja={deja.email} style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>{deja.pseudo ? `« ${deja.pseudo} »` : 'Ce compte Discord'} sert de pseudo à <strong style={{ color: C.text }}>{deja.email}</strong>, pas pour te connecter. Ce nouveau compte est vide.</p>
           : <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ce compte {nom} n’était relié à aucun compte VRM : VRM vient d’en créer un nouveau, vide.</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           {deja && <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>Supprimer ce compte vide et revenir au mien</button>}
@@ -16090,7 +16090,8 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       </>}
       {etape === 'confirmer' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
-        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'}, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
+        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite :</p>
+        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
@@ -16099,7 +16100,8 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       </>}
       {etape === 'fait' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
-        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Le compte vide est supprimé. Connecte-toi avec ton e-mail, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</p>
+        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Le compte vide est supprimé. Ensuite :</p>
+        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
         <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
       </>}
     </div>
@@ -16538,11 +16540,11 @@ function AuthScreen() {
               UNE connexion pour les deux : l'app connecte l'extension juste après. */}
           {__lier && (mode==='in' || mode==='up') && (
             <div data-lier-connexion="" style={{fontSize:13,color:C.text,background:`${C.accent}12`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>
-              Connecte-toi ici : l'extension {NAV.de} sera connectée en même temps — rien à taper dans l'extension.
+              Connecte-toi ici : l'extension {NAV.de} se connecte aussi, rien à taper.
             </div>
           )}
           {lierFournisseurMot && (mode==='in' || mode==='up') && <div role="status" data-lier-fournisseur-mot={lierFournisseur} style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>{lierFournisseurMot}</div>}
-          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>La connexion a pris plus de 10 minutes : l’extension n’a pas été connectée. Connecte-toi ici, puis reclique « Continuer avec Google » ou « Continuer avec Discord » dans la fenêtre de l’extension VRM.</div>}
+          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>Plus de 10 minutes : l’extension n’est pas connectée.</div><div>Connecte-toi, puis reclique « Continuer avec Google » (ou Discord) dans l’extension.</div></div>}
 
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12}}>
@@ -16802,9 +16804,8 @@ function BlocNumerosPerimes() {
           {!relue ? 'Cet écran n\'est plus à jour' : remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
         </div>
         <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-          Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur une étiquette et n'imprime rien depuis cet écran.
-          <br/><br/>
-          Recharge-le. Ce que tu as tapé ici (prix d'achat, colis cochés…) est <b>gardé</b> et remis après le rechargement.
+          <div>Numéros peut-être <b>faux</b> : n'en écris aucun, n'imprime rien d'ici.</div>
+          <div style={{ marginTop: 10 }}>Recharge : ce que tu as tapé ici est <b>gardé</b>.</div>
         </div>
         <button type="button" onClick={rechargerEnGardantLesSaisies}
           style={{ marginTop: 16, width: '100%', border: 'none', background: C.accent, color:C.onAccent, borderRadius: 12, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -16976,7 +16977,7 @@ function ApercuSansAbonnement({ tab, setTab }) {
   return createPortal(
     <div className="vrm-apercu-carte" role="region" aria-labelledby="vrm-apercu-titre" data-carte-apercu="" data-signe={signe || undefined} key={signe}>
       <div className="vrm-apercu-titre" id="vrm-apercu-titre">{e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
-      <div className="vrm-apercu-phrase">Tes données sont là, rien n'est supprimé. Voici un aperçu ; {e.impaye ? 'mets ta carte à jour' : "reprends l'abonnement"} pour tout retrouver et agir à nouveau.</div>
+      <div className="vrm-apercu-phrase">Tes données sont là, rien n'est supprimé. {e.impaye ? 'Mets ta carte à jour' : "Reprends l'abonnement"} pour tout retrouver.</div>
       <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
     </div>, document.body);
 }
@@ -17307,7 +17308,7 @@ function LigneEtatHorsLigne({ at, maintenant }) {
     <LigneHorsLigne date={new Date(at).toISOString()}>Hors connexion — dernier état du {quandEtat(at)}. Ce que tu notes ici part au retour du réseau.</LigneHorsLigne>
     {etatVieux(at, maintenant) ? (
       <div role="note" data-hors-ligne-vieux={Math.floor(h || 0)} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 14px',margin:'-6px 0 14px',fontSize:13,color:C.text,lineHeight:1.45}}>
-        Ce dernier état a plus {h >= 24 ? 'd’un jour' : `de ${ETAT_VIEUX_H} h`} : un colis a pu être retiré ou arriver depuis — vérifie au comptoir.
+        État de plus {h >= 24 ? 'd’un jour' : `de ${ETAT_VIEUX_H} h`} : vérifie au comptoir.
       </div>) : null}
   </>);
 }
@@ -17568,7 +17569,7 @@ function JourneeHorsLigne({ uid, tab }) {
   if (!photo) return (
     <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
       {titre}
-      <LigneHorsLigne>Hors connexion — aucune copie {colis ? 'de tes colis' : 'de ta journée'} n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
+      <LigneHorsLigne>Hors connexion — aucune copie {colis ? 'de tes colis' : 'de ta journée'} ici ; elle se fera avec du réseau.</LigneHorsLigne>
       <BlocCodesHorsLigne/>
       {!colis ? <div style={{marginTop:12}}><BlocInventaireHorsLigne uid={uid}/></div> : null}
     </div>
@@ -18634,7 +18635,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
     <>
       <p style={{margin:'0 0 10px'}}>Ton extension est là 👍, mais pas encore reliée à ton compte.</p>
       {voie === 'retard' ? (
-        <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) est trop ancienne : mets-la à jour, ou clique son icône {NAV.hautDe} avec <b style={{color:C.text}}>l’e-mail et le mot de passe VRM</b> (pas Vinted).</p>
+        <><p style={{margin:'0 0 6px'}}>Version {vmrExtVersion() || '?'} trop ancienne : mets-la à jour.</p><p style={{margin:0}}>Sinon, son icône {NAV.hautDe} : <b style={{color:C.text}}>e-mail et mot de passe VRM</b> (pas Vinted).</p></>
       ) : voie === 'serveur' ? (
         fenetreAncienne()
           ? <p style={{margin:0}}>Clique son icône {NAV.hautDe} : <b style={{color:C.text}}>e-mail et mot de passe VRM</b> (pas Vinted).</p>
@@ -18642,7 +18643,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
       ) : voie === 'page' ? (
         /* Relecture croisée de la 5.174 : une 5.164/5.170, connectée par l'ancien
            message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
-        <p style={{margin:0}}>Je la connecte d’ici, <b style={{color:C.text}}>sans rien à taper</b>. Sinon : recharge, ou son icône {NAV.hautDe} (<b style={{color:C.text}}>e-mail et mot de passe VRM</b>).</p>
+        <div style={{margin:0}}>Je la connecte d’ici, <b style={{color:C.text}}>sans rien à taper</b>. Sinon : recharge, ou son icône. <Pourquoi>Clique son icône {NAV.hautDe} et connecte-toi avec l’e-mail et le mot de passe VRM (pas Vinted).</Pourquoi></div>
       ) : (
         <p style={{margin:0}}>Je la connecte d’ici, <b style={{color:C.text}}>sans rien à taper</b>. Sinon : son icône {NAV.hautDe}, puis <b style={{color:C.text}} data-bouton-lier-ext="">{boutonLierExt()}</b>.</p>
       )}
@@ -18691,7 +18692,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
           : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. Ouvre </>}
         <b style={{color:C.text}}>vrm.center</b> sur ton ordinateur : tu y retrouveras cet écran{mobile === 'ios' ? <span data-premiers-relais="ios">, puis l’iPhone fera agir l’ordinateur allumé</span> : null}.
       </p>}
-      {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Le paquet pour <b style={{color:C.text}}>Orion sur iPhone et iPad</b> est disponible ci-dessous. Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>Voir les étapes</a>. Le fonctionnement sur ton appareil reste à vérifier.</p>}
+      {mobile === 'ios-orion' && <div style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Paquet <b style={{color:C.text}}>Orion iPhone/iPad</b> ci-dessous : importe-le dans Extensions. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>Les étapes</a> <Pourquoi>Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. Le fonctionnement sur ton appareil reste à vérifier.</Pourquoi></div>}
       {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) l’installe aussi, pas encore essayé.</p>}
     </>
   ) : boutique.lien ? (
@@ -18700,7 +18701,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
       {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
         <p style={{margin:'0 0 10px'}}>Une petite extension lit tes pages Vinted et range tout ici. Jamais ton mot de passe.</p>
       )}
-      <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Installe-la depuis la boutique de {nomNavigateurIci()} (bouton ci-dessous) et clique «&nbsp;Ajouter&nbsp;». Reviens ensuite ici&nbsp;: l’écran avance tout seul.</p>
+      <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Bouton ci-dessous, puis «&nbsp;Ajouter&nbsp;». L’écran avance tout seul.</p>
     </>
   ) : (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion') ? (
     /* Le zip est un paquet Chromium : Firefox et Safari ne l'installent pas.
@@ -18717,7 +18718,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
           ? <>Pas encore pour Firefox : ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera.</>
           : <>{nomNavigateurIci()} n’accepte pas cette extension : ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera.</>}
       </p>
-      {boutique.nav === 'safari' && orion && <p style={{margin:'10px 0 0'}} data-premiers-orion="safari">Tu préfères un navigateur proche de Safari&nbsp;? <b style={{color:C.text}}>Orion</b> (gratuit) l’installe, pas encore essayé.</p>}
+      {boutique.nav === 'safari' && orion && <p style={{margin:'10px 0 0'}} data-premiers-orion="safari">Proche de Safari&nbsp;: <b style={{color:C.text}}>Orion</b> (gratuit) l’installe, pas encore essayé.</p>}
     </>
   ) : (
     <>
@@ -18728,7 +18729,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
       <ul style={{margin:'6px 0 0',padding:'0 0 0 18px',lineHeight:1.7}}>
         <li>ouvre le fichier pour le décompresser&nbsp;— tu obtiens un dossier <b style={{color:C.text}}>VRM-extension</b>&nbsp;;</li>
         <li>{NAV.dansNu}, {NAV.pageExt ? <>va sur <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:6}}>{NAV.pageExt}</code></> : <>ouvre la page des extensions</>}&nbsp;;</li>
-        <li>allume l’interrupteur <b style={{color:C.text}}>Mode développeur</b>, en haut à droite (normal : elle est hors magasin)&nbsp;;</li>
+        <li>allume <b style={{color:C.text}}>Mode développeur</b>, en haut à droite (normal, hors magasin)&nbsp;;</li>
         <li>clique <b style={{color:C.text}}>Charger l’extension non empaquetée</b> et choisis le dossier.</li>
       </ul>
     </>
@@ -22322,7 +22323,7 @@ function AchatsVestiaire() {
   else {
     // (9 nov., soir, lot AJ) le plus récent en haut, la règle unique (src/ordreRecent.js)
     const liste = ordreRecent(Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v })), quandVestiaire);
-    if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire à la dernière lecture{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur vestiairecollective.com {NAV.dans} : il apparaît ici.</div>;
+    if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire lu{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur Vestiaire.</div>;
     else corps = (
       <div data-vc-achats="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-achats-resume="" style={style}>
@@ -25011,7 +25012,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 
         {/* ── Colonne droite : le stock vu de face, meuble par meuble ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }} data-rgt-plan="">
-          {meubles.length === 0 && <div style={{ ...carte, fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun meuble pour ranger dans ta pièce. Ajoute une étagère, une table ou un portant dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
+          {meubles.length === 0 && <div style={{ ...carte, fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun meuble. Ajoute-en un dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
           {meubles.map((m, mi) => {
             const pleines = Object.keys(m.vue).length;
             const enTete = plusieursPieces && (mi === 0 || meubles[mi - 1].roomId !== m.roomId);
@@ -25301,7 +25302,7 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
   const basculerCase = (r, c) => { const u = new Set(cases), k = r + ':' + c; if (u.has(k)) u.delete(k); else u.add(k); poser(u); };
   return (<>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{nPlanches}</b> {nPlanches > 1 ? mots : mot}{nPartielles ? <> (dont {nPartielles} {plateau ? 'partiel' : 'partielle'}{nPartielles > 1 ? 's' : ''})</> : null}</> : null}</div>
-      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées, sous une colonne, pour poser ou enlever {plateau ? 'le plateau' : 'la planche'} à cet endroit. Le bouton ⟷ à gauche fait toute la largeur.</div>}
+      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées pour poser ou enlever {plateau ? 'le plateau' : 'la planche'}. ⟷ : toute la largeur.</div>}
       <div data-editeur-planches="" style={{ display: 'grid', gridTemplateColumns: '30px 1fr', columnGap: 6, maxWidth: 300, margin: '0 auto' }}>
         <span />
         <div style={{ background: C.line, padding: '5px 5px 0', borderRadius: '7px 7px 0 0' }}>
@@ -28049,8 +28050,8 @@ function TamponPose({ r }) {
   const f = (r && r.fiches) || 0, b = (r && r.bandes) || 0;
   if (!f && !b) return null;
   return <div data-tampon-pose={f ? 'fiche' : 'bande'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8, textAlign: 'left' }}>
-    {f > 0 && <div>Pas de place libre sur {f > 1 ? `${f} étiquettes` : 'l’étiquette'} : le N° et le titre sont sur une <b style={{ color: C.text }}>fiche colis</b> imprimée juste après (ce n’est pas une étiquette de transport).</div>}
-    {b > 0 && <div>Pas de place libre sur {b > 1 ? `${b} bordereaux` : 'le bordereau'} : le N° et le titre sont dans une <b style={{ color: C.text }}>bande ajoutée dessous</b>, le bordereau reste à taille réelle.</div>}
+    {f > 0 && <div>Pas de place sur {f > 1 ? `${f} étiquettes` : 'l’étiquette'} : N° et titre sur une <b style={{ color: C.text }}>fiche colis</b> juste après.</div>}
+    {b > 0 && <div>Pas de place sur {b > 1 ? `${b} bordereaux` : 'le bordereau'} : N° et titre dans une <b style={{ color: C.text }}>bande dessous</b>, taille réelle gardée.</div>}
   </div>;
 }
 // ── L'APERÇU DU TAMPON : LE POSER OÙ ON VEUT (3 nov., 18 h 59) ───────────────
@@ -44981,7 +44982,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span>
                     {boitesKO.length===1 ? <>La boîte de <b>{accName(boitesKO[0])}</b> n'a pas pu être lue</>
                       : <>Les boîtes de {boitesKO.map((a,i)=><React.Fragment key={String(a.vinted_user_id)}>{i?(i===boitesKO.length-1?' et ':', '):''}<b>{accName(a)}</b></React.Fragment>)} n'ont pas pu être lues</>}
-                    {' '}— {boitesKO.length===1?'ses':'leurs'} messages ne sont ni listés ni comptés ici. Si ça dure, ouvre ta messagerie Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
+                    {' '}: messages pas comptés ici. Si ça dure, ouvre Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
                     {' '}<button type="button" className="vrm-pied-lien" data-pied-lien="reessayer" data-boites-ko-reessayer="" onClick={()=>loadConvs(true)}>{VERBES.reessayer}</button>
                   </span>
                 </div>
@@ -47674,7 +47675,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {s.pts.map(p=>(<g key={p.i}><circle cx={xs(p.i)} cy={ys(p.avg)} r="3.5" fill={C.accent}/><text x={xs(p.i)} y={ys(p.avg)-7} textAnchor="middle" fontSize="8.5" fontWeight="800" fill={C.text}>{Math.round(p.avg)}</text></g>))}
                 </svg>
               )}
-              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des articles <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Ça monte : tu vends plus cher.</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Un point = prix moyen du mois, <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b>. Ça monte : tu vends plus cher.</div>
             </div>
           </div>
         </div>
@@ -50746,7 +50747,7 @@ function AdressesSansCompte({ comptes }) {
           <div className="vrm-sans-compte-tete">
             <span className="vrm-sans-compte-titre">Adresse sans compte : {x.n} e-mail{x.n > 1 ? 's' : ''}</span>
             <span className="vrm-sans-compte-adresse vrm-sensible" data-stream-type="adresse">{x.adresse}</span>
-            <span className="vrm-sans-compte-aide">Aucun compte Vinted ne porte cette adresse{x.dernier ? ` · dernier e-mail le ${jour(x.dernier)}` : ''} : ses ventes, bordereaux et messages ne disent pas de quel compte ils viennent.</span>
+            <span className="vrm-sans-compte-aide">Aucun compte Vinted à cette adresse{x.dernier ? ` · dernier e-mail le ${jour(x.dernier)}` : ''} : ses e-mails restent sans compte.</span>
           </div>
           <div className="vrm-sans-compte-gestes">
             <Bouton variante="secondaire" data-relier-compte={x.adresse} aria-expanded={choix === x.adresse} onClick={() => setChoix((c) => (c === x.adresse ? '' : x.adresse))}>Relier un compte</Bouton>
@@ -51126,7 +51127,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         ? <div data-toutes-vide="" className="vrm-toutes-vide">
             {enCours ? <p>{PAS_SU.enCours}</p>
               : visibles.some((e) => e[1] === 'pas-su' || e[1] === 'partiel') ? <p>Aucune vente lue : une lecture a échoué (ci-dessus). Rien n’est perdu.</p>
-              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p data-toutes-etat-site="vinted" data-etat="jamais">Vinted : aucun compte relié — installe l’extension VRM {ouExtensionIci()}, puis ouvre vinted.fr une fois connecté : elle range tes ventes toute seule.</p></>
+              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p data-toutes-etat-site="vinted" data-etat="jamais">Vinted : aucun compte relié. Installe l’extension VRM {ouExtensionIci()}, puis ouvre vinted.fr.</p></>
               : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part, il apparaît ici, sur tous tes sites.</p></>}
           </div>
         : (
