@@ -43,6 +43,26 @@ const cleDefaut = (n) => {
   return /^\d+$/.test(s) ? String(parseInt(s, 10)) : s;
 };
 export const EN_LIGNE_FRAIS_MS = 24 * 60 * 60 * 1000;
+// Le prix d'une annonce Vinted : un objet `{ amount }` (la forme réelle) ou un nombre.
+// Illisible ⇒ null (« — » à l'écran, jamais 0).
+export const prixEuros = (p) => {
+  const v = p && typeof p === 'object' ? p.amount : p;
+  const n = Number(String(v == null ? '' : v).replace(',', '.'));
+  return v != null && String(v).trim() !== '' && Number.isFinite(n) && n > 0 ? n : null;
+};
+// « 60 € », « 59,90 € » ; null ⇒ « prix pas lu ».
+export const texteEuros = (n) => (n == null ? 'prix pas lu' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')}\u00a0€`);
+// « en ligne depuis le 3 nov. » (« depuis aujourd'hui ») ; null ⇒ la date n'est pas lue.
+export const texteDepuis = (ms, maintenant = Date.now()) => {
+  if (!Number.isFinite(ms)) return 'date de mise en ligne pas lue';
+  const d = new Date(ms), m = new Date(maintenant);
+  if (d.toDateString() === m.toDateString()) return 'en ligne depuis aujourd’hui';
+  return `en ligne depuis le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== m.getFullYear() ? { year: 'numeric' } : {}) })}`;
+};
+// (9 nov., lot AF) LES GROUPES SUR DEUX COMPTES : la même paire publiée sur deux comptes
+// Vinted différents (le risque que Julien veut voir AVANT la double vente). Même compte :
+// toujours dans `vinted` (la carte de Ma journée), mais pas « deux comptes ».
+export const surDeuxComptes = (groupes) => arr(groupes).filter((g) => g && Array.isArray(g.comptes) && g.comptes.length >= 2);
 const PLATS = ['ebay', 'leboncoin', 'vestiaire'];
 
 // La lecture d'un compte peut-elle conclure ? 'ok' · une raison (« pas su »).
@@ -61,7 +81,7 @@ export function raisonPasSu(c, maintenant) {
 // Rend { su, manque, vinted, numeroSeul, sites, auMoins }.
 //   groupe : { cle, numeros, annonces: [{ plat, id, uid, nom, titre, photo, url, numero }],
 //              comptes, memeCompte, preuves: ['photo' | 'recree' | 'numero'] }
-export function enLigneDeuxFois({ vinted, fiches, autres = null, clePhoto = null, cle = cleDefaut, maintenant = Date.now() } = {}) {
+export function enLigneDeuxFois({ vinted, fiches, autres = null, clePhoto = null, cle = cleDefaut, maintenant = Date.now(), dateDe = null } = {}) {
   const F = fiches && typeof fiches === 'object' ? fiches : {};
   const manque = [];
   const parts = [];
@@ -83,6 +103,10 @@ export function enLigneDeuxFois({ vinted, fiches, autres = null, clePhoto = null
         photo: it.photo || f.photo || null, url: typeof it.url === 'string' ? it.url : '', numero, cle: numero ? cle(numero) : '',
         photos: [...new Set([clePhoto && it.photo ? clePhoto(it.photo) : '', f.photoK ? String(f.photoK) : ''].filter(Boolean))],
         recreeDe: f.recreeDe != null ? String(f.recreeDe) : '' });
+      // (9 nov., lot AF) Ce que l'alerte montre de CHAQUE annonce : son prix et depuis quand
+      // elle est en ligne (`dateDe` = `dateMiseEnLigneMs` d'App.jsx ; null = pas lue, dit).
+      parts[parts.length - 1].prix = prixEuros(it.price != null ? it.price : f.price);
+      parts[parts.length - 1].depuis = typeof dateDe === 'function' ? (Number.isFinite(dateDe(it)) ? dateDe(it) : null) : null;
     }
   }
 
@@ -108,7 +132,7 @@ export function enLigneDeuxFois({ vinted, fiches, autres = null, clePhoto = null
     const comptes = [...new Set(g.filter((p) => p.plat === 'vinted').map((p) => p.uid))];
     const t = g.find((p) => p.cle) || g[0];
     return { cle: t.cle, numeros: nums,
-      annonces: g.map((p) => ({ plat: p.plat, id: p.id, uid: p.uid, nom: p.nom, titre: p.titre, photo: p.photo, url: p.url, numero: p.numero })),
+      annonces: g.map((p) => ({ plat: p.plat, id: p.id, uid: p.uid, nom: p.nom, titre: p.titre, photo: p.photo, url: p.url, numero: p.numero, prix: p.prix == null ? null : p.prix, depuis: p.depuis == null ? null : p.depuis })),
       comptes, memeCompte: comptes.length === 1, preuves: [...preuves].sort() };
   };
   const groupes = new Map();

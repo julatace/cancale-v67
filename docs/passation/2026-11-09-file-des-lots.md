@@ -14,7 +14,7 @@ libère son numéro (le dire ici).
 | — | intégration journee-v2 + zero-banc-rouge (1re partie) | PR #1069 | **en ligne** |
 | — | suites serveur (Solo côté serveur, double vente LBC < 24 h) | PR #1070 | **en ligne** |
 | — | direction artistique 4 (feuilles, confirmations, toasts, états vides, barre du bas) | PR #1072 | **en ligne** |
-| — | zéro banc rouge (suite) | `claude/zero-banc-rouge` | en cours |
+| — | zéro banc rouge (suite) | PR #1082 | **en ligne** |
 | — | direction artistique 5 : colonne de gauche refaite + boutons (demande de Julien) | PR #1073 | **en ligne** |
 | A | Ma journée instantanée + objectif du mois | PR #1074 | **en ligne** |
 | B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | PR #1080 | **en ligne** |
@@ -49,14 +49,25 @@ libère son numéro (le dire ici).
 | — | transporteurs inconnus (PDF du bordereau, identité) + e-mails Vestiaire et Chronopost mieux lus (demandes de Julien) | PR #1074 | **en ligne** |
 
 | — | colis à retirer : relecture fréquente, retirés jamais montrés, carte = onglet (plainte de Julien) | PR #1079 | **en ligne** |
-| — | direction artistique 6 : refonte VISIBLE « Widgets » (« il n'y a pas un grand changement ») | `claude/direction-artistique-6` | en cours |
+| — | direction artistique 6 : refonte VISIBLE « Widgets » (« il n'y a pas un grand changement ») | PR #1082 | **en ligne** |
 | — | plus de balayage entre onglets ; vues Vinted à 0 = pas su | PR #1074 | **en ligne** |
 
 | AC | « À trancher » : un seul endroit pour tous les doutes, un geste par ligne | `claude/a-trancher` | en cours |
-| AD | « Préparer mes colis » pas à pas + mode relais (codes plein écran) | `claude/preparer-relais` | en cours |
+| AD | « Préparer mes colis » pas à pas + mode relais (codes plein écran) | PR #1083 | **en ligne** |
 | AE | Colis et Ventes instantanés | `claude/colis-ventes-instantanes` | en cours |
-| AF | même annonce sur deux comptes Vinted + historique d'un N° | `claude/doublons-historique` | à lancer |
-| AG | ligne de fraîcheur unique | `claude/fraicheur-unique` | à lancer |
+| AF | même annonce sur deux comptes Vinted + historique d'un N° | `claude/doublons-historique` | en cours |
+| AG | ligne de fraîcheur unique | `claude/fraicheur-unique` | en cours |
 | AH | Siri / Raccourcis (ajouter un achat, où est le N°) | `claude/siri-raccourcis` | à lancer |
+
+| AI | textes d'explication ⇒ pop-ups ; bouton « Imprimer » en double ; carte du compte ⇒ Paramètres ; point du compte Vinted refait (demandes 1, 2, 13, 14 du 9 nov. 21 h) | `claude/popups-propre` | en cours |
+| AJ | ordre partout : plus récent en haut, tous comptes (3) | `claude/ordre-recent` | à lancer (priorité) |
+| AK | zéro « Transporteur inconnu » (tous les PDF), logos des transporteurs, carte des relais parfaite, suivi irréprochable (4, 5, 11) | `claude/transporteurs-parfaits` | à lancer (priorité) |
+| AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | à lancer |
+| AM | Annonces « Toutes » en grille comme Vinted, propositions lisibles (15) | `claude/annonces-grille` | à lancer |
+| AN | photo en grand partout + Achats plus beaux + facture d'achat hors Vinted (9, 10, 16) | `claude/photos-achats` | à lancer |
+| AO | Compta reliée à Statistiques (8) | `claude/compta-stats` | à lancer |
+| AP | republication à la main conseillée et attirante, photos vers la galerie, N° et descriptions en sélection multiple (17) | `claude/republier-main` | à lancer |
+| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | à lancer |
+| AR | Communauté pour les créateurs de formation (7) | `claude/communaute-formateurs` | à lancer |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.

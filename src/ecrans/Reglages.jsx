@@ -28,7 +28,7 @@ import { MesModeles } from '../ModelesDescription.jsx';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
 // (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
 const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
-import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE } from '../profilVendeur.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
 
@@ -3307,15 +3307,19 @@ function JeVendsSetting() {
   React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lireReglageJeVends(load(CLE_JE_VENDS, null))); }), []);
   const choisir = (choix) => {
     touche.current = true;
-    const n = { choix, at: new Date().toISOString() };
-    setR(n); save(CLE_JE_VENDS, n);
+    // (9 nov., soir) Les catégories cochées dans « Ma configuration » restent si elles
+    // disent la même chose que ce choix ; sinon elles sont mises d'accord (src/profilVendeur.js).
+    const n = reglageJeVendsDepuisChoix(load(CLE_JE_VENDS, null), choix, new Date().toISOString());
+    setR(lireReglageJeVends(n)); save(CLE_JE_VENDS, n);
   };
   const vend = p.vend || 'autre';
+  const cats = r.categories && r.choix !== 'auto' ? nomsCategories(r.categories, r.autre) : [];
   return (
     <div data-reglage-je-vends={vend} data-reglage-je-vends-choix={r.choix}>
       <Segmente label="Je vends" plein value={r.choix} onChange={choisir}
         options={[['auto', 'Automatique'], ['sneakers', 'Sneakers'], ['autre', 'Autre']].map(([v, l]) => ({ v, l, data: { 'data-je-vends-choix': v } }))}/>
       <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{vend === 'sneakers' ? 'Sneakers : VRM parle de « paires » et vérifie taille et marque avant de publier.' : 'Autre : VRM parle d’« articles » ; taille et marque sont facultatives.'}</div>
+      {cats.length ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }} data-reglage-je-vends-categories={cats.length}>Tu as dit vendre : {cats.join(', ')}. Pour changer le détail : Ma configuration, en tête de ce groupe.</div> : null}
     </div>
   );
 }
@@ -3476,7 +3480,7 @@ function NumeroEcritSetting({ onAnnonces }) {
         </div>}
       </div>
       <GuideReglage titre="Numéroter dans tes annonces" etapes={[
-        ['Écris le numéro sur la boîte', 'Sur le carton, comme d’habitude.'],
+        ['Écris le numéro là où tu ranges l’article', 'Sur le carton, l’étagère ou le bac, comme d’habitude.'],
         ['Écris-le à la fin de la description', '« N° 123 » sur la dernière ligne. Sur Leboncoin, la référence pro marche aussi ; sur eBay, le SKU.'],
         ['Ouvre tes annonces dans VRM', 'Il lit le numéro et le range avec la paire. Si un numéro ne colle pas, il te demande.'],
       ]}/>
@@ -3694,8 +3698,8 @@ function NumeroSurVinted() {
         </div>)}
       <GuideReglage titre="Bien placer ton N°" etapes={[
         ['Pense au moment où tu le cherches', 'Une vente tombe : tu lis la liste (le titre) ou tu ouvres l’annonce (la description). Mets le N° là où ton œil va en premier.'],
-        ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… La même partout : tu la repères d’un coup d’œil, et elle ne change jamais le numéro écrit sur ton carton.'],
-        ['Si tu changes un N°', 'Dans les textes que VRM te prépare, l’ancienne étiquette est remplacée, jamais empilée. Sur une annonce déjà en ligne, c’est à toi de la changer : VRM te dit quoi remplacer. L’ancien numéro passe dans « numéros à écrire sur tes cartons » jusqu’à « C’est écrit ».'],
+        ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… La même partout : tu la repères d’un coup d’œil, et elle ne change jamais le numéro écrit là où l’article est rangé.'],
+        ['Si tu changes un N°', 'Dans les textes que VRM te prépare, l’ancienne étiquette est remplacée, jamais empilée. Sur une annonce déjà en ligne, c’est à toi de la changer : VRM te dit quoi remplacer. L’ancien numéro passe dans « Nouveaux N° à écrire » jusqu’à « C’est écrit ».'],
       ]}/>
     </section>
   );

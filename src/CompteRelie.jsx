@@ -273,7 +273,7 @@ function ChoixCompte({ c, nb }) {
       {vinted && (
         <p className="vrm-cr-regle" data-cr-numeros={ecrit ? 'toi' : 'suite'}>
           <span className="vrm-cr-champ-lib">Numéros</span>
-          {ecrit ? 'Tu numérotes toi-même : VRM ne pose aucun N° sur ses annonces.' : `Ses annonces sans N° en reçoivent un, à la suite. Aucun N° déjà écrit sur un carton ne change${nb > 1 ? ', sur aucun compte' : ''}.`}
+          {ecrit ? 'Tu numérotes toi-même : VRM ne pose aucun N° sur ses annonces.' : `Ses annonces sans N° en reçoivent un, à la suite. Aucun N° déjà écrit là où tes articles sont rangés ne change${nb > 1 ? ', sur aucun compte' : ''}.`}
         </p>
       )}
     </div>

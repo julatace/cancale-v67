@@ -51,6 +51,19 @@ export function lireReponseEntreprise(json, saisi) {
     ville: etab ? propre(etab.libelle_commune) : '',
     etabTrouve: !!etab,
     ferme: r.etat_administratif === 'C' || (etab && etab.etat_administratif === 'F') || false,
+    // (9 nov., soir — « Ma facture » et « Ma configuration » : la carte « Vérifie ces
+    // informations », src/entrepriseRecherche.js) Ce que le registre DIT, tel quel ;
+    // chaque champ absent de la réponse reste `null` (« pas su », jamais deviné).
+    // Forme documentée de l'API (open-api.yml du dépôt search-api, lu le 9 nov.) :
+    //   nature_juridique (code INSEE), etat_administratif (A / C), tva (n° actifs,
+    //   DGFiP), complements.est_entrepreneur_individuel, siege / établissement :
+    //   etat_administratif (A / F), activite_principale_registre_metier.
+    fermeUnite: r.etat_administratif === 'C',
+    etabFerme: !!(etab && etab.etat_administratif === 'F'),
+    nature: typeof r.nature_juridique === 'string' || typeof r.nature_juridique === 'number' ? String(r.nature_juridique) : '',
+    ei: r.complements && typeof r.complements.est_entrepreneur_individuel === 'boolean' ? r.complements.est_entrepreneur_individuel : null,
+    tva: Array.isArray(r.tva) ? r.tva.filter((x) => typeof x === 'string').map((x) => x.replace(/\s/g, '').toUpperCase()) : null,
+    rm: etab && Object.prototype.hasOwnProperty.call(etab, 'activite_principale_registre_metier') ? !!etab.activite_principale_registre_metier : null,
   };
 }
 

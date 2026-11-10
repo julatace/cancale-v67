@@ -35,7 +35,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
       {rn.ancienNumero && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Un ancien numéro (d'avant la remise à zéro) : il ne désigne que l'histoire.</div>}
       {rn.double && (
         <div data-tout-double="1" role="alert" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, border: `1px solid ${C.doublon}`, color: C.doublon, fontSize: 13, fontWeight: 600 }}>
-          Deux paires présentes portent le N°{k}. Vérifie les cartons avant d'imprimer un bordereau.
+          Deux paires présentes portent le N°{k}. Vérifie là où ils sont rangés avant d'imprimer un bordereau.
           <button type="button" onClick={() => onNav('cat_annonces')} style={{ ...lien, display: 'block', marginTop: 4, color: C.doublon }}>Voir dans Annonces</button>
         </div>
       )}
@@ -43,7 +43,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
         <div key={'r' + r.id + r.sens} data-tout-reattribue={r.sens} style={{ marginTop: 8, fontSize: 13, color: C.text }}>
           {r.sens === 'parti'
             ? <>Le N°{r.de} a été remplacé (doublon réglé) : « {r.title || 'un article'} » porte maintenant le <b>N°{r.vers}</b>. </>
-            : <>Ce numéro remplace le N°{r.de} (doublon réglé){r.ecrit ? '.' : ' — pas encore écrit sur le carton.'}</>}
+            : <>Ce numéro remplace le N°{r.de} (doublon réglé){r.ecrit ? '.' : ' — pas encore écrit là où l’article est rangé.'}</>}
           {r.sens === 'parti' && <button type="button" onClick={() => onChercher(r.vers)} style={lien}>Voir le N°{r.vers}</button>}
         </div>
       ))}

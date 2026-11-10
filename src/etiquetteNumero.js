@@ -31,7 +31,7 @@ export const CLE_REGLAGE_ETIQUETTE = 'vrm_num_vinted';
 export const TITRE_MAX_VINTED = 100;
 
 export const PLACES = [
-  { v: 'aucune', ou: 'nulle part', l: 'Nulle part', court: 'Nulle part', d: 'Le texte de l’annonce ne change pas. Le N° reste sur ton carton, dans VRM et sur la pastille de l’extension (dans ton navigateur seulement).' },
+  { v: 'aucune', ou: 'nulle part', l: 'Nulle part', court: 'Nulle part', d: 'Le texte de l’annonce ne change pas. Le N° reste là où l’article est rangé, dans VRM et sur la pastille de l’extension (dans ton navigateur seulement).' },
   { v: 'titre_fin', ou: 'à la fin du titre', l: 'À la fin du titre', court: 'Fin du titre', d: 'Visible partout où le titre s’affiche : ton dressing, tes ventes, tes messages. Les acheteurs le voient aussi. Il prend quelques caractères sur les 100 du titre.' },
   { v: 'titre_debut', ou: 'au début du titre', l: 'Au début du titre', court: 'Début du titre', d: 'Le plus rapide à repérer dans une liste. Mais c’est le premier mot que lit l’acheteur, avant la marque.' },
   { v: 'desc_debut', ou: 'en haut de la description', l: 'En haut de la description', court: 'Haut de la description', d: 'Le titre reste propre. Le N° est la première ligne quand tu ouvres l’annonce.' },

@@ -27,33 +27,20 @@
 // Exécuté par scripts/bancs/journee-instantanee.cjs et scripts/tests/journee-instantanee.test.mjs.
 // ════════════════════════════════════════════════════════════════════════════
 
-export const VERSION_INSTANTANE = 1;
-export const PREFIXE_INSTANTANE = 'vrm_journee_instantane:';
-export const AGE_MAX_INSTANTANE_MS = 3 * 86400000;
-const TXT_MAX = 90;
+// (9 nov., soir) La clé, la lecture, l'écriture, l'âge et la carte des chiffres sont la règle
+// COMMUNE des instantanés (src/instantaneEcran.js : Ma journée, Colis, Ventes). Ici : ce que
+// Ma journée range, et comment il se montre.
+import {
+  VERSION_INSTANTANE, AGE_MAX_INSTANTANE_MS, PREFIXES_INSTANTANE, cleInstantaneEcran, jourLocalIso, moisLocalIso,
+  propre, attr, txt, enLecture, ageTexte, capturerCases, capturerObjectif, enTeteInstantane,
+  lireInstantaneEcran, ecrireInstantaneEcran, effacerInstantanes,
+} from './instantaneEcran.js';
 
-export const cleInstantane = (uid) => PREFIXE_INSTANTANE + String(uid || '');
-
-const jourIso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-export const jourLocalIso = jourIso;
-const moisIso = (t) => jourIso(t).slice(0, 7);
-
-const propre = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, TXT_MAX);
-const attr = (el, n) => (el && el.hasAttribute(n) ? el.getAttribute(n) : null);
-const txt = (el) => (el ? propre(el.textContent) : '');
-// Une valeur encore en lecture n'est jamais rangée (elle se figerait en « lecture… »).
-const enLecture = (s) => /lecture/i.test(String(s || ''));
-
-// « il y a 4 min » — l'âge d'un instantané, toujours dit.
-export const ageTexte = (ms) => {
-  const m = Math.max(0, Math.floor((Number(ms) || 0) / 60000));
-  if (m < 1) return 'à l’instant';
-  if (m < 60) return `il y a ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `il y a ${h} h`;
-  const j = Math.floor(h / 24);
-  return `il y a ${j} j`;
-};
+export { VERSION_INSTANTANE, AGE_MAX_INSTANTANE_MS, jourLocalIso, ageTexte, effacerInstantanes };
+export const PREFIXE_INSTANTANE = PREFIXES_INSTANTANE.journee;
+export const cleInstantane = (uid) => cleInstantaneEcran('journee', uid);
+const jourIso = jourLocalIso;
+const moisIso = moisLocalIso;
 
 // ── LA CAPTURE : relue dans l'écran VRAI (Ma journée), toutes ses données là ──
 // `racine` = l'élément `.vrm-fu-journee` rendu. Rend l'instantané, ou null (rien à ranger).
@@ -63,7 +50,7 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
   const tete = racine.querySelector('.vrm-fu-tete');
   if (!tete) return null;
   if (enLecture(tete.textContent)) return null;
-  const snap = { v: VERSION_INSTANTANE, uid: String(uid), t: maintenant, jour: jourIso(maintenant), mois: moisIso(maintenant), largeur: Math.round(largeur || 0) };
+  const snap = enTeteInstantane('journee', uid, maintenant, largeur);
   // Le prénom : SON prénom (vrm_prenom), celui qui suit le bonjour.
   const bj = txt(tete.querySelector('.vrm-fu-bonjour'));
   snap.prenom = propre(bj.replace(/^(Bonjour|Bon après-midi|Bonsoir)\s*/, '')).slice(0, 24);
@@ -108,18 +95,9 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
   } else snap.frise = null;
   // Les cases du mois de la carte (son choix, « Modifier ») : le texte rendu et la valeur des `data-*`.
   const carte = tete.querySelector('[data-carte-stats="journee"]');
-  const cases = carte ? [...carte.querySelectorAll('[data-fu-case]')].map((c) => {
-    const b = c.querySelector('b');
-    const raison = txt(c.querySelector('small'));
-    return { cle: attr(c, 'data-fu-case') || '', valeur: attr(c, 'data-carte-valeur') || '', partiel: attr(c, 'data-carte-partiel') === '1', b: txt(b), vide: !!(b && b.classList.contains('is-vide')), l: txt(c.querySelector(':scope > span')), raison };
-  }) : [];
-  snap.cases = cases.length && !cases.some((c) => enLecture(c.b) || enLecture(c.raison)) ? cases : null;
+  snap.cases = capturerCases(carte);
   // L'objectif du mois (src/objectifMois.js) : les nombres de SA barre (la valeur = la case « Vendu · mois »).
-  const ob = carte && carte.querySelector('[data-objectif]');
-  snap.objectif = ob ? {
-    type: attr(ob, 'data-objectif'), cible: attr(ob, 'data-objectif-cible') || '', valeur: attr(ob, 'data-objectif-valeur') || '',
-    pct: attr(ob, 'data-objectif-pct') || '', partiel: attr(ob, 'data-objectif-partiel') === '1', atteint: attr(ob, 'data-objectif-atteint') === '1',
-  } : null;
+  snap.objectif = capturerObjectif(carte);
   // « Ensuite · N gestes » : le nombre seulement (la liste arrive avec l'écran vrai).
   const g = racine.querySelector('[data-fu-gestes]');
   snap.gestes = g && /^\d+$/.test(attr(g, 'data-fu-gestes') || '') ? Number(attr(g, 'data-fu-gestes')) : null;
@@ -130,19 +108,8 @@ export function capturerJournee(racine, { uid, maintenant = Date.now(), largeur 
 }
 
 // ── LECTURE ─────────────────────────────────────────────────────────────────
-const stockage = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch (_) { return null; } };
-
-// L'instantané brut de CE compte, ou null. Jamais celui d'un autre uid.
-export function lireInstantane(uid, { maintenant = Date.now(), ls = stockage() } = {}) {
-  if (!uid || !ls) return null;
-  let s = null;
-  try { s = JSON.parse(ls.getItem(cleInstantane(uid)) || 'null'); } catch (_) { return null; }
-  if (!s || typeof s !== 'object' || s.v !== VERSION_INSTANTANE) return null;
-  if (String(s.uid || '') !== String(uid)) return null;
-  const t = Number(s.t);
-  if (!Number.isFinite(t) || t > maintenant + 60000 || maintenant - t > AGE_MAX_INSTANTANE_MS) return null;
-  return s;
-}
+// L'instantané brut de CE compte, ou null. Jamais celui d'un autre uid (règle commune).
+export const lireInstantane = (uid, opts) => lireInstantaneEcran('journee', uid, opts);
 
 // Ce qui se MONTRE aujourd'hui d'un instantané (un autre jour, un autre mois : moins).
 export function instantaneMontrable(s, maintenant = Date.now()) {
@@ -168,17 +135,6 @@ export function instantaneMontrable(s, maintenant = Date.now()) {
   return out;
 }
 
-// ── ÉCRITURE / EFFACEMENT ──────────────────────────────────────────────────
-export function ecrireInstantane(snap, { ls = stockage() } = {}) {
-  if (!snap || !snap.uid || !ls) return false;
-  try {
-    // Un seul instantané sur l'appareil : celui d'un autre compte part (la déconnexion l'efface aussi).
-    for (let i = ls.length - 1; i >= 0; i--) { const k = ls.key(i); if (k && k.startsWith(PREFIXE_INSTANTANE) && k !== cleInstantane(snap.uid)) ls.removeItem(k); }
-    ls.setItem(cleInstantane(snap.uid), JSON.stringify(snap));
-    return true;
-  } catch (_) { return false; }
-}
-export function effacerInstantanes({ ls = stockage() } = {}) {
-  if (!ls) return;
-  try { for (let i = ls.length - 1; i >= 0; i--) { const k = ls.key(i); if (k && k.startsWith(PREFIXE_INSTANTANE)) ls.removeItem(k); } } catch (_) {}
-}
+// ── ÉCRITURE ───────────────────────────────────────────────────────────────
+// Un seul compte sur l'appareil : écrire pour un uid efface les instantanés des autres (tous écrans).
+export const ecrireInstantane = (snap, opts) => ecrireInstantaneEcran('journee', snap, opts);

@@ -252,7 +252,7 @@ const LIGNE_J = { owner: J, data: { adresses: { 'recu@vrm.center': { owner: J } 
     const b = L({ v: 1, t: 'bordereau', tx: '12345678901', n: '42', pdf: 1, a: 'Nike Air Max 90' });
     dit(b.etat === 'range' && b.quoi === 'Bordereau de la vente Nike Air Max 90' && /Ajouté aux colis à expédier · vente n° 12345678901 · N°42/.test(b.fait) && b.lien.tab === 'cat_bord' && b.num === '42', 'bordereau : phrase, lien Colis, N° lu', JSON.stringify(b));
     const bt = L({ v: 1, t: 'bordereau', tx: '12345678901', n: '42', nt: 1, pdf: 1, av: 'num-titre' });
-    dit(bt.etat === 'verifier' && bt.num === null && !/N°42/.test(bt.fait) && /titre/.test(bt.raison) && /carton/.test(bt.geste), 'N° par le titre : « à vérifier », raison + geste, AUCUN lien vers ce N°', JSON.stringify(bt));
+    dit(bt.etat === 'verifier' && bt.num === null && !/N°42/.test(bt.fait) && /titre/.test(bt.raison) && /là où l’article est rangé/.test(bt.geste), 'N° par le titre : « à vérifier », raison + geste, AUCUN lien vers ce N°', JSON.stringify(bt));
     dit(b.delier && b.delier.offert === false && /transaction/.test(b.delier.pourquoi), 'bordereau : « Ce n’est pas ça » non proposé, et dit pourquoi');
     const c = L({ v: 1, t: 'suivi', s: '12345678', st: 'available', code: '418205', lieu: 'Relais Tabac du Port' });
     dit(c.quoi === 'Code de retrait 418 205 chez Relais Tabac du Port' && c.fait === 'Rangé avec le colis n° 12345678' && c.lien.tab === 'cat_bord' && c.de === 'Vinted', 'code de retrait : « Code de retrait 418 205 chez … »', JSON.stringify(c));

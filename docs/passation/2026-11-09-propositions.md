@@ -141,3 +141,33 @@ demandes du soir : « pas d'hésitation », « tout doit être parfait », rapid
 mes colis pas à pas + mode relais) · AE = 44 (Colis et Ventes instantanés) · AF = 45 + 49 (même
 annonce sur deux comptes + historique d'un N°) · AG = 47 (ligne de fraîcheur unique) · AH = 50
 (Siri / Raccourcis).
+
+## Demandes de Julien du 9 nov. (soir, 21 h) — captures Annonces (Vinted par compte, Vestiaire), Stock
+Toutes à faire (« reste cohérent et fais tout parfaitement ») :
+1. Les longs textes d'explication (bandeaux « 3 annonces plus en ligne sur Vinted… shop_cancale : annonces lues
+   aujourd'hui à 14 h 50… », « Une annonce remise en ligne ? … », « Coche des annonces d'un même compte… »,
+   « 3 rangées · 42 pas encore rangées · dont 3 à confirmer… » du Stock, « 3 annonces (au moins), lues sur
+   Vestiaire il y a 7 j… ») ⇒ remplacés par des POP-UPS (une pastille/icône discrète qui ouvre l'explication ou
+   la proposition) : « ça fait très moche ».
+2. Retirer le bouton en double (« 8 bordereaux » : deux boutons font la même chose).
+3. Ventes, Achats, Colis à expédier, à préparer : TOUJOURS du plus récent en haut au plus vieux en bas, quel que
+   soit le compte.
+4. « Transporteur inconnu » impossible : VRM a les bordereaux ⇒ tout lire (PDF), pas 6 par jour.
+5. Données plus fiables partout ; carte des points relais parfaite ; suivi des colis irréprochable, très
+   souvent mis à jour.
+6. Câbler la création des e-mails de transfert (adresse de réception unique).
+7. Communauté : un outil parfait et pratique pour les créateurs de formation.
+8. Compta trop floue : la relier à Statistiques.
+9. Achats : mise en page bien plus belle.
+10. Toucher la photo d'un article ⇒ la photo en grand (ordinateur et téléphone, partout dans l'app).
+11. LOGOS des transporteurs à côté des colis, pas leurs noms.
+12. « Favoris & offres » DANS Messages, « Republier » DANS Annonces (rien supprimé, plus d'onglets à part).
+13. La carte du compte (nom d'utilisateur, en bas de la colonne) ⇒ ouvre Paramètres.
+14. Remplacer le point rouge « compte Vinted ouvert dans l'extension » (en haut à droite) par autre chose de plus beau.
+15. Annonces : la disposition par compte de Vinted lui plaît (grille de cartes : case, photo, N°, titre, état,
+   prix) ⇒ la même pour « Toutes », en gardant toutes les fonctions (liaison des achats…) ; les propositions
+   collées entre elles cachent le produit ⇒ à corriger ; peut-être une paire par ligne s'il faut toutes les infos.
+16. Factures d'achat : pouvoir joindre une facture d'achat qui ne vient pas de Vinted (en reliant un achat).
+17. Republication à la main : la conseiller (moins risquée) et la rendre attirante ; transmettre les photos
+   retouchées à la galerie du téléphone pour poster sans souci ; regarder comment garder/réattribuer le N° et
+   comment gérer les descriptions en sélection multiple.
