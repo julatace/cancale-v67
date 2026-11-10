@@ -540,6 +540,9 @@ import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
+import { CLE_VUES_FILTRES, vuesDe, vueActive, opsAjoutVue, opsSupprimerVue, filtresPropres } from './vuesFiltres.js'; // (10 nov., lot X)
+import { gestesSerie, garderVisibles, basculerCle } from './selectionSerie.js'; // (10 nov., lot X)
+import { PucesVues, BarreSelection, BoutonSelectionner, CaseSelection, PanneauFiche, usePanneauLarge } from './VuesPanneau.jsx'; // (10 nov., lot X) styles-vues-panneau.css, après la DA6
 import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
 import "./styles-popups.css";       // (9 nov., lot AI) l'avatar du compte Vinted ouvert (en haut à droite) — après la DA6
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
@@ -2502,6 +2505,9 @@ const SYNC_KEYS = [
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
   'vrm_notes_paires', 'vrm_achats_hors_masques',
+  // (10 nov., lot X) Les FILTRES ENREGISTRÉS de Ventes, Achats et Colis (src/vuesFiltres.js) :
+  // { [id]: { e, nom, f: { site, compte, etat, periode }, at } } — une puce chacun, sur tous ses appareils.
+  CLE_VUES_FILTRES,
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
   'vrm_brouillons_refaire_ecartes',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
@@ -14374,6 +14380,65 @@ const suivreCibleTrancher=(clic,cible)=>{ const t0=Date.now(); let clique=!clic;
 // (10 nov., cartes) `ex` : les premières choses, { id, num, photo } (photo de L'ANNONCE, par identité).
 const publierATrancher=(cle,n,ex)=>{ try{ if(publierSourceTrancher(localStorage, AUTH.user?.id, cle, n, Date.now(), ex)) window.dispatchEvent(new CustomEvent('vrm:save',{detail:{k:CLE_A_TRANCHER}})); }catch(_){} };
 const prendreVue=(quoi)=>{ if(DEMANDE_VUE.quoi===quoi && Date.now()-DEMANDE_VUE.at<30000){ DEMANDE_VUE.quoi=null; return true; } return false; };
+// ── (10 nov., lot X) FILTRES ENREGISTRÉS (src/vuesFiltres.js) ─────────────────
+// UNE lecture de la clé synchronisée `vrm_vues_filtres`, suivie (sauvegarde, nuage relu) ;
+// l'écriture est un geste annulable (`gesteVrm`). Les filtres « état » et « période » de
+// l'écran Vinted vivent DANS Comptabilite : il les PUBLIE ici (`FILTRES_VINTED`) pour la
+// puce appuyée et l'enregistrement, et PREND une demande (`DEMANDE_FILTRES`) quand une
+// puce est touchée — comme `DEMANDE_VUE`, consommée une fois.
+let _vuesFiltresVue = null, _vuesFiltresEcoute = false;
+const _vuesFiltresAbonnes = new Set();
+const notifierVuesFiltres = () => { [..._vuesFiltresAbonnes].forEach((f) => { try { f(); } catch (_) {} }); };
+const lireVuesFiltres = () => { if (_vuesFiltresVue == null) { const v = load(CLE_VUES_FILTRES, {}); _vuesFiltresVue = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } return _vuesFiltresVue; };
+const abonnerVuesFiltres = (fn) => {
+  if (!_vuesFiltresEcoute) {
+    _vuesFiltresEcoute = true;
+    window.addEventListener('vrm:save', (e) => { if (e && e.detail && e.detail.k === CLE_VUES_FILTRES) { _vuesFiltresVue = null; notifierVuesFiltres(); } });
+    onCloudReady(() => { _vuesFiltresVue = null; notifierVuesFiltres(); });
+  }
+  _vuesFiltresAbonnes.add(fn);
+  return () => { _vuesFiltresAbonnes.delete(fn); };
+};
+const poserVuesFiltresVue = (f) => { const avant = lireVuesFiltres(); _vuesFiltresVue = typeof f === 'function' ? f(avant) : f; notifierVuesFiltres(); };
+const FILTRES_VINTED = { ventes: null, achats: null };
+const _filtresVintedAbonnes = new Set();
+const publierFiltresVinted = (ecran, f) => { const a = FILTRES_VINTED[ecran]; if (a && f && a.etat === f.etat && JSON.stringify(a.periode) === JSON.stringify(f.periode)) return; FILTRES_VINTED[ecran] = f; [..._filtresVintedAbonnes].forEach((x) => { try { x(); } catch (_) {} }); };
+const abonnerFiltresVinted = (fn) => { _filtresVintedAbonnes.add(fn); return () => { _filtresVintedAbonnes.delete(fn); }; };
+const DEMANDE_FILTRES = { ecran: null, etat: '', periode: null, at: 0 };
+const demanderFiltres = (ecran, etat, periode) => { DEMANDE_FILTRES.ecran = ecran; DEMANDE_FILTRES.etat = etat || ''; DEMANDE_FILTRES.periode = periode || null; DEMANDE_FILTRES.at = Date.now(); try { window.dispatchEvent(new CustomEvent('vrm:filtres', { detail: ecran })); } catch (_) {} };
+const prendreFiltres = (ecran) => { if (DEMANDE_FILTRES.ecran === ecran && Date.now() - DEMANDE_FILTRES.at < 30000) { DEMANDE_FILTRES.ecran = null; return { etat: DEMANDE_FILTRES.etat, periode: DEMANDE_FILTRES.periode }; } return null; };
+const periodeVersIso = (p) => (p && (p.from || p.to)) ? { from: p.from ? new Date(p.from).toISOString() : null, to: p.to ? new Date(p.to).toISOString() : null } : null;
+const periodeDepuisIso = (p) => p ? { from: p.from ? new Date(p.from) : null, to: p.to ? new Date(p.to) : null } : null;
+const nouvelIdVue = () => { try { return 'v' + crypto.randomUUID().replace(/-/g, '').slice(0, 16); } catch (_) { return 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); } };
+// La rangée de puces, branchée sur ses données : `courant` = les filtres affichés, `appliquer(f)` les pose.
+function VuesFiltresBranche({ ecran, courant, appliquer, nomCompte }) {
+  const map = React.useSyncExternalStore(abonnerVuesFiltres, lireVuesFiltres);
+  const vues = vuesDe(map, ecran);
+  const actif = vueActive(vues, courant, ecran);
+  const enregistrer = async () => {
+    const f = filtresPropres(courant, ecran);
+    if (!f) { toast('Ces filtres ne peuvent pas être enregistrés.'); return; }
+    const nom = await askText({ title: 'Nommer ces filtres', desc: 'Une puce les rappellera, sur tous tes appareils.', value: '', placeholder: 'ex : À envoyer compte_a', ok: 'Enregistrer', max: 30, data: 'vue-filtres-nom' });
+    if (nom == null) return;
+    const r = opsAjoutVue(lireVuesFiltres(), ecran, nom, f, { id: nouvelIdVue(), at: Date.now() });
+    if (r.erreur) { toast(r.erreur); return; }
+    gesteVrm('Filtres enregistrés', r.ops, { [CLE_VUES_FILTRES]: poserVuesFiltresVue });
+  };
+  const supprimer = (v) => { const ops = opsSupprimerVue(lireVuesFiltres(), v.id); if (ops.length) gesteVrm(`« ${v.nom} » supprimé`, ops, { [CLE_VUES_FILTRES]: poserVuesFiltresVue }); };
+  return <PucesVues ecran={ecran} vues={vues} actif={actif} nomCompte={nomCompte} onAppliquer={(v) => appliquer(v.f)} onEnregistrer={enregistrer} onSupprimer={supprimer} peutEnregistrer={!!filtresPropres(courant, ecran) && !actif}/>;
+}
+// Ventes et Achats : la rangée sous le filtre des sites. La plateforme et le compte sont ceux de
+// la coque ; l'état et la période, ceux de l'écran Vinted (publiés par Comptabilite).
+function VuesFiltresTache({ ecran, site, compteVu, onSite, setCompteSel, nomCompte }) {
+  const fv = React.useSyncExternalStore(abonnerFiltresVinted, () => FILTRES_VINTED[ecran]);
+  const vinted = site === 'vinted';
+  const courant = { site, compte: vinted ? (compteVu || '') : '', etat: vinted && fv ? fv.etat : '', periode: vinted && fv ? fv.periode : null };
+  const appliquer = (f) => {
+    if (f.site !== site && onSite) onSite(f.site);
+    if (f.site === 'vinted') { if (setCompteSel) setCompteSel(f.compte || '*'); demanderFiltres(ecran, f.etat, f.periode); }
+  };
+  return <VuesFiltresBranche ecran={ecran} courant={courant} appliquer={appliquer} nomCompte={nomCompte}/>;
+}
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
 // requêtes multiples, donc on donne une progression PLAUSIBLE plutôt qu'un
@@ -29705,6 +29770,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     );
   };
   const [vFilter, setVFilter] = useVueSession('ventes-filtre', 'all'); // aexpedier | transit | finalisees | annulees | all (encours : ancien lien)
+  // (10 nov., lot X) LA SÉLECTION MULTIPLE (src/selectionSerie.js) : un écran à la fois, les clés
+  // sont des n° de transaction (§5). Rien n'est écrit tant qu'il ne touche pas un geste de la barre.
+  const [selEcran, setSelEcranBrut] = useState(null);
+  const [selCles, setSelCles] = useState(() => new Set());
+  const setSelEcran = (v) => { setSelEcranBrut(v); setSelCles(new Set()); };
+  const basculerSel = (cle) => setSelCles((x) => basculerCle(x, cle));
+  // Le conteneur d'une liste en mode sélection : un toucher sur une ligne la coche (et n'ouvre rien).
+  const captureSel = (ecran) => selEcran === ecran ? { 'data-selection-mode': ecran, onClickCapture: (e) => {
+    const t = e.target; if (!t || typeof t.closest !== 'function') return;
+    if (t.closest('.vrm-sel-case-hote')) return;
+    const r = t.closest('[data-sel-cle]'); if (!r) return;
+    e.preventDefault(); e.stopPropagation(); basculerSel(r.getAttribute('data-sel-cle'));
+  } } : {};
+  const attrsSel = (ecran, cle) => selEcran === ecran && cle != null ? { 'data-sel-cle': String(cle), 'data-sel-coche': selCles.has(String(cle)) ? '1' : '0' } : {};
+  const caseSel = (ecran, cle, label) => selEcran === ecran && cle != null ? <CaseSelection cle={String(cle)} on={selCles.has(String(cle))} onChange={() => basculerSel(cle)} label={`Choisir ${label || 'cette ligne'}`}/> : null;
+  // (10 nov., lot X) Sur ordinateur (≥ 1200 px), la fiche À CÔTÉ de la liste (Achats, Colis).
+  const panneauLarge = usePanneauLarge();
+  const [ficheCote, setFicheCote] = useState(null); // { ecran, cle }
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
   const [aFilterBrut, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | route | recus | all
@@ -37972,7 +38055,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ov = saleOv[tx] || {};
     const hidden = isHidden(o);
     const cell = num ? garageCellOf(garageGrid, num) : null;
-    const deps = [C, INV_STATUS, ventesUnCompte, garageUtilise, clavierNum(),
+    const deps = [C, INV_STATUS, ventesUnCompte, garageUtilise, clavierNum(), selEcran === 'ventes' ? (selCles.has(tx) ? 2 : 1) : 0,
       JSON.stringify(e), baseE, ov, photo, sourcesPhoto.join('\n'), hidden, isShipDone(o), estFloute(o),
       JSON.stringify(venteStage(o)), o._acc ? accNameOf(o._acc) : '', cell ? garageCellLabel(cell) : '', inGarage(num),
       saleOutcome(o), isPairLost(num), num ? numeroReprenable(num) : null,
@@ -39124,6 +39207,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ()=>window.removeEventListener('vrm:vue',f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[only]);
+  // (10 nov., lot X) LES FILTRES ENREGISTRÉS : l'écran Vinted PUBLIE son état et sa période (la puce
+  // appuyée, l'enregistrement) et PREND la demande d'une puce touchée (`DEMANDE_FILTRES`, une fois).
+  const ecranFiltres = only==='ventes' ? 'ventes' : (only==='achats' && !modeRetraits) ? 'achats' : null;
+  React.useEffect(()=>{ if(ecranFiltres && !cache()) publierFiltresVinted(ecranFiltres,{ etat: ecranFiltres==='ventes' ? vFilter : aFilter, periode: periodeVersIso(periode) }); });
+  React.useEffect(()=>{
+    if(!ecranFiltres) return undefined;
+    const appliquer=()=>{ const d=prendreFiltres(ecranFiltres); if(!d) return; if(ecranFiltres==='ventes') setVFilter(d.etat||'all'); else setAFilter(d.etat||'all'); setPeriode(periodeDepuisIso(d.periode)); };
+    appliquer();
+    const f=()=>{ if(cache()) return; setTimeout(appliquer,0); };
+    window.addEventListener('vrm:filtres',f);
+    return ()=>window.removeEventListener('vrm:filtres',f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[ecranFiltres]);
 
   const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
   const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
@@ -45059,6 +45155,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ]}/>
             </div>
+            {/* (10 nov., lot X) Ses filtres enregistrés : le site et l'onglet, une puce chacun. */}
+            {!baseKO && <VuesFiltresBranche ecran="colis" courant={{ site: siteColis, compte: '', etat: onglet || '', periode: null }} nomCompte={() => ''}
+              appliquer={(f) => { if (f.site === 'leboncoin' && onColisLeboncoin) { onColisLeboncoin(); return; } setSiteColis(f.site); if (f.etat && onOngletColis) onOngletColis(f.etat); }}/>}
             {/* (3 nov.) Les puces du haut : « N en route » (achats dont Vinted ne dit pas encore le point — la liste
                 au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
                 les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
@@ -53675,6 +53774,10 @@ function AppCoeur() {
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
+        {/* (10 nov., lot X) Ses filtres enregistrés : une puce par combinaison (plateforme, compte, état, période). */}
+        {(t==='ventes'||t==='achats') && !baseKO && <div className="vrm-vues-hote" style={{padding:'12px 16px 0'}}><VuesFiltresTache ecran={t} site={site} onSite={(s)=>setPlatSub(s)} setCompteSel={setCompteSel}
+          compteVu={String(compteSel)==='*' ? '' : (compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u)) || '')}
+          nomCompte={(u) => (accountLabels || {})[String(u)] || ((vintedAccounts || []).find((a) => String(a.vinted_user_id) === String(u)) || {}).login || ''}/></div>}
         {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
         {t==='ventes' && !baseKO && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
