@@ -761,6 +761,11 @@ export function sensDeLigne(t, envoyes) {
 // « colis » (api/ship-reminders.js?moment=colis, GitHub toutes les 15 min de 6 h à 23 h) qui ne visite
 // QUE les vendeurs ayant une ligne due (api/_lib/colis-frequent.js).
 export const RYTHME_MS = { disponible: 15 * 60000, en_route: 60 * 60000, inconnu: 2 * 3600000, incident: 2 * 3600000, retour_expediteur: 2 * 3600000 };
+// (9 nov., fraîcheur unique) La cadence du passage « colis » (.github/workflows/colis-frais.yml, toutes les
+// 15 min) et la marge d'un passage qui tombe un peu tôt — UNE définition, lue par api/_lib/colis-frequent.js
+// (ses créneaux, ses requêtes) et par src/fraicheur.js (un suivi pas relu au-delà de RYTHME + cadence + marge).
+export const CADENCE_COLIS_MS = 15 * 60000;
+export const MARGE_RYTHME_MS = 60000;              // un passage qui tombe 30 s trop tôt ne rate pas la ligne
 export const RECUL_MS = [30, 60, 120, 360].map((m) => m * 60000);
 export const INTROUVABLE_MS = 6 * 3600000;
 export const INTROUVABLE_MAX = 3;
