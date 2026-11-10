@@ -32,3 +32,15 @@ button.vrm-fraicheur-texte { cursor: pointer; }
   .vrm-fraicheur .vrm-bandeau-abo-texte { flex-basis: auto; }
   .vrm-fraicheur-phrase { font-size: 13px; }
 }
+/* (10 nov., Julien : « je trouve ça moche ») Le détail : UNE ligne par source (nom · état court · ›),
+   l'instruction n'apparaît que sous la rangée touchée. */
+.vrm-fraicheur-rangee { display: block; padding: 0; }
+.vrm-fraicheur-rangee-tete { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px 0 var(--d-e-4, 16px);
+  border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.vrm-fraicheur-rangee-nom { flex: 0 1 auto; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fraicheur-rangee-etat { flex: 1 1 auto; min-width: 0; text-align: right; color: var(--d-gris, var(--vrm-muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.vrm-fraicheur-chevron { flex: 0 0 auto; color: var(--d-gris, var(--vrm-muted)); font-size: 18px; transition: transform .18s ease; }
+.vrm-fraicheur-rangee.is-ouverte .vrm-fraicheur-chevron { transform: rotate(90deg); }
+.vrm-fraicheur-rangee-suite { display: flex; align-items: center; gap: 10px; padding: 0 12px 10px var(--d-e-4, 16px); }
+.vrm-fraicheur-rangee-suite .vrm-fraicheur-rangee-geste { flex: 1 1 auto; font-size: var(--d-t-13, 13px); }
+@media (prefers-reduced-motion: reduce) { .vrm-fraicheur-chevron { transition: none; } }

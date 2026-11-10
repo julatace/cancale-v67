@@ -62,12 +62,12 @@ libère son numéro (le dire ici).
 | AI | textes d'explication ⇒ pop-ups ; bouton « Imprimer » en double ; carte du compte ⇒ Paramètres ; point du compte Vinted refait (demandes 1, 2, 13, 14 du 9 nov. 21 h) | `claude/popups-propre` | en cours |
 | AJ | ordre partout : plus récent en haut, tous comptes (3) | PR #1087 | **en ligne** |
 | AK | zéro « Transporteur inconnu » (tous les PDF), logos des transporteurs, carte des relais parfaite, suivi irréprochable (4, 5, 11) | PR #1086 | **en ligne** |
-| AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | en cours |
+| AL | Favoris & offres dans Messages, Republier dans Annonces (12) | `claude/navigation-fusion` | fait (à fusionner) — `2026-11-09-navigation-fusion.md` |
 | AM | Annonces « Toutes » en grille comme Vinted, propositions lisibles (15) | `claude/annonces-grille` | à lancer |
 | AN | photo en grand partout + Achats plus beaux + facture d'achat hors Vinted (9, 10, 16) | `claude/photos-achats` | en cours |
 | AO | Compta reliée à Statistiques (8) | `claude/compta-stats` | en cours |
 | AP | republication à la main conseillée et attirante, photos vers la galerie, N° et descriptions en sélection multiple (17) | `claude/republier-main` | à lancer |
-| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | à lancer |
+| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | en cours |
 | AR | Communauté pour les créateurs de formation (7) | `claude/communaute-formateurs` | à lancer |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.

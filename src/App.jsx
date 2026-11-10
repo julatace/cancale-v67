@@ -13404,8 +13404,12 @@ async function demanderQuestionRepub(q, titre) {
 // propose, selon la sélection… ». Règles : `src/annoncesActions.js`. Les moteurs
 // sont ceux qui existent (`RepublierVinted` / `ACTIONS_REPUB`) : la sélection
 // ne fait que choisir, rien ne part d'ici.
-function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, suivis = [], onSuivi, onDetailBrouillons }) {
-  const liste = (annonces || []).filter((a) => filtre !== 'brouillon' || a.etat === 'brouillon');
+// (9 nov., lot AL) `filtre = 'republier'` : la vue « Republier » d'Annonces (l'ancienne entrée
+// du menu) — ses annonces EN LIGNE seulement, la même sélection, et au pied « Republier · N »
+// (`onRepublier`) qui ouvre l'atelier ; « Sélectionner » garde « Actions · N ».
+function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, onRepublier, suivis = [], onSuivi, onDetailBrouillons }) {
+  const rep = filtre === 'republier';
+  const liste = (annonces || []).filter((a) => (filtre !== 'brouillon' || a.etat === 'brouillon') && (!rep || a.etat === 'en-ligne'));
   const cle = (a) => a.uid + ':' + a.id;
   const coches = new Set((sel || []).map((x) => x.uid + ':' + x.id));
   const groupes = []; const parUid = new Map();
@@ -13419,6 +13423,9 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
   const decocherG = (g) => setSel((v) => v.filter((x) => x.uid !== g.uid));
   const prixTxt = prixTxtMontant;   // (5 nov.) alias de `montant()`, src/format.js
   const nCoches = (sel || []).length;
+  // Republier : seules les annonces en ligne cochées DE CETTE LISTE partent (un brouillon coché dans
+  // « Sélectionner » reste coché, mais n'est pas republié).
+  const aRepublier = rep ? liste.filter((a) => coches.has(cle(a))) : [];
   return (
     <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
       {suivis.length > 0 && suivis.map((s) => (
@@ -13429,7 +13436,9 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
         </div>
       ))}
       <div className="vrm-sel-tete" data-sel-tete="">
-        <span>{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. Coche-les, puis ' : 'Coche des annonces d’un même compte, puis '}<b>Actions</b>{filtre === 'brouillon' ? ' : mettre en ligne.' : ' : republier, modifier prix ou titre, mettre en brouillon ou en ligne.'}</span>
+        {rep
+          ? <span>Coche des annonces en ligne d’un même compte, puis <b>Republier</b> : tu choisis l’ordre et l’espacement, et c’est toi qui lances.</span>
+          : <span>{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. Coche-les, puis ' : 'Coche des annonces d’un même compte, puis '}<b>Actions</b>{filtre === 'brouillon' ? ' : mettre en ligne.' : ' : republier, modifier prix ou titre, mettre en brouillon ou en ligne.'}</span>}
         {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
         {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>Un par un</Bouton> : null}
       </div>
@@ -13459,7 +13468,9 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
             </ul>
           </div>
         ))}
-      {nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>Actions · {nCoches}</Bouton></div>}
+      {rep
+        ? (aRepublier.length > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-republier-lancer={aRepublier.length} onClick={() => onRepublier && onRepublier(aRepublier)}>Republier · {aRepublier.length}</Bouton></div>)
+        : (nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>Actions · {nCoches}</Bouton></div>)}
     </section>
   );
 }
@@ -14122,10 +14133,19 @@ const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[1],BOTTOM_TABS[2],ONGLET_MESSAGES,B
 // DEUX écrans distincts. Le 8 novembre, Julien retire les doublons par
 // plateforme de la colonne : les anciens liens restent résolus par la tâche.
 const GROUPES_PLUS=[
+  // ⚠️ (9 nov., lot AL — Julien, mot pour mot : « Je ne pense pas qu'un onglet Republier et
+  // Favoris & offres soient dans des onglets à part ; ils doivent exister, rien ne doit être
+  // supprimé, mais par exemple les favoris et offres doivent être dans Messages et Republier
+  // dans Annonces, ce sera beaucoup plus clair et simple je pense. ») Les deux entrées
+  // « Republier » et « Favoris & offres » QUITTENT la colonne, la barre du bas et « Plus » :
+  // « Favoris & offres » est une section de Messages (Conversations · Favoris & offres),
+  // « Republier » une vue d'Annonces (Toutes · Sélectionner · Republier · Brouillons…).
+  // Rien n'est supprimé : mêmes écrans, mêmes moteurs, mêmes réglages ; les anciens
+  // chemins (`?tab=republier`, `?tab=favoris`, `vue=republier|favoris`, `demanderVue`)
+  // mènent au nouvel endroit (`VUES_DEPLACEES`). Sur l'ordinateur, le groupe « Vendre »
+  // devient vide et disparaît (Messages est dans les tâches) ; au téléphone, il garde Messages.
   { titre:'Vendre', items:[
     {...ONGLET_MESSAGES, tel:true},
-    {id:'cat_annonces', icon:'sync', cle:'republier', vue:'republier', label:'Republier'},
-    {id:'cat_msg', icon:'heart', cle:'favoris', vue:'favoris', label:'Favoris & offres'},
   ]},
   // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis
   // on a les codes de retrait ») Plus d'entrée « Colis à retirer » ni de groupe
@@ -14189,7 +14209,11 @@ function titreEcran(tab) {
 // (reçu, litige) vise `achats` directement.
 // La liste blanche des écrans qu'un lien `?tab=` (et la reprise, src/repriseEcran.js)
 // peut ouvrir. Un onglet absent d'ici n'ouvre rien : l'app reste sur Ma journée.
-const ONGLETS_LIENS=['ventes','annonces','messages','achats','retraits','journee','trancher','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+// (9 nov., lot AL) Les entrées « Republier » et « Favoris & offres » ne sont plus des
+// onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
+// qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
+const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
+const ONGLETS_LIENS=['republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -26935,7 +26959,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
       {/* (3 nov.) La règle de main (src/beneficeNoms.js) : « Bénéfice » = la notion de Compta,
           « — » quand elle dit « pas su » (jamais un brut partiel, jamais « ≥ »). */}
       <span>{NOM_BENEFICE} du mois</span>
-      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne="net">{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
+      <b className={valeur == null ? 'is-vide' : undefined} style={{ '--nc': valeur == null ? 1 : Math.round(valeur).toLocaleString('fr-FR').length + 2 }} data-journee-benef-ligne="net">{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
     </button>
   );
   return place === 'integre'
@@ -38565,7 +38589,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ouvert, à l'évènement `vrm:vue`.
   React.useEffect(()=>{
     const appliquer=()=>{
-      if(only==='annonces' && prendreVue('republier')) setAnnSort('selection');   // (5 nov., chantier C) l'entrée « Republier » mène à « Sélectionner », puis Actions
+      // (9 nov., lot AL) « Republier » est une vue d'Annonces : tout chemin vers elle (ancienne entrée du menu, lien, `?tab=republier`) l'ouvre.
+      if(only==='annonces' && prendreVue('republier')) setAnnSort('republier');
       if(only==='annonces' && prendreVue('dorment')) { setModeDort('dort'); setAnnSort('sleeping'); }
       // (6 nov., vague 2) Ma journée : « N annonces sans achat relié » et « N ventes annulées avant l'envoi ».
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
@@ -42785,8 +42810,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 on coche, puis UNE feuille « Actions » (Republier · Modifier prix ou titre ·
                 Mettre en brouillon · Mettre en ligne). L'ancienne feuille « Republier et
                 brouillons » (un second chemin, d'autres mots) est retirée. */}
-            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='selection'} aria-label="Republier des annonces" title="Republier : coche les annonces, puis Actions"
-              onClick={()=>setAnnSort('selection')}><Icon name="sync" size={17}/><span className="vrm-annbar-mot">Republier…</span></button>
+            {/* (9 nov., lot AL) … et depuis que « Republier » est une vue d'Annonces, il mène à ELLE
+                (cocher, puis « Republier » ouvre l'atelier) ; « Sélectionner » garde la feuille « Actions ». */}
+            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='republier'} aria-label="Republier des annonces" title="Republier : coche les annonces, puis Republier"
+              onClick={()=>setAnnSort('republier')}><Icon name="sync" size={17}/><span className="vrm-annbar-mot">Republier…</span></button>
             <div className="vrm-ann-outils">
               <button type="button" className="vrm-annbar-bouton" aria-label="Outils des annonces" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : offres automatiques, répartir un lot, studio photo, inventaire, audit du stock">
                 <Icon name="more" size={17}/><span className="vrm-annbar-mot vrm-ann-outils-mot">Outils</span></button>
@@ -42879,6 +42906,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" data-vue-toutes="" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Toutes</button>
           {/* (5 nov.) « Sélectionner » : en ligne, brouillons et masquées ensemble, puis UNE feuille « Actions ». */}
           <button type="button" data-vue-selection aria-pressed={annSort==='selection'} onClick={()=>setAnnSort('selection')}>Sélectionner{selAnn.length ? <span className="vrm-of-n">{selAnn.length}</span> : null}</button>
+          {/* (9 nov., lot AL — Julien : « Republier dans Annonces ») L'ancienne entrée « Republier » du menu
+              est ICI : ses annonces en ligne à cocher, puis « Republier » ouvre l'atelier (ordre, espacement, lancer). */}
+          <button type="button" data-vue-republier="" aria-pressed={annSort==='republier'} onClick={()=>setAnnSort('republier')}>Republier</button>
           {/* (5 nov., Julien : « les annonces en brouillon doivent apparaître dans Annonces,
               avec leur marque « brouillon » ») Ses brouillons, compte par compte, à cocher. */}
           {((brVinted.liste||[]).length>0 || annSort==='brouillons') && <button type="button" data-vue-brouillons={(brVinted.liste||[]).length} aria-pressed={annSort==='brouillons'} onClick={()=>setAnnSort('brouillons')}>Brouillons<span className="vrm-of-n">{(brVinted.liste||[]).length}</span></button>}
@@ -42896,7 +42926,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
-        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='brouillons' && annSort!=='sansachat' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
+        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
           <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Tout afficher</button>
         </div>}
@@ -43052,7 +43082,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {(()=>{
             const m = annBase.length;
             const n = m ? annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length : 0;
-            const vuePrix = !['selection','brouillons','masquees','sleeping','sansachat'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
+            const vuePrix = !['selection','republier','brouillons','masquees','sleeping','sansachat'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
             // (6 nov.) LE PROCHAIN GESTE EN TÊTE (src/prochainGesteAnnonces.js) : un geste, celui
             // qui compte le plus, avec son bouton — sur la liste de toujours (pas dans une vue filtrée).
             const geste = annSort === 'oldest' && !annSearch.trim() && listings.items && !listings.error
@@ -43132,10 +43162,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
         <FichesNeuves/>
-        {(annSort==='selection' || annSort==='brouillons') ? (
-          <ChoixAnnoncesVinted filtre={annSort==='brouillons' ? 'brouillon' : 'tout'} annonces={annSelectionnables} sel={selAnn} setSel={setSelAnn}
+        {(annSort==='selection' || annSort==='brouillons' || annSort==='republier') ? (
+          <ChoixAnnoncesVinted filtre={annSort==='brouillons' ? 'brouillon' : annSort==='republier' ? 'republier' : 'tout'} annonces={annSelectionnables} sel={selAnn} setSel={setSelAnn}
             charge={listings.items==null && listings.loading} brLecture={brVinted.liste==null}
-            onActions={()=>setActionsSelOpen(true)} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
+            onActions={()=>setActionsSelOpen(true)}
+            onRepublier={(choisies)=>{
+              // (9 nov., lot AL) La vue « Republier » lance LE MÊME atelier que la tuile « Republier »
+              // de la feuille Actions (`RepublierVinted`, action `recreer`), avec la même règle
+              // (`actionsPossibles` : un compte, celui de l'onglet, extension à jour) — refus ⇒ sa raison.
+              const vc = vintedDeChrome();
+              const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: vc === undefined ? undefined : (vc ? String(vc.uid||'') : null),
+                capOk: (cap)=>extSait(cap)==='ok', nomCompte: (u)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(u)); return a ? accNameOf(a) : ''; } }).find(x=>x.k==='recreer');
+              if (!r || !r.ok) { toast((r && r.raison) || 'Republier n’est pas possible pour cette sélection.'); return; }
+              setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction('recreer'); }} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
@@ -43817,9 +43856,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!dansPlateforme && <ScreenHead icon="chat" title="Messages" />}
         <NoAcc/>
         {/* (3 nov., critique #7) « Lecture par compte » passe sous la liste, avec les vérifications. */}
-        <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
-          <button type="button" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
-          <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><Icon name="heart" size={17}/>Favoris reçus</button>
+        {/* (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages ») L'ancienne
+            entrée « Favoris & offres » du menu est CETTE section : même écran (`FavorisConnectes` :
+            favoris reçus, offre aux favoris, mode auto), son nom d'hier. */}
+        <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris & offres">
+          <button type="button" data-messages-zone="conversations" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
+          <button type="button" data-messages-zone="favoris" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><Icon name="heart" size={17}/>Favoris & offres</button>
         </div>
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;const px=Number(it?.price&&typeof it.price==='object'?it.price.amount:it?.price);return it||n?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null,prix:Number.isFinite(px)&&px>0?px:null}:null;}} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
@@ -50362,6 +50404,8 @@ function AppCoeur() {
   const tabCourant=React.useRef(tab); tabCourant.current=tab;
   const setTab=React.useCallback((v)=>{
     if(typeof v==='function'){ setTabBrut(v); return; }
+    // (9 nov., lot AL) « Republier » / « Favoris & offres » : l'écran qui les porte, sur leur vue.
+    if(typeof v==='string'&&VUES_DEPLACEES[v]){ const [o,vue]=VUES_DEPLACEES[v]; demanderVue(vue); try{ window.dispatchEvent(new CustomEvent('vrm:vue',{detail:vue})); }catch(_){} v=o; }
     const r=redirigerOnglet(v, subVoulue.current, ONGLETS_DEPLACES);
     if(r.sub!=null){
       if(r.tab===tabCourant.current){ const sub=r.sub; subVoulue.current=null; setTimeout(()=>setPlatSub(sub),0); }
@@ -50582,7 +50626,9 @@ function AppCoeur() {
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
-      if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
+      if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris'); else if(vue==='republier') demanderVue('republier');
+      // (9 nov., lot AL) Favoris & offres et Republier sont des vues de Vinted : sans `site`, le filtre retenu (Leboncoin…) ne les cache pas.
+      if(!site&&((vue==='favoris'&&t==='messages')||(vue==='republier'&&t==='annonces'))) subVoulue.current='vinted';
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
       const tt=(t==='cat_achats'&&vue==='achats')?'achats':t;
       const cible=lireCible(p); if(cible) poserCible(cible, redirigerOnglet(tt, subVoulue.current, ONGLETS_DEPLACES).tab);
