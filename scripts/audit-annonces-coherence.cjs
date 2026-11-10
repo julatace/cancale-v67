@@ -32,8 +32,9 @@ const MUTATIONS = {
   pas_de_tete: { f: 'src', m: (s) => s.replace("for (const [r, n] of compte) if (n > max) { max = n; tete = r; }", '') },
   cinq_tuiles: { f: 'src', m: (s) => s.replace('export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien)', 'export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => A)') },
   vieux_mots: { f: 'src', m: (s) => s.replace("titre: 'Modifier prix ou titre'", "titre: 'En ligne → en ligne, avec tes modifications'") },
-  feuille_revenue: { f: 'app', m: (s) => s.replace("if(only==='annonces' && prendreVue('republier')) setAnnSort('selection');", "if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);") },
-  republier_feuille: { f: 'app', m: (s) => s.replace("data-actions-ouvrir=\"\" aria-pressed={annSort==='selection'} title=\"Republier : coche les annonces, puis Actions\"\n              onClick={()=>setAnnSort('selection')}", "data-actions-ouvrir=\"\" aria-pressed={annSort==='selection'} title=\"Republier : coche les annonces, puis Actions\"\n              onClick={()=>setActionsOpen(true)}") },
+  // (9 nov., lot AL) « Republier » est une VUE d'Annonces (plus une entrée du menu) : l'ancien chemin et « Republier… » y mènent.
+  feuille_revenue: { f: 'app', m: (s) => s.replace("if(only==='annonces' && prendreVue('republier')) setAnnSort('republier');", "if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);") },
+  republier_feuille: { f: 'app', m: (s) => s.replace("onClick={()=>setAnnSort('republier')}><Icon name=\"sync\" size={17}/>", "onClick={()=>setActionsOpen(true)}><Icon name=\"sync\" size={17}/>") },
   baisser_revenu: { f: 'app', m: (s) => s.replace('<button type="button" className="vrm-fiche-geste" data-fiche-vendue=""', '<a className="vrm-fiche-geste" style={{color:C.accent}}>Baisser à 9 €</a><button type="button" className="vrm-fiche-geste" data-fiche-vendue=""') },
   refuse_chevron: { f: 'app', m: (s) => s.replace('<span style={lib}>Refuser sous</span>', "<span style={lib}>{'refuse <'}</span>") },
   filtre_selection: { f: 'app', m: (s) => s.replace("return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`;", "return `${k} annonce${k>1?'s':''} dans cette sélection`;") },
@@ -83,8 +84,8 @@ async function auditer(S) {
   // ── A ── l'app
   const app = S.app; const appN = sansCommentaires(app);
   dit(!/data-actions-menu/.test(appN) && !/Republier et brouillons/.test(appN), 'A1 plus de seconde feuille d’actions (« Republier et brouillons »)');
-  dit(/if\(only==='annonces' && prendreVue\('republier'\)\) setAnnSort\('selection'\);/.test(app), 'A2 l’entrée « Republier » du menu mène à « Sélectionner »');
-  { const b = tranche(appN, 'data-actions-ouvrir=""', '</button>'); dit(b && /onClick=\{\(\)=>setAnnSort\('selection'\)\}/.test(b) && !/setActionsOpen\(true\)/.test(b), 'A3 « Republier… » de la barre mène à « Sélectionner »', b.slice(0, 160)); }
+  dit(/if\(only==='annonces' && prendreVue\('republier'\)\) setAnnSort\('republier'\);/.test(app), 'A2 l’ancien chemin « Republier » (menu, lien) mène à la vue « Republier » d’Annonces (lot AL)');
+  { const b = tranche(appN, 'data-actions-ouvrir=""', '</button>'); dit(b && /onClick=\{\(\)=>setAnnSort\('republier'\)\}/.test(b) && !/setActionsOpen\(true\)/.test(b), 'A3 « Republier… » de la barre mène à la vue « Republier » (lot AL)', b.slice(0, 160)); }
   const feuille = tranche(appN, 'function ActionsSelectionFeuille(', '\nfunction ');
   dit(/raisonCommune\(actions\)/.test(feuille) && /ACTIONS_TUILES\.map/.test(feuille), 'A4 la feuille Actions lit `raisonCommune` et `ACTIONS_TUILES`');
   dit(/<SheetShell [^>]*titre=\{/.test(feuille) && !/✕/.test(feuille), 'A5 la feuille Actions : `SheetShell titre` (croix partagée), aucune croix faite main');
