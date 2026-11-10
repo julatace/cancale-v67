@@ -5,7 +5,9 @@ name: Statut des colis (toutes les 15 min)
 # api/ship-reminders.js?moment=colis toutes les 15 min, de 5 h à 21 h 45 UTC (6 h → 23 h
 # à Paris l'hiver). La route ne visite QUE les vendeurs qui ont un colis actif dû
 # (au point relais : relu toutes les 15 min ; en route : toutes les heures) —
-# api/_lib/colis-frequent.js. Le journal ne porte que des nombres.
+# api/_lib/colis-frequent.js. Puis (9 nov. au soir) les étiquettes (PDF des bordereaux) pas
+# encore lues, chez les vendeurs dont la ligne dit qu'il en reste (`passageEtiquettes`).
+# Le journal ne porte que des nombres.
 # La route répond 503 quand elle n'a pas pu lire qui visiter : le job échoue.
 # Sans le secret `CRON_SECRET` dans GitHub (Settings → Secrets and variables →
 # Actions, le même que sondes-statut.yml), rien n'est appelé et le journal le dit.
@@ -35,5 +37,5 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" \
             "https://vrm.center/api/ship-reminders?moment=colis")
           echo "HTTP $code"
-          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,dus:r.dus,traites:r.traites,restants:r.restants,lus:r.lus,changes:r.changes,echecs:r.echecs,raison:r.raison}))" || true
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,dus:r.dus,traites:r.traites,restants:r.restants,lus:r.lus,changes:r.changes,echecs:r.echecs,raison:r.raison,etiquettes:r.etiquettes}))" || true
           test "$code" = "200"

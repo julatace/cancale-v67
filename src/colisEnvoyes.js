@@ -28,6 +28,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { transporteurDuColis, cleTransporteur, nomDuTransporteur, PAS_LU } from './transporteursVisuels.js';
 import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
+import { ordreRecent } from './ordreRecent.js';
 
 export const INCONNU = PAS_LU;   // « Transporteur inconnu »
 
@@ -83,15 +84,9 @@ export function quandEnvoye({ depart = null, coche = null, vente = null } = {}) 
 }
 
 // Le plus récent en haut ; sans date en bas ; à égalité, l'ordre reçu (stable).
+// (9 nov., soir, lot AJ) La règle unique des listes (src/ordreRecent.js) : même comportement.
 export function rangerEnvoyes(liste, quand = (x) => x && x.quand && x.quand.ms) {
-  return (Array.isArray(liste) ? liste : []).map((x, i) => [x, i, quand(x)])
-    .sort((a, b) => {
-      const A = Number.isFinite(a[2]) ? a[2] : null, B = Number.isFinite(b[2]) ? b[2] : null;
-      if (A == null && B == null) return a[1] - b[1];
-      if (A == null) return 1;
-      if (B == null) return -1;
-      return (B - A) || (a[1] - b[1]);
-    }).map(([x]) => x);
+  return ordreRecent(liste, quand);
 }
 
 // Les pastilles : [{ nom, cle, n }] — le plus fourni d'abord, l'inconnu en dernier.
@@ -113,4 +108,46 @@ export function filtrerEnvoyes(liste, filtre, tr = (x) => x && x.tr) {
   if (!filtre || filtre === 'tous') return { liste: L, filtre: 'tous' };
   const f = L.filter((x) => nomEnvoye(tr(x)) === filtre);
   return f.length ? { liste: f, filtre } : { liste: L, filtre: 'tous' };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (9 nov. au soir, « transporteurs parfaits ») CE QUI RESTE INCONNU EST COMPTÉ ET DIT
+//  Julien : « Ce n'est pas possible d'avoir "transporteur inconnu" sachant que tu as les
+//  bordereaux en ta possession. » Toutes les étiquettes sont maintenant lues (serveur :
+//  réception, cron, passage de 15 min, app ouverte). Un colis qui reste « inconnu » l'est
+//  pour UNE raison, lue — jamais un transporteur deviné :
+//    · 'a-lire'     — son étiquette n'a pas encore été lue (lecture en cours) ;
+//    · 'muette'     — l'étiquette ne porte aucun nom lisible (image, police sans table) et
+//                     ni son n°, ni un e-mail, ni le transporteur ne le nomment ;
+//    · 'plusieurs'  — l'étiquette nomme deux transporteurs (on ne choisit pas) ;
+//    · 'illisible'  — le PDF ne s'ouvre pas ;
+//    · 'sans-pdf'   — la ligne du bordereau n'a plus son PDF ;
+//    · 'sans-bordereau' — aucun bordereau rangé pour cette vente (ni e-mail, ni extension).
+//  `bord` : SON bordereau e-mail (avec `hasPdf`, `pdfLu`) ; `pdf`/`vu` : ce que la passe des
+//  étiquettes a rangé pour CE n° de transaction (`pdf[tx]`, `pdfVus[tx]`).
+// ════════════════════════════════════════════════════════════════════════════
+export const RAISONS_INCONNU = Object.freeze({
+  'a-lire': ['étiquette en cours de lecture', 'étiquettes en cours de lecture'],
+  muette: ['étiquette sans nom lisible', 'étiquettes sans nom lisible'],
+  plusieurs: ['étiquette qui nomme deux transporteurs', 'étiquettes qui nomment deux transporteurs'],
+  illisible: ['PDF illisible', 'PDF illisibles'],
+  'sans-pdf': ['bordereau sans PDF', 'bordereaux sans PDF'],
+  'sans-bordereau': ['vente sans bordereau reçu par VRM', 'ventes sans bordereau reçu par VRM'],
+});
+export function raisonInconnu({ bord = null, pdf = null, vu = null } = {}) {
+  const lu = (bord && bord.pdfLu && bord.pdfLu !== 'None') ? String(bord.pdfLu) : '';
+  const r = lu && lu !== 'ok' ? lu : (vu && vu.r) || '';
+  if (r === 'aucun') return 'muette';
+  if (r === 'plusieurs' || r === 'illisible' || r === 'sans-pdf') return r;
+  if (lu === 'ok' || (pdf && pdf.t)) return 'muette';   // lue, mais rien que VRM connaisse
+  if (bord && bord.hasPdf) return 'a-lire';
+  if (bord) return 'sans-pdf';
+  if (pdf || vu) return 'muette';
+  return 'sans-bordereau';
+}
+// Les comptes par raison, dans l'ordre de RAISONS_INCONNU : [{ cle, n, texte }].
+export function compterRaisons(raisons) {
+  const n = new Map();
+  for (const r of raisons || []) if (r) n.set(r, (n.get(r) || 0) + 1);
+  return Object.keys(RAISONS_INCONNU).filter((k) => n.get(k)).map((k) => ({ cle: k, n: n.get(k), texte: RAISONS_INCONNU[k][n.get(k) > 1 ? 1 : 0] }));
 }

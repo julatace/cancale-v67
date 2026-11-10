@@ -145,7 +145,7 @@ const essaie = async (nom, f) => { try { return await f(); } catch (e) { dit(fal
   // ── W : une règle d'ordre pour l'écran et « Tout imprimer ».
   await essaie('W', () => {
     dit(/const colisAEnvoyerRanges = \(\) => \{[^\n]*rangerColisEnvoi\(/.test(app), 'W « Tout imprimer » range par `rangerColisEnvoi`');
-    dit(/const exT = rangerColisEnvoi\(tous, trNomDe\);/.test(app), 'W l\'écran range par `rangerColisEnvoi`');
+    dit(/const exT = rangerColisEnvoi\(tousF?, trNomDe\);/.test(app), 'W l\'écran range par `rangerColisEnvoi`');
   });
 
   console.log(ko ? `\n❌ audit-colis-envoi : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-colis-envoi : ${ok} verts`);

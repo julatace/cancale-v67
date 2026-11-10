@@ -115,9 +115,12 @@ const VOIX = (pg) => pg.evaluate(() => {
   const main = document.querySelector('.vrm-main') || document.body;
   const SEL = '[data-fraicheur-voix], [data-fraicheur-comptes]:not(.vrm-etat-comptes), [data-fraicheur-ventes], [data-ann-fraicheur], [data-dash-fraicheur], [data-comptes-a-relire], [data-fraicheur-achats], .vrm-fraicheur-plat, .vrm-colis-fraicheur';
   const RE = /(datent d['’]il y a|derni[eè]re lecture|lues? (il y a|hier|aujourd)|pas relus? depuis|annonces lues|ventes vinted à jour|achats relus|comptes? à relire|relus? il y a \d)/i;
-  const cands = [...main.querySelectorAll(SEL)].filter((e) => vis(e) && (e.innerText || '').trim() && (RE.test(e.innerText) || e.hasAttribute('data-comptes-a-relire') || e.hasAttribute('data-fraicheur-voix')) && !e.closest('[data-etat-panneau]'));
+  // (9 nov., lot AG) La ligne de fraîcheur UNIQUE du haut de l'app (`.vrm-fraicheur-hote`, sur tous les écrans)
+  // n'est pas une voix de l'ÉCRAN : elle est comptée à part (`unique`, exactement une).
+  const cands = [...main.querySelectorAll(SEL)].filter((e) => vis(e) && (e.innerText || '').trim() && (RE.test(e.innerText) || e.hasAttribute('data-comptes-a-relire') || e.hasAttribute('data-fraicheur-voix')) && !e.closest('[data-etat-panneau]') && !e.closest('.vrm-fraicheur-hote'));
   const voix = cands.filter((e) => !cands.some((o) => o !== e && o.contains(e)));
-  return voix.map((e) => ({ attr: [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-')).slice(0, 3).join(' ') || e.className, texte: e.innerText.replace(/\s+/g, ' ').trim().slice(0, 90) }));
+  const unique = document.querySelectorAll('[data-fraicheur-unique]').length;
+  return voix.map((e) => ({ unique, attr: [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-')).slice(0, 3).join(' ') || e.className, texte: e.innerText.replace(/\s+/g, ' ').trim().slice(0, 90) }));
 });
 
 // K — le contraste de chaque texte de la carte sombre contre son pire fond.
@@ -226,12 +229,16 @@ async function tourneeF(nav, { W, theme }) {
     await calme(o.pg);
     const v = await VOIX(o.pg);
     await capture(o.pg, `v3-F-${nom.replace(/[^a-z]/gi, '')}-${W}-${theme}`);
-    dit(v.length === 1, 'F', `${T} ${nom} : la fraîcheur des lectures dite par UNE voix (${v.length})`, JSON.stringify(v));
+    // (9 nov., lot AG) Les comptes pas relus sont dits par la ligne UNIQUE du haut de l'app ; l'écran ne garde que
+    // ce qui lui est propre (Annonces, Statistiques : les annonces « à confirmer » de SA liste). Ventes, Colis : rien.
+    const unique = await o.pg.evaluate(() => document.querySelectorAll('[data-fraicheur-unique]').length);
+    const propre = nom === 'Annonces · Vinted' || nom === 'Statistiques';
+    dit(unique === 1 && (propre ? v.length === 1 : v.length === 0), 'F', `${T} ${nom} : la fraîcheur dite UNE fois — la ligne du haut${propre ? ' + la voix propre à la liste' : ', rien de plus dans l’écran'} (écran ${v.length}, ligne ${unique})`, JSON.stringify(v));
     if (nom === 'Colis') {
       // (6 nov., finitions) Une phrase par écran (§7) : la ligne du bas n'est plus rendue du tout — cachée, elle
       // redisait la puce quand la carte du haut manquait. Aucune `FraicheurDonnees` dans le DOM de Colis.
       const dom = await o.pg.evaluate(() => ({ ligne: document.querySelectorAll('.vrm-colis-fraicheur').length, puce: document.querySelectorAll('[data-comptes-a-relire]').length, phrase: [...document.querySelectorAll('.vrm-main [data-fraicheur-comptes]')].filter((e) => !e.classList.contains('vrm-etat-comptes')).length }));
-      dit(dom.ligne === 0 && dom.phrase === 0 && dom.puce === 1, 'F', `${T} Colis : l'ancienne ligne de fraîcheur n'est plus RENDUE (même cachée) ; la puce seule parle`, JSON.stringify(dom));
+      dit(dom.ligne === 0 && dom.phrase === 0 && dom.puce === 0, 'F', `${T} Colis : l'ancienne ligne de fraîcheur n'est plus RENDUE (même cachée), ni la puce (lot AG : la ligne du haut parle)`, JSON.stringify(dom));
     }
   }
   dit(!o.journal.erreurs.length, 'F0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));

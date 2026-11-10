@@ -18,10 +18,24 @@ const CONTENU_MAX = 2_000_000;
 const TEXTE_MAX = 20_000;
 const PROFONDEUR_MAX = 3;
 
+// (9 nov., transporteurs parfaits) SANS `Buffer` : le même lecteur tourne dans le navigateur
+// (l'app lit l'étiquette qu'elle vient de télécharger pour l'imprimer) et sur le serveur.
+export const latin1 = (u) => {
+  let s = '';
+  for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode.apply(null, Array.from(u.subarray(i, i + 8192)));
+  return s;
+};
+const base64VersOctets = (b64) => {
+  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(b64, 'base64'));
+  const bin = atob(String(b64).replace(/[^A-Za-z0-9+/=]/g, ''));
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+};
 const octetsDe = (src) => {
   if (src == null) return null;
   if (src instanceof Uint8Array) return src;
-  if (typeof src === 'string') { try { return new Uint8Array(Buffer.from(src, 'base64')); } catch (_) { return null; } }
+  if (typeof src === 'string') { try { return base64VersOctets(src); } catch (_) { return null; } }
   return null;
 };
 export const estPdf = (u) => !!(u && u.length >= 5 && u[0] === 0x25 && u[1] === 0x50 && u[2] === 0x44 && u[3] === 0x46);
@@ -86,7 +100,7 @@ function decodeurPolice(ctx, fontObj) {
   const sous = nom(f.get(PDFName.of('Subtype')));
   let tu = null;
   const tuRef = f.get(PDFName.of('ToUnicode'));
-  if (tuRef) { const o = fluxOctets(ctx, tuRef); if (o) tu = lireToUnicode(Buffer.from(o).toString('latin1')); }
+  if (tuRef) { const o = fluxOctets(ctx, tuRef); if (o) tu = lireToUnicode(latin1(o)); }
   const composite = sous === 'Type0';
   const largeur = tu ? (composite ? Math.max(2, tu.largeur) : tu.largeur) : (composite ? 2 : 1);
   // /Differences (polices simples sans ToUnicode)
@@ -162,10 +176,10 @@ function* jetons(u) {
     if (b === 0x5b) { yield { t: '[' }; i++; continue; }
     if (b === 0x5d) { yield { t: ']' }; i++; continue; }
     if (b === 0x7b || b === 0x7d || b === 0x3e || b === 0x29) { i++; continue; }
-    if (b === 0x2f) { let j = i + 1; while (j < n && !ESPACE(u[j]) && !DELIM(u[j])) j++; yield { t: 'n', v: Buffer.from(u.subarray(i + 1, j)).toString('latin1') }; i = j; continue; }
+    if (b === 0x2f) { let j = i + 1; while (j < n && !ESPACE(u[j]) && !DELIM(u[j])) j++; yield { t: 'n', v: latin1(u.subarray(i + 1, j)) }; i = j; continue; }
     let j = i; while (j < n && !ESPACE(u[j]) && !DELIM(u[j])) j++;
     if (j === i) { i++; continue; }
-    const mot = Buffer.from(u.subarray(i, j)).toString('latin1'); i = j;
+    const mot = latin1(u.subarray(i, j)); i = j;
     if (/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(mot)) { yield { t: '#', v: Number(mot) }; continue; }
     if (mot === 'ID') {                                                                     // image en ligne : sauter les octets
       let k = i + 1;
@@ -187,7 +201,7 @@ function lireContenu(ctx, octets, ressources, sortie, prof, budget) {
   const police = (n) => {
     if (polices.has(n)) return polices.get(n);
     const f = dictPolices ? dictPolices.get(PDFName.of(n)) : null;
-    const d = f ? decodeurPolice(ctx, f) : { lire: (o) => Buffer.from(o).toString('latin1').replace(/[^\x20-\x7e\xa0-\xff]/g, '') };
+    const d = f ? decodeurPolice(ctx, f) : { lire: (o) => latin1(o).replace(/[^\x20-\x7e\xa0-\xff]/g, '') };
     polices.set(n, d); return d;
   };
   let pile = []; let tableau = null; let cour = null; let dictProf = 0;
