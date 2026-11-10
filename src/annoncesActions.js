@@ -87,12 +87,17 @@ export const ACTIONS_SELECTION = [
   // la même que la case de la carte) : ni robot, ni compte du navigateur, et
   // plusieurs comptes à la fois sont permis. Un lien sous les quatre tuiles, comme
   // « à la main » (les quatre tuiles restent celles des moteurs, chantier C).
+  // (10 nov., lot C) « Baisser le prix… » : −X € ou −X % sur les annonces cochées, UNE par UNE
+  // par l'extension (5.336, `baisserPrixVinted`), prix relu. Un lien sous les tuiles, comme
+  // « à la main » : comptes mélangés permis (`parPaire`) — dans la feuille, une annonce d'un
+  // autre compte que celui de l'onglet est dite « Ouvre ce compte » et ne part JAMAIS.
+  { k: 'baisser', titre: 'Baisser le prix…', desc: '−X € ou −X % sur les annonces cochées, une par une, prix relu sur Vinted.', etats: ['en-ligne'], robot: false, parPaire: true, lien: true, cap: 'baisseprix' },
   { k: 'mini', titre: 'Prix mini…', desc: '« Accepter dès » (et « Refuser sous ») sur les annonces cochées, calculés depuis leur prix.', etats: ['en-ligne'], robot: false, lien: true, multiComptes: true },
 ];
 // Ce qui se lance au nom d'UN compte (dit d'un mot quand la sélection en mélange deux),
 // et le mot court d'une action permise sur plusieurs comptes.
 const PAR_COMPTE = 'Republier, modifier, brouillon, mise en ligne';
-const COURT = { mini: 'Prix mini', main: 'Republier à la main' };
+const COURT = { mini: 'Prix mini', main: 'Republier à la main', baisser: 'Baisser le prix' };
 // Les quatre tuiles de la feuille, dans l'ordre (« à la main » est un lien à part).
 export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien).map((A) => A.k);
 const POUR_ETAT = { 'en-ligne': 'les annonces en ligne', brouillon: 'les brouillons', masquee: 'les annonces masquées', verification: 'les annonces en vérification' };
@@ -126,6 +131,8 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
       const hors = Object.keys(parEtat).filter((e) => !A.etats.includes(e));
       if (hors.length) raison = `Seulement pour ${A.etats.map((e) => POUR_ETAT[e]).join(' ou ')} : ta sélection contient ${hors.map((e) => COMPTE_ETAT(parEtat[e], e)).join(', ')}.`;
     }
+    // (10 nov.) Une action sans robot qui part quand même chez Vinted par l'extension (`cap`).
+    if (!raison && !A.robot && A.cap && capOk && !capOk(A.cap)) raison = 'Demande une extension VRM plus récente dans ce navigateur.';
     if (!raison && A.robot) {
       if (A.cap && capOk && !capOk(A.cap)) raison = 'Demande une extension VRM plus récente dans ce navigateur.';
       // (5 nov.) Le navigateur est NOMMÉ tel qu'il est (Orion, Chrome…), relu à chaque phrase (`motsNavigateur`).

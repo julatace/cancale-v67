@@ -5,7 +5,7 @@ utile d'abord. Chaque geste dit où le faire. Aucun ne demande d'écrire du code
 
 | # | geste | où | pourquoi |
 |---|---|---|---|
-| 1 | Installer l'extension **5.335.0** | vrm.center/VRM-extension.zip → remplacer le dossier → ⟳ dans CHAQUE Chrome (Orion : VRM-Orion-dossier.zip) | sans elle, la lecture Vinted des colis et des codes reste à l'ancienne |
+| 1 | Installer l'extension **5.336.0** | vrm.center/VRM-extension.zip → remplacer le dossier → ⟳ dans CHAQUE Chrome (Orion : VRM-Orion-dossier.zip) | sans elle, la lecture Vinted des colis et des codes reste à l'ancienne |
 | 2 | Ouvrir « Mes annonces » sur chaque compte Leboncoin | leboncoin.fr, connecté sur chaque compte | VRM apprend tes annonces Leboncoin |
 | 3 | `CRON_SECRET` dans les secrets GitHub | GitHub → dépôt → Settings → Secrets → Actions → New secret, même valeur que sur Vercel | colis à retirer relus toutes les 15 min (sinon 2 fois par jour) |
 | 4 | Capture du logo **Chronopost** (et Colissimo, InPost, Relais Colis si tu les as) | une capture d'écran du haut d'un e-mail, envoyée dans la conversation | aujourd'hui ces logos sont leur nom en couleurs, pas le vrai dessin |

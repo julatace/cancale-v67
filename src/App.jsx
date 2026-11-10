@@ -144,6 +144,7 @@ import FeuilleLienVc from "./LienVestiaire.jsx";
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
+import './styles-baisse-prix.css';
 import './styles-achats-outils.css';
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
 import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
@@ -227,6 +228,8 @@ const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
 const PreparerColis = aLaDemande(() => import('./PreparerColis.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
 const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
+// (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
+const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // ⟦→ ecrans/Reglages.jsx #10⟧
 // (8 nov., démarrage léger) Écrans sortis d’App.jsx vers src/ecrans/ (découpe mécanique) : chargés
@@ -602,7 +605,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.335.0';
+const EXT_ATTENDUE = '5.336.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1029,7 +1032,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -13610,6 +13613,8 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
   const main = actions.find((x) => x.k === 'main');
   // (6 nov., vague 2 · point 2) « Prix mini… » : un second lien discret (rien ne part chez Vinted).
   const mini = actions.find((x) => x.k === 'mini');
+  // (10 nov., lot C) « Baisser le prix… » : un troisième lien discret (la feuille de baisse en série).
+  const baisser = actions.find((x) => x.k === 'baisser');
   const { tete, parTuile } = raisonCommune(actions);
   // Ce que VRM n'a pas lu : la MÊME phrase sur chaque paire ⇒ une fois, sous la liste.
   const cleNL = (l) => l.join(', ');
@@ -13638,6 +13643,12 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
           <div className="vrm-act-main" data-action-sel="mini" data-action-sel-ok={mini.ok ? 'oui' : 'non'}>
             <Bouton variante="discret" disabled={!mini.ok} title={mini.ok ? mini.desc : mini.raison} onClick={() => { if (mini.ok) onLancer('mini'); }}>{mini.titre}</Bouton>
             <span>{mini.ok ? '« Accepter dès » sur toutes, depuis leur prix.' : mini.raison}</span>
+          </div>
+        ) : null}
+        {baisser ? (
+          <div className="vrm-act-main" data-action-sel="baisser" data-action-sel-ok={baisser.ok ? 'oui' : 'non'}>
+            <Bouton variante="discret" disabled={!baisser.ok} title={baisser.ok ? baisser.desc : baisser.raison} onClick={() => { if (baisser.ok) onLancer('baisser'); }}>{baisser.titre}</Bouton>
+            <span>{baisser.ok ? '−X € ou −X %, une par une, prix relu.' : baisser.raison}</span>
           </div>
         ) : null}
         <div className="vrm-act-verif" data-avant-lancer={nManque}>
@@ -28788,6 +28799,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [repubMainOuvert, setRepubMainOuvert] = useState(null);
   // (6 nov.) Plusieurs annonces « à la main » : traitées une par une ({ liste, i }, « paire 2/5 »).
   const [repubMainFile, setRepubMainFile] = useState(null);
+  // (10 nov., lot C) « Baisser le prix » en série : les annonces cochées (vue « Qui dorment »
+  // ou Sélectionner), et les cases de la vue « Qui dorment » (confort de l'écran, rien d'écrit).
+  const [baisseSel, setBaisseSel] = useState(null);
+  const [qdSel, setQdSel] = useState(() => new Set());
   const [miniSel, setMiniSel] = useState(null);   // (6 nov., vague 2) « Prix mini… » : les annonces cochées // l'annonce republiée à la main (objet de la sélection)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
@@ -33043,6 +33058,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // En ligne (la MÊME base que la grille, `annBase`), masquées (`annMasquees`) et
   // brouillons (la MÊME liste que « Voir mes brouillons », `brVinted`, §11), chacun
   // avec SON compte : un brouillon d'un compte n'est jamais montré sous un autre.
+  // (10 nov., lot C) Une annonce EN LIGNE telle que la feuille « Baisser le prix » la lit :
+  // son identité (id + compte), son N°, son prix LU (euros ; autre devise ⇒ null, rien proposé).
+  const annonceBaisse = (it) => {
+    const uid = String((it && it._acc && it._acc.vinted_user_id) || (it && it._uid) || '');
+    const p = it && it.price; const dev = p && typeof p === 'object' ? String(p.currency_code || p.currency || 'EUR').toUpperCase() : 'EUR';
+    const n = Number(String((p && typeof p === 'object' ? p.amount : p) ?? '').replace(',', '.'));
+    const e = numeros[it.id] || {};
+    return { id: String(it.id), uid, compte: it._acc ? accNameOf(it._acc) : (uid ? `compte ${uid}` : ''), numero: e.numero ? String(e.numero) : '',
+      titre: it.title || '', photo: photoArticle(it) || '', prix: dev === 'EUR' && isFinite(n) && n > 0 ? n : null };
+  };
   const annSelectionnables = useMemo(() => {
     const out = []; const vus = new Set();
     const nomAcc = (acc, uid) => (acc && acc.vinted_user_id ? accNameOf(acc) : '') || (uid ? `compte ${uid}` : 'compte inconnu');
@@ -33559,6 +33584,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Un total inconnu ne se juge pas (mieux vaut un blanc qu'un faux, §5).
     let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0;
     const prepaCompte = {};
+    // (10 nov., lot AW) « Qui dorment » : LA règle de la vue (`articlesQuiDorment`,
+    // src/quiDorment.js) au seuil du bilan (30 j) — ce nombre est celui que l'écran
+    // publie (`vrm_paires_dorment`) et que `dormentDe` (bilan de la semaine, Ma
+    // semaine) lit : une seule règle, jamais une seconde comparaison d'âge.
+    const qdBilan = articlesQuiDorment(arr.map((it) => ({ id: String(it.id), age: listedAgeDays(it) })), SLEEP_DAYS);
+    const dortIds = new Set(qdBilan ? qdBilan.liste.map((x) => x.id) : []);
+    sleeping = qdBilan ? qdBilan.n : 0;
     for (const it of arr) {
       if (it.promoted === true) boostees++;
       if (lbcAussi.has(String(it.id))) aussiLbc++;
@@ -33574,7 +33606,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // la grille, jamais recalculé par le bandeau qui l'annonce (§11).
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'lbc')) surLbc++;
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'ebay')) surEbay++;
-      const age = listedAgeDays(it); if (age!=null) datesKnown++; if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
+      const age = listedAgeDays(it); if (age!=null) datesKnown++;
+      if (dortIds.has(String(it.id))) sleepingVal+=p;
       // Prête pour Leboncoin : numérotée, toutes ses photos captées, une description.
       if (numeros[it.id]?.numero) {
         const total = Number(it.photoCount)||0, capt = Number(it.captPhotos)||0, descOk = (Number(it.descLen)||0) > 0;
@@ -43695,6 +43728,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
+            selection={qdSel} onSelection={setQdSel} onBaisser={(choisies)=>setBaisseSel(choisies.map(a=>annonceBaisse(a.it)))}
             mode={modeDort} onMode={setModeDort} seuilFavoris={seuilFav} onSeuilFavoris={setSeuilFav} nDort={vueRelancer.dort} nFavoris={vueRelancer.favoris}
             pasLus={modeDort==='favoris' && vueRelancer.favorisPasLus>0 ? `Favoris pas lus sur ${vueRelancer.favorisPasLus} annonce${vueRelancer.favorisPasLus>1?'s':''}.` : ''}
             liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
@@ -47793,6 +47827,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onLancer={(k)=>{ setActionsSelOpen(false);
             if (k==='main') { const a=choisies[0]; if (a) { setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(a); } return; }
             if (k==='mini') { setMiniSel(choisies); return; }
+            // (10 nov., lot C) « Baisser le prix… » : la feuille de baisse en série (rien ne part avant SON clic).
+            if (k==='baisser') { const idx2 = new Map((listings.items||[]).map((it)=>[String((it._acc&&it._acc.vinted_user_id)||'')+':'+String(it.id), it])); setBaisseSel(choisies.filter(a=>a.etat==='en-ligne').map(a=>{ const it=idx2.get(a.uid+':'+a.id); return it ? annonceBaisse(it) : { id:a.id, uid:a.uid, compte:a.compte, numero:a.numero, titre:a.titre, photo:a.photo, prix:null }; })); return; }
             setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
       })()}
       {miniSel && (
@@ -47808,6 +47844,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           toast(n === lignes.length ? `${n} prix mini posé${n>1?'s':''}` : `${n} prix mini posé${n>1?'s':''} · ${lignes.length - n} annonce${lignes.length - n > 1 ? 's' : ''} plus en ligne : rien posé`);
         }}/>
       )}
+      {baisseSel && (()=>{
+        // (10 nov., lot C) « Baisser le prix » en série (src/BaissePrixSerie.jsx, règles src/baissePrix.js).
+        // Promis seulement à une extension 5.336+ de CE navigateur, connectée à CE compte VRM
+        // (`raisonExtGlobale`, capacité `baisseprix`) ; sinon la feuille dit pourquoi et rien ne part.
+        // Chaque baisse : UNE commande `baisserPrixVinted`, la suivante après la réponse.
+        const vc = vintedDeChrome();
+        const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
+        const ownerB = AUTH.user?.id;
+        return <BaissePrixSerie annonces={baisseSel} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
+          plancherDe={(a)=>plancherDeItem(a.id)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
+          onFermer={()=>setBaisseSel(null)}
+          onBaisser={async (l)=>{
+            const r = await vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000);
+            // Le prix RELU (jamais supposé) : l'historique des prix et la liste à l'écran le prennent.
+            if (r && r.accepte && (r.etape==='fait' || r.etape==='ecart') && r.prixVu != null && ownerB && AUTH.user?.id===ownerB) {
+              noterPrix({ uid:l.uid, id:l.id }, { ancien:r.ancien, nouveau:r.prixVu });
+              setListings((x)=>({ ...x, items:Array.isArray(x.items) ? x.items.map((it)=>(String(it.id)===String(l.id) && String((it._acc&&it._acc.vinted_user_id)||'')===String(l.uid))
+                ? { ...it, price: it.price && typeof it.price==='object' ? { ...it.price, amount:String(r.prixVu) } : String(r.prixVu) } : it) : x.items }));
+            }
+            return r;
+          }}
+          onFini={()=>setQdSel(new Set())}/>;
+      })()}
       {repubMainOuvert && (()=>{
         const p = repubMainOuvert; const s = repubMain[String(p.ancienId||p.id)] || null;
         // (6 nov., vague 2 · point 1) Une vente ANNULÉE avant l'envoi (`annulee`) : l'ancienne

@@ -18,7 +18,7 @@ libère son numéro (le dire ici).
 | — | direction artistique 5 : colonne de gauche refaite + boutons (demande de Julien) | PR #1073 | **en ligne** |
 | A | Ma journée instantanée + objectif du mois | PR #1074 | **en ligne** |
 | B | « Annuler » 5 s au lieu des confirmations réversibles + ⌘K qui agit | PR #1080 | **en ligne** |
-| C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | à lancer |
+| C | baisse de prix en série sur son clic (ext. 5.336) | `claude/baisse-prix-serie` | **fait, à intégrer** (`2026-11-10-baisse-prix-serie.md`) |
 | D | ouverture hors ligne à froid (oui explicite de Julien) + « compte Vinted déjà relié » dans l'app | PR #1081 | **en ligne** |
 | E | Solo étendu : un compte vendeur PAR plateforme (choix par défaut, à confirmer par Julien) | `claude/solo-plateformes` | **fini, à intégrer** (`2026-11-09-solo-plateformes.md`, migration 030) |
 | F | prix plancher sous chaque offre + « déjà N paires de ce modèle » | PR #1079 | **en ligne** |
@@ -80,7 +80,7 @@ Validé par Julien le 10 nov. (« Parfait fait tout ») :
 | AT | résumé du soir 20 h : ce qu'il y a à faire demain (proposition 3 ; ≠ « rappel la veille au soir » déjà retenu le 11 oct. : le relier, une seule notification) | `claude/resume-soir` | à lancer |
 | AU | mode « dépôt » au point relais : les colis à déposer, scannés un à un, coche quand tout est déposé (proposition 4 ; s'appuie sur le scanner V et Préparer AD) | `claude/mode-depot` | à lancer |
 | AV | prix de revente réel par modèle sur la fiche d'achat (SES ventes seulement, ressemblance = proposition, jamais une identité) (proposition 5) | `claude/revente-modele` | à lancer |
-| AW | paires qui dorment > 30 j + baisse de prix en série en un geste (proposition 6 ; fusionne avec C) | `claude/baisse-prix-serie` | à lancer avec C |
+| AW | paires qui dorment > 30 j + baisse de prix en série en un geste (proposition 6 ; fusionne avec C) | `claude/baisse-prix-serie` | **fait avec C, à intégrer** |
 | AX | recherche universelle : N°, pseudo, n° de suivi, code de retrait (proposition 7 ; étendre ⌘K et la loupe « Tout sur le N° », pas un 3e outil) | `claude/recherche-universelle` | à lancer |
 | AY | hors ligne au point relais : codes et colis à déposer lisibles sans réseau (proposition 8 ; prolonge D et le mode relais AD) | `claude/hors-ligne-relais` | à lancer |
 
