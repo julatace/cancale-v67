@@ -35,6 +35,7 @@ import './styles-colis-colonnes.css';
 import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.jsx';
 import { cleStatTransporteur, cleTransporteur, svgMarque } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
+import { NOMS_SOURCES, texteVerifie } from './sourcesRetrait.js';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -385,10 +386,16 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const dl = !x.horsCompte && delai ? delai(x) : null;
   const e = (dl || delaiEnTete) ? null : (echeance ? echeance(x) : null);
   const st = statut ? statut(x) : null;
-  const aCode = !!(x.code || x.qr || x.code2);
+  // (10 nov., retraits irréprochables) Deux sources donnent deux codes différents : rien n'est choisi,
+  // la ligne le dit en ambre et le détail montre les deux valeurs avec leur source (src/sourcesRetrait.js).
+  const desaccord = Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1 ? x.codesDesaccord : null;
+  const aCode = !!(x.code || x.qr || x.code2 || desaccord);
+  const marques = Array.isArray(x.sources) ? x.sources : [];
+  const verifie = texteVerifie(x.verifieMs);
   const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
-    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '' };  // (lot AJ) l'arrivée lue qui range la ligne
+    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '',  // (lot AJ) l'arrivée lue qui range la ligne
+    'data-rp-sources': marques.join(','), 'data-rp-verifie': Number.isFinite(x.verifieMs) ? String(x.verifieMs) : '', 'data-rp-code-sur': x.code && x.codeSur ? '1' : undefined, 'data-rp-codes-desaccord': desaccord ? desaccord.map((d) => d.source + ':' + d.code).join(',') : undefined };
   const basculer = () => setOuvert((o) => !o);
   return (
     <div className="vrm-rpf-ligne" {...attrs} data-ouvert={ouvert ? '1' : undefined}>
@@ -410,16 +417,25 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
             {e ? <span className={'vrm-rpf-puce' + (e.ambre ? ' is-ambre' : '')} data-rp-echeance={e.code || ''}>{e.t}</span> : null}
             {!aCode && !x.horsCompte ? <span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span> : null}
           </span> : (!aCode && !x.horsCompte ? <span className="vrm-rpf-puces"><span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span></span> : null)}
+          {/* D'où vient ce que la ligne dit, en petit : les sources qui ont vu CE colis et l'heure de la dernière vérification. */}
+          {marques.length || verifie ? <span className="vrm-rpf-sources" data-rp-sources-ligne="">{marques.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className="vrm-rpf-verifie" data-rp-verifie-texte="">{verifie}</span> : null}</span> : null}
         </span>
         <span className="vrm-rpf-chevron" aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span>
         </button>
-        {aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label="Voir le code de retrait" onClick={(ev) => { ev.stopPropagation(); voirCode(); }}>{copie?'Copié':'Code'}</button> : null}
+        {desaccord
+          ? <button type="button" className="vrm-rpf-code is-ambre" data-rp-code="" data-rp-code-desaccord="" aria-label="Deux codes différents : voir les deux" onClick={(ev) => { ev.stopPropagation(); setOuvert(true); }}>2 codes</button>
+          : aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label={x.codeSur ? `Voir le code de retrait (sûr : ${(x.codeSources || []).map((m) => NOMS_SOURCES[m] || m).join(' et ')})` : 'Voir le code de retrait'} onClick={(ev) => { ev.stopPropagation(); voirCode(); }}>{copie?'Copié':'Code'}{x.code && x.codeSur ? <svg className="vrm-rpf-code-sur" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}</button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
       {/* La barre hors du bouton de la ligne (un bouton rend ses enfants muets pour un lecteur d'écran). */}
       {dl && !delaiEnTete ? <div className="vrm-rpf-ligne-delai"><BarreDelai d={dl}/></div> : null}
       {ouvert ? <div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
         <strong className="vrm-rpf-titre-complet">{x.num ? `N°${x.num} · ` : ''}{(titreDe && titreDe(x)) || x.titre || 'Colis'}</strong>
+        {desaccord ? <div className="vrm-rpf-desaccord" data-rp-desaccord="" role="note">
+          <span className="vrm-rpf-desaccord-t">Deux codes différents — vérifie sur place</span>
+          {desaccord.map((d) => <span key={d.source + d.code} className="vrm-rpf-desaccord-v" data-rp-desaccord-valeur={d.code} data-rp-desaccord-source={d.source}><b>{d.code}</b> · {NOMS_SOURCES[d.source] || d.source}</span>)}
+        </div> : null}
+        {x.code && (x.codeSources || []).length ? <div className="vrm-rpf-code-origine" data-rp-code-origine="">Code {x.code} · {(x.codeSources || []).map((m) => NOMS_SOURCES[m] || m).join(' + ')}{x.codeSur ? ' · sûr' : ''}{x.codeRemplace ? ` · remplace ${x.codeRemplace.code}` : ''}</div> : null}
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
       </div> : null}
