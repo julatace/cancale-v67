@@ -110,6 +110,9 @@ const COUPLES = {
   'src/adresseReception.js|www.icloud.com': ['lien', LIEN],
   'src/adresseReception.js|outlook.live.com': ['lien', LIEN],
   'src/adresseReception.js|mail.yahoo.com': ['lien', LIEN],
+  // (10 nov.) « Recevoir tes e-mails Vinted dans VRM » : Orange et Free, sur son clic.
+  'src/adresseReception.js|mail.orange.fr': ['lien', LIEN],
+  'src/adresseReception.js|zimbra.free.fr': ['lien', LIEN],
   'src/navigateurExtension.js|play.google.com': ['lien', LIEN],
   'src/Tournee.jsx|maps.apple.com': ['lien', LIEN + ' — « Ouvrir dans Plans » d’un point de retrait'],
   // Une origine SENTINELLE en `.invalid` (RFC 6761 : ne se résout jamais) quand

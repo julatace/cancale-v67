@@ -102,7 +102,7 @@ function Essai({ adresse, d, maintenant, essai, prepare, onLancer, onRecommencer
           <a className={'vrm-b ' + (e.etat === 'repos' ? 'vrm-b-primaire' : 'vrm-b-secondaire')} href={lienEssai(adresse, code)} data-essai="" onClick={() => onLancer(code)}>{e.etat === 'repos' ? 'Envoyer l’e-mail d’essai' : 'Le renvoyer'}</a>
           <BoutonCopier texte={sujetEssai(code)} mot="Copier l’objet" className="vrm-b vrm-b-secondaire" data-copier-objet="" onCopie={() => onLancer(code)}/>
         </div>
-        <p className="vrm-ar-etat" data-ton={e.etat === 'attente' ? 'attente' : e.etat === 'repos' ? 'off' : 'passu'} aria-live="polite" data-essai-phrase="">
+        <p className="vrm-ar-essai-phrase" data-ton={e.etat === 'attente' ? 'attente' : e.etat === 'repos' ? 'off' : 'passu'} aria-live="polite" data-essai-phrase="">
           <span className="vrm-ar-point" aria-hidden="true"/>
           <span><b>{e.etat === 'attente' ? 'J’attends ton e-mail…' : e.etat === 'trop-long' ? 'Pas encore reçu.' : e.etat === 'passu' ? 'Pas su pour l’instant : je relis.' : 'Pas encore envoyé.'}</b>
             {e.etat === 'attente' ? ' Ça prend souvent moins d’une minute.' : e.etat === 'trop-long' ? ' Vérifie l’adresse collée, puis renvoie-le.' : ''}</span>
