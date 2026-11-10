@@ -190,6 +190,7 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
           dix: /10 comptes vendeurs|10 comptes vendent/.test(document.body.innerText || ''), deborde: document.documentElement.scrollWidth - window.innerWidth }));
         dit(/illimités/.test(a.phrase) && a.faq && !a.dix && a.deborde <= 0, `accueil ${largeur}${sombre ? ' sombre' : ''} : l’offre Pro et la FAQ disent « tous tes comptes, sans limite »`, JSON.stringify(a));
         await pg.locator('[data-offre-phrase="pro"]').scrollIntoViewIfNeeded().catch(() => {});
+        await pg.waitForTimeout(1200);
         await capture(pg, `accueil-${largeur}${sombre ? '-sombre' : ''}`);
         await ctx.close();
       });

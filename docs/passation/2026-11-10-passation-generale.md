@@ -78,7 +78,7 @@ des deux achats irlandais « à vérifier ».
 1. Les ≈ 1 780 ventes à dater : tout dater · seulement l'année en cours · les sortir du compte
    (le CA déclaré en dépend — ne pas décider à sa place).
 2. « Je dépose » remplace-t-il la « Tournée de dépôt » du 5 nov. ? (les deux restent en attendant).
-3. ✅ Réponse de Julien (10 nov.) : « Solo = un compte vendeur par plateforme : oui, et 19,99 pour 10 comptes vendeurs ». Pro (19,99 €/mois) passe de « tous les comptes » à **10 comptes vendeurs** (lu : 10 au total, toutes plateformes — à confirmer s'il voulait 10 par plateforme) : lot BO, `claude/pro-10-comptes`.
+3. ✅ Réponse de Julien (10 nov.) : « Solo = un compte vendeur par plateforme : oui, et 19,99 pour 10 comptes vendeurs ». Pro (19,99 €/mois) passe de « tous les comptes » à **10 comptes vendeurs** (lu : 10 au total, toutes plateformes — à confirmer s'il voulait 10 par plateforme) : lot BO, `claude/pro-10-comptes`. ⛔ **Annulé à 20 h** : « on fait un nombre de comptes de vente illimité » ⇒ Pro = comptes vendeurs illimités (lot `claude/pro-illimite`, `2026-11-10-pro-illimite.md`).
 4. Un seul « Retiré » partout (le mode relais hors ligne n'en propose pas, la liste hors ligne si) ?
 5. Factures au téléphone : ranger les cinq boutons d'action dans un menu ?
 
