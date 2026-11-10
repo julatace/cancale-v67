@@ -229,7 +229,8 @@ async function vue(b, nom, vp, sombre) {
     const e1 = ecrits.filter((x) => x.id === 'colis_photo_v_9203');
     dit(ecrits.length === 1 && e1.length === 1 && e1[0].jpeg && e1[0].taille <= 480 * 1024 && e1[0].tx === '9203' && e1[0].site === 'v', `${nom} : P2 UNE écriture, SA ligne colis_photo_v_9203 (JPEG ≤ 480 Ko, tx 9203)`, JSON.stringify(ecrits.map((x) => ({ id: x.id, t: x.taille, j: x.jpeg, tx: x.tx }))));
     await shot('4-photo-rangee');
-    // P3 : le bordereau relu pendant qu'il photographie.
+    // P3 : le bordereau relu pendant qu'il photographie (après la fenêtre anti-répétition de 2,5 s du scanner).
+    await pg.waitForTimeout(2700);
     r = await scanner(pg, 'XA100000003FR', 99).catch(() => null);
     await pg.waitForTimeout(800);
     r = await etat(pg);
