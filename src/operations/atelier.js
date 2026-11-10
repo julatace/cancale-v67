@@ -91,7 +91,7 @@ export function ligneAtelierJournee(resume) {
   const court = lourdes.length === 1
     ? `${n} paire${n > 1 ? 's' : ''} à « ${lourdes[0].nom} » depuis plus de ${ATTENTE_JOURS} j`
     : `${n} paires bloquées à l’atelier depuis plus de ${ATTENTE_JOURS} j`;
-  const detail = lourdes.map((e) => `${e.nom} ${e.enRetard}`).join(' · ');
+  const detail = lourdes.length > 1 ? lourdes.map((e) => `${e.nom} ${e.enRetard}`).join(' · ') : ''; // une seule étape : la phrase la dit déjà
   return { n, court, detail };
 }
 
