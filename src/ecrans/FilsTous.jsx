@@ -182,7 +182,8 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     <div data-fils-tous={chargement ? 'charge' : String(fils.length)} data-fils-sources={sources.map(([p, s]) => p + ':' + s).join(',')}>
       <div className="vrm-message-workspace">
         <div className="vrm-inbox-column">
-          {propositions.slice(0, 3).map((p) => {
+          {/* Une question à la fois (la liste reste au premier écran) ; « Non » ou « Oui » fait venir la suivante. */}
+          {propositions.slice(0, 1).map((p) => {
             const A = filDe(p.a), B = filDe(p.b); if (!A || !B) return null;
             return (
               <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
@@ -200,6 +201,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               </div>
             );
           })}
+          {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>Encore {propositions.length - 1} question{propositions.length > 2 ? 's' : ''} après celle-ci.</p> : null}
           {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>Lecture…</div>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>Aucune conversation lue pour l'instant.</div>
             : <div className="vrm-msg-list" style={{ border: `1px solid ${C.border}`, background: C.card }}>

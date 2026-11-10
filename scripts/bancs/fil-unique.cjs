@@ -152,10 +152,14 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
         dit(L.length === 6, 'B · six fils (Vinted ×4, Leboncoin, Vestiaire)', String(L.length));
         dit(L.some((x) => x.sites === 'leboncoin') && L.some((x) => x.sites === 'vestiaire' && x.num === '12'), 'C · Leboncoin et Vestiaire marqués, le N° de Vestiaire par sa référence');
         dit(await r.pg.$$eval('[data-fil] [data-fil-marques] [data-logo-site]', (l) => l.length) >= 6, 'C · chaque ligne porte la marque de sa plateforme');
-        const props = await r.pg.$$eval('[data-fil-proposition]', (l) => l.map((x) => x.getAttribute('data-fil-proposition')));
+        // Une question à la fois : on lit chacune en répondant « Non » sur une copie, puis on recharge.
+        const props = [];
+        dit(await r.pg.$$eval('[data-fil-proposition]', (l) => l.length) === 1 && await r.pg.$('[data-fil-propositions-autres="2"]') != null, 'D · une question à la fois (« encore 2 »)');
+        for (let i = 0; i < 3; i++) { const s = await r.pg.$('[data-fil-proposition]'); if (!s) break; props.push(await s.getAttribute('data-fil-proposition')); await r.pg.click('[data-fil-proposition] [data-fil-refuser]'); await r.pg.waitForTimeout(200); }
+        await r.pg.evaluate(() => localStorage.removeItem('vrm_fils_relies')); await r.pg.reload(); await attendreFils(r.pg);
         dit(props.includes('paire'), 'D · « Peut-être la même paire ? » (305, même acheteur, aucune paire)', props.join(','));
         dit(props.includes('acheteur'), 'D · « Peut-être le même acheteur ? » (N°12 Vinted + Vestiaire)');
-        dit(!(await r.pg.$$eval('[data-fil-proposition]', (l) => l.map((x) => x.getAttribute('data-fil-a') + '|' + x.getAttribute('data-fil-b')))).some((s) => s.includes('leboncoin')), 'D · Leboncoin (sans identité) jamais proposé');
+        dit(props.length === 3 && !props.includes(null), 'D · Leboncoin (sans identité) jamais proposé (trois questions seulement)', props.join(','));
         // F — le fil 301 + 302
         await r.pg.click(`[data-fil="${f301.cle}"]`);
         await r.pg.waitForSelector('[data-fil-fusionne] [data-fil-msg]', { timeout: 10000 }).catch(() => {});
@@ -192,10 +196,10 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
         await r.pg.click('[data-fil-delier]');
         await r.pg.waitForTimeout(400);
         dit((await lignes(r.pg)).length === avant, 'G · « délier » défait');
-        // « Non »
-        await r.pg.click('[data-fil-proposition="paire"] [data-fil-refuser]');
-        await r.pg.waitForTimeout(300);
-        dit(await r.pg.$('[data-fil-proposition="paire"]') == null, 'E · « Non » fait partir la proposition');
+        // « Non » : chaque réponse fait partir SA question
+        let n0 = await r.pg.$$eval('[data-fil-proposition]', (l) => l.length), nNon = 0;
+        while (await r.pg.$('[data-fil-proposition]') && nNon < 5) { await r.pg.click('[data-fil-proposition] [data-fil-refuser]'); await r.pg.waitForTimeout(200); nNon++; }
+        dit(n0 === 1 && await r.pg.$('[data-fil-proposition]') == null, 'E · « Non » fait partir la proposition', String(nNon));
         // H — Leboncoin
         const lb = (await lignes(r.pg)).find((x) => x.sites === 'leboncoin');
         await r.pg.click(`[data-fil="${lb.cle}"]`);
