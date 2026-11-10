@@ -83,7 +83,7 @@ export function EmballagesCarte({ reglage, ecrire, lireFaits, Feuille }) {
                 <span className="vrm-emb2-chevron" aria-hidden="true">›</span>
               </button>
               {t.recompter ? <p className="vrm-emb2-alerte" data-emb-recompter={t.id}>Plus de colis que comptés : recompte-les.</p>
-                : t.alerte ? <p className="vrm-emb2-alerte" data-emb-alerte-txt={t.id}>{t.restant <= 0 ? 'Il n’en reste plus.' : `Plus que ${t.restant} : pense à en racheter.`}</p> : null}
+                : t.alerte ? <p className="vrm-emb2-alerte" data-emb-alerte-txt={t.id}>{t.restant <= 0 ? 'Il n’en reste plus.' : 'Bientôt plus : pense à en racheter.'}</p> : null}
             </li>
           ))}
         </ul>

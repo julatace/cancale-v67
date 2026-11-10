@@ -86,3 +86,6 @@
 .vrm-emb2-b.is-plein { background: var(--vrm-accent, #0066CC); color: var(--vrm-on-accent, #fff); border-color: transparent; }
 .vrm-cv-champ:has(.vrm-cv-champ-puces) { flex-wrap: wrap; justify-content: flex-end; }
 .vrm-cv-champ-puces { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex-basis: 100%; }
+.vrm-emb2-form label > input { flex: none; }
+.vrm-calc-sites { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.vrm-calc-sites .vrm-calc-site { padding: 0 6px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
