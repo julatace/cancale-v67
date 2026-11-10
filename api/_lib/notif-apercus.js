@@ -80,20 +80,40 @@ export const texteOffresMini = (n) => ({
   title: n > 1 ? `${n} offres au-dessus de ton prix mini` : 'Une offre au-dessus de ton prix mini',
   body: n > 1 ? `${n} offres à accepter en 1 tap dans VRM.` : 'À accepter en 1 tap dans VRM.',
 });
-// Le rappel du soir (api/ship-reminders.js, `rappelDuSoir`) — déplacé ici tel quel.
-// `aVerifier` : les dates ESTIMÉES (pas d'email de bordereau) qui seront
-// passées demain — jamais « déjà en retard » (revue du 22 octobre).
-export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDemain = null, manque = null }) {
-  const N = `${auMoins ? 'au moins ' : ''}${n} colis à poster`;
-  const H = heureDemain ? heureCourte(heureDemain) : '';
-  const parts = [];
-  if (retard) parts.push(`${retard} déjà en retard`);
-  if (aVerifier) parts.push(`${aVerifier} à vérifier sur Vinted (date estimée passée)`);
-  if (demain) parts.push(`${demain} avec la date limite demain${H ? (demain === 1 ? ` à ${H}` : `, la première à ${H}`) : ''}`);
-  return {
-    title: `Demain : ${N}`,
-    body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? `Les ventes ${(Array.isArray(manque) && manque.length ? manque : ['eBay']).join(' et ')} n'ont pas pu être relues : il peut y en avoir plus. ` : ''}Prépare-les ce soir.`,
-  };
+// LE RÉSUMÉ DU SOIR (10 nov., lot AT ; le « rappel de la veille au soir » du 11 oct.,
+// amélioré — UNE notification) : seulement ce qu'il y a à faire DEMAIN. La décision
+// (envoyer ou non, où mène le toucher) est dans api/_lib/resume-soir.js ; ici, le texte.
+//   colis    : { demain, heure, retard, aVerifier } — `demain` = date limite LUE demain
+//              (`heure` = la plus proche, lue) ; `retard` = limite lue déjà passée demain ;
+//              `aVerifier` = date ESTIMÉE passée (jamais « en retard », revue du 22 oct.) ;
+//   retraits : { n, lieu } — dernier jour (lu) demain pour retirer ;
+//   offres   : { n } — offres Vestiaire REÇUES qui expirent avant demain soir
+//              (Vinted : aucune, ses offres n'expirent pas — Julien, 5 nov.) ;
+//   manque   : les sources de colis pas relues ⇒ « au moins », nommées.
+const pl = (n, un, plusieurs) => (n > 1 ? plusieurs : un);
+const lieuCourt = (l) => String(l || '').split(',')[0].trim().slice(0, 40);
+export function texteSoir({ colis = null, retraits = null, offres = null, manque = null } = {}) {
+  const c = colis || {};
+  const nDemain = c.demain || 0, nRetard = c.retard || 0, nVerif = c.aVerifier || 0;
+  const nColis = nDemain + nRetard + nVerif;
+  const nRetraits = (retraits && retraits.n) || 0, nOffres = (offres && offres.n) || 0;
+  const manques = Array.isArray(manque) ? manque.filter(Boolean) : [];
+  const am = manques.length ? 'au moins ' : '';
+  const sortes = [nColis, nRetraits, nOffres].filter((x) => x > 0).length;
+  const title = sortes > 1
+    ? 'Demain : ' + [nColis ? `${am}${nColis} colis` : '', nRetraits ? `${nRetraits} ${pl(nRetraits, 'retrait', 'retraits')}` : '', nOffres ? `${nOffres} ${pl(nOffres, 'offre', 'offres')}` : ''].filter(Boolean).join(', ')
+    : nColis ? `Demain : ${am}${nColis} colis à déposer`
+      : nRetraits ? `Demain : ${nRetraits} colis à retirer`
+        : `Demain : ${nOffres} ${pl(nOffres, 'offre expire', 'offres expirent')}`;
+  const H = c.heure ? heureCourte(c.heure) : '';
+  const phrases = [];
+  if (nDemain) phrases.push(nDemain === 1 ? `1 colis à déposer${H ? ` avant ${H}` : ''} demain.` : `${nDemain} colis à déposer demain${H ? `, le premier avant ${H}` : ''}.`);
+  if (nRetard) phrases.push(`${nRetard} déjà en retard : ${pl(nRetard, 'dépose-le', 'dépose-les')} en premier.`);
+  if (nVerif) phrases.push(`${nVerif} ${pl(nVerif, 'date estimée passée', 'dates estimées passées')} : vérifie sur Vinted.`);
+  if (nRetraits) phrases.push(nRetraits === 1 && lieuCourt(retraits.lieu) ? `Dernier jour pour retirer ton colis à ${lieuCourt(retraits.lieu)}.` : `Dernier jour pour retirer ${nRetraits} colis.`);
+  if (nOffres) phrases.push(`${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')} avant demain soir.`);
+  if (manques.length && nColis) phrases.push(`${manques.join(' et ')} pas ${pl(manques.length, 'relu', 'relus')} : il peut y en avoir plus.`);
+  return { title, body: phrases.join(' ') };
 }
 
 // ── L'APERÇU, famille par famille (ids de api/_lib/notif-textes.js, FAMILLES) ──
@@ -151,9 +171,9 @@ export const APERCUS_NOTIF = {
     ],
   },
   rappels: {
-    quoi: 'La veille au soir (colis à poster demain), la déclaration URSSAF à faire, le bilan de la semaine, un compte Vinted pas relu depuis plus de 24 h.',
+    quoi: 'Le soir, ce qu’il y a à faire demain (colis, retraits, offres), la déclaration URSSAF à faire, le bilan de la semaine, un compte Vinted pas relu depuis plus de 24 h.',
     exemples: [
-      { ...texteSoir({ n: 3, auMoins: false, retard: 0, demain: 1, heureDemain: '12:00' }), mene: 'Colis · À envoyer' },
+      { ...texteSoir({ colis: { demain: 2, heure: '12:00', retard: 0, aVerifier: 0 }, retraits: { n: 1, lieu: 'Tabac des Halles, 8 Rue des Lilas, 44000 Nantes' }, offres: { n: 0 } }), mene: 'Colis · À envoyer (le premier geste de demain)' },
       ...(URSSAF && URSSAF.envoyer ? [{ ...deux(URSSAF), mene: 'Comptabilité · ta déclaration' }] : []),
       { ...deux(BILAN), mene: 'Ma journée' },
       { ...texteComptesARelire([{ nom: EX.compte, age: 'il y a 2 j' }]), mene: 'Paramètres · Comptes liés' },
