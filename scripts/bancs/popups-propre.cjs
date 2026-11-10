@@ -129,7 +129,7 @@ const paragraphes = (pg, seuil) => pg.evaluate((seuil) => {
   const bloc = (d) => /^(block|flex|grid|list-item|table|table-cell|flow-root)$/.test(d);
   const longs = [];
   for (const el of main.querySelectorAll('*')) {
-    if (el.closest('[data-feuille], [data-feuille-cadre], svg, script, style, select, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary), .vrm-pop-corps')) continue;
+    if (el.closest('[data-feuille], [data-feuille-cadre], svg, script, style, select, table, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary), .vrm-pop-corps')) continue;
     const s = getComputedStyle(el);
     if (!bloc(s.display) || !vis(el)) continue;
     // une feuille de texte : aucun enfant BLOC qui porte du texte

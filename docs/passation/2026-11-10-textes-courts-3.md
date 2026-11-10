@@ -52,7 +52,17 @@ Exemples :
 - Avant chaque remplacement, les morceaux du texte d'avant cherchés dans `scripts/` (les bancs lisent des `data-*`,
   sauf les phrases gardées ci-dessus).
 - Banc `scripts/bancs/popups-propre.cjs` : `ECRANS` prolongé de `argent`, `argent-stats`, `argent-declarer`,
-  `argent-factures` (résultat dans le rapport de la branche).
+  `argent-factures`. P1 ignore désormais les `<table>` (des données, comme la liste du Stock ; le tableau
+  accessible caché de « Vendu par semaine » et l'en-tête du tableau des factures étaient lus comme un paragraphe).
+  Le premier passage a trouvé 4 vrais textes (tuile « Société », « CA déclaré pas encore calculé », Factur-X et
+  « Où l'envoyer », raison « Régime fiscal pas renseigné. » de `src/facturationElectronique.js`) ⇒ réécrits.
+  - cette branche : **266 verts / 9 rouges** au 1er passage complet (les 9 sur les écrans Argent ajoutés), puis
+    Argent seul **36 verts, 0 rouge** ;
+  - `origin/main` (git archive, son build, le banc copié dedans), Argent seul : **8 rouges** (« Pas encore
+    calculés : ils se lisent… », « Je n'ai pas pu lire ta connexion Super PDP… », Factur-X, « Société »).
+  - Captures 390 sombre/clair et 1512 regardées (Argent → Factures).
+- Banc `facturx` : 3 rouges (« un PDF est téléchargé », CSV/JSON, `scrollIntoViewIfNeeded`) **à l'identique sur
+  `origin/main`** (mesuré dans l'arbre `git archive`) — pas de ce lot.
 
 ## Ce qui reste
 

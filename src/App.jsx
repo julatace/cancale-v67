@@ -7086,7 +7086,7 @@ const tauxUrssaf = () => tauxDe(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT));
 const REGIMES_FISCAUX = [
   ['particulier', 'Particulier', 'Je vends mes propres affaires', "Rien à déclarer à l'URSSAF : VRM ne calcule aucune cotisation."],
   ['micro', 'Micro-entrepreneur', 'Auto-entrepreneur, achat-revente', 'VRM estime tes cotisations URSSAF sur ce que tu reçois.'],
-  ['societe', 'Société', 'SAS, SASU, SARL, EURL…', "Tes impôts et cotisations ne se calculent pas sur le chiffre d'affaires : VRM ne les estime pas."],
+  ['societe', 'Société', 'SAS, SASU, SARL, EURL…', "Impôts et cotisations hors chiffre d'affaires : VRM ne les estime pas."],
   ['marge', 'Régime de la marge', 'Société, TVA sur la marge', 'VRM calcule la TVA sur ta marge.'],
 ];
 const regimeValide = (r) => REGIMES_FISCAUX.some((x) => x[0] === r) ? r : null;
