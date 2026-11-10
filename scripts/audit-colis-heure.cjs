@@ -183,8 +183,10 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     await lancer(SOIR, { moment: 'soir' });
     const p = pushes.find((x) => /^soir-/.test(x.tag || '')) || {};
     console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
-    dit(/Demain : 4 colis à poster/.test(p.title || ''), 'le soir : « Demain : 4 colis à poster »', p.title);
-    dit(/1 déjà en retard/.test(p.body || '') && /1 à vérifier sur Vinted/.test(p.body || '') && /1 avec la date limite demain à 10 h/.test(p.body || ''), 'le « dont » : 1 déjà en retard (limite lue), 1 à vérifier (la vente sans email : date estimée), 1 avant demain 10 h — l’heure écrite', p.body);
+    // (10 nov., lot AT) Le soir est devenu le RÉSUMÉ DU SOIR : seulement ce qu'il y a à faire
+    // DEMAIN (906, estimée plus tard, n'est plus dite) — les mêmes faits, la même règle.
+    dit(p.title === 'Demain : 3 colis à déposer', 'le soir : « Demain : 3 colis à déposer » (906, dû plus tard, n’est pas dit)', p.title);
+    dit(/1 déjà en retard/.test(p.body || '') && /1 date estimée passée : vérifie sur Vinted/.test(p.body || '') && /1 colis à déposer avant 10 h demain/.test(p.body || ''), 'le corps : 1 déjà en retard (limite lue), 1 à vérifier (la vente sans email : date estimée), 1 avant demain 10 h — l’heure écrite', p.body);
   });
 
   console.log('\n── 4. Heure illisible : le jour seul, comme avant');
@@ -267,7 +269,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     await lancer(SOIR, { moment: 'soir' });
     const p = pushes.find((x) => /^soir-/.test(x.tag || '')) || {};
     console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
-    dit(!/déjà en retard/.test(p.body || '') && /^Demain : /.test(p.title || '') && !/retard/i.test(p.title || '') && /2 à vérifier sur Vinted/.test(p.body || ''), 'le soir : ni « déjà en retard » ni ⏰ — « 2 à vérifier sur Vinted » (la vente du 14 et celle du 15, estimées)', `${p.title} / ${p.body}`);
+    dit(!/déjà en retard/.test(p.body || '') && /^Demain : /.test(p.title || '') && !/retard/i.test(p.title || '') && /2 dates estimées passées : vérifie sur Vinted/.test(p.body || ''), 'le soir : ni « déjà en retard » ni ⏰ — « 2 dates estimées passées : vérifie sur Vinted » (la vente du 14 et celle du 15, estimées)', `${p.title} / ${p.body}`);
   });
   await essaie('module, estimée dépassée', async () => {
     if (!L) throw new Error('module absent');

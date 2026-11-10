@@ -35,7 +35,7 @@ libère son numéro (le dire ici).
 | Q | factures Pro : envoi auto (éteint), à envoyer, avoir, registre + zip | `claude/factures-pro-2` | **fait** (branche, sans PR) — `2026-11-10-factures-pro-2.md` |
 | R | livre de police | `claude/livre-police` | à lancer |
 | S | factures Pro Leboncoin/eBay/Vestiaire (forme à mesurer) | `claude/factures-autres` | à lancer |
-| T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | à lancer |
+| T | facture en anglais + alerte seuil TVA | `claude/facture-en-tva` | **fait** (à intégrer) |
 
 | U | annonces à compléter + avis sur chaque vente | `claude/annonces-avis` | à lancer |
 | V | scanner au dépôt (Colis) ET au retrait (Achats) | PR #1075 | **en ligne** |

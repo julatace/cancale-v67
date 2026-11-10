@@ -1,6 +1,7 @@
 import { PlateformesSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
+import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -36,8 +37,8 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
 // (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
-import { OffresSoloPro, ouvrirQuelCompte, choixDe } from '../abonnement/PlansSoloPro.jsx';
-import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO } from '../../api/_lib/plan-regle.js';
+import { OffresSoloPro, ouvrirQuelCompte, choixDe, listeProDe } from '../abonnement/PlansSoloPro.jsx';
+import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, MAX_VENDEURS_PRO, decouperCleVendeurPro } from '../../api/_lib/plan-regle.js';
 import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
 import { publierAbonnement, suivreAbonnement } from '../abonnement/etatAbonnement.js';
 
@@ -66,6 +67,7 @@ import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '..
 import GuideIphone, { useGuideIphone } from '../GuideIphone.jsx';
 // (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
 import SmsColisSetting from '../SmsColis.jsx';
+import RaccourcisSiri from '../RaccourcisSiri.jsx';
 import { etatJetonSms } from '../smsColis.js';
 // ⟦← App.jsx #6⟧
 import PhotoProfil,{AvatarCompte} from '../profil/AvatarPersonnel.jsx';
@@ -150,7 +152,15 @@ function ModelesSetting() {
   const [modeles, setModeles] = useStateCle(CLE_MODELES, () => lireModelesRanges());
   React.useEffect(() => onCloudReady(() => setModeles((l) => (l && l.length ? l : lireModelesRanges()))), []);   // eslint-disable-line react-hooks/exhaustive-deps
   const poser = (l) => { setModeles(l); save(CLE_MODELES, l); };
-  return <MesModeles modeles={modeles} onChange={poser} confirmer={(m) => askConfirm({ title: `Supprimer « ${m.nom} » ?`, ok: 'Supprimer', cancel: 'Annuler', danger: true })}/>;
+  // (10 nov., lot Y) Supprimer = à la corbeille 30 jours (pilule « Annuler » 5 s) : la feuille ne retire
+  // rien elle-même (`confirmer` rend false), le geste le fait sur la valeur rangée.
+  const aLaCorbeille = (m) => {
+    const L = load(CLE_MODELES, []); const i = Array.isArray(L) ? L.findIndex((x) => x && String(x.id) === String(m.id)) : -1;
+    if (i < 0) return true;
+    gesteCorbeille({ type: 'modele', libelle: m.nom || '', morceaux: [{ k: CLE_MODELES, type: 'element', idCle: 'id', id: L[i].id, index: i, avant: L[i] }] }, { [CLE_MODELES]: setModeles });
+    return false;
+  };
+  return <MesModeles modeles={modeles} onChange={poser} confirmer={aLaCorbeille}/>;
 }
 // ⟦← App.jsx #22⟧
 
@@ -1877,11 +1887,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', desc:'Choisir les mots, marques et comptes à cacher.', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", desc:'Agrandir ou réduire les textes de VRM.', val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
+      // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
+      { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:'Siri et Raccourcis', desc:'Ajouter un achat ou trouver un N° en parlant à Siri.', data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
     ]},
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      // (10 nov., lot Y) Ce qu'il a supprimé DANS VRM, restaurable 30 jours (src/corbeille.js).
+      { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:'Corbeille', desc:'Ce que tu as supprimé, à restaurer pendant 30 jours.', val:String(lireListeCorbeille().length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', desc:'Remettre VRM tel qu’il était dans une sauvegarde.', onClick:onImport },
     ], pied: (
       <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
@@ -2738,8 +2752,8 @@ function MonAbonnement() {
   // (9 nov., Solo par plateforme) Un choix fait dans la feuille « Quel compte vend ? »
   // (publié par elle) se relit ici tout de suite ; et les comptes des autres plateformes
   // (lus seulement en Solo) disent quelles rangées montrer.
-  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs } : p)); }), []);
-  const [autresSolo] = useComptesAutresSites(!!(e && e.plan === 'solo'));
+  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs, comptesPro: x.comptesPro !== undefined ? x.comptesPro : p.comptesPro } : p)); }), []);
+  const [autresSolo] = useComptesAutresSites(!!(e && (e.plan === 'solo' || e.proLimite === true)));
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
       const fin = e && e.finPeriode ? dateLisible(e.finPeriode) : 'la fin du mois payé';
@@ -2763,7 +2777,7 @@ function MonAbonnement() {
     if (!cgv) { setMsg("Coche les deux cases (conditions de vente et accès immédiat) avant de changer d'offre."); return; }
     const oui = await askConfirm({ title: plan === 'pro' ? 'Passer à Pro ?' : 'Revenir à Solo ?',
       desc: plan === 'pro'
-        ? 'Les ventes de tous tes comptes reviennent tout de suite, dans tes listes et tes totaux. Stripe calcule la différence au prorata sur ta prochaine facture.'
+        ? `Jusqu’à ${MAX_VENDEURS_PRO} comptes vendeurs, toutes plateformes : leurs ventes reviennent tout de suite. Au-delà de ${MAX_VENDEURS_PRO} comptes, tu choisis lesquels. Stripe calcule la différence au prorata sur ta prochaine facture.`
         : 'Un seul compte vendra : tu le choisiras ensuite. Les ventes de tes autres comptes sortent de tes totaux, rien n’est supprimé. Stripe calcule la différence au prorata.',
       ok: plan === 'pro' ? 'Passer à Pro' : 'Revenir à Solo', cancel: 'Annuler' });
     if (!oui) return;
@@ -2774,7 +2788,7 @@ function MonAbonnement() {
       if (r.ok && j && j.ok) {
         const x = await lireAbonnement();
         if (x) { setE(x); publierAbonnement(x); }
-        toast(plan === 'pro' ? '✓ Tu es en Pro : tous tes comptes vendent' : '✓ Tu es en Solo : choisis le compte qui vend');
+        toast(plan === 'pro' ? `✓ Tu es en Pro : ${MAX_VENDEURS_PRO} comptes vendeurs` : '✓ Tu es en Solo : choisis le compte qui vend');
         if (plan === 'solo') ouvrirQuelCompte();
       } else setMsg((j && j.message) || "Ton offre n'a pas changé. Réessaie dans un instant.");
     } catch (_) { setMsg('Pas de connexion : ton offre n’a pas changé.'); }
@@ -2806,6 +2820,21 @@ function MonAbonnement() {
           })}
         </GroupeIos>
       )}
+      {/* (10 nov.) Pro = 10 comptes vendeurs au total : UNE rangée, qui ouvre « Quels 10 comptes vendent ? ». */}
+      {e && e.plan === 'pro' && e.proLimite === true && (() => {
+        const l = listeProDe(e) || [];
+        const nb = l.reduce((n, k) => { const d = decouperCleVendeurPro(k); n[d.plateforme] = (n[d.plateforme] || 0) + 1; return n; }, {});
+        const resume = ['vinted', ...PLATEFORMES_SOLO].filter((p) => nb[p]).map((p) => `${NOMS_PLATEFORMES_SOLO[p]} ${nb[p]}`).join(' · ');
+        const attendre = e.comptesPro && e.comptesPro.prochainChangement;
+        return (
+          <GroupeIos titre={`Tes ${MAX_VENDEURS_PRO} comptes vendeurs`} pied={attendre ? `Retirer un compte : possible le ${dateLisible(attendre)}.` : `Tes autres comptes gardent leurs achats. Retirer un compte : une fois tous les 30 jours.`}>
+            <RangeeIos titre={<span data-comptes-pro={l.length}>{l.length ? `${l.length} / ${MAX_VENDEURS_PRO} choisis` : 'Pas encore choisis'}</span>}
+              detail={l.length ? resume : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
+              onClick={() => ouvrirQuelCompte('pro')} data-rangee-compte-vendeur="pro"/>
+          </GroupeIos>
+        );
+      })()}
+      {e && e.plan === 'pro' && e.proLimite === false && !e.proprietaire && <div className="vrm-ios-groupe-pied" data-plan-raison="pro-ancien" style={{ margin: '8px 16px 0' }}>Ton Pro a été pris avant la limite de {MAX_VENDEURS_PRO} comptes : tous tes comptes vendent, comme le disaient tes conditions.</div>}
       {e && e.plan === 'solo' && e.offres && e.offres.pro && e.offres.pro.ouvert && <CaseCgv cases={cases} onChange={setCases}/>}
       {e && e.plan == null && e.planRaison === 'cgv-anterieures' && <div className="vrm-ios-groupe-pied" data-plan-raison="cgv-anterieures" style={{ margin: '8px 16px 0' }}>Abonné avant Solo et Pro : tous tes comptes vendent.</div>}
     </div>
