@@ -141,7 +141,7 @@ Puis **Deployments** → le plus récent → **⋯** → **Redeploy**.
 
 ## Étape 6 — Vérifier (2 min)
 
-1. VRM → **Paramètres** → **E-mails** → **Recevoir tes e-mails Vinted dans VRM**.
+1. VRM → **Paramètres** → **Mes e-mails** → **Mon adresse VRM**.
 2. Ton adresse VRM s'affiche. (Encore « Bientôt disponible » ? La liste dit quoi.)
 3. Étape 3 de la fenêtre : **Envoyer l'e-mail d'essai**, depuis ta boîte.
 4. En moins d'une minute : **Reçu ✓**.

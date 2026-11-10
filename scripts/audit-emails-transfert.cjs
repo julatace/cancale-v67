@@ -22,7 +22,9 @@ require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calm
 //   F. sans domaine configuré : la route le DIT (pret:false, manque:domaine),
 //      aucune adresse ; au SEUL propriétaire, ce qui manque (états, jamais une
 //      valeur) ; domaine mal écrit ⇒ « mal-forme » ;
-//   G. le Worker de la notice de Julien est, octet pour octet, le fichier testé.
+//   G. le Worker de la notice de Julien est, octet pour octet, le fichier testé ;
+//   H. Paramètres → Mes e-mails : la ligne « Mon adresse VRM » ouvre la feuille,
+//      À CÔTÉ des SMS de colis (gardés), et la notice y mène.
 // `--src <arbre>` : le lance sur un autre arbre (preuve sur origin/main).
 // ═══════════════════════════════════════════════════════════════════════════
 const path = require('path');
@@ -255,6 +257,21 @@ const message = (raw, to, en = {}) => ({ raw, to, from: 'bounce+srs=sophie@gmail
     const fichier = fs.existsSync(path.join(RACINE, 'cloudflare', 'worker-reception.js')) ? fs.readFileSync(path.join(RACINE, 'cloudflare', 'worker-reception.js'), 'utf8') : '';
     dit(!!bloc && bloc === fichier, 'G. le code à coller dans la notice est, octet pour octet, le Worker testé ici', bloc ? `${bloc.length} / ${fichier.length} octets` : 'notice ou bloc absent');
     dit(/DOMAINE_RECEPTION/.test(texte) && /EMAIL_INBOUND_SECRET/.test(texte) && /route1\.mx\.cloudflare\.net/.test(texte) && /Catch-all/i.test(texte), 'G. la notice nomme les variables, les MX de Cloudflare et le catch-all');
+  });
+
+  // ── H. Paramètres → Mes e-mails : la ligne qui crée l'adresse ─────────────
+  await essaie('H', async () => {
+    const src = fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8').replace(/^\s*\/\/[^\n]*/gm, '');
+    const debut = src.indexOf("id:'emails-reglages'"), fin = src.indexOf("id:'notifications'", debut);
+    const groupe = debut > 0 && fin > debut ? src.slice(debut, fin) : '';
+    const iA = groupe.indexOf("id:'adresse-vrm'"), iS = groupe.indexOf("id:'sms-colis'");
+    dit(iA > 0 && iS > iA && /<SmsColisSetting/.test(groupe), 'H. « Mon adresse VRM » est dans Mes e-mails, juste avant les SMS de colis (gardés)', `adresse ${iA} · sms ${iS}`);
+    const ligne = iA > 0 ? groupe.slice(iA, groupe.indexOf('\n', iA)) : '';
+    const ouvre = /onClick:\(\)=>(set[A-Za-z]+)\(true\)/.exec(ligne);
+    const monte = ouvre && new RegExp('\\{feuilleAdresseVrm && <FeuilleAdresseVrm [^\\n]*onFermer=\\{\\(\\)=>' + ouvre[1] + '\\(false\\)').test(src);
+    dit(!!monte && /m\.FeuilleAdresseReception/.test(src), 'H. la ligne ouvre LA feuille de l’adresse (FeuilleAdresseReception), qui se referme');
+    const doc = fs.readFileSync(path.join(RACINE, 'docs', 'emails-transfert-mise-en-service.md'), 'utf8');
+    dit(/\*\*Mes e-mails\*\* → \*\*Mon adresse VRM\*\*/.test(doc), 'H. la notice de Julien mène à la même ligne');
   });
 
   console.log(`\n${ok} ✅ · ${ko} ❌`);
