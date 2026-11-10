@@ -67,7 +67,7 @@ libère son numéro (le dire ici).
 | AN | photo en grand partout + Achats plus beaux + facture d'achat hors Vinted (9, 10, 16) | `claude/photos-achats` | en cours |
 | AO | Compta reliée à Statistiques (8) | `claude/compta-stats` | en cours |
 | AP | republication à la main conseillée et attirante, photos vers la galerie, N° et descriptions en sélection multiple (17) | `claude/republier-main` | à lancer |
-| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | à lancer |
+| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | en cours |
 | AR | Communauté pour les créateurs de formation (7) | `claude/communaute-formateurs` | à lancer |
 
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
