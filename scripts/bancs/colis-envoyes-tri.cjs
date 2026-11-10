@@ -16,7 +16,7 @@
 //  T. transporteur de chaque carte (`data-envoye-transp`), aucun groupe « Autres » ;
 //  F. pastilles « Tous · 6 · Chronopost 2 · Mondial Relay 1 · Transporteur inconnu 3 », un clic filtre ;
 //  S. « Suivre » chez le transporteur pour T1 ;
-//  A. « À envoyer » reste rangé par urgence (date limite la plus proche d'abord) ;
+//  A. « À envoyer » : la vente la plus récente d'abord (lot AJ, 9 nov. soir ; avant : par urgence) ;
 //  R. la règle pure (src/colisEnvoyes.js, api/_lib/transporteur-bordereau.js) ;
 //  Z. aucune erreur, rien ne déborde.
 // Lancer : construire dist/, puis node scripts/bancs/colis-envoyes-tri.cjs   (BANC_PORT 9071, SHOTS=dossier)
@@ -229,7 +229,9 @@ async function regle() {
         await pg.waitForFunction(() => document.querySelectorAll('[data-bord-card]').length >= 2, null, { timeout: 20000 }).catch(() => {});
         await pg.waitForTimeout(1200);
         const A = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card]')].map((x) => x.getAttribute('data-colis-ident')));
-        dit(A.join() === 'v:7202,v:7201', 'A. « À envoyer » : la limite la plus proche d’abord (7202 demain, puis 7201)', A.join());
+        // (9 nov., soir, lot AJ — décision de Julien) « À envoyer » : la vente la plus RÉCENTE en haut (7201 vendue
+        // il y a 1 j, puis 7202 il y a 5 j), plus la limite la plus proche — banc mis à jour, règle : src/ordreRecent.js.
+        dit(A.join() === 'v:7201,v:7202', 'A. « À envoyer » : la vente la plus récente d’abord (7201, puis 7202 malgré sa limite demain)', A.join());
         const IS = await pg.evaluate(() => { const e = document.querySelector('[data-infos-sms="vestiaire"]'); return e ? { n: e.getAttribute('data-infos-sms-n'), t: e.innerText } : null; });
         dit(IS && IS.n === '1' && /Prada/.test(IS.t) && /12 nov/.test(IS.t) && !/peut-être «/.test(IS.t), 'I. « À envoyer » dit l’information SMS Vestiaire (marque, date limite), sans la relier à rien', JSON.stringify(IS));
         dit(A.length === 2, 'I. l’information SMS n’est pas comptée comme un colis');

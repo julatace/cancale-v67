@@ -378,7 +378,7 @@ import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
-import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
+import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
@@ -413,6 +413,7 @@ import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons } from "./colisEnvoyes.js";
+import { ordreRecent, nbSansDate, debutSansDate, PHRASE_SANS_DATE, quandCommandeVinted, quandLeboncoin, quandEbay, quandVestiaire, quandColisAEnvoyer, quandARetirer, ordreRecentPoints } from "./ordreRecent.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
 const TOURNEE_SUR_JOURNEE = false;
@@ -20185,8 +20186,11 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   const ventes=lbcVentes.ventes || [];
   // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
   const lbcOuvert = useCompteLbcOuvert();
-  const visibles=ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
-    && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o))));
+  // (9 nov., soir, lot AJ) La plus récente en haut, TOUS COMPTES MÉLANGÉS (date de vente lue, sinon la date
+  // relevée par l'extension ou datée à la main) ; sans date en bas — la règle unique (src/ordreRecent.js).
+  const datesLbcV = React.useMemo(() => lireDatesLbc(), [lbcVentes]);
+  const visibles=ordreRecent(ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
+    && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o)))), (o) => quandLeboncoin(o, datesLbcV));
   // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay, 26 oct.) ──────────────────────
   // N° et bénéfice par IDENTITÉ seulement (§5) : `numeroLbcIdentite` (lien posé
   // à la main > référence VRM de l'annonce, '' si ambigu), puis le prix d'achat
@@ -20258,8 +20262,9 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const fmt2 = (n) => n.toFixed(2).replace('.', ',') + '\u00a0€';
   // (28 oct.) Le plus récent d'abord, comme les achats Vinted ; une date
   // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
-  const tsAchat = (o) => { const t = o && o.dateVente ? Date.parse(o.dateVente) : NaN; return isNaN(t) ? -Infinity : t; };
-  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{[...arr].sort((a, b) => tsAchat(b) - tsAchat(a)).map(o => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />)}</div>;
+  // (9 nov., soir, lot AJ) La règle unique (src/ordreRecent.js) : date d'achat lue, tous comptes mélangés.
+  const tsAchat = (o) => quandLeboncoin(o);
+  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{ordreRecent(arr, tsAchat).map(o => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />)}</div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
       {/* (27 oct., « pareil que Vinted ») Plus de second titre « Achats
@@ -21872,7 +21877,8 @@ function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
   // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
-  const E = vc.aEnvoyer || [], F = vc.faits || [];
+  // (9 nov., soir, lot AJ) La vente la plus récente en haut (src/ordreRecent.js) ; la limite reste sur la carte.
+  const E = ordreRecent(vc.aEnvoyer || [], quandVestiaire), F = ordreRecent(vc.faits || [], quandVestiaire);
   if (!E.length && !F.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
@@ -21946,8 +21952,8 @@ function AchatsVestiaire() {
   else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus. Ouvre <b style={{ color: C.text }}>tes achats</b> (« Mes commandes ») sur Vestiaire, dans le navigateur où l'extension VRM est installée{extSait('vcachats') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord</> : ''} : elle les lit en passant. Ton panier n'est jamais lu.</div>;
   else {
-    const liste = Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v }))
-      .sort((a, z) => String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
+    // (9 nov., soir, lot AJ) le plus récent en haut, la règle unique (src/ordreRecent.js)
+    const liste = ordreRecent(Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v })), quandVestiaire);
     if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire à la dernière lecture{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur vestiairecollective.com {NAV.dans} : il apparaît ici.</div>;
     else corps = (
       <div data-vc-achats="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -31913,7 +31919,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
   // `STYLE_FLOU` : UNE définition, partagée avec Leboncoin (src/flouCompte.js, §11).
   const ventesAffichees = useMemo(() => {
-    const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = (ventesListe || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
@@ -31953,14 +31958,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ── FILTRE PAR COMPTE (sélecteur de l'onglet) ────────────────────────────
     // ⚠️ `_acc` d'une vente est l'OBJET compte (son uid vit dans
     //    `_acc.vinted_user_id`, repli `_uid`) — comme les annonces, PAS une
-    //    chaîne. Compte choisi ⇒ ses ventes seules ; « Tous » ⇒ celles du compte
-    //    connecté d'abord (tri STABLE, l'ordre par date ci-dessous conservé dans
-    //    chaque groupe).
-    .sort(parDateDesc);
-    // Compte sélectionné (ou connecté) EN TÊTE ; les autres restent (ils seront
-    // FLOUTÉS à l'affichage, pas masqués — demande de Julien). Tri stable.
-    { const c = selEff;
-      if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
+    //    chaîne. Le compte choisi (ou connecté) est NET, les autres FLOUTÉS à
+    //    l'affichage (pas masqués — demande de Julien).
+    ;
+    // ⚠️⚠️ (9 nov., soir, lot AJ — Julien : « du plus récent en haut au plus vieux en bas, peu importe le
+    // compte ») LA PLUS RÉCENTE EN HAUT, TOUS COMPTES MÉLANGÉS : la règle unique `ordreRecent`
+    // (src/ordreRecent.js), date de vente lue, stable, sans date en bas. AVANT : le compte choisi (ou
+    // connecté) passait EN TÊTE — ne pas le remettre ; le flou par compte reste, à sa place dans le temps.
+    arr = ordreRecent(arr, quandCommandeVinted);
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ventesListe, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff, emailBords, bordsHidden, partisVinted]);
@@ -31971,6 +31976,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // diraient à l'identique se dit une fois en tête de la liste — la note « vue par e-mail » par
   // compte (`groupesVentesEmailEnTete`), le refus de facture commun (`FactureRaisonsTete`, qui
   // juge sur `groupeFacture` avec la règle de la ligne). Placés après `ventesMax` (TDZ, §4.6).
+  // (lot AJ) Les ventes sans date lue vont en bas (src/ordreRecent.js) : où elles commencent, combien — dit une fois.
+  const ventesSansDate = useMemo(() => ({ i: debutSansDate(ventesAffichees, quandCommandeVinted), n: nbSansDate(ventesAffichees, quandCommandeVinted) }), [ventesAffichees]);
   const ventesEmailTete = useMemo(() => groupesVentesEmailEnTete(ventesAffichees.slice(0, ventesMax)), [ventesAffichees, ventesMax]);
   const groupeFacture = useMemo(() => ventesAffichees.slice(0, ventesMax).map((o) => {
     const tx = o && (o._fromEmail ? o._txMail : o.transaction_id);
@@ -34653,7 +34660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     });
   };
-  const achatsAffiches = useMemo(() => { const uidA = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+  const achatsAffiches = useMemo(() => {
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
@@ -34661,26 +34668,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (aFilter === 'recus') return p === 'recu';
       return true; })
     .filter(o => matchOrd(o))
-    .sort(parDateDesc)
-    .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; })
-    // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui
-    // s'affiche en haut peu importe le compte et le filtre ») EN ROUTE : le plus
-    // RÉCENT en haut, et RIEN d'autre ne passe devant — ni l'étape du colis, ni
-    // le compte choisi. (Avant : le plus ancien d'abord, après l'étape, puis le
-    // compte choisi en tête.) Ailleurs, inchangé : l'étape puis le plus récent.
-    .sort((a, b) => {
-      if (aFilter === 'route') return (tsCommande(b.o)||0) - (tsCommande(a.o)||0);
-      const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
-      const d = pr(a) - pr(b); if (d !== 0) return d;
-      return new Date(b.o.date||0) - new Date(a.o.date||0); });
-    // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés, pas
-    // masqués — demande de Julien). Tri STABLE. Pas dans « En route » (5 nov.).
-    { const c = selEff;
-      if (c && aFilter !== 'route') arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
+    .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; });
+    // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui s'affiche en haut peu importe
+    // le compte et le filtre ») puis (9 nov., soir, lot AJ — « du plus récent en haut au plus vieux en bas,
+    // peu importe le compte ») PARTOUT : le plus RÉCENT en haut (date d'achat lue), et RIEN d'autre ne
+    // passe devant — ni l'étape du colis, ni le compte choisi (il reste net, les autres floutés, à leur
+    // place dans le temps). La règle unique `ordreRecent` (src/ordreRecent.js) : stable, sans date en bas.
+    // Ne PAS remettre « l'étape d'abord » ni « le compte choisi en tête ».
+    arr = ordreRecent(arr, (x) => quandCommandeVinted(x.o));
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
   const [achatsMax, setAchatsMax] = useState(60);
+  // (lot AJ) Les achats sans date lue vont en bas (src/ordreRecent.js) : dit une fois.
+  const achatsSansDate = useMemo(() => ({ i: debutSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)), n: nbSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)) }), [achatsAffiches]);
   const [achatsOutilsOuverts, setAchatsOutilsOuverts] = useState(false);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
@@ -36799,10 +36800,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (5 nov., chantier D) Les groupes « Prêts à imprimer » / « En attente de leur bordereau » n'existent
     // plus (la liste est rangée par transporteur, le plus pressé d'abord) : la phrase disait où
     // chercher dans des groupes absents. Elle dit l'ordre réel, une fois.
-    if (!u.presseAttente) return 'dans chaque transporteur, le plus pressé est en haut.';
+    // (9 nov., soir, lot AJ) La liste est rangée du plus récent au plus ancien (décision de Julien) :
+    // les pressés se lisent sur leur carte (date limite, ambre si proche), plus « en haut ».
+    if (!u.presseAttente) return 'sa date limite est écrite sur sa carte.';
     return u.presseAttente > 1
-      ? `dans chaque transporteur, le plus pressé est en haut ; ${u.presseAttente} attendent encore leur bordereau.`
-      : 'dans chaque transporteur, le plus pressé est en haut ; 1 attend encore son bordereau.';
+      ? `sa date limite est écrite sur sa carte ; ${u.presseAttente} attendent encore leur bordereau.`
+      : 'sa date limite est écrite sur sa carte ; 1 attend encore son bordereau.';
   };
 
   // La saisie en série : l'écriture de tout prix tapé (`ecrirePrixTape`, src/prixAuNumerotage.js).
@@ -37810,20 +37813,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
     // (5 nov.) L'ACHAT LEBONCOIN OU VESTIAIRE D'UN COLIS, PAR SON N° DE SUIVI (src/retraitQr.js, §5) :
     // jamais le titre, le prix ou le relais ; deux achats au même n° ⇒ personne.
+    // (9 nov., soir, lot AJ) LA DATE D'ARRIVÉE LUE d'un colis à retirer, pour l'ORDRE seulement (le plus
+    // récent en haut, src/ordreRecent.js) : l'arrivée de l'e-mail du colis (`arriveeColisEmail`), ou
+    // l'arrivée PROUVÉE d'un achat vu par Vinted (`arriveeSure` : message d'arrivée de la conversation,
+    // ligne « disponible » du transporteur) — jamais la borne « au plus tard ». Rien de lu ⇒ null (en bas).
+    const arriveeLueRetrait = ({ t = null, o = null } = {}) => {
+      try {
+        if (t) { const a = arriveeColisEmail(t); return a && Number.isFinite(a.ms) ? a.ms : null; }
+        if (o) { const e = etatColisVinted(o, maintenant, tpmC); return e && Number.isFinite(e.arriveeSure) ? e.arriveeSure : null; }
+      } catch (_) {}
+      return null;
+    };
     const achatsAutres = indexAchatsAutresSites({ lbcVentes: (lbcVentes && lbcVentes.achats) || [], vcAchats: ((vcEtat || vcBrut) && (vcEtat || vcBrut).achats) || null });
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
     for (const o of (pickupUnion.extra || [])) {
       const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -37838,11 +37852,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
+        arrivee: arriveeLueRetrait(x.kind === 'email' ? { t: x.t } : { o: x.o }),
         raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC) || colisInternational(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
+        arrivee: arriveeLueRetrait({ o }),
         raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, src: { o } }); }
     // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
     if (Array.isArray(sales.items)) {
@@ -37950,6 +37966,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [tourneeDepot, setTourneeDepot] = useState(false);
   // (9 nov.) Colis → Envoyés : la pastille de transporteur choisie (« tous » par défaut).
   const [filtreEnvoyes, setFiltreEnvoyes] = useState('tous');
+  // (lot AJ) La pastille de transporteur de « À envoyer » (un filtre, jamais un ordre).
+  const [filtreEnvoyer, setFiltreEnvoyer] = useState('tous');
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
   // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
   // (5 nov.) Leboncoin aussi (la tournée) : sa coche « Colis fait » de toujours (`vrm_lbc_colis_done`).
@@ -38425,11 +38443,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (5 nov.) Le compte d'un colis ne se dit que s'il y en a plusieurs (un seul compte : la même étiquette
   // sur chaque carte ne distingue rien, §7).
   const plusieursComptesColis = (accounts || []).length > 1;
-  // L'ordre de l'écran ET de « Tout imprimer » : la limite la plus proche d'abord (LUE dans l'e-mail du
-  // bordereau quand on l'a, sinon l'estimation vente + 7 j — `dl`), à limite égale la vente la plus
-  // ANCIENNE ; puis par transporteur, dans l'ordre de leur premier colis (src/lotTransporteurs.js).
-  const rangerColisEnvoi = (tous, trNom) => rangerParTransporteur(ordrePreparation(tous, { jours: (x) => x.dl, attente: attenteColis }), { trNom, jours: (x) => x.dl });
-  // Les colis à envoyer rangés comme l'écran : le plus pressé d'abord, puis par transporteur.
+  // ⚠️⚠️ (9 nov., soir, lot AJ — DÉCISION NOUVELLE de Julien : « du plus récent en haut au plus vieux en
+  // bas, peu importe le compte ») L'ORDRE DE L'ÉCRAN, DE « PRÉPARER MES COLIS » ET DE LA TOURNÉE : la vente
+  // la plus RÉCENTE en haut, tous comptes et sites mélangés, stable, sans date en bas (src/ordreRecent.js,
+  // `quandColisAEnvoyer` = date de la vente). Elle REMPLACE le tri par urgence (limite la plus proche
+  // d'abord, puis groupes par transporteur) des 8-9 nov. : la date limite reste écrite sur chaque carte
+  // (ambre si aujourd'hui/demain), le transporteur devient une pastille (filtre), jamais un ordre imposé.
+  // « Tout imprimer » (le PDF) garde ses groupes par transporteur (choix n° 2 du 3 nov.), chacun dans cet ordre.
+  const rangerColisEnvoi = (tous) => ordreRecent(tous, quandColisAEnvoyer);
+  // Les colis à envoyer rangés comme l'écran : le plus récent en haut (lot AJ).
   const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
   const listeEnvoyes = () => {
@@ -39644,18 +39666,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // conversation / l'annonce ELLE-MÊME, ou celle reliée par son identifiant (n° de
         // transaction, n° de suivi ou code de retrait via `cmdParColis`, txId Leboncoin, vente
         // Vestiaire). Jamais un titre. Les MÊMES listes que les compteurs (aucun nombre ne change) ;
-        // l'ordre est celui de la liste (le plus pressé d'abord).
+        // l'ordre est celui de la liste de Colis (le plus récent d'abord depuis le lot AJ).
         const photosCase = (() => {
           const out = { envoyer: [], retirer: [], messages: [], prix: [] };
           try {
             const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
-            // `toShip` est déjà rangé du plus pressé au moins pressé (l'ordre de Colis).
-            out.envoyer = [
-              ...toShip.map((t) => orderPhoto(t.o)),
-              ...((colisEb && colisEb.aPoster) || []).map((x) => x.ordre ? photoCommande(x.ordre) : null),
-              ...((colisAutres.vestiaire) || []).map((v) => v && v.photo),
-              ...((colisAutres.leboncoin) || []).map((x) => photoArticle(lbcParTx.get(String(x.txId)))),
-            ];
+            // (9 nov., soir, lot AJ) L'ORDRE DE COLIS → « À envoyer » : la vente la plus RÉCENTE d'abord, tous
+            // sites et comptes mélangés (src/ordreRecent.js) — plus « le plus pressé d'abord ».
+            out.envoyer = ordreRecent([
+              ...toShip.map((t) => ({ p: orderPhoto(t.o), t: quandCommandeVinted(t.o) })),
+              ...((colisEb && colisEb.aPoster) || []).map((x) => ({ p: x.ordre ? photoCommande(x.ordre) : null, t: quandEbay(x.ordre) })),
+              ...((colisAutres.vestiaire) || []).map((v) => ({ p: v && v.photo, t: quandVestiaire(v) })),
+              ...((colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)); return { p: photoArticle(o), t: quandLeboncoin(o || x) }; }),
+            ], (x) => x.t).map((x) => x.p);
             out.retirer = [
               ...(pickupUnion.emailList || []).map((t) => { const o = pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)); return o ? orderPhoto(o) : null; }),
               ...(pickupUnion.extra || []).map((o) => orderPhoto(o)),
@@ -39697,7 +39720,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .sort((a, b) => (a.jours == null ? 9999 : a.jours) - (b.jours == null ? 9999 : b.jours));
             const colRet = colonnesColis(cartesColis(), 'toutes').colonnes.find(c => c.cle === 'retirer');
             const pointsVinted = ((dropOffs && dropOffs.carriers) || []).flatMap(c => c.points || []);
-            const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: [], pointsVinted });
+            const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: [], pointsVinted, ordonner: ordreRecentPoints });
             const minuit0 = new Date(); minuit0.setHours(0, 0, 0, 0); const m0 = minuit0.getTime();
             const t = etapesTournee({
               lignesImpr, nPrets, pretsAuMoins: !pretsExact, imprPasSu: emailBords === null,
@@ -40459,10 +40482,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {!premierJour && (
                   <FriseJournee liveStats={liveStats} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte}
                     onVentes={() => onNav && onNav('cat_ventes')}
-                    photosEntre={(de, a) => (sales.items || [])
+                    photosEntre={(de, a) => ordreRecent((sales.items || [])
                       .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
                       .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
-                      .sort((x, y) => y.t - x.t).map((x) => orderPhoto(x.o)).filter(Boolean)}/>
+                      .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>
                 )}
                 {/* (3 nov., carte réglable par page) Les chiffres de la tête : un grand chiffre + trois
                     cases, choisis par Julien (« Modifier »). Défaut = vendu aujourd'hui (porté par la frise
@@ -40806,7 +40829,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               (`ordSearchDiff` est en retard) : `LigneVenteVinted` garde alors la
               ligne déjà peinte. Le rendu différé, lui, refait tout comme avant
               — aucun comportement ne change. */}
-          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{ const gel = ordSearch!==ordSearchDiff; return <LigneVenteVinted key={o.transaction_id} o={o} i={i} gel={gel} pre={gel?null:preparerLigneVente(o)} rendre={(o,i,pre)=>{
+          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{ const gel = ordSearch!==ordSearchDiff; return <React.Fragment key={o.transaction_id}>{i === ventesSansDate.i ? <LigneSansDate n={ventesSansDate.n}/> : null}<LigneVenteVinted o={o} i={i} gel={gel} pre={gel?null:preparerLigneVente(o)} rendre={(o,i,pre)=>{
             if (!pre) pre = preparerLigneVente(o);
             const st = classifyOrderStatus(o.status);
             const hidden = pre.hidden;
@@ -41028,7 +41051,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
-          }}/>; })}
+          }}/></React.Fragment>; })}
         </div>
         <BarreAnnulerDepose attente={deposeVente.attente} onAnnuler={deposeVente.annuler} zIndex={Z_CONFIRMATION - 1}/>
         {/* ⚠️ RIEN N'EST CACHÉ : le compte total est écrit sur le bouton, et
@@ -42584,7 +42607,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            <div key={o.transaction_id} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+            <React.Fragment key={o.transaction_id}>
+            {i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
+            <div className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
@@ -42689,6 +42714,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               })()}
             </div>
+            </React.Fragment>
           );})}
         </div>
           </>); })()}
@@ -44143,7 +44169,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const photoCarte = (src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(src)}/>;
           const colRet = vue.colonnes.find(c => c.cle === 'retirer');
           const pointsVinted = ((dropOffs && dropOffs.carriers) || []).flatMap(c => c.points || []);
-          const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: (groupesRelais && groupesRelais.attendus) || [], pointsVinted });
+          const parPoint = pointsARetirer({ colis: ((colRet && colRet.cartes) || []).map(x => ({ ...x, id: x.cle, titre: x.nom, nom: x.lieuNom || '', adresse: x.lieuAdresse || '' })), attendus: (groupesRelais && groupesRelais.attendus) || [], pointsVinted, ordonner: ordreRecentPoints });
           // « Pas su » se DIT dans la colonne concernée, jamais un 0 muet (§5).
           const notes = {
             prets: ((sales.loading || accountsReady !== true || accounts.length > 0) && !sales.items) ? 'Je lis tes ventes…' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n’ont pas pu être lues.' : (!labelsPrets || emailBords===null) ? 'Je lis encore tes bordereaux : il y en a peut-être plus.' : null,
@@ -45126,8 +45152,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
                 // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
                 const tous = [...ex, ...autresColis];
-                const exT = rangerColisEnvoi(tous, trNomDe);
-                const nParT = {}; tous.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
+                // (9 nov., soir, lot AJ) UNE liste, la vente la plus récente en haut (tous comptes, tous sites) ;
+                // le transporteur est une PASTILLE (filtre, comme « Envoyés »), plus un groupe qui impose l'ordre.
+                const trDeColis = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
+                const pastillesEnv = filtresTransporteurs(tous, trDeColis);
+                const { liste: tousF, filtre: filtreEnvT } = filtrerEnvoyes(tous, filtreEnvoyer, trDeColis);
+                const exT = rangerColisEnvoi(tousF, trNomDe);
+                const iSansDateEnv = debutSansDate(exT, quandColisAEnvoyer), nSansDateEnv = nbSansDate(exT, quandColisAEnvoyer);
+                const pastillesEl = pastillesEnv.length > 1 ? (
+                  <div key="__filtres-env" className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyer-filtres="" data-envoyer-filtre={filtreEnvT} style={{display:'flex',gap:6,marginBottom:4}}>
+                    <button type="button" aria-pressed={filtreEnvT === 'tous'} data-envoyer-filtre-choix="tous" data-envoyer-filtre-n={tous.length} onClick={() => setFiltreEnvoyer('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {tous.length}</button>
+                    {pastillesEnv.map((p) => (
+                      <button key={p.nom} type="button" aria-pressed={filtreEnvT === p.nom} data-envoyer-filtre-choix={p.nom} data-envoyer-filtre-cle={p.cle || 'inconnu'} data-envoyer-filtre-n={p.n} onClick={() => setFiltreEnvoyer(filtreEnvT === p.nom ? 'tous' : p.nom)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{p.nom} · {p.n}</button>
+                    ))}
+                  </div>
+                ) : null;
                 const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
                   if (e.__autre === 'vc') return <CarteColisVc v={e.v} imprime={!!(vcCarte('vrm_vc_imprimes') || {})[e.v.id]} fait={null}/>;
@@ -45164,19 +45203,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
-                return (colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
-                const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
-                const trG = e.__autre ? e.tr : transporteurVente(e.b);
+                return [pastillesEl, ...(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
+                const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
                   <React.Fragment key={e.key}>
-                    {ouvreT && (
-                      <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                        <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                        <h3>{trNomDe(e)}</h3>
-                        <span>{nParT[trNomDe(e)]} colis</span>
-                      </div>
-                    )}
-                    {carteAutre(e)}
+                    {ouvreSansDate}
+                    <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-envoyer-site={e.__autre} style={{display:'contents'}}>{carteAutre(e)}</div>
                   </React.Fragment>);
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
@@ -45225,14 +45258,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
                 return (
                   <React.Fragment key={e.key}>
-                  {ouvreT && (
-                    <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                      <h3>{trNomDe(e)}</h3>
-                      <span>{nParT[trNomDe(e)]} colis</span>
-                    </div>
-                  )}
-                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  {ouvreSansDate}
+                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -45407,7 +45434,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   </React.Fragment>
                 );
-              }); })()}
+              })]; })()}
               </div>
               {/* (2 nov., colis clair) Sous la liste : ce n'est pas un geste du moment. */}
               {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
@@ -49921,6 +49948,12 @@ function OngletManque({ site, onglet, onNav }) {
 // son colis à envoyer est DIT et reste dans Colis. La règle : `venteAutreHorsPlan`
 // (api/_lib/plan-regle.js) sur l'identité que la vente PORTE (`compteDeVente`).
 const horsPlanAutre = (plateforme, v) => venteAutreHorsPlan(reglePlanCourante(), plateforme, compteDeVente(plateforme, v));
+// (9 nov., soir, lot AJ) « SANS DATE LUE » : posée UNE fois au-dessus des lignes qu'aucune date lue ne
+// range (src/ordreRecent.js : elles vont en bas, jamais datées au hasard) — le manque est NOMMÉ (§5).
+function LigneSansDate({ n }) {
+  if (!n) return null;
+  return <div role="presentation" data-sans-date={n} style={{ fontSize: 12, color: C.muted, padding: '12px 2px 4px', lineHeight: 1.4 }}>{PHRASE_SANS_DATE(n)}</div>;
+}
 function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir, onPro }) {
   // (8 nov.) Les départs prouvés chez le transporteur : la ligne d'une vente Vestiaire partie se redessine.
   const vcLocDep = useVcLocal();
@@ -50021,12 +50054,15 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null, tr: transporteurDuColis({ declare: v.transporteur || '', suivi: v.suivi || '' }) });
       }
     }
-    // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
-    return out.sort((a, z) => (z.t ?? -Infinity) - (a.t ?? -Infinity));
+    // La plus récente d'abord, TOUS COMPTES ET SITES MÉLANGÉS ; une vente sans date lue va à la fin
+    // (jamais datée au hasard). La règle unique (src/ordreRecent.js, lot AJ du 9 nov.).
+    return ordreRecent(out, (l) => l.t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx, sigPlanT]);
   const lignes = React.useMemo(() => toutesLignes.filter((l) => !l.hp), [toutesLignes]);
   const lignesHorsPlan = React.useMemo(() => toutesLignes.filter((l) => l.hp), [toutesLignes]);
+  // (lot AJ) Où commencent les ventes sans date lue (en bas), et combien : dit une fois.
+  const sansDateT = React.useMemo(() => ({ i: debutSansDate(lignes, (x) => x.t), n: nbSansDate(lignes, (x) => x.t) }), [lignes]);
   const [n, setN] = React.useState(60);
   const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).
@@ -50108,8 +50144,10 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           </div>
         : (
           <div className="vrm-toutes-liste" role="list">
-            {lignes.slice(0, n).map((l) => (
-              <button key={l.cle} type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} onClick={() => onOuvrir(l)}
+            {lignes.slice(0, n).map((l, il) => (
+              <React.Fragment key={l.cle}>
+              {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
+              <button type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
                 aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
@@ -50130,6 +50168,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                   {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}
                 </span>
               </button>
+              </React.Fragment>
             ))}
             {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
           </div>

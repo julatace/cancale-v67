@@ -235,12 +235,15 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         // le transporteur en en-tête de son groupe (une fois), le n° de suivi dans le récapitulatif.
         await pg.click('[data-colis-plus="vc:V1"]').catch(() => {});
         await pg.waitForTimeout(200);
-        const c = await pg.evaluate(() => { const x = document.querySelector('[data-vc-colis="V1"]'); let g = x.previousElementSibling; while (g && !g.hasAttribute('data-groupe-transp')) g = g.previousElementSibling; const tete = g ? g.innerText : ''; return { classe: x.className, bord: x.hasAttribute('data-bord-card'), num: x.getAttribute('data-vc-colis-num'), chip: (x.querySelector('.vrm-colis-num, .vrm-colis-titre .vrm-num') || {}).textContent || '',   /* (5 nov., chantier D) le N° est la pastille `Numero` du titre */ t: x.innerText + '\n' + tete,
+        const c = await pg.evaluate(() => { const x = document.querySelector('[data-vc-colis="V1"]'); let g = x.previousElementSibling; while (g && !g.hasAttribute('data-groupe-transp')) g = g.previousElementSibling; /* (lot AJ) plus de groupe : la pastille du transporteur */ const p = document.querySelector('[data-envoyer-filtre-choix="Chronopost"]'); const tete = g ? g.innerText : (p ? p.innerText : ''); return { classe: x.className, bord: x.hasAttribute('data-bord-card'), num: x.getAttribute('data-vc-colis-num'), chip: (x.querySelector('.vrm-colis-num, .vrm-colis-titre .vrm-num') || {}).textContent || '',   /* (5 nov., chantier D) le N° est la pastille `Numero` du titre */ t: x.innerText + '\n' + tete,
           gestes: [...x.querySelectorAll('[data-geste]')].map((g) => g.getAttribute('data-geste')), imprimer: !!x.querySelector('[data-imprime].vrm-colis-primaire'), titre: !!x.querySelector('.vrm-colis-titre'), h: Math.min(...[...x.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().height > 0).map((b) => b.getBoundingClientRect().height)) }; });
         dit(/vrm-colis-carte/.test(c.classe) && c.bord && c.titre && c.imprimer, 'C · la carte d’un colis Vinted (vrm-colis-carte, data-bord-card, Imprimer en tête)', c.classe);
         dit(c.num === n1 && c.chip === `N°${n1}`, 'C · le N° de son annonce sur la carte', `${c.num} · ${c.chip}`);
         dit(c.gestes.join() === 'imprime,fait', 'C · Imprimé · Colis fait, comme Vinted', c.gestes.join());
-        dit(compte(c.t, 'Chronopost') === 1 && compte(c.t, 'XW000000001FR') <= 1, 'C · « Chronopost » écrit UNE fois (en-tête du groupe), le suivi au plus une fois', `${compte(c.t, 'Chronopost')} / ${compte(c.t, 'XW000000001FR')}`);
+        // (lot AJ) Plus d'en-tête de groupe : le transporteur est porté par la carte (`data-colis-transporteur`, sa
+        // puce) et, s'il y en a plusieurs, par sa pastille de filtre — jamais écrit deux fois.
+        const puceVc = await pg.evaluate(() => !!document.querySelector('[data-colis-transporteur="vc:V1"]'));
+        dit(puceVc && compte(c.t, 'Chronopost') <= 1 && compte(c.t, 'XW000000001FR') <= 1, 'C · le transporteur porté par la carte, « Chronopost » au plus UNE fois, le suivi au plus une fois', `${puceVc} · ${compte(c.t, 'Chronopost')} / ${compte(c.t, 'XW000000001FR')}`);
         dit(c.h >= 44, 'C · gestes à 44 px', String(c.h));
         const tr = await pg.evaluate(() => { const x = document.querySelector('[data-vc-colis="V1"] .vrm-colis-actions [data-colis-transporteur]'); return x ? x.getAttribute('data-transporteur') : ''; });
         dit(tr === 'chronopost', 'C · la pastille transporteur à côté du bouton bordereau, comme Vinted', tr);

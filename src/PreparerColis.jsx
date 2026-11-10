@@ -1,8 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  « PRÉPARER MES COLIS » PAS À PAS (9 nov., lot AD, proposition 46 validée)
 //  Colis → À envoyer : un colis à la fois, plein écran (portail, `FermeAuRetour`),
-//  dans l'ORDRE de la liste « À envoyer » (le plus pressé d'abord — jamais trié
-//  par emplacement, refus du 11 oct.). Chaque écran : la photo de la paire, le N°
+//  dans l'ORDRE de la liste « À envoyer » (depuis le 9 nov. au soir, lot AJ, décision de
+//  Julien : la vente la plus RÉCENTE en haut, tous comptes mélangés — src/ordreRecent.js ;
+//  la date limite reste sur chaque écran ; jamais trié par emplacement, refus du 11 oct.). Chaque écran : la photo de la paire, le N°
 //  en pastille, titre, taille, compte, transporteur, date limite ; le bordereau
 //  (« Imprimer ce bordereau » seul, ou « Scanner » pour vérifier que c'est le bon,
 //  le scanner existant) ; « Colis fait » = le geste des cartes (`marquerColisFait`
