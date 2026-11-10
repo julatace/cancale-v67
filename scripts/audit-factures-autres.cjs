@@ -152,17 +152,28 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   base.get(cle(A, 'lbc_ventes')).ventes['723456789'] = lbc(723456789, { stepStatus: 'cancelled' });
   r = await appel({ action: 'emettre', confirme: true, plateforme: 'leboncoin', ref: '723456789', acheteur: ACH });
   dit(r.code === 409 && r.corps.code === 'annulee' && compteur() === avant, 'S4 vente annulée ⇒ refus, aucun numéro');
-  pannes.add('lbc_ventes');
+  r = await appel({ action: 'emettre', confirme: true, plateforme: 'leboncoin', ref: '423456789', acheteur: { nom: 'Lucie Banc', adresse: 'Marseille' } });
+  dit(r.code === 409 && r.corps.erreur === 'incomplet' && compteur() === avant, 'S4 adresse sans rue ni code postal ⇒ 409, aucun numéro pris');
+  // L'écriture de la facture échoue APRÈS le numéro pris : le clic suivant reprend LE MÊME numéro (journal).
+  pannes.add('post:email_invoice_lbc423456789');
   r = await appel({ action: 'emettre', confirme: true, plateforme: 'leboncoin', ref: '423456789', acheteur: ACH });
-  dit(r.code === 503 && compteur() === avant && !base.has(cle(A, 'email_invoice_lbc423456789')), 'S4 lecture des ventes ratée ⇒ 503, RIEN numéroté (pas su ≠ absente)');
+  const pris = compteur();
+  pannes.delete('post:email_invoice_lbc423456789');
+  const r2 = await appel({ action: 'emettre', confirme: true, plateforme: 'leboncoin', ref: '423456789', acheteur: ACH });
+  dit(r.code === 503 && pris === avant + 1 && r2.code === 200 && r2.corps.facture.numero === `FA-${annee}-${String(pris).padStart(4, '0')}` && compteur() === pris, 'S5 écriture ratée après le numéro : le clic suivant garde CE numéro (aucun trou)', `${r.code} ${pris} ${r2.code} ${r2.corps && r2.corps.facture && r2.corps.facture.numero}`);
+  const avantB = compteur();
+  base.get(cle(A, 'lbc_ventes')).ventes['923456789'] = lbc(923456789);
+  pannes.add('lbc_ventes');
+  r = await appel({ action: 'emettre', confirme: true, plateforme: 'leboncoin', ref: '923456789', acheteur: ACH });
+  dit(r.code === 503 && compteur() === avantB && !base.has(cle(A, 'email_invoice_lbc923456789')), 'S4 lecture des ventes ratée ⇒ 503, RIEN numéroté (pas su ≠ absente)');
   pannes.clear();
-  r = await appel({ action: 'emettre', plateforme: 'leboncoin', ref: '423456789', acheteur: ACH });
-  dit(r.code === 400 && compteur() === avant, 'S4 sans confirmation ⇒ rien');
+  r = await appel({ action: 'emettre', plateforme: 'leboncoin', ref: '923456789', acheteur: ACH });
+  dit(r.code === 400 && compteur() === avantB, 'S4 sans confirmation ⇒ rien');
 
   // eBay
   base.set(cle(A, 'ebay_orders'), { orders: [eb('12-34567-89012')], complet: true });
   r = await appel({ action: 'emettre', confirme: true, plateforme: 'ebay', ref: '12-34567-89012', acheteur: { nom: 'Jean Banc', adresse: '3 rue Fictive\n69001 Lyon' } });
-  dit(r.code === 200 && r.corps.facture.numero === `FA-${annee}-0008` && r.corps.facture.contenu.totaux.ttc === 8000 && /eBay n° 12-34567-89012/.test(r.corps.facture.contenu.reference), 'S4 eBay : numéro suivant, prix de l’article relu', JSON.stringify(r.corps).slice(0, 300));
+  dit(r.code === 200 && r.corps.facture.numero === `FA-${annee}-0009` && r.corps.facture.contenu.totaux.ttc === 8000 && /eBay n° 12-34567-89012/.test(r.corps.facture.contenu.reference), 'S4 eBay : numéro suivant, prix de l’article relu', JSON.stringify(r.corps).slice(0, 300));
   base.set(cle(A, 'ebay_orders_abcdef0123456789'), { orders: [eb('99-00000-00001')] });
   base.get(cle(A, 'ebay_orders')).orders.push(eb('99-00000-00001'));
   const av2 = compteur();
