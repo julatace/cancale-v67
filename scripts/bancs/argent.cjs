@@ -203,6 +203,9 @@ const lireStats = (pg) => pg.evaluate(() => {
         if (scen === SCEN[0]) {
           for (const [q, seg, quoi] of [['tab=dashboard', 'stats', 'stats'], ['tab=stats', 'stats', 'stats'], ['tab=prixmarche', 'stats', 'prix'], ['tab=invoices', 'factures', 'factures'], ['tab=argent', 'resume', 'resume'], ['tab=compta&section=declarer', 'declarer', 'declarer'], ['tab=argent_declarer', 'declarer', 'declarer']]) {
             await aller(pg, q, 2400);
+            // L'ÉTAT, pas un délai : la piste d'Argent montée, son segment allumé (une machine chargée met plus de 2,4 s).
+            await pg.waitForFunction(() => !!document.querySelector('[data-argent-nav] [aria-current="page"]'), null, { timeout: 15000 }).catch(() => {});
+            await pg.waitForTimeout(300);
             const r = await pg.evaluate(() => ({ on: (document.querySelector('[data-argent-nav] [aria-current="page"]') || { getAttribute: () => '' }).getAttribute('data-section'),
               resume: !!document.querySelector('[data-argent-vue="resume"]:not([hidden])'), declarer: !!document.querySelector('[data-argent-vue="declarer"]:not([hidden])'), factures: !!document.querySelector('[data-argent-vue="factures"]:not([hidden])'),
               prix: !!document.querySelector('[data-section="prix"][aria-current="page"]'), stats: !!document.querySelector('[data-section="stats"][aria-current="page"]') }));

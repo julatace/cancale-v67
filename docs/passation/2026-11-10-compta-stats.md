@@ -54,13 +54,32 @@ texte, du visuel. L'extension n'est pas touchée.
   quatre segments sous le titre et **aucun segment coupé** (« Statisti… » vu en capture
   à 1512 px, corrigé : la piste prend ses 640 px), les quatre réponses égales à leurs
   sources, toucher = détail, anciens liens, 44 px, ≤ 12 mots, aucune erreur JS.
-- Bancs remis à la règle d'Argent : `compta-stats-coherence`, `_compta.cjs`
-  (`allerSegment`), `compta-simple`, `menu-range`.
-- Audits verts : variables, tdz, coherence, identite, icones, urssaf, benefice,
-  cout-vente, argent.
+- Bancs remis à la règle d'Argent (ils jugeaient « Documents et réglages », le rail
+  « Compta », le titre « Le prix qui marche ») : `_compta.cjs` (`allerSegment`),
+  `compta-stats-coherence` (C1 ignore un panneau dans un repli FERMÉ, C5 lu sur le widget
+  « À déclarer »), `compta-simple` (ce qui vivait dans « Avancé » est cherché dans SON
+  segment ; `SCENARIOS=` et `BANC_DIST=` ajoutés), `menu-range` (racine `data-prix-marche`,
+  attente de l'état), noms « Argent » dans `tous-boutons`, `mobile`, `revendeurs`,
+  `annonces-ventes-brouillon`.
+  Mesuré contre le build de `origin/main` (même banc, même jeu) :
+  `compta-simple` 4 rouges sur main → 2 (« 7,44 € écrit 3 fois », déjà rouge sur main) ;
+  `menu-range` 13 → 2 (`?tab=plat_ebay`, déjà rouge sur main) ; `compta-stats-coherence`
+  A 0 rouge ; B garde les rouges U1 de main (le jeu ne publie pas la ligne URSSAF :
+  « Copier » absent — même chose sur main).
+- Plus aucun texte ne renvoie à « Documents et réglages » (supprimé) : « Argent →
+  Déclarer » (facturation électronique, statut, taux) ; le « ⓘ » du résultat dit « dans
+  le Résumé » au lieu d'« en haut de l'écran ».
+- Captures regardées (390/1512, clair/sombre, A/B/C) : Résumé, Statistiques (valeur du
+  stock du lot BF présente), Déclarer, Factures. Défaut vu et corrigé : « Statisti… »
+  coupé (piste tassée à 275 px à l'ordinateur, et par les cinq actions de Factures).
 
 ## Ce qui reste
 
+- Factures au téléphone : les cinq actions passent AVANT les segments (la piste est sous
+  la ligne d'actions) ; à revoir si Julien la veut juste sous le titre (il faudrait
+  replier les actions dans un menu).
 - Le libellé « Statistiques » du segment se lit en entier ; si Julien le veut plus court
   (« Stats »), c'est `SEGMENTS_ARGENT` (src/argent.js), une ligne.
+- Rouges d'avant, pas touchés : `compta-simple` (7,44 € ×3), `menu-range` (plat_ebay),
+  `compta-stats-coherence` B (U1).
 - Geste de Julien : aucun.
