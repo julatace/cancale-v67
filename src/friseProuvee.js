@@ -152,12 +152,14 @@ export function preuvesFriseVinted({ vente, bord = null, label = null, suiviPdf 
 // Rend { genre, libelle, sous, geste } ou null. `geste` : SA réponse est attendue
 // (un litige ouvert par l'acheteur, une annulation demandée) ⇒ ambre.
 const HORS = { 'Annulée': 'annulee', 'Remboursée': 'remboursee', 'Retournée': 'retour', 'Retour en cours': 'retour', 'Suspendue': 'suspendue' };
+// « Retour · Retour initié » ⇒ « Retour initié » (un mot une fois).
+const sansRedite = (x) => (x.sous && x.sous.toLowerCase().startsWith(x.libelle.toLowerCase()) ? { ...x, libelle: x.sous, sous: '' } : x);
 export function bifurcationVente({ litige = null, retour = null, etiquette = '', annulee = false } = {}) {
   if (litige && !litige.ancien && LIBELLE_GENRE[litige.genre]) {
     const sous = litige.genre === 'retour' && retour && LIBELLE_ETAPE[retour.etape] ? LIBELLE_ETAPE[retour.etape] : '';
-    return { genre: litige.genre, libelle: LIBELLE_GENRE[litige.genre], sous, geste: litige.genre === 'probleme' || litige.genre === 'annulation' };
+    return sansRedite({ genre: litige.genre, libelle: LIBELLE_GENRE[litige.genre], sous, geste: litige.genre === 'probleme' || litige.genre === 'annulation' });
   }
-  if (retour && LIBELLE_ETAPE[retour.etape]) return { genre: 'retour', libelle: 'Retour', sous: LIBELLE_ETAPE[retour.etape], geste: false };
+  if (retour && LIBELLE_ETAPE[retour.etape]) return sansRedite({ genre: 'retour', libelle: 'Retour', sous: LIBELLE_ETAPE[retour.etape], geste: false });
   if (HORS[etiquette]) return { genre: HORS[etiquette], libelle: etiquette, sous: '', geste: false };
   if (annulee) return { genre: 'annulee', libelle: 'Annulée', sous: '', geste: false };
   return null;

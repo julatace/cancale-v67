@@ -74,6 +74,7 @@
   .vrm-frv-sous { font-size: 12px; }
   .vrm-frv-bif { margin: 0; max-width: 100%; width: max-content; padding: 5px 12px; }
   .vrm-frv-bif::before { display: none; }
+  .vrm-frv-bif .vrm-frv-texte { flex-direction: row; align-items: baseline; }
   .vrm-frv-bif .vrm-frv-nom { font-size: 13px; }
   .vrm-frv-bif .vrm-frv-sous { font-size: 12px; }
 }
