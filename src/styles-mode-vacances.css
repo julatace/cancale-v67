@@ -1,0 +1,20 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE VACANCES (10 nov., lot O) — src/ModeVacances.jsx. Jetons seulement (--vrm-*).
+   Neutre partout ; l'ambre seulement pour un geste à faire (« Ouvre vinted.fr… »).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-vac { display: flex; flex-direction: column; gap: 12px; }
+.vrm-vac-phrase { margin: 0 4px; font-size: 15px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
+.vrm-vac-boutons { display: flex; flex-wrap: wrap; gap: 10px; }
+.vrm-vac-boutons > .vrm-b { flex: 1 1 200px; min-height: 44px; }
+.vrm-vac-note { margin: 0 4px; font-size: 14px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-vac-geste { color: var(--vrm-warn, #B25000); }
+.vrm-vac-geste .vrm-lien-action { white-space: nowrap; }
+.vrm-vac-jauge { margin: 0 4px; }
+.vrm-vac .vrm-ios-groupe { margin-top: 8px; }
+.vrm-vac-initiale { font-size: 14px; font-weight: 600; }
+.vrm-vac .vrm-ios-detail[data-ton="geste"] { color: var(--vrm-warn, #B25000); white-space: normal; }
+.vrm-vac .vrm-ios-valeur { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; color: var(--vrm-ink, #1D1D1F); }
+.vrm-vac .vrm-ios-valeur[data-ton="vacances"] { font-weight: 600; }
+.vrm-vac-issue { font-size: 12px; color: var(--vrm-muted, #6E6E73); font-weight: 400; }
+.vrm-vac a.vrm-ios-rangee-zone { text-decoration: none; color: inherit; }
+.vrm-vac a.vrm-ios-rangee-zone .vrm-ios-valeur { color: var(--vrm-accent, #0071E3); }
