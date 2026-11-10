@@ -147,7 +147,8 @@ const capture = async (pg, nom) => {
           const vis = (e) => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().height > 0;
           const main = document.querySelector('.vrm-main');
           const h1 = [...main.querySelectorAll('h1')].find(vis);
-          const panneauxVides = [...main.querySelectorAll('.vrm-fu-panneau, .vrm-compta-carte, .vrm-sv-carte, .vrm-repartition-anneau')].filter(vis)
+          // (10 nov., lot AO) Un panneau dans un repli FERMÉ n'est pas à l'écran (Chrome lui garde une boîte, sans texte rendu).
+          const panneauxVides = [...main.querySelectorAll('.vrm-fu-panneau, .vrm-compta-carte, .vrm-sv-carte, .vrm-repartition-anneau')].filter(vis).filter((e) => !e.closest('details:not([open])'))
             .filter((e) => !e.innerText.trim() && !e.querySelector('svg circle[stroke-dasharray], svg rect, .vrm-fu-barre')).map((e) => e.className);
           // Les endroits où le statut se choisit (même replié : un endroit caché reste un endroit).
           const places = [];
@@ -155,8 +156,11 @@ const capture = async (pg, nom) => {
           if (main.querySelector('[data-statut-changer]')) places.push('changer');
           if (main.querySelector('[data-regime-choix]')) places.push('profil');
           if (main.querySelector('[data-prevision-geste="statut"]')) places.push('prevision');
-          const declarer = main.querySelector('[data-carte-chiffre="declarer"]');
-          const raison = main.querySelector('[data-declarer-raison]');
+          // (10 nov., lot AO) « À déclarer » se lit en tête du Résumé (le widget `data-argent-q`, sa raison en note) ;
+          // la carte sombre est rangée dans le repli « Ton bénéfice ». On juge celle qui est À L'ÉCRAN.
+          const w = main.querySelector('[data-argent-q="declarer"]');
+          const declarer = w && vis(w) ? w.querySelector('.vrm-argent-w-n') : main.querySelector('[data-carte-chiffre="declarer"]');
+          const raison = w && vis(w) ? w.querySelector('.vrm-argent-w-note') : main.querySelector('[data-declarer-raison]');
           return {
             h1: h1 ? h1.innerText.trim() : '', date: !!main.querySelector('[data-date-tete]'),
             panneauxVides, places, regimeFiscal: /Régime fiscal/.test(main.textContent),
