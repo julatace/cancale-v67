@@ -25,8 +25,6 @@ const _ecoutes = new Set();
 export const signatureDe = (r) => signatureRegle(r);
 export const reglePlanCourante = () => _regle;
 export const signaturePlan = () => signatureDe(_regle);
-// (10 nov.) Pro = 10 comptes vendeurs : `r.pro` (ses 10 choisis) entre dans la signature
-// et dans ce qui est gardé sur l'appareil (`brideAutres` le compte), comme un choix Solo.
 // Le prédicat qu'appellent `compteEcarte` (App.jsx) et les écrans : vrai
 // seulement quand c'est SÛR (Solo, compte vendeur choisi, autre compte).
 export const venteHorsPlanUid = (uid) => venteHorsPlan(_regle, uid);
@@ -35,7 +33,7 @@ function poser(r) {
   const avant = signatureDe(_regle);
   _regle = r && (r.bride || brideAutres(r)) ? r : (r ? { ...LIBRE, plan: r.plan || null } : LIBRE);
   const garde = _regle.bride || brideAutres(_regle);
-  if (_uid) { try { garde ? localStorage.setItem(cle(_uid), JSON.stringify({ plan: _regle.plan, compteVendeur: _regle.bride ? _regle.vendeur : null, comptesVendeurs: _regle.pro ? { ..._regle.autres, pro: _regle.pro } : _regle.autres })) : localStorage.removeItem(cle(_uid)); } catch (_) {} }
+  if (_uid) { try { garde ? localStorage.setItem(cle(_uid), JSON.stringify({ plan: _regle.plan, compteVendeur: _regle.bride ? _regle.vendeur : null, comptesVendeurs: _regle.autres })) : localStorage.removeItem(cle(_uid)); } catch (_) {} }
   if (signatureDe(_regle) !== avant) _ecoutes.forEach((f) => { try { f(_regle); } catch (_) {} });
 }
 

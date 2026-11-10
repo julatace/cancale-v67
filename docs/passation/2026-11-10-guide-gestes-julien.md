@@ -4,7 +4,7 @@ Ce guide se suit **sans moi**. Chaque étape dit : où aller, quoi toucher, quoi
 ce que tu dois voir à la fin, et quoi faire si ça ne marche pas.
 Fais-les **dans l'ordre**. Coche au fur et à mesure.
 
-> État vérifié ce soir dans ta base (lecture seule) : **aucune** des migrations 016, 023 à 031
+> État vérifié ce soir dans ta base (lecture seule) : **aucune** des migrations 016, 023 à 030
 > n'est encore appliquée (seules la 022 et `vrm_acces` de la 027 sont présentes).
 
 Légende : ⏱ durée · ✅ ce que tu dois voir · ⚠️ attention · 🆘 si ça bloque
@@ -103,13 +103,12 @@ conversation. Aujourd'hui ces logos sont leur nom en couleurs, pas le vrai dessi
 | 1 | 029 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/029-vinted-accounts-preuve.sql | un compte Vinted ne se relie qu'après preuve |
 | 2 | 028 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/028-plans-solo-pro.sql | les offres Solo / Pro |
 | 3 | 030 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/030-solo-plateformes.sql | Solo = un compte vendeur par plateforme |
-| 4 | 031 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/031-pro-dix-comptes.sql | Pro = 10 comptes vendeurs (⚠️ seulement quand je t'ai dit que « Pro à 10 comptes » est en ligne ; si le lien dit « 404 », ce n'est pas encore le cas : saute-la) |
-| 5 | 024 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/024-appareils-connectes.sql | la liste de tes appareils connectés |
-| 6 | 025 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/025-communaute-accompagnement.sql | les groupes d'accompagnement de la Communauté |
-| 7 | 026 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/026-charge-ebay-et-id.sql | eBay plus léger |
-| 8 | 027 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/027-abonnement-apercu-et-parrainage.sql | aperçu sans abonnement + parrainage |
-| 9 | 023 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/023-un-compte-vinted-par-vrm.sql | un compte Vinted = un seul compte VRM. ⚠️ Elle peut REFUSER en nommant un compte Vinted en double (ex. `angeled92` sur ton compte d'essai) : c'est normal, envoie-moi le message, on décide ensemble quel compte VRM le garde. |
-| 10 | 016 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/016-equipe.sql | le mode équipe (aide qui imprime les bordereaux). Seulement si tu veux le mode équipe. |
+| 4 | 024 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/024-appareils-connectes.sql | la liste de tes appareils connectés |
+| 5 | 025 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/025-communaute-accompagnement.sql | les groupes d'accompagnement de la Communauté |
+| 6 | 026 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/026-charge-ebay-et-id.sql | eBay plus léger |
+| 7 | 027 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/027-abonnement-apercu-et-parrainage.sql | aperçu sans abonnement + parrainage |
+| 8 | 023 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/023-un-compte-vinted-par-vrm.sql | un compte Vinted = un seul compte VRM. ⚠️ Elle peut REFUSER en nommant un compte Vinted en double (ex. `angeled92` sur ton compte d'essai) : c'est normal, envoie-moi le message, on décide ensemble quel compte VRM le garde. |
+| 9 | 016 | https://github.com/julatace/cancale-v67/blob/main/supabase/migrations/016-equipe.sql | le mode équipe (aide qui imprime les bordereaux). Seulement si tu veux le mode équipe. |
 
 ✅ À la fin, envoie-moi « migrations faites » : je vérifie tout depuis ici en lecture seule.
 
@@ -233,8 +232,8 @@ Supabase → ton projet → **Authentication** :
 1. **Les ≈ 1 780 ventes à dater** : (a) tout dater, (b) seulement l'année en cours, (c) les
    sortir du compte. Ça change ton chiffre d'affaires déclaré.
 2. **« Je dépose »** remplace-t-il l'ancienne « Tournée de dépôt » ? (oui / non)
-3. **Pro = 10 comptes vendeurs au total** (toutes plateformes) — c'est bien ça ? (ou 10 par
-   plateforme ?)
+3. ✅ Réglé (10 nov., 20 h) : **Pro = comptes vendeurs illimités**. La migration 031 n'existe
+   plus (rien à appliquer).
 4. **Comparer deux mois** : compter les **paires achetées** plutôt que les **achats** ?
 5. **Revendu combien ?** : le prix médian une seule fois (au lieu de deux) ?
 6. **Un seul bouton « Retiré »** partout, y compris hors ligne ?
