@@ -164,6 +164,7 @@
    (bordure, fond blanc) : remis à zéro ici, puis dessinés plus bas. */
 html body .vrm-pv-barre-btn, html body .vrm-pv-changer, html body .vrm-pv-verifier, html body .vrm-pv-compte { border: 0 !important; box-shadow: none !important; outline-offset: 2px; }
 html body .vrm-pv-barre-btn, html body .vrm-pv-changer { background: transparent !important; }
+html body .vrm-pv-barre-btn:disabled { opacity: 1 !important; }
 html body .vrm-pv .vrm-ar-lien { border: 0 !important; box-shadow: none !important; background: transparent !important; padding: 0 !important; }
 html body .vrm-pv-barre li[aria-current="step"] .vrm-pv-barre-btn { background: var(--w-remplir, rgba(118,118,128,.12)) !important; }
 html body .vrm-pv-verifier { background: var(--w-carte, #FFF) !important; }
