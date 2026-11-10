@@ -1,5 +1,5 @@
 import './_lib/sans-bruit.js';
-import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture,changementDeRelais} from './_lib/etat-colis-email.js';
+import {etatColisDepuisTexte,conserverRetrait,retraitTenu,annonceArriveeFuture,changementDeRelais} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 import { listePieces } from "./_lib/boite-email.js";
@@ -2432,7 +2432,7 @@ export async function traiterEmail(req, res) {
       Object.assign(track, garde);
       // L'état gardé garde le sujet qui l'a posé (le sujet d'un « en route » plus
       // ancien ne décrit pas un colis disponible).
-      const sujetGarde = (prevLigne?.status === 'delivered' || garde.conserve) ? (prevLigne.subject || subject) : subject;
+      const sujetGarde = (retraitTenu(prevLigne) || garde.conserve) ? (prevLigne.subject || subject) : subject;   // (10 nov.) un faux « retiré » (changé de plan, perdu) ne garde pas son sujet
       const emailAtLigne = [emailAt, prevLigne && prevLigne.emailAt].filter((x) => Number.isFinite(Date.parse(x || ''))).sort().pop() || null;
       // (revue du 23 oct., n° 7) LE SENS DU COLIS, PAR IDENTITÉ. Le « retiré » a
       // sa clé (`retire-N`) depuis le 23 : il sonnait « ✅ Colis livré » (ouvre
@@ -2460,7 +2460,7 @@ export async function traiterEmail(req, res) {
         statusLabel: track.label, subject: sujetGarde, receivedAt: now,
         ...(sensLigne ? { sens: sensLigne } : {}),
         ...(emailAtLigne ? { emailAt: emailAtLigne } : {}),
-        ...(track.status==='delivered'?{retireLe:prevLigne?.status==='delivered'?(prevLigne.retireLe||prevLigne.receivedAt||now):now}:{}),
+        ...(track.status==='delivered'?{retireLe:retraitTenu(prevLigne)?(prevLigne.retireLe||prevLigne.receivedAt||now):now}:{}),
         // (revue du 23 oct., n° 4) La date de l'ARRIVÉE est celle de l'e-mail
         // (`emailAt`, la date Gmail), pas l'heure du traitement : un « reparti »
         // traité AVANT l'e-mail d'arrivée (le script lit sa boîte du plus récent

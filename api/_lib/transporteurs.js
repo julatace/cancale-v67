@@ -32,7 +32,7 @@
 //     contrôle de l'ÉCHO (n° ET code postal).
 // ─────────────────────────────────────────────────────────────────────────────
 import { texteArrivee } from './notif-textes.js';
-import { normaliserSuivi } from './etat-colis-email.js';
+import { normaliserSuivi, changementDeRelais } from './etat-colis-email.js';
 import { preuveDeTransp, lectureEnRetard } from './etat-colis.js';
 
 // ── LES TRANSPORTEURS LUS, LEURS VOIES, LEURS NOMS ──────────────────────────
@@ -750,6 +750,12 @@ export function sensDeLigne(t, envoyes) {
   if (!suj) return null;
   const so = SUJET_SORTANT.test(suj), en = SUJET_ENTRANT.test(suj);
   if (so && !en) return 'sortant';
+  // (10 nov., retraits irréprochables) « Votre colis a changé de plan » : le point de RETRAIT a changé,
+  // et le code de retrait est écrit dedans — un e-mail du DESTINATAIRE (ses envois sont écartés plus
+  // haut par le n° de ses bordereaux). Mesuré : sans sens, les deux colis redirigés n'étaient plus
+  // jamais relus chez Mondial Relay (« en route » lu il y a 36 h) — l'arrivée au nouveau point passait
+  // inaperçue.
+  if (!so && (t.relaisChange || changementDeRelais(suj))) return 'entrant';
   if (en && !so) return 'entrant';
   return null;
 }
