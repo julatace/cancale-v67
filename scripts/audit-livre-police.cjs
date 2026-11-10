@@ -83,7 +83,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     P = await import('file://' + path.join(dir, 'livrePolice.js'));
   } catch (e) { dit(false, 'les modules se chargent', e.message); }
   dit(!!P && typeof P.livreDePolice === 'function' && typeof P.inscrire === 'function', 'src/livrePolice.js : livreDePolice et inscrire existent');
-  if (!P || !RG) { console.log(`\n❌ livre de police : ${ko} rouge(s), ${ok} vert(s)`); process.exit(1); }
+  if (!P || !RG || typeof P.livreDePolice !== 'function') { console.log(`\n❌ livre de police : ${ko} rouge(s), ${ok} vert(s)`); process.exit(1); }
 
   // ── P1 · à qui ──
   const pf = (etat) => ({ etat });

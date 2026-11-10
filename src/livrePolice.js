@@ -312,7 +312,7 @@ export async function pdfLivre(L, { PDFLib = null, entreprise = null, maintenant
   const borne = (s, font, t, max) => { let x = propre(s); if (font.widthOfTextAtSize(x, t) <= max) return x; while (x.length > 1 && font.widthOfTextAtSize(x + '...', t) > max) x = x.slice(0, -1); return x + '...'; };
   let page = doc.addPage(A4P); let y = H - M;
   const txt = (s, x, yy, { font = f, t = 8, c = ENCRE, max = null } = {}) => { page.drawText(max ? borne(s, font, t, max) : propre(s), { x, y: yy, size: t, font, color: c }); };
-  const LARG = { n: 40, date: 52, description: 170, provenance: 100, prix: 70, reglement: 72, vendeur: 92, identite: 70, note: 0 };
+  const LARG = { n: 48, date: 52, description: 150, provenance: 100, prix: 70, reglement: 72, vendeur: 110, identite: 84, note: 0 };
   const xs = []; let x = M;
   for (const [k] of COLONNES_POLICE) { xs.push(x); x += LARG[k]; }
   const largeur = (i) => (LARG[COLONNES_POLICE[i][0]] || (W - M - xs[i])) - 6;

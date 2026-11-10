@@ -70,7 +70,7 @@ async function page(b, T, opts) {
   const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, acceptDownloads: true, colorScheme: T.sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!T.sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request(); const u = decodeURIComponent(metaVersData(req.url()));
@@ -121,12 +121,13 @@ const an = String(maintenant.getFullYear());
         await pg.waitForSelector('[data-livre-police]', { timeout: 20000 }).catch(() => {});
         dit(await pg.locator('[data-livre-police]').count() === 1, 'Argent → Déclarer : une carte « Livre de police » (micro)');
         if (!(await pg.locator('[data-livre-police]').count())) { await ctx.close(); continue; }
-        dit(await attr(pg, 'data-livre-police') === 'ferme' && !opts.lus.some((u) => /vrm_livre_police|_txn_/.test(u)), 'fermée : rien lu tant qu’il n’ouvre pas');
+        dit(await attr(pg, 'data-livre-police') === 'ferme' && !opts.lus.some((u) => /vrm_livre_police|seller->>login/.test(u)), 'fermée : rien lu tant qu’il n’ouvre pas');
         await pg.click('[data-livre-ouvrir]');
         await pg.waitForFunction(() => { const e = document.querySelector('[data-livre-police]'); return e && e.getAttribute('data-livre-police') === 'lu' && e.getAttribute('data-livre-a-inscrire') !== ''; }, null, { timeout: 20000 }).catch(() => {});
         const aIns = await attr(pg, 'data-livre-a-inscrire');
         dit(aIns === String(ATTENDUS.length) && await attr(pg, 'data-livre-inscrits') === '0', `ouverte : « Inscrire ${ATTENDUS.length} achats » (hors remboursé)`, `${aIns} · inscrits ${await attr(pg, 'data-livre-inscrits')}`);
-        dit(opts.lus.filter((u) => /_txn_/.test(u)).every((u) => !/select=data(&|$)/.test(u) && /user_side/.test(u)), 'pseudos lus en projection (jamais select=data)');
+        const lusTx = opts.lus.filter((u) => /harvest_111_txn_71001/.test(u) && /seller->>login/.test(u));
+        dit(lusTx.length > 0 && lusTx.every((u) => !/select=data(&|$)/.test(u) && /user_side/.test(u)), 'pseudos lus en projection (jamais select=data)', String(lusTx.length));
         if (process.env.BANC_CAPTURE) { await pg.locator('[data-livre-police]').scrollIntoViewIfNeeded(); await pg.locator('[data-livre-police]').screenshot({ path: path.join(process.env.BANC_CAPTURE, `livre-police-avant-${T.nom.replace(' ', '-')}.png`) }).catch(() => {}); }
         await pg.click('[data-livre-inscrire]');
         await pg.waitForSelector('.vrm-confirmation', { timeout: 10000 });
