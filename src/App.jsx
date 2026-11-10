@@ -512,6 +512,7 @@ import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, 
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
+import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
 import { carteArgentJournee } from "./journeeArgent.js";
@@ -567,6 +568,7 @@ import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 import Visionneuse from "./Visionneuse.jsx";
 import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
 import { cleFacture } from "./factureAchat.js";
+import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille de vignettes, par compte — même couche, après la DA6
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
 import { enregistrerGaleries } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -33054,6 +33056,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort, modeDort, seuilFav]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
+  // (10 nov., lot AM — demande 15 de Julien) LA GRILLE « COMME LE DRESSING VINTED », RANGÉE PAR COMPTE :
+  // l'ordre de `annShown` est gardé dans chaque compte (src/annoncesGrille.js) ; un compte prend la place de
+  // sa première annonce (celui de l'onglet reste en tête). Affichage seulement : rien n'entre ni ne sort.
+  const annGroupes = useMemo(() => groupesParCompte(annShown, (it) => String((it && it._acc && it._acc.vinted_user_id) || '')), [annShown]);
+  // Les annonces que l'alerte « même paire en ligne deux fois » nomme (lot AF, mêmes groupes, §11) : une marque sur leur vignette.
+  const annEnDouble = useMemo(() => new Set(groupesDeuxFois.filter((g) => g.length > 1).flat()), [groupesDeuxFois]);
+  // La grille de vignettes est montrée pour « Toutes » et ses tris (pas pour les vues à cocher ni les files).
+  const annGrilleMontree = !['selection','brouillons','republier','sansachat','masquees','sleeping'].includes(annSort);
   // ── SÉLECTIONNER, PUIS « ACTIONS POSSIBLES » (5 nov., `src/annoncesActions.js`) ──
   // En ligne (la MÊME base que la grille, `annBase`), masquées (`annMasquees`) et
   // brouillons (la MÊME liste que « Voir mes brouillons », `brVinted`, §11), chacun
@@ -35320,46 +35330,66 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setRemiseRefus(n); save('vrm_remise_refus', n);
     toast('C’est noté : VRM ne le propose plus pour cette annonce.');
   };
+  // (10 nov., lot AM — Julien : « les propositions collées entre elles cachent le produit ») Une proposition
+  // dont la nouvelle annonce est DANS la grille vit SUR sa vignette (la photo de l'annonce au-dessus, l'ancienne
+  // paire dans la bande, [Oui] [Non]) ; en tête ne reste qu'une pastille « N · Même paire ? » qui y mène. Une
+  // proposition dont l'annonce n'est pas montrée (recherche, autre vue) garde sa carte en tête : rien n'est perdu.
+  const remisesParts = useMemo(() => remisesSurVignettes(remises, annGrilleMontree ? new Set(annShown.map((it) => String(it.id))) : null), [remises, annGrilleMontree, annShown]);
+  const vignetteRemise = (src, num, alt) => (
+    <span className="vrm-remise-photo">{src && !imgMortes.has(src) ? <PhotoVinted src={src} alt={alt} loading="lazy" onError={() => noterImgMorte(src)}/> : <PhotoVide taille={40}/>}{num ? <span className="vrm-remise-num">N°{num}</span> : null}</span>
+  );
+  const photoNouvelleRemise = (id) => { const it = (listings.items || []).find((x) => String(x.id) === String(id)); return (it && it.photo) || ''; };
+  const photoAncienneRemise = (id) => { const f = numeros[id] || {}; return f.photo || ''; };
+  // `surVignette` : la bande posée sur la vignette de la nouvelle annonce (sa photo est juste au-dessus).
+  const carteRemise = (r, surVignette) => {
+    const o0 = r.options[0];
+    return (
+      <div key={r.nouvelle} className={'vrm-remise-carte' + (surVignette ? ' is-vignette' : '')} data-remise-ligne={r.nouvelle} data-remise-force={o0.force} data-remise-sur-vignette={surVignette ? '1' : undefined}>
+        <div className="vrm-remise-photos">
+          {vignetteRemise(photoAncienneRemise(o0.ancienne), o0.numero, o0.titre || 'Ancienne annonce')}
+          <span className="vrm-remise-egal" aria-hidden="true">=</span>
+          {vignetteRemise(photoNouvelleRemise(r.nouvelle), '', r.titre || 'Nouvelle annonce')}
+        </div>
+        <div className="vrm-remise-q"><b>Même paire{r.options.length === 1 ? ` que N°${o0.numero}` : ''} ?</b>
+          <Pourquoi label="Pourquoi ?" titre="Même paire ?">
+            {r.titre || 'Nouvelle annonce'} — {r.options.length === 1 ? <>c’est la même paire que N°{o0.numero} « {o0.titre || 'ancienne annonce'} » ?</> : 'c’est la même paire qu’une de celles-ci ?'}
+            {' '}{PHRASE_REMISE[o0.force]}
+            {r.plusieurs && r.options.length > 1 ? ' Plusieurs anciennes lui ressemblent : seule l’étiquette dit laquelle.' : ''}
+            {r.concurrence ? ' Une autre nouvelle annonce lui ressemble aussi.' : ''}
+            {' '}Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire là où elle est rangée.
+          </Pourquoi>
+        </div>
+        <div className="vrm-remise-boutons">
+          {r.options.map((o) => <Bouton key={o.ancienne} variante="secondaire" data-remise-oui={o.numero} title={o.titre} onClick={() => repondreRemise(r, o)}>{r.options.length > 1 ? `Oui, N°${o.numero}` : 'Oui'}</Bouton>)}
+          <Bouton variante="secondaire" data-remise-non={r.nouvelle} onClick={() => repondreRemise(r, null)}>Non</Bouton>
+        </div>
+      </div>
+    );
+  };
   const blocRemiseEnLigne = () => {
-    if (!remises.length) return null;
+    const tete = remisesParts.tete; const nSur = remisesParts.sur.size;
+    if (!tete.length && !nSur) return null;
     // (10 nov., Julien : « je n'aime pas du tout les pop-up ») Une PROPOSITION est une carte VISUELLE :
     // les deux photos côte à côte (l'ancienne paire et la nouvelle annonce), « Même paire ? » et [Oui] [Non].
     // Aucun paragraphe ; la règle (photo / ressemblance, vérifier l'étiquette) reste derrière ⓘ.
     // SON clic relie (`repondreRemise` → `poserNumero`), rien d'autre. `data-remise-bloc` : la cible d'« À trancher ».
-    const photoNouvelle = (id) => { const it = (listings.items || []).find((x) => String(x.id) === String(id)); return (it && it.photo) || ''; };
-    const photoAncienne = (id) => { const f = numeros[id] || {}; return f.photo || ''; };
-    const vignette = (src, num, alt) => (
-      <span className="vrm-remise-photo">{src && !imgMortes.has(src) ? <PhotoVinted src={src} alt={alt} loading="lazy" onError={() => noterImgMorte(src)}/> : <PhotoVide taille={40}/>}{num ? <span className="vrm-remise-num">N°{num}</span> : null}</span>
-    );
-    return (
-      <div className="vrm-remise-cartes" data-remise-bloc={remises.length} role="group" aria-label="Annonces remises en ligne : même paire ?">
-        {remises.slice(0, 20).map((r) => {
-          const o0 = r.options[0];
-          return (
-            <div key={r.nouvelle} className="vrm-remise-carte" data-remise-ligne={r.nouvelle} data-remise-force={o0.force}>
-              <div className="vrm-remise-photos">
-                {vignette(photoAncienne(o0.ancienne), o0.numero, o0.titre || 'Ancienne annonce')}
-                <span className="vrm-remise-egal" aria-hidden="true">=</span>
-                {vignette(photoNouvelle(r.nouvelle), '', r.titre || 'Nouvelle annonce')}
-              </div>
-              <div className="vrm-remise-q"><b>Même paire{r.options.length === 1 ? ` que N°${o0.numero}` : ''} ?</b>
-                <Pourquoi label="Pourquoi ?" titre="Même paire ?">
-                  {r.titre || 'Nouvelle annonce'} — {r.options.length === 1 ? <>c’est la même paire que N°{o0.numero} « {o0.titre || 'ancienne annonce'} » ?</> : 'c’est la même paire qu’une de celles-ci ?'}
-                  {' '}{PHRASE_REMISE[o0.force]}
-                  {r.plusieurs && r.options.length > 1 ? ' Plusieurs anciennes lui ressemblent : seule l’étiquette dit laquelle.' : ''}
-                  {r.concurrence ? ' Une autre nouvelle annonce lui ressemble aussi.' : ''}
-                  {' '}Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire là où elle est rangée.
-                </Pourquoi>
-              </div>
-              <div className="vrm-remise-boutons">
-                {r.options.map((o) => <Bouton key={o.ancienne} variante="secondaire" data-remise-oui={o.numero} title={o.titre} onClick={() => repondreRemise(r, o)}>{r.options.length > 1 ? `Oui, N°${o.numero}` : 'Oui'}</Bouton>)}
-                <Bouton variante="secondaire" data-remise-non={r.nouvelle} onClick={() => repondreRemise(r, null)}>Non</Bouton>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+    const allerVignette = () => { try { const el = document.querySelector('[data-remise-sur-vignette]'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); const b = el.querySelector('[data-remise-oui]'); if (b) b.focus({ preventScroll: true }); } } catch (_) {} };
+    return (<>
+      {nSur > 0 && (
+        <span className="vrm-pop-puce-hote" data-remise-resume={nSur} data-remise-bloc={tete.length ? undefined : nSur}>
+          <button type="button" className="vrm-pop-puce is-ambre" onClick={allerVignette} aria-label={`${nSur} annonce${nSur > 1 ? 's' : ''} : même paire qu’une ancienne ? Voir dans la grille`}>
+            <span className="vrm-pop-puce-n">{nSur}</span>
+            <span className="vrm-pop-puce-txt">Même paire ?</span>
+            <svg className="vrm-pop-puce-chev" width="7" height="12" viewBox="0 0 8 14" aria-hidden="true" focusable="false"><path d="M1.2 1.2 6.8 7l-5.6 5.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </span>
+      )}
+      {tete.length > 0 && (
+        <div className="vrm-remise-cartes" data-remise-bloc={tete.length} role="group" aria-label="Annonces remises en ligne : même paire ?">
+          {tete.slice(0, 20).map((r) => carteRemise(r, false))}
+        </div>
+      )}
+    </>);
   };
   const blocNumeroEcrit = () => {
     if (!ecritOnUi || !apercuEcrit) return null;
@@ -43736,8 +43766,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
         ) : (<>
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
-        <div className="vrm-ann-grid vrm-fiches" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',gap:16}}>
-          {annShown.map(it=>{
+        {/* (10 nov., lot AM — demande 15 de Julien : « la disposition par compte de Vinted me plaît … la même pour
+            Toutes, en gardant toutes les fonctions ») LA GRILLE DE VIGNETTES, RANGÉE PAR COMPTE, comme le dressing
+            Vinted : un en-tête par compte (son initiale, comme la carte du compte de la colonne), puis ses annonces
+            — photo carrée, N° en pastille, prix, titre, petites marques d'état. 2 colonnes au téléphone, 4 à 6 sur
+            ordinateur (styles-annonces-grille.css). TOUCHER la vignette l'ouvre EN PLACE, sur toute la largeur :
+            c'est la fiche d'avant, entière (achat, mini, refuse, boost, marge, achat relié, stock, « … »), mêmes
+            éléments, mêmes écritures, mêmes data-* (rien n'est retiré, seulement replié). Toucher la PHOTO ouvre la
+            visionneuse unique (src/visionneuse.js). L'ordre et la règle « en ligne » ne changent pas (`annShown`). */}
+        <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes" data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
+          {annGroupes.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
+          <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.items.length} role="heading" aria-level={3}>
+            <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
+            <span className="vrm-ann-compte-nom">{nomG || 'Compte Vinted'}</span>
+            <span className="vrm-ann-compte-n">{g.items.length} annonce{g.items.length>1?'s':''}</span>
+          </div>,
+          ...g.items.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
             //    reconstruit avec 5 champs, la pastille « prête » valait
             //    « à capter » sur toutes les cartes, par construction.
@@ -43789,6 +43833,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // seulement repliés (styles-annonces-fiche.css). L'ordinateur ne change pas.
             const ouverte = fichesOuvertes.has(String(it.id));
             const idRepli = `fiche-plus-${it._acc.vinted_user_id}-${it.id}`;
+            // (10 nov., lot AM) Ouvrir / fermer la vignette (le même état que « Détails et gestes ») ; ouverte, elle
+            // prend toute la largeur : on la garde à l'écran.
+            const cleCarte = it._acc.vinted_user_id+'_'+it.id;
+            const basculerFiche = () => { const k=String(it.id); const ouvrir = !fichesOuvertes.has(k);
+              setFichesOuvertes(x=>{ const n=new Set(x); if(n.has(k)) n.delete(k); else n.add(k); return n; });
+              if (ouvrir) requestAnimationFrame(()=>{ try { const el=document.querySelector(`[data-vignette-cle="${CSS.escape(cleCarte)}"]`); if (el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); } catch (_) {} }); };
+            const remiseIci = remisesParts.sur.get(String(it.id)) || null;
+            const enDouble = annEnDouble.has(String(it.id));
             const achatConnu = achat!=null && !isNaN(achat);
             // (1er nov., banc tous-boutons) La photo promet « Ouvrir l'annonce sur
             // Vinted » : sans `url` lue, le lien n'avait AUCUNE adresse (un clic
@@ -43796,11 +43848,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // le domaine du compte) ; sans id numérique, la photo n'est pas un lien.
             const urlFiche = it.url || (/^\d+$/.test(String(it.id)) ? `https://${(it._acc && it._acc.domain) || 'www.vinted.fr'}/items/${it.id}` : '');
             return (
-              <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
+              <div className="vrm-ann-card vrm-fiche vrm-vignette" key={cleCarte} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
+                onClick={(ev)=>{ if (ouverte) return; const t = ev.target; if (t && t.closest && t.closest('a,button,input,select,textarea,label,[data-edition],[role="dialog"]')) return; basculerFiche(); }}
+                style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?"Ouvrir l'annonce sur Vinted":undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide remplir rayon={0}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
+                    {enDouble && <span className="vrm-vignette-marque is-ambre" data-vignette-en-double="" title="La même paire est en ligne deux fois sur Vinted (même photo) : retire celle en trop sur vinted.fr — l'alerte au-dessus les nomme">En double</span>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
                   </a>
                   {/* (31 oct., Vitrine) Le N° de rangement SUR la photo, en haut à
@@ -43818,6 +43873,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
                     {/* (10 nov., lot BD) La note privée de la paire, par SON identité (N°, sinon l'annonce). */}
                     <NotePaireCoque numero={num} itemId={it.id} recreeDe={e && e.recreeDe} ajout rangee/>
+                    {remiseIci ? carteRemise(remiseIci, true) : null}
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
                       <span data-prix style={{fontSize:22,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
                     </div>
@@ -43860,7 +43916,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
                         {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
                         {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
-                        {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{accNameOf(it._acc)}</span>}
+                        {!annUnCompte && <span data-stats-compte="" style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{accNameOf(it._acc)}</span>}
                       </span>
                       {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
                       <span data-plateformes style={{display:'inline-flex',alignItems:'center',gap:4,marginLeft:'auto',flexShrink:0}}>
@@ -43873,7 +43929,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:12,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
                     {/* Téléphone seulement (caché sur ordinateur, où tout reste à la vue). */}
                     <button type="button" className="vrm-fiche-plus-bouton" data-fiche-plus-bouton="" aria-expanded={ouverte} aria-controls={idRepli}
-                      onClick={()=>setFichesOuvertes(x=>{ const n=new Set(x); const k=String(it.id); if(n.has(k)) n.delete(k); else n.add(k); return n; })}>
+                      onClick={basculerFiche}>
                       <span>{ouverte ? 'Moins de détails' : 'Détails et gestes'}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
                     </button>
                   </div>
@@ -43950,7 +44006,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </div>
             );
-          })}
+          })]; })}
         </div>
         </>)}
           </>)}
