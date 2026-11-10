@@ -137,3 +137,16 @@ dans « à jour ». Les gestes courts viennent de `gesteCourt` (src/fraicheurCom
   (src/receptionEmail.js), à brancher en source de gravité 5.
 - eBay : un compte eBay « à relire » dit « touche « Relire » (Comptes liés) » — le bouton de la ligne
   mène à Comptes liés Vinted (`vintedaccounts`) ; un lien direct vers la carte eBay serait plus juste.
+
+## 7. Après le vrai merge de `origin/main` (10 nov., PR #1084 incluse)
+
+Conflits : Colis (main avait redonné la puce « Relire » par `comptesARelireDe`, lot AC) ⇒ la ligne du haut
+reste la seule voix sur Colis ; `comptesARelireDe` reste utilisé par « À trancher » (son écran à lui) ;
+CLAUDE.md §9 : les deux côtés gardés, puis ramené sous 59 000 octets (lignes déplacées telles quelles).
+Build et audits (`variables tdz coherence identite statuts icones fraicheur-unique vague3-ecrans
+finitions-v36`) verts. Bancs relancés un à la fois : `fraicheur-unique` 86/86, `tout-va-bien` 71/71,
+`retraits-frais` 34/34, `colis-retirer-propre` 129/129, `vague3-ecrans` F 15/15 (K : les 18 rouges de
+contraste, sans rapport), `journee-instantanee` 0 rouge, `hors-ligne-froid` 80/80, `iphone-reprise`
+139/139, `nav-v2` 54/54, `direction-artistique-6` 184/184. `colis-fiables` : 1 rouge, « [défaut 6] Ma
+journée : À retirer pas compté » — rouge AUSSI sur `origin/main` (7 rouges là-bas, dont ceux de la puce
+que cette branche corrige) : vient de Ma journée, pas de la ligne.
