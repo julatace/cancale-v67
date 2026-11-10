@@ -272,6 +272,12 @@ const ECRANS = [
   { nom: 'messages-leboncoin', url: '/?tab=messages&site=leboncoin', pret: '.vrm-main' },
   { nom: 'achats', url: '/?tab=achats', pret: '.vrm-main' },
   { nom: 'achats-vestiaire', url: '/?tab=achats&site=vestiaire', pret: '.vrm-main' },
+  // (10 nov., 3e série — branche claude/textes-courts-3) Argent (Compta, Statistiques, Déclarer,
+  // Factures) et Republier, passés à la même règle.
+  { nom: 'argent', url: '/?tab=argent', pret: '.vrm-main' },
+  { nom: 'argent-stats', url: '/?tab=stats', pret: '.vrm-main' },
+  { nom: 'argent-declarer', url: '/?tab=argent_declarer', pret: '.vrm-main' },
+  { nom: 'argent-factures', url: '/?tab=invoices', pret: '.vrm-main' },
 ].filter((e) => !process.env.ECRANS_SEULS || process.env.ECRANS_SEULS.split(',').includes(e.nom));
 
 async function compte(b, sombre) {
