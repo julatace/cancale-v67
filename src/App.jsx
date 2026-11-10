@@ -4517,16 +4517,22 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   // (9 nov., lot AI — Julien : « ça fait très moche ») L'écran ne garde qu'UNE ligne courte
   // (le signal : retirées, à confirmer, l'heure de lecture) ; TOUT le texte d'avant passe,
   // tel quel, dans la pop-up (src/composants/InfoPop.jsx). Ambre : un geste à faire.
-  const morceaux = [];
-  if (nSuppr > 0) morceaux.push(`${nSuppr} retirée${s} de Vinted`);
-  if (nAC > 0) morceaux.push(`${nAC} à confirmer`);
-  if (vieux.length === 1) morceaux.push(`${nom(vieux[0])} lu ${quandFr(Number(lues[vieux[0]]))}`);
-  else if (vieux.length > 1) morceaux.push(`${vieux.length} comptes lus il y a un moment`);
-  if (pubKO) morceaux.push('relecture des autres comptes pas lue');
-  const resume = morceaux.join(' · ');
+  // (10 nov., Julien : « ça n'a rien changé ») Des PASTILLES sans phrase ; la feuille dit UNE phrase (le fait +
+  // le geste, 12 mots au plus) et replie le détail d'avant sous « Pourquoi ? ».
+  const puces = [];
+  if (nSuppr > 0) puces.push({ texte: `${nSuppr} retirée${s} de Vinted` });
+  if (nAC > 0) puces.push({ texte: `${nAC} à confirmer`, ton: 'ambre' });
+  if (vieux.length === 1) puces.push({ texte: `Lu ${quandFr(Number(lues[vieux[0]]))}` });
+  else if (vieux.length > 1) puces.push({ texte: `${vieux.length} comptes à relire`, ton: relit ? undefined : 'ambre' });
+  if (pubKO) puces.push({ texte: 'Relecture pas lue', ton: 'ambre' });
   const ambre = nAC > 0 || pubKO || (!!geste && !relit);
+  const unCompte = aRelire.length === 1 ? nom(aRelire[0]) : '';
+  const phrase = pubKO ? 'Relecture de tes comptes pas lue : rien n’est retiré.'
+    : nAC > 0 ? (relit ? 'À confirmer : VRM les vérifie à ta prochaine visite sur Vinted.' : `À confirmer : ouvre Vinted sur ${unCompte || 'chaque compte'}.`)
+    : aRelire.length ? (relit ? 'Relues à ta prochaine visite sur Vinted.' : `Ouvre Vinted sur ${unCompte || 'chaque compte'} pour les relire.`)
+    : `${nSuppr} annonce${s} retirée${s} de Vinted, enlevée${s} d’ici.`;
   return (
-    <InfoPop nom="fraicheur-annonces" titre="Ce que VRM sait de tes annonces" ton={ambre ? 'ambre' : 'neutre'} resume={resume}
+    <InfoPop nom="fraicheur-annonces" titre="Tes annonces Vinted" ton={ambre ? 'ambre' : 'neutre'} puces={puces} phrase={phrase}
       style={{ ...(style || {}) }}
       attrs={{ [attr]: '', 'data-vieux': vieux.join(','), 'data-supprimees': nSuppr, 'data-cap': cap, 'data-cap-suppr': capS,
         'data-promesse': promet ? '1' : '0', 'data-ailleurs': ailleurs ? '1' : '0', 'data-relit': relit ? '1' : '0', 'data-perime': perime ? '1' : '0', 'data-pub-ko': pubKO ? '1' : '0',
@@ -13425,11 +13431,8 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
         </div>
       ))}
       <div className="vrm-sel-tete" data-sel-tete="">
-        {/* (9 nov., lot AI) La consigne en UNE ligne courte ; la phrase entière dans sa pop-up. */}
-        <InfoPop nom="selection-consigne" titre="Choisir des annonces" style={{ margin: 0, minWidth: 0, flex: '1 1 auto' }}
-          resume={<>Coche, puis <b>Actions</b></>}>
-          <p data-sel-consigne="">{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. Coche-les, puis ' : 'Coche des annonces d’un même compte, puis '}<b>Actions</b>{filtre === 'brouillon' ? ' : mettre en ligne.' : ' : republier, modifier prix ou titre, mettre en brouillon ou en ligne.'}</p>
-        </InfoPop>
+        {/* (10 nov.) La consigne RÉÉCRITE en une phrase courte, sans pop-up (le geste suffit). */}
+        <span data-sel-consigne="" style={{ minWidth: 0, flex: '1 1 auto' }}>{filtre === 'brouillon' ? <>Coche tes brouillons, puis <b>Actions</b>.</> : <>Coche des annonces d’un compte, puis <b>Actions</b>.</>}</span>
         {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
         {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>Un par un</Bouton> : null}
       </div>
@@ -34934,32 +34937,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const blocRemiseEnLigne = () => {
     if (!remises.length) return null;
-    // (9 nov., lot AI) Une PROPOSITION : une puce compacte (« 1 annonce remise en ligne ? › ») ; la
-    // pop-up porte le texte d'avant, les mêmes boutons et la même règle — SON clic relie, rien d'autre.
-    // `data-remise-bloc` reste sur la puce (la cible d'« À trancher » y défile).
+    // (10 nov., Julien : « je n'aime pas du tout les pop-up ») Une PROPOSITION est une carte VISUELLE :
+    // les deux photos côte à côte (l'ancienne paire et la nouvelle annonce), « Même paire ? » et [Oui] [Non].
+    // Aucun paragraphe ; la règle (photo / ressemblance, vérifier l'étiquette) reste derrière ⓘ.
+    // SON clic relie (`repondreRemise` → `poserNumero`), rien d'autre. `data-remise-bloc` : la cible d'« À trancher ».
+    const photoNouvelle = (id) => { const it = (listings.items || []).find((x) => String(x.id) === String(id)); return (it && it.photo) || ''; };
+    const photoAncienne = (id) => { const f = numeros[id] || {}; return f.photo || ''; };
+    const vignette = (src, num, alt) => (
+      <span className="vrm-remise-photo">{src && !imgMortes.has(src) ? <PhotoVinted src={src} alt={alt} loading="lazy" onError={() => noterImgMorte(src)}/> : <span aria-hidden="true">photo</span>}{num ? <span className="vrm-remise-num">N°{num}</span> : null}</span>
+    );
     return (
-      <PuceProposition n={remises.length} libelle={remises.length > 1 ? 'annonces remises en ligne ?' : 'annonce remise en ligne ?'}
-        nom="remise-en-ligne" titre={remises.length > 1 ? `${remises.length} annonces remises en ligne ?` : 'Une annonce remise en ligne ?'}
-        attrs={{ 'data-remise-bloc': remises.length }}>
-        <div data-remise-detail={remises.length}>
-        <p className="vrm-pop-note">Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire là où elle est rangée.</p>
-        {remises.slice(0, 20).map((r) => (
-          <div key={r.nouvelle} data-remise-ligne={r.nouvelle} data-remise-force={r.options[0].force} style={{padding:'9px 0',borderTop:`1px solid ${C.border}`,marginTop:6}}>
-            <div style={{fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || 'Nouvelle annonce'}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.5}}>
-              {r.options.length === 1 ? <>C’est la même paire que <b style={{color:C.text}}>N°{r.options[0].numero}</b> « {r.options[0].titre || 'ancienne annonce'} » ?</> : 'C’est la même paire qu’une de celles-ci ?'}
-              {' '}{PHRASE_REMISE[r.options[0].force]}
-              {r.plusieurs && r.options.length > 1 ? ' Plusieurs anciennes lui ressemblent : seule l’étiquette dit laquelle.' : ''}
-              {r.concurrence ? ' Une autre nouvelle annonce lui ressemble aussi.' : ''}
+      <div className="vrm-remise-cartes" data-remise-bloc={remises.length} role="group" aria-label="Annonces remises en ligne : même paire ?">
+        {remises.slice(0, 20).map((r) => {
+          const o0 = r.options[0];
+          return (
+            <div key={r.nouvelle} className="vrm-remise-carte" data-remise-ligne={r.nouvelle} data-remise-force={o0.force}>
+              <div className="vrm-remise-photos">
+                {vignette(photoAncienne(o0.ancienne), o0.numero, o0.titre || 'Ancienne annonce')}
+                <span className="vrm-remise-egal" aria-hidden="true">=</span>
+                {vignette(photoNouvelle(r.nouvelle), '', r.titre || 'Nouvelle annonce')}
+              </div>
+              <div className="vrm-remise-q"><b>Même paire{r.options.length === 1 ? ` que N°${o0.numero}` : ''} ?</b>
+                <Pourquoi label="Pourquoi ?" titre="Même paire ?">
+                  {r.titre || 'Nouvelle annonce'} — {r.options.length === 1 ? <>c’est la même paire que N°{o0.numero} « {o0.titre || 'ancienne annonce'} » ?</> : 'c’est la même paire qu’une de celles-ci ?'}
+                  {' '}{PHRASE_REMISE[o0.force]}
+                  {r.plusieurs && r.options.length > 1 ? ' Plusieurs anciennes lui ressemblent : seule l’étiquette dit laquelle.' : ''}
+                  {r.concurrence ? ' Une autre nouvelle annonce lui ressemble aussi.' : ''}
+                  {' '}Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire là où elle est rangée.
+                </Pourquoi>
+              </div>
+              <div className="vrm-remise-boutons">
+                {r.options.map((o) => <Bouton key={o.ancienne} variante="secondaire" data-remise-oui={o.numero} title={o.titre} onClick={() => repondreRemise(r, o)}>{r.options.length > 1 ? `Oui, N°${o.numero}` : 'Oui'}</Bouton>)}
+                <Bouton variante="secondaire" data-remise-non={r.nouvelle} onClick={() => repondreRemise(r, null)}>Non</Bouton>
+              </div>
             </div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>
-              {r.options.map((o) => <Bouton key={o.ancienne} variante="secondaire" data-remise-oui={o.numero} title={o.titre} onClick={() => repondreRemise(r, o)}>Oui, N°{o.numero}</Bouton>)}
-              <Bouton variante="secondaire" data-remise-non={r.nouvelle} onClick={() => repondreRemise(r, null)}>Non, une autre paire</Bouton>
-            </div>
-          </div>
-        ))}
-        </div>
-      </PuceProposition>
+          );
+        })}
+      </div>
     );
   };
   const blocNumeroEcrit = () => {

@@ -39,22 +39,39 @@ function IconeInfo() {
 // d'avant, déplacé ; `attrs` : les data-* de l'ancien bloc, posés sur la ligne ;
 // `Feuille` : la feuille de l'app (relais qui fournit `FermeAuRetour`).
 // `ouvert`/`setOuvert` : facultatifs (pop-up pilotée par l'écran).
-export function InfoPop({ resume, titre, sousTitre, ton = 'neutre', children, attrs, Feuille = SheetShellBase, className = '', style, nom = 'info', ouvert: ouvertProp, setOuvert: setOuvertProp, maxWidth = 520 }) {
+export function InfoPop({ resume, puces, phrase, titre, sousTitre, ton = 'neutre', children, attrs, Feuille = SheetShellBase, className = '', style, nom = 'info', ouvert: ouvertProp, setOuvert: setOuvertProp, maxWidth = 520 }) {
   const [ouvertIci, setOuvertIci] = React.useState(false);
   const ouvert = ouvertProp != null ? ouvertProp : ouvertIci;
   const setOuvert = setOuvertProp || setOuvertIci;
   const fermer = React.useCallback(() => setOuvert(false), [setOuvert]);
+  const ouvrir = (e) => { e.stopPropagation(); setOuvert(true); };
+  // (10 nov., Julien : « je n'aime pas du tout les pop-up, ça n'a rien changé ») À l'écran : des PASTILLES
+  // d'une ligne, sans phrase (`puces` : [{ texte, ton }]) — ou la ligne courte (`resume`). La feuille ne montre
+  // d'abord que `phrase` (le fait + le geste, 12 mots au plus) ; le détail d'avant est replié sous « Pourquoi ? »
+  // (rien n'est perdu, rien n'est imposé).
+  const liste = Array.isArray(puces) ? puces.filter((x) => x && x.texte) : null;
   return (
-    <div className={`vrm-pop-ligne${ton === 'ambre' ? ' is-ambre' : ''}${className ? ' ' + className : ''}`} data-popup-ligne={nom} style={style} {...(attrs || {})}>
-      <button type="button" className="vrm-pop-declencheur" data-popup-ouvrir={nom} aria-haspopup="dialog" aria-expanded={ouvert}
-        onClick={(e) => { e.stopPropagation(); setOuvert(true); }}>
-        <span className="vrm-pop-resume">{resume}</span>
-        <span className="vrm-pop-i" aria-hidden="true"><IconeInfo/></span>
-        <span className="vrm-pop-sr">{' '}— en savoir plus</span>
-      </button>
+    <div className={`vrm-pop-ligne${ton === 'ambre' ? ' is-ambre' : ''}${liste ? ' a-puces' : ''}${className ? ' ' + className : ''}`} data-popup-ligne={nom} style={style} {...(attrs || {})}>
+      {liste ? (
+        <div className="vrm-pop-chips" role="group" aria-label={titre || ''}>
+          {liste.map((x, i) => (
+            <button key={i} type="button" className={`vrm-pop-chip${x.ton === 'ambre' ? ' is-ambre' : ''}`} data-popup-ouvrir={i === 0 ? nom : undefined} data-popup-chip={nom}
+              aria-haspopup="dialog" aria-expanded={ouvert} title={phrase || undefined} onClick={ouvrir}>{x.texte}</button>
+          ))}
+        </div>
+      ) : (
+        <button type="button" className="vrm-pop-declencheur" data-popup-ouvrir={nom} aria-haspopup="dialog" aria-expanded={ouvert} onClick={ouvrir}>
+          <span className="vrm-pop-resume">{resume}</span>
+          <span className="vrm-pop-i" aria-hidden="true"><IconeInfo/></span>
+          <span className="vrm-pop-sr">{' '}— en savoir plus</span>
+        </button>
+      )}
       {ouvert && (
         <Feuille onClose={fermer} titre={titre} sousTitre={sousTitre} z={10400} maxWidth={maxWidth} data-popup-corps={nom}>
-          <div className="vrm-pop-corps">{children}</div>
+          <div className="vrm-pop-corps">
+            {phrase ? <p className="vrm-pop-phrase" data-popup-phrase="">{phrase}</p> : null}
+            {phrase ? <details className="vrm-pop-pourquoi" data-popup-pourquoi=""><summary>Pourquoi ?</summary><div className="vrm-pop-detail">{children}</div></details> : children}
+          </div>
         </Feuille>
       )}
     </div>

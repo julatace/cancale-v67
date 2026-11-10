@@ -288,7 +288,8 @@ function AnnoncesVestiaire() {
             ambre si la lecture est à refaire ; la phrase d'avant, entière, dans la pop-up. */}
         <InfoPop nom="vc-fraicheur" titre="Tes annonces Vestiaire" ton={vieille || sansFiche ? 'ambre' : 'neutre'}
           attrs={{ 'data-vc-annonces-fraicheur': '' }}
-          resume={<>{d.complet ? '' : 'au moins '}{n} annonce{n > 1 ? 's' : ''} · lu{n > 1 ? 'es' : 'e'} {ageCourtVc(d.capturedAt)}{vieille ? ' · à confirmer' : ''}{sansFiche ? ' · fiches à venir' : ''}</>}>
+          puces={[{ texte: `${d.complet ? '' : 'Au moins '}${n} annonce${n > 1 ? 's' : ''}` }, { texte: `Lu ${ageCourtVc(d.capturedAt)}` }, vieille ? { texte: 'À confirmer', ton: 'ambre' } : null, sansFiche ? { texte: 'Fiches à venir', ton: 'ambre' } : null].filter(Boolean)}
+          phrase={vieille ? 'Ouvre « Mes articles » sur Vestiaire pour les relire.' : sansFiche ? 'Mets l’extension à jour pour voir photo, titre et prix.' : `${n} annonce${n > 1 ? 's' : ''} lue${n > 1 ? 's' : ''} sur Vestiaire.`}>
           <p data-vc-annonces-fraicheur-detail="" style={{ margin: 0 }}>
           {n} annonce{n > 1 ? 's' : ''}{d.complet ? '' : d.total != null ? ` (au moins — Vestiaire en annonce ${d.total})` : ' (au moins)'}, lue{n > 1 ? 's' : ''} sur Vestiaire {ageCourtVc(d.capturedAt)}.
           {vieille ? <> <b style={{ color: C.warn }}>À confirmer</b> : la lecture a plus de 24 h — {geste} pour la remettre à jour (rien n'est retiré d'ici).</> : null}

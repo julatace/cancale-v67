@@ -705,9 +705,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {aa && aa.su && <InfoPop nom="stock-resume" titre="Tes annonces actuelles" className="vrm-s2d-resume-l"
           ton={nAConf > 0 || aa.manque.length > 0 || aa.vcVieille ? 'ambre' : 'neutre'}
           attrs={{ 'data-stock-resume-court': '' }}
-          resume={nAffiche > 0
-            ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> à ranger{nAConf > 0 ? ` · ${nAConf} à confirmer` : ''}{aa.manque.length > 0 ? ' · pas tout lu' : ''}{nSansNum + sansNumAutres + vcSansNum.length > 0 ? ` · ${nSansNum + sansNumAutres + vcSansNum.length} sans N°` : ''}</>
-            : <>Aucune annonce en ligne lue{aa.manque.length > 0 ? ' · pas tout lu' : ''}</>}>
+          puces={nAffiche > 0
+            ? [{ texte: `${nRangees} rangée${nRangees > 1 ? 's' : ''}` }, { texte: `${nAffiche - nRangees - nSansNum} à ranger` },
+               nAConf > 0 ? { texte: `${nAConf} à confirmer`, ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null,
+               nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: `${nSansNum + sansNumAutres + vcSansNum.length} sans N°` } : null].filter(Boolean)
+            : [{ texte: 'Aucune annonce lue' }, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null].filter(Boolean)}
+          phrase={aa.manque.length > 0 ? 'Une lecture manque : ouvre ce site avec l’extension.' : nAConf > 0 ? 'À confirmer : repasse sur ce compte pour le relire.' : nAffiche - nRangees - nSansNum > 0 ? 'Range chaque paire : touche « Ranger » dans la liste.' : 'Tout ce qui est en ligne est rangé.'}>
         <div data-stock-resume-detail="">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
           {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · dont <b>{nAConf}</b> à confirmer ({aConfTxt} — {aConfGeste})</span>}
@@ -756,7 +759,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-plus-en-ligne={plusEnLigne.length}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Plus en ligne · {plusEnLigne.length}</div>
-        <InfoPop nom="stock-plus-en-ligne" titre="Plus en ligne" style={{ margin: '2px 0 4px' }} resume="Rangées, plus en annonce nulle part">
+        <InfoPop nom="stock-plus-en-ligne" titre="Plus en ligne" style={{ margin: '2px 0 4px' }} resume="Retire-les de leur case, ou garde-les">
           <p>Rangées, mais plus en annonce nulle part : retire-les de leur case, ou garde-les si elles reviennent en vente.</p>
         </InfoPop>
         {plusEnLigne.map((f) => ligneRangee(f, <>
@@ -769,7 +772,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     // (9 nov., lot AI) Une ligne courte (« 3 rangées pas vérifiées · N°5, N°27… ») ; la phrase entière en pop-up.
     <InfoPop nom="stock-pas-verifiees" titre="Paires rangées pas vérifiées" ton="neutre" style={{ margin: 0 }}
       attrs={{ 'data-stock-rangees-passu': rangeesPasSu.length }}
-      resume={<>{rangeesPasSu.length} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} · {rangeesPasSu.slice(0, 3).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 3 ? '…' : ''}</>}>
+      puces={[{ texte: `${rangeesPasSu.length} pas vérifiée${rangeesPasSu.length > 1 ? 's' : ''}` }]}
+      phrase="Une lecture manque : ni « en ligne », ni « partie » n'est dit.">
       {/* (6 nov., onglets B) La lecture qui manque est déjà NOMMÉE en tête (« pas lu : … ») : elle ne se redit
           pas ici (§7, une phrase une fois — mesuré sur sa base : « Vestiaire (jamais lu : ouvre… ») deux fois). */}
       <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. Je ne dis ni qu'elles sont en ligne, ni qu'elles sont parties.</p>

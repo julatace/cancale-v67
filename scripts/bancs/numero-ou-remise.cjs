@@ -13,7 +13,7 @@
 //     mise en ligne : « Une annonce remise en ligne ? … N°7 » ; « Oui, N°7 » ⇒ 9303
 //     porte 7 (sur SON clic, la fiche de 9100 revient avec), rien à barrer ;
 //     « Non » sur une autre ⇒ plus proposé, synchronisé (`vrm_remise_refus`).
-//     (9 nov., lot AI) La proposition est une PUCE qui ouvre sa pop-up : le banc l'ouvre d'abord.
+//     (10 nov.) La proposition est une carte visuelle : deux photos, « Même paire ? », [Oui] [Non].
 //  390 px tactile et 1512 px, clair et sombre. Aucune fixture : tout est inventé.
 //  BANC_PORT (7972 par défaut), BANC_DIST (dist par défaut), BANC_CAPTURES.
 // ════════════════════════════════════════════════════════════════════════════
@@ -175,13 +175,10 @@ async function remise(b, largeur, sombre) {
     const bloc = await pg.waitForSelector('[data-remise-bloc]', { timeout: 15000 }).then(() => true).catch(() => false);
     dit(bloc, `${tag} : « Une annonce remise en ligne ? » apparaît`);
     if (!bloc) { await capture(pg, `C-${nom}-absent`); return; }
-    // (9 nov., lot AI) La proposition est une PUCE : ses lignes et ses boutons vivent dans SA pop-up.
-    dit(await pg.locator('[data-remise-ligne]').count() === 0, `${tag} : la proposition est une puce (rien d'autre à l'écran)`);
-    await toucher(pg, '[data-remise-bloc] [data-popup-ouvrir]', mobile);
-    await pg.waitForSelector('[data-popup-corps="remise-en-ligne"] [data-remise-ligne]', { timeout: 8000 }).catch(() => {});
+    // (10 nov.) La proposition est une carte visuelle (deux photos, « Même paire ? », [Oui] [Non]) ; la règle derrière ⓘ.
     const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-remise-ligne]')].map((e) => [e.getAttribute('data-remise-ligne'), e.getAttribute('data-remise-force')]));
     dit(lignes.length === 2 && lignes.every(([id, f]) => ['9303', '9304'].includes(id) && f === 'simple') && !lignes.some(([id]) => id === '9202'), `${tag} : 9303 et 9304 (même marque, modèle, taille) proposées en « simple » ; la Salomon non`, JSON.stringify(lignes));
-    dit(/N°7/.test(await pg.locator('[data-remise-ligne="9303"]').innerText()) && /vérifie l’étiquette/.test(await pg.locator('[data-remise-ligne="9303"]').innerText()), `${tag} : « C'est la même paire que N°7 ? » et « vérifie l'étiquette »`);
+    dit(/N°7/.test(await pg.locator('[data-remise-ligne="9303"]').innerText()) && /vérifie l’étiquette/.test(await pg.locator('[data-remise-ligne="9303"]').evaluate((e) => e.textContent)), `${tag} : « Même paire que N°7 ? » et (derrière ⓘ) « vérifie l'étiquette »`);
     let f = await fiches(pg);
     const avant = String((f['9303'] || {}).numero || '');
     dit(avant !== '7', `${tag} : rien n'est relié tout seul (9303 ne porte pas 7 avant son clic)`, avant);
@@ -212,10 +209,7 @@ async function refus(b) {
   console.log('\n── C bis. « Non, une autre paire » (390 clair)');
   const { pg, ctx, errs, base } = await ouvrir(b, { main: MAIN(), url: '/?tab=cat_annonces', largeur: 390, sombre: false, items: ITEMS_C.slice(0, 1).concat(ITEMS_C.slice(2)), supprimees: { 9100: ilYa(20) } });
   try {
-    // (9 nov., lot AI) La puce d'abord, puis la pop-up qui porte « Non, une autre paire ».
-    await pg.waitForSelector('[data-remise-bloc] [data-popup-ouvrir]', { timeout: 15000 }).catch(() => {});
-    await toucher(pg, '[data-remise-bloc] [data-popup-ouvrir]', true).catch(() => {});
-    const bloc = await pg.waitForSelector('[data-remise-non="9303"]', { timeout: 8000 }).then(() => true).catch(() => false);
+    const bloc = await pg.waitForSelector('[data-remise-non="9303"]', { timeout: 15000 }).then(() => true).catch(() => false);
     dit(bloc, '« Non, une autre paire » est proposé');
     if (bloc) {
       await toucher(pg, '[data-remise-non="9303"]', true);

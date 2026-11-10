@@ -172,6 +172,10 @@ async function popup(pg, mobile, tag, { ligne, nom, attendu, quoi }) {
   const ouverte = await corps.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
   dit(ouverte && await corps.evaluate((e) => !!e.closest('body > *') && !e.closest('.vrm-main')), `${tag} : ${quoi} — la pop-up s'ouvre (portail, hors de l'écran)`);
   if (!ouverte) return;
+  // (10 nov.) La feuille dit d'abord UNE phrase (≤ 12 mots) ; le détail d'avant est replié sous « Pourquoi ? ».
+  const phrase = ((await corps.locator('[data-popup-phrase]').allInnerTexts())[0] || '').trim();
+  dit(!!phrase && phrase.split(/\s+/).length <= 12, `${tag} : ${quoi} — la feuille dit une phrase de 12 mots au plus`, phrase);
+  await corps.locator('[data-popup-pourquoi] > summary').first().click().catch(() => {});
   const txt = (await corps.innerText()).replace(/\s+/g, ' ');
   dit(attendu.every((re) => re.test(txt)), `${tag} : ${quoi} — la pop-up dit le texte d'avant`, txt.slice(0, 300));
   await capture(pg, `${tag.replace(/\s+/g, '-')}-${nom}-popup`);
@@ -195,6 +199,8 @@ async function ecran(b, largeur, sombre, { nom, url, pret, apres, zone }) {
     if (zone) { const z = pg.locator(zone).filter({ visible: true }).first(); if (await z.count()) { await z.evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(400); await capture(pg, `${largeur}-${sombre ? 'sombre' : 'clair'}-${nom}-zone`); await pg.evaluate(() => window.scrollTo(0, 0)); } }
     const p = await paragraphes(pg, SEUIL);
     dit(!p.pasDEcran && p.longs.length === 0, `${tag} : P1 — aucun paragraphe visible de plus de ${SEUIL} caractères hors pop-up`, p.pasDEcran ? 'écran absent' : p.longs.join(' | '));
+    const nc = await pg.evaluate(() => { const main = [...document.querySelectorAll('.vrm-main')].find((m) => m.getClientRects().length); return main ? (main.innerText || '').replace(/\s+/g, ' ').trim().length : 0; });
+    console.log(`  CARACTÈRES ${largeur}-${sombre ? 'sombre' : 'clair'}-${nom} ${nc}`);
     const rg = await rouges(pg);
     dit(rg.length === 0, `${tag} : P6 — aucun rouge rendu`, rg.join(' | '));
     if (apres) await apres(pg, mobile, tag, base);
@@ -209,24 +215,19 @@ const ECRANS = [
   { nom: 'annonces-vinted', url: '/?tab=annonces&site=vinted', pret: '[data-ann-fraicheur]', zone: '[data-ann-fraicheur]', apres: async (pg, mobile, tag) => {
     await popup(pg, mobile, tag, { ligne: '[data-ann-fraicheur]', nom: 'fraicheur-annonces', quoi: 'fraîcheur des annonces',
       attendu: [/annonces lues/i, /ce que tu as supprimé ou mis en ligne depuis n'y est pas/] });
-    // P3 — la proposition
-    const puce = pg.locator('[data-remise-bloc]').filter({ visible: true }).first();
-    dit(await puce.count() > 0 && await pg.locator('[data-remise-ligne]').count() === 0, `${tag} : P3 — la remise en ligne est une PUCE (aucune carte d'explication sur l'écran)`);
-    // (règle §5 (a) : une annonce sans N° en reçoit un tout seul — elle peut porter un N° neuf ; jamais le 7 avant SON clic)
+    // P3 — la proposition : une carte VISUELLE (deux photos, « Même paire ? », [Oui] [Non]), sans paragraphe.
+    const carte = pg.locator('[data-remise-bloc] [data-remise-ligne="9303"]');
+    const la = await carte.count() > 0;
+    const m = la ? await carte.evaluate((e) => ({ photos: e.querySelectorAll('.vrm-remise-photo').length, q: (e.querySelector('.vrm-remise-q b') || {}).innerText || '', oui: e.querySelectorAll('[data-remise-oui]').length, non: e.querySelectorAll('[data-remise-non]').length,
+      txt: [...e.childNodes].map((c) => c.querySelector && c.querySelector('.vrm-pourquoi') ? (c.querySelector('b') || {}).innerText || '' : c.innerText || '').join(' ').replace(/\s+/g, ' ').trim() })) : null;
+    dit(!!m && m.photos === 2 && /Même paire/.test(m.q) && /N°7/.test(m.q) && m.oui === 1 && m.non === 1, `${tag} : P3 — la proposition est une carte : deux photos, « Même paire que N°7 ? », [Oui] [Non]`, JSON.stringify(m));
+    dit(!!m && m.txt.length <= 60, `${tag} : P3 — aucun paragraphe sur la carte (${m && m.txt.length} caractères)`, m && m.txt);
     const avant = String(((await fiches(pg))['9303'] || {}).numero || '');
     dit(avant !== '7', `${tag} : P3 — avant SON clic, 9303 ne porte pas le N°7`, JSON.stringify((await fiches(pg))['9303'] || null));
-    await toucher(pg, '[data-remise-bloc] [data-popup-ouvrir]', mobile);
-    const corps = pg.locator('[data-popup-corps="remise-en-ligne"]');
-    const ouverte = await corps.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
-    const txt = ouverte ? (await corps.innerText()).replace(/\s+/g, ' ') : '';
-    dit(ouverte && /la même paire que N°7/.test(txt) && /rien à réécrire/.test(txt) && await corps.locator('[data-remise-oui="7"]').count() === 1 && await corps.locator('[data-remise-non]').count() >= 1,
-      `${tag} : P3 — la pop-up porte la question, la règle et les deux boutons`, txt.slice(0, 300));
-    await pg.waitForTimeout(1500);
-    dit(String(((await fiches(pg))['9303'] || {}).numero || '') === avant, `${tag} : P3 — ouvrir la pop-up ne relie RIEN`);
-    await capture(pg, `${tag.replace(/\s+/g, '-')}-remise-popup`);
-    await toucher(pg, '[data-popup-corps="remise-en-ligne"] [data-remise-ligne="9303"] [data-remise-oui="7"]', mobile);
+    await capture(pg, `${tag.replace(/\s+/g, '-')}-remise-carte`);
+    await toucher(pg, '[data-remise-ligne="9303"] [data-remise-oui="7"]', mobile);
     await attendre(async () => String(((await fiches(pg))['9303'] || {}).numero || '') === '7', 10000);
-    dit(String(((await fiches(pg))['9303'] || {}).numero || '') === '7', `${tag} : P3 — « Oui, N°7 » relie 9303 au N°7`, JSON.stringify((await fiches(pg))['9303'] || null));
+    dit(String(((await fiches(pg))['9303'] || {}).numero || '') === '7', `${tag} : P3 — « Oui » relie 9303 au N°7`, JSON.stringify((await fiches(pg))['9303'] || null));
   } },
   { nom: 'annonces-toutes', url: '/?tab=annonces&site=toutes', pret: '.vrm-main', zone: '[data-ann-fraicheur]' },
   { nom: 'annonces-vestiaire', url: '/?tab=annonces&site=vestiaire', pret: '[data-vc-annonces]', zone: '[data-vc-annonces-fraicheur]', apres: async (pg, mobile, tag) => {

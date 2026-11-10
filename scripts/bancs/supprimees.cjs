@@ -160,8 +160,11 @@ const ouvrirPop = async (pg, sel) => {
   const b = pg.locator(`${sel} [data-popup-ouvrir]`).first();
   if (!(await b.count())) return false;
   await b.evaluate((e) => e.scrollIntoView({ block: 'center' })).catch(() => {});
-  await b.click({ timeout: 8000 }).catch(() => {});
-  return pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
+  await b.dispatchEvent('click').catch(() => {});
+  const ok = await pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
+  // (10 nov.) Le détail est replié sous « Pourquoi ? » : le banc le déplie comme lui le ferait.
+  if (ok) await pg.locator('[data-popup-pourquoi] > summary').first().click().catch(() => {});
+  return ok;
 };
 const fermerPop = async (pg) => { if (!(await pg.locator('[data-popup-corps]').count())) return; await pg.keyboard.press('Escape'); await pg.waitForSelector('[data-popup-corps]', { state: 'detached', timeout: 4000 }).catch(() => {}); };
 const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel); const r = await pg.evaluate(f, arg); if (o) await fermerPop(pg); return r; };
