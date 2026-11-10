@@ -89,10 +89,15 @@ export function sourcesNonLues(sources) {
   const S = sources || {};
   return SOURCES_LUES.filter(([k]) => !Array.isArray(S[k])).map(([k]) => k);
 }
-// La phrase : « en cours » (la loupe lit encore) ou « pas lus » (la lecture n'a pas répondu).
+// LA phrase (une seule) : « en cours » (la loupe lit encore) ou « pas lus » (la lecture n'a
+// pas répondu). Une source : « Achats pas encore lus. » ; plusieurs : « Pas encore lus :
+// achats, colis et retraits. » — '' si tout est lu.
 export function phraseNonLues(cles, { enCours = false } = {}) {
   const l = SOURCES_LUES.filter(([k]) => (cles || []).includes(k));
-  return l.map(([, lib, acc]) => `${lib} ${enCours ? 'pas encore ' + acc : 'pas ' + acc + ' (la lecture n’a pas répondu)'}`);
+  if (!l.length) return '';
+  const raison = enCours ? '' : ' — la lecture n’a pas répondu';
+  if (l.length === 1) { const [, lib, acc] = l[0]; return `${lib} ${enCours ? 'pas encore ' : 'pas '}${acc}${raison}.`; }
+  return `${enCours ? 'Pas encore lus' : 'Pas lus'}${raison} : ${l.map(([, lib]) => lib.charAt(0).toLowerCase() + lib.slice(1)).join(', ')}.`;
 }
 
 // (9 nov., recherche universelle) CE QUE LA REQUÊTE A L'AIR D'ÊTRE — pour le

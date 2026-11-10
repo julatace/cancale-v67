@@ -50,6 +50,8 @@ const MUTATIONS = {
   'suivi-partiel-exact': ['src', "if (s) { par = 'suivi'; exact = s === qa; valeur = s; }", "if (s) { par = 'suivi'; exact = true; valeur = s; }"],
   // Un suivi recopié par blocs redevient « des mots du titre ».
   'suivi-blocs': ['src', "const blocs = un || (/^[a-z0-9\\s-]+$/i.test(brut) && /\\d/.test(brut));", 'const blocs = un;'],
+  // Les actions à N° reviennent sur un code de retrait.
+  'app-actions-code': ['app', '.filter(a => !(a.num && kNumQ && !estNumQ));', ';'],
   // L'app ne demande plus la tête.
   'app-sans-tete': ['app', 'chercherPartout(idx, qBrut, { numero: kNumQ, exactesEnTete: true,', 'chercherPartout(idx, qBrut, { numero: kNumQ,'],
   // L'app : une lecture ratée redevient « aucun achat ».
@@ -179,12 +181,14 @@ const essaie = (nom, f) => { try { f(); } catch (e) { dit(false, nom + ' — le 
   essaie('pas lu ≠ rien', () => {
     const i1 = R.indexRecherche({ ...S, achats: null });
     dit(i1.nonLues.join() === 'achats', 'achats pas lus ⇒ « achats » nommé', i1.nonLues);
-    dit(R.phraseNonLues(i1.nonLues, { enCours: true }).join() === 'Achats pas encore lus', '« Achats pas encore lus » pendant la lecture', R.phraseNonLues(i1.nonLues, { enCours: true }));
-    dit(/^Achats pas lus/.test(R.phraseNonLues(i1.nonLues).join()) && /n’a pas répondu/.test(R.phraseNonLues(i1.nonLues).join()), 'lecture ratée ⇒ « Achats pas lus (la lecture n’a pas répondu) »', R.phraseNonLues(i1.nonLues));
+    dit(R.phraseNonLues(i1.nonLues, { enCours: true }) === 'Achats pas encore lus.', '« Achats pas encore lus » pendant la lecture', R.phraseNonLues(i1.nonLues, { enCours: true }));
+    dit(/^Achats pas lus/.test(R.phraseNonLues(i1.nonLues)) && /n’a pas répondu/.test(R.phraseNonLues(i1.nonLues)), 'lecture ratée ⇒ « Achats pas lus — la lecture n’a pas répondu »', R.phraseNonLues(i1.nonLues));
     const i2 = R.indexRecherche({ ...S, achats: [] });
     dit(!i2.nonLues.length, 'une liste lue et VIDE n’est pas « pas lue »', i2.nonLues);
     const i3 = R.indexRecherche({});
     dit(['ventes', 'achats', 'colis'].every((k) => i3.nonLues.includes(k)), 'rien de lu ⇒ ventes, achats, colis nommés', i3.nonLues);
+    dit(/^Pas encore lus : ventes, achats, colis et retraits/.test(R.phraseNonLues(i3.nonLues, { enCours: true })), 'plusieurs sources : UNE phrase qui les nomme', R.phraseNonLues(i3.nonLues, { enCours: true }));
+    dit(R.phraseNonLues([]) === '', 'tout lu ⇒ rien à dire');
   });
 
   essaie('branchement dans l’app', () => {
@@ -192,6 +196,7 @@ const essaie = (nom, f) => { try { f(); } catch (e) { dit(false, nom + ' — le 
     dit(a > 0 && z > a, 'le panneau de la loupe trouvé');
     const p = app.slice(a, z).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
     dit(/chercherPartout\(idx, qBrut, \{[^}]*exactesEnTete: true/.test(p), 'la loupe demande la tête (`exactesEnTete`)');
+    dit(/\.filter\(a => !\(a\.num && kNumQ && !estNumQ\)\)/.test(p), 'un code / suivi / transaction exact ne propose pas d’action « N°482913 »');
     dit(/data-recherche-exacte=""/.test(p) && /Correspondance exacte/.test(p) && /IDENTITES_EXACTES/.test(p), 'la tête est rendue et dit PAR QUOI (« Trouvé par son n° de suivi »)');
     dit(/data-recherche-exacte-numero=""/.test(p), 'un N° exact le dit au-dessus de « Tout sur le N° »');
     dit(/\{nonLues\.length > 0 && <div data-recherche-non-lu=/.test(p) && /phraseNonLues\(idx\.nonLues/.test(p), '« … pas encore lus » rendu dans la loupe');

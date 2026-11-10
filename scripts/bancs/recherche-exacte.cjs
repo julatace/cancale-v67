@@ -159,7 +159,7 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const tours = [[{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false], [{ width: 1512, height: 950 }, true]];
-    for (const [vp, sombre] of tours) {
+    for (const [vp, sombre] of (process.env.BANC_SEUL === 'ko' ? [] : tours)) {
       const tel = vp.width < 600; const TT = `[${vp.width}${sombre ? ' sombre' : ''}]`; const suf = `${vp.width}${sombre ? '-sombre' : ''}`;
       console.log(`── ${vp.width} px${sombre ? ' · sombre' : ''}`);
       const { ctx, pg, errs, lectures } = await preparer(b, vp, { sombre });
@@ -189,6 +189,7 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
         const x = await etat(pg);
         dit(x.r[0] && x.r[0].cle === 'colis:MR7000123' && x.r[0].par === 'code' && x.r[0].groupe === 'exacte' && /code de retrait/.test(x.tete.txt), `${TT} code de retrait ⇒ CE colis en tête, « par son code de retrait »`, JSON.stringify({ r: x.r.slice(0, 2), t: x.tete }));
         dit(!x.groupes.includes('retrait') && x.r.filter((r) => r.cle === 'colis:MR7000123').length === 1, `${TT} pas répété dans « Retraits »`, JSON.stringify(x.groupes));
+        dit(!x.r.some((r) => r.type === 'action' && /482913/.test(r.cle || '')) && !x.groupes.includes('action'), `${TT} un code de retrait ne propose pas « Baisser le prix de N°482913 »`, JSON.stringify(x.groupes));
         await pg.screenshot({ path: path.join(SHOTS, `code-${suf}.png`) });
       });
       await essaie('transaction', async () => {
@@ -251,7 +252,7 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
       await ctx.close();
     }
     // « pas encore lus » : la lecture des colis de la loupe TENUE.
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+    for (const vp of (process.env.BANC_SEUL === 'ko' ? [] : [{ width: 390, height: 844 }, { width: 1512, height: 950 }])) {
       const tel = vp.width < 600; const TT = `[${vp.width} tenu]`;
       const { ctx, pg, errs, relacher } = await preparer(b, vp, { mode: 'tenu' });
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(2500);
@@ -260,7 +261,7 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
         await taper(pg, '482913', '[data-recherche-non-lu]');
         await pg.waitForTimeout(250);
         let x = await etat(pg);
-        dit(x.nonLu && x.nonLu.encours === '1' && /colis/.test(x.nonLu.cles) && /Colis et retraits pas encore lus/.test(x.nonLu.txt), `${TT} lecture des colis tenue ⇒ « Colis et retraits pas encore lus »`, JSON.stringify(x.nonLu));
+        dit(x.nonLu && x.nonLu.encours === '1' && /colis/.test(x.nonLu.cles) && /Pas encore lus : .*colis et retraits/.test(x.nonLu.txt), `${TT} lecture des colis tenue ⇒ « Colis et retraits pas encore lus »`, JSON.stringify(x.nonLu));
         dit(!x.r.some((r) => r.cle === 'colis:MR7000123'), `${TT} … et aucun colis inventé pendant ce temps`, JSON.stringify(x.r));
         await pg.screenshot({ path: path.join(SHOTS, `pas-encore-lus-${vp.width}.png`) });
         relacher();
@@ -280,9 +281,11 @@ const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
         await taper(pg, 'salomon', '[data-recherche-non-lu]');
         await pg.waitForTimeout(250);
         const x = await etat(pg);
-        dit(x.nonLu && x.nonLu.encours === '0' && x.nonLu.cles.split(' ').includes('achats') && /Achats pas lus/.test(x.nonLu.txt) && /pas répondu/.test(x.nonLu.txt), `${TT} lecture des achats ratée ⇒ « Achats pas lus (la lecture n’a pas répondu) »`, JSON.stringify(x.nonLu));
+        dit(x.nonLu && x.nonLu.encours === '0' && x.nonLu.cles.split(' ').includes('achats') && /Achats pas lus/.test(x.nonLu.txt) && /pas répondu/.test(x.nonLu.txt), `${TT} lecture des achats ratée ⇒ « Achats pas lus — la lecture n’a pas répondu »`, JSON.stringify(x.nonLu));
         dit(!x.groupes.includes('achat'), `${TT} … et aucun achat inventé`, JSON.stringify(x.groupes));
         await pg.screenshot({ path: path.join(SHOTS, `achats-pas-lus-${vp.width}${sombre ? '-sombre' : ''}.png`) });
+        const vu = await pg.evaluate(() => { const p = document.querySelector('[data-recherche-panneau]'); const r = p && p.getBoundingClientRect(); return !!(r && r.width > 100 && r.height > 40); });
+        dit(vu, `${TT} la loupe est VISIBLE sur la capture (pas l’écran de chargement)`, String(vu));
       });
       dit(errs.length === 0, `${TT} aucune erreur de page`, errs.join(' | ').slice(0, 200));
       await ctx.close();

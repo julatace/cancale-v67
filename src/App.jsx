@@ -53931,7 +53931,7 @@ function AppCoeur() {
         const exacteNumero = !!(trouve && estNumQ && trouve.exactes.some(r => r.par === 'numero'));
         // (10 nov., lot AX) Ce qui n'est pas lu, DIT : « Achats pas encore lus » (la loupe lit
         // encore) ou « pas lus » (la lecture n'a pas répondu) — jamais un silence.
-        const nonLues = q && idx && idx.nonLues && idx.nonLues.length ? phraseNonLues(idx.nonLues, { enCours: !gsData }) : [];
+        const nonLues = q && idx && idx.nonLues && idx.nonLues.length ? phraseNonLues(idx.nonLues, { enCours: !gsData }) : '';
         const mails = gsEmails && gsEmails.q === requeteEmails(qBrut.trim()) ? gsEmails : null;
         const listeMails = mails && Array.isArray(mails.liste) ? mails.liste : [];
         const total = trouve ? GROUPES_LOUPE.reduce((n,[t])=>n+groupe(t).length,0) + exactes.length + listeMails.length : 0;
@@ -54032,7 +54032,9 @@ function AppCoeur() {
         const sugg = !q ? suggestionsRecherche(idx, { n: 3 }) : null;
         // (9 nov., lot B) ⌘K QUI AGIT : des ACTIONS en plus des résultats (src/annulerCommandes.js).
         // Une action OUVRE un écran ou une feuille existante — elle n'écrit rien, n'envoie rien.
-        const actionsGs = actionsPour(qBrut, { lireNumero: (t) => lireNumeroCherche(t, { cleNum }, [prefixeNumeros(), archiveNumeros()]) });
+        // (10 nov., lot AX) Un nombre qui est l'identité EXACTE d'autre chose (code de retrait, suivi,
+        // transaction — « Tout sur le N° » s'efface alors) ne propose pas « Baisser le prix de N°482913 ».
+        const actionsGs = actionsPour(qBrut, { lireNumero: (t) => lireNumeroCherche(t, { cleNum }, [prefixeNumeros(), archiveNumeros()]) }).filter(a => !(a.num && kNumQ && !estNumQ));
         const ligneAction = (a) => (
           <button key={'action-' + a.id + (a.num || '')} type="button" className="vrm-recherche-ligne" onClick={()=>lancerActionRecherche(a, qBrut)} data-recherche-resultat="action" data-recherche-action={a.id} data-recherche-num={a.num || undefined} title={a.sous} style={styleLigne}>
             {thumb(null, <Icon name={a.icone} size={18} style={{color:C.text}}/>)}
@@ -54058,7 +54060,7 @@ function AppCoeur() {
               <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>Tape un N° (« b125 », « 007 »), un pseudo, un n° de suivi, de transaction ou de commande eBay, Leboncoin, Vestiaire, un code de retrait, un montant ou des mots du titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
             </div>}
             {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
-            {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues.join(' · ')}.</div>}
+            {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues}</div>}
             {q && blocExactes}
             {q && !estNumQ && blocActions}
             {q && total===0 && !estNumQ && !actionsGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« 125 », « B125 »), un pseudo, un n° de suivi, de transaction ou de commande, un code de retrait, un montant (« 52 € ») ou deux mots du titre.</>:'Je lis tes ventes, achats et colis…'}</div>}
