@@ -276,3 +276,18 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { paddin
 :root:root body .vrm-relais-indice { position: absolute; left: 8px; top: 8px; z-index: 3; max-width: calc(100% - 16px); padding: 4px 10px; border-radius: 12px; font: 500 12px/18px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 3px rgba(0,0,0,.15); pointer-events: none; animation: vrm-indice-part 2.5s ease forwards; }
 @keyframes vrm-indice-part { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { :root:root body .vrm-relais-indice { animation: none; } }
+
+/* (10 nov., retraits irréprochables) D'où vient chaque information d'un colis à retirer : des marques
+   discrètes (texte gris, petit), l'heure de la dernière vérification ; le code « sûr » (deux voix
+   concordantes) porte une coche ; deux codes différents ⇒ ambre, les deux valeurs dans le détail. */
+html body .vrm-rpf-ligne .vrm-rpf-sources { display: block !important; margin-top: 3px; white-space: normal !important; overflow: visible !important; font-size: 11px !important; line-height: 15px !important; color: var(--p-gris, #86868b) !important; font-weight: 400 !important; letter-spacing: 0; }
+html body .vrm-rpf-ligne .vrm-rpf-source + .vrm-rpf-source::before,
+html body .vrm-rpf-ligne .vrm-rpf-source + .vrm-rpf-verifie::before { content: "·"; margin: 0 4px; opacity: .7; }
+html body .vrm-rpf-ligne .vrm-rpf-source, html body .vrm-rpf-ligne .vrm-rpf-verifie { display: inline !important; white-space: nowrap; }
+html body .vrm-rpf-ligne .vrm-rpf-verifie { font-variant-numeric: tabular-nums; }
+html body .vrm-rpf-ligne .vrm-rpf-code .vrm-rpf-code-sur { margin-left: 4px; vertical-align: -1px; }
+html body .vrm-rpf-ligne .vrm-rpf-code.is-ambre { color: var(--vrm-warn, #B25000) !important; border-color: currentColor !important; font-weight: 600 !important; }
+html body .vrm-rpf-ligne .vrm-rpf-desaccord { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 4px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--vrm-warn, #B25000); color: var(--vrm-warn, #B25000); font-size: 13px; }
+html body .vrm-rpf-ligne .vrm-rpf-desaccord-t { font-weight: 600; }
+html body .vrm-rpf-ligne .vrm-rpf-desaccord-v b { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+html body .vrm-rpf-ligne .vrm-rpf-code-origine { margin: 4px 0; font-size: 12px; color: var(--p-gris, #86868b); }

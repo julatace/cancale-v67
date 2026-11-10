@@ -24,6 +24,13 @@ marcher à côté.
 
 ### Les gestes de Julien (une fois)
 
+> ⭐ **(10 nov.) La notice à suivre est `docs/emails-transfert-mise-en-service.md`**
+> (pas à pas, valeurs exactes, et le Worker SANS paquet à coller tel quel :
+> `cloudflare/worker-reception.js`, testé par `scripts/audit-emails-transfert.cjs`).
+> Le Worker `postal-mime` plus bas demande une installation (impossible dans
+> l'éditeur de Cloudflare) et son `btoa(String.fromCharCode(...))` casse sur une
+> grosse pièce jointe : ne plus le coller.
+
 1. Acheter un **domaine court dédié** à la réception (≈ 10 €/an, ex. `recu-vrm.fr`) —
    jamais `vrm.center` (ses e-mails à lui y vivent).
 2. L'ajouter à **Cloudflare** (gratuit) : Cloudflare donne deux *nameservers*, les

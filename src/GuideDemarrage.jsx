@@ -120,7 +120,7 @@ export function VerificationInstallation({ verif, onGeste, lienGeste = () => '',
   );
 }
 
-export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, onExemple = null, onMasquer = null, onVerifier = null, onPlusTard = null, numerotation = null, verification = null, onOuvrirVerification = null }) {
+export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, onExemple = null, onMasquer = null, onVerifier = null, onPlusTard = null, numerotation = null, verification = null, onOuvrirVerification = null, Pop = null }) {
   if (!guide) return null;
   const { etapes, faites, total, courante } = guide;
   return (
@@ -151,7 +151,9 @@ export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, on
                 {ouverte && (
                   <div className="vrm-guide-ouverte" key={e.cle}>
                     {(e.cle === 'emails' || e.cle === 'vente') && <IllustrationEtape cle={e.cle} />}
-                    <p className="vrm-guide-pourquoi">{e.pourquoi}</p>
+                    {/* (9 nov., lot AI) Le « pourquoi » en pop-up (une ligne « Pourquoi ? » + ⓘ) quand l'app fournit `Pop`. */}
+                    {Pop ? <Pop nom={'guide-' + e.cle} titre={e.titre} resume="Pourquoi cette étape ?" style={{ margin: '0 0 6px' }}><p className="vrm-guide-pourquoi">{e.pourquoi}</p></Pop>
+                      : <p className="vrm-guide-pourquoi">{e.pourquoi}</p>}
                     {(e.cle === 'extension' || e.cle === 'vinted') && detail ? <div className="vrm-guide-detail" data-guide-detail={e.cle}>{detail}</div> : null}
                     {e.etat === 'passu' && onVerifier ? <button type="button" className="vrm-b vrm-b-secondaire" onClick={onVerifier}>Réessayer la vérification</button> : null}
                     {(geste && e.etat !== 'passu' && e.etat !== 'encours') || (onPlusTard && !e.attente) ? (
