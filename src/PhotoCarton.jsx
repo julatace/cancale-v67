@@ -8,7 +8,7 @@
 //   · `PhotoCartonVente`  : la fiche de la vente — « Voir » (lu au toucher) ou « Ajouter ».
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { createPortal } from 'react-dom';
+import { ouvrirVisionneuse } from './visionneuse.js';
 import { compresserPhotoCarton, ecrirePhotoCarton, photoCartonDe, aPhotoCarton, idPhotoCarton, ecouterPhotoCarton } from './photoCarton.js';
 import './styles-photo-carton.css';
 
@@ -24,25 +24,9 @@ const IconeAppareil = () => (
   </svg>
 );
 
-// La photo en grand (un toucher la ferme ; Échap aussi).
-export function VuePhotoCarton({ src, titre = 'Photo du carton', sous = '', onFermer, zIndex = 19000 }) {
-  React.useEffect(() => {
-    const f = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onFermer && onFermer(); } };
-    window.addEventListener('keydown', f, true); return () => window.removeEventListener('keydown', f, true);
-  }, [onFermer]);
-  if (typeof document === 'undefined') return null;
-  return createPortal(
-    <div className="vrm-pc-vue" data-photo-carton-vue="" onClick={onFermer} style={{ zIndex }}>
-      <div role="dialog" aria-modal="true" aria-label={titre} className="vrm-pc-vue-cadre" onClick={(e) => e.stopPropagation()}>
-        <div className="vrm-pc-vue-tete"><span><b>{titre}</b>{sous ? <small>{sous}</small> : null}</span>
-          <button type="button" data-photo-carton-vue-fermer="" aria-label="Fermer la photo" onClick={onFermer}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>
-        <img src={src} alt={titre}/>
-      </div>
-    </div>, document.body);
-}
+// La photo en grand : LA visionneuse de l'app (src/Visionneuse.jsx — zoom, retour du téléphone,
+// Échap, croix), avec la légende « Photo du carton · N°… ». Plus de vue à part (10 nov., lot AN).
+const voirEnGrand = (src, sous = '') => ouvrirVisionneuse([src], 0, { titre: 'Photo du carton', sous });
 
 // Le geste : « Photo du carton » ⇒ l'appareil photo ⇒ rangée avec la vente.
 // `vente` = { site, tx, num } (l'identité de la vente, src/photoCarton.js `venteDuColis`) ;
@@ -53,7 +37,6 @@ export function BoutonPhotoCarton({ vente, ton = 'sombre', compact = false, libe
   const [etat, setEtat] = React.useState('');      // '' · envoi · range · echec · illisible
   const [apercu, setApercu] = React.useState(null);
   const [deja, setDeja] = React.useState(undefined);   // undefined lecture · false aucune · { at } · null pas su
-  const [vue, setVue] = React.useState(null);
   React.useEffect(() => {
     let vivant = true; setEtat(''); setApercu(null); setDeja(undefined);
     if (!id) return undefined;
@@ -74,9 +57,10 @@ export function BoutonPhotoCarton({ vente, ton = 'sombre', compact = false, libe
   };
   const ouvrir = () => { if (fichier.current) fichier.current.click(); };
   const voir = async () => {
-    if (apercu) { setVue(apercu); return; }
+    const sous = vente.num ? `N°${vente.num}` : '';
+    if (apercu) { voirEnGrand(apercu, sous); return; }
     const r = await photoCartonDe(vente.tx, vente.site);
-    if (r && r.src) setVue(r.src); else setEtat(r === false ? '' : 'echec-lecture');
+    if (r && r.src) voirEnGrand(r.src, sous); else setEtat(r === false ? '' : 'echec-lecture');
   };
   const range = etat === 'range' || (!etat && deja && deja.at);
   return (
@@ -98,7 +82,6 @@ export function BoutonPhotoCarton({ vente, ton = 'sombre', compact = false, libe
       {etat === 'echec' ? <p className="vrm-pc-note is-ambre" role="alert" data-photo-carton-echec="">Photo pas envoyée : réessaie quand le réseau revient.</p> : null}
       {etat === 'illisible' ? <p className="vrm-pc-note is-ambre" role="alert" data-photo-carton-echec="illisible">Cette photo n’a pas pu être lue : reprends-la.</p> : null}
       {etat === 'echec-lecture' ? <p className="vrm-pc-note is-ambre" role="alert">La photo n’a pas pu être lue : réessaie.</p> : null}
-      {vue ? <VuePhotoCarton src={vue} sous={vente.num ? `N°${vente.num}` : ''} onFermer={() => setVue(null)}/> : null}
     </div>
   );
 }
@@ -108,7 +91,6 @@ export function BoutonPhotoCarton({ vente, ton = 'sombre', compact = false, libe
 export function PhotoCartonVente({ site = 'vinted', tx, num = '' }) {
   const id = idPhotoCarton(site, tx);
   const [etat, setEtat] = React.useState(undefined);   // undefined · false · { at } · null
-  const [vue, setVue] = React.useState(null);
   const [lecture, setLecture] = React.useState('');
   React.useEffect(() => {
     let vivant = true; if (!id) return undefined;
@@ -122,7 +104,7 @@ export function PhotoCartonVente({ site = 'vinted', tx, num = '' }) {
     setLecture('…');
     const r = await photoCartonDe(tx, site);
     setLecture('');
-    if (r && r.src) setVue(r); else if (r === false) setEtat(false); else setLecture('pas lue');
+    if (r && r.src) voirEnGrand(r.src, [num ? `N°${num}` : '', quand(r.at)].filter(Boolean).join(' · ')); else if (r === false) setEtat(false); else setLecture('pas lue');
   };
   return (
     <div className="vrm-recap-ligne vrm-pc-ligne" data-photo-carton-vente={id} data-photo-carton-vente-etat={etat === undefined ? 'lecture' : etat === null ? 'pas-su' : etat ? 'oui' : 'non'}>
@@ -133,7 +115,6 @@ export function PhotoCartonVente({ site = 'vinted', tx, num = '' }) {
           <small className="vrm-pc-date">{lecture === 'pas lue' ? 'pas lue — réessaie' : quand(etat.at)}</small>
         </> : etat === false ? <BoutonPhotoCarton vente={{ site, tx, num }} ton="clair" compact libelle="Ajouter"/>
           : etat === null ? <span title="La base n’a pas répondu">—</span> : <span aria-busy="true">…</span>}
-        {vue ? <VuePhotoCarton src={vue.src} sous={[num ? `N°${num}` : '', quand(vue.at)].filter(Boolean).join(' · ')} onFermer={() => setVue(null)}/> : null}
       </dd>
     </div>
   );

@@ -3,7 +3,8 @@
 //   · le toucher d'une vignette d'article n'importe où (`data-vrm-vignette`,
 //     règle dans src/visionneuse.js), en phase de CAPTURE sur le document : la
 //     rangée ne reçoit pas ce clic, le reste de la rangée garde son geste ;
-//   · `ouvrirVisionneuse(photos, index)` (une facture jointe, par exemple).
+//   · `ouvrirVisionneuse(photos, index, { titre, sous })` (une facture jointe, la photo du
+//     carton — lot AZ, sa vue à part fondue ici le 10 nov. : il n'y a qu'UNE visionneuse).
 // Fond noir, portail, `FermeAuRetour` (le retour du téléphone ferme), croix ronde,
 // Échap ; plusieurs photos : glisser, flèches, compteur « 2/5 » ; zoom : pincer au
 // doigt, double toucher / double clic, molette à l'ordinateur.
@@ -11,7 +12,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { EVT_VISIONNEUSE, vignetteTouchee, origineVignette, lienVignette, galerieDe, borneZoom, borneDeplacement, ZOOM_DOUBLE } from './visionneuse.js';
 
-const Z_VISIONNEUSE = 15000;   // au-dessus des feuilles (≤ 10000), sous les confirmations (20000) et les messages (30000)
+// Au-dessus des feuilles ET des pleins écrans (scanner 19998, bienvenue 19000), sous les confirmations
+// (20000) et les messages (30000) : une photo touchée dans le scanner s'ouvre DEVANT lui.
+const Z_VISIONNEUSE = 19999;
 
 const Fleche = ({ sens }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -22,7 +25,7 @@ const Croix = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
 );
 
-function Scene({ photos, index, lien = '', fermer, Photo, Retour }) {
+function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo, Retour, clavier }) {
   const [i, setI] = useState(index);
   const [z, setZ] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -46,18 +49,22 @@ function Scene({ photos, index, lien = '', fermer, Photo, Retour }) {
     const av = document.activeElement;
     try { croix.current && croix.current.focus({ preventScroll: true }); } catch (_) {}
     const k = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermer(); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); aller(1); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); aller(-1); }
+      // stopImmediatePropagation : la feuille ou le plein écran SOUS la photo (scanner, Préparer,
+      // mode relais…) n'entend pas cet Échap — seule la photo se ferme.
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); fermer(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); e.stopImmediatePropagation(); aller(1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopImmediatePropagation(); aller(-1); }
       else if (e.key === 'Tab') {   // le focus reste dans la visionneuse
         const f = scene.current ? [...scene.current.parentNode.querySelectorAll('button')] : [];
         if (!f.length) return; const a = f.indexOf(document.activeElement);
         e.preventDefault(); f[(a + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
       }
     };
-    window.addEventListener('keydown', k, true);
+    // L'écouteur est celui de la coque, posé au démarrage (AVANT ceux des feuilles) : il passe
+    // donc le premier, même devant une feuille qui écoute elle aussi en capture.
+    clavier.current = k;
     const html = document.documentElement, avant = html.style.overflow; html.style.overflow = 'hidden';
-    return () => { window.removeEventListener('keydown', k, true); html.style.overflow = avant; try { av && av.focus && av.focus({ preventScroll: true }); } catch (_) {} };
+    return () => { if (clavier.current === k) clavier.current = null; html.style.overflow = avant; try { av && av.focus && av.focus({ preventScroll: true }); } catch (_) {} };
   }, [fermer, aller]);
   // La molette zoome (écouteur NON passif : la page ne défile pas derrière).
   useEffect(() => {
@@ -107,7 +114,7 @@ function Scene({ photos, index, lien = '', fermer, Photo, Retour }) {
   const annule = (e) => { ptrs.current.delete(e.pointerId); geste.current = null; setGlisse(0); };
   const src = photos[i];
   return (
-    <div className="vrm-visionneuse" role="dialog" aria-modal="true" aria-label={n > 1 ? `Photo ${i + 1} sur ${n}` : 'Photo en grand'}
+    <div className="vrm-visionneuse" role="dialog" aria-modal="true" aria-label={titre || (n > 1 ? `Photo ${i + 1} sur ${n}` : 'Photo en grand')}
       data-visionneuse="ouverte" data-visionneuse-index={i} data-visionneuse-n={n} data-visionneuse-zoom={z.toFixed(2)}
       style={{ position: 'fixed', inset: 0, zIndex: Z_VISIONNEUSE, background: '#000', color: '#fff', display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
       {Retour ? <Retour fermer={fermer}/> : null}
@@ -122,7 +129,12 @@ function Scene({ photos, index, lien = '', fermer, Photo, Retour }) {
         </div>
       </div>
       <div className="vrm-visionneuse-haut" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'max(10px, env(safe-area-inset-top)) 12px 0', pointerEvents: 'none' }}>
-        <span data-visionneuse-compteur="" aria-live="polite" style={{ minWidth: 44, fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', opacity: n > 1 ? 0.9 : 0, padding: '0 6px' }}>{n > 1 ? `${i + 1}/${n}` : ''}</span>
+        {titre ? (
+          <span data-visionneuse-legende="" style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, padding: '0 6px', textShadow: '0 1px 2px rgba(0,0,0,.6)' }}>
+            <b style={{ fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titre}{n > 1 ? <span data-visionneuse-compteur="" style={{ fontWeight: 500, opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>{` · ${i + 1}/${n}`}</span> : null}</b>
+            {sous ? <small style={{ fontSize: 13, color: '#c7c7cc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sous}</small> : null}
+          </span>
+        ) : <span data-visionneuse-compteur="" aria-live="polite" style={{ minWidth: 44, fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', opacity: n > 1 ? 0.9 : 0, padding: '0 6px' }}>{n > 1 ? `${i + 1}/${n}` : ''}</span>}
         <button ref={croix} type="button" data-visionneuse-fermer="" aria-label="Fermer la photo" onClick={fermer}
           style={{ pointerEvents: 'auto', width: 44, height: 44, borderRadius: 22, border: 0, background: 'rgba(255,255,255,.16)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><Croix/></button>
       </div>
@@ -141,8 +153,14 @@ function Scene({ photos, index, lien = '', fermer, Photo, Retour }) {
 export default function Visionneuse({ Photo = null, Retour = null }) {
   const [vue, setVue] = useState(null);   // { photos, index, cle }
   const fermer = useCallback(() => setVue(null), []);
+  const clavier = useRef(null);
   useEffect(() => {
-    const ouvrir = (e) => { const d = e && e.detail; if (d && Array.isArray(d.photos) && d.photos.length) setVue({ photos: d.photos, index: d.index || 0, cle: Date.now() }); };
+    const k = (e) => { if (clavier.current) clavier.current(e); };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, []);
+  useEffect(() => {
+    const ouvrir = (e) => { const d = e && e.detail; if (d && Array.isArray(d.photos) && d.photos.length) setVue({ photos: d.photos, index: d.index || 0, titre: d.titre || '', sous: d.sous || '', cle: Date.now() }); };
     // En CAPTURE sur le document : avant la rangée (React écoute sur sa racine, plus bas).
     const clic = (e) => {
       if (e.defaultPrevented || (e.button != null && e.button !== 0) || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -157,5 +175,5 @@ export default function Visionneuse({ Photo = null, Retour = null }) {
     return () => { window.removeEventListener(EVT_VISIONNEUSE, ouvrir); document.removeEventListener('click', clic, true); };
   }, []);
   if (!vue || typeof document === 'undefined') return null;
-  return createPortal(<Scene key={vue.cle} photos={vue.photos} index={vue.index} lien={vue.lien || ''} fermer={fermer} Photo={Photo} Retour={Retour}/>, document.body);
+  return createPortal(<Scene key={vue.cle} photos={vue.photos} index={vue.index} lien={vue.lien || ''} titre={vue.titre || ''} sous={vue.sous || ''} fermer={fermer} clavier={clavier} Photo={Photo} Retour={Retour}/>, document.body);
 }

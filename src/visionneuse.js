@@ -117,10 +117,15 @@ export function lienVignette(img) {
   return /^https:\/\//i.test(h) ? h : '';
 }
 
-export function ouvrirVisionneuse(photos, index = 0) {
+// `legende` (facultative) : { titre, sous } écrits en haut, à côté de la croix — la photo du
+// carton (« Photo du carton », « N°12 · 10 nov. · 14:02 »), une facture jointe… Une seule
+// visionneuse pour toute l'app (10 nov. : celle de la photo du carton, lot AZ, fondue ici).
+export function ouvrirVisionneuse(photos, index = 0, legende = null) {
   const L = (Array.isArray(photos) ? photos : [photos]).map((p) => String(p || '')).filter(Boolean);
   if (!L.length) return false;
-  try { window.dispatchEvent(new CustomEvent(EVT_VISIONNEUSE, { detail: { photos: L, index: Math.max(0, Math.min(Number(index) || 0, L.length - 1)) } })); return true; } catch (_) { return false; }
+  const titre = legende && legende.titre ? String(legende.titre).slice(0, 80) : '';
+  const sous = legende && legende.sous ? String(legende.sous).slice(0, 120) : '';
+  try { window.dispatchEvent(new CustomEvent(EVT_VISIONNEUSE, { detail: { photos: L, index: Math.max(0, Math.min(Number(index) || 0, L.length - 1)), titre, sous } })); return true; } catch (_) { return false; }
 }
 
 // Le zoom : borné, et un double toucher bascule 1 ⇄ 2,5.
