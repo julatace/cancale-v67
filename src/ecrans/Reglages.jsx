@@ -4145,7 +4145,7 @@ function PushSetting() {
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
         {/* (5 nov.) Sur un iPhone dans Safari, le guide illustré le dit (une phrase, une fois — §7). */}
-        {state==='unsupported' && !guideIphone && ' — Ici, non : ajoute VRM à l\'écran d\'accueil (Partager), puis ouvre l\'icône.'}
+        {state==='unsupported' && !guideIphone && ' — Non disponible ici : ajoute VRM à l\'écran d\'accueil (Partager), puis ouvre l\'icône.'}
       </div>
       {guideIphone && <GuideIphone onFermer={fermerGuideIphone}/>}
       {/* ⚠️ « Je ne reçois plus rien » a DEUX causes qui font le même silence :

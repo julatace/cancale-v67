@@ -19901,7 +19901,7 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
           {choisi === 'mondialrelay' && <input aria-label="Code postal (facultatif)" data-suivi-cp="" value={cp} onChange={e => setCp(e.target.value)} inputMode="numeric" placeholder="Code postal du point relais (facultatif)" style={champ}/>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Bouton variante="primaire" data-suivi-enregistrer="" disabled={envoi} onClick={enregistrer} style={{ minHeight: 44, opacity: envoi ? .5 : 1 }}>{envoi ? 'Enregistrement…' : 'Enregistrer ce suivi'}</Bouton>
-            <span className="vrm-aide" data-suivi-promesse="" style={{ fontSize: 12, color: C.muted }}>« À retirer » dès que le transporteur le dit {LECTURE_SERVEUR_TRANSP.mondialrelay ? '(Mondial Relay : code postal du relais).' : '(Mondial Relay : depuis ton ordinateur).'}</span>
+            <span className="vrm-aide" data-suivi-promesse="" style={{ fontSize: 12, color: C.muted }}>« À retirer » dès que le transporteur le dit {LECTURE_SERVEUR_TRANSP.mondialrelay ? '(Mondial Relay : code postal du point relais).' : '(Mondial Relay : depuis ton ordinateur).'}</span>
           </div>
           {msg && <div data-suivi-msg="" style={{ fontSize: 13, color: C.warn }}>{msg}</div>}
         </div>
