@@ -178,7 +178,8 @@ const LIGNES = [
       // (2 nov., soir, « un numéro par annonce ») Sans référence, l'annonce reçoit un N° NEUF
       // (par son productId, au-dessus de tout N° servi) — jamais celui d'une autre, jamais par le titre.
       dit(P('P3') && P('P3').etat === 'attente' && Number(P('P3').num) > 42 && P('P3').prix === '', 'Annonces : sans référence ⇒ un N° neuf (jamais deviné, jamais par le titre) ; sans prix ⇒ « — »', JSON.stringify(P('P3')));
-      dit(an && /lues? sur Vestiaire il y a 2 h/.test(an.fr) && !/À confirmer/.test(an.fr), 'Annonces : la fraîcheur de la lecture dite une fois, en tête', an && an.fr.slice(0, 140));
+      // (9 nov., lot AI) La ligne courte « 3 annonces · lues il y a 2 h » (la phrase entière est dans sa pop-up).
+      dit(an && /lues? (sur Vestiaire )?il y a 2 h/.test(an.fr) && !/confirmer/i.test(an.fr), 'Annonces : la fraîcheur de la lecture dite une fois, en tête', an && an.fr.slice(0, 140));
       await o.pg.screenshot({ path: path.join(CAPTURES, `vc-fiches-annonces-${vp.width}.png`), fullPage: true }).catch(() => {});
       // 2. Les ventes.
       await aller(o.pg, 'ventes', '[data-vc-ventes="lu"]');

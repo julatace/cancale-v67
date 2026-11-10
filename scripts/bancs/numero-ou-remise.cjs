@@ -13,6 +13,7 @@
 //     mise en ligne : « Une annonce remise en ligne ? … N°7 » ; « Oui, N°7 » ⇒ 9303
 //     porte 7 (sur SON clic, la fiche de 9100 revient avec), rien à barrer ;
 //     « Non » sur une autre ⇒ plus proposé, synchronisé (`vrm_remise_refus`).
+//     (10 nov.) La proposition est une carte visuelle : deux photos, « Même paire ? », [Oui] [Non].
 //  390 px tactile et 1512 px, clair et sombre. Aucune fixture : tout est inventé.
 //  BANC_PORT (7972 par défaut), BANC_DIST (dist par défaut), BANC_CAPTURES.
 // ════════════════════════════════════════════════════════════════════════════
@@ -174,9 +175,10 @@ async function remise(b, largeur, sombre) {
     const bloc = await pg.waitForSelector('[data-remise-bloc]', { timeout: 15000 }).then(() => true).catch(() => false);
     dit(bloc, `${tag} : « Une annonce remise en ligne ? » apparaît`);
     if (!bloc) { await capture(pg, `C-${nom}-absent`); return; }
+    // (10 nov.) La proposition est une carte visuelle (deux photos, « Même paire ? », [Oui] [Non]) ; la règle derrière ⓘ.
     const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-remise-ligne]')].map((e) => [e.getAttribute('data-remise-ligne'), e.getAttribute('data-remise-force')]));
     dit(lignes.length === 2 && lignes.every(([id, f]) => ['9303', '9304'].includes(id) && f === 'simple') && !lignes.some(([id]) => id === '9202'), `${tag} : 9303 et 9304 (même marque, modèle, taille) proposées en « simple » ; la Salomon non`, JSON.stringify(lignes));
-    dit(/N°7/.test(await pg.locator('[data-remise-ligne="9303"]').innerText()) && /vérifie l’étiquette/.test(await pg.locator('[data-remise-ligne="9303"]').innerText()), `${tag} : « C'est la même paire que N°7 ? » et « vérifie l'étiquette »`);
+    dit(/N°7/.test(await pg.locator('[data-remise-ligne="9303"]').innerText()) && /vérifie l’étiquette/.test(await pg.locator('[data-remise-ligne="9303"]').evaluate((e) => e.textContent)), `${tag} : « Même paire que N°7 ? » et (derrière ⓘ) « vérifie l'étiquette »`);
     let f = await fiches(pg);
     const avant = String((f['9303'] || {}).numero || '');
     dit(avant !== '7', `${tag} : rien n'est relié tout seul (9303 ne porte pas 7 avant son clic)`, avant);

@@ -15,6 +15,8 @@ utile d'abord. Chaque geste dit où le faire. Aucun ne demande d'écrire du code
 | 8 | Adresse de réception des e-mails (≈ 30 min) | `docs/emails-transfert-mise-en-service.md` : acheter un domaine (jamais vrm.center), Cloudflare, Worker `vrm-reception`, `DOMAINE_RECEPTION` sur Vercel, e-mail d'essai depuis Paramètres → Mes e-mails | les autres vendeurs voient « Bientôt disponible » d'ici là |
 | 9 | Variables d'e-mail VRM sur Vercel (Brevo) | `RELANCES_SMTP_HOTE`, `_PORT`, `_UTILISATEUR`, `_MOT_DE_PASSE`, `RELANCES_EXPEDITEUR` | factures et liens de preuve d'adresse |
 | 10 | Pour pouvoir encaisser | remplir `public/legal/editeur.js` et `src/contact.js` ; Stripe (prix, `STRIPE_SECRET_KEY`, webhook) ; relire les CGV | tant que c'est vide, personne ne peut payer |
+| 11 | Relier l'adresse qui reçoit les e-mails Vinted « ton achat t'attend » sans compte (17 e-mails) | VRM → E-mails → Relier ma boîte | ces colis deviennent des identités (aujourd'hui rapprochés par point + date seulement) |
+| 12 | Ouvrir sur vinted.fr le compte des deux achats irlandais à vérifier | vinted.fr, connecté sur ce compte | Vinted seul dira s'ils ont été retirés |
 
 Le reste (Vercel Pro vers 70 vendeurs, compte de démo, notifications GitHub) attend :
 `2026-11-09-passation-generale.md` §5.
