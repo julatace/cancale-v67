@@ -2,13 +2,25 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE RAPPEL DE LA VEILLE AU SOIR, EXÉCUTÉ (node scripts/bancs/rappel-soir.cjs)
 // ═══════════════════════════════════════════════════════════════════════════
-// Retenu par Julien le 11 octobre : « Demain : N colis à poster ». §4.10 : on
+// Retenu par Julien le 11 octobre (« Demain : N colis à poster ») ; devenu le
+// RÉSUMÉ DU SOIR le 10 nov. (lot AT, api/_lib/resume-soir.js) : seulement ce qu'il
+// y a à faire DEMAIN — colis à date limite LUE demain (ou déjà en retard), colis à
+// retirer dont le dernier jour lu est demain, offres Vestiaire reçues qui expirent
+// avant demain soir — et RIEN si rien demain. UNE notification. §4.10 : on
 // lance le VRAI `api/ship-reminders.js?moment=soir` (et le vrai widget pour
 // comparer) sur une fausse base CLOISONNÉE à DEUX vendeurs, un faux Web Push
 // (rien ne part), un mercredi 21 octobre 2026 à 20 h 05 (Paris). On exige :
-//   • A a 3 colis à poster (2 Vinted + 1 eBay ; un coché « posté » exclu) : il
-//     reçoit « Demain : 3 colis à poster », le « dont » juste, sur SON appareil ;
-//   • ce nombre est CELUI du widget (même règle, §11) ;
+//   • A a 4 colis à poster (3 Vinted + 1 eBay ; un coché « posté » exclu) : il
+//     reçoit « Demain : 2 colis à déposer » (1 limite lue demain, 1 déjà en
+//     retard ; l'eBay dû dans 4 jours et la vente sans bordereau dont la limite
+//     ESTIMÉE tombe demain ne sont PAS dits), sur SON appareil ;
+//   • le total du cron (`n`) reste CELUI du widget (même règle, §11) ;
+//   • rien demain (colis dus plus tard) ⇒ rien ne sonne, rien mémorisé ;
+//   • B : un colis à retirer dont le dernier jour LU est demain, une offre
+//     Vestiaire reçue qui expire demain ⇒ « Demain : 1 retrait, 1 offre », le
+//     toucher ouvre la carte du colis ; l'offre seule ouvre Messages · Vestiaire ;
+//     une offre envoyée par lui, une qui expire plus tard, un dernier jour
+//     aujourd'hui ou après-demain ne sont pas dits ;
 //   • B n'a rien à poster ⇒ rien pour B ;
 //   • une fois par jour : relancé ⇒ rien ; mémo non écrit / illisible ⇒ rien ;
 //   • préférence « soir » coupée ⇒ rien ; ventes Vinted illisibles ⇒ rien ;
@@ -52,10 +64,13 @@ const vendeurs = () => ({
     subs: [{ endpoint: 'https://fcm.googleapis.com/A1', keys: {} }], prefs: null,
     comptes: [{ vinted_user_id: '11', login: 'vendeuse_a' }],
     main: { vinted_sales_hidden: [], vinted_accounts_hidden: [], vinted_ship_done: { 102: true }, vinted_bords_shipped: {}, vrm_widget_token: 'tokA' },
-    ventes: { 11: { cap: iso(SOIR - 3600000), txns: ['102', '106', '107'], orders: [
+    ventes: { 11: { cap: iso(SOIR - 3600000), txns: ['102', '106', '107', '108'], orders: [
       { transaction_id: 102, status: 'Le paiement a été validé', date: iso(SOIR - J), price: { amount: '23.5' }, transaction_user_status: 'needs_action' },
       { transaction_id: 106, status: 'Le paiement a été validé', date: iso(SOIR - J), price: { amount: '30' }, transaction_user_status: 'needs_action' },
       { transaction_id: 107, status: 'Le paiement a été validé', date: iso(SOIR - 4 * J), price: { amount: '45' }, transaction_user_status: 'needs_action' },
+      // (10 nov.) Aucun e-mail de bordereau : limite ESTIMÉE (vente + 7 j) = demain. Un plancher,
+      // pas une date lue : le résumé du soir ne la dit PAS « à déposer demain ».
+      { transaction_id: 108, status: 'Le paiement a été validé', date: iso(SOIR - 6 * J), price: { amount: '50' }, transaction_user_status: 'needs_action' },
     ] } },
     // §6.3 (22 oct.) : la forme RÉELLE d'un bordereau email — `filename` et
     // `receivedAt` sont sur 204 lignes sur 204 ; la table « un bordereau par
@@ -72,9 +87,16 @@ const vendeurs = () => ({
     comptes: [{ vinted_user_id: '22', login: 'vendeur_b' }],
     main: { vinted_sales_hidden: [], vinted_accounts_hidden: [], vinted_ship_done: {}, vinted_bords_shipped: {}, vrm_widget_token: 'tokB' },
     ventes: { 22: { cap: iso(SOIR - 3600000), txns: [], orders: [{ transaction_id: 201, status: 'Commande finalisée', date: iso(SOIR - 9 * J), price: { amount: '40' } }] } },
-    bords: [], ebay: [],
+    bords: [], ebay: [], tracks: [], vcOffres: undefined,
   },
 });
+// (10 nov., lot AT) Un colis à retirer (ligne e-mail, scalaires dans `meta` comme en base).
+const track = (suivi, limite, lieu = 'Tabac des Halles, 8 Rue des Lilas, 44000 Nantes') => {
+  const m = { status: 'available', receivedAt: iso(SOIR - 2 * J), arriveLe: iso(SOIR - 2 * J), limite, suivi, subject: `Votre colis ${suivi} est disponible`, carrier: 'mondialrelay', lieu, code: '454602' };
+  return { id: 'email_track_mondialrelay_' + suivi, data: m, meta: m };
+};
+// Une offre Vestiaire (la forme de `vc_offres` rangée par l'extension 5.319).
+const offreVc = (id, expireMs, par = 'acheteur') => ({ id, produit: '9' + id, compte: '555', titre: 'Sac', expire: iso(expireMs), ouverte: true, aToi: par === 'acheteur', dernier: { action: 'offer', par, at: iso(SOIR - J) }, offre: 20000, initial: 25000 });
 
 let V, memos, lus, ecrits, pannes;
 const reset = () => { V = vendeurs(); memos = {}; lus = []; ecrits = []; pannes = new Set(); pushes.length = 0; };
@@ -99,6 +121,8 @@ const lignesDe = (o) => {
   const L = [{ id: 'main', data: v.main }];
   for (const [uid, x] of Object.entries(v.ventes)) L.push({ id: `harvest_${uid}_orders_sold`, data: { capturedAt: x.cap, payload: { my_orders: x.orders }, resume: { txns: x.txns } } });
   for (const b of v.bords) L.push(b);
+  for (const t of (v.tracks || [])) L.push(t);
+  if (v.vcOffres) L.push({ id: 'vc_offres', data: { capturedAt: iso(SOIR - 3600000), offres: v.vcOffres } });
   L.push({ id: 'ebay_orders', data: { orders: v.ebay } });
   L.push({ id: 'push_subs', data: { subs: v.subs } });
   if (v.prefs) L.push({ id: 'push_prefs', data: v.prefs });
@@ -144,7 +168,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   const lancer = async (t, query = { moment: 'soir' }) => { Date.now = () => t; try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query }, r); return r; } finally { Date.now = vraiNow; } };
   const soirDe = (o) => pushes.filter((p) => /^soir-/.test(p.tag || '') && p.endpoint.includes('/' + o));
 
-  console.log('── Le soir : « Demain : N colis à poster », pour chacun le sien');
+  console.log('── Le soir : ce qu’il y a à faire DEMAIN, pour chacun le sien');
   await essaie('soir', async () => {
     reset();
     const r = await lancer(SOIR);
@@ -152,8 +176,9 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const p = a[0] || {};
     console.log(`     sur le téléphone de A : « ${p.title} » / « ${p.body} »`);
     dit(a.length === 1, 'A reçoit UN rappel du soir sur son appareil', `A=${a.length} · HTTP ${r.code}`);
-    dit(/^Demain : 3 colis à poster/.test(p.title || '') && /déjà en retard/.test(p.body || ''), 'le titre dit « ⏰ Demain : 3 colis à poster » (2 Vinted + 1 eBay ; le colis coché « posté » exclu)', p.title);
-    dit(/1 déjà en retard/.test(p.body || '') && /1 avec la date limite demain/.test(p.body || '') && !/2 déjà en retard/.test(p.body || ''), 'le « dont » : 1 en retard (limite ce soir), 1 avec la date limite demain — le bordereau du colis coché « posté » n’est pas compté', p.body);
+    dit(p.title === 'Demain : 2 colis à déposer', 'le titre dit « Demain : 2 colis à déposer » (1 limite lue demain + 1 en retard ; l’eBay dû dans 4 jours, la limite ESTIMÉE de demain et le colis coché « posté » ne sont pas dits)', p.title);
+    dit(/^1 colis à déposer avant 23 h 59 demain\./.test(p.body || '') && /1 déjà en retard/.test(p.body || '') && !/2 déjà en retard|à poster/.test(p.body || ''), 'le corps : l’heure LUE de la limite de demain, puis 1 déjà en retard — le bordereau du colis coché « posté » n’est pas compté', p.body);
+    dit((p.title || '').length <= 40 && (p.body || '').length <= 170, 'la forme passe par api/_lib/push.js (titre ≤ 40, corps ≤ 170)');
     dit(p.url === '/?tab=cat_bord&cible=colonne&colonne=prets', 'le clic ouvre Colis, sur la colonne « Prêts à imprimer » (31 oct.)', p.url);
     dit(b.length === 0, 'B n’a rien à poster ⇒ rien pour B', `B=${b.length}`);
     const lect = lus.filter((u) => /orders_sold|email_bord|ebay_orders|ebay_comptes|vinted_accounts|soir_reminder_dedup/.test(u));
@@ -171,6 +196,47 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const r = await lancer(SOIR);
     const bil = r.corps && Array.isArray(r.corps.bilans) ? r.corps.bilans.find((x) => x.owner === 'A') : null;
     dit(w.corps && w.corps.ship && bil && bil.n === w.corps.ship.total, 'le soir annonce exactement les colis « à expédier » du widget', `soir=${bil && bil.n} widget=${w.corps && w.corps.ship && w.corps.ship.total}`);
+  });
+
+  console.log('\n── Rien demain ⇒ rien ne sonne');
+  await essaie('rien demain', async () => {
+    reset();
+    // A : la limite lue de 106 passe à après-demain + 2, 107 aussi ; l'eBay est dû dans 4 jours.
+    V.A.bords[0].data.dateLimite = '24/10/2026 23:59'; V.A.bords[1].data.dateLimite = '25/10/2026 12:00';
+    const r = await lancer(SOIR);
+    const bil = r.corps && Array.isArray(r.corps.bilans) ? r.corps.bilans.find((x) => x.owner === 'A') : null;
+    dit(soirDe('A').length === 0, 'A a 4 colis à poster, aucun pour demain (la limite estimée n’est pas lue) ⇒ rien ne sonne (« rien demain » ne se dit pas)', `${soirDe('A').length}`);
+    dit(bil && bil.n === 4 && /rien demain/.test(String(bil.soir)), 'le cron le rapporte : n = 4 à poster, « rien demain »', JSON.stringify(bil && { n: bil.n, soir: bil.soir }));
+    dit(!((memos.A || {}).soir_reminder_dedup), 'rien mémorisé : si un colis devient dû ce soir, le prochain passage peut le dire');
+  });
+
+  console.log('\n── Codes à retirer et offres Vestiaire qui expirent demain');
+  await essaie('retrait et offre', async () => {
+    reset();
+    V.B.tracks = [track('30000077', '2026-10-22'), track('30000078', '2026-10-21', 'Bar Test, 5 Rue Exemple, 56000 Vannes'), track('30000079', '2026-10-24')];
+    V.B.vcOffres = {
+      n101: offreVc('101', Date.parse('2026-10-22T13:00:00Z')),          // reçue, expire demain 15 h ⇒ dite
+      n102: offreVc('102', Date.parse('2026-10-24T13:00:00Z')),          // reçue, expire dans 3 jours ⇒ non
+      n103: offreVc('103', Date.parse('2026-10-22T09:00:00Z'), 'vendeur'), // envoyée par lui ⇒ jamais
+    };
+    await lancer(SOIR);
+    const b = soirDe('B'), p = b[0] || {};
+    console.log(`     sur le téléphone de B : « ${p.title} » / « ${p.body} » → ${p.url}`);
+    dit(b.length === 1, 'B (aucun colis à poster) reçoit UNE notification du soir', `${b.length}`);
+    dit(p.title === 'Demain : 1 retrait, 1 offre', 'le titre : 1 retrait (dernier jour LU demain), 1 offre (Vestiaire, reçue, expire demain)', p.title);
+    dit(/Dernier jour pour retirer ton colis à Tabac des Halles\./.test(p.body || '') && !/Vannes|Bar Test/.test(p.body || ''), 'le corps nomme le point du colis de demain — pas celui dont le dernier jour est aujourd’hui (le matin l’a dit)', p.body);
+    dit(/1 offre Vestiaire expire avant demain soir\./.test(p.body || '') && !/Vinted/.test(p.body || ''), 'l’offre envoyée par lui et celle qui expire dans 3 jours ne sont pas dites ; aucune offre Vinted (elles n’expirent pas)', p.body);
+    dit(p.url === '/?tab=cat_bord&cible=retrait&suivi=30000077', 'le toucher ouvre la carte de CE colis à retirer (son n° de suivi)', p.url);
+    reset();
+    V.B.vcOffres = { n101: offreVc('101', Date.parse('2026-10-22T13:00:00Z')) };
+    await lancer(SOIR);
+    const q = soirDe('B')[0] || {};
+    dit(q.title === 'Demain : 1 offre expire' && q.url === '/?tab=messages&site=vestiaire', 'une offre seule : « Demain : 1 offre expire », le toucher ouvre Messages · Vestiaire', `${q.title} → ${q.url}`);
+    reset();
+    V.B.vcOffres = { n101: offreVc('101', Date.parse('2026-10-22T13:00:00Z')) };
+    pannes.add('B:vc_offres');
+    await lancer(SOIR);
+    dit(soirDe('B').length === 0, 'offres illisibles et rien d’autre ⇒ rien ne sonne (« pas su » n’annonce rien)');
   });
 
   console.log('\n── Une fois par jour');
@@ -207,7 +273,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     reset(); pannes.add('A:ebay_orders');
     await lancer(SOIR);
     const p = soirDe('A')[0] || {};
-    dit(/au moins 2 colis/.test(p.title || '') && /eBay/.test(p.body || ''), 'eBay illisible ⇒ « au moins 2 colis », eBay nommé', `${p.title} / ${p.body}`);
+    dit(/au moins 2 colis/.test(p.title || '') && /eBay pas relu/.test(p.body || ''), 'eBay illisible ⇒ « au moins 2 colis », eBay nommé', `${p.title} / ${p.body}`);
   });
 
   console.log('\n── Le matin ne part pas le soir, et inversement');

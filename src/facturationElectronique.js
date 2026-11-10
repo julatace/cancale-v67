@@ -53,7 +53,7 @@ export const frJour = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${
 export const etatFacturation = ({ cfg, regime, verifier }) => {
   if (cfg === undefined) return { ok: false, etat: 'encours', raison: 'Je lis ton profil fiscal…', geste: '' };
   if (cfg === null) return { ok: false, etat: 'passu', raison: "Ton profil fiscal n'a pas pu être lu (la base n'a pas répondu).", geste: 'Rouvre cet écran dans un moment : aucune facture ne part sur un profil que je n\'ai pas lu.' };
-  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: "Ton régime fiscal n'est pas renseigné : je ne sais pas quelle mention de TVA écrire.", geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
+  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: "Régime fiscal pas renseigné.", geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
   if (regime === 'marge') return { ok: false, etat: 'regime', raison: "Le régime de la marge n'est pas encore pris en charge par cette facture (sa mention de TVA est différente).", geste: 'Émets-la depuis ta plateforme agréée, ou vois-la avec ton comptable.' };
   if (regime !== 'micro') return { ok: false, etat: 'regime', raison: 'Régime fiscal inconnu.', geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
   if (String(cfg.tva || '').trim()) return { ok: false, etat: 'tva', raison: "Un n° de TVA est renseigné : tu es assujetti, la mention « art. 293 B » ne s'applique pas et VRM ne sait pas encore faire une facture avec TVA.", geste: 'Si tu es en franchise de TVA, vide le champ « N° TVA » de ton profil fiscal.' };

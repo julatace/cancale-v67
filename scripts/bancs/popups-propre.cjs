@@ -129,7 +129,7 @@ const paragraphes = (pg, seuil) => pg.evaluate((seuil) => {
   const bloc = (d) => /^(block|flex|grid|list-item|table|table-cell|flow-root)$/.test(d);
   const longs = [];
   for (const el of main.querySelectorAll('*')) {
-    if (el.closest('[data-feuille], [data-feuille-cadre], svg, script, style, select, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary), .vrm-pop-corps')) continue;
+    if (el.closest('[data-feuille], [data-feuille-cadre], svg, script, style, select, table, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary), .vrm-pop-corps')) continue;
     const s = getComputedStyle(el);
     if (!bloc(s.display) || !vis(el)) continue;
     // une feuille de texte : aucun enfant BLOC qui porte du texte
@@ -258,7 +258,27 @@ const ECRANS = [
     dit(n.lot === 1 && !n.agir.some((t) => /imprimer/i.test(t)), `${tag} : P4 — un seul bouton qui imprime le lot (« Tout imprimer »)`, JSON.stringify(n));
   } },
   { nom: 'journee', url: '/?tab=journee', pret: '.vrm-main[data-ecran="journee"]' },
-];
+  // (10 nov., suite — branche claude/textes-courts-suite) Les écrans passés à la même règle
+  // (phrase courte, détail replié sous « Pourquoi ? » seulement s'il est indispensable) : P1, P6,
+  // CARACTÈRES et « aucune erreur d'app » y sont jugés avec les mêmes données inventées.
+  { nom: 'reglages', url: '/?tab=settings', pret: '.vrm-main[data-ecran="settings"]' },
+  { nom: 'ventes-vinted', url: '/?tab=ventes&site=vinted', pret: '.vrm-main' },
+  { nom: 'ventes-ebay', url: '/?tab=ventes&site=ebay', pret: '.vrm-main' },
+  { nom: 'annonces-ebay', url: '/?tab=annonces&site=ebay', pret: '.vrm-main' },
+  { nom: 'ventes-leboncoin', url: '/?tab=ventes&site=leboncoin', pret: '.vrm-main' },
+  { nom: 'annonces-leboncoin', url: '/?tab=annonces&site=leboncoin', pret: '.vrm-main' },
+  { nom: 'ventes-vestiaire', url: '/?tab=ventes&site=vestiaire', pret: '.vrm-main' },
+  { nom: 'messages', url: '/?tab=messages', pret: '.vrm-main' },
+  { nom: 'messages-leboncoin', url: '/?tab=messages&site=leboncoin', pret: '.vrm-main' },
+  { nom: 'achats', url: '/?tab=achats', pret: '.vrm-main' },
+  { nom: 'achats-vestiaire', url: '/?tab=achats&site=vestiaire', pret: '.vrm-main' },
+  // (10 nov., 3e série — branche claude/textes-courts-3) Argent (Compta, Statistiques, Déclarer,
+  // Factures) et Republier, passés à la même règle.
+  { nom: 'argent', url: '/?tab=argent', pret: '.vrm-main' },
+  { nom: 'argent-stats', url: '/?tab=stats', pret: '.vrm-main' },
+  { nom: 'argent-declarer', url: '/?tab=argent_declarer', pret: '.vrm-main' },
+  { nom: 'argent-factures', url: '/?tab=invoices', pret: '.vrm-main' },
+].filter((e) => !process.env.ECRANS_SEULS || process.env.ECRANS_SEULS.split(',').includes(e.nom));
 
 async function compte(b, sombre) {
   const tag = `1512${sombre ? ' sombre' : ' clair'} · compte`;
@@ -282,12 +302,12 @@ async function compte(b, sombre) {
   await new Promise((r) => srv.listen(PORT, r));
   const b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
-    for (const [largeur, sombre] of [[390, true], [390, false], [1512, false]]) {
+    for (const [largeur, sombre] of [[390, true], [390, false], [1512, false]].filter(([l, s]) => !process.env.VUES_SEULES || process.env.VUES_SEULES.split(',').includes(`${l}${s ? 's' : 'c'}`))) {
       console.log(`\n── ${largeur} ${sombre ? 'sombre' : 'clair'}`);
       for (const e of ECRANS) await ecran(b, largeur, sombre, e);
     }
-    console.log('\n── Carte du compte et avatar (ordinateur)');
-    await compte(b, false); await compte(b, true);
+    if (!process.env.ECRANS_SEULS) { console.log('\n── Carte du compte et avatar (ordinateur)');
+    await compte(b, false); await compte(b, true); }
   } finally { await b.close(); srv.close(); }
   console.log(`\n${ok} verts, ${ko} rouges — captures : ${CAPTURES}`);
   process.exit(ko ? 1 : 0);
