@@ -191,3 +191,17 @@ export function fraicheurUnique({ baseKO = false, horsLigne = false, capture, ac
 
 // La phrase d'une source en retard, telle qu'écrite sur la ligne (une fois).
 export const phraseRetard = (r) => `${r.nom} ${r.texte}`;
+
+// ── LA PUBLICATION (10 nov., lot BK « Mois bouclé ») ─────────────────────────
+// La ligne de fraîcheur est le PROPRIÉTAIRE de « quels comptes ne sont pas relus »
+// (§5 : un écran publie, les autres consomment). Elle publie ici son dernier
+// résultat ; Argent → Déclarer → « Mois bouclé » le lit, sans recalculer.
+// `undefined` = pas encore publié (en cours) ; jamais un « à jour » par défaut.
+let _publiee;
+const _abonnes = new Set();
+export const fraicheurPubliee = () => _publiee;
+export function publierFraicheur(f) {
+  _publiee = f;
+  for (const cb of [..._abonnes]) { try { cb(f); } catch (_) {} }
+}
+export function suivreFraicheur(cb) { _abonnes.add(cb); return () => _abonnes.delete(cb); }
