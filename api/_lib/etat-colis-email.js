@@ -168,8 +168,23 @@ export function etatColisDepuisTexte(sujet,texte='') {
 // « retiré » (delivered) et « reparti » (retour), par identité, font sortir un colis.
 const FUTUR_LIEU=/prochains?\s+jours|prochainement|d[èe]s\s+(?:son|que)/i;
 const preuveDisponible=(l)=>!!(l&&(l.code||l.qrB64||l.qrUrl||(l.lieu&&!FUTUR_LIEU.test(String(l.lieu)))));
+// (10 nov., retraits irréprochables) UN « RETIRÉ » RANGÉ PAR UNE RÈGLE D'AVANT NE TIENT QUE SI SON
+// PROPRE SUJET LE DIT ENCORE. Mesuré sur sa base : deux colis Mondial Relay « Votre colis a changé de
+// plan » rangés « livré / retiré » (avant la règle du changement de point) ; l'e-mail suivant du même
+// n° (« disponible » au NOUVEAU point, avec son code) était absorbé par « un retiré reste retiré » —
+// le colis arrivé restait « en route » (relu) et n'était jamais « à retirer ». Idem « le colis semble
+// avoir été perdu ». Le retiré reste retiré quand c'est un vrai retrait ; un faux, jugé sur le sujet
+// qui l'a posé (§5 : le SUJET d'abord), ne garde rien.
+export function retraitTenu(precedent){
+ if(precedent?.status!=='delivered')return false;
+ const sj=precedent.subject||precedent.sujet||precedent.sj||'';
+ if(!sj)return true;
+ if(colisPerdu(sj))return false;
+ if(changementDeRelais(sj)&&etatColisDepuisTexte(sj)!=='delivered')return false;
+ return true;
+}
 export function conserverRetrait(precedent,nouveau,plusRecent=false){
- if(precedent?.status==='delivered')return {...nouveau,status:'delivered',label:precedent.statusLabel||'Livré / retiré'};
+ if(retraitTenu(precedent))return {...nouveau,status:'delivered',label:precedent.statusLabel||'Livré / retiré'};
  if(!plusRecent&&precedent?.status==='available'&&preuveDisponible(precedent)&&['transit','info'].includes(nouveau?.status))return {...nouveau,status:'available',label:precedent.statusLabel||'Arrivé au point de retrait',conserve:true};
  if(!plusRecent&&precedent?.status==='retour'&&['available','transit','info'].includes(nouveau?.status))return {...nouveau,status:'retour',label:precedent.statusLabel||'Reparti chez l’expéditeur',conserve:true};
  if(nouveau?.status==='info'&&['available','transit'].includes(precedent?.status))return {...nouveau,status:precedent.status,label:precedent.statusLabel||'Mise à jour'};
