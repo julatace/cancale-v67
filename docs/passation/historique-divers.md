@@ -1127,3 +1127,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Direction artistique 5 (à valider)** : colonne de gauche refaite (panneau qui flotte, matière floutée, marque, pastille qui glisse, carte du compte, rail d'icônes 1024–1199 px) + boutons plus soignés + recherche du haut ; `src/styles-nav-v2.css`, banc `nav-v2`. `docs/passation/2026-11-09-direction-artistique-5.md`. Branche `claude/direction-artistique-5`. Geste : regarder les planches.
+
+## Lignes du §9 de CLAUDE.md déplacées telles quelles (10 nov., lot AJ)
+- **9 nov. · Suites serveur** : l'offre Solo appliquée aussi par les bilans (semaine, mois), le repli e-mails du widget et le rappel des offres mini (`compteEcarteRegle`, recopiée d'App.jsx ; propriétaire = Pro ; pas su ⇒ rien bridé ; colis jamais bridés) ; double vente Leboncoin serveur seulement si vue en ligne < 24 h (`src/enLigneLbc.js`). `docs/passation/2026-11-09-suites-serveur.md`. Geste : aucun (028 pour que l'offre soit lue).
