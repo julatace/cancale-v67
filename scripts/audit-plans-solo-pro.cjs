@@ -16,10 +16,9 @@
 //   6. (9 nov., soir) SOLO PAR PLATEFORME : un compte vendeur Leboncoin, eBay,
 //      Vestiaire — deux comptes de chaque, Solo / Pro / ancien Solo / pas su ;
 //      le prédicat des totaux (`excluAutreDe(v, regle)`), la route, le webhook (030).
-//   7. (10 nov.) PRO = 10 COMPTES VENDEURS AU TOTAL : 12 comptes sur 4 plateformes ; pas
-//      choisis ⇒ tous comptent ; choisis ⇒ les 2 autres sortent des totaux ; Pro d'avant le
-//      10 nov., plus de 10, pas su, propriétaire ⇒ rien bridé ; la route (à lui, 30 jours pour
-//      retirer, ajouter libre, lecture ratée ⇒ rien écrit), le webhook (030), l'app, les CGV.
+//   7. (10 nov., 20 h) PRO ILLIMITÉ — Julien : « on fait un nombre de comptes de vente
+//      illimité » (annule les 10 comptes du lot BO) : 50 comptes par plateforme, une
+//      liste de 10 restée dans Stripe, dans la ligne ou dans la réponse ⇒ AUCUN écarté.
 // `--prouve` : rejoue des MUTATIONS de la règle (chacune doit rendre du rouge).
 // Aucune donnée réelle : tout est inventé ici.
 const path = require('path'), fs = require('fs'), crypto = require('crypto'), os = require('os');
@@ -70,52 +69,44 @@ async function controlesRegle(R, dire) {
   dire(R.prochainChangement(null, T) === null && R.prochainChangement(new Date(T - 31 * 864e5).toISOString(), T) === null && !!R.prochainChangement(new Date(T - 3 * 864e5).toISOString(), T),
     'changer de compte vendeur : premier choix libre, puis une fois tous les 30 jours');
   await controlesAutres(R, dire);
-  await controlesPro(R, dire);
+  await controlesProIllimite(R, dire);
 }
 
-// ── (10 nov.) PRO = 10 COMPTES VENDEURS AU TOTAL ──────────────────────────────
-// 12 comptes : 8 Vinted, 2 Leboncoin, 1 eBay, 1 Vestiaire ; une vente de 10 € chacun.
-// Il choisit 10 comptes : 6 Vinted + 2 Leboncoin + eBay + Vestiaire ⇒ 2 Vinted sortent.
-const DOUZE = [...Array.from({ length: 8 }, (_, i) => ['vinted', String(2000 + i)]), ['leboncoin', '8442001'], ['leboncoin', '8442002'], ['ebay', 'principal'], ['vestiaire', 'vc111']];
-const DIX = DOUZE.filter(([p, id]) => !(p === 'vinted' && (id === '2006' || id === '2007'))).map(([p, id]) => ({ plateforme: p, id }));
-async function controlesPro(R, dire) {
-  if (typeof R.listeVendeursPro !== 'function' || typeof R.etatVendeursPro !== 'function') { dire(false, 'plan-regle porte la règle Pro = 10 comptes vendeurs (`listeVendeursPro`, `etatVendeursPro`)', 'absente'); return; }
-  const hors = (r, p, id) => (p === 'vinted' ? R.venteHorsPlan(r, id) : R.venteAutreHorsPlan(r, p, id));
-  const somme = (r) => DOUZE.filter(([p, id]) => !hors(r, p, id)).length * 10;
-  const sansChoix = R.regleVentes({ plan: 'pro', comptesPro: null });
-  dire(somme(sansChoix) === 120 && R.signatureRegle(sansChoix) === 'libre', 'Pro, 12 comptes, rien choisi : tous comptent (120 €) — jamais deviné', `${somme(sansChoix)} €`);
-  const pro = R.regleVentes({ plan: 'pro', comptesPro: { liste: DIX } });
-  dire(somme(pro) === 100 && R.venteHorsPlan(pro, '2006') && R.venteHorsPlan(pro, '2007') && !R.venteHorsPlan(pro, '2000'),
-    'Pro, 10 comptes choisis : les 2 autres sortent des totaux (100 € sur 120)', `${somme(pro)} €`);
-  dire(!R.venteAutreHorsPlan(pro, 'leboncoin', 'lbc-account:8442002') && R.venteAutreHorsPlan(R.regleVentes({ plan: 'pro', comptesPro: { liste: DIX.filter((c) => c.id !== '8442002') } }), 'leboncoin', '8442002'),
-    'Pro : un compte Leboncoin choisi compte (`lbc-account:` reconnu) ; non choisi, il sort');
-  dire(!R.venteHorsPlan(pro, '') && !R.venteHorsPlan(pro, 'shop') && !R.venteAutreHorsPlan(pro, 'vestiaire', '-') && !R.venteAutreHorsPlan(pro, 'leboncoin', null),
-    'Pro : une vente sans compte relevé (pseudo, Vestiaire « non identifié ») n’est jamais écartée');
-  const onze = [...DIX, { plateforme: 'vinted', id: '2006' }];
-  dire(R.listeVendeursPro(onze) === null && somme(R.regleVentes({ plan: 'pro', comptesPro: { liste: onze } })) === 120, 'plus de 10 comptes dans la liste ⇒ illisible ⇒ rien bridé (« pas su »)');
-  dire(somme(R.regleVentes({ proprietaire: true, plan: 'pro', comptesPro: { liste: DIX } })) === 120 && somme(R.regleVentes({ plan: null, comptesPro: { liste: DIX } })) === 120
-    && somme(R.regleVentes({ plan: 'solo', comptesPro: { liste: DIX } })) === 120, 'propriétaire, plan pas su, Solo : la liste Pro ne bride rien');
-  dire(somme(R.regleVentes({ plan: 'pro', comptesVendeurs: { pro: DIX.map((c) => c.plateforme + ':' + c.id) } })) === 100, 'la ligne `abonnements` (030, `comptes_vendeurs.pro`) donne la même règle au serveur');
-  dire(R.brideAutres(pro) === true && R.brideAutres(sansChoix) === false && R.signatureRegle(pro).startsWith('pro:') && R.signatureRegle(pro) !== R.signatureRegle(R.regleVentes({ plan: 'pro', comptesPro: { liste: DIX.slice(1) } })),
-    'Pro choisi : les totaux des autres plateformes sont bridés ; la signature change avec la liste (l’app se remonte)');
-  // Les métadonnées Stripe (500 caractères par valeur) : 10 identifiants longs tiennent en deux morceaux.
-  const longs = Array.from({ length: 10 }, (_, i) => ({ plateforme: 'leboncoin', id: '9'.repeat(60) + i }));
-  const m = R.metaVendeursPro(longs) || {};
-  const relu = R.lireMetaPro(m);
-  dire(Object.values(m).every((v) => String(v).length <= 500) && Array.isArray(relu) && relu.length === 10 && relu[9] === 'leboncoin:' + '9'.repeat(60) + '9', 'métadonnées : ≤ 500 caractères par valeur, la liste relue entière', Object.values(m).map((v) => String(v).length).join(' + '));
-  const T = '2026-11-10';
-  const sub = (meta) => ({ items: { data: [{ id: 'si_1', quantity: 1, price: { id: 'price_pro' } }] }, metadata: meta });
-  const neuf = R.planDeLAbonnement(sub({ cgv_version: T, ...R.metaVendeursPro(DIX), vrm_pro_vendeurs_le: '2026-11-10T10:00:00Z' }), { prixPro: 'price_pro' });
-  const ancien = R.planDeLAbonnement(sub({ cgv_version: '2026-11-09', ...R.metaVendeursPro(DIX) }), { prixPro: 'price_pro' });
-  dire(neuf.plan === 'pro' && neuf.pro && neuf.pro.liste.length === 10 && !neuf.proAncien, 'Pro aux CGV du 10 nov. : ses 10 comptes lus des métadonnées', JSON.stringify(neuf.pro && neuf.pro.liste.length));
-  dire(ancien.plan === 'pro' && ancien.pro === null && ancien.proAncien === true && somme(R.regleVentes({ plan: 'pro', comptesPro: ancien.pro })) === 120,
-    'Pro souscrit avant le 10 nov. : garde « tous tes comptes » (jamais limité)');
-  // Quand demander ? Jamais sous 10 comptes sans choix ; au-delà, oui ; liste pleine ⇒ plus rien à demander.
-  const cles = (l) => l.map(([p, id]) => p + ':' + id);
-  const e12 = R.etatVendeursPro(cles(DOUZE), null), e9 = R.etatVendeursPro(cles(DOUZE.slice(0, 9)), null), e10 = R.etatVendeursPro(cles(DOUZE.slice(0, 10)), null);
-  const plein = R.etatVendeursPro(cles(DOUZE), DIX), place = R.etatVendeursPro(cles(DOUZE), DIX.slice(0, 8));
-  dire(e12.aChoisir && !e9.aChoisir && !e10.aChoisir && !plein.aChoisir && plein.hors.length === 2 && place.aChoisir && place.places === 2,
-    'la demande : plus de 10 comptes sans choix ⇒ « Quels 10 comptes vendent ? » ; 10 ou moins ⇒ rien ; 10 choisis ⇒ rien ; une place libre ⇒ demandé', JSON.stringify({ e12: e12.aChoisir, e9: e9.aChoisir, e10: e10.aChoisir, plein: plein.aChoisir, place: place.places }));
+// ── 7. (10 nov., 20 h) PRO ILLIMITÉ : 50 comptes par plateforme, aucun n'est écarté ──
+// Une liste de 10 « comptes vendeurs Pro » laissée par le lot BO (métadonnées Stripe
+// `vrm_pro_vendeurs`, `comptes_vendeurs.pro` de la ligne, `comptesPro` d'une réponse)
+// ne doit RIEN brider. Solo, lui, reste bridé (contrôlé plus haut).
+async function controlesProIllimite(R, dire) {
+  const N = 50;
+  const ids = {
+    vinted: Array.from({ length: N }, (_, i) => String(2000 + i)),
+    leboncoin: Array.from({ length: N }, (_, i) => String(8443000 + i)),
+    ebay: ['principal', ...Array.from({ length: N - 1 }, (_, i) => ('e' + i.toString(16)).padStart(16, '0'))],
+    vestiaire: Array.from({ length: N }, (_, i) => 'vc' + (500 + i)),
+  };
+  const abr = { vinted: 'v', leboncoin: 'l', ebay: 'e', vestiaire: 'c' };
+  const dix = [];
+  for (const p of Object.keys(ids)) for (const id of ids[p].slice(0, p === 'vinted' ? 4 : 2)) dix.push({ plateforme: p, id });
+  const cles = dix.map((d) => d.plateforme + ':' + d.id);
+  const meta = { cgv_version: '2026-11-10', vrm_pro_vendeurs: dix.map((d) => abr[d.plateforme] + ':' + d.id).join(','), vrm_pro_vendeurs_le: '2026-11-10T18:00:00Z', vrm_compte_vendeur: ids.vinted[0] };
+  const lu = R.planDeLAbonnement({ items: { data: [{ id: 'si', quantity: 1, price: { id: 'price_pro', lookup_key: null } }] }, metadata: meta }, { prixPro: 'price_pro' });
+  const regles = {
+    'liste rendue par le serveur (`comptesPro`)': R.regleVentes({ plan: 'pro', compteVendeur: { uid: ids.vinted[0] }, comptesPro: { liste: dix } }),
+    'liste dans la ligne (`comptes_vendeurs.pro`)': R.regleVentes({ plan: 'pro', comptesVendeurs: { pro: cles, leboncoin: { id: ids.leboncoin[0] }, ebay: { id: 'principal' }, vestiaire: { id: ids.vestiaire[0] } } }),
+    'liste dans les métadonnées Stripe': R.regleVentes({ plan: lu.plan, compteVendeur: { uid: lu.vendeur }, comptesVendeurs: { ...(lu.autres || {}), pro: lu.pro && lu.pro.liste }, comptesPro: lu.pro }),
+  };
+  for (const [nom, r] of Object.entries(regles)) {
+    let ecartees = 0, total = 0;
+    for (const uid of ids.vinted) { total++; if (R.venteHorsPlan(r, uid)) ecartees++; }
+    for (const p of ['leboncoin', 'ebay', 'vestiaire']) for (const c of ids[p]) { total++; if (R.venteAutreHorsPlan(r, p, c)) ecartees++; }
+    const hors = R.comptesHorsPlan(r, ids.vinted.map((uid) => ({ uid }))).length;
+    dire(r.plan === 'pro' && ecartees === 0 && hors === 0 && !R.brideAutres(r) && R.signatureRegle(r) === 'libre',
+      `Pro illimité : ${N} comptes par plateforme (${total}), ${nom} ⇒ aucun compte vendeur écarté`, `${ecartees} écartée(s) sur ${total}, ${hors} compte(s) Vinted « hors offre », signature ${R.signatureRegle(r)}`);
+  }
+  dire(lu.plan === 'pro' && !('pro' in lu && lu.pro) && !lu.proAncien, 'l’abonnement Pro lu chez Stripe ne porte aucune liste de comptes (une liste glissée dans les métadonnées ne décide rien)', JSON.stringify({ plan: lu.plan, pro: lu.pro }));
+  dire(!/10 comptes|dix comptes|Jusqu’à \d+ comptes/i.test(R.OFFRES.pro.phrase) && /illimit/i.test(R.OFFRES.pro.phrase), 'l’offre Pro dit « illimités », jamais un nombre de comptes', R.OFFRES.pro.phrase);
+  const limite = ['MAX_VENDEURS_PRO', 'listeVendeursPro', 'etatVendeursPro', 'CGV_PRO_DIX_DEPUIS'].filter((k) => k in R);
+  dire(limite.length === 0, 'plus aucune limite de comptes Pro dans la règle', limite.join(', '));
 }
 
 // ── (9 nov., soir) SOLO PAR PLATEFORME : deux comptes Leboncoin, deux eBay, deux Vestiaire ──
@@ -167,17 +158,11 @@ const MUTATIONS = [
   ['métadonnées des autres plateformes ignorées', (s) => s.replace("const k = META_VENDEUR[pl], id = idCompteVendeur(pl, m[k]);", 'const k = META_VENDEUR[pl], id = null;')],
   ['venteHorsPlan ignore le compte vendeur', (s) => s.replace("return uidValide(u) && u !== regle.vendeur;", 'return uidValide(u);')],
   ['bride sans compte choisi', (s) => s.replace("bride: plan === PLAN_SOLO && !!vendeur", 'bride: plan === PLAN_SOLO')],
-  ['propriétaire bridé', (s) => s.replace("if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES, pro: null };", '')],
-  // (10 nov.) Pro = 10 comptes vendeurs.
-  ['Pro : liste Vinted ignorée', (s) => s.replace("if (regle && regle.plan === PLAN_PRO && regle.pro) { const k = cleVendeurPro('vinted', uid); return !!k && !regle.pro.includes(k); }", '')],
-  ['Pro : autres plateformes ignorées', (s) => s.replace("if (regle && regle.plan === PLAN_PRO && regle.pro && PLATEFORMES_SOLO.includes(plateforme)) { const k = cleVendeurPro(plateforme, compte); return !!k && !regle.pro.includes(k); }", '')],
-  ['Pro d’avant le 10 nov. limité', (s) => s.replace("if (String(m.cgv_version || '') >= CGV_PRO_DIX_DEPUIS) {", 'if (true) {')],
-  ['Pro : plus de 10 acceptés', (s) => s.replace("return out.length && out.length <= MAX_VENDEURS_PRO ? out : null;", 'return out.length ? out : null;')],
-  ['Pro : second morceau des métadonnées ignoré', (s) => s.replace("[m[META_PRO], m[META_PRO + '_2']]", '[m[META_PRO]]')],
-  ['Pro : demander sous 10 comptes', (s) => s.replace("aChoisir: ids.length > MAX_VENDEURS_PRO", 'aChoisir: ids.length > 0')],
-  ['Pro : liste appliquée hors Pro (Solo, pas su)', (s) => s.replace("if (plan === PLAN_PRO) {\n    const src", 'if (true) {\n    const src').replace("if (regle && regle.plan === PLAN_PRO && regle.pro) { const k = cleVendeurPro('vinted'", "if (regle && regle.pro) { const k = cleVendeurPro('vinted'")],
+  ['propriétaire bridé', (s) => s.replace("if (x.proprietaire === true) return { plan: PLAN_PRO, vendeur: null, bride: false, autres: AUTRES_LIBRES };", '')],
   ['CGV d’avant bridées', (s) => s.replace("if (plan === PLAN_SOLO && !(String(m.cgv_version || '') >= CGV_PLANS_DEPUIS)) { plan = null; raison = 'cgv-anterieures'; }", '')],
   ['pas su ⇒ Solo', (s) => s.replace("const plan = x.plan === PLAN_PRO || x.plan === PLAN_SOLO ? x.plan : null;", "const plan = x.plan === PLAN_PRO ? x.plan : PLAN_SOLO;")],
+  ['Pro limité à 10 comptes Vinted', (s) => s.replace("if (!regle || regle.bride !== true || !regle.vendeur) return false;", "if (regle && regle.plan === PLAN_PRO) { const n = Number(uidDe(uid)); return Number.isFinite(n) && n >= 2010; }\n  if (!regle || regle.bride !== true || !regle.vendeur) return false;")],
+  ['Pro : comptes vendeurs des autres plateformes appliqués', (s) => s.replace("autres[p] = plan === PLAN_SOLO && id ? id : null;", "autres[p] = plan && id ? id : null;").replace("if (!regle || regle.plan !== PLAN_SOLO || !regle.autres", "if (!regle || !regle.plan || !regle.autres")],
   ['égalité ⇒ un compte proposé', (s) => s.replace("return meilleur && !egal ? meilleur : null;", 'return meilleur;')],
 ];
 
@@ -525,101 +510,61 @@ const MUTATIONS = [
     dit(r && !R.venteAutreHorsPlan(r, 'leboncoin', '8442002'), 'Pro : rien bridé, même avec des comptes vendeurs rangés');
   });
 
-  console.log('── 7. Pro = 10 comptes vendeurs au total (10 nov.)');
-  if (compte) await essaie('route Pro 10 comptes et webhook', async () => {
-    reset();
-    if (typeof (await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'))).listeVendeursPro !== 'function') { dit(false, 'route Pro 10 comptes', 'règle absente'); return; }
-    process.env.STRIPE_PRIX_PRO = 'price_pro';
-    // Pro aux CGV du 10 nov. ; ses 8 comptes (2 Vinted, 2 Leboncoin, 2 eBay, 2 Vestiaire).
-    sub.items.data[0].price = { id: 'price_pro', lookup_key: null, unit_amount: 1999, currency: 'eur', recurring: { interval: 'month' } };
-    sub.metadata.cgv_version = '2026-11-10';
-    let r = await appel({ mode: 'abonnement', headers: A_ });
-    dit(r.code === 200 && r.corps.plan === 'pro' && r.corps.proLimite === true && r.corps.comptesPro === null && r.corps.maxVendeursPro === 10, 'Pro (CGV du 10 nov.) : limite de 10, rien encore choisi', JSON.stringify({ plan: r.corps.plan, l: r.corps.proLimite, c: r.corps.comptesPro }));
-    const onze = Array.from({ length: 11 }, (_, i) => ({ plateforme: 'vinted', id: String(3000 + i) }));
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: onze } });
-    dit(r.code === 400 && postsStripe().length === 0, '11 comptes ⇒ refusé (10 au plus), rien chez Stripe', `HTTP ${r.code}`);
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: [{ plateforme: 'vinted', id: '1007' }, { plateforme: 'leboncoin', id: '9999999' }] } });
-    dit(r.code === 403 && postsStripe().length === 0, 'un compte Leboncoin qui n’est pas à lui ⇒ refusé, rien chez Stripe', `HTTP ${r.code}`);
-    const fetchVrai = global.fetch;
-    global.fetch = async (url, o) => (String(url).includes('/rest/v1/app_data') ? new Response('{}', { status: 500 }) : fetchVrai(url, o));
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: [{ plateforme: 'ebay', id: 'principal' }] } });
-    global.fetch = fetchVrai;
-    dit(r.code === 503 && postsStripe().length === 0, 'ses comptes illisibles (base KO) ⇒ 503, rien écrit', `HTTP ${r.code}`);
-    const sept = [{ plateforme: 'vinted', id: '1007' }, { plateforme: 'vinted', id: '1008' }, { plateforme: 'leboncoin', id: 'lbc-account:8442001' }, { plateforme: 'leboncoin', id: '8442002' }, { plateforme: 'ebay', id: 'principal' }, { plateforme: 'vestiaire', id: 'vc111' }, { plateforme: 'vestiaire', id: 'vc222' }];
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: sept } });
-    dit(r.code === 200 && /^v:1007,v:1008,l:8442001,l:8442002,e:principal,c:vc111,c:vc222$/.test(sub.metadata.vrm_pro_vendeurs || '') && r.corps.comptesPro && r.corps.comptesPro.liste.length === 7,
-      'ses 7 comptes (4 plateformes) rangés dans SON abonnement Stripe, relus', sub.metadata.vrm_pro_vendeurs);
-    const le1 = sub.metadata.vrm_pro_vendeurs_le;
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: [...sept, { plateforme: 'ebay', id: '0123456789abcdef' }] } });
-    dit(r.code === 200 && /e:0123456789abcdef/.test(sub.metadata.vrm_pro_vendeurs) && sub.metadata.vrm_pro_vendeurs_le === le1, 'ajouter un compte dans une place libre : permis tout de suite, les 30 jours ne repartent pas');
-    const n = postsStripe().length;
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: sept.slice(1) } });
-    dit(r.code === 429 && postsStripe().length === n && /30 jours/.test(r.corps.message), 'retirer un compte avant 30 jours : refusé, la date est dite, rien écrit', r.corps && r.corps.message);
-    sub.metadata.vrm_pro_vendeurs_le = new Date(Date.now() - 31 * 864e5).toISOString();
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: sept.slice(1) } });
-    dit(r.code === 200 && !/v:1007/.test(sub.metadata.vrm_pro_vendeurs) && Date.now() - Date.parse(sub.metadata.vrm_pro_vendeurs_le) < 60000, 'après 30 jours : retiré, la date repart');
-    r = await appel({ mode: 'abonnement', headers: A_ });
-    dit(r.corps.comptesPro && r.corps.comptesPro.liste.length === 6 && !!r.corps.comptesPro.prochainChangement && r.corps.comptesPro.liste.some((c) => c.plateforme === 'leboncoin' && c.id === '8442001'), 'l’app relit ses comptes vendeurs et le prochain retrait possible', JSON.stringify(r.corps.comptesPro && r.corps.comptesPro.liste.slice(0, 2)));
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { uid: '1007' } });
-    dit(r.code === 409, 'en Pro, le choix Solo (un compte par plateforme) est refusé');
-    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: P_, corps: { plateforme: 'pro', comptes: sept } });
-    dit(r.code === 409, 'propriétaire : sans limite, rien à choisir');
-    // Le webhook range la liste dans `comptes_vendeurs.pro` (030) ; le serveur l'applique (bilans).
-    const signer = (c) => { const t = Math.floor(Date.now() / 1000); return `t=${t},v1=${crypto.createHmac('sha256', SECRET).update(`${t}.${c}`).digest('hex')}`; };
-    const envoyer = async (objet, ts) => { const c = JSON.stringify({ id: 'evt_p' + ts, type: 'customer.subscription.updated', created: ts, livemode: false, data: { object: objet } }); return appel({ method: 'POST', mode: 'webhook', headers: { 'stripe-signature': signer(c) }, corps: c }); };
-    r = await envoyer({ ...sub }, 700);
-    dit(r.code === 200 && abos[A].plan === 'pro' && Array.isArray(abos[A].comptes_vendeurs && abos[A].comptes_vendeurs.pro) && abos[A].comptes_vendeurs.pro.length === 6 && !abos[A].comptes_vendeurs.pro.includes('vinted:1007'),
-      'webhook : la liste Pro rangée dans `comptes_vendeurs.pro` (030)', JSON.stringify(abos[A].comptes_vendeurs));
-    const PV = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-vendeur.js'));
-    const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
-    PV.oublierPlans();
-    const rv = await PV.regleDuVendeur(A);
-    dit(rv && R.venteHorsPlan(rv, '1007') && !R.venteHorsPlan(rv, '1008') && !R.venteAutreHorsPlan(rv, 'leboncoin', '8442001'), 'serveur (bilans, notifications) : la vente du compte retiré sort, les 10 autres restent');
-    // Un Pro d'avant le 10 nov. : jamais limité, refus dit.
-    sub.metadata.cgv_version = '2026-11-09';
-    r = await appel({ mode: 'abonnement', headers: A_ });
-    const rp = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: sept } });
-    dit(r.corps.proLimite === false && r.corps.comptesPro === null && rp.code === 409, 'Pro souscrit avant le 10 nov. : pas de limite (« tous tes comptes »), rien à choisir', JSON.stringify({ l: r.corps.proLimite, code: rp.code }));
-    r = await envoyer({ ...sub }, 800);
-    dit(r.code === 200 && !(abos[A].comptes_vendeurs && abos[A].comptes_vendeurs.pro), '  … et le webhook ne range aucune liste pour lui');
-    delete process.env.STRIPE_PRIX_PRO;
-  });
-  await essaie('état de l’app et câblage (Pro)', async () => {
-    const mem = {}; global.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } };
-    const E = await import('file://' + path.join(RACINE, 'src', 'abonnement', 'etatAbonnement.js'));
-    const P = await import('file://' + path.join(RACINE, 'src', 'abonnement', 'planVentes.js'));
-    const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
-    P.demarrerPlan('uid-banc-pro');
-    E.publierAbonnement({ ok: true, plan: 'pro', proLimite: true, comptesPro: null });
-    dit(P.signaturePlan() === 'libre' && !P.venteHorsPlanUid('2007'), 'Pro sans choix : libre');
-    E.publierAbonnement({ ok: true, plan: 'pro', proLimite: true, comptesPro: { liste: DIX } });
-    dit(P.venteHorsPlanUid('2007') && !P.venteHorsPlanUid('2000') && /^pro:/.test(P.signaturePlan()) && String(mem['vrm_plan_regle_uid-banc-pro'] || '').includes('vinted:2000'),
-      'Pro, 10 choisis : le compte 2007 sort (listes, totaux), gardé sur l’appareil (juste dès l’ouverture suivante)', P.signaturePlan().slice(0, 40));
-    dit(R.venteAutreHorsPlan(P.reglePlanCourante(), 'leboncoin', '8442003') && !R.venteAutreHorsPlan(P.reglePlanCourante(), 'leboncoin', '8442001'), 'Pro, 10 choisis : un compte Leboncoin hors des 10 sort des totaux');
-    const plans = sansCommentaires(lire('src/abonnement/PlansSoloPro.jsx'));
-    const reg = sansCommentaires(lire('src/ecrans/Reglages.jsx'));
-    const app = sansCommentaires(lire('src/App.jsx'));
-    dit(/data-quels-comptes-pro=""/.test(plans) && /ouvert === 'pro' && <QuelsComptesPro /.test(plans) && /ouvrirQuelCompte\('pro'\)/.test(reg),
-      'la coque porte la feuille « Quels 10 comptes vendent ? » ; Paramètres → Abonnement l’ouvre');
-    dit(/useComptesAutresSites\(!!\(aboCoque && \(aboCoque\.plan === 'solo' \|\| aboCoque\.proLimite === true\)\)\)/.test(app), 'la coque lit les comptes des autres plateformes en Pro (pour compter les 10)');
-    dit(/hors de tes \$\{MAX_VENDEURS_PRO\} comptes vendeurs \(Pro\)/.test(plans) && /data-choisir-pro=""/.test(plans), 'l’aperçu des ventes hors offre dit « hors de tes 10 comptes vendeurs » et ouvre la feuille (pas « Passe à Pro »)');
-  });
-
   console.log('── 5. Les prix : Solo 16,99 €, Pro 19,99 € (décision du 9 nov.), une valeur chacun');
   await essaie('prix', async () => {
     const reg = lire('src/accueil-reglages.js'), cpt = lire('api/compte.js'), cgv = lire('public/legal/cgv.html');
     dit(/PRIX_PRO_MOIS = '19,99'/.test(reg) && /PRIX_PRO_CGV = \{ centimes: 1999, devise: 'eur', intervalle: 'month' \}/.test(cpt) && /Offre Pro : 19,99 € par mois/.test(cgv), 'Pro 19,99 € : app, serveur et CGV disent la même chose');
-    dit(/Dernière mise à jour : 10 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-10'/.test(cpt), 'CGV du 10 novembre (Solo, Pro 10 comptes), version acceptée à jour');
-    dit(/<b>10 comptes vendeurs au total<\/b>, toutes plateformes confondues/.test(cgv) && /Pro souscrit avant le 10 novembre 2026 garde les ventes de tous tes comptes/.test(cgv) && /retirer un une fois tous les 30 jours/.test(cgv) && /19,99 € par mois pour 10 comptes vendeurs/.test(cgv),
-      'CGV : Pro = 10 comptes vendeurs au total, un Pro d’avant garde tous ses comptes, 30 jours pour retirer');
+    dit(/Dernière mise à jour : 10 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-10'/.test(cpt), 'CGV du 10 novembre (Solo et Pro illimité), version acceptée à jour');
     dit(/un compte vendeur/.test(cgv) && /comptes d’achat/.test(cgv) && /rien n’est supprimé/.test(cgv), 'CGV : Solo dit « un compte vendeur » et « comptes d’achat », rien supprimé');
     const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
     dit(/un compte vendeur par plateforme<\/b> \(un compte Vinted, un compte Leboncoin, un compte eBay et un compte Vestiaire Collective\)/.test(cgv) && /plateforme par plateforme/.test(cgv) && /colis à envoyer restent affichés/.test(cgv),
       'CGV : « un compte vendeur par plateforme » (Vinted, Leboncoin, eBay, Vestiaire), 30 jours par plateforme, colis gardés');
     dit(/^Un compte vendeur par plateforme \(un Vinted, un Leboncoin, un eBay, un Vestiaire\)/.test(R.OFFRES.solo.phrase) && /un compte vend sur chaque plateforme/.test(lire('src/Accueil.jsx')),
       'l’offre Solo dit la même chose dans l’app, sur l’accueil et dans Paramètres (une phrase, `OFFRES.solo`)');
-    dit(/^Jusqu’à 10 comptes vendeurs, toutes plateformes confondues/.test(R.OFFRES.pro.phrase) && /avec Pro, 10 comptes vendent/.test(lire('src/Accueil.jsx')),
-      'l’offre Pro dit « 10 comptes vendeurs » dans l’app, sur l’accueil et dans Paramètres (`OFFRES.pro`)');
+  });
+
+  console.log('── 7. Pro illimité (10 nov., 20 h) : aucun compte vendeur écarté, rien à choisir');
+  if (compte) await essaie('serveur : Pro illimité', async () => {
+    reset();
+    process.env.STRIPE_PRIX_PRO = 'price_pro';
+    vintedDe[A] = Array.from({ length: 50 }, (_, i) => String(2000 + i));
+    sub.items.data[0].price = { id: 'price_pro', lookup_key: null, unit_amount: 1999, currency: 'eur', recurring: { interval: 'month' } };
+    sub.metadata = { ...sub.metadata, cgv_version: '2026-11-10', vrm_pro_vendeurs: 'v:2000,v:2001,v:2002,v:2003,v:2004,v:2005,v:2006,v:2007,v:2008,v:2009', vrm_pro_vendeurs_le: '2026-11-10T18:00:00Z' };
+    let r = await appel({ mode: 'abonnement', headers: A_ });
+    const restes = ['proLimite', 'comptesPro', 'maxVendeursPro'].filter((k) => r.corps && k in r.corps);
+    dit(r.code === 200 && r.corps.plan === 'pro' && restes.length === 0, '`mode=abonnement` en Pro : aucune limite ni liste de comptes rendue', `${r.corps && r.corps.plan} · ${restes.join(', ')}`);
+    const n = postsStripe().length;
+    r = await appel({ method: 'POST', mode: 'compte-vendeur', headers: A_, corps: { plateforme: 'pro', comptes: [{ plateforme: 'vinted', id: '2000' }] } });
+    dit(r.code === 409 && postsStripe().length === n && r.corps && r.corps.erreur === 'pro-illimite', '`mode=compte-vendeur` plateforme « pro » : refusé proprement (409), rien écrit chez Stripe', `HTTP ${r.code} · ${r.corps && r.corps.erreur}`);
+    const signer = (c) => { const t = Math.floor(Date.now() / 1000); return `t=${t},v1=${crypto.createHmac('sha256', SECRET).update(`${t}.${c}`).digest('hex')}`; };
+    const c = JSON.stringify({ id: 'evt_pro_illimite', type: 'customer.subscription.updated', created: 900, livemode: false, data: { object: sub } });
+    r = await appel({ method: 'POST', mode: 'webhook', headers: { 'stripe-signature': signer(c) }, corps: c });
+    dit(r.code === 200 && abos[A].plan === 'pro' && !(abos[A].comptes_vendeurs && 'pro' in abos[A].comptes_vendeurs), 'webhook Pro : aucune liste de comptes rangée dans `comptes_vendeurs`', JSON.stringify(abos[A].comptes_vendeurs));
+    const PV = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-vendeur.js'));
+    const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
+    PV.oublierPlans();
+    abos[A] = { statut: 'active', plan: 'pro', compte_vendeur: '2000', comptes_vendeurs: { pro: ['vinted:2000', 'leboncoin:8443000'], leboncoin: '8443000' } };
+    const rg = await PV.regleDuVendeur(A);
+    const ec = vintedDe[A].filter((u) => R.venteHorsPlan(rg, u)).length + Array.from({ length: 50 }, (_, i) => String(8443000 + i)).filter((x) => R.venteAutreHorsPlan(rg, 'leboncoin', x)).length;
+    dit(rg && ec === 0, 'serveur (bilans, notifications) : Pro avec une ancienne liste dans la ligne ⇒ 100 comptes, aucun écarté', `${ec} écarté(s)`);
+    PV.oublierPlans();
+    delete process.env.STRIPE_PRIX_PRO;
+  });
+  await essaie('app : Pro illimité', async () => {
+    const mem = {}; global.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } };
+    const E = await import('file://' + path.join(RACINE, 'src', 'abonnement', 'etatAbonnement.js'));
+    const P = await import('file://' + path.join(RACINE, 'src', 'abonnement', 'planVentes.js'));
+    P.demarrerPlan('uid-banc-pro');
+    E.publierAbonnement({ ok: true, plan: 'pro', proLimite: true, comptesPro: { liste: [{ plateforme: 'vinted', id: '2000' }] }, comptesVendeurs: { pro: ['vinted:2000'] } });
+    const hors = Array.from({ length: 50 }, (_, i) => String(2000 + i)).filter((u) => P.venteHorsPlanUid(u)).length;
+    dit(P.signaturePlan() === 'libre' && hors === 0 && !mem['vrm_plan_regle_uid-banc-pro'], 'app : Pro (même avec une liste reçue) ⇒ 50 comptes Vinted, aucun écarté, rien gardé sur l’appareil', `${P.signaturePlan()} · ${hors}`);
+    const plans = sansCommentaires(lire('src/abonnement/PlansSoloPro.jsx')), reg = sansCommentaires(lire('src/ecrans/Reglages.jsx')), app = sansCommentaires(lire('src/App.jsx'));
+    const acc = lire('src/Accueil.jsx'), cgv = lire('public/legal/cgv.html');
+    const traces = [[/QuelsComptesPro|data-quels-comptes-pro|Quels 10 comptes/, plans + app], [/comptes vendeurs`|data-comptes-pro|proLimite|MAX_VENDEURS_PRO/, reg + app], [/10 comptes vendeurs|10 comptes vendent|hors de tes 10/, plans + reg + app + acc]]
+      .filter(([re, t]) => re.test(t)).map(([re]) => String(re));
+    dit(traces.length === 0, 'écrans : ni feuille « Quels 10 comptes vendent ? », ni rangée « Tes 10 comptes vendeurs », ni « hors de tes 10 »', traces.join(' · '));
+    dit(/avec Pro, tous tes comptes vendent/.test(acc) && /tous tes comptes vendeurs, sans limite de nombre/.test(cgv) && !/10 comptes vendeurs/.test(cgv),
+      'accueil et CGV : Pro = tous les comptes vendeurs, sans limite');
   });
 
   console.log(`\n${ko ? '❌' : '✅'} audit-plans-solo-pro : ${ok} verts, ${ko} rouge(s)`);

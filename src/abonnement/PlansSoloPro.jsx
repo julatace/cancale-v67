@@ -18,15 +18,11 @@
 //     et Vestiaire (`plateforme`) : un compte vendeur par plateforme, choisi par
 //     LUI, un geste chacun, 30 jours chacun ; `VentesAutresHorsPlan` montre en
 //     aperçu les ventes de leurs comptes d'achat (« Tous » de Ventes).
-//   · (10 nov.) PRO = 10 COMPTES VENDEURS AU TOTAL : `QuelsComptesPro` (« Quels 10 comptes
-//     vendent ? »), une ligne de la coque seulement au-delà de 10 comptes sans choix (ou un
-//     compte qui attend une place libre) ; l'aperçu dit « hors de tes 10 comptes vendeurs ».
 // La règle : api/_lib/plan-regle.js. L'état : src/abonnement/planVentes.js.
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { compteDefaut, compteDefautAutre, comptesHorsPlan, venteHorsPlan, OFFRES, JOURS_CHANGEMENT_VENDEUR, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, idCompteVendeur,
-  MAX_VENDEURS_PRO, PLATEFORMES_PRO, cleVendeurPro, decouperCleVendeurPro, listeVendeursPro, etatVendeursPro } from '../../api/_lib/plan-regle.js';
+import { compteDefaut, compteDefautAutre, comptesHorsPlan, venteHorsPlan, OFFRES, JOURS_CHANGEMENT_VENDEUR, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, idCompteVendeur } from '../../api/_lib/plan-regle.js';
 import { abonnementPublie, publierAbonnement, suivreAbonnement } from './etatAbonnement.js';
 import { reglePlanCourante, suivrePlan } from './planVentes.js';
 import { APERCU_LIGNES, bloquerGestes } from './apercu.js';
@@ -54,117 +50,6 @@ export function plateformesAChoisir(x, autres) {
   if (!choixDe(x, 'vinted')) out.push('vinted');
   for (const p of PLATEFORMES_SOLO) { const l = autres && autres[p] && autres[p].comptes; if (Array.isArray(l) && l.length >= 2 && !choixDe(x, p)) out.push(p); }
   return out;
-}
-
-// ── (10 nov.) PRO = 10 COMPTES VENDEURS AU TOTAL ─────────────────────────────
-// Ses 10 choisis, tels que le serveur les a rendus (`['vinted:1007', …]`, `null` = pas choisis).
-export function listeProDe(x) {
-  if (!x || x.plan !== 'pro' || x.proLimite !== true) return null;
-  return listeVendeursPro(x.comptesPro && x.comptesPro.liste);
-}
-// Les identités de TOUS ses comptes (Vinted + autres plateformes), pour la règle des 10.
-export function tousLesComptesPro(comptes, autres) {
-  const out = [];
-  for (const c of Array.isArray(comptes) ? comptes : []) { const k = cleVendeurPro('vinted', c && c.uid); if (k) out.push(k); }
-  for (const p of PLATEFORMES_SOLO) for (const c of (autres && autres[p] && Array.isArray(autres[p].comptes) ? autres[p].comptes : [])) { const k = cleVendeurPro(p, c && c.uid); if (k) out.push(k); }
-  return [...new Set(out)];
-}
-// Pro limité : faut-il lui demander de choisir ? (plus de 10 comptes sans choix, ou un
-// compte hors des 10 alors qu'il reste des places). Jamais un choix fait à sa place.
-export function proAChoisir(x, comptes, autres) {
-  if (!x || x.plan !== 'pro' || x.proLimite !== true) return null;
-  return etatVendeursPro(tousLesComptesPro(comptes, autres), listeProDe(x));
-}
-export async function choisirComptesPro(liste, enTete) {
-  try {
-    const comptes = liste.map(decouperCleVendeurPro);
-    const r = await fetch('/api/compte?mode=compte-vendeur', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(enTete ? enTete() : {}) }, body: JSON.stringify({ plateforme: 'pro', comptes }) });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok && j && j.ok && j.comptesPro) {
-      const x = abonnementPublie();
-      if (x && typeof x === 'object') publierAbonnement({ ...x, comptesPro: j.comptesPro });
-      return { ok: true };
-    }
-    return { ok: false, message: (j && j.message) || "Ton choix n'a pas été enregistré. Réessaie dans un instant." };
-  } catch (_) { return { ok: false, message: 'Pas de connexion : rien n’a changé. Réessaie dans un instant.' }; }
-}
-
-// La feuille « Quels 10 comptes vendent ? » : ses comptes de CHAQUE plateforme, par identité,
-// « N ventes lues » ; rien n'est coché à sa place (« Cocher les 10 qui vendent le plus » est SON
-// clic). Un compte déjà choisi ne se retire qu'une fois tous les 30 jours (dit avec la date).
-export function QuelsComptesPro({ comptes, ventes, autres, enTete, onFerme }) {
-  const x = useAbonnementPublie();
-  const actuels = listeProDe(x) || [];
-  const attendre = x && x.comptesPro && x.comptesPro.prochainChangement ? x.comptesPro.prochainChangement : null;
-  const [choix, setChoix] = React.useState(() => new Set(actuels));
-  const [occupe, setOccupe] = React.useState(false);
-  const [msg, setMsg] = React.useState('');
-  React.useEffect(() => { const f = (e) => { if (e.key === 'Escape') onFerme(); }; window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f); }, [onFerme]);
-  // Les comptes, groupés par plateforme, avec leurs ventes lues (`null` = pas lues).
-  const groupes = React.useMemo(() => PLATEFORMES_PRO.map((p) => {
-    const liste = p === 'vinted' ? (Array.isArray(comptes) ? comptes : []) : ((autres && autres[p] && autres[p].comptes) || []);
-    const n = new Map();
-    let lues = false;
-    if (p === 'vinted' && Array.isArray(ventes)) { lues = true; for (const v of ventes) { const k = cleVendeurPro('vinted', uidDe(v)); if (k) n.set(k, (n.get(k) || 0) + 1); } }
-    const cdv = p !== 'vinted' && autres && autres[p] ? autres[p].comptesDesVentes : null;
-    if (Array.isArray(cdv)) { lues = true; for (const c of cdv) { const k = cleVendeurPro(p, c); if (k) n.set(k, (n.get(k) || 0) + 1); } }
-    const lignes = liste.map((c) => { const k = cleVendeurPro(p, c && c.uid); return k ? { k, id: decouperCleVendeurPro(k).id, nom: (c && c.nom) || '', n: lues ? (n.get(k) || 0) : null } : null; }).filter(Boolean);
-    return { p, nomP: NOMS_PLATEFORMES_SOLO[p], lignes };
-  }).filter((g) => g.lignes.length), [comptes, ventes, autres]);
-  const verrou = (k) => !!attendre && actuels.includes(k);
-  const plein = choix.size >= MAX_VENDEURS_PRO;
-  const basculer = (k) => setChoix((s0) => { const s = new Set(s0); if (s.has(k)) { if (!verrou(k)) s.delete(k); } else if (s.size < MAX_VENDEURS_PRO) s.add(k); return s; });
-  // SON clic : garde ceux qu'il ne peut pas retirer, puis les plus vendeurs (égalité ⇒ l'ordre de la liste).
-  const cocherMeilleurs = () => {
-    const tous = groupes.flatMap((g) => g.lignes).filter((l) => l.n);
-    tous.sort((a, b) => b.n - a.n);
-    const s = new Set(actuels.filter(verrou));
-    for (const l of tous) { if (s.size >= MAX_VENDEURS_PRO) break; s.add(l.k); }
-    setChoix(s);
-  };
-  const pareil = choix.size === actuels.length && actuels.every((k) => choix.has(k));
-  const valider = async () => {
-    if (!choix.size || pareil) return;
-    setOccupe(true); setMsg('');
-    const r = await choisirComptesPro([...choix], enTete);
-    setOccupe(false);
-    if (r.ok) onFerme(); else setMsg(r.message);
-  };
-  const auMoinsUnLu = groupes.some((g) => g.lignes.some((l) => l.n));
-  return createPortal(
-    <div className="vrm-plan-voile" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onFerme(); }}>
-      <div className="vrm-plan-feuille" role="dialog" aria-modal="true" aria-labelledby="vrm-plan-titre-pro" data-quels-comptes-pro="" data-pro-coches={choix.size}>
-        <div className="vrm-plan-feuille-titre" id="vrm-plan-titre-pro">Quels {MAX_VENDEURS_PRO} comptes vendent ?</div>
-        <div className="vrm-plan-phrase">Avec Pro, {MAX_VENDEURS_PRO} comptes vendent, toutes plateformes. Les autres gardent leurs achats. Rien n'est supprimé.{' '}
-          {attendre ? `Retirer un compte : possible le ${dateLongue(attendre)}.` : `Retirer un compte : une fois tous les ${JOURS_CHANGEMENT_VENDEUR} jours.`}</div>
-        <div className="vrm-plan-compteur" data-pro-compteur="" aria-live="polite"><b>{choix.size}</b> / {MAX_VENDEURS_PRO}</div>
-        {auMoinsUnLu && <button type="button" className="vrm-lien-action vrm-plan-meilleurs" data-pro-meilleurs="" disabled={occupe} onClick={cocherMeilleurs}>Cocher les {MAX_VENDEURS_PRO} qui vendent le plus</button>}
-        {!groupes.length && <div className="vrm-plan-phrase" data-quel-compte-vide="">Aucun compte relié pour l'instant.</div>}
-        {groupes.map((g) => (
-          <div key={g.p} className="vrm-plan-groupe" data-pro-plateforme={g.p}>
-            <div className="vrm-plan-groupe-titre">{g.nomP}</div>
-            <div role="group" aria-label={`Comptes ${g.nomP}`} className="vrm-plan-comptes">
-              {g.lignes.map((l) => {
-                const coche = choix.has(l.k), bloque = coche ? verrou(l.k) : plein;
-                return (
-                  <button type="button" role="checkbox" aria-checked={coche} key={l.k} data-compte-pro={l.k} data-compte-actuel={actuels.includes(l.k) ? '' : undefined}
-                    className="vrm-plan-compte" disabled={occupe || bloque} onClick={() => basculer(l.k)}>
-                    <span className="vrm-plan-case" aria-hidden="true" data-coche={coche ? '' : undefined}/>
-                    <span className="vrm-plan-compte-nom">{l.nom || `n° ${l.id}`}{l.nom && l.nom !== `n° ${l.id}` && <span className="vrm-plan-compte-id"> · {l.id === 'principal' ? 'compte principal' : `n° ${l.id}`}</span>}</span>
-                    <span className="vrm-plan-compte-detail">{l.n == null ? 'ventes pas lues' : `${l.n} vente${l.n > 1 ? 's' : ''} lue${l.n > 1 ? 's' : ''}`}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {msg && <div role="alert" className="vrm-plan-alerte">{msg}</div>}
-        <div className="vrm-plan-actions">
-          <button type="button" className="vrm-b vrm-b-secondaire" onClick={onFerme}>Plus tard</button>
-          <button type="button" className="vrm-b vrm-b-primaire" data-valider-pro="" disabled={occupe || !choix.size || pareil} onClick={valider}>{occupe ? 'Un instant…' : 'Ces comptes vendent'}</button>
-        </div>
-      </div>
-    </div>, document.body);
 }
 
 function useAbonnementPublie() {
@@ -269,20 +154,8 @@ export function BandeauCompteVendeur({ comptes, ventes, autres, enTete }) {
   const manque = plateformesAChoisir(x, autres);
   const p = manque[0] || '';
   const nomP = NOMS_PLATEFORMES_SOLO[p] || '';
-  const a = ouvert && ouvert !== 'vinted' && ouvert !== 'pro' ? (autres && autres[ouvert]) || { comptes: [], comptesDesVentes: null } : null;
-  // (10 nov.) Pro : 10 comptes vendeurs. La ligne ne parle qu'au-delà de 10 comptes sans choix,
-  // ou quand un compte attend une place libre.
-  const etatPro = proAChoisir(x, comptes, autres);
+  const a = ouvert && ouvert !== 'vinted' ? (autres && autres[ouvert]) || { comptes: [], comptesDesVentes: null } : null;
   return (<>
-    {etatPro && etatPro.aChoisir && (
-      <div className="vrm-bandeau-abo" role="status" data-bandeau-compte-vendeur="" data-bandeau-plateforme="pro" data-bandeau-pro-hors={etatPro.hors.length}>
-        <span className="vrm-bandeau-abo-texte">{listeProDe(x)
-          ? <>Ton offre Pro : {etatPro.hors.length} compte{etatPro.hors.length > 1 ? 's' : ''} hors de tes {MAX_VENDEURS_PRO} vendeurs. Il te reste {etatPro.places} place{etatPro.places > 1 ? 's' : ''}.</>
-          : <>Ton offre Pro : choisis tes {MAX_VENDEURS_PRO} comptes vendeurs. D'ici là, tous comptent.</>}</span>
-        <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={() => setOuvert('pro')}>Choisir</button>
-      </div>
-    )}
-    {ouvert === 'pro' && <QuelsComptesPro comptes={comptes} ventes={ventes} autres={autres} enTete={enTete} onFerme={() => setOuvert('')}/>}
     {p && (
       <div className="vrm-bandeau-abo" role="status" data-bandeau-compte-vendeur="" data-bandeau-plateforme={p} data-bandeau-a-choisir={manque.join(',')}>
         <span className="vrm-bandeau-abo-texte">{p === 'vinted'
@@ -302,8 +175,6 @@ export function BandeauCompteVendeur({ comptes, ventes, autres, enTete }) {
 // [{ cle, site, compteId, compte, titre, prix, aEnvoyer }] — déjà jugées hors offre
 // par l'écran (`venteAutreHorsPlan`).
 export function VentesAutresHorsPlan({ lignes, onPro }) {
-  const regle = useRegle();
-  const pro = regle && regle.plan === 'pro' && !!regle.pro;
   const blocs = React.useMemo(() => {
     const par = new Map();
     for (const l of Array.isArray(lignes) ? lignes : []) {
@@ -327,7 +198,7 @@ export function VentesAutresHorsPlan({ lignes, onPro }) {
           <section key={b.cle} className="vrm-plan-bloc" data-hors-plan-site={b.site} data-hors-plan-compte={b.compteId} data-hors-plan-n={b.ventes.length} data-hors-plan-a-envoyer={b.aEnvoyer} aria-label={`Ventes ${nomP} de ${b.nom}`}>
             <div className="vrm-plan-bloc-tete">
               <h3 className="vrm-plan-bloc-titre">Ventes {nomP} de {b.nom}</h3>
-              <div className="vrm-plan-phrase">{b.ventes.length} vente{b.ventes.length > 1 ? 's' : ''}{b.aEnvoyer ? `, dont ${b.aEnvoyer} à envoyer (dans Colis)` : ''} — {pro ? `hors de tes ${MAX_VENDEURS_PRO} comptes vendeurs (Pro)` : 'hors de ton offre Solo (un compte vendeur par plateforme)'} : ni dans tes listes, ni dans tes totaux. Rien n'est supprimé.</div>
+              <div className="vrm-plan-phrase">{b.ventes.length} vente{b.ventes.length > 1 ? 's' : ''}{b.aEnvoyer ? `, dont ${b.aEnvoyer} à envoyer (dans Colis)` : ''} — hors de ton offre Solo (un compte vendeur par plateforme) : ni dans tes listes, ni dans tes totaux. Rien n'est supprimé.</div>
             </div>
             <ul className="vrm-plan-lignes">
               {b.ventes.map((l, i) => {
@@ -340,9 +211,7 @@ export function VentesAutresHorsPlan({ lignes, onPro }) {
                 );
               })}
             </ul>
-            {pro
-              ? <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-choisir-pro="" onClick={() => ouvrirQuelCompte('pro')}>Choisir mes {MAX_VENDEURS_PRO} comptes vendeurs</button>
-              : <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes {nomP} de {b.nom}</button>}
+            <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes {nomP} de {b.nom}</button>
           </section>
         );
       })}
@@ -355,7 +224,7 @@ export function VentesAutresHorsPlan({ lignes, onPro }) {
 export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
   const regle = useRegle();
   const blocs = React.useMemo(() => {
-    if (!(regle.bride || regle.pro) || !Array.isArray(ventes)) return [];
+    if (!regle.bride || !Array.isArray(ventes)) return [];
     return comptesHorsPlan(regle, comptes).map((c) => {
       const u = String(c.uid);
       const siennes = ventes.filter((o) => uidDe(o) === u && venteHorsPlan(regle, u));
@@ -373,7 +242,7 @@ export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
         <section key={b.uid} className="vrm-plan-bloc" data-hors-plan-compte={b.uid} data-hors-plan-n={b.ventes.length} data-hors-plan-a-envoyer={b.aEnvoyer} aria-label={`Ventes de ${b.nom}`}>
           <div className="vrm-plan-bloc-tete">
             <h3 className="vrm-plan-bloc-titre">Ventes de {b.nom}</h3>
-            <div className="vrm-plan-phrase">{b.ventes.length} vente{b.ventes.length > 1 ? 's' : ''}{b.aEnvoyer ? `, dont ${b.aEnvoyer} à envoyer` : ''} — {regle.pro ? `hors de tes ${MAX_VENDEURS_PRO} comptes vendeurs (Pro)` : 'hors de ton offre Solo'} : ni dans tes listes, ni dans tes totaux. Rien n'est supprimé.</div>
+            <div className="vrm-plan-phrase">{b.ventes.length} vente{b.ventes.length > 1 ? 's' : ''}{b.aEnvoyer ? `, dont ${b.aEnvoyer} à envoyer` : ''} — hors de ton offre Solo : ni dans tes listes, ni dans tes totaux. Rien n'est supprimé.</div>
           </div>
           <ul className="vrm-plan-lignes">
             {b.ventes.map((o, i) => {
@@ -387,9 +256,7 @@ export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
               );
             })}
           </ul>
-          {regle.pro
-            ? <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-choisir-pro="" onClick={() => ouvrirQuelCompte('pro')}>Choisir mes {MAX_VENDEURS_PRO} comptes vendeurs</button>
-            : <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes de {b.nom}</button>}
+          <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes de {b.nom}</button>
         </section>
       ))}
     </div>
