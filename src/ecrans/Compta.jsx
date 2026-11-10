@@ -32,6 +32,8 @@ import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
+// (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).
+const SeuilTvaFactures = aLaDemande(() => import('../SeuilTvaFactures.jsx'));
 // ⟦← App.jsx #2⟧
 import PorteMonnaie from "../PorteMonnaie.jsx";
 // (6 nov., vitesse 2) Dac7Comptes : à la demande.
@@ -995,6 +997,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
             tassaient la piste (« Statistiqu… », vu en capture à 1512 px). */}
         {argentNav}
       </div>
+      <SeuilTvaFactures deps={DEPS_FACTURE}/>
       {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
       <ListeFacturesPro deps={DEPS_FACTURE}/>
 

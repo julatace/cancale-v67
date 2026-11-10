@@ -24,6 +24,8 @@
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
 import React from 'react';
 import './facture-pro.css';
+import './facture-tva.css';
+import { bi, EN, paiementAnglais, acheteurHorsFrance } from './facturePro/anglais.js';
 import { SheetShell } from './composants/SheetShell.jsx';
 import {
   REGIMES_TVA, FORMES, COULEURS, TAUX_TVA, estSociete, verifierSiret, manquantsVendeur, manquantsVente,
@@ -101,31 +103,34 @@ export function ApercuFacture({ contenu, provisoire = false, numeroLibelle = '',
   const c = contenu; const T = c.totaux; const marge = c.regime === 'marge';
   const S = sensible ? { className: 'vrm-sensible', 'data-stream-type': 'acheteur' } : {};
   const trous = [c.vendeur.nom, ...c.vendeur.adresse, ...c.vendeur.legal, ...c.mentions, c.numeroTrou].filter(estTrou).length;
+  // (10 nov., lot T) Facture en anglais : les mêmes libellés « français / English » que le PDF.
+  const en = !!c.anglais; const B = (fr) => bi(fr, en);
   return (
-    <div className="vrm-fp-apercu" data-fp-apercu={c.numero} data-fp-trous={trous} style={{ '--fp-accent': c.couleur }}>
+    <div className="vrm-fp-apercu" data-fp-apercu={c.numero} data-fp-trous={trous} data-fp-langue={en ? 'fr-en' : 'fr'} style={{ '--fp-accent': c.couleur }}>
       <div className="vrm-fp-a-tete">
         {c.logo ? <img src={c.logo} alt="" className="vrm-fp-a-logo"/> : <span/>}
         <div className="vrm-fp-a-titre">
-          <b>{c.type === 'avoir' ? 'AVOIR' : 'FACTURE'}</b>
+          <b>{B(c.type === 'avoir' ? 'AVOIR' : 'FACTURE')}</b>
           <span className="vrm-fp-a-num" data-fp-a-numero="">{c.numeroTrou ? L(c.numeroTrou, 'n') : provisoire ? (numeroLibelle || 'N° donné à l’émission') : `N° ${c.numero}`}</span>
-          <span>Émise le {c.emiseJour}</span>
-          {c.origine ? <span>Annule la facture {c.origine}</span> : null}
+          <span>{B('Émise le')} {c.emiseJour}</span>
+          {c.origine ? <span>{B('Annule la facture')} {c.origine}</span> : null}
         </div>
       </div>
       <div className="vrm-fp-a-parties">
-        <div data-fp-a-vendeur=""><small>Vendeur</small><b>{estTrou(c.vendeur.nom) ? L(c.vendeur.nom, 'nom') : c.vendeur.nom}</b>{[...c.vendeur.adresse, ...c.vendeur.legal, c.vendeur.email, c.vendeur.telephone].filter((x) => estTrou(x) || x).map((l, i) => L(l, i))}</div>
-        <div data-fp-a-acheteur="" {...S}><small>Facturé à</small><b>{c.acheteur.nom}</b>{[...c.acheteur.adresse, c.acheteur.email].filter(Boolean).map((l, i) => <span key={i}>{l}</span>)}</div>
+        <div data-fp-a-vendeur=""><small>{B('Vendeur')}</small><b>{estTrou(c.vendeur.nom) ? L(c.vendeur.nom, 'nom') : c.vendeur.nom}</b>{[...c.vendeur.adresse, ...c.vendeur.legal, c.vendeur.email, c.vendeur.telephone].filter((x) => estTrou(x) || x).map((l, i) => L(l, i))}</div>
+        <div data-fp-a-acheteur="" {...S}><small>{B('Facturé à')}</small><b>{c.acheteur.nom}</b>{[...c.acheteur.adresse, c.acheteur.email].filter(Boolean).map((l, i) => <span key={i}>{l}</span>)}</div>
       </div>
-      <p className="vrm-fp-a-infos">Date de la vente : {c.venteJour} · {c.nature}{c.reference ? ` · Référence : ${c.reference}` : ''}</p>
-      <table className="vrm-fp-a-table"><thead><tr><th>Désignation</th><th>Qté</th><th>{marge ? 'Prix unitaire' : 'Prix unit. HT'}</th><th>{marge ? 'Total' : 'Total HT'}</th></tr></thead>
+      <p className="vrm-fp-a-infos">{B('Date de la vente')} : {c.venteJour} · {en && EN[c.nature] ? `${c.nature} / ${EN[c.nature]}` : c.nature}{c.reference ? ` · ${B('Référence')} : ${c.reference}` : ''}</p>
+      <table className="vrm-fp-a-table"><thead><tr><th>{B('Désignation')}</th><th>{B('Qté')}</th><th>{B(marge ? 'Prix unitaire' : 'Prix unit. HT')}</th><th>{B(marge ? 'Total' : 'Total HT')}</th></tr></thead>
         <tbody>{c.lignes.map((l, i) => <tr key={i}><td>{l.designation}</td><td>{l.quantite}</td><td>{euros(l.unite)}</td><td>{euros(l.total)}</td></tr>)}</tbody></table>
       <dl className="vrm-fp-a-totaux">
-        {c.regime === 'normal' ? <><div><dt>Total HT</dt><dd>{euros(T.ht)}</dd></div><div><dt>TVA {String(c.taux).replace('.', ',')}&nbsp;%</dt><dd>{euros(T.tva)}</dd></div><div className="is-fort"><dt>Total TTC</dt><dd>{euros(T.ttc)}</dd></div></>
-          : c.regime === 'franchise' ? <><div><dt>Total HT</dt><dd>{euros(T.ht)}</dd></div><div><dt>TVA</dt><dd>non applicable</dd></div><div className="is-fort"><dt>{c.type === 'avoir' ? 'Montant à rembourser' : 'Net à payer'}</dt><dd>{euros(T.ttc)}</dd></div></>
-          : <div className="is-fort"><dt>{c.type === 'avoir' ? 'Montant à rembourser' : 'Total à payer'}</dt><dd>{euros(T.ttc)}</dd></div>}
+        {c.regime === 'normal' ? <><div><dt>{B('Total HT')}</dt><dd>{euros(T.ht)}</dd></div><div><dt>{B('TVA')} {String(c.taux).replace('.', ',')}&nbsp;%</dt><dd>{euros(T.tva)}</dd></div><div className="is-fort"><dt>{B('Total TTC')}</dt><dd>{euros(T.ttc)}</dd></div></>
+          : c.regime === 'franchise' ? <><div><dt>{B('Total HT')}</dt><dd>{euros(T.ht)}</dd></div><div><dt>{B('TVA')}</dt><dd>{B('non applicable')}</dd></div><div className="is-fort"><dt>{B(c.type === 'avoir' ? 'Montant à rembourser' : 'Net à payer')}</dt><dd>{euros(T.ttc)}</dd></div></>
+          : <div className="is-fort"><dt>{B(c.type === 'avoir' ? 'Montant à rembourser' : 'Total à payer')}</dt><dd>{euros(T.ttc)}</dd></div>}
       </dl>
       <p className="vrm-fp-a-paye">{c.paiement}</p>
-      {c.mentions.map((m, i) => (estTrou(m) ? <p key={i} className="vrm-fp-a-mention">{L(m, 'm')}</p> : <p key={i} className="vrm-fp-a-mention">{m}</p>))}
+      {en ? <p className="vrm-fp-a-paye" data-fp-a-paye-en="">{paiementAnglais(c)}</p> : null}
+      {c.mentions.map((m, i) => (estTrou(m) ? <p key={i} className="vrm-fp-a-mention">{L(m, 'm')}</p> : <p key={i} className="vrm-fp-a-mention">{m}{en && c.anglais.mentions && c.anglais.mentions[i] ? <><br/><span data-fp-a-mention-en="">{c.anglais.mentions[i]}</span></> : null}</p>))}
       {c.note ? <p className="vrm-fp-a-note">{c.note}</p> : null}
     </div>
   );
@@ -616,6 +621,9 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
   const [envoisIci, setEnvoisIci] = React.useState(null);
   React.useEffect(() => { if (!fiche) relireEtatEnvoi(deps); }, [deps, fiche]);
   const prouve = !!(preuve && preuve.prouve);
+  // (10 nov., lot T) « Facture en anglais » : une option PAR facture, pré-cochée
+  // seulement quand l'adresse prouvée finit par un pays étranger (un indice).
+  const [anglais, setAnglais] = React.useState(() => !!(prouve && acheteurHorsFrance(preuve.acheteur && preuve.acheteur.adresse)));
   const donnees = prouve ? { acheteur: preuve.acheteur, designation, centimes: preuve.centimes, venteLe: preuve.venteLe, reference: tx, plateforme: 'Vinted' } : null;
   const emise = !!(facture && facture.emiseLe) || !!emiseIci;
   const numero = (emiseIci && emiseIci.numero) || (facture && facture.numero) || '';
@@ -627,7 +635,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
   const bloque = bloqueEnvoi(cfg, etat);
   let apercu = null; let mail = null;
   if (cfg && donnees && !mv.length && !manquantsVente(donnees).length) {
-    try { apercu = contenuFacture(cfg, donnees, { numero: numero || (etat && Number.isInteger(etat.prochain) ? numeroFacture(cfg.prefixe, anneeParis(Date.now()), etat.prochain) : '…'), emiseLe: Date.now() }); mail = emailFacture(cfg, apercu, { via: cfg.envoiPar === 'boite' ? 'boite' : 'vrm' }); } catch (_) {}
+    try { apercu = contenuFacture(cfg, donnees, { numero: numero || (etat && Number.isInteger(etat.prochain) ? numeroFacture(cfg.prefixe, anneeParis(Date.now()), etat.prochain) : '…'), emiseLe: Date.now(), langue: anglais ? 'en' : 'fr' }); mail = emailFacture(cfg, apercu, { via: cfg.envoiPar === 'boite' ? 'boite' : 'vrm' }); } catch (_) {}
   }
 
   const envoyerFacture = async (renvoyer) => {
@@ -648,7 +656,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
       ? { title: 'Envoyer la facture ?', desc: `À ${preuve.acheteur.nom} (${preuve.acheteur.email}).${cfg.envoiPar === 'boite' ? '' : ' Elle part de VRM à ton nom, avec toi en copie.'} Elle reçoit son numéro définitif et ne se modifie plus (pour la corriger, il faudra un avoir).`, ok: 'Envoyer' }
       : { title: 'Émettre la facture sans l’envoyer ?', desc: 'Elle reçoit son numéro définitif et ne se modifie plus. Tu pourras l’envoyer ensuite, ou partager le PDF.', ok: 'Émettre' }))) return;
     setOccupe('emettre'); setRetour(null);
-    const r = await route(deps, { action: 'emettre', confirme: true, tx, compte: vente.compte || '', designation });
+    const r = await route(deps, { action: 'emettre', confirme: true, tx, compte: vente.compte || '', designation, langue: anglais ? 'en' : 'fr' });
     if (r.code !== 200) { setOccupe(''); setRetour({ ko: true, t: r.j.manquants ? `Il manque : ${r.j.manquants.map((m) => m.l).join(', ')}.` : (r.j.message || "La facture n'a pas pu être émise. Réessaie : elle gardera le même numéro.") }); return; }
     setEmiseIci(r.j.facture);
     if (envoyer) { await envoyerFacture(false); } else { setOccupe(''); setRetour({ t: `Facture ${r.j.facture.numero} émise.` }); }
@@ -706,6 +714,10 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             <h3>L'article</h3>
             <label className="vrm-fp-champ is-large"><span>Désignation</span><input value={designation} onChange={(e) => setDesignation(e.target.value)}/></label>
             <p className="vrm-fp-muet">Prix : <b className="vrm-fp-chiffre">{euros(preuve.centimes)}</b> — celui de la vente Vinted (sans les frais de port ni la protection acheteur, payés à Vinted).</p>
+            <label className="vrm-fp-anglais" data-fp-anglais={anglais ? '1' : '0'}>
+              <input type="checkbox" checked={anglais} onChange={(e) => setAnglais(e.target.checked)} disabled={!!occupe}/>
+              <span><b>Facture en anglais</b><small>Français et anglais côte à côte. Toujours en euros.</small></span>
+            </label>
           </section>
           {mail ? <section className="vrm-fp-section" data-fp-mail="">
             <h3>L'e-mail</h3>

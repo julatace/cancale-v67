@@ -1,0 +1,30 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LOT T (10 nov.) — « Seuil de TVA » à côté des factures, et l'option
+   « Facture en anglais ». Style DA6 (widget blanc, rayon 24, ambre = geste).
+   Seuls les jetons --vrm-* : le mode sombre suit tout seul.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-stva { display: grid; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--vrm-card, #fff); border: 1px solid var(--vrm-line, #e5e5ea); color: var(--vrm-ink, #1d1d1f); min-width: 0; }
+.vrm-stva-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.vrm-stva-titre { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.vrm-stva-chiffre { font-size: 13px; color: var(--vrm-muted, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-stva-chiffre b { font-size: 17px; font-weight: 700; color: var(--vrm-ink, #1d1d1f); }
+.vrm-stva-jauge { position: relative; height: 10px; border-radius: 999px; background: var(--fu-remplir, rgba(118,118,128,.12)); overflow: visible; }
+.vrm-stva-plein { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--vrm-muted, #6e6e73); max-width: 100%; }
+.vrm-stva.is-alerte .vrm-stva-plein { background: var(--vrm-warn, #b25000); }
+.vrm-stva-trait { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--vrm-ink, #1d1d1f); }
+.vrm-stva-calme { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6e6e73); }
+.vrm-stva-alerte { display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px; background: var(--vrm-warn-soft, #fff4e5); border: 1px solid color-mix(in srgb, var(--vrm-warn, #b25000) 35%, transparent); }
+.vrm-stva-alerte b { font-size: 15px; color: var(--vrm-warn, #b25000); line-height: 1.35; }
+.vrm-stva-alerte span { font-size: 13px; line-height: 1.45; color: var(--vrm-ink, #1d1d1f); }
+.vrm-stva-porte { justify-self: start; min-height: 44px; margin-top: 6px; }
+.vrm-stva-pourquoi summary { min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--vrm-muted, #6e6e73); cursor: pointer; }
+.vrm-stva-pourquoi p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6e6e73); }
+.vrm-stva-fiche { margin-top: 4px; }
+:root[data-theme="dark"] .vrm-stva-alerte { background: color-mix(in srgb, var(--vrm-warn, #ffb340) 14%, transparent); }
+
+/* « Facture en anglais » : une case, une cible de 44 px. */
+.vrm-fp-anglais { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; cursor: pointer; }
+.vrm-fp-anglais input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--vrm-accent, #0071e3); }
+.vrm-fp-anglais span { display: grid; gap: 2px; }
+.vrm-fp-anglais b { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1d1d1f); }
+.vrm-fp-anglais small { font-size: 13px; color: var(--vrm-muted, #6e6e73); }

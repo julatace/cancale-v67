@@ -287,7 +287,8 @@ async function emettre(owner, corps, res) {
     numero = numeroFacture(cfg.prefixe, anneeParis(Date.now()), p.n);
   }
   const emiseLe = Date.now();
-  const contenu = contenuFacture(cfg, vente, { numero, emiseLe });
+  // (10 nov., lot T) « Facture en anglais » : choisie à l'émission, figée dans l'instantané.
+  const contenu = contenuFacture(cfg, vente, { numero, emiseLe, langue: corps.langue === 'en' ? 'en' : 'fr' });
   const data = {
     ...(ligne || {}), type: 'facture_pro', number: numero, status: 'emise', contenu,
     emiseLe: contenu.emiseLe, transaction: tx, account: String(corps.compte || (ligne && ligne.account) || '').slice(0, 80),
