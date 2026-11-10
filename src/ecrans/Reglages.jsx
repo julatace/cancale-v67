@@ -1891,6 +1891,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:'Siri et Raccourcis', desc:'Ajouter un achat ou trouver un N° en parlant à Siri.', data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
+      // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
+      { id:'raccourcis-clavier', type:'action', ic:'grid', lib:'Raccourcis clavier', desc:'Sur ordinateur : « g » puis une lettre, « ? » pour la liste.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
