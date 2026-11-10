@@ -435,7 +435,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
         <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 32 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
-            {!editId && importer ? <button type="button" className="vrm-lien-action" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ minHeight: 44 }}>Importer un tableur</button> : null}
+            {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>Importer un tableur</Bouton> : null}
           </div>
           {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
           {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
