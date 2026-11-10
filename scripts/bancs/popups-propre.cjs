@@ -114,6 +114,11 @@ async function ouvrir(b, { url, largeur, sombre }) {
     const r = servir(rows, u, req.headers()); return j(r.body, 200, r.range);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  // (10 nov., 4e série) Organisation lit SON espace par /api/compte?mode=operations : un espace vide
+  // (forme de `VIDE()` de src/operations/metier.js), sinon l'écran ne montre que sa panne. Enregistrée
+  // APRÈS la route générale : Playwright essaie la dernière en premier.
+  await pg.route(/\/api\/compte\?mode=operations/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, serveur: new Date().toISOString(), equipe: [],
+    donnees: { version: 1, revision: 0, missions: [], reservations: [], lots: [], consommables: [], veilles: [], receptions: [], dossiers: [], journal: [], commandes: [] } }) }));
   await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(6500);
   return { pg, ctx, errs, base };
@@ -281,6 +286,31 @@ const ECRANS = [
   { nom: 'argent-stats', url: '/?tab=stats', pret: '.vrm-main' },
   { nom: 'argent-declarer', url: '/?tab=argent_declarer', pret: '.vrm-main' },
   { nom: 'argent-factures', url: '/?tab=invoices', pret: '.vrm-main' },
+  // (10 nov., 4e série — branche claude/textes-courts-4) Favoris (avertissement « Aucune garantie contre
+  // un blocage Vinted » gardé À L'ÉCRAN, le reste sous « Pourquoi ? »), Organisation (formulaires ouverts
+  // un à un : leurs notes), Communauté (carte, classement, groupes), Stock → inventaire.
+  { nom: 'favoris', url: '/?tab=messages&site=vinted&vue=favoris', pret: '.vrm-main' },
+  { nom: 'organisation', url: '/?tab=organisation', pret: '.vrm-operations', apres: async (pg, mobile, tag) => {
+    // Chaque formulaire (onglet ⇒ « Nouvel élément ») : sa note dit une phrase courte, le détail est replié.
+    const onglets = await pg.evaluate(() => [...document.querySelectorAll('.ops-onglets button')].map((b) => b.innerText.trim()).filter(Boolean));
+    let vus = 0;
+    for (const o of onglets) {
+      await pg.locator('.ops-onglets button', { hasText: o }).first().click().catch(() => {});
+      await pg.waitForTimeout(250);
+      const nouveau = pg.locator('.vrm-operations button', { hasText: /^(\+ )?(Nouvel|Nouvelle|Ajouter)/ }).first();
+      if (!(await nouveau.count())) continue;
+      await nouveau.click().catch(() => {}); await pg.waitForTimeout(300);
+      if (!(await pg.locator('.ops-form').count())) continue;
+      vus++;
+      await pg.locator('.ops-form').first().evaluate((e) => e.scrollIntoView({ block: 'start' })).catch(() => {});
+      await capture(pg, `${tag.replace(/\s+/g, '-')}-organisation-form-${vus}`);
+      const p = await paragraphes(pg, SEUIL);
+      dit(p.longs.length === 0, `${tag} : P1 — formulaire « ${o} » : aucun paragraphe de plus de ${SEUIL} caractères`, p.longs.join(' | '));
+      await pg.locator('.ops-form-head button').first().click().catch(() => {}); await pg.waitForTimeout(200);
+    }
+    dit(vus >= 1, `${tag} : au moins un formulaire d'Organisation ouvert et jugé (${vus})`);
+  } },
+  { nom: 'communaute', url: '/?tab=communaute', pret: '.vrm-main' },
 ].filter((e) => !process.env.ECRANS_SEULS || process.env.ECRANS_SEULS.split(',').includes(e.nom));
 
 async function compte(b, sombre) {

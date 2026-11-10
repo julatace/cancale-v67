@@ -30,6 +30,7 @@ import { requeteDeLaVoix } from './rechercheVocale.js';
 import { placeCase } from './stockSortie.js';
 import { SegmenteBase } from './composants/Bouton.jsx';
 import { Numero } from './composants/Numero.jsx';
+import Pourquoi from './composants/PourquoiReplie.jsx';
 import './styles-inventaire.css';
 import { useLectureCamera, creerBip } from './ScannerColis.jsx';   // (10 nov., lot W) la caméra du lot V
 import { numeroDuScan } from './inventaireAnnuel.js';
@@ -224,9 +225,9 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
 
   const accueil = (
     <div className="vrm-inv-accueil" data-inv-vue="accueil">
-      <p className="vrm-inv-intro">Passe devant tes rangements (cartons, étagères, bacs…) et tape chaque N° que tu vois. Je te dis tout de suite s’il est <b>attendu</b>, <b>en trop</b> ou <b>vendu</b> ; à la fin, ce qui <b>manque</b>. Aucun numéro n’est changé.</p>
+      <div className="vrm-inv-intro">Tape chaque N° vu : <b>attendu</b>, <b>en trop</b> ou <b>vendu</b>. Aucun N° changé. <Pourquoi>Passe devant tes rangements (cartons, étagères, bacs…) et tape chaque N° que tu vois. Je te dis tout de suite s’il est attendu, en trop ou vendu ; à la fin, ce qui manque. Aucun numéro n’est changé.</Pourquoi></div>
       {stock === undefined ? <p className="vrm-inv-note" data-inv-lecture="encours">Je lis tes annonces…</p>
-        : (!stock || !stock.su ? <p className="vrm-inv-note" data-inv-lecture="passu">Je n’ai pas pu lire tes annonces{lecturesTxt ? ` (${lecturesTxt})` : ''} : sans elles, je ne peux rien dire de ce qui manque. Ouvre Vinted avec l’extension, puis reviens.</p>
+        : (!stock || !stock.su ? <p className="vrm-inv-note" data-inv-lecture="passu">Annonces pas lues{lecturesTxt ? ` (${lecturesTxt})` : ''} : « manque » pas su. Ouvre Vinted, puis reviens.</p>
           : <p className="vrm-inv-note" data-inv-lecture="ok" data-inv-attendus={index ? index.unites.length : 0}>{plur(index ? index.unites.length : 0, 'paire attendue', 'paires attendues')} en stock{lecturesTxt ? <> · <b>pas lu : {lecturesTxt}</b> — ses paires ne comptent pas</> : null}.</p>)}
       <button type="button" className="vrm-b vrm-b-primaire vrm-inv-large" data-inv-commencer="" disabled={sync === 'lecture' || stock === undefined} onClick={commencer}>Commencer l’inventaire</button>
       {sync === 'lecture' ? etatSync : (sync === 'ko' ? <p className="vrm-inv-sync" data-inv-sync="ko">{horsLigne ? 'Hors connexion : un inventaire commencé sur un autre appareil n’apparaît pas ici.' : 'Je n’ai pas pu relire ton inventaire : un inventaire commencé sur un autre appareil n’apparaît pas encore ici.'}</p> : null)}
@@ -350,7 +351,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
     </section>) : null);
   const vueRevoir = sRevoir ? (() => { const c = sRevoir.constat; const fin = Number(sRevoir.finAt) || Number(sRevoir.debut) || 0; return (
     <div className="vrm-inv-bilan" data-inv-vue="revoir" data-inv-revu={sRevoir.id}>
-      <p className="vrm-inv-note">Constat du <b>{jour(fin)} à {heure(fin)}</b>{c && c.base ? <> — fait hors connexion, avec la liste des paires du {jour(c.base)} à {heure(c.base)}</> : null}. Tel qu’il était ce jour-là : rien n’est recalculé, rien n’est changé dans tes numéros.</p>
+      <p className="vrm-inv-note">Constat du <b>{jour(fin)} à {heure(fin)}</b>{c && c.base ? <> — fait hors connexion, avec la liste des paires du {jour(c.base)} à {heure(c.base)}</> : null}. Tel qu’il était ce jour-là, rien recalculé.</p>
       {c ? (<>
         <div className="vrm-inv-resume">
           <div><b>{c.vus}</b><small>vus</small></div>
@@ -373,8 +374,8 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
   // au-delà d'un jour, ambre : des paires ont pu partir ou arriver depuis.
   const ageH = horsLigne && Number.isFinite(horsLigne.at) ? (Date.now() - horsLigne.at) / 3600e3 : null;
   const teteHl = horsLigne ? (<>
-    <p className="vrm-inv-hl" role="status" data-inv-hors-ligne={new Date(horsLigne.at).toISOString()}>Hors connexion · liste des paires du {jour(horsLigne.at)} à {heure(horsLigne.at)}. Tes N° restent sur cet appareil et partent au retour du réseau.</p>
-    {ageH != null && ageH >= 24 ? <p className="vrm-inv-hl-vieux" role="note" data-inv-hl-vieux={Math.floor(ageH)}>Cette liste a plus d’un jour : une paire vendue ou ajoutée depuis peut sortir « à vérifier » ou « à chercher » à tort — refais le bilan avec du réseau.</p> : null}
+    <p className="vrm-inv-hl" role="status" data-inv-hors-ligne={new Date(horsLigne.at).toISOString()}>Hors connexion · liste des paires du {jour(horsLigne.at)} à {heure(horsLigne.at)}. Tes N° partent au retour du réseau.</p>
+    {ageH != null && ageH >= 24 ? <p className="vrm-inv-hl-vieux" role="note" data-inv-hl-vieux={Math.floor(ageH)}>Liste de plus d’un jour : refais le bilan avec du réseau.</p> : null}
   </>) : null;
 
   return (

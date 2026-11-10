@@ -10,6 +10,7 @@ import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import {RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
 import {articlesFavoris,filtrerArticles,apercuMessageFavori,texteEtatPersonne,pseudoFavori,PERIODES_FAVORIS,FILTRES_ARTICLES} from './favorisEcran.js';
 import CarteMois from './design/CarteMois.jsx';
+import Pourquoi from './composants/PourquoiReplie.jsx';
 // La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
 // secours par l'extension, pictogramme), fourni par l'app. Sans lui, aucune
 // image : une photo Vinted affichée hors de la règle partirait cassée.
@@ -191,8 +192,8 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         {feuille&&alertes}{feuille&&assistance}
 
         {etape==='choix'&&data&&<>
-          <p className="vrm-favoris-note">Choisis jusqu’à 10 favoris. Ceux déjà contactés (ou en conversation) ne peuvent pas être recochés.</p>
-          {ouvrirFavori&&<p className="vrm-favoris-note">« Vérifier sur Vinted » ouvre la cloche puis la conversation de ce favori, pour que VRM apprenne à qui écrire. Aucun message n’est envoyé.</p>}
+          <p className="vrm-favoris-note">Jusqu’à 10 favoris. Déjà contactés ou en conversation : pas recochables.</p>
+          {ouvrirFavori&&<div className="vrm-favoris-note">« Vérifier » ouvre sa conversation sur Vinted, sans rien envoyer. <Pourquoi>« Vérifier sur Vinted » ouvre la cloche puis la conversation de ce favori, pour que VRM apprenne à qui écrire. Aucun message n’est envoyé.</Pourquoi></div>}
           <div className="vrm-favoris-outils">
             {recupererPage&&<button type="button" onClick={importer} disabled={importation||etat.charge||selectionVerrouillee}>{importation?'Récupération…':data.archive?.sync&&!data.archive.sync.complete?'Compléter les pages restantes':'Récupérer toutes les pages'}</button>}
             {importation&&<button type="button" onClick={()=>{annulerImport.current=true;}}>Arrêter la lecture</button>}
@@ -211,7 +212,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
           {blocDestinataires}
           <label>Ton message<textarea ref={champMessage} data-favoris-message disabled={preparation} maxLength={2000} rows={4} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Bonjour {username}, merci pour ton favori !"/></label>
           <div className="vrm-favoris-variables" role="group" aria-label="Variables du message"><button type="button" data-favoris-variable="username" disabled={preparation} onClick={()=>inserer('{username}')}>{'{username}'}</button><button type="button" data-favoris-variable="variante" disabled={preparation} onClick={()=>inserer('{Bonjour|Salut}')}>{'{a|b}'} variante</button></div>
-          <small>{'{username}'} : le pseudo de la personne. {'{Bonjour|Salut}'} : un des choix, tiré au hasard pour chaque message.</small>
+          <small>{'{username}'} = son pseudo · {'{Bonjour|Salut}'} = un choix au hasard par message.</small>
           {!message.trim()&&offreChoix!=='aucune'&&<small data-favoris-message-defaut>Message vide : VRM enverra « {MESSAGE_PAR_DEFAUT} » avec ton offre.</small>}
           <div className="vrm-favoris-offre" data-favoris-offre={offreChoix}>
             <strong>Offre de prix Vinted</strong>
@@ -223,10 +224,10 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
             </>}
             {offreChoix==='fixer'&&<label>Prix de l’offre (€)<input data-favoris-offre-valeur disabled={preparation} type="text" inputMode="decimal" maxLength={9} value={montantOffre} onChange={e=>{setMontantOffre(e.target.value);change();}} placeholder="45"/></label>}
             {offreChoix!=='aucune'&&<label className="vrm-favoris-arrondi"><input type="checkbox" data-favoris-arrondi disabled={preparation} checked={arrondi} onChange={e=>{setArrondi(e.target.checked);change();}}/>Arrondir à l’euro inférieur</label>}
-            {offreChoix!=='aucune'&&!erreurOffre&&<small data-favoris-offre-exemple>{offreChoix==='fixer'?`Offre à ${prixFixeTexte}\u00a0€ sur chaque article. Si l’annonce coûte ce prix ou moins, aucune offre : le message part seul.`:`Exemple : une annonce à 50,00\u00a0€ reçoit une offre à ${exempleOffre?exempleOffre.replace('.',','):'—'}\u00a0€.`} Une vraie offre Vinted est faite juste avant le message. Si le prix de l’annonce ne peut pas être lu, le message part sans offre.</small>}
+            {offreChoix!=='aucune'&&!erreurOffre&&<div><small data-favoris-offre-exemple>{offreChoix==='fixer'?`Offre à ${prixFixeTexte}\u00a0€ par article ; à ce prix ou moins, message seul.`:`Ex. : annonce à 50,00\u00a0€ ⇒ offre à ${exempleOffre?exempleOffre.replace('.',','):'—'}\u00a0€.`}</small> <Pourquoi>Une vraie offre Vinted est faite juste avant le message. Si le prix de l’annonce ne peut pas être lu, le message part sans offre.{offreChoix==='fixer'?' Si l’annonce coûte ce prix ou moins, aucune offre : le message part seul.':''}</Pourquoi></div>}
           </div>
           {apercu.erreur&&<p role="alert">{apercu.erreur}</p>}
-          {exigePerso&&!favorisPerso&&<p role="alert" data-favoris-maj>Ces variables ou cette offre demandent l’extension 5.281. Mets-la à jour puis recharge-la (⟳) avant de lancer.</p>}
+          {exigePerso&&!favorisPerso&&<p role="alert" data-favoris-maj>Variables ou offre : extension 5.281 requise. Mets-la à jour, puis ⟳.</p>}
           {!!apercu.message&&<div className="vrm-favoris-apercu"><strong>Aperçu{destinataires[0]?.nom&&aDesVariablesFavori(message)?` pour ${destinataires[0].nom}`:''}</strong><output aria-label="Aperçu du message" data-favoris-apercu>{personnaliserMessageFavori(apercu.message,destinataires[0]?.nom||'',()=>0)}</output>{/\{[^{}]*\|/.test(message)&&<small>Les variantes changent à chaque message ; l’aperçu montre la première.</small>}</div>}
           <button type="button" disabled={!apercu.message||!!apercu.erreur} onClick={copier}>Copier le message</button>
         </div>}
@@ -235,13 +236,13 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
           <div className="vrm-favoris-rythme" data-favoris-rythme={rythme}>
             <strong>Temps entre deux messages</strong>
             <div role="group" aria-label="Temps entre deux messages" className="vrm-favoris-segment"><button type="button" disabled={selectionVerrouillee} aria-pressed={rythme==='fixe'} onClick={()=>{setRythme('fixe');change();}}>Fixe</button><button type="button" disabled={selectionVerrouillee} aria-pressed={rythme==='aleatoire'} onClick={()=>{setRythme('aleatoire');change();}}>Aléatoire</button><button type="button" data-favoris-rythme-vintex disabled={selectionVerrouillee} aria-pressed={rythme==='vintex'} onClick={()=>{setRythme('vintex');change();}}>Comme Vintex</button></div>
-            {rythme==='vintex'?<p className="vrm-favoris-cadence">Un message toutes les 6 à 10 secondes environ, tiré au hasard : le rythme mesuré chez Vintex.</p>:rythme==='fixe'?<label className="vrm-favoris-cadence">Un message toutes les<input disabled={selectionVerrouillee} aria-label="Minutes entre deux messages" type="text" inputMode="numeric" maxLength={4} value={intervalle} onChange={e=>{setIntervalle(e.target.value);change();}}/>minutes</label>
+            {rythme==='vintex'?<p className="vrm-favoris-cadence">Un message toutes les 6 à 10 s, au hasard (rythme mesuré chez Vintex).</p>:rythme==='fixe'?<label className="vrm-favoris-cadence">Un message toutes les<input disabled={selectionVerrouillee} aria-label="Minutes entre deux messages" type="text" inputMode="numeric" maxLength={4} value={intervalle} onChange={e=>{setIntervalle(e.target.value);change();}}/>minutes</label>
               :<div className="vrm-favoris-cadence"><span>Entre</span><input disabled={selectionVerrouillee} aria-label="Minimum (minutes)" type="text" inputMode="numeric" maxLength={4} value={intervalle} onChange={e=>{setIntervalle(e.target.value);change();}}/><span>et</span><input disabled={selectionVerrouillee} aria-label="Maximum (minutes)" type="text" inputMode="numeric" maxLength={4} value={intervalleMax} onChange={e=>{setIntervalleMax(e.target.value);change();}}/><span>minutes</span></div>}
-            <small>{rythme==='aleatoire'?'Avant chaque message, un temps est tiré au hasard entre ces deux bornes. ':''}Le premier message part tout de suite. Les messages partent de l’onglet vinted.fr ouvert dans le navigateur où est l’extension VRM, comme Vintex : garde-le ouvert pendant l’envoi.</small>
+            <div><small>{rythme==='aleatoire'?'Un temps au hasard entre ces bornes. ':''}Le premier part tout de suite. Garde l’onglet vinted.fr ouvert.</small> <Pourquoi>{rythme==='aleatoire'?'Avant chaque message, un temps est tiré au hasard entre ces deux bornes. ':''}Le premier message part tout de suite. Les messages partent de l’onglet vinted.fr ouvert dans le navigateur où est l’extension VRM, comme Vintex : garde-le ouvert pendant l’envoi.</Pourquoi></div>
             {erreurRythme&&!selectionVerrouillee&&<p role="alert">{erreurRythme}</p>}
           </div>
           {!!destinataires.length&&<div className="vrm-favoris-compte-rendu" data-favoris-compte-rendu aria-label="Compte rendu par favori"><strong>{selectionnees.length?`${destinataires.length} favori${destinataires.length>1?'s':''} à contacter`:'Dernier envoi'}</strong><ul>{destinataires.map(x=>{const j=statut(x),e=selectionnees.includes(x)&&!j?'pret':j?.etat||'pret';const attenteIci=fileActive&&e==='attente'&&p.secondes>0&&x.id===destinataires.find(y=>statut(y)?.etat==='attente')?.id;return <li key={x.id} data-favoris-envoi={e}><span>{nomFavori(x)}</span><b {...(attenteIci?{'data-favoris-attente':p.secondes}:{})}>{attenteIci?`Attente ${p.secondes<60?p.secondes+' s':dureeFavoris(p.secondes)}…`:e==='pret'?'Prêt':e==='refuse'?(RAISONS_FAVORIS[j.raison]||ETAT_ENVOI.refuse):ETAT_ENVOI[e]||e}</b></li>;})}</ul></div>}
-          <p className="vrm-favoris-note">Garde cet écran ouvert et visible, avec l’extension à jour et le bon compte Vinted connecté. Une conversation qui contient déjà des messages est ignorée. Aucune garantie contre un blocage Vinted.</p>
+          <div className="vrm-favoris-note" data-favoris-avertissement><b>Aucune garantie contre un blocage Vinted.</b> Garde cet écran ouvert. <Pourquoi>Garde cet écran ouvert et visible, avec l’extension à jour et le bon compte Vinted connecté. Une conversation qui contient déjà des messages est ignorée. Aucune garantie contre un blocage Vinted.</Pourquoi></div>
           {reglages.erreur&&<p role="alert">{reglages.erreur} {!reglagesLus.current&&'Actualise la liste pour relire les réglages.'}</p>}
           {reglages.prets&&!reglages.enregistres&&!fileActive&&<button type="button" data-favoris-enregistrer disabled={reglages.sauvegarde||preparation||!apercu.message||!!apercu.erreur||!!erreurRythme} onClick={async()=>{if(await enregistrer())setRetour('Message, réduction et rythme enregistrés pour ce compte. Rien n’est envoyé.');}}>{reglages.sauvegarde?'Enregistrement…':'Enregistrer sans envoyer'}</button>}
         </div>}
