@@ -1221,3 +1221,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Argent = Compta + Statistiques (lot AO)** : UNE entrée « Argent », quatre segments (Résumé · Statistiques · Déclarer · Factures) ; en tête du Résumé vendu · reçu · bénéfice · à déclarer, chiffres de leurs propriétaires (`valeurChiffre`, `previsionUrssaf`, `profilFiscal`), toucher = le détail ; « Documents et réglages » rangé dans Déclarer ; anciens liens (`dashboard`, `stats`, `invoices`, `argent_declarer`) redirigés ; règle `src/argent.js`, chiffres avant = après (banc `argent`). `docs/passation/2026-11-10-compta-stats.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot BO, taille du dossier)
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Note privée d'une paire + achat saisi deux fois (lots BD, BH)** : note ≤ 200 car. rangée par IDENTITÉ (`n:<N°>`, sinon `a:<annonce>` ; N° sur deux paires ⇒ cachée), visible Annonces/fiche/Ventes/Préparer/scan/Stock, clé `vrm_notes_paires` (main), jamais envoyée ; doublon d'achat par n° de transaction/commande/facture SEULEMENT (champ « N° de commande ou de facture »), « Garder celle-ci » masque l'autre (annulable, `vrm_achats_hors_masques`, hors des totaux), source À trancher. `docs/passation/2026-11-10-note-achat-double.md`. Geste : aucun.
