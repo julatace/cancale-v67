@@ -54,7 +54,7 @@ export function PlanEcran({ plan, hauteurMax = 240 }) {
           return <rect key={i} x={x} y={y} width={w} height={h} rx={Math.min(10, h / 4, w / 4)} fill={d.fill} opacity={d.opacity} stroke={d.stroke} strokeWidth={d.sw} vectorEffect="non-scaling-stroke"/>;
         })}
       </svg>
-      <figcaption style={{ ...S.muet, fontSize: 12, textAlign: 'center', marginTop: 6 }}>Le schéma de ton écran : chaque bloc à sa place, aucun texte, aucune image. Les blocs foncés sont masqués.</figcaption>
+      <figcaption style={{ ...S.muet, fontSize: 12, textAlign: 'center', marginTop: 6 }}>Schéma de ton écran : ni texte, ni image. Foncé = masqué.</figcaption>
     </figure>
   );
 }
@@ -112,7 +112,7 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
       {etat.phase === 'envoye' ? (
         <div data-signalement-etat="envoye" role="status">
           <p style={{ fontSize: 17, fontWeight: 600, margin: '4px 0 6px', color: 'var(--vrm-ink)' }}>Envoyé. Merci.</p>
-          <p style={{ ...S.muet, margin: '0 0 16px' }}>Ton signalement est arrivé. Il sera lu avec l’écran, la version et les plantages que tu as vus partir.</p>
+          <p style={{ ...S.muet, margin: '0 0 16px' }}>Signalement reçu, avec l’écran, la version et les plantages.</p>
           <Bouton variante="primaire" plein onClick={onClose}>Fermer</Bouton>
         </div>
       ) : (
@@ -122,7 +122,7 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
             placeholder="Ex. : l’écran Colis reste vide depuis ce matin."
             onChange={(e) => { setTexte(e.target.value); if (etat.phase === 'refus') setEtat({ phase: 'ecrire' }); }}
             style={{ width: '100%', boxSizing: 'border-box', minHeight: 112, resize: 'vertical', fontSize: 17, lineHeight: 1.4, padding: '12px 14px', borderRadius: 12, border: '1px solid var(--vrm-line)', background: 'var(--vrm-surface)', color: 'var(--vrm-ink)', fontFamily: 'inherit', outline: 'none' }}/>
-          <p style={{ ...S.muet, margin: '6px 2px 16px' }}>N’écris ni mot de passe ni code. Un montant, une adresse e-mail, un pseudo connu ou un long numéro est masqué avant l’envoi.</p>
+          <p style={{ ...S.muet, margin: '6px 2px 16px' }}>Ni mot de passe ni code. Montants, e-mails, pseudos et longs numéros sont masqués.</p>
 
           <section data-signaler-apercu="" aria-label="Ce qui part avec ton message">
             <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--vrm-muted)', margin: '0 0 8px' }}>Ce qui part, exactement</h3>

@@ -1,0 +1,39 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   La jauge du plafond d'actions (10 nov., lot G, extension 5.337) : src/JaugeActions.jsx.
+   Neutre ; ambre seulement quand VRM a atteint ses 45 (il attend). Aucun rouge (§7).
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-jauge {
+  display: flex; align-items: center; gap: 10px; min-height: 32px;
+  font-size: 13px; line-height: 1.35; color: var(--w-gris, #6E6E73);
+  font-variant-numeric: tabular-nums;
+}
+.vrm-jauge-barre {
+  position: relative; flex: 0 0 64px; height: 6px; border-radius: 3px;
+  background: var(--w-remplir, rgba(118,118,128,.12)); overflow: hidden; display: inline-block;
+}
+.vrm-jauge-plein { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--w-encre, #1D1D1F); opacity: .55; }
+.vrm-jauge[data-ton="geste"] .vrm-jauge-plein { background: var(--vrm-warn, #B25000); opacity: 1; }
+.vrm-jauge-repere { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--w-carte, #fff); }
+.vrm-jauge-texte { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; min-width: 0; }
+.vrm-jauge-mot { color: var(--w-gris, #6E6E73); }
+.vrm-jauge-valeur { color: var(--w-encre, #1D1D1F); font-weight: 600; }
+.vrm-jauge-suite::before { content: "· "; }
+.vrm-jauge[data-ton="geste"] .vrm-jauge-suite { color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-jauge[data-ton="passu"] .vrm-jauge-valeur { color: var(--w-gris, #6E6E73); }
+
+.vrm-jauges {
+  margin: 0 0 16px; padding: 10px 16px 12px; border-radius: var(--w-r, 24px);
+  background: var(--w-carte, #fff); box-shadow: var(--w-ombre, none);
+}
+.vrm-jauges-titre { font-size: 13px; font-weight: 600; color: var(--w-gris, #6E6E73); margin: 0 0 4px; }
+.vrm-jauge-rangee { min-height: 44px; border-top: 0.5px solid var(--w-filet, rgba(60,60,67,.18)); }
+.vrm-jauge-rangee:first-of-type { border-top: none; }
+.vrm-jauge-nom { flex: 1 1 auto; min-width: 0; color: var(--w-encre, #1D1D1F); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-jauge-rangee .vrm-jauge-texte { flex: 0 1 auto; justify-content: flex-end; text-align: right; }
+.vrm-jauges-pied { margin: 6px 0 0; font-size: 12px; color: var(--w-gris, #6E6E73); line-height: 1.4; }
+@media (max-width: 420px) {
+  .vrm-jauge-rangee { flex-wrap: wrap; gap: 4px 10px; padding: 6px 0; }
+  .vrm-jauge-rangee .vrm-jauge-nom { flex-basis: 100%; }
+}
+.vrm-bp-plafond { margin: 0 4px 8px; }
+.vrm-fa-jauge { margin: 4px 2px 0; }

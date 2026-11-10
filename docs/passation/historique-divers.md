@@ -1293,3 +1293,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Calculette d'achat + historique de prix + emballages (lot L)** : Achats/⌘K « Calculette » (achat X €, revente Y €, site ⇒ bénéfice net par `cascadeVente`, frais LUS : Vinted/Leboncoin 0, eBay part lue sur SES commandes « environ », Vestiaire « au plus » ; rien écrit, aucun prix conseillé) ; fiche paire : prix LUS dans le dressing datés par leur lecture (`vrm_prix_lus`) + escalier ; Stock : emballages (reste = compté − « Colis fait » datés après, ambre au seuil, coût dans une vente sur SON clic seulement). `docs/passation/2026-11-10-calculette-emballages.md`. Geste : noter ses emballages au Stock.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (textes courts 4)
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Annonces en grille, par compte (lot AM, demande 15)** : « Toutes » = vignettes comme le dressing Vinted (photo carrée, N°, titre 2 lignes, prix, état · vues · favoris · jours ; « En double », « À confirmer », « Boostée » sur la photo), un en-tête par compte (initiale), 2 colonnes à 390 / 4–6 à 1512, ordre et règle « en ligne » inchangés (`src/annoncesGrille.js`) ; toucher = la fiche entière EN PLACE pleine largeur, en rangées (rien retiré), photo ⇒ visionneuse ; « Même paire ? » sur SA vignette. `docs/passation/2026-11-10-annonces-grille.md`. Geste : regarder Annonces au téléphone.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Marge par plateforme (lot I)** : Argent → Statistiques, une barre par site (Vinted, Leboncoin, eBay, Vestiaire) : ventes et vendu (`venduLignes`, « au moins » si un argent pas lu, nommé), bénéfice par paire médian + total du relevé de Ventes (vente − achat − frais ; eBay = `montantRecuEbay`), couverture « sur N · prix d’achat manquant pour M », jamais « au moins » ; site pas lu ⇒ « — » + raison (`src/margePlateforme.js`). `docs/passation/2026-11-10-marge-plateforme.md`. Geste : aucun.

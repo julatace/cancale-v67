@@ -268,7 +268,7 @@ const attendreCmds = (pg, n) => pg.waitForFunction((k) => window.__cmds.length >
         const { ctx, pg } = await page(b, T, { version: '5.335.0' });
         await ouvrirQD(pg); await ouvrirFeuille(pg, ['900001']);
         const s = await lireBP(pg);
-        dit(s && /5\.336/.test(s.ext) && s.lancer && s.lancer.off, 'F1 extension 5.335 : la feuille dit « mets à jour (5.336) », « Baisser » grisé', s && `${s.ext} ${JSON.stringify(s.lancer)}`);
+        dit(s && /5\.3(3[6-9]|[4-9]\d)/.test(s.ext) && s.lancer && s.lancer.off, 'F1 extension 5.335 : la feuille dit « mets à jour » (la version servie, 5.336 ou plus), « Baisser » grisé', s && `${s.ext} ${JSON.stringify(s.lancer)}`);
         dit((await cmds(pg)).length === 0, 'F2 rien ne part');
         await capture(pg, 'feuille-extension-ancienne-1512');
         await ctx.close();

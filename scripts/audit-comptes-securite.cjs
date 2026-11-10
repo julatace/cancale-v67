@@ -176,7 +176,7 @@ async function audit(fichiers, bavard) {
     dit(j.evenements.length === 1 && j.evenements[0].compte === '111' && !/secret|99/.test(JSON.stringify(j.evenements)), '4.20 le compte retrouvé par l\'empreinte, ni message ni destinataire rendus', JSON.stringify(j.evenements));
     dit(Array.isArray(j.nonJournalise) && j.nonJournalise.some((x) => x.id === 'offres') && j.nonJournalise.some((x) => x.id === 'lbc'), '4.21 ce qui n\'est pas noté en base est dit');
     const j2 = await V.lireJournal({ userId: A, neutre: 'n', lireVendeur: async () => null, lireService: async () => null });
-    dit(j2.pasLu.length === 6 && j2.pasLu.includes('relais') && j2.evenements.length === 0, '4.22 rien lu ⇒ « pas lu » nommé, jamais « rien »', JSON.stringify(j2.pasLu));
+    dit(j2.pasLu.length === 7 && j2.pasLu.includes('relais') && j2.pasLu.includes('extension') && j2.evenements.length === 0, '4.22 rien lu ⇒ « pas lu » nommé, jamais « rien »', JSON.stringify(j2.pasLu));
   }
 
   // ── 5. SQL et branchement de la route ──────────────────────────────────────

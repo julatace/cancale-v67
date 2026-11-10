@@ -183,7 +183,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
           <button type="button" aria-label="Fermer le studio photo" onClick={fermer} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
-          Le même cadre pour toutes tes paires. Enregistre la photo, puis ajoute-la toi-même sur Vinted.
+          Même cadre pour toutes tes paires. Enregistre, puis ajoute-la sur Vinted.
         </div>
 
         {!sel && (
@@ -191,7 +191,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre de la paire" aria-label="Chercher une paire"
               style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 15, background: C.card, color: C.text, marginBottom: 8, fontFamily: 'inherit' }} />
             {!(paires || []).length ? (
-              <div style={{ fontSize: 13, color: C.muted }}>Aucune paire numérotée chez toi pour l’instant : le studio range les photos sous le numéro de rangement.</div>
+              <div style={{ fontSize: 13, color: C.muted }}>Aucune paire numérotée : les photos se rangent sous le N°.</div>
             ) : liste.map((p) => (
               <button key={p.cle} type="button" data-studio-paire={p.cle} onClick={() => { setSel(p); setMode('choix'); setMsg(''); }}
                 style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', textAlign: 'left', border: 'none', borderBottom: `1px solid ${C.border}`, background: 'transparent', padding: '10px 4px', cursor: 'pointer', fontFamily: 'inherit', color: C.text }}>
@@ -228,7 +228,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
 
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: '6px 0' }}>Photos de la paire N°{sel.num}</div>
           {photos === undefined ? <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>
-            : photos === null ? <div data-studio-passu style={{ fontSize: 13, color: C.muted }}>La base n’a pas répondu : je ne sais pas encore quelles photos sont rangées. Rien ne sera écrasé.</div>
+            : photos === null ? <div data-studio-passu style={{ fontSize: 13, color: C.muted }}>La base n’a pas répondu : photos rangées pas sues. Rien ne sera écrasé.</div>
             : !photos.length ? <div style={{ fontSize: 13, color: C.muted }}>Aucune photo rangée pour cette paire.</div>
             : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
@@ -249,7 +249,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
               </div>
             )}
           <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: 10 }}>
-            « Détourer ici » reste dans ce navigateur, sans envoi ni clé : vérifie les bords avant de t’en servir.
+            « Détourer ici » : dans ce navigateur, sans envoi. Vérifie les bords.
             {avecPhotoroom && <span data-studio-photoroom-note="" style={{ display: 'block', marginTop: 4 }}>« Détourer avec Photoroom » envoie la photo à Photoroom avec <b>ta</b> clé (se termine par {(cleP && cleP.fin) || '····'}) : c’est ton compte Photoroom qui paie, à la photo, sur fond blanc.</span>}
             {sansPhotoroom && <span data-studio-photoroom-indispo={cleP.verif} style={{ display: 'block', marginTop: 4 }}>{sansPhotoroom}</span>}
           </div>

@@ -20,6 +20,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
+import Pourquoi from '../composants/PourquoiReplie.jsx';
 import { NIVEAUX, STATUTS, codeLisible, codeTape, CODE_RE, lienInvitation, serieVue, etatVue, noterNiveau, publierPartage } from './accompagnement.js';
 // (10 nov., lot AR) L'espace formateur (032) : page publique, suivi, programme, annonces.
 import { MaPage, FeuillePage, OutilsFormateur, OutilsEleve, RejoindrePage } from './Formateur.jsx';
@@ -56,7 +57,7 @@ export function VueMembre({ vue, pour = 'createur', nomCreateur = '' }) {
     <p className="vrm-cm-vue-tete"><b>{vue.nom}</b><span> · {STATUTS[vue.statut] || vue.statut} · partage : {libNiveau(vue.partage)}</span></p>
     {e === 'pas-membre' ? <p className="vrm-cm-note">Pas encore membre : aucun chiffre n’est visible avant la validation.</p>
       : e === 'rien' ? <p className="vrm-cm-note" data-cm-accomp-rien>{qui === 'Tu' ? 'Tu ne partages rien : seuls ton nom et ta présence dans le groupe sont visibles.' : `${qui} ne partage rien : tu vois seulement qu’il est dans le groupe.`}</p>
-      : e === 'pas-publie' ? <p className="vrm-cm-note" data-cm-accomp-pas-publie>Partage accepté, mais aucun chiffre n’est encore arrivé : ils partent de {pour === 'membre' ? 'ton' : 'son'} VRM dès que ses ventes y sont lues (écran Ventes).</p>
+      : e === 'pas-publie' ? <p className="vrm-cm-note" data-cm-accomp-pas-publie>Aucun chiffre encore : ils partent quand {pour === 'membre' ? 'tes' : 'ses'} ventes sont lues (écran Ventes).</p>
       : <>
         <div className="vrm-cm-onglets vrm-cm-periodes" role="group" aria-label="Période">
           {[['mois', 'Par mois'], ['semaine', 'Par semaine']].map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={pas === k} onClick={() => setPas(k)} data-cm-accomp-pas={k}>{t}</button>)}
@@ -71,7 +72,7 @@ export function VueMembre({ vue, pour = 'createur', nomCreateur = '' }) {
         </table>
         {(!vue.chiffres.ventes || !vue.chiffres.achats) && <p className="vrm-cm-note" data-cm-accomp-moitie>{!vue.chiffres.ventes ? 'Ventes' : 'Achats'} pas encore publiés depuis {pour === 'membre' ? 'ton' : 'son'} VRM : « — », jamais 0.</p>}
         {vue.chiffres.ventes && vue.chiffres.horsVc > 0 && <p className="vrm-cm-note" data-cm-accomp-hors-vc={vue.chiffres.horsVc}>Sans {vue.chiffres.horsVc} vente{vue.chiffres.horsVc > 1 ? 's' : ''} Vestiaire : {vue.chiffres.horsVc > 1 ? 'leur montant versé n’est pas encore connu, elles ne sont comptées' : 'son montant versé n’est pas encore connu, elle n’est comptée'} ni dans les ventes ni dans le vendu.</p>}
-        <p className="vrm-cm-note">Ventes finalisées, toutes plateformes, datées au jour de la vente ; achats Vinted hors annulés. Publié le {dateHeure(vue.chiffres_le) || '—'}.</p>
+        <div className="vrm-cm-note">Publié le {dateHeure(vue.chiffres_le) || '—'}. <Pourquoi>Ventes finalisées, toutes plateformes, datées au jour de la vente ; achats Vinted hors annulés.</Pourquoi></div>
         {e === 'detail' && (vue.detail ? <div data-cm-accomp-detail={vue.detail.ventes.length}>
           <h4>Ventes · {vue.detail.ventes.length > 1 ? `les ${vue.detail.ventes.length} plus récentes` : 'la plus récente'}</h4>
           {vue.detail.ventes.length === 0 ? <p className="vrm-cm-note">Aucune vente publiée.</p> :
@@ -112,7 +113,7 @@ function Creer({ api, prenom, onFait, onFerme, FermeAuRetour }) {
       <label className="vrm-cm-champ"><span>Nom du groupe</span><input value={nom} maxLength={60} onChange={(e) => setNom(e.target.value)} placeholder="Accompagnement novembre" data-cm-accomp-nom required /></label>
       <label className="vrm-cm-champ"><span>Description <small>(facultatif)</small></span><textarea value={desc} maxLength={500} rows={3} onChange={(e) => setDesc(e.target.value)} placeholder="Ce que les membres y trouvent." data-cm-accomp-description /></label>
       <label className="vrm-cm-champ"><span>Ton nom dans le groupe</span><input value={moi} maxLength={40} onChange={(e) => setMoi(e.target.value)} placeholder="Ton prénom" data-cm-accomp-createur required /></label>
-      <p className="vrm-cm-note">Tu recevras un code et un lien. Chaque personne qui l’utilise te DEMANDE l’accès : rien ne se voit avant que tu valides, et seulement ce qu’elle choisit de partager.</p>
+      <div className="vrm-cm-note">Tu recevras un code et un lien. Rien ne se voit avant que tu valides. <Pourquoi>Chaque personne qui l’utilise te DEMANDE l’accès : rien ne se voit avant que tu valides, et seulement ce qu’elle choisit de partager.</Pourquoi></div>
       {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
       <button type="submit" className="vrm-cm-primaire" disabled={occupe || nom.trim().length < 2 || moi.trim().length < 2} data-cm-accomp-valider>{occupe ? 'Un instant…' : 'Créer le groupe'}</button>
     </form>
@@ -155,7 +156,7 @@ function Rejoindre({ api, prenom, codeInitial = '', onFait, onFerme, FermeAuReto
         : <>
           <label className="vrm-cm-champ"><span>Ton nom dans le groupe</span><input value={nom} maxLength={40} onChange={(e) => setNom(e.target.value)} placeholder="Ton prénom" data-cm-accomp-moi required /></label>
           <ChoixPartage valeur={partage} onChange={setPartage} nomCreateur={apercu.createur} />
-          <p className="vrm-cm-note">Tu pourras changer ce choix, ou tout retirer, quand tu veux. Rien n’est visible avant que {apercu.createur} accepte ta demande.</p>
+          <p className="vrm-cm-note">Modifiable à tout moment. Rien n’est visible avant l’accord de {apercu.createur}.</p>
           {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
           <button type="button" className="vrm-cm-primaire" onClick={demander} disabled={occupe || nom.trim().length < 2} data-cm-accomp-demander>{occupe ? 'Un instant…' : 'Demander à rejoindre'}</button>
         </>}
@@ -199,7 +200,7 @@ function GroupeCree({ api, g, onFait, onVoir, outils = null }) {
         </div></li>)}</ul>
     </div>}
     <h4>Membres</h4>
-    {membres.length === 0 ? <p className="vrm-cm-note" data-cm-accomp-aucun-membre>Personne pour l’instant. Envoie le lien ou le code à ceux que tu accompagnes : leur demande apparaîtra ici.</p>
+    {membres.length === 0 ? <p className="vrm-cm-note" data-cm-accomp-aucun-membre>Personne encore. Envoie le lien ou le code : les demandes arriveront ici.</p>
       : <ul className="vrm-cm-liste">{membres.map((m) => <li key={m.id} data-cm-accomp-membre={m.id} data-partage={m.partage}>
         <div><b>{m.nom}</b><small>Partage : {libNiveau(m.partage)}{m.partage !== 'rien' && m.chiffres_le ? ` · à jour le ${date(m.chiffres_le)}` : ''}</small></div>
         <div className="vrm-cm-ligne-boutons">
@@ -291,14 +292,14 @@ export default function Accompagnement({ api, headers, prenom = '', codeLien = '
   // (5 nov., chantier G, revue 1.10) La panne des groupes : `EtatPanne`.
   if (etat === 'pas-su') return <EtatPanne data-cm-accomp={etat} quoi="Tes groupes" raison={msg || PAS_SU} onReessayer={() => lire()}/>;
   if (etat !== 'lu') return <div className="vrm-cm-carton" data-cm-accomp={etat}>
-    {etat === 'non-installe' ? <><b>Les groupes d’accompagnement ne sont pas encore activés sur ta base.</b><p>Ils s’ouvriront dès que la mise à jour de la base sera faite. D’ici là, rien n’est créé et rien n’est partagé.</p></>
+    {etat === 'non-installe' ? <><b>Les groupes d’accompagnement ne sont pas encore activés sur ta base.</b><p>Ils s’ouvriront après la mise à jour de la base. Rien n’est créé ni partagé.</p></>
       : <><b>Ton abonnement n’est pas actif.</b><p>Les groupes sont réservés aux abonnés.</p></>}
   </div>;
 
   const publie = d.publie || {};
   return <div data-cm-accomp="lu" data-cm-accomp-partage-max={d.niveau}>
     <div className="vrm-cm-carton vrm-cm-accomp-intro">
-      <div><p className="vrm-cm-note">Crée un groupe pour ceux que tu accompagnes, ou rejoins celui de ton coach. Chaque entrée est validée par le créateur ; chacun choisit ce qu’il partage — rien, par défaut.</p></div>
+      <div><div className="vrm-cm-note">Crée ton groupe, ou rejoins celui de ton coach. <Pourquoi>Crée un groupe pour ceux que tu accompagnes, ou rejoins celui de ton coach. Chaque entrée est validée par le créateur ; chacun choisit ce qu’il partage — rien, par défaut.</Pourquoi></div></div>
       <div className="vrm-cm-ligne-boutons">
         {/* L'accent est rare (§7) : plein seulement tant qu'il n'a aucun groupe. */}
         <button type="button" className={d.crees.length || d.rejoints.length ? '' : 'vrm-cm-primaire'} onClick={() => setFeuille({ type: 'creer' })} data-cm-accomp-creer>Créer un groupe</button>
