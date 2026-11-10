@@ -59,7 +59,8 @@ const lignesBase = (ageMs, zero = false) => [
   { id: 'vrm_email_owners', data: { adresses: {} } },
 ];
 // Ce que les écrans propriétaires ont rangé sur l'appareil (forme réelle, src/aTrancher.js).
-const SEMIS = { 'numeros-double': 1, 'colis-postes': 2, 'numeros-a-ecrire': 1, 'numeros-a-verifier': 3, 'sms-vestiaire': 1, 'sms-pickup': 1, 'supprimes-vinted': 1, 'remise-en-ligne': 1, 'achats-sans-prix': 4 };
+// (10 nov., lot BB) « Litiges en cours » publiée à 0 : comptée, sans ligne (la source vit dans scripts/bancs/litiges-ecran.cjs).
+const SEMIS = { 'numeros-double': 1, 'colis-postes': 2, 'numeros-a-ecrire': 1, 'numeros-a-verifier': 3, 'sms-vestiaire': 1, 'sms-pickup': 1, 'supprimes-vinted': 1, 'remise-en-ligne': 1, 'achats-sans-prix': 4, 'litiges-en-cours': 0 };
 // (10 nov., cartes) Les CHOSES publiées avec certains nombres (`ex`, forme réelle) : photo
 // (adresse inventée, servie par le banc), N°. « supprimes-vinted » n'est PAS semé : la coque
 // le publie de sa vraie carte (fiche 7002, N°12, `vrm_vus_en_ligne`).

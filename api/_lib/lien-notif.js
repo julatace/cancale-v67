@@ -17,7 +17,8 @@ import { normaliserSuivi } from './etat-colis-email.js';
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
-const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne'];
+// (10 nov., lot BC) `lundi` : la semaine (AAAA-MM-JJ, un lundi) de l'écran « Ma semaine ».
+const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi'];
 
 export function lienNotif(tab, o = {}) {
   const p = { tab, ...o };
@@ -62,6 +63,8 @@ export const DESTINATIONS = {
   agentEbay: () => lienNotif('plat_ebay', { section: 'agent' }),
   facture: () => lienNotif('compta', { section: 'factures' }),
   journee: () => lienNotif('journee'),
+  // (10 nov., lot BC) Le bilan de la semaine ouvre « Ma semaine » sur SA semaine (le lundi).
+  semaine: ({ lundi } = {}) => lienNotif('semaine', { lundi: /^\d{4}-\d{2}-\d{2}$/.test(String(lundi || '')) ? lundi : '' }),
   // (5 nov.) Paramètres → Comptes liés : chaque compte, sa dernière relecture.
   comptes: () => lienNotif('vintedaccounts'),
   // (8 nov.) Paramètres → « Tout va bien ? » : un compte qui n'arrive plus (api/_lib/garde-capture.js).

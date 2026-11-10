@@ -37,7 +37,7 @@ import { modifierNeutre } from './_lib/neutre-cas.js';
 import { sbCle } from './_lib/cle.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { idIndexJeton } from './_lib/jeton-index.js';
-import { domaineReception, nouveauJeton, jetonValide, adresseDeJeton, ecrireIndexReception, marquerRemplacee, ID_ADRESSE, ID_VU, ID_CODE } from './_lib/adresse-reception.js';
+import { domaineReception, nouveauJeton, jetonValide, adresseDeJeton, ecrireIndexReception, marquerRemplacee, ID_ADRESSE, ID_VU, ID_CODE, ID_ESSAI, etatMiseEnService } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -511,7 +511,15 @@ async function adresseUnique(req, res) {
   const u = await utilisateurDuJeton(jetonDe(req));
   if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
   const domaine = domaineReception();
-  if (!domaine) { res.status(200).json({ ok: true, pret: false, manque: 'domaine', message: "L'adresse de réception VRM n'est pas encore ouverte : le domaine de réception n'est pas réglé sur le serveur." }); return; }
+  if (!domaine) {
+    // (10 nov.) Au SEUL propriétaire de l'installation : ce que le serveur sait
+    // de lui-même (domaine posé ? bien formé ? clé de réception posée ?) —
+    // jamais une valeur. Un vendeur n'en reçoit rien (« bientôt disponible »).
+    const proprio = !!installation() && u.id === installation();
+    res.status(200).json({ ok: true, pret: false, manque: 'domaine', message: "L'adresse de réception VRM n'est pas encore ouverte : le domaine de réception n'est pas réglé sur le serveur.",
+      ...(proprio ? { proprio: true, miseEnService: etatMiseEnService() } : {}) });
+    return;
+  }
   const cl = await sondeCloisonnee();
   if (cl === null) { indispo(res); return; }
   if (!cl) { res.status(200).json({ ok: true, pret: false, manque: 'cloisonnement', message: "L'adresse de réception VRM demande une base séparée par vendeur." }); return; }
@@ -569,7 +577,7 @@ async function adresseUnique(req, res) {
     if (ok === false) { res.status(409).json({ ok: false, raison: 'change', message: "Ton adresse vient d'être changée sur un autre appareil : relis-la." }); return; }
     ligne = { ...ligne, actif: corps.actif, actifLe: iso };
   } else if (req.method === 'POST') { res.status(400).json({ ok: false, error: 'geste inconnu' }); return; }
-  const [vu, code] = await Promise.all([lireLigneVendeur(u.id, ID_VU), lireLigneVendeur(u.id, ID_CODE)]);
+  const [vu, code, essai] = await Promise.all([lireLigneVendeur(u.id, ID_VU), lireLigneVendeur(u.id, ID_CODE), lireLigneVendeur(u.id, ID_ESSAI)]);
   const adresse = adresseDeJeton(ligne.jeton, domaine);
   // Un dernier e-mail / un code d'avant le dernier remplacement ne prouve rien pour la nouvelle.
   const depuis = Date.parse(ligne.remplaceLe || ligne.creeLe || '') || 0;
@@ -577,6 +585,8 @@ async function adresseUnique(req, res) {
   res.status(200).json({ ok: true, pret: true, adresse, actif: ligne.actif !== false, creeLe: ligne.creeLe || null, remplaceLe: ligne.remplaceLe || null,
     // Trois états : `null` = rien encore · objet = lu · absent de la réponse = pas su (lecture ratée).
     ...(vu === undefined ? {} : { dernier: apres(vu, 'at') ? { at: vu.at, sujet: vu.sujet || '', de: vu.de || '' } : null }),
+    // (10 nov.) Le dernier code d'e-mail d'essai reçu à SON adresse (la feuille le compare à celui qu'elle attend).
+    ...(essai === undefined ? {} : { essai: apres(essai, 'at') && essai.code ? { code: String(essai.code).slice(0, 8), at: essai.at } : null }),
     ...(code === undefined ? {} : { code: apres(code, 'recuLe') && code.adresse === adresse ? { fournisseur: code.fournisseur, code: code.code || '', lien: code.lien || '', source: code.source || '', signe: !!code.signe, recuLe: code.recuLe } : null }) });
 }
 
