@@ -37,8 +37,8 @@ import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
 // (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
-import { OffresSoloPro, ouvrirQuelCompte, choixDe, listeProDe } from '../abonnement/PlansSoloPro.jsx';
-import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, MAX_VENDEURS_PRO, decouperCleVendeurPro } from '../../api/_lib/plan-regle.js';
+import { OffresSoloPro, ouvrirQuelCompte, choixDe } from '../abonnement/PlansSoloPro.jsx';
+import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO } from '../../api/_lib/plan-regle.js';
 import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
 import { publierAbonnement, suivreAbonnement } from '../abonnement/etatAbonnement.js';
 
@@ -2752,8 +2752,8 @@ function MonAbonnement() {
   // (9 nov., Solo par plateforme) Un choix fait dans la feuille « Quel compte vend ? »
   // (publié par elle) se relit ici tout de suite ; et les comptes des autres plateformes
   // (lus seulement en Solo) disent quelles rangées montrer.
-  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs, comptesPro: x.comptesPro !== undefined ? x.comptesPro : p.comptesPro } : p)); }), []);
-  const [autresSolo] = useComptesAutresSites(!!(e && (e.plan === 'solo' || e.proLimite === true)));
+  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs } : p)); }), []);
+  const [autresSolo] = useComptesAutresSites(!!(e && e.plan === 'solo'));
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
       const fin = e && e.finPeriode ? dateLisible(e.finPeriode) : 'la fin du mois payé';
@@ -2777,7 +2777,7 @@ function MonAbonnement() {
     if (!cgv) { setMsg("Coche les deux cases (conditions de vente et accès immédiat) avant de changer d'offre."); return; }
     const oui = await askConfirm({ title: plan === 'pro' ? 'Passer à Pro ?' : 'Revenir à Solo ?',
       desc: plan === 'pro'
-        ? `Jusqu’à ${MAX_VENDEURS_PRO} comptes vendeurs, toutes plateformes : leurs ventes reviennent tout de suite. Au-delà de ${MAX_VENDEURS_PRO} comptes, tu choisis lesquels. Stripe calcule la différence au prorata sur ta prochaine facture.`
+        ? 'Tous tes comptes vendent, sans limite : leurs ventes reviennent tout de suite dans tes totaux. Stripe calcule la différence au prorata sur ta prochaine facture.'
         : 'Un seul compte vendra : tu le choisiras ensuite. Les ventes de tes autres comptes sortent de tes totaux, rien n’est supprimé. Stripe calcule la différence au prorata.',
       ok: plan === 'pro' ? 'Passer à Pro' : 'Revenir à Solo', cancel: 'Annuler' });
     if (!oui) return;
@@ -2788,7 +2788,7 @@ function MonAbonnement() {
       if (r.ok && j && j.ok) {
         const x = await lireAbonnement();
         if (x) { setE(x); publierAbonnement(x); }
-        toast(plan === 'pro' ? `✓ Tu es en Pro : ${MAX_VENDEURS_PRO} comptes vendeurs` : '✓ Tu es en Solo : choisis le compte qui vend');
+        toast(plan === 'pro' ? '✓ Tu es en Pro : tous tes comptes vendent' : '✓ Tu es en Solo : choisis le compte qui vend');
         if (plan === 'solo') ouvrirQuelCompte();
       } else setMsg((j && j.message) || "Ton offre n'a pas changé. Réessaie dans un instant.");
     } catch (_) { setMsg('Pas de connexion : ton offre n’a pas changé.'); }
@@ -2820,21 +2820,6 @@ function MonAbonnement() {
           })}
         </GroupeIos>
       )}
-      {/* (10 nov.) Pro = 10 comptes vendeurs au total : UNE rangée, qui ouvre « Quels 10 comptes vendent ? ». */}
-      {e && e.plan === 'pro' && e.proLimite === true && (() => {
-        const l = listeProDe(e) || [];
-        const nb = l.reduce((n, k) => { const d = decouperCleVendeurPro(k); n[d.plateforme] = (n[d.plateforme] || 0) + 1; return n; }, {});
-        const resume = ['vinted', ...PLATEFORMES_SOLO].filter((p) => nb[p]).map((p) => `${NOMS_PLATEFORMES_SOLO[p]} ${nb[p]}`).join(' · ');
-        const attendre = e.comptesPro && e.comptesPro.prochainChangement;
-        return (
-          <GroupeIos titre={`Tes ${MAX_VENDEURS_PRO} comptes vendeurs`} pied={attendre ? `Retirer un compte : possible le ${dateLisible(attendre)}.` : `Tes autres comptes gardent leurs achats. Retirer un compte : une fois tous les 30 jours.`}>
-            <RangeeIos titre={<span data-comptes-pro={l.length}>{l.length ? `${l.length} / ${MAX_VENDEURS_PRO} choisis` : 'Pas encore choisis'}</span>}
-              detail={l.length ? resume : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
-              onClick={() => ouvrirQuelCompte('pro')} data-rangee-compte-vendeur="pro"/>
-          </GroupeIos>
-        );
-      })()}
-      {e && e.plan === 'pro' && e.proLimite === false && !e.proprietaire && <div className="vrm-ios-groupe-pied" data-plan-raison="pro-ancien" style={{ margin: '8px 16px 0' }}>Ton Pro a été pris avant la limite de {MAX_VENDEURS_PRO} comptes : tous tes comptes vendent, comme le disaient tes conditions.</div>}
       {e && e.plan === 'solo' && e.offres && e.offres.pro && e.offres.pro.ouvert && <CaseCgv cases={cases} onChange={setCases}/>}
       {e && e.plan == null && e.planRaison === 'cgv-anterieures' && <div className="vrm-ios-groupe-pied" data-plan-raison="cgv-anterieures" style={{ margin: '8px 16px 0' }}>Abonné avant Solo et Pro : tous tes comptes vendent.</div>}
     </div>

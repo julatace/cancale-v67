@@ -1,26 +1,24 @@
 require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
-//  BANC « PRO = 10 COMPTES VENDEURS » (10 nov.) — Julien : « 19,99 pour 10 comptes
-//  vendeurs ». Rendu réel (dist/), données du mode exemple (Vinted 111 et 222) +
-//  SIX comptes Leboncoin (lbcA 1 vente, lbcB 4 ventes, lbcC…lbcF), deux eBay, deux
-//  Vestiaire = 12 comptes — tout inventé ; faux serveur (aucun Stripe réel) :
-//    · Pro, rien choisi : TOUT compte (5 ventes Leboncoin) ; la coque demande « choisis
-//      tes 10 comptes vendeurs » ; la feuille « Quels 10 comptes vendent ? » : 12 cases,
-//      rien coché ni envoyé, la 11e refusée ; son clic part UNE fois `{ plateforme:
-//      'pro', comptes }` (10), puis lbcB sort de la liste et passe en aperçu ;
-//    · Pro, 10 choisis : lbcB en aperçu (« hors de tes 10 comptes vendeurs »), 3 nettes,
-//      la 4e floutée et `inert`, le geste ouvre la feuille (pas « Passe à Pro ») ;
-//      plus aucune ligne de coque (liste pleine) ;
-//    · Pro d'avant le 10 nov. : rien demandé, tout compte ;
-//    · Paramètres → Abonnement : « Tes 10 comptes vendeurs · 10 / 10 », ouvre la feuille ;
-//    · 390 px tactile et 1512 px, clair et sombre : rien ne déborde, cibles 44 px.
-//  `BANC_MUTATION=pro` : la liste Pro neutralisée dans le code servi ⇒ DOIT être rouge.
+//  BANC « PRO ILLIMITÉ » (10 nov., 20 h) — Julien : « on fait un nombre de comptes
+//  de vente illimité » (annule « Pro = 10 comptes vendeurs », lot BO). Rendu réel
+//  (dist/), données du mode exemple (Vinted 111 et 222) + SIX comptes Leboncoin
+//  (lbcA 1 vente, lbcB 4 ventes, lbcC…lbcF), deux eBay, deux Vestiaire = 12 comptes —
+//  tout inventé ; faux serveur (aucun Stripe réel) :
+//    · Pro (réponse propre, ET réponse avec un reste du lot BO : `proLimite`,
+//      `comptesPro` de 10, comptes vendeurs Solo posés) : les 5 ventes Leboncoin
+//      sont dans la liste, aucun aperçu « hors offre », aucune ligne de coque,
+//      aucune feuille « Quels 10 comptes vendent ? » ;
+//    · Paramètres → Abonnement : aucune rangée « Tes 10 comptes vendeurs », l'offre
+//      Pro dit « illimités » ; l'accueil (page des offres) aussi, sans « 10 comptes » ;
+//    · 390 px tactile et 1512 px, clair et sombre : rien ne déborde.
+//  `BANC_MUTATION=limite` : un compte Leboncoin seul vend en Pro (code servi) ⇒ DOIT être rouge.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = Number(process.env.BANC_PORT) || 4573;
-const CAPTURES = process.env.BANC_CAPTURES || path.join(os.tmpdir(), 'banc-pro-10-comptes');
+const PORT = Number(process.env.BANC_PORT) || 4574;
+const CAPTURES = process.env.BANC_CAPTURES || path.join(os.tmpdir(), 'banc-pro-illimite');
 const MUTATION = process.env.BANC_MUTATION || '';
 fs.mkdirSync(CAPTURES, { recursive: true });
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
@@ -32,11 +30,12 @@ const base = { ok: true, proprietaire: false, configure: true, modeTest: true, o
   offres: { solo: { texte: '16,99 € / mois', ouvert: true }, pro: { ouvert: false, texte: null } } };
 const DIX = ['vinted:111', 'vinted:222', 'leboncoin:lbcA', 'leboncoin:lbcC', 'leboncoin:lbcD', 'leboncoin:lbcE', 'ebay:principal', 'ebay:0123456789abcdef', 'vestiaire:vcA', 'vestiaire:vcB'];
 const liste = (l) => l.map((k) => ({ plateforme: k.split(':')[0], id: k.split(':').slice(1).join(':') }));
-const proBase = { ...base, plan: 'pro', compteVendeur: null, comptesVendeurs: {}, proLimite: true, maxVendeursPro: 10, prixAbonnement: { montant: 19.99, devise: 'eur', intervalle: 'month', texte: '19,99 € / mois' } };
+const proBase = { ...base, plan: 'pro', compteVendeur: null, comptesVendeurs: {}, prixAbonnement: { montant: 19.99, devise: 'eur', intervalle: 'month', texte: '19,99 € / mois' } };
 const ETATS = {
-  proSans: { ...proBase, comptesPro: null },
-  proChoisi: { ...proBase, comptesPro: { liste: liste(DIX), le: new Date(Date.now() - 2 * J).toISOString(), prochainChangement: new Date(Date.now() + 28 * J).toISOString() } },
-  proAncien: { ...proBase, proLimite: false, comptesPro: null },
+  proPropre: proBase,
+  // Ce qu'un serveur du lot BO (ou un cache) pouvait encore dire : rien ne doit brider.
+  proReste: { ...proBase, compteVendeur: cv111, comptesVendeurs: { leboncoin: { id: 'lbcA' }, ebay: { id: 'principal' }, vestiaire: { id: 'vcA' }, pro: DIX }, proLimite: true, maxVendeursPro: 10,
+    comptesPro: { liste: liste(DIX), le: new Date(Date.now() - 2 * J).toISOString(), prochainChangement: new Date(Date.now() + 28 * J).toISOString() } },
 };
 
 let ko = 0, ok = 0;
@@ -48,10 +47,10 @@ const srv = http.createServer((q, r) => {
   const p = path.join(DIST, f);
   if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
   let corps = fs.readFileSync(p);
-  // La mutation : `venteAutreHorsPlan` ne dit plus jamais « hors offre ».
-  if (MUTATION === 'pro' && /\.js$/.test(p)) {
+  // La mutation : en Pro, un seul compte Leboncoin (lbcA) vend — une limite réintroduite.
+  if (MUTATION === 'limite' && /\.js$/.test(p)) {
     const t = corps.toString('utf8');
-    const m = t.replace(/return!!(\w+)&&!(\w+)\.pro\.includes\(\1\)/g, () => { mutee++; return 'return!1'; });
+    const m = t.replace(/function (\w+)\((\w),(\w),(\w)\)\{if\(!\2\|\|\2\.plan!==/g, (x, f, a, b, c) => { mutee++; return `function ${f}(${a},${b},${c}){if(${a}&&${a}.plan==="pro"&&${b}==="leboncoin"&&String(${c}).replace(/^lbc-account:/,"")!=="lbcA")return!0;if(!${a}||${a}.plan!==`; });
     if (m !== t) corps = Buffer.from(m, 'utf8');
   }
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(corps);
@@ -109,11 +108,7 @@ async function ouvrir(nav, { abo, tab = 'ventes', largeur = 1512, sombre = false
     if (/mode=abonnement/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(etat.abo) });
     if (/mode=compte-vendeur/.test(u)) {
       const c = JSON.parse(r.request().postData() || '{}'); appels.push({ mode: 'compte-vendeur', m, ...c });
-      if (c.plateforme === 'pro') {
-        const comptesPro = { liste: c.comptes, le: new Date().toISOString(), prochainChangement: new Date(Date.now() + 30 * J).toISOString() };
-        etat.abo = { ...etat.abo, comptesPro };
-        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, comptesPro }) });
-      }
+      if (c.plateforme === 'pro') return r.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ erreur: 'pro-illimite', message: 'En Pro, tous tes comptes vendent : rien à choisir.' }) });
       if (c.plateforme && c.plateforme !== 'vinted') {
         const cvs = { ...(etat.abo.comptesVendeurs || {}), [c.plateforme]: { id: String(c.id), le: new Date().toISOString(), prochainChangement: new Date(Date.now() + 30 * J).toISOString() } };
         etat.abo = { ...etat.abo, comptesVendeurs: cvs };
@@ -128,7 +123,7 @@ async function ouvrir(nav, { abo, tab = 'ventes', largeur = 1512, sombre = false
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(4500);
   // Ventes : attendre que la liste « Tous » soit RENDUE (jamais un délai seul), puis l'aperçu s'il y en a un.
-  if (tab === 'ventes') { await pg.waitForSelector('[data-toutes-vente="leboncoin"][data-toutes-id]', { timeout: 20000 }).catch(() => {}); if (abo.comptesPro) await pg.waitForSelector('[data-ventes-autres-hors-plan]', { timeout: 10000 }).catch(() => {}); await pg.waitForTimeout(300); }
+  if (tab === 'ventes') { await pg.waitForSelector('[data-toutes-vente="leboncoin"][data-toutes-id]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(300); }
   return { ctx, pg, erreurs, appels, etat };
 }
 const lireVentes = (pg) => pg.evaluate(() => {
@@ -142,17 +137,10 @@ const lireVentes = (pg) => pg.evaluate(() => {
     bloc = { compte: b.getAttribute('data-hors-plan-compte'), n: b.getAttribute('data-hors-plan-n'), nettes: lignes.slice(0, 3).filter((l) => !l.hasAttribute('data-apercu-floute')).length,
       floutees: fl.length, inertes: fl.every((l) => l.hasAttribute('inert')), choisir: !!b.querySelector('[data-choisir-pro]'), passerPro: !!b.querySelector('[data-passer-pro]'), phrase: (b.innerText || b.textContent).slice(0, 400) };
   }
-  const band = document.querySelector('[data-bandeau-plateforme="pro"]');
-  return { lbc: ids('leboncoin'), bloc, bandeau: !!band, bandeauTexte: band ? band.innerText : '', deborde: document.documentElement.scrollWidth - window.innerWidth };
-});
-const lireFeuille = (pg) => pg.evaluate(() => {
-  const d = document.querySelector('[data-quels-comptes-pro]'); if (!d) return null;
-  const r = d.getBoundingClientRect();
-  const cases = [...d.querySelectorAll('[data-compte-pro]')];
-  return { n: cases.length, cles: cases.map((c) => c.getAttribute('data-compte-pro')), coches: cases.filter((c) => c.getAttribute('aria-checked') === 'true').map((c) => c.getAttribute('data-compte-pro')),
-    bloquees: cases.filter((c) => c.disabled).map((c) => c.getAttribute('data-compte-pro')), compteur: d.getAttribute('data-pro-coches'), valide: !d.querySelector('[data-valider-pro]').disabled,
-    groupes: [...d.querySelectorAll('[data-pro-plateforme]')].map((g) => g.getAttribute('data-pro-plateforme')), dedans: r.left >= 0 && r.right <= window.innerWidth + 0.5,
-    cibles: [...d.querySelectorAll('button')].every((x) => x.getBoundingClientRect().height >= 44), titre: (d.querySelector('#vrm-plan-titre-pro') || {}).innerText };
+  const band = document.querySelector('[data-bandeau-plateforme]');
+  const texte = document.body.innerText || '';
+  return { lbc: ids('leboncoin'), bloc, horsPlan: !!h, bandeau: !!band, bandeauTexte: band ? band.innerText : '', feuille: !!document.querySelector('[data-quels-comptes-pro]'),
+    dix: /10 comptes vendeurs|10 comptes vendent|hors de tes 10/.test(texte), deborde: document.documentElement.scrollWidth - window.innerWidth };
 });
 const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.png'), fullPage: false }).catch(() => {});
 
@@ -161,82 +149,57 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     if (MUTATION) console.log(`\n⚠️  MUTATION « ${MUTATION} » : ce banc DOIT être rouge`);
-    console.log('\n── Pro, 12 comptes, rien choisi : tout compte, la feuille « Quels 10 comptes vendent ? »');
-    for (const [largeur, sombre] of [[390, false], [1512, true], [390, true], [1512, false]]) {
-      await essaie(`feuille ${largeur}`, async () => {
-        const { ctx, pg, appels, erreurs } = await ouvrir(nav, { abo: ETATS.proSans, largeur, sombre });
-        const nom = `${largeur}${sombre ? ' sombre' : ''}`;
-        let v = await lireVentes(pg);
-        dit(v.lbc.length === 5 && !v.bloc && v.bandeau && /10 comptes vendeurs/.test(v.bandeauTexte) && erreurs.length === 0, `${nom} : rien bridé avant SON choix (5 ventes Leboncoin) ; la coque demande ses 10 comptes`, JSON.stringify({ lbc: v.lbc.length, b: v.bandeau, e: erreurs }));
-        await pg.locator('[data-bandeau-plateforme="pro"] button').first().click(); await pg.waitForTimeout(700);
-        let f = await lireFeuille(pg);
-        dit(f && f.n === 12 && f.coches.length === 0 && !f.valide && appels.length === 0 && f.groupes.join(',') === 'vinted,leboncoin,ebay,vestiaire',
-          '  12 comptes, 4 plateformes, rien coché ni envoyé', JSON.stringify(f && { n: f.n, c: f.coches, g: f.groupes }));
-        dit(f && f.dedans && f.cibles, '  la feuille tient dans l’écran ; chaque bouton fait au moins 44 px', JSON.stringify(f && { d: f.dedans, c: f.cibles }));
-        await capture(pg, `feuille-vide-${largeur}${sombre ? '-sombre' : ''}`);
-        if (largeur === 390 && !sombre) {
-          for (const k of DIX) await pg.locator(`[data-compte-pro="${k}"]`).click();
-          f = await lireFeuille(pg);
-          dit(f.coches.length === 10 && f.compteur === '10' && f.bloquees.sort().join(',') === 'leboncoin:lbcB,leboncoin:lbcF' && f.valide, '  10 cochés : les 2 autres refusés (la 11e case ne se coche pas)', JSON.stringify({ c: f.coches.length, b: f.bloquees }));
-          await capture(pg, 'feuille-dix-390');
-          await pg.locator('[data-valider-pro]').click(); await pg.waitForTimeout(3500);
-          v = await lireVentes(pg);
-          const a = appels.filter((x) => x.mode === 'compte-vendeur');
-          dit(a.length === 1 && a[0].plateforme === 'pro' && Array.isArray(a[0].comptes) && a[0].comptes.length === 10 && v.lbc.join(',') === 'LA1' && v.bloc && v.bloc.compte === 'lbcB' && !v.bandeau,
-            '  son clic : envoyé UNE fois (10 comptes), lbcB sort de la liste et passe en aperçu, plus rien à demander', JSON.stringify({ a: a.length, lbc: v.lbc, c: v.bloc && v.bloc.compte, b: v.bandeau }));
-        }
-        await ctx.close();
-      });
-    }
-    console.log('\n── Pro, 10 choisis : l’aperçu des comptes hors des 10');
-    for (const [largeur, sombre] of [[1512, false], [390, true], [390, false], [1512, true]]) {
-      await essaie(`choisi ${largeur}`, async () => {
-        const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS.proChoisi, largeur, sombre });
-        const nom = `${largeur}${sombre ? ' sombre' : ''}`;
-        const v = await lireVentes(pg), b = v.bloc || {};
-        dit(v.lbc.join(',') === 'LA1' && !v.bandeau && erreurs.length === 0, `${nom} : la liste ne garde que les comptes Leboncoin choisis ; liste pleine ⇒ aucune ligne de coque`, JSON.stringify({ lbc: v.lbc, b: v.bandeau, e: erreurs }));
-        dit(b.compte === 'lbcB' && b.n === '4' && b.nettes === 3 && b.floutees === 1 && b.inertes, '  lbcB : 4 ventes en aperçu, 3 nettes, la 4e floutée et `inert`', JSON.stringify(b));
-        dit(b.choisir && !b.passerPro && /hors de tes 10 comptes vendeurs/.test(b.phrase) && /Rien n'est supprimé/.test(b.phrase), '  « hors de tes 10 comptes vendeurs », rien supprimé ; le geste ouvre la feuille (pas « Passe à Pro »)', (b.phrase || '').replace(/\n/g, ' · '));
+    console.log('\n── Pro, 12 comptes : tous vendent, rien à choisir');
+    for (const [etat, largeur, sombre] of [['proPropre', 390, false], ['proPropre', 1512, true], ['proReste', 390, true], ['proReste', 1512, false]]) {
+      await essaie(`ventes ${etat} ${largeur}`, async () => {
+        const { ctx, pg, appels, erreurs } = await ouvrir(nav, { abo: ETATS[etat], largeur, sombre });
+        const nom = `${etat} ${largeur}${sombre ? ' sombre' : ''}`;
+        const v = await lireVentes(pg);
+        dit(v.lbc.length === 5 && !v.horsPlan && erreurs.length === 0, `${nom} : les 5 ventes Leboncoin (6 comptes) dans la liste, aucun aperçu « hors offre »`, JSON.stringify({ lbc: v.lbc, h: v.horsPlan, e: erreurs }));
+        dit(!v.bandeau && !v.feuille && !v.dix && appels.length === 0, '  aucune ligne de coque, aucune feuille, aucun « 10 comptes », rien envoyé', JSON.stringify({ b: v.bandeauTexte, f: v.feuille, dix: v.dix, a: appels.length }));
         dit(v.deborde <= 0, '  rien ne déborde', String(v.deborde));
-        await pg.locator('[data-ventes-autres-hors-plan]').scrollIntoViewIfNeeded().catch(() => {});
-        await capture(pg, `ventes-choisi-${largeur}${sombre ? '-sombre' : ''}`);
-        if (largeur === 390 && sombre) {
-          await pg.locator('[data-choisir-pro]').first().click({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(700);
-          const f = await lireFeuille(pg);
-          dit(f && f.coches.length === 10 && f.bloquees.includes('leboncoin:lbcA') && f.bloquees.includes('leboncoin:lbcB'), '  la feuille s’ouvre cochée de ses 10 ; moins de 30 jours ⇒ aucun ne se retire, aucune place libre', JSON.stringify(f && { c: f.coches.length, b: f.bloquees.length }));
-          await capture(pg, 'feuille-choisie-390-sombre');
-        }
+        await capture(pg, `ventes-${etat}-${largeur}${sombre ? '-sombre' : ''}`);
         await ctx.close();
       });
     }
-    await essaie('pro ancien', async () => {
-      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.proAncien });
-      const v = await lireVentes(pg);
-      dit(v.lbc.length === 5 && !v.bloc && !v.bandeau, 'Pro souscrit avant le 10 nov. : rien demandé, tout compte', JSON.stringify({ lbc: v.lbc.length, b: v.bandeau }));
-      await ctx.close();
-    });
     console.log('\n── Paramètres → Abonnement');
-    for (const [largeur, sombre] of [[1512, false], [390, true]]) {
+    for (const [etat, largeur, sombre] of [['proReste', 1512, false], ['proPropre', 390, true], ['proReste', 390, false]]) {
       await essaie(`reglages ${largeur}`, async () => {
-        const { ctx, pg } = await ouvrir(nav, { abo: ETATS.proChoisi, tab: 'settings', largeur, sombre });
+        const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS[etat], tab: 'settings', largeur, sombre });
         await pg.waitForSelector('[data-offres]', { timeout: 10000 }).catch(() => {});
         await pg.waitForTimeout(1500);
-        const o = await pg.evaluate(() => ({ n: (document.querySelector('[data-comptes-pro]') || { getAttribute: () => null }).getAttribute('data-comptes-pro'), offre: (document.querySelector('[data-offre="pro"] .vrm-plan-phrase') || {}).innerText || '', deborde: document.documentElement.scrollWidth - window.innerWidth }));
-        dit(o.n === '10' && /10 comptes vendeurs/.test(o.offre) && o.deborde <= 0, `${largeur} : « Tes 10 comptes vendeurs · 10 / 10 », l’offre Pro dit 10 comptes vendeurs`, JSON.stringify(o));
-        await pg.locator('[data-rangee-compte-vendeur="pro"]').scrollIntoViewIfNeeded().catch(() => {});
-        await capture(pg, `reglages-${largeur}${sombre ? '-sombre' : ''}`);
-        await pg.locator('[data-rangee-compte-vendeur="pro"]').click({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(700);
-        const f = await lireFeuille(pg);
-        dit(f && f.n === 12 && f.coches.length === 10, '  la rangée ouvre « Quels 10 comptes vendent ? »', JSON.stringify(f && { n: f.n, c: f.coches.length }));
+        const o = await pg.evaluate(() => ({ rangee: !!document.querySelector('[data-comptes-pro], [data-rangee-compte-vendeur="pro"]'), offre: (document.querySelector('[data-offre="pro"] .vrm-plan-phrase') || {}).innerText || '',
+          dix: /10 comptes vendeurs|10 comptes vendent/.test(document.body.innerText || ''), deborde: document.documentElement.scrollWidth - window.innerWidth }));
+        dit(!o.rangee && /illimités/.test(o.offre) && !o.dix && o.deborde <= 0 && erreurs.length === 0, `${etat} ${largeur}${sombre ? ' sombre' : ''} : aucune rangée « Tes 10 comptes vendeurs », l’offre Pro dit « illimités »`, JSON.stringify(o));
+        await pg.locator('[data-offre="pro"]').first().scrollIntoViewIfNeeded().catch(() => {});
+        await capture(pg, `reglages-${etat}-${largeur}${sombre ? '-sombre' : ''}`);
         await ctx.close();
       });
     }
-    if (MUTATION === 'pro') console.log(`  (mutation appliquée ${mutee} fois dans le code servi)`);
+    console.log('\n── Accueil (page des offres)');
+    for (const [largeur, sombre] of [[390, false], [1512, true]]) {
+      await essaie(`accueil ${largeur}`, async () => {
+        const mobile = largeur < 600;
+        const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, colorScheme: sombre ? 'dark' : 'light', serviceWorkers: 'block' });
+        await ctx.route(/supabase\.co|\/api\//, (rt) => rt.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+        await ctx.route(/^https?:\/\/(?!localhost)/, (rt) => rt.abort());
+        const pg = await ctx.newPage();
+        await pg.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('[data-offre-phrase="pro"]', { timeout: 15000 }).catch(() => {});
+        const a = await pg.evaluate(() => ({ phrase: (document.querySelector('[data-offre-phrase="pro"]') || {}).innerText || '', faq: /avec Pro, tous tes comptes vendent, sans limite/.test(document.body.innerText || ''),
+          dix: /10 comptes vendeurs|10 comptes vendent/.test(document.body.innerText || ''), deborde: document.documentElement.scrollWidth - window.innerWidth }));
+        dit(/illimités/.test(a.phrase) && a.faq && !a.dix && a.deborde <= 0, `accueil ${largeur}${sombre ? ' sombre' : ''} : l’offre Pro et la FAQ disent « tous tes comptes, sans limite »`, JSON.stringify(a));
+        await pg.locator('[data-offre-phrase="pro"]').scrollIntoViewIfNeeded().catch(() => {});
+        await capture(pg, `accueil-${largeur}${sombre ? '-sombre' : ''}`);
+        await ctx.close();
+      });
+    }
+    if (MUTATION === 'limite') console.log(`  (mutation appliquée ${mutee} fois dans le code servi)`);
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 160)); }
   finally {
     await nav.close(); srv.close();
     console.log(`\n  captures : ${CAPTURES}`);
-    console.log(ko ? `\n❌ pro-10-comptes (rendu) : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ pro-10-comptes (rendu) : ${ok} verts, 0 rouge`);
+    console.log(ko ? `\n❌ pro-illimite (rendu) : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ pro-illimite (rendu) : ${ok} verts, 0 rouge`);
     process.exit(ko ? 1 : 0);
   }
 })();

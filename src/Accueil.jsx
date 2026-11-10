@@ -476,7 +476,7 @@ export default function Accueil({ onEntrer }) {
               <p><b>Mes données sont-elles en sécurité ?</b> Ta boutique est cloisonnée : aucun autre vendeur ne la voit. Double vérification possible. <a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p>
               <p><b>Comment j’arrête ?</b> Tu résilies depuis l’app : fin à la période payée, rien à payer pendant l’essai. « Fermer mon compte » efface tes données.</p>
               <p><b>Et sur mon téléphone ?</b> Tout se consulte, tes codes de retrait même sans réseau, une notification par vente. Les actions passent par ton ordinateur.</p>
-              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, chiffres séparés. Avec Solo, un compte vend sur chaque plateforme, les autres achètent ; avec Pro, 10 comptes vendent, toutes plateformes.</p>
+              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, chiffres séparés. Avec Solo, un compte vend sur chaque plateforme, les autres achètent ; avec Pro, tous tes comptes vendent, sans limite.</p>
               <p><b>C’est seulement pour les baskets ?</b> Non : tout article (vêtements, sacs, livres…).</p>
               {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> En cours : ses ventes n’entrent encore dans aucun total.</p>}
               <p><b>Une autre question ?</b> <a href="/aide">L’aide</a> ; <a href="/statut">l’état du service</a>.</p>
