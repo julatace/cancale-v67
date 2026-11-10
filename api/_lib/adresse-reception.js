@@ -209,3 +209,31 @@ export function lireCodeTransfert(mail, adresse, { signeGoogle = false } = {}) {
     .filter((a) => a !== normAdresse(adresse) && !/@(?:[a-z0-9-]+\.)*(?:yahoo-inc\.com|microsoft\.com)$/.test(a) && !/no-?reply/.test(a));
   return { fournisseur, code: codes.length === 1 ? codes[0] : '', source: sources.length === 1 ? sources[0] : '', lien, signe: false };
 }
+
+// ── L'E-MAIL D'ESSAI (10 nov. — « Recevoir tes e-mails Vinted dans VRM ») ────
+// La feuille fabrique un petit code (4 à 8 caractères de l'alphabet sans
+// ambiguïté, en MAJUSCULES) et propose d'envoyer « Essai VRM K7P2 » à SON
+// adresse. Quand cet e-mail arrive, le code est rangé chez LUI
+// (`vrm_adresse_reception_essai`, une ligne à part : le « dernier e-mail reçu »
+// est réécrit par le prochain e-mail Vinted, l'essai non). La feuille montre
+// « Reçu ✓ » quand le code rangé est CELUI qu'elle attend — une identité, pas
+// une heure. Rien d'autre n'est lu de l'e-mail (ni corps, ni pièce jointe).
+export const ID_ESSAI = 'vrm_adresse_reception_essai';
+export const RE_CODE_ESSAI = new RegExp(`(?:^|[^A-Za-z0-9])essai\\s+vrm\\s*[:#·-]?\\s*([${ALPHABET_JETON}]{4,8})(?![A-Za-z0-9])`, 'i');
+export function codeEssaiDe(sujet) {
+  const m = RE_CODE_ESSAI.exec(String(sujet || ''));
+  return m ? m[1].toUpperCase() : '';
+}
+
+// ── CE QUI MANQUE POUR OUVRIR LA RÉCEPTION (au seul propriétaire) ────────────
+// Ce que le serveur SAIT de lui-même — jamais une valeur, seulement « posée » ou
+// non. Le reste (DNS, Cloudflare, Worker) ne se voit pas d'ici : il se prouve
+// par l'e-mail d'essai, une fois le domaine posé.
+//   domaine : 'ok' · 'absent' · 'mal-forme'      cle : true · false
+export function etatMiseEnService(env = process.env) {
+  const brut = String((env && env.DOMAINE_RECEPTION) || '').trim();
+  return {
+    domaine: domaineReception(env) ? 'ok' : brut ? 'mal-forme' : 'absent',
+    cle: !!String((env && env.EMAIL_INBOUND_SECRET) || '').trim(),
+  };
+}

@@ -89,6 +89,11 @@ const COUPLES = {
   'src/photoroomCle.js|app.photoroom.com': ['lien', LIEN + ' — créer sa clé Photoroom (carte « Ta clé Photoroom »)'],
   'src/photoroomCle.js|www.photoroom.com': ['lien', LIEN + ' — les tarifs de Photoroom (même carte)'],
   'src/App.jsx|supabase.com': ['lien', LIEN],
+  'src/profilFiscal.js|www.service-public.gouv.fr': ['lien', LIEN + ' — la fiche officielle du statut (Ma configuration)'],
+  'src/profilFiscal.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la fiche officielle du statut (Ma configuration)'],
+  'src/profilFiscal.js|www.autoentrepreneur.urssaf.fr': ['lien', LIEN + ' — le site de l’URSSAF (Ma configuration)'],
+  'src/relaisChange.js|maps.apple.com': ['lien', LIEN + ' — « Itinéraire » vers le nouveau point relais (adresse lue dans l’e-mail)'],
+  'src/relaisChange.js|www.google.com': ['lien', LIEN + ' — « Itinéraire » (Google Maps) vers le nouveau point relais'],
   'src/App.jsx|vercel.com': ['lien', LIEN],
   'src/App.jsx|www.autoentrepreneur.urssaf.fr': ['lien', LIEN],
   'src/App.jsx|fr.vestiairecollective.com': ['lien', LIEN],
@@ -110,6 +115,9 @@ const COUPLES = {
   'src/adresseReception.js|www.icloud.com': ['lien', LIEN],
   'src/adresseReception.js|outlook.live.com': ['lien', LIEN],
   'src/adresseReception.js|mail.yahoo.com': ['lien', LIEN],
+  // (10 nov.) « Recevoir tes e-mails Vinted dans VRM » : Orange et Free, sur son clic.
+  'src/adresseReception.js|mail.orange.fr': ['lien', LIEN],
+  'src/adresseReception.js|zimbra.free.fr': ['lien', LIEN],
   'src/navigateurExtension.js|play.google.com': ['lien', LIEN],
   'src/Tournee.jsx|maps.apple.com': ['lien', LIEN + ' — « Ouvrir dans Plans » d’un point de retrait'],
   // Une origine SENTINELLE en `.invalid` (RFC 6761 : ne se résout jamais) quand

@@ -103,6 +103,8 @@ const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
 const JournalEmails = aLaDemande(() => import('../JournalEmails.jsx'));
 // (8 nov.) « Ton adresse VRM » : l'adresse de réception unique (src/AdresseReception.jsx), à la demande.
 const CarteAdresseReception = aLaDemande(() => import('../AdresseReception.jsx'));
+// (10 nov., lot AQ) Paramètres → Mes e-mails → « Mon adresse VRM » : la MÊME feuille, ouverte d'une ligne.
+const FeuilleAdresseVrm = aLaDemande(() => import('../AdresseReception.jsx').then((m) => ({ default: m.FeuilleAdresseReception })), true);
 // ⟦← App.jsx #17⟧
 // Un nom déjà pris (GoTrue refuse deux facteurs au même nom pour un compte) :
 // comparé sans casse ni espaces de bord, pour ne pas laisser « iPhone » et
@@ -1686,6 +1688,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const tokWidget = load('vrm_widget_token', '');
   // (6 nov.) Le jeton des SMS Mondial Relay : relu dans le stockage (le nuage le remplit au chargement).
   const [jetonSms, setJetonSms] = useState(() => load('vrm_sms_token', ''));
+  const [feuilleAdresseVrm, setFeuilleAdresseVrm] = useState(false);
   const urlWidget = tokWidget ? `https://vrm.center/api/widget?k=${tokWidget}` : '';
 
   // ── Les morceaux de rendu (des FONCTIONS appelées, pas des composants : un
@@ -1800,6 +1803,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
       // l'onglet « Relier ma boîte » de l'écran E-mails ; Paramètres y MÈNE (plus de second écran ici).
       { id:'adresses', type:'nav', ic:'mail', lib:L.emails, desc:'Relier ta boîte pour que VRM lise tes ventes, colis et codes de retrait.', onClick:()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }, data:{ 'data-reglage-emails':'', 'data-sous-ouvrir':'adresses' } },   // l'attribut d'avant reste : « Paramètres → E-mails » se touche au même endroit
+      // (10 nov., lot AQ — demande 6 de Julien) SON adresse VRM, créée par le serveur à la première
+      // ouverture (`email-rattacher?mode=adresse-unique`) : une ligne, la feuille fait le reste.
+      { id:'adresse-vrm', type:'nav', ic:'send', lib:'Mon adresse VRM', desc:'Une adresse à toi : tes e-mails Vinted y arrivent seuls.', onClick:()=>setFeuilleAdresseVrm(true), data:{ 'data-reglage-adresse-vrm':'' } },
       // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
       // (10 nov., Julien : « mets ça avec les e-mails ») Rangé dans « Mes e-mails », sous le transfert des e-mails.
       { id:'sms-colis', type:'panneau', nu:true, ic:'truck', lib:'SMS de colis', desc:'Transférer à VRM tes SMS Mondial Relay, Vinted Go et Pickup, comme tes e-mails.', val: etatJetonSms(jetonSms) === 'actif' ? 'Activé' : etatJetonSms(jetonSms) === 'coupe' ? 'Coupé' : 'À activer', data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
@@ -2018,6 +2024,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
       {AcctSheet()}
       {signaler && <SignalerProblemeFeuille onClose={()=>setSignaler(false)}/>}
+      {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
       {ouvert ? (
         // ── SOUS-ÉCRAN (téléphone) ──
         <div className="vrm-set-nav">

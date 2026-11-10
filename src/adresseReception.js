@@ -41,51 +41,118 @@ export const codeAMontrer = (d, maintenant = Date.now()) =>
 
 export const NOM_FOURNISSEUR = { gmail: 'Gmail', yahoo: 'Yahoo', outlook: 'Outlook' };
 
-// Le pas-à-pas par messagerie. `ecran` : le dessin schématique (le champ où coller).
-// Les chemins de menu sont ceux des pages d'aide officielles (relevés le 6 nov.,
-// docs/passation/2026-11-06-onglets-c.md).
+// Le pas-à-pas par messagerie (10 nov. : une étape = une phrase de 12 mots au
+// plus — Julien déteste les murs de texte). `ecran` : le dessin schématique
+// (le champ où coller). `code` : la messagerie envoie une confirmation à
+// l'adresse VRM, que la feuille affiche à cette étape (index de l'étape).
+// Chemins de menu : pages d'aide officielles (Gmail, iCloud, Outlook, Yahoo,
+// relevés le 6 nov., docs/passation/2026-11-06-onglets-c.md) ; Orange et Free :
+// libellés relevés le 10 nov. sur l'aide de la communauté Orange et l'aide
+// Zimbra — ils peuvent changer, la note le dit.
 export const FOURNISSEURS = [
   {
-    id: 'gmail', nom: 'Gmail', ou: 'Sur un ordinateur — l’app Gmail du téléphone ne sait pas le faire.',
+    id: 'gmail', nom: 'Gmail', ou: 'Sur un ordinateur : l’app du téléphone ne sait pas.',
     lien: 'https://mail.google.com/mail/u/0/#settings/fwdandpop', lienMot: 'Ouvrir les réglages de Gmail',
     etapes: [
-      'Gmail → ⚙︎ → Voir tous les paramètres → Transfert et POP/IMAP.',
-      'Ajouter une adresse de transfert : colle ton adresse VRM, puis Suivant.',
-      'Gmail envoie un code à ton adresse VRM : il s’affiche en haut de cette feuille dans la minute. Copie-le dans Gmail, puis Valider.',
-      'Choisis « Transférer une copie des e-mails reçus » et « conserver la copie dans la boîte de réception », puis Enregistrer.',
+      '⚙︎ → Voir tous les paramètres → Transfert et POP/IMAP.',
+      'Ajouter une adresse de transfert : colle ton adresse VRM.',
+      'Gmail envoie un code à VRM. Il s’affiche juste ici.',
+      'Colle ce code dans Gmail, puis Valider.',
+      'Choisis « Transférer une copie », puis Enregistrer.',
     ],
+    code: 2, filtre: true,
     ecran: { titre: 'Transfert et POP/IMAP', champ: 'Ajouter une adresse de transfert', bouton: 'Suivant' },
   },
   {
     id: 'icloud', nom: 'iCloud', ou: 'Sur icloud.com, depuis un ordinateur.',
     lien: 'https://www.icloud.com/mail/', lienMot: 'Ouvrir iCloud Mail',
     etapes: [
-      'iCloud Mail → ⚙︎ → Réglages → Règles → Ajouter une règle.',
-      'Si un e-mail est « de » vinted (puis une règle par transporteur si tu veux).',
-      'Alors « Transférer à » : colle ton adresse VRM. Terminé.',
+      'iCloud Mail → ⚙︎ → Réglages → Règles.',
+      'Ajouter une règle : « De » contient « vinted ».',
+      'Alors « Transférer à » : colle ton adresse VRM.',
+      'Terminé. Refais-le pour chaque transporteur si tu veux.',
     ],
+    relais: true,
     ecran: { titre: 'Règles', champ: 'Transférer à', bouton: 'Terminé' },
   },
   {
-    id: 'outlook', nom: 'Outlook', ou: 'Sur outlook.com (Hotmail, Live).',
+    id: 'outlook', nom: 'Outlook', ou: 'Sur outlook.com (Hotmail, Live), depuis un ordinateur.',
     lien: 'https://outlook.live.com/mail/0/options/mail/forwarding', lienMot: 'Ouvrir les réglages d’Outlook',
     etapes: [
       'Outlook → ⚙︎ → Courrier → Transfert.',
       'Active le transfert et colle ton adresse VRM.',
-      'Coche « Conserver une copie des messages transférés », puis Enregistrer.',
+      'Coche « Conserver une copie », puis Enregistrer.',
     ],
+    note: 'Certains comptes Outlook bloquent le transfert. Fais l’essai plus bas.',
     ecran: { titre: 'Transfert', champ: 'Transférer mon courrier à', bouton: 'Enregistrer' },
   },
   {
-    id: 'yahoo', nom: 'Yahoo', ou: 'Le transfert de Yahoo est réservé à Yahoo Mail Plus (payant).',
+    id: 'orange', nom: 'Orange', ou: 'Sur mail.orange.fr, depuis un ordinateur.',
+    lien: 'https://mail.orange.fr/', lienMot: 'Ouvrir Mail Orange',
+    etapes: [
+      'Mail Orange → ⚙︎ → Préférences.',
+      'Ouvre « Transférer mes mails vers une autre boîte ».',
+      'Choisis « Envoyer une copie » : tes e-mails restent chez Orange.',
+      'Colle ton adresse VRM, puis Valider.',
+    ],
+    note: 'Orange change parfois ses menus : cherche « Transfert ».',
+    ecran: { titre: 'Préférences', champ: 'Envoyer une copie à', bouton: 'Valider' },
+  },
+  {
+    id: 'free', nom: 'Free', ou: 'Sur zimbra.free.fr, depuis un ordinateur.',
+    lien: 'https://zimbra.free.fr/', lienMot: 'Ouvrir le webmail de Free',
+    etapes: [
+      'Webmail Free → Préférences → Mail.',
+      'Section « Réception des messages » : champ « Faire suivre ».',
+      'Colle ton adresse VRM. Garde une copie chez Free.',
+      'Enregistrer.',
+    ],
+    note: 'Les libellés peuvent changer : cherche « Faire suivre ».',
+    ecran: { titre: 'Préférences · Mail', champ: 'Faire suivre une copie à', bouton: 'Enregistrer' },
+  },
+  {
+    id: 'yahoo', nom: 'Yahoo', ou: 'Réservé à Yahoo Mail Plus (payant).',
     lien: 'https://mail.yahoo.com/', lienMot: 'Ouvrir Yahoo Mail',
     etapes: [
-      'Yahoo Mail → Paramètres → Plus de paramètres → Boîtes aux lettres → ton adresse.',
-      'Transfert : colle ton adresse VRM, puis Vérifier.',
-      'Yahoo envoie un lien de vérification à ton adresse VRM : il s’affiche en haut de cette feuille. Ouvre-le, puis Enregistrer.',
+      'Yahoo Mail → Paramètres → Plus de paramètres.',
+      'Boîtes aux lettres → ton adresse → Transfert.',
+      'Colle ton adresse VRM, puis Vérifier.',
+      'Yahoo envoie un lien. Il s’affiche juste ici.',
+      'Ouvre le lien, puis Enregistrer.',
     ],
+    code: 3,
     ecran: { titre: 'Boîtes aux lettres', champ: 'Adresse de transfert', bouton: 'Vérifier' },
   },
+  {
+    id: 'autre', nom: 'Autre', ou: 'SFR, La Poste, Proton… : le principe est le même.',
+    lien: '', lienMot: '',
+    etapes: [
+      'Ouvre les réglages de ta messagerie.',
+      'Cherche « Transfert », « Faire suivre » ou « Redirection ».',
+      'Colle ton adresse VRM. Garde une copie chez toi.',
+      'Une confirmation demandée ? Elle arrive dans ta boîte VRM.',
+    ],
+    ecran: { titre: 'Réglages', champ: 'Transférer à', bouton: 'Enregistrer' },
+  },
+];
+
+// Le relais d'Apple (« Masquer mon adresse e-mail », « Se connecter avec
+// Apple ») : une adresse @privaterelay.appleid.com n'est PAS une boîte. Apple
+// fait suivre vers UNE adresse de ton compte Apple (le réglage « Transférer à »
+// n'accepte que celles-là) : le transfert vers VRM se pose dans CETTE boîte.
+export const RELAIS_APPLE = [
+  'C’est le relais d’Apple : il fait suivre vers ta vraie boîte.',
+  'iPhone : Réglages → ton nom → iCloud → Masquer mon adresse.',
+  'Regarde « Transférer à » : c’est ta vraie boîte.',
+  'Crée le transfert vers VRM dans CETTE boîte-là.',
+];
+
+// Le filtre Gmail « seulement Vinted et les colis ».
+export const ETAPES_FILTRE_GMAIL = [
+  'Fais d’abord les étapes 1 à 4.',
+  'Barre de recherche → ⚙︎ des options → champ « De ».',
+  'Colle la règle ci-dessous → Créer un filtre.',
+  'Coche « Transférer à » ton adresse VRM → Créer.',
 ];
 
 // Ce que VRM lit, par famille d'expéditeurs (les mots de l'app, une table).
@@ -95,7 +162,50 @@ export const CE_QUI_EST_LU = [
   { id: 'sites', titre: 'Leboncoin, Vestiaire, eBay', detail: 'Ventes et suppressions d’annonces' },
 ];
 
+// ── L'E-MAIL D'ESSAI (10 nov.) ──────────────────────────────────────────────
+// Un petit code (alphabet sans ambiguïté de api/_lib/adresse-reception.js, en
+// majuscules) mis dans l'objet : « Essai VRM K7P2 ». Le serveur le range chez
+// lui à l'arrivée (`essai: { code, at }`) ; la feuille dit « Reçu ✓ » quand le
+// code rangé est CELUI qu'elle attend — une identité, jamais une heure.
+export const ALPHABET_ESSAI = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export function nouveauCodeEssai(aleas) {
+  const n = ALPHABET_ESSAI.length;
+  let out = '';
+  while (out.length < 4) {
+    let octets;
+    if (aleas) octets = aleas(16);
+    else { octets = new Uint8Array(16); try { crypto.getRandomValues(octets); } catch (_) { for (let i = 0; i < octets.length; i++) octets[i] = Math.floor(Math.random() * 256); } }
+    for (const b of octets) { if (b >= 256 - (256 % n)) continue; out += ALPHABET_ESSAI[b % n]; if (out.length === 4) break; }
+  }
+  return out;
+}
+export const sujetEssai = (code) => `Essai VRM ${code}`;
 // Le lien de l'e-mail d'essai : sa propre messagerie, vers son adresse VRM.
-export const lienEssai = (adresse) => adresse
-  ? `mailto:${adresse}?subject=${encodeURIComponent('Essai VRM')}&body=${encodeURIComponent('Un e-mail d’essai pour vérifier que mon adresse VRM reçoit bien.')}`
+export const lienEssai = (adresse, code = '') => adresse
+  ? `mailto:${adresse}?subject=${encodeURIComponent(code ? sujetEssai(code) : 'Essai VRM')}&body=${encodeURIComponent('Un e-mail d’essai pour vérifier que mon adresse VRM reçoit bien.')}`
   : '';
+// Combien de temps on attend (au-delà : « Pas encore reçu », avec le geste).
+export const ATTENTE_ESSAI_MS = 15 * 60000;
+//   { etat: 'repos' | 'attente' | 'recu' | 'trop-long' | 'passu', at? }
+export function etatEssai(d, attendu, maintenant = Date.now()) {
+  if (!attendu || !attendu.code) return { etat: 'repos' };
+  if (d && d.essai && String(d.essai.code || '').toUpperCase() === attendu.code) return { etat: 'recu', at: d.essai.at };
+  if (d === null || (d && !('essai' in d))) return { etat: 'passu' };
+  if (maintenant - (attendu.depuis || 0) > ATTENTE_ESSAI_MS) return { etat: 'trop-long' };
+  return { etat: 'attente' };
+}
+
+// ── PAS ENCORE OUVERTE : ce que voit le PROPRIÉTAIRE (10 nov.) ──────────────
+// La route ne lui rend que des états (`miseEnService: { domaine, cle }`),
+// jamais une valeur. Le reste se vérifie par l'e-mail d'essai.
+//   [{ id, titre, etat: 'fait' | 'a-faire' | 'a-verifier', detail }]
+export function gestesMiseEnService(m) {
+  const x = m && typeof m === 'object' ? m : {};
+  return [
+    { id: 'domaine', titre: 'Un domaine de réception sur Cloudflare', etat: x.domaine === 'ok' ? 'fait' : 'a-faire', detail: 'Ex. recu-vrm.fr, environ 10 € par an.' },
+    { id: 'worker', titre: 'Cloudflare : tout vers le Worker VRM', etat: 'a-verifier', detail: 'Se vérifie avec l’e-mail d’essai, une fois ouvert.' },
+    { id: 'cle', titre: 'La clé de réception, Vercel et Worker', etat: x.cle === true ? 'fait' : x.cle === false ? 'a-faire' : 'a-verifier', detail: 'EMAIL_INBOUND_SECRET : la même valeur aux deux endroits.' },
+    { id: 'variable', titre: 'Le domaine posé sur Vercel', etat: x.domaine === 'ok' ? 'fait' : 'a-faire', detail: x.domaine === 'mal-forme' ? 'DOMAINE_RECEPTION mal écrit : le domaine seul, sans @.' : 'DOMAINE_RECEPTION = le domaine, puis redéployer.' },
+  ];
+}
+export const DOC_MISE_EN_SERVICE = 'docs/emails-transfert-mise-en-service.md';

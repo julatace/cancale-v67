@@ -76,6 +76,7 @@ import './notif-reglages.css';
 import './design/guide-iphone.css'; // (8 nov.) style de ./GuideIphone.jsx, gardé à sa place (son écran est chargé à la demande)
 import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à sa place (son écran est chargé à la demande)
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
+import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe} from '../api/_lib/achat-arrive-relais.js';
 import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
@@ -115,6 +116,9 @@ import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee 
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher } from "./aTrancher.js";
 import ATrancher from "./ATrancher.jsx";
+// (10 nov., lot BC) « Ma semaine » : l'écran du bilan de la semaine (src/maSemaine.js, aucune règle à lui).
+import MaSemaine from "./MaSemaine.jsx";
+import { maSemaine } from "./maSemaine.js";
 import LitigesEnCours, { EntreeLitiges } from "./LitigesEnCours.jsx";
 import { litigesDesVentes, retoursParModele, preuvesVente, nombreLitigesPublie } from "./litigesEcran.js";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
@@ -2847,6 +2851,9 @@ const DEMANDE_SIGNALEMENTS = { on: false };
 // (6 nov.) Un conseil (src/accompagnement.js, `action: 'reglages:…'`) ouvre un panneau de
 // Paramètres : la demande est servie au montage de l'écran, ou tout de suite s'il est ouvert.
 const DEMANDE_REGLAGE_SOUS = { id: null };
+// (10 nov., lot BC) La semaine demandée par un lien `?tab=semaine&lundi=AAAA-MM-JJ` (la notification
+// du bilan) : lue par l'écran « Ma semaine » à son montage, ou par l'événement `vrm:semaine`.
+const DEMANDE_SEMAINE = { lundi: null };
 
 // ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
 // Julien : « tu peux sélectionner lesquels tu ranges ici, la taille… vraiment
@@ -14226,6 +14233,8 @@ const BAR_GROUPE={
   cat_expedition:'cat_bord',
   // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue est mise en avant.
   organisation:'settings',
+  // (10 nov., lot BC) « Ma semaine » s'ouvre depuis Ma journée (et la notification du bilan).
+  semaine:'journee',
   // (10 nov., lot BB) « Litiges en cours » s'ouvre depuis Ventes et À trancher.
   litiges:'ventes',
 };
@@ -14233,6 +14242,7 @@ const BAR_GROUPE={
 // défilement). Une source : les listes de navigation elles-mêmes (§11).
 function titreEcran(tab) {
   if (tab === 'journee') return 'Ma journée';
+  if (tab === 'semaine') return 'Ma semaine';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
   return { litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
@@ -14252,7 +14262,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -16872,7 +16882,7 @@ function BlocCodesHorsLigne() {
             <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
             <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
             {comptes.length ? <Bouton variante="secondaire" icone="qr" data-relais-ouvrir="hors-ligne" onClick={() => setRelais(true)} style={{ minHeight: 44, marginBottom: 8 }}>Mode relais</Bouton> : null}
-            {relais ? <ModeRelais horsLigne colis={comptes.map((x, i) => ({ cle: 'hl:' + (x.id || i), ident: x.id || '', titre: x.titre || (x.carrier ? carrierName(x.carrier) : 'Colis'), lieu: x.lieu || '', code: x.code || '', suivi: x.suivi || '', qr: '', sansQrHorsLigne: !!x.qr }))}
+            {relais ? <ModeRelais horsLigne colis={comptes.map((x, i) => ({ cle: 'hl:' + (x.id || i), ident: x.id || '', titre: x.titre || (x.carrier ? carrierName(x.carrier) : 'Colis'), lieu: x.lieu || '', code: x.code || '', desaccord: x.desaccord || null, suivi: x.suivi || '', qr: '', sansQrHorsLigne: !!x.qr }))}
               note={`Codes gardés sur cet appareil, mis à jour ${quand}.`} onFermer={() => setRelais(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
             {c.codes.map((x, i) => (
               <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
@@ -16882,6 +16892,8 @@ function BlocCodesHorsLigne() {
                 </div>
                 {x.code
                   ? <div className="vrm-sensible" data-stream-type="code" style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 11px'}}>{x.code}</div>
+                  : Array.isArray(x.desaccord) && x.desaccord.length > 1
+                  ? <div className="vrm-sensible" data-code-hl-desaccord="" style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.warn,textAlign:'right'}}>2 codes : {x.desaccord.map((d) => d.code).join(' / ')}</div>
                   : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
               </div>
             ))}
@@ -26068,7 +26080,11 @@ const fusionLignesMemeSuivi = (m, s) => {
   const lp = cleanLieu(p.lieu), lq = cleanLieu(q.lieu);
   const lpA = { lieuNom: lp.nom, lieuAdresse: lp.adresse }, lqA = { lieuNom: lq.nom, lieuAdresse: lq.adresse };
   const lieuF = lp.nom ? ((lq.nom && memePoint(lpA, lqA) && completudeLieu(lqA) > completudeLieu(lpA)) ? q.lieu : p.lieu) : (q.lieu || p.lieu);
-  return { ...m, lieu: lieuF || null,
+  // (10 nov., retraits irréprochables) Ce que CHAQUE ligne disait du code (source, émetteur, date) : la
+  // carte dit d'où vient le code, « sûr » quand deux voix concordent, et un désaccord n'est jamais tranché
+  // en silence (src/sourcesRetrait.js).
+  const codesLus = [...(Array.isArray(m.codesLus) && m.codesLus.length ? m.codesLus : [codeLuDeLigne(m)]), ...(Array.isArray(s.codesLus) && s.codesLus.length ? s.codesLus : [codeLuDeLigne(s)])];
+  return { ...m, lieu: lieuF || null, codesLus,
     code: src.code || null, code2: src.code2 || (memeCode ? autre.code2 : null) || null,
     qrB64: qrSrc.qrB64 || null, qrType: qrSrc.qrType || null, qrUrl: qrSrc.qrUrl || null, consigne: !!(m.consigne || s.consigne),
     limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null };
@@ -26549,7 +26565,7 @@ const jourIso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${Str
 const LETTRES_JOUR = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const CLES_VERSE_JOURNEE = ['vinted_urssaf_mois'];
 const majusculeJ = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = null, mortes, onMorte, maintenant: maint = null }) {
+function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemaine = null, Photo = null, mortes, onMorte, maintenant: maint = null }) {
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
   const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
@@ -26626,6 +26642,8 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, Photo = 
         <div className="vrm-jv2-quand">
           <span className="vrm-fu-surtitre vrm-jv2-nom" data-jv2-nom="">{nom}</span>
           <button type="button" className="vrm-jv2-sem" aria-pressed={semaine} data-jv2-semaine={S.lundi} onClick={() => setChoix(semaine ? null : 'sem')}>{semaine ? 'Revenir aux jours' : S.titre}</button>
+          {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine en cours). */}
+          {onSemaine ? <button type="button" className="vrm-jv2-sem vrm-jv2-ma-semaine" data-ouvre-ma-semaine="" onClick={onSemaine}>Ma semaine ›</button> : null}
         </div>
         <div className="vrm-jv2-corps">
           <div className="vrm-jv2-chiffre">
@@ -27125,6 +27143,47 @@ function useSourcesCarte(liveStats) {
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
     enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
   }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep]);
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
+// ═══════════════════════════════════════════════════════════════════════════
+// Les sources sont celles de la carte « Semaine du … » (`JournalSemaineCarte`) et de la frise :
+// les lignes de `ventesFaites` de la coque (comptes sélectionnés), `vrm_benefice_jours`, ses
+// gestes « Colis fait », le reçu publié par Ventes (`recuPublieEntre`, + ventes à dater) et
+// `vrm_paires_dorment`. Les bornes, la comparaison et « qui dorment » : src/maSemaine.js
+// (les bornes et la règle du bilan en notification, api/_lib/bilan-semaine.js).
+const REGLES_SEMAINE = { bilanLignes, beneficeDesJours, chiffreBrut };
+function EcranMaSemaine({ liveStats, onNav, entete }) {
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
+  const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
+  const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
+  const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
+  const ligneUrssaf = useLigneUrssaf();
+  const [lundi, setLundi] = React.useState(() => { const l = DEMANDE_SEMAINE.lundi; DEMANDE_SEMAINE.lundi = null; return l; });
+  React.useEffect(() => {
+    const f = () => { const l = DEMANDE_SEMAINE.lundi; DEMANDE_SEMAINE.lundi = null; setLundi(l); };
+    window.addEventListener('vrm:semaine', f);
+    return () => window.removeEventListener('vrm:semaine', f);
+  }, []);
+  // L'heure qui passe : la semaine en cours finit MAINTENANT (relue chaque minute, et au retour).
+  const [maintenant, setMaintenant] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 60000);
+    const vu = () => { if (document.visibilityState === 'visible') setMaintenant(Date.now()); };
+    document.addEventListener('visibilitychange', vu);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vu); };
+  }, []);
+  const vendu = venduEtat(liveStats) !== 'lu' ? (venduEtat(liveStats) === 'pasSu' ? null : undefined)
+    : { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] };
+  const M = React.useMemo(() => maSemaine({
+    maintenant, lundi, vendu, joursBenef: pub, dorment,
+    colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {},
+    recuEntre: (de, a) => ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuAvecADater(recuPublieEntre(ligneUrssaf, { de, a }, maintenant), ligneUrssaf),
+    R: REGLES_SEMAINE,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [maintenant, lundi, liveStats, pub, dorment, pret, ship, lbcF, vcF, ligneUrssaf]);
+  return <MaSemaine M={M} entete={entete} onSemaine={setLundi} onNav={onNav}/>;
 }
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
@@ -30652,11 +30711,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const codes = [];
       const comptesE = new Set(pickupUnion.emailList);
       for (const t of pickupUnion.emailList.concat(pickupUnion.aVerifier.filter(x => x.kind === 'email').map(x => x.t))) {
-        const code = codeRetrait(t.code); const lieu = (cleanLieu(t.lieu).nom || '').trim();
+        // (10 nov., retraits irréprochables) LE MÊME VERDICT QUE LA CARTE (src/sourcesRetrait.js) : le code de la
+        // conversation de SA commande compte ; deux codes différents ⇒ les deux, jamais un choisi en silence.
+        const oV = pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(colisKey(t)) : null; const rV = oV ? colisRelais[String(oV.transaction_id)] : null;
+        const vC = verdictCode({ lignes: codesDesLignes(t, codeRetrait), message: rV ? codeRetrait(rV.code) : '' });
+        const desaccord = vC.desaccord || null;
+        const code = desaccord ? '' : (codeRetrait(vC.code) || codeRetrait(t.code)); const lieu = (cleanLieu(t.lieu).nom || '').trim();
         const qr = !!(t && (t.qr || t.qrUrl || t.qrB64));
         // (9 nov., lot AD) + `id` (l'identité publiée) et `compte` (dans « à retirer » = `vrm_colis_retirer`, ou
         // seulement « à vérifier ») : le mode relais hors ligne ne montre QUE les colis comptés.
-        if (code || qr) codes.push({ code: code || '', lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
+        if (code || qr || desaccord) codes.push({ code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
       }
       for (const o of pickupUnion.extra) {
         const r = colisRelais[String((o && o.transaction_id) || '')] || null;
@@ -37994,19 +38058,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return null;
     };
     const achatsAutres = indexAchatsAutresSites({ lbcVentes: (lbcVentes && lbcVentes.achats) || [], vcAchats: ((vcEtat || vcBrut) && (vcEtat || vcBrut).achats) || null });
+    // (10 nov., retraits irréprochables) D'OÙ VIENT CHAQUE INFORMATION (src/sourcesRetrait.js) : les marques
+    // (Vinted · e-mail · message · SMS · transporteur), l'heure de la dernière vérification, et LE code par
+    // identité — celui des e-mails/SMS de CE n° et celui de la conversation de SA commande (reliée par n° de
+    // suivi, code ou conversation : `cmdParColis`). Concordants ⇒ « sûr » ; différents ⇒ la carte montre les
+    // deux, en ambre, et n'en choisit aucun. Seul dans la conversation ⇒ montré (avant : « code pas lu »).
+    const sourcesCarte = ({ t = null, o = null } = {}) => {
+      try {
+        const k = t ? suiviDeLigne(t) : (o ? normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || '') : '');
+        const tr = k && tpmC && typeof tpmC.get === 'function' ? (tpmC.get(normaliserSuivi(k)) || null) : null;
+        const uid = o && o._acc ? String(o._acc.vinted_user_id) : '';
+        const cap = uid ? _harvestSeen[`${uid}_orders_purchased`] : null;
+        const e = o ? entreeSuiviAchat(o) : null;
+        const vs = e ? { capturedAt: (e.nv && e.nv.cap) || (e.nvSansDate && e.nvSansDate.cap) || null } : null;
+        return sourcesDuColis({ t, o, r: o ? relaisDe(o) : null, tr, vs, capMs: Number.isFinite(cap) ? cap : null, codeValide: codeRetrait });
+      } catch (_) { return null; }
+    };
+    const codeDesSources = (sc, repli) => (sc && sc.code ? (sc.code.desaccord ? '' : (codeRetrait(sc.code.code) || repli || '')) : (repli || ''));
+    const champsSources = (sc) => (sc ? { sources: sc.marques, verifieMs: sc.verifieMs, codeSur: !!(sc.code && sc.code.sur), codeSources: (sc.code && sc.code.sources) || [], codesDesaccord: (sc.code && sc.code.desaccord) || null, codeRemplace: (sc.code && sc.code.remplace) || null } : {});
     for (const t of (pickupUnion.emailList || [])) {
-      const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
+      const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
+      const scE = sourcesCarte({ t, o: a || (pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))) || null }); const code = codeDesSources(scE, scE && scE.code && scE.code.desaccord ? '' : codeDeLigne(t));
       const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), src: { t } });
     }
     for (const o of (pickupUnion.extra || [])) {
-      const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
+      const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const scV = sourcesCarte({ o }); const code = codeDesSources(scV, r ? codeRetrait(r.code) : ''); const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -38014,7 +38097,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const suX = x.kind === 'email' ? (suiviDeLigne(x.t) || '') : (suivisAchat(x.o, indexSuivisAchats)[0] || ''); const eSX = x.kind === 'email' ? null : entreeSuiviAchat(x.o);
       const trInconnu = !!suX && !((x.kind === 'email' ? (x.t && x.t.carrier) : (relaisDe(x.o) || {}).transporteur) || (eSX && eSX.transporteur) || transporteurDeForme(suX) || colisInternational(suX));
       const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : completer(lieuDe((relaisDe(x.o) || {}).lieu), (relaisDe(x.o) || {}).transporteur, '');
-      const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
+      const scX = sourcesCarte(x.kind === 'email' ? { t: x.t, o } : { o: x.o });
+      const code = codeDesSources(scX, scX && scX.code && scX.code.desaccord ? '' : (x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code)));
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, lieuType: x.kind === 'email' ? typeCasier(x.t && x.t.lieu) : '', transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
@@ -38022,7 +38106,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
         arrivee: arriveeLueRetrait(x.kind === 'email' ? { t: x.t } : { o: x.o }),
-        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
+        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC) || colisInternational(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
@@ -38285,7 +38369,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
       const qr = t ? qrVivant(t) : (o ? (qrImage(relaisDe(o)) || '') : '');
       out.push({ cle: x.cle, ident: t ? identRetraitEmail(t) : identRetraitVinted(o), titre: x.nom || 'Colis à retirer', photo: x.photo || null,
-        lieu: x.lieuNom || '', adresse: x.lieuAdresse || '', code: x.code || '', code2: x.code2 || '', qr, suivi: t ? (suiviDeLigne(t) || '') : '', src: x.src });
+        lieu: x.lieuNom || '', adresse: x.lieuAdresse || '', code: x.code || '', code2: x.code2 || '', desaccord: x.codesDesaccord || null, qr, suivi: t ? (suiviDeLigne(t) || '') : '', src: x.src });
     }
     return out;
   };
@@ -40656,7 +40740,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     (« vendu · aujourd'hui ») EST le chiffre du jour de la frise : il n'est plus écrit deux fois. */}
                 {!premierJour && (
                   <FriseJournee liveStats={liveStats} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte}
-                    onVentes={() => onNav && onNav('cat_ventes')}
+                    onVentes={() => onNav && onNav('cat_ventes')} onSemaine={onNav ? () => onNav('semaine') : null}
                     photosEntre={(de, a) => ordreRecent((sales.items || [])
                       .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
                       .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
@@ -41826,7 +41910,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* (10 nov.) « Votre colis a changé de plan » : POINT RELAIS CHANGÉ, en ambre, avec le
             nouveau point LU dans l'e-mail et son itinéraire (src/AlerteRelaisChange.jsx). */}
-        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C}/>}
+        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>}
         {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
             des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
@@ -44440,7 +44524,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <img src={qi} alt="QR de retrait" onError={() => noterImgMorte(qrImage(t))}/></button> : null}
               {/* (5 nov.) LE CODE ET LE QR EN GRAND, au doigt, pour le comptoir ou le casier — un geste pour
                   tout colis qui a un code ou un QR (e-mail, capture de l’app Mondial Relay, conversation Vinted). */}
-              {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(t) : openQrView(ligneRetraitVinted(o)))}
+              {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : openQrView(ligneRetraitVinted(o)))}
                 aria-label="Afficher le code et le QR en grand">En grand</button> : null}
               {/* (5 nov.) Un QR qu'on n'a pas se DIT, avec où le trouver (src/retraitQr.js) — jamais un QR fabriqué.
                   Mondial Relay : la vérité, courte — « QR dans l'app Mondial Relay » (ni e-mail ni site ne le
@@ -44450,7 +44534,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!qi && t && qrParCapture(carrierKey(t.carrier)) && suiviDeLigne(t) ? <button type="button" className="vrm-rp-plein" data-colis-qr-ajouter="" onClick={() => choisirCaptureQr(t)}
                 aria-label="Ajouter le QR (capture de l’app Mondial Relay)">Ajouter le QR (capture)</button> : null}
               {t && qrAjout && qrAjout.suivi && qrAjout.suivi === suiviDeLigne(t) ? <span className={'vrm-rp-sous' + (['pose', 'lecture', 'retire'].includes(qrAjout.etat) ? '' : ' is-ambre')} role="status" data-colis-qr-ajout={qrAjout.etat}>{qrAjout.msg}</span> : null}
-              {!x.code && !qi ? (!t && relV && relV.lieu && !relV.qr
+              {!x.code && !qi && !(Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1) ? (!t && relV && relV.lieu && !relV.qr
                 // La conversation a été LUE (le lieu en vient) et ne porte aucun code :
                 // il arrive par l'e-mail du transporteur (même phrase que l'ancien détail).
                 ? <span className="vrm-rp-sans-code" data-colis-sans-code="" data-colis-sans-code-conv="">Code par l’e-mail du transporteur</span>
@@ -50787,6 +50871,8 @@ function AppCoeur() {
       if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
       if(t==='settings'&&section==='signalements') DEMANDE_SIGNALEMENTS.on=true;
+      // (10 nov., lot BC) La notification du bilan porte le lundi de SA semaine.
+      if(t==='semaine'){ const l=p.get('lundi'); DEMANDE_SEMAINE.lundi=l&&/^\d{4}-\d{2}-\d{2}$/.test(l)?l:null; try{ window.dispatchEvent(new Event('vrm:semaine')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
@@ -54152,6 +54238,7 @@ function AppCoeur() {
         }}/></GardeEcran>}
         {tab==='sales'    &&<GardeEcran nom="sales"><Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/></GardeEcran>}
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
+        {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} onTrancher={trancherAT} Photo={PhotoVinted} entete={<ScreenHead icon="help" title="À trancher"/>}/></GardeEcran>}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}

@@ -14,6 +14,9 @@ require('./_porte-banc.cjs');
 //  quatre messageries ont leur pas-à-pas et leur schéma ; « pas encore ouverte »
 //  et « pas su » ont leur phrase ; ni débordement, ni cible < 44 px, ni erreur
 //  JavaScript, ni violet, ni rouge. Captures dans CAPTURE_DIR (à REGARDER).
+//  (10 nov., lot AQ) Et depuis Paramètres → Mes e-mails : la ligne « Mon adresse
+//  VRM », juste avant « SMS de colis » (gardée), ouvre la MÊME feuille, qui lit
+//  la route et se referme ; captures `reglages-*` (390/1512, clair/sombre).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
 let chromium;
@@ -38,12 +41,12 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
 });
 
-async function ouvrir(nav, { viewport, tactile, sombre, etat = 'pret', refusActif = false }) {
+async function ouvrir(nav, { viewport, tactile, sombre, etat = 'pret', refusActif = false, depuis = 'emails' }) {
   const ctx = await nav.newContext({ viewport, hasTouch: tactile, isMobile: tactile, colorScheme: sombre ? 'dark' : 'light', timezoneId: 'Europe/Paris', locale: 'fr-FR', permissions: ['clipboard-read', 'clipboard-write'] });
   const pg = await ctx.newPage(); pg.setDefaultTimeout(10000);
   await pg.clock.setFixedTime(MAINTENANT);
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
-  await pg.addInitScript(([s, sombre]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {} }, [SESSION, sombre]);
+  await pg.addInitScript(([s, sombre]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_reglages_vue', 'reglages'); } catch (_) {} }, [SESSION, sombre]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => (r.request().method() !== 'GET' ? r.fulfill({ status: 201, contentType: 'application/json', body: '' }) : r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' })));
@@ -65,6 +68,12 @@ async function ouvrir(nav, { viewport, tactile, sombre, etat = 'pret', refusActi
     if (u.pathname === '/api/email-rattacher') return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, page: 0, parPage: 20, suite: false, emails: [], compteurs: { sur: 0, parRubrique: {} }, adresses: [] }) });
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   });
+  if (depuis === 'reglages') {
+    // (10 nov., lot AQ) Paramètres → Mes e-mails → « Mon adresse VRM ».
+    await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
+    await pg.locator('[data-reglage-adresse-vrm]').first().waitFor({ timeout: 30000 });
+    return { ctx, pg, erreurs, appels };
+  }
   await pg.goto(`http://localhost:${PORT}/?tab=emails`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-boite-vue="relier"]').click({ timeout: 15000 });
   await pg.locator('[data-ouvrir-adresse-reception]').first().click();
@@ -164,6 +173,35 @@ const regles = async (pg, nom, tactile = true) => {
       dit(erreurs.length === 0, 'refus : aucune erreur JavaScript', erreurs.join(' '));
       await ctx.close();
     });
+    for (const [nom, vp, tactile, sombre] of [['390 clair', { width: 390, height: 844 }, true, false], ['390 sombre', { width: 390, height: 844 }, true, true], ['1512 clair', { width: 1512, height: 945 }, false, false], ['1512 sombre', { width: 1512, height: 945 }, false, true]]) {
+      await essaie('Paramètres ' + nom, async () => {
+        const { ctx, pg, erreurs, appels } = await ouvrir(nav, { viewport: vp, tactile, sombre, depuis: 'reglages' });
+        const tag = 'reglages-' + nom.replace(/\s+/g, '-');
+        const g = pg.locator('[data-groupe-reglages="emails-reglages"]');
+        await g.scrollIntoViewIfNeeded();
+        const ordre = await g.evaluate((n) => [...n.querySelectorAll('.vrm-set-ligne')].map((x) => x.hasAttribute('data-reglage-adresse-vrm') ? 'adresse' : x.getAttribute('data-sous-ouvrir') === 'sms-colis' ? 'sms' : 'autre'));
+        const iA = ordre.indexOf('adresse');
+        dit(iA >= 0 && ordre[iA + 1] === 'sms', `${nom} : Mes e-mails — « Mon adresse VRM » juste avant « SMS de colis » (gardée)`, ordre.join(' · '));
+        const h = await pg.locator('[data-reglage-adresse-vrm]').first().evaluate((n) => Math.round(n.getBoundingClientRect().height));
+        dit(h >= 44, `${nom} : la ligne fait au moins 44 px`, String(h));
+        dit(appels.length === 0, `${nom} : rien n'est demandé au serveur avant son toucher`, String(appels.length));
+        await pg.screenshot({ timeout: 30000, animations: 'disabled', path: path.join(CAPT, `${tag}-ligne.png`) });
+        await pg.locator('[data-reglage-adresse-vrm]').first().click();
+        const f = pg.locator('[data-feuille-adresse-reception]');
+        await f.waitFor({ timeout: 15000 });
+        await pg.waitForFunction(() => document.querySelector('[data-feuille-adresse-reception]')?.dataset.etat === 'active', null, { timeout: 15000 });
+        await pg.waitForTimeout(450);
+        const adr = await f.locator('[data-adresse-reception]').first().getAttribute('data-adresse-reception');
+        dit(adr === A1 && appels.length >= 1 && appels[0].m === 'GET' && /^Bearer jeton-de-banc/.test(appels[0].auth), `${nom} : la feuille lit SON adresse (GET, sa session)`, adr);
+        await pg.screenshot({ timeout: 30000, animations: 'disabled', path: path.join(CAPT, `${tag}-feuille.png`) });
+        await f.locator('[data-termine]').scrollIntoViewIfNeeded();
+        await f.locator('[data-termine]').click();
+        await pg.waitForTimeout(500);
+        dit(await pg.locator('[data-feuille-adresse-reception]').count() === 0 && await pg.locator('[data-reglage-adresse-vrm]').count() === 1, `${nom} : « Terminé » ramène à Paramètres`);
+        dit(erreurs.length === 0, `${nom} (Paramètres) : aucune erreur JavaScript`, erreurs.join(' '));
+        await ctx.close();
+      });
+    }
     for (const [etat, sombre] of [['pas-prete', false], ['panne', true]]) {
       await essaie(etat, async () => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { viewport: { width: 390, height: 844 }, tactile: true, sombre, etat });

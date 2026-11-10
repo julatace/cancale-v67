@@ -66,7 +66,7 @@ export function minuitParis(ymd) {
 }
 let _fmtDateParis = null;
 export const dateParis = (t) => (_fmtDateParis || (_fmtDateParis = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }))).format(new Date(t));
-const plusJours = (ymd, k) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + k)).toISOString().slice(0, 10); };
+export const plusJours = (ymd, k) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + k)).toISOString().slice(0, 10); };
 
 // La semaine TERMINÉE la plus récente (lundi 00:00 → lundi suivant 00:00, à
 // Paris), et le jour d'aujourd'hui (1 = lundi … 7 = dimanche).
@@ -203,11 +203,21 @@ export function calculerBilan(e) {
 
   // ── QUI DORMENT : publié par l'écran Annonces (`vrm_paires_dorment`) ──
   // On ne le recalcule pas (§11). Plus de 8 jours, ce n'est plus une mesure.
-  const d = e.dorment;
-  if (d && Number.isFinite(d.n) && Number(d.datesKnown) > 0 && maintenant - (Number(d.at) || 0) < 8 * JOUR) {
-    out.dorment = { etat: 'su', n: d.n, auMoins: Number(d.datesKnown) < Number(d.total) };
-  }
+  const dm = dormentDe(e.dorment, maintenant);
+  if (dm.etat === 'su') out.dorment = dm;
   return out;
+}
+
+// (10 nov., lot BC) LES PAIRES QUI DORMENT, lues de la publication de l'écran Annonces
+// (`vrm_paires_dorment` : { n, total, datesKnown, at }). UNE règle pour le bilan en
+// notification ET l'écran « Ma semaine » (src/maSemaine.js) : sans date de mise en ligne
+// connue, ou publiée il y a 8 jours ou plus ⇒ « pas su » ; moins de dates que d'annonces
+// ⇒ « au moins ».
+export function dormentDe(d, maintenant = Date.now()) {
+  if (d && Number.isFinite(d.n) && Number(d.datesKnown) > 0 && maintenant - (Number(d.at) || 0) < 8 * JOUR) {
+    return { etat: 'su', n: d.n, auMoins: Number(d.datesKnown) < Number(d.total) };
+  }
+  return { etat: 'pas-su', n: null, auMoins: false };
 }
 
 // Le bilan part s'il a quelque chose à dire : au moins un des deux chiffres

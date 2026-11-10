@@ -208,7 +208,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(lecturesBilan.length > 0 && lecturesBilan.every((u) => /owner=eq\./.test(u)), 'toutes les lectures du bilan portent owner=eq.<vendeur> (aucune lecture globale)', `${lecturesBilan.length} lectures`);
     const memA = (memos.A || {}).bilan_semaine_dedup, memB = (memos.B || {}).bilan_semaine_dedup;
     dit(memA && memA.semaine === '2026-09-28' && memB && memB.semaine === '2026-09-28', 'le mémo de la semaine est écrit POUR CHAQUE vendeur (lundi 28 septembre)');
-    dit(a[0] && a[0].url === '/?tab=journee' && /28 sept/.test(a[0].title || '') && /4 oct/.test(a[0].title || ''), 'titre : la semaine nommée (28 sept. → 4 oct.), et le clic ouvre Ma journée', a[0] && a[0].title);
+    dit(a[0] && a[0].url === '/?tab=semaine&lundi=2026-09-28' && /28 sept/.test(a[0].title || '') && /4 oct/.test(a[0].title || ''), 'titre : la semaine nommée (28 sept. → 4 oct.), et le clic ouvre « Ma semaine » sur CETTE semaine (lot BC)', a[0] && a[0].title);
   });
 
   // ── LE BILAN DU DIMANCHE SOIR (26 octobre) ──────────────────────────────────
