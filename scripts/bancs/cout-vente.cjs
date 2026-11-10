@@ -169,6 +169,7 @@ async function ventes(b, tel, sombre) {
       const id = await ouvrirVente(r.pg, 7102); const v = await lireVente(r.pg, id);
       dit(v.emb === 'non-saisi' && v.porte && /non saisi/.test(v.porte.t) && AMBRES.includes(v.porte.c) && !ROUGES.includes(v.porte.c) && v.porte.h >= 44 && v.benef === '40.00',
         `${T} 7102 : « non saisi » nommé, en ambre, cible ≥ 44 px ; bénéfice 40 € (rien deviné)`, JSON.stringify(v));
+      await r.pg.screenshot({ path: path.join(CAP, `cout-vente-${tel ? 390 : 1512}-${sombre ? 'sombre' : 'clair'}-emballage.png`) });
       await toucher(r.pg, tel, r.pg.locator(`[id="${id}"] [data-cv-emballage-saisir]`));
       await r.pg.locator(`[id="${id}"] [data-cv-emballage-champ]`).fill('1,20');
       await toucher(r.pg, tel, r.pg.locator(`[id="${id}"] [data-cv-emballage-ok]`));
@@ -218,9 +219,11 @@ async function stock(b, tel, sombre) {
     await aller('?tab=dashboard');
     await r.pg.waitForSelector('[data-stats-valeur-stock]', { timeout: 20000 }).catch(() => {});
     await r.pg.waitForTimeout(600);
-    const s = await r.pg.evaluate(() => { const e = document.querySelector('[data-stats-valeur-stock]'); return e ? { v: e.getAttribute('data-stats-valeur-stock'), sans: e.getAttribute('data-stats-valeur-sans'), t: e.innerText.replace(/\s+/g, ' ') } : null; });
+    const s = await r.pg.evaluate(() => { const e = document.querySelector('[data-stats-valeur-stock]'); return e ? { v: e.getAttribute('data-stats-valeur-stock'), sans: e.getAttribute('data-stats-valeur-sans'), t: e.textContent.replace(/\s+/g, ' ') } : null; });
     dit(s && s.v === '14550' && s.sans === '2' && /au moins 145,50\s€/.test(s.t) && /2 sans prix/.test(s.t), `${T} Statistiques : la MÊME valeur, lue (au moins 145,50 € · 2 sans prix)`, JSON.stringify(s));
-    await r.pg.locator('[data-stats-valeur-stock]').first().evaluate((e) => (e.firstElementChild || e).scrollIntoView({ block: 'center' })).catch(() => {});
+    await r.pg.evaluate(() => { const e = document.querySelector('[data-stats-valeur-stock] .vrm-finance-metric'); const d = e && e.closest('details'); if (d) d.open = true; if (e) e.scrollIntoView({ block: 'center' }); });
+    await r.pg.waitForTimeout(300);
+    await r.pg.locator('[data-stats-valeur-stock] .vrm-finance-metric').first().screenshot({ path: path.join(CAP, `cout-vente-${tel ? 390 : 1512}-${sombre ? 'sombre' : 'clair'}-stats-carte.png`) }).catch(() => {});
     await r.pg.waitForTimeout(300);
     await r.pg.screenshot({ path: path.join(CAP, `cout-vente-${tel ? 390 : 1512}-${sombre ? 'sombre' : 'clair'}-stats.png`) });
     dit(r.errs.length === 0, `${T} Stock/Statistiques : aucune erreur`, r.errs.join(' | '));

@@ -10,8 +10,8 @@
 }
 .vrm-cv-seg { display: block; height: 100%; min-width: 3px; }
 .vrm-cv-seg.is-achat, .vrm-cv-point.is-achat { background: var(--vrm-ink, #1D1D1F); opacity: .82; }
-.vrm-cv-seg.is-frais, .vrm-cv-point.is-frais { background: var(--vrm-muted, #6E6E73); opacity: .7; }
-.vrm-cv-seg.is-emballage, .vrm-cv-point.is-emballage { background: var(--vrm-muted, #6E6E73); opacity: .38; }
+.vrm-cv-seg.is-frais, .vrm-cv-point.is-frais { background: var(--vrm-muted, #6E6E73); opacity: .75; }
+.vrm-cv-seg.is-emballage, .vrm-cv-point.is-emballage { background: var(--vrm-muted, #6E6E73); opacity: .5; }
 .vrm-cv-seg.is-benefice, .vrm-cv-point.is-benefice { background: var(--vrm-accent, #0066CC); }
 .vrm-cv-barre[data-cv-perte="1"] { box-shadow: inset 0 0 0 1.5px var(--vrm-warn, #B25000); }
 .vrm-cv-trait { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--vrm-warn, #B25000); }
