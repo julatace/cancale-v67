@@ -341,7 +341,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
             );
           })}
         </div>
-        {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Aucune photo captée pour cette annonce : ouvre-la sur Vinted, l'extension lit ses photos au passage. Leboncoin refuse une annonce sans photo.</div>}
+        {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Pas de photo (Leboncoin la refuse) : ouvre l'annonce sur Vinted.</div>}
 
         <Etiquette droite={`${desc.length}/${LBC_DESC_MAX}`} err={errDe('description')}>Description</Etiquette>
         <ChipsModeles valeur={desc} surChange={setDesc} champ={refDescLbc} vars={{ titre, prix: Number(String(prix).replace(',', '.')), numero: q.numero, taille: q.taille, marque: q.marque }}/>
@@ -366,7 +366,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
 
         {aConfirmer && (
           <div data-fiche-confirmer="" style={{ marginTop: 14, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '11px 12px', background: C.card }}>
-            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> VRM n'a pas vu la fin du précédent. Si tu l'as publiée toi-même sur Leboncoin, un nouveau dépôt la publierait une seconde fois.</div>
+            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> Déjà publiée à la main ? Elle partirait deux fois.</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: 'none', background: C.accent, color:C.onAccent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
               <button className="vrm-b vrm-b-discret" type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
@@ -533,8 +533,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
         // tant que « Mes transactions » n'a pas été relue, Colis disait « Aucun
         // colis » sur la même absence de lecture (« rien lu » ne vaut pas « rien »).
         <Card><div data-lbc-colis-vide={lbcVentes.maj ? 'lu' : 'jamais'} style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{lbcVentes.maj
-          ? <>Aucun colis Leboncoin à envoyer dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}). Dès qu'une vente Leboncoin est captée, elle apparaît ici — avec son bordereau, son QR et son numéro.</>
-          : <>Tes colis Leboncoin arrivent avec tes ventes, quand l’extension passe sur leboncoin.fr (« Mes transactions ») — pas encore lu pour l’instant.</>}</div></Card>
+          ? <>Aucun colis Leboncoin à envoyer dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}).</>
+          : <>Pas encore lu : ouvre « Mes transactions » sur leboncoin.fr.</>}</div></Card>
       ) : (<>
         {/* ── À GÉNÉRER : vendu, mais le bordereau n'existe pas encore ──────────
             Générer un bordereau Leboncoin est une action SUR leboncoin.fr (API de
@@ -578,7 +578,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
         <div onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1250, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 12, maxWidth: 420, width: '100%', padding: 16 }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : imprime-le. Sinon, le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
             <TamponPose r={bordResult}/>
             {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
@@ -907,11 +907,11 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
   // sans extension dans CE navigateur, on le dit au lieu de réclamer une mise à jour.
   // (29 oct., revue) Sur un ORDINATEUR sans extension, le téléphone n'a rien à y
   // voir : la cause est l'extension absente de ce navigateur (celle de l'indicateur).
-  const bloqueExt = !vmrExtPresent() && sansSouris ? "La republication se fait sur l'ordinateur où l'extension VRM est installée : la suppression d'une annonce ne passe pas par le relais du téléphone."
+  const bloqueExt = !vmrExtPresent() && sansSouris ? "Republie depuis l'ordinateur où est l'extension."
     : glob ? glob.texte
-    : !vmrExtPresent() ? "L'extension VRM n'est pas détectée dans ce navigateur — installe-la, ou ouvre VRM dans le navigateur où elle est installée."
+    : !vmrExtPresent() ? "Extension absente ici : installe-la, ou ouvre VRM là où elle est."
     : __vmrEtat === undefined ? "Je vérifie l'extension…"
-    : !saitSuppr ? `Ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore supprimer une annonce Leboncoin : mets-la à jour (${EXT_CAPACITES.lbcsupprime}) depuis Paramètres → État des connexions.` : '';
+    : !saitSuppr ? `Ton extension (${vmrExtVersion() || 'version ?'}) est trop ancienne : mets-la à jour (${EXT_CAPACITES.lbcsupprime}).` : '';
   const triees = (liste || []).filter((it) => !q || `${it.numero} ${it.lbc.titre} ${it.title}`.toLowerCase().includes(q.toLowerCase())).slice()
     .sort((a, b) => tri === 'favoris' ? ((b.lbc.favoris == null ? -1 : b.lbc.favoris) - (a.lbc.favoris == null ? -1 : a.lbc.favoris))
       : tri === 'vues' ? ((a.lbc.vues == null ? 1e9 : a.lbc.vues) - (b.lbc.vues == null ? 1e9 : b.lbc.vues))
@@ -988,7 +988,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
         {bloqueExt && <div data-repub-lbc-bloque="" style={{ marginTop: 12, fontSize: 13, color: C.warn, lineHeight: 1.5 }}>{bloqueExt}</div>}
         {etape === 'choix' && <>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>
-            Republier = supprimer l'annonce puis la remettre comme une neuve : elle repart avec une nouvelle date de mise en ligne. Au plus {REPUB_LBC_MAX} par passage (la limite de suppressions de l'extension par heure).
+            Supprimée puis remise comme neuve. {REPUB_LBC_MAX} au plus par passage.
           </div>
           {nbExclues > 0 && (
             <details className="vrm-repli" data-repub-lbc-exclues={nbExclues} style={{ marginBottom: 8 }}>
@@ -1020,7 +1020,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
           </>}
         </>}
         {etape === 'modif' && <>
-          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>Le titre, la description (avec sa référence VRM) et les photos sont ceux de « Publier sur Leboncoin ». Le prix reste celui de l'annonce, sauf si tu le baisses ici.</div>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>Même annonce, même prix, sauf si tu le baisses ici.</div>
           <Segmente value={pMode} onChange={setPMode} options={[{ v: 'aucun', l: 'Même prix' }, { v: 'euros', l: 'Baisser de … €' }, { v: 'pourcent', l: 'Baisser de … %' }]} label="Prix de la nouvelle annonce" plein/>
           {pMode !== 'aucun' && <input data-repub-lbc-baisse="" inputMode="decimal" aria-label={pMode === 'euros' ? 'Baisse en euros' : 'Baisse en pourcentage'} placeholder={pMode === 'euros' ? 'ex. 5' : 'ex. 10'} value={pVal} onChange={(e) => setPVal(e.target.value)} style={{ marginTop: 8, width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 17 }}/>}
           <div style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
@@ -1037,7 +1037,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
           {sansFiche && <div style={{ marginTop: 8, fontSize: 12, color: C.warn, lineHeight: 1.5 }}>Ton extension ne sait pas encore recevoir un prix changé ({EXT_CAPACITES.lbcfiche}) : garde le même prix, ou mets-la à jour.</div>}
         </>}
         {etape === 'envoi' && <>
-          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>Une à la fois : chaque annonce est supprimée, puis republiée ; VRM attend la confirmation de Leboncoin avant la suivante. Au moindre doute, tout s'arrête et la ligne dit où elle en est.</div>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>Une à la fois. Au moindre doute, tout s'arrête et c'est dit.</div>
           <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
             {fiches.map(({ it, f }, i) => { const s0 = st[it.lbc.id] || { etat: 'attente', texte: 'en attente' }; return (
               <div key={it.lbc.id} data-repub-lbc-etat={s0.etat} data-repub-lbc-id={it.lbc.id} style={{ padding: '9px 12px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
@@ -1758,7 +1758,7 @@ function LeboncoinScreen() {
         <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ marginLeft: 'auto', minWidth: 44, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
-      {erreurReception && <LignePanne>La relecture de tes données Leboncoin a échoué. Les informations précédentes restent affichées. Réessaie avec Actualiser.</LignePanne>}
+      {erreurReception && <LignePanne>Relecture Leboncoin ratée (ancien affichage gardé) : touche Actualiser.</LignePanne>}
       {conseilsLbc.length > 0 && (
         <Card data-lbc-conseils={conseilsLbc.length} style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>À faire sur Leboncoin</div>
@@ -1782,7 +1782,7 @@ function LeboncoinScreen() {
             {data.doublons.length} article{data.doublons.length > 1 ? 's' : ''} vendu{data.doublons.length > 1 ? 's' : ''} sur Leboncoin — encore sur Vinted
           </div>
           <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 6 }}>
-            Retire-{data.doublons.length > 1 ? 'les' : 'la'} de Vinted maintenant, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait pas à ta place : sur Vinted, c'est sans retour.
+            Retire-{data.doublons.length > 1 ? 'les' : 'la'} de Vinted maintenant, sinon double vente.
           </div>
           {data.doublons.map((d) => {
             const ph = (Array.isArray(d.ad.images) && d.ad.images[0]) || '';
@@ -1818,7 +1818,7 @@ function LeboncoinScreen() {
           <Titre data-lbc-ventes-a-relier={data.aRelierVentes.length}>
             {data.aRelierVentes.length} vente{data.aRelierVentes.length > 1 ? 's' : ''} Leboncoin : quel article ?
           </Titre>
-          <Sous>Un article qui y ressemble est encore en vente sur Vinted. Si c'est le même, touche-le : je te dirai de le retirer de Vinted.</Sous>
+          <Sous>Un article semblable est en vente sur Vinted. Le même ? Touche-le.</Sous>
           {data.aRelierVentes.map(({ vente, ad, suggestions }) => (
             <LbcRelier key={String(vente.txId || ad.id)} ad={ad} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={suggestions} vendue
               cleRangement={'tx:' + (vente.txId || ad.id)}
@@ -1832,7 +1832,7 @@ function LeboncoinScreen() {
         <div data-repub-lbc-porte={data.repub === null ? 'pas-su' : String(data.repub.length)} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 16px', marginBottom: 14 }}>
           <div style={{ flex: '1 1 220px', minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Republier sur Leboncoin</div>
-            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Je n'ai pas pu vérifier lesquelles peuvent l'être (une lecture a échoué) — clique « ↻ Actualiser »." : <>{`${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être`}{' '}<Pourquoi titre="Republier sur Leboncoin">Supprimer puis remettre une annonce comme neuve, une à la fois.</Pourquoi></>}</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Pas vérifié (lecture ratée) : touche « ↻ Actualiser »." : <>{`${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être`}{' '}<Pourquoi titre="Republier sur Leboncoin">Supprimer puis remettre une annonce comme neuve, une à la fois.</Pourquoi></>}</div>
           </div>
           {data.repub !== null && <button type="button" data-repub-lbc-ouvrir="" onClick={() => setRepubOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Choisir les annonces…</button>}
         </div>
@@ -1840,11 +1840,11 @@ function LeboncoinScreen() {
       {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
       {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} aConfirmerDe={(ad) => !!(data.lbcAConfirmer && data.lbcAConfirmer.ids.includes(String(ad && ad.id)))} confirmer={nAConf > 0 ? (() => {
         const pe = pauseEtat(), A = data.lbcAConfirmer;
-        return <>{A.jamais ? 'Ta liste « Mes annonces » n’a jamais été lue en entier' : `Ta liste « Mes annonces » a été ${quandLectureLbc(A.lu)}`} : je ne sais pas si ces annonces sont encore en ligne. Elles sont « à confirmer » — pas comptées, rien n’est effacé.{' '}
+        return <>{A.jamais ? 'Ta liste « Mes annonces » n’a jamais été lue en entier' : `Ta liste « Mes annonces » a été ${quandLectureLbc(A.lu)}`} : « à confirmer », pas comptées, rien effacé.{' '}
           {pe === 'absente'
-            ? <>Sur l’ordinateur où l’extension est installée, ouvre « Mes annonces » sur leboncoin.fr, sur chacun de tes comptes.</>
+            ? <>Ouvre « Mes annonces » sur leboncoin.fr, chaque compte.</>
             : pe === 'retard'
-              ? <>Mets l’extension à jour, puis ouvre « Mes annonces » sur leboncoin.fr, sur chacun de tes comptes.</>
+              ? <>Mets l’extension à jour, puis ouvre « Mes annonces », chaque compte.</>
               : <><a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" data-lbc-ouvrir-mes-annonces="">Ouvrir « Mes annonces » sur leboncoin.fr ↗</a> — sur chacun de tes comptes : l’extension relit la liste en entier.</>}</>;
       })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
@@ -1864,7 +1864,7 @@ function LeboncoinScreen() {
         ].filter(Boolean);
         return (
           <div data-lbc-lecture-ratee={rates.length} style={{ marginBottom: 12 }}>
-            <LignePanne>Je n'ai pas pu lire {liste} — rien n'est perdu, c'est la lecture qui a échoué ; rouvre l'écran dans un moment. En attendant, {effets.join(', et ')}.</LignePanne>
+            <LignePanne>Je n'ai pas pu lire {liste} (rien perdu) : rouvre dans un moment. En attendant, {effets.join(', et ')}.</LignePanne>
           </div>
         );
       })()}
@@ -1922,10 +1922,10 @@ function LeboncoinScreen() {
               <div data-lbc-pas-revues={data.pasRevues} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
                 {data.pasRevues} annonce{data.pasRevues > 1 ? 's' : ''} Leboncoin pas revue{data.pasRevues > 1 ? 's' : ''} depuis plus de {data.pasRevuesJours > LBC_REVUE_JOURS ? data.pasRevuesJours : LBC_REVUE_JOURS} jours : je ne sais pas si elle{data.pasRevues > 1 ? 's y sont' : ' y est'} encore, je ne te demande donc pas à quel article {data.pasRevues > 1 ? 'les' : 'la'} relier.{' '}
                 {pe === 'absente'
-                  ? <>Sur l'ordinateur où l'extension est installée, ouvre ta page profil Leboncoin (celle qui liste toutes tes annonces) : elle relira ta liste en entier.</>
+                  ? <>Ouvre ta page profil Leboncoin : la liste sera relue en entier.</>
                   : pe === 'retard'
-                    ? <>Mets l'extension à jour, puis ouvre ta page profil Leboncoin (celle qui liste toutes tes annonces) : elle relira ta liste en entier.</>
-                    : <>Ouvre ta page profil Leboncoin {NAV.dans} (celle qui liste toutes tes annonces) : l'extension relira ta liste en entier et sortira celles qui n'y sont plus.</>}
+                    ? <>Mets l'extension à jour, puis ouvre ta page profil Leboncoin.</>
+                    : <>Ouvre ta page profil Leboncoin {NAV.dans} : la liste sera relue en entier.</>}
               </div>
             );
           })()}
@@ -2001,7 +2001,7 @@ function LeboncoinScreen() {
           const carteDoute = vendues.some((r) => r.sortie) ? 'vendues' : doute.some((r) => r.sortie) ? 'doute' : pause.some((r) => r.sortie) ? 'pause' : null;
           const phraseDoute = nDoute > 0 ? (
             <div data-lbc-retirer-doute={nDoute} style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
-              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, l'annonce Leboncoin reliée n'est plus en ligne, mais je ne peux pas encore te dire qu'<b>aucune autre</b> annonce de la paire ne l'est (ton autre compte, une annonce republiée). Vérifie, ou ouvre ta page profil Leboncoin sur chacun de tes comptes : une fois ta liste relue en entier, la ligne partira d'elle-même.
+              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, <b>une autre annonce</b> est peut-être encore en ligne. Ouvre ta page profil Leboncoin, chaque compte.
             </div>
           ) : null;
           return (<>
@@ -2010,7 +2010,7 @@ function LeboncoinScreen() {
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de l'article ne change pas.
                   {pausables && se === 'ok' ? <> <span data-lbc-supprimer-geste="ok">Tu peux {vendues.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {vendues.length > 1 ? 'les' : 'la'} mettre en pause (elle se remet en ligne depuis « Mes annonces »), une à la fois.</span></>
-                    : pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression, elle se remet en ligne depuis « Mes annonces ».</span></> : null}
+                    : pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici (réversible).</span></> : null}
                   {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Paramètres → État des connexions).</span></> : null}
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
@@ -2020,11 +2020,11 @@ function LeboncoinScreen() {
             {venduesEbay.length > 0 && (<div data-lbc-retirer-bloc="ebay" data-cible="doublon:leboncoin">
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{venduesEbay.length} vendue{venduesEbay.length > 1 ? 's' : ''} sur eBay — à retirer de Leboncoin</Titre>
-                <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente eBay est <b>certaine</b> (le SKU <b>VRM-N°</b> de la commande désigne cette paire). Retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.
+                <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Vente eBay <b>certaine</b> (SKU <b>VRM-N°</b>) : retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin.
                   {venduesEbay.some((r) => r.ident && r.lbc && r.id) && se === 'ok' ? <> <span data-lbc-supprimer-geste-ebay="ok">Tu peux {venduesEbay.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause, une à la fois.</span></>
                     : venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
                   {venduesEbay.some((r) => r.ident && r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Paramètres → État des connexions).</span></> : null}
-                  {venduesEbay.some((r) => !r.ident) ? <> <span data-lbc-ebay-sans-ident={venduesEbay.filter((r) => !r.ident).length}>{(() => { const sans = venduesEbay.filter((r) => !r.ident); const ns = sans.map((r) => 'N°' + r.numero).join(', '); return sans.length > 1 ? `${ns} ne sont reliées que par ta marque « publiée » : VRM ne sait pas quelles annonces c'est sur Leboncoin, retire-les toi-même dans « Mes annonces ».` : `La ${ns} n'est reliée que par ta marque « publiée » : VRM ne sait pas quelle annonce c'est sur Leboncoin, retire-la toi-même dans « Mes annonces ».`; })()}</span></> : null}
+                  {venduesEbay.some((r) => !r.ident) ? <> <span data-lbc-ebay-sans-ident={venduesEbay.filter((r) => !r.ident).length}>{(() => { const sans = venduesEbay.filter((r) => !r.ident); const ns = sans.map((r) => 'N°' + r.numero).join(', '); return sans.length > 1 ? `${ns} : annonces inconnues, retire-les toi-même dans « Mes annonces ».` : `${ns} : annonce inconnue, retire-la toi-même dans « Mes annonces ».`; })()}</span></> : null}
                 </div>
                 {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
               </Card>
@@ -2032,14 +2032,14 @@ function LeboncoinScreen() {
             {venduesVc.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{venduesVc.length} vendue{venduesVc.length > 1 ? 's' : ''} sur Vestiaire — à retirer de Leboncoin</Titre>
-                <div data-lbc-retirer-vestiaire={venduesVc.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente Vestiaire désigne cette paire par son <b>identité</b> (l'annonce publiée depuis VRM, ou la référence <b>VRM-N°</b> de l'article). Retire-{venduesVc.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.</div>
+                <div data-lbc-retirer-vestiaire={venduesVc.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Vente Vestiaire <b>prouvée</b> : retire-{venduesVc.length > 1 ? 'les' : 'la'} de Leboncoin.</div>
                 {venduesVc.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
               </Card>
             )}
             {doute.length > 0 && (
               <Card>
                 <Titre>{doute.length} plus en ligne sur Vinted — à vérifier</Titre>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Ces annonces ne sont plus sur Vinted, mais <b>je n'ai pas la preuve qu'elles sont vendues</b> : tu as peut-être simplement retiré l'annonce. Ouvre-les et décide — je ne te dis pas de les supprimer.</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Plus sur Vinted, <b>vente pas prouvée</b> : ouvre-les et décide.</div>
                 {doute.slice(0, 30).map((r, i) => Ligne(r, i, C.warn))}
                 {carteDoute === 'doute' ? phraseDoute : null}
               </Card>
@@ -2088,7 +2088,7 @@ function LeboncoinScreen() {
         {data.unlinked && data.unlinked.length > 0 && (
           <Card className="vrm-lbc-non-reliees">
             <Titre>{data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</Titre>
-            <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quel article c'est. Choisis le bon article s'il est proposé, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Quel article ? Choisis-le, ou tape son <b>N°</b> et « Relier ».</div>
             {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions} cleRangement={u.id != null ? 'ad:' + u.id : ''}/>)}
             {data.unlinked.length > 40 && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
           </Card>
@@ -2100,7 +2100,7 @@ function LeboncoinScreen() {
           return (
             <Card>
               <Titre>{flagged.length} annonce{flagged.length > 1 ? 's' : ''} signalée{flagged.length > 1 ? 's' : ''} par Leboncoin</Titre>
-              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>C'est Leboncoin qui le dit dans ton espace pro : ces annonces sortent mal. Baisse le prix, améliore le titre/les photos, ou passe une option de visibilité.</div>
+              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Selon Leboncoin, elles sortent mal : prix, titre ou photos.</div>
               {flagged.slice(0, 20).map((a, i) => (
                 <div key={i} style={{ fontSize: 13, color: C.text, padding: '3px 0' }}>
                   {a.subject || '—'}{a.price != null && isFinite(Number(a.price)) ? ` · ${Number(a.price).toFixed(2).replace('.', ',')}\u00a0€` : ''} · <span style={{ color: C.warn, fontWeight: 700 }}>{a.issue === 'LowVisibility' ? 'peu visible' : a.issue}</span>
@@ -2140,7 +2140,7 @@ function LeboncoinScreen() {
               parce que la base n'avait pas répondu — une fête sur une lecture
               ratée. Le 🎉 ne sort que si on a pu REGARDER. */}
           {data.queue.length === 0 ? (data.echecLecture
-            ? <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Cette file est vide parce que la lecture a échoué (voir plus haut), pas parce qu'il ne reste rien à publier.</div>
+            ? <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>File pas lue (lecture ratée), pas vide.</div>
             /* ⚠️⚠️ TROISIÈME CAUSE, VUE AU RENDU LE 16 SEPTEMBRE SUR UNE
                INSTALLATION NEUVE : « Tout est publié 🎉 (toutes tes paires
                numérotées en ligne sont sur Leboncoin) » s'affichait à quelqu'un
@@ -2175,7 +2175,7 @@ function LeboncoinScreen() {
                      ordinateur » était dit ici ET dans la ligne juste dessous
                      (`RaisonPublication`) — une cause, une phrase (§7). */
                   ? <Pourquoi ecrit label="Ce que VRM publie">Voici le titre <b>que VRM proposera</b> sur Leboncoin (50 caractères max, la taille à la fin).</Pourquoi>
-                  : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Paramètres → État des connexions pour que ce soit ce titre-là qui parte.</>}
+                  : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour (Paramètres → État des connexions).</>}
             </div>
             {/* ⚠️ LA LISTE SE GROUPE SUR CE QU'IL PEUT FAIRE, pas sur le numéro.
                 C'est la loi de l'écran Colis : mesuré ici, 54 des 59 annonces
@@ -2258,7 +2258,7 @@ function LeboncoinScreen() {
               return (<>
                 {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, là où est l’extension : ses photos arrivent ici au passage.</> })}
                 {pretes.length > 0 && Groupe({ titre: "Prêtes", liste: pretes })}
-                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois, là où est l’extension : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
+                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois : les photos suivent. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
               </>);
             })()}
           </>)}
@@ -2328,7 +2328,7 @@ function LeboncoinScreen() {
           : !p.majAt ? { q: 'Mets l’extension à jour, puis passe une fois sur leboncoin.fr.', d: 'Rien n’a encore été relevé : c’est la visite qui déclenche tout.' }
           : aPiece('codes') !== 'ok' ? { q: 'Passe une fois sur leboncoin.fr.', d: 'Leboncoin envoie ses codes au chargement — l’extension les attrape au passage.' }
           : aPiece('config') !== 'ok' || aPiece('soumission') !== 'ok'
-            ? { q: 'Dépose une annonce à la main, jusqu’au bout.', d: 'C’est le seul moment où Leboncoin envoie la composition du formulaire et la forme de la publication.' }
+            ? { q: 'Dépose une annonce à la main, jusqu’au bout.', d: 'VRM apprend ainsi le formulaire de Leboncoin.' }
             : null;
         return (
           <Card style={{ borderColor: C.border }}>
@@ -2386,7 +2386,7 @@ function LeboncoinScreen() {
         const e = extSait('publication');
         if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
         if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Paramètres → État des connexions</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
-        return <>La publication part de l'ordinateur où l'extension est installée : ouvre cet écran là-bas et clique « Publier » sur la paire. Cette liste, elle, se consulte de partout.</>;
+        return <>Publie depuis l'ordinateur où est l'extension.</>;
       })()}</Pourquoi></div>
 
       {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
@@ -2415,7 +2415,7 @@ function LeboncoinScreen() {
             );
           })}
           <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-            Un compte apparaît ici dès que tu ouvres Leboncoin avec l'extension active, connecté dessus.
+            Ouvre Leboncoin, connecté : le compte apparaît ici.
           </div>
         </div>
       )}

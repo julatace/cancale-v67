@@ -91,12 +91,13 @@ export function crc32(octets) {
 }
 // fichiers : [{ nom, texte }] ⇒ Uint8Array (un zip lisible partout).
 export function zipStocke(fichiers, quand = new Date()) {
+  // (10 nov., lot Q) Un fichier porte `texte` OU `octets` (Uint8Array : un PDF).
   const enc = new TextEncoder();
   const dosT = ((quand.getHours() << 11) | (quand.getMinutes() << 5) | (quand.getSeconds() >> 1)) & 0xFFFF;
   const dosD = (((quand.getFullYear() - 1980) << 9) | ((quand.getMonth() + 1) << 5) | quand.getDate()) & 0xFFFF;
   const locaux = [], centraux = []; let decal = 0;
   for (const f of fichiers) {
-    const nom = enc.encode(f.nom), data = enc.encode(f.texte), crc = crc32(data);
+    const nom = enc.encode(f.nom), data = f.octets instanceof Uint8Array ? f.octets : enc.encode(f.texte), crc = crc32(data);
     const h = new DataView(new ArrayBuffer(30));
     h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
     h.setUint16(10, dosT, true); h.setUint16(12, dosD, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
@@ -124,7 +125,7 @@ export function lireZipStocke(octets) {
   while (o + 30 <= octets.length && v.getUint32(o, true) === 0x04034b50) {
     const crc = v.getUint32(o + 14, true), n = v.getUint32(o + 18, true), ln = v.getUint16(o + 26, true), lx = v.getUint16(o + 28, true);
     const nom = dec.decode(octets.subarray(o + 30, o + 30 + ln)), data = octets.subarray(o + 30 + ln + lx, o + 30 + ln + lx + n);
-    out.push({ nom, texte: dec.decode(data), crcOk: crc32(data) === crc }); o += 30 + ln + lx + n;
+    out.push({ nom, texte: dec.decode(data), octets: data, crcOk: crc32(data) === crc }); o += 30 + ln + lx + n;
   }
   return out;
 }
