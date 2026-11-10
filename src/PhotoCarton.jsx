@@ -129,7 +129,7 @@ export function PhotoCartonVente({ site = 'vinted', tx, num = '' }) {
       <dt>Photo du carton</dt>
       <dd>
         {etat && etat.at ? <>
-          <button type="button" className="vrm-lien-action" data-photo-carton-vente-voir="" onClick={voir}>Voir</button>
+          <button type="button" className="vrm-pc-voir" data-photo-carton-vente-voir="" onClick={voir}>Voir</button>
           <small className="vrm-pc-date">{lecture === 'pas lue' ? 'pas lue — réessaie' : quand(etat.at)}</small>
         </> : etat === false ? <BoutonPhotoCarton vente={{ site, tx, num }} ton="clair" compact libelle="Ajouter"/>
           : etat === null ? <span title="La base n’a pas répondu">—</span> : <span aria-busy="true">…</span>}

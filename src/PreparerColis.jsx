@@ -135,6 +135,7 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
           {c.num ? <span className={'vrm-prep-num is-' + (c.etatNum || 'ok')} data-preparer-grand-num={c.num}>N°{c.num}</span> : <span className="vrm-prep-num is-sans" data-preparer-grand-num="">Sans N°</span>}
         </div>
         {PHRASE_NUM[c.etatNum] ? <p className={'vrm-emb-alerte is-' + c.etatNum} role={c.etatNum === 'double' ? 'alert' : undefined} data-preparer-alerte={c.etatNum}>{PHRASE_NUM[c.etatNum](c.num, c)}</p> : null}
+        {fait && photoCarton ? photoCarton(c) : null}
         <h2 className="vrm-prep-titre" data-preparer-titre="">{c.titre}</h2>
         {puces.length ? <p className="vrm-prep-puces">{puces.map((p, k) => <span key={k} className={k === 1 && c.compte ? 'vrm-sensible' : undefined} data-stream-type={k === 1 && c.compte ? 'compte' : undefined}>{p}</span>)}</p> : null}
         {c.limite ? <p className={'vrm-prep-limite' + (c.limiteAmbre ? ' is-ambre' : '')} data-preparer-limite="">{c.limite}</p> : null}
@@ -151,7 +152,6 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
         </div>
         {fait ? <p className="vrm-prep-fait" data-preparer-fait-note="" role="status">{enAttente ? 'Colis fait · annulable quelques secondes' : 'Colis fait ✓'}</p>
           : sorti ? <p className="vrm-emb-aide" data-preparer-sorti="">Ce colis n’est plus dans « À envoyer ».</p> : null}
-        {fait && photoCarton ? photoCarton(c) : null}
       </div>
     );
   })();
