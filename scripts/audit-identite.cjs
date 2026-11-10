@@ -560,5 +560,36 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('sans relecture, un appareil neuf renumérote à partir de 1');
 }
 
+// ── 16. (10 nov., lots BD + BH) LA NOTE PRIVÉE ET L'ACHAT EN DOUBLE ──────────
+// Cinquante paires RIGOUREUSEMENT identiques : la note posée sur l'une n'apparaît
+// sur AUCUNE autre ; cinquante achats identiques (titre, prix, date) sans référence
+// ne font AUCUN « achat saisi deux fois ». Les deux règles sont exécutées telles
+// quelles (src/notePaire.js, src/achatsDoubles.js) — l'identité, jamais le titre.
+{
+  const { execFileSync } = require('child_process');
+  const code = `
+    const N = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'notePaire.js'))});
+    const D = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'achatsDoubles.js'))});
+    const paires = Array.from({ length: ${N} }, (_, i) => ({ titre: ${JSON.stringify(TITRE)}, title: ${JSON.stringify(TITRE)}, numero: String(i + 1), itemId: String(700000 + i) }));
+    const notes = { 'n:13': { t: 'petite tache' } };
+    const avec = paires.filter((p) => N.noteDe(notes, p)).map((p) => p.numero);
+    // Une paire décrite par son seul titre n'a AUCUNE clé (ni lue, ni écrite), même si une
+    // note existe sous une forme quelconque de ce titre.
+    const T0 = ${JSON.stringify(TITRE)};
+    const pieges = { ...notes, ['t:' + T0]: { t: 'x' }, ['titre:' + T0]: { t: 'x' }, [T0]: { t: 'x' }, ['n:' + T0]: { t: 'x' } };
+    const anonymes = paires.map((p) => ({ titre: p.titre, title: p.title })).filter((p) => N.noteDe(pieges, p) || N.clesPaire(p).length || N.cleEcriture(p)).length;
+    const achats = Array.from({ length: ${N} }, (_, i) => ({ id: 'h' + i, title: ${JSON.stringify(TITRE)}, price: '30', date: '2026-11-01' }));
+    const vinted = Array.from({ length: ${N} }, (_, i) => ({ transaction_id: 96000000 + i, title: ${JSON.stringify(TITRE)}, price: { amount: '30' } }));
+    console.log(JSON.stringify({ avec, anonymes, doubles: D.achatsEnDouble({ vinted, hors: achats }).length }));`;
+  let r = null;
+  try { r = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { r = null; }
+  r && r.avec.length === 1 && r.avec[0] === '13' && r.anonymes === 0
+    ? ok('la note privée d\'une paire parmi 50 identiques ne s\'affiche que sur elle (par N°)')
+    : nok('la note privée doit suivre l\'identité de la paire, jamais son titre', JSON.stringify(r));
+  r && r.doubles === 0
+    ? ok('50 achats identiques sans référence : aucun « achat saisi deux fois »')
+    : nok('« achat saisi deux fois » doit se décider par référence (n° de transaction, commande, facture), jamais par ressemblance', JSON.stringify(r));
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
