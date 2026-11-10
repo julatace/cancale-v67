@@ -257,6 +257,7 @@ const AtelierFile = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) =
 const AtelierLots = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.AtelierLots })));
 const AtelierBrouillon = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.AtelierBrouillon })));
 const RepublierALaMain = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.RepublierALaMain })));
+const PreparerALaMain = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.PreparerALaMain })));
 const BrouillonsVinted = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.BrouillonsVinted })));
 const BrouillonsARefaire = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.BrouillonsARefaire })));
 const PublierVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.PublierVestiaire })));
@@ -13696,7 +13697,7 @@ async function demanderQuestionRepub(q, titre) {
 // (9 nov., lot AL) `filtre = 'republier'` : la vue « Republier » d'Annonces (l'ancienne entrée
 // du menu) — ses annonces EN LIGNE seulement, la même sélection, et au pied « Republier · N »
 // (`onRepublier`) qui ouvre l'atelier ; « Sélectionner » garde « Actions · N ».
-function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, onRepublier, suivis = [], onSuivi, onDetailBrouillons }) {
+function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, onRepublier, onALaMain, suivis = [], onSuivi, onDetailBrouillons }) {
   const rep = filtre === 'republier';
   const liste = (annonces || []).filter((a) => (filtre !== 'brouillon' || a.etat === 'brouillon') && (!rep || a.etat === 'en-ligne'));
   const cle = (a) => a.uid + ':' + a.id;
@@ -13724,10 +13725,16 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
           <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>Reprendre</Bouton></div>
         </div>
       ))}
+      {/* (10 nov., lot AP — demande 17) À LA MAIN, CONSEILLÉ : le moins risqué (c'est lui qui publie,
+          rien ne part d'ici), rendu attirant — trois gestes prêts, le N° qui suit la paire. */}
+      {rep && <div className="vrm-kit-conseil vrm-kit-conseil-vue" data-republier-conseil="main">
+        <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
+        <div><b>À la main : conseillé, le moins risqué.</b><span>Photos dans ta galerie, N° et description à copier.</span></div>
+      </div>}
       <div className="vrm-sel-tete" data-sel-tete="">
         {/* (10 nov., lot AI) La consigne RÉÉCRITE en une phrase courte, sans pop-up (le geste suffit) ;
             sur la vue « Republier » (navigation fusionnée) : c'est toujours lui qui choisit et lance. */}
-        <span data-sel-consigne="" style={{ minWidth: 0, flex: '1 1 auto' }}>{rep ? <>Coche des annonces en ligne d’un compte, puis <b>Republier</b>.</> : filtre === 'brouillon' ? <>Coche tes brouillons, puis <b>Actions</b>.</> : <>Coche des annonces d’un compte, puis <b>Actions</b>.</>}</span>
+        <span data-sel-consigne="" style={{ minWidth: 0, flex: '1 1 auto' }}>{rep ? <>Coche des annonces, puis choisis <b>À la main</b> ou <b>Par VRM</b>.</> : filtre === 'brouillon' ? <>Coche tes brouillons, puis <b>Actions</b>.</> : <>Coche des annonces d’un compte, puis <b>Actions</b>.</>}</span>
         {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
         {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>Un par un</Bouton> : null}
       </div>
@@ -13758,7 +13765,10 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
           </div>
         ))}
       {rep
-        ? (aRepublier.length > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-republier-lancer={aRepublier.length} onClick={() => onRepublier && onRepublier(aRepublier)}>Republier · {aRepublier.length}</Bouton></div>)
+        ? (aRepublier.length > 0 && <div className="vrm-sel-barre vrm-sel-barre-deux">
+            <Bouton variante="secondaire" data-republier-lancer={aRepublier.length} onClick={() => onRepublier && onRepublier(aRepublier)}>Par VRM · {aRepublier.length}</Bouton>
+            <Bouton variante="primaire" icone="shield" data-republier-main-lancer={aRepublier.length} onClick={() => onALaMain && onALaMain(aRepublier)}>À la main · {aRepublier.length}</Bouton>
+          </div>)
         : (nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>Actions · {nCoches}</Bouton></div>)}
     </section>
   );
@@ -28995,6 +29005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [repubMainOuvert, setRepubMainOuvert] = useState(null);
   // (6 nov.) Plusieurs annonces « à la main » : traitées une par une ({ liste, i }, « paire 2/5 »).
   const [repubMainFile, setRepubMainFile] = useState(null);
+  const [kitMain, setKitMain] = useState(null);   // (10 nov., lot AP) « À la main » sur plusieurs : le kit
   // (10 nov., lot C) « Baisser le prix » en série : les annonces cochées (vue « Qui dorment »
   // ou Sélectionner), et les cases de la vue « Qui dorment » (confort de l'écran, rien d'écrit).
   const [baisseSel, setBaisseSel] = useState(null);
@@ -44090,7 +44101,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: vc === undefined ? undefined : (vc ? String(vc.uid||'') : null),
                 capOk: (cap)=>extSait(cap)==='ok', nomCompte: (u)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(u)); return a ? accNameOf(a) : ''; } }).find(x=>x.k==='recreer');
               if (!r || !r.ok) { toast((r && r.raison) || 'Republier n’est pas possible pour cette sélection.'); return; }
-              setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction('recreer'); }} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
+              setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction('recreer'); }}
+            onALaMain={(choisies)=>{
+              // (10 nov., lot AP) « À la main » : la règle de la tuile « Republier à la main » (chaque paire SON compte connu).
+              const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: undefined, capOk: ()=>true }).find(x=>x.k==='main');
+              if (!r || !r.ok) { toast((r && r.raison) || 'À la main n’est pas possible pour cette sélection.'); return; }
+              setKitMain(choisies.map(a=>{ const fl = prixAchatDe(numeros[a.id]||{}, buyByNum); return { ...a, floor: fl!=null && !isNaN(fl) ? Number(fl) : null }; })); }} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
@@ -48312,6 +48328,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
             if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...marque, ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;
       })()}
+      {kitMain && kitMain.length > 0 && (
+        // (10 nov., lot AP) Le kit « à la main » : rien ne part chez Vinted ; « Pas à pas » = la feuille en cinq étapes.
+        <PreparerALaMain paires={kitMain} onClose={()=>setKitMain(null)}
+          onUneParUne={()=>{ const l=kitMain; setKitMain(null); setRepubMainFile(l.length>1 ? { liste:l, i:0 } : null); setRepubMainOuvert(l[0]); }}
+          onOuvrirVinted={()=>{ for (const p of kitMain) { if (p.numero && !repubMain[String(p.id)]) poserRepubMain(String(p.id), { uid:String(p.uid||''), num:String(p.numero), titre:p.titre||'', domain:p.domain||'www.vinted.fr', at:new Date().toISOString() }); } }}/>
+      )}
       {brouillonsOpen && (
         <BrouillonsVinted br={brVinted} brouillonOk={extSait('brouillon')==='ok'} onClose={()=>setBrouillonsOpen(false)} onFile={()=>{ setBrouillonsOpen(false); setRepubAction('enLigne'); }}
           publier={async (it) => {
