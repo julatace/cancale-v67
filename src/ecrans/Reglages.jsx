@@ -67,6 +67,8 @@ import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '..
 import GuideIphone, { useGuideIphone } from '../GuideIphone.jsx';
 // (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
 import SmsColisSetting from '../SmsColis.jsx';
+import AgendaEcheances from '../composants/AgendaEcheances.jsx';   // (10 nov., lot H)
+import { DEMANDE_APPAREIL } from '../appareilNouveau.js';               // (10 nov., lot H)
 import RaccourcisSiri from '../RaccourcisSiri.jsx';
 import { etatJetonSms } from '../smsColis.js';
 // ⟦← App.jsx #6⟧
@@ -1677,7 +1679,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
   React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
   // (6 nov.) Un conseil ouvre un panneau (« Voir comment ») : `DEMANDE_REGLAGE_SOUS`.
-  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; setVueBrute('reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
+  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; setVueBrute(id==='appareils'?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
   // (6 nov.) La notification « problème signalé » ouvre la liste (propriétaire seul).
   React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setVueBrute('reglages'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
@@ -1826,6 +1828,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
+      // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
+      AUTH.user && { id:'agenda', type:'panneau', ic:'calendar', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
@@ -2437,6 +2441,8 @@ function AppareilsConnectes() {
   // `undefined` en cours · `{ erreur, message }` pas su · `{ appareils }` lu.
   const [etat, setEtat] = React.useState(undefined);
   const [enVol, setEnVol] = React.useState(null);
+  // (10 nov., lot H) La session qu'une alerte « Nouvel appareil » désigne (src/appareilNouveau.js).
+  const [cible] = React.useState(() => { const x = DEMANDE_APPAREIL.session; DEMANDE_APPAREIL.session = null; return x; });
   const lire = React.useCallback(async () => {
     const { status, j } = await appelSecurite('appareils');
     setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || "Je n'ai pas pu lire tes appareils — réessaie dans un instant." });
@@ -2461,7 +2467,7 @@ function AppareilsConnectes() {
         : (
         <div className="vrm-sec-liste">
           {etat.appareils.map((a) => (
-            <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'}>
+            <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'} {...(cible && a.id === cible && !a.ici ? { 'data-appareil-nouveau': 'oui' } : {})}>
               <div className="vrm-sec-corps">
                 <span className="vrm-sec-titre">{a.appareil}</span>
                 <span className="vrm-sec-sous">{quandCourt(a.actifLe)}</span>

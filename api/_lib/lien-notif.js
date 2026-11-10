@@ -18,7 +18,7 @@ import { normaliserSuivi } from './etat-colis-email.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // (10 nov., lot BC) `lundi` : la semaine (AAAA-MM-JJ, un lundi) de l'écran « Ma semaine ».
-const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi'];
+const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi', 'session'];
 
 export function lienNotif(tab, o = {}) {
   const p = { tab, ...o };
@@ -71,6 +71,8 @@ export const DESTINATIONS = {
   comptes: () => lienNotif('vintedaccounts'),
   // (8 nov.) Paramètres → « Tout va bien ? » : un compte qui n'arrive plus (api/_lib/garde-capture.js).
   toutVaBien: () => lienNotif('settings', { section: 'toutvabien' }),
+  // (10 nov., lot H) « Nouvel appareil » : Paramètres → Appareils connectés, CETTE session en évidence.
+  appareil: ({ session } = {}) => lienNotif('settings', { section: 'appareils', session: /^[0-9a-f-]{36}$/i.test(String(session || '')) ? session : '' }),
   // (6 nov.) Leboncoin a supprimé une annonce (e-mail sans identité) : Annonces · Leboncoin,
   // où l'app dit d'ouvrir « Mes annonces » sur Leboncoin (api/_lib/lbc-suppression.js).
   lbcAnnonces: () => lienNotif('annonces', { site: 'leboncoin' }),

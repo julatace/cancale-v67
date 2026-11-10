@@ -36,7 +36,11 @@ export const prixDuLien = (v) => {
 // `achat=1` est exigé : un `titre=` seul (un autre lien) n'ouvre rien.
 export const lireDemandeAchat = (p) => {
   if (!p || typeof p.get !== 'function' || p.get('achat') !== '1') return null;
-  return { titre: propre(p.get('titre'), TITRE_MAX), prix: prixDuLien(p.get('prix')), lieu: propre(p.get('ou'), LIEU_MAX) };
+  // (10 nov., lot J) `photo=partage` : une photo partagée depuis l'app Photos attend dans
+  // l'appareil (public/sw.js, src/partagePhoto.js) — rien d'autre ne passe par le lien.
+  const d = { titre: propre(p.get('titre'), TITRE_MAX), prix: prixDuLien(p.get('prix')), lieu: propre(p.get('ou'), LIEU_MAX) };
+  if (p.get('photo') === 'partage') d.photoPartagee = true;
+  return d;
 };
 
 // `q` ⇒ la requête de la loupe ('' = rien). « numéro 124 », « cent vingt-quatre » ⇒ « 124 ».

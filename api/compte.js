@@ -45,6 +45,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //   /api/compte?mode=commandes    (POST, session de l'extension) les ventes/achats
 //                                 envoyés LÉGERS, fusionnés dans la ligne
 //                                 `harvest_{uid}_orders_*` — api/_lib/commandes-leger.js
+//   /api/compte?mode=agenda       (GET/POST, session ; GET &f=<jeton>.ics sans session) l'agenda .ics
 //   /api/compte?mode=mail-essai   (POST, session) « M'envoyer un e-mail d'essai » :
 //                                 à l'adresse de SON compte, 3/h — api/_lib/mail-essai.js
 //   /api/compte?mode=supprimer    (GET/POST, session) SUPPRIMER MON COMPTE : GET
@@ -76,11 +77,14 @@ import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe } from './_lib/equipe.js';
 import { routeCommunaute } from './_lib/communaute.js';
+import { pagePublique } from './_lib/formateur.js';
 import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
 import { routeCommandes } from './_lib/commandes-leger.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
+import { verifierNouvelAppareil } from './_lib/appareil-nouveau.js';   // (10 nov., lot H)
+import { traiterAgenda } from './_lib/agenda-ics.js';                 // (10 nov., lot H)
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
 import { effacerCompte } from './_lib/effacer-compte.js';
@@ -1121,8 +1125,34 @@ async function appareils(req, res) {
     corps = await lireCorpsJson(req);
     if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
   }
+  // (10 nov., lot H) « Nouvel appareil » : l'app le demande à chaque ouverture (api/_lib/appareil-nouveau.js).
+  if (req.method === 'POST' && corps.action === 'verifier') {
+    const v = await verifierNouvelAppareil({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, pousser: (notif) => contexteVendeur.run({ owner: u.id }, () => sendPushToAll(notif)) });
+    return repondre(res, v.status, v.body);
+  }
   const r = await traiterAppareils({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, jeton: jetonDe(req), methode: req.method, corps });
   return repondre(res, r.status, r.body);
+}
+// (10 nov., lot H) « Échéances dans l'agenda » (api/_lib/agenda-ics.js) : le calendrier
+// par le jeton seul (`f`, réécrit depuis /agenda/<jeton>.ics), le réglage sur SA session.
+async function agenda(req, res) {
+  const fichier = req.query && req.query.f != null ? String(req.query.f) : null;
+  let user = null, corps = null;
+  if (fichier == null) {
+    user = await vendeurExige(req, res);
+    if (!user) return;
+    if (req.method === 'POST') {
+      corps = await lireCorpsJson(req);
+      if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+    }
+  }
+  const r = await traiterAgenda({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', methode: req.method, fichier, user, corps, acces: accesVendeur });
+  if (r.type === 'json') return repondre(res, r.status, r.body);
+  res.statusCode = r.status;
+  res.setHeader('Content-Type', r.type === 'ics' ? 'text/calendar; charset=utf-8' : 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (r.type === 'ics') res.setHeader('Content-Disposition', 'inline; filename="vrm-echeances.ics"');
+  res.end(r.body);
 }
 async function journalVrm(req, res) {
   const u = await vendeurExige(req, res);
@@ -1713,6 +1743,14 @@ export default async function handler(req, res) {
   if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  // (10 nov., lot AR) La page PUBLIQUE d'un formateur (vrm.center/f/<adresse>) : SANS session,
+  // clé publique ; la base (032) ne rend que nom, présentation et groupes montrés.
+  if (mode === 'formateur') {
+    if (m !== 'GET') return repondre(res, 405, { erreur: 'GET seulement' });
+    res.setHeader('Cache-Control', 'no-store');
+    const r = await pagePublique(req.query && req.query.f, ANON);
+    return repondre(res, r.code, r.corps);
+  }
   if (mode === 'discord-debut') return m === 'POST' ? discordDebut(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'discord-attente') return m === 'POST' ? discordAttente(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'discord') return m === 'GET' ? retourDiscord(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
@@ -1737,6 +1775,7 @@ export default async function handler(req, res) {
   if (mode === 'mesures') return (m === 'GET' || m === 'POST') ? mesures(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'agenda') return (m === 'GET' || m === 'POST') ? agenda(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   // (5 nov.) Les e-mails de l'essai gratuit : état, choix, lien de désinscription.
   if (mode === 'relances') return (m === 'GET' || m === 'POST') ? relances(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

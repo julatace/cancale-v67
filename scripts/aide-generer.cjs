@@ -18,7 +18,9 @@
 const fs = require('fs');
 const path = require('path');
 const DOSSIER = path.join(__dirname, '..', 'public', 'aide');
-const { ARTICLES } = require('./aide-contenu.cjs');
+const { ARTICLES, ETAPES_ECRANS } = require('./aide-contenu.cjs');
+// (10 nov., lot J) Les étapes du « ? » de chaque écran : le même texte, rangé pour l'app.
+const ETAPES_JS = path.join(__dirname, '..', 'src', 'aideEtapes.js');
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // Un texte d'article : **gras**, `code`, [lien](url) — rien d'autre (aucun HTML brut).
@@ -77,7 +79,7 @@ ${autres.length ? `  <section class="voir" aria-label="Voir aussi"><h2>Voir auss
 
 function pageIndex() {
   return tete({ titre: 'Centre d’aide · VRM', description: 'Installer l’extension, relier ta boîte e-mail, les numéros, les bordereaux, les colis à retirer, la compta et l’URSSAF.', slug: 'index' })
-    + `  <h1 class="titre-index">Comment t’aider<h1 class="titre-index">Comment peut-on t’aider&nbsp;?</h1>nbsp;?</h1>
+    + `  <h1 class="titre-index">Comment peut-on t’aider&nbsp;?</h1>
   <form class="recherche" role="search" action="/aide" data-aide-recherche="">
     <label for="q" class="cache">Chercher dans l’aide</label>
     <input id="q" name="q" type="search" placeholder="Bordereau, code de retrait, URSSAF…" autocomplete="off" enterkeyhint="search">
@@ -97,6 +99,13 @@ function indexRecherche() {
   return ARTICLES.map((a) => ({ slug: a.slug, titre: a.titre, resume: a.resume, mots: net([a.mots || '', ...a.blocs.map(brut)].join(' ')).slice(0, 4000) }));
 }
 
+function etapesJs() {
+  return `// GÉNÉRÉ par scripts/aide-generer.cjs depuis scripts/aide-contenu.cjs (ETAPES_ECRANS) — ne pas modifier à la main.
+// Les 3 à 5 gestes du « ? » de chaque écran (src/composants/AideEcran.jsx).
+export const ETAPES_ECRANS = ${JSON.stringify(ETAPES_ECRANS, null, 2)};
+`;
+}
+
 function rendu() {
   const fichiers = { 'index.html': pageIndex(), 'index-recherche.json': JSON.stringify(indexRecherche()) + '\n' };
   for (const a of ARTICLES) fichiers[a.slug + '.html'] = pageArticle(a);
@@ -107,11 +116,13 @@ if (require.main === module) {
   const f = rendu();
   if (process.argv.includes('--verifier')) {
     const ecarts = Object.entries(f).filter(([n, t]) => { const p = path.join(DOSSIER, n); return !fs.existsSync(p) || fs.readFileSync(p, 'utf8') !== t; }).map(([n]) => n);
+    if (!fs.existsSync(ETAPES_JS) || fs.readFileSync(ETAPES_JS, 'utf8') !== etapesJs()) ecarts.push('src/aideEtapes.js');
     console.log(ecarts.length ? `❌ public/aide/ pas à jour : ${ecarts.join(', ')} — lance node scripts/aide-generer.cjs` : '✅ public/aide/ = scripts/aide-contenu.cjs');
     process.exit(ecarts.length ? 1 : 0);
   }
   fs.mkdirSync(DOSSIER, { recursive: true });
   for (const [n, t] of Object.entries(f)) fs.writeFileSync(path.join(DOSSIER, n), t);
+  fs.writeFileSync(ETAPES_JS, etapesJs());
   console.log(`✅ ${Object.keys(f).length} fichiers écrits dans public/aide/`);
 }
-module.exports = { rendu, ARTICLES, enLigne };
+module.exports = { rendu, ARTICLES, enLigne, etapesJs };
