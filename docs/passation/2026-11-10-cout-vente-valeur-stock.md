@@ -81,7 +81,9 @@ de `stockValue`), `src/ecrans/Stock.jsx`, `src/ecrans/Stats.jsx`.
   trois colonnes) ⇒ le montant seul en gros, « au moins · sur N paires · K sans prix »
   dessous.
 - Bancs touchés relancés : `recap-vente` (68 verts), `plancher-stock` (40 verts), et
-  `stock-annonces`, `ventes-benefice-glisser`, `benefice-brut-net` (voir le rapport).
+  `ventes-benefice-glisser`, `benefice-brut-net` : verts. `stock-annonces` : 16 rouges, LES MÊMES
+  sur `origin/main` avant ce chantier (résumé du Stock : Leboncoin/Vestiaire « à confirmer »,
+  annonce Vestiaire sans N°) — pas touché ici, à reprendre par la session Stock.
 - Taille de CLAUDE.md : la ligne §9 la plus ancienne (« DA4 suite ») déplacée telle quelle
   dans `historique-divers.md`.
 - `npm run build` ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`, `urssaf`,
