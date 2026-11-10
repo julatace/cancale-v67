@@ -3,8 +3,9 @@
 // Données INVENTÉES (le dépôt est public) ; 390 px tactile et 1512 px, clair et
 // sombre ; un faux pont d'extension (onglet Vinted sur le compte 111). Il MESURE
 // les règles du chantier, jamais un libellé de commentaire :
-//   U. UNE feuille d'actions : « Republier… » (barre) et l'entrée « Republier »
-//      du menu mènent à la vue « Sélectionner » ; aucune autre feuille d'actions
+//   U. UNE feuille d'actions : « Republier… » (barre) et l'ancien chemin « Republier »
+//      mènent à la vue « Republier » d'Annonces (lot AL, 9 nov. : plus d'entrée de menu) ;
+//      « Sélectionner » garde la feuille « Actions » ; aucune autre feuille d'actions
 //      (`[data-actions-menu]`) ; la feuille « Actions » porte QUATRE tuiles, dans
 //      l'ordre : Republier · Modifier prix ou titre · Mettre en brouillon · Mettre
 //      en ligne ; une raison commune est dite UNE fois (en tête), jamais sous
@@ -146,7 +147,7 @@ async function ouvrirAnnonces(pg) {
   await pg.waitForTimeout(600);
 }
 async function vueSelection(pg) {
-  if (!(await pg.$('[data-selection-vue]'))) await clic(pg, '[data-vue-selection]');
+  if (!(await pg.$('[data-selection-vue="tout"]'))) await clic(pg, '[data-vue-selection]');
   await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 }).catch(() => {});
   for (let i = 0; i < 30; i++) { if (await pg.$('[data-selection-annonce="9301"]')) break; await pg.waitForTimeout(200); }
 }
@@ -262,11 +263,11 @@ async function vueSelection(pg) {
           dit(/affichée/.test(recap) && !/s[ée]lection/i.test(recap) && /Tout afficher/.test(recap), `S ${T} le filtre dit « N annonces affichées · Tout afficher »`, recap);
           await pg.screenshot({ path: nomF('filtre') });
 
-          // ── U : « Republier… » mène à Sélectionner ; une seule feuille d'actions ──
+          // ── U : « Republier… » mène à la vue « Republier » (lot AL) ; une seule feuille d'actions ──
           await clic(pg, '[data-actions-ouvrir]');
           await pg.waitForTimeout(500);
-          const apres = await pg.evaluate(() => ({ vue: !!document.querySelector('[data-selection-vue]'), menu: !!document.querySelector('[data-actions-menu]') }));
-          dit(apres.vue && !apres.menu, `U ${T} « Republier… » mène à la vue « Sélectionner » (aucune autre feuille)`, JSON.stringify(apres));
+          const apres = await pg.evaluate(() => ({ vue: !!document.querySelector('[data-selection-vue="republier"]'), menu: !!document.querySelector('[data-actions-menu]') }));
+          dit(apres.vue && !apres.menu, `U ${T} « Republier… » mène à la vue « Republier » (aucune autre feuille)`, JSON.stringify(apres));
           await vueSelection(pg);
           const selN = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-selection-annonce]')]; return { n: l.length, num: l.filter((x) => x.querySelector('.vrm-num')).length, vide: l.filter((x) => x.querySelector('[data-photo-vide]')).length, img: l.filter((x) => x.querySelector('img')).length }; });
           dit(selN.n >= 6 && selN.num >= 5 && selN.vide + selN.img === selN.n, `N ${T} Sélectionner : N° en Numero, PhotoVide sans photo`, JSON.stringify(selN));
@@ -292,13 +293,11 @@ async function vueSelection(pg) {
           await pg.screenshot({ path: nomF('actions') });
           await fermer(pg);
 
-          // ── U : l'entrée « Republier » du menu ──
-          await ouvrirAnnonces(pg);
-          if (tel) { await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').click().catch(() => {}); await pg.waitForTimeout(500); }
-          const entree = pg.locator('[data-nav-entree="republier"]').first();
-          if (await entree.count()) { await entree.click().catch(() => {}); await pg.waitForTimeout(1200); }
-          const viaMenu = await pg.evaluate(() => ({ vue: !!document.querySelector('[data-selection-vue]'), menu: !!document.querySelector('[data-actions-menu]') }));
-          dit(viaMenu.vue && !viaMenu.menu, `U ${T} l'entrée « Republier » du menu mène à « Sélectionner »`, JSON.stringify(viaMenu));
+          // ── U : l'ancien chemin « Republier » (lot AL : plus une entrée du menu, un lien) ──
+          await pg.goto(`http://localhost:${PORT}/?tab=republier`, { waitUntil: 'domcontentloaded' });
+          await pg.waitForSelector('[data-selection-vue="republier"]', { timeout: 15000 }).catch(() => {});
+          const viaMenu = await pg.evaluate(() => ({ vue: !!document.querySelector('[data-selection-vue="republier"]'), menu: !!document.querySelector('[data-actions-menu]'), entree: !!document.querySelector('[data-nav-entree="republier"]') }));
+          dit(viaMenu.vue && !viaMenu.menu && !viaMenu.entree, `U ${T} l'ancien lien « Republier » mène à la vue « Republier » d'Annonces (plus d'entrée de menu)`, JSON.stringify(viaMenu));
 
           const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
           dit(deb <= 1, `F ${T} aucun débordement horizontal`, String(deb));

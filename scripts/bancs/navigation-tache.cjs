@@ -222,13 +222,16 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
           dit(!!f && !['journee', 'annonces', 'ventes', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && new Set(f.entrees).size === f.entrees.length, 'I. aucune entrée deux fois', JSON.stringify(f && f.entrees));
-          dit(!!f && ['messages', 'republier', 'favoris', 'achats', 'garage', 'dashboard', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)), 'I. « Plus » porte Messages, Republier, Favoris, Colis à retirer, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres', JSON.stringify(f && f.entrees));
+          // (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages et Republier dans Annonces »)
+          // « Republier » et « Favoris & offres » ne sont plus des entrées : ils vivent DANS Annonces et Messages (banc navigation-fusion).
+          dit(!!f && ['messages', 'achats', 'garage', 'dashboard', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('republier') && !f.entrees.includes('favoris'), 'I. « Plus » porte Messages, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres — plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
           dit(!!f && f.petits === 0, 'I. rangées ≥ 44 px', String(f && f.petits));
         } else {
           const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="cat_bord"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
           dit(col.taches.join('|') === 'journee|annonces|ventes|messages|cat_bord', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Colis', col.taches.join('|'));
-          dit(col.groupes.join('|') === 'Vendre|Gérer|Argent|Moi', 'A/J. groupes par tâche — aucun doublon par plateforme (décision du 8 novembre)', col.groupes.join('|'));
+          // (9 nov., lot AL) « Vendre » n'avait plus que Republier et Favoris & offres dans la colonne : vide, il disparaît.
+          dit(col.groupes.join('|') === 'Gérer|Argent|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(exp.join('|') === 'garage|achats|emails' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : Stock, Achats, E-mails ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));

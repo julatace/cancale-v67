@@ -183,7 +183,7 @@
 
 /* Messages et favoris sont deux espaces explicites, pas deux listes empilées. */
 .vrm-messages-sections{display:flex;gap:4px;padding:4px;margin:0 0 14px;border:1px solid var(--vrm-line);border-radius:12px;background:var(--vrm-card2);width:fit-content;max-width:100%;box-sizing:border-box;}
-.vrm-messages-sections button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 18px;border:0;border-radius:6px;font:inherit;font-size:13px;font-weight:600;color:var(--vrm-muted);background:transparent;cursor:pointer;}
+.vrm-messages-sections button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;white-space:nowrap;padding:8px 18px;border:0;border-radius:6px;font:inherit;font-size:13px;font-weight:600;color:var(--vrm-muted);background:transparent;cursor:pointer;}
 .vrm-messages-sections button[aria-pressed=true]{background:var(--vrm-surface);color:var(--vrm-ink);box-shadow:0 1px 4px #2C2C2E10;}
 .vrm-messages-sections button:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .vrm-favoris-compose h4{margin:0 0 10px;font-size:13px;}
