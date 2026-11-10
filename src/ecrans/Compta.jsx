@@ -28,6 +28,7 @@ import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal } from '../App.jsx';
+import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
@@ -4041,12 +4042,16 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     majFraiche((cur) => ({ ...cur, abonnements: (cur.abonnements || []).map(x => x.id === id ? { ...x, fin: auj } : x) }));
     toast('✓ Abonnement arrêté ce mois-ci');
   };
-  const retirer = async (cle, id) => {
-    const x = (data[cle] || []).find((y) => y.id === id);
-    if (!(await askConfirm({ title: `Supprimer « ${nomLigneCompta(cle, x)} » ?`, desc: `${x && Number(x.montant) ? fmt(Number(x.montant)) + ' sortent' : 'Elle sort'} de tes charges et de tes rapports.`, ok: 'Supprimer', cancel: 'Annuler', danger: true }))) return;
-    majFraiche((cur) => ({ ...cur, [cle]: (cur[cle] || []).filter(y => y.id !== id) }));
-    if (cle === 'depenses' && x && x.ticket) ecrireTicket(id, null);   // (3 nov.) la ligne du ticket est vidée (un DELETE ne supprime rien)
-    toast('Supprimé de tes charges');
+  // (10 nov., lot Y) Supprimer = à la corbeille 30 jours : la pilule dit « Mis à la corbeille » et offre
+  // « Annuler » 5 s ; Paramètres → Corbeille la restaure ensuite. Le ticket n'est vidé qu'à la purge.
+  const retirer = (cle, id) => {
+    const rangee = load('vrm_compta', null);
+    const L = (rangee && Array.isArray(rangee[cle]) ? rangee[cle] : data[cle]) || [];
+    const i = L.findIndex((y) => y && y.id === id); const x = i >= 0 ? L[i] : null;
+    if (!x) return;
+    gesteCorbeille({ type: cle === 'depenses' ? 'depense' : cle === 'packs' ? 'pack' : cle === 'abonnements' ? 'abonnement' : 'cout', libelle: nomLigneCompta(cle, x),
+      lignes: cle === 'depenses' && x.ticket ? [idTicket(id)] : [],
+      morceaux: [{ k: 'vrm_compta', type: 'element', sous: cle, idCle: 'id', id, index: i, avant: x }] }, { vrm_compta: setData });
   };
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
   const exporterCharges = () => {

@@ -561,6 +561,9 @@ import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRel
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
+import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
+import { combiner as combinerIssues } from "./gesteAnnulable.js";
+import "./styles-corbeille.css";
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
@@ -2502,6 +2505,8 @@ const SYNC_KEYS = [
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
   'vrm_notes_paires', 'vrm_achats_hors_masques',
+  // (10 nov., lot Y) La CORBEILLE 30 jours ({ [id]: entrée }, src/corbeille.js) : ce qu'il a supprimé DANS VRM.
+  'vrm_corbeille',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
   'vrm_brouillons_refaire_ecartes',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
@@ -3358,11 +3363,12 @@ function FichesNeuves() {
   for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
   const liste = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum);
   if (!liste.length) return null;
-  const retirer = async (f) => {
-    if (!(await askConfirm({ title: `Retirer la fiche N°${f.numero} ?`, ok: 'Retirer', cancel: 'Annuler' }))) return;
-    const toutes = { ...(load('vrm_fiches_neuves', {}) || {}) };
-    if (toutes[f.id]) toutes[f.id] = { ...toutes[f.id], retireeAt: new Date().toISOString() };
-    save('vrm_fiches_neuves', toutes); maj();
+  // (10 nov., lot Y) « Retirer » range la fiche (le N° reste servi, §5) ET la met à la corbeille 30 jours :
+  // pilule « Annuler » 5 s, puis Paramètres → Corbeille la remet « À publier », même N°.
+  const retirer = (f) => {
+    const toutes = load('vrm_fiches_neuves', {}) || {};
+    if (!toutes[f.id]) return;
+    gesteCorbeille({ type: 'fiche', libelle: f.titre || '', numero: f.numero, morceaux: [{ k: 'vrm_fiches_neuves', type: 'champs', id: f.id, avant: { retireeAt: toutes[f.id].retireeAt }, apres: { retireeAt: new Date().toISOString() } }] }, {}, () => maj());
   };
   return (
     <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label="À publier">
@@ -3777,6 +3783,108 @@ function PiluleAnnulerCoque() {
   return <PiluleAnnuler gestes={_gestes} enHaut={enHaut}/>;
 }
 
+// ── (10 nov., lot Y) LA CORBEILLE 30 JOURS (src/corbeille.js) ─────────────────
+// Supprimer DANS VRM = un geste annulable 5 s (la pilule du lot B) qui range une
+// entrée dans `vrm_corbeille` ; Paramètres → Corbeille la restaure pendant 30 jours,
+// puis la purge l'efface pour de bon. Rien ici ne part vers un site.
+// Chaque écriture relit la clé (une lecture ratée n'écrit rien, `ecrireMorceaux`) ;
+// après elle, les écrans qui tiennent la clé dans leur état se relisent et leur
+// prochaine sauvegarde fusionne à trois voies — le chemin d'un changement venu
+// d'un autre onglet (`noterAvantDistant` + `emettreClesRelues`).
+const ecrireCleCorbeille = async (k, v) => {
+  let avantTxt; try { avantTxt = localStorage.getItem(k); } catch (_) { avantTxt = null; }
+  const r = await _ecrivainVrm.ecrire(k, v);
+  if (!r || r.ok !== false) { noterAvantDistant(k, avantTxt); emettreClesRelues([k]); }
+  return r;
+};
+const gesteMorceaux = (texte, morceaux, setters = {}, apres = null) => _gestes.lancer({
+  texte, cles: clesDesMorceaux(morceaux),
+  vue: (sens) => {
+    for (const k of clesDesMorceaux(morceaux)) { const s = setters[k]; if (typeof s === 'function') s((p) => appliquerMorceaux(p, morceaux, sens, k, { force: true }).valeur); }
+    if (typeof apres === 'function') { try { apres(sens); } catch (_) {} }
+  },
+  ecrire: (sens) => ecrireMorceaux({ morceaux, sens, lire: _ecrivainVrm.lire, ecrire: ecrireCleCorbeille, combiner: combinerIssues }),
+});
+const courtCorbeille = (t) => { const s = String(t || '').trim(); return s.length > 28 ? s.slice(0, 27) + '…' : s; };
+// `e` : { type, libelle, numero, morceaux, lignes } (src/corbeille.js, `creerEntree`).
+// Rend l'entrée rangée (null = rien à supprimer).
+const gesteCorbeille = (e, setters = {}, apres = null) => {
+  const entree = e && e.morceaux ? creerEntree(e) : null;
+  if (!entree) return null;
+  const quoi = entree.numero ? `N°${entree.numero}` : entree.libelle ? `« ${courtCorbeille(entree.libelle)} »` : '';
+  gesteMorceaux(quoi ? `${TEXTE_MIS} · ${quoi}` : TEXTE_MIS, morceauxSupprimer(entree), setters, apres);
+  return entree;
+};
+// Restaurer : la valeur d'avant revient à sa place (même id, même N°) ; ce qui a
+// changé depuis est gardé ; un N° porté maintenant par une autre paire ⇒ rien (§5).
+const restaurerCorbeille = (entree) => {
+  const plan = planRestauration(entree, (k) => load(k, null), cleNum);
+  if (plan.conflit) { toast(`Le N°${plan.conflit} est porté par une autre paire : rien n'est restauré.`); return false; }
+  if (!plan.ok) return false;
+  gesteMorceaux(plan.gardes ? 'Restauré · ce qui a changé depuis est gardé' : `Restauré${entree.numero ? ` · N°${entree.numero}` : ''}`, morceauxRestaurer(entree));
+  return true;
+};
+// Une ligne annexe (photo d'un achat, ticket d'une dépense) se VIDE (un DELETE
+// sur app_data ne supprime rien) — seulement à la purge, jamais avant.
+const viderLigneAnnexe = async (id) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id, data: { b64: null, supprime: true, at: new Date().toISOString() } })]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+};
+// La purge : plus de 30 jours (ou au-delà des 300 plus récentes). Seulement le
+// nuage lu (sinon la carte de l'appareil n'est pas la vraie) ; lire-fusionner-réécrire.
+let _purgeCorbeilleEnVol = null;
+const purgerCorbeille = () => {
+  if (!isCloudReady() || !AUTH.user?.id) return Promise.resolve(0);
+  if (_purgeCorbeilleEnVol) return _purgeCorbeilleEnVol;
+  _purgeCorbeilleEnVol = (async () => {
+    const r = aPurger(load(CLE_CORBEILLE, {}));
+    if (!r.ids.length) return 0;
+    const lignes = [...new Set(r.purgees.flatMap((e) => annexesAVider(e, (k) => load(k, null))))];
+    const cur = { ...lireCorbeille(load(CLE_CORBEILLE, {})) };
+    for (const id of r.ids) delete cur[id];
+    save(CLE_CORBEILLE, cur);
+    for (const l of lignes) await viderLigneAnnexe(l);
+    return r.ids.length;
+  })().finally(() => { _purgeCorbeilleEnVol = null; });
+  return _purgeCorbeilleEnVol;
+};
+onCloudReady(() => { setTimeout(() => { purgerCorbeille().catch(() => {}); }, 5000); });
+const lireListeCorbeille = () => listeCorbeille(load(CLE_CORBEILLE, {}));
+const dateCorbeille = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
+// Paramètres → Corbeille : la plus récente en haut, la date, « Restaurer ».
+function CorbeilleSetting() {
+  const [liste, setListe] = useStateCle(CLE_CORBEILLE, lireListeCorbeille);
+  React.useEffect(() => {
+    const relire = () => setListe(lireListeCorbeille());
+    const offNuage = onCloudReady(relire);
+    const surSave = (e) => { if (e && e.detail && e.detail.k === CLE_CORBEILLE) relire(); };
+    window.addEventListener('vrm:save', surSave);
+    purgerCorbeille().then((n) => { if (n) relire(); }).catch(() => {});
+    return () => { if (typeof offNuage === 'function') offNuage(); window.removeEventListener('vrm:save', surSave); };
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!liste.length) return <div className="vrm-corbeille is-vide" data-corbeille="0"><Icon name="trash" size={22}/><p>La corbeille est vide.</p></div>;
+  return (
+    <div className="vrm-corbeille" data-corbeille={liste.length}>
+      <p className="vrm-corbeille-tete">Effacé pour de bon après 30 jours.</p>
+      <ul className="vrm-corbeille-liste">
+        {liste.map((e) => { const j = joursRestants(e); return (
+          <li key={e.id} className="vrm-corbeille-ligne" data-corbeille-ligne={e.id} data-corbeille-type={e.type} data-corbeille-num={e.numero || ''} data-corbeille-jours={j}>
+            <span className="vrm-corbeille-quoi">
+              <b>{e.numero ? `N°${e.numero} · ` : ''}{e.libelle || nomType(e.type)}</b>
+              <small>{nomType(e.type)} · supprimé le {dateCorbeille(e.at)} · {j > 1 ? `encore ${j} j` : 'dernier jour'}</small>
+            </span>
+            <Bouton variante="secondaire" className="vrm-corbeille-restaurer" data-corbeille-restaurer={e.id} onClick={() => { if (restaurerCorbeille(e)) setListe((l) => l.filter((x) => x.id !== e.id)); }}>Restaurer</Bouton>
+          </li>); })}
+      </ul>
+    </div>);
+}
+export { gesteCorbeille, restaurerCorbeille, CorbeilleSetting, lireListeCorbeille };
+
 // ── (10 nov., lot BD) LA NOTE PRIVÉE D'UNE PAIRE (src/notePaire.js, src/NotePaire.jsx) ──
 // UN état pour tous les endroits où la paire apparaît (Annonces, fiche paire, Ventes,
 // Colis → Préparer et scan, Stock) : la clé synchronisée `vrm_notes_paires`, relue à
@@ -3806,6 +3914,8 @@ const editerNotePaire = async (paire, actuelle) => {
   if (v == null) return;
   const ops = opsNote(lireNotesPaires(), paire, v, { cleNum });
   if (!ops.length) return;
+  // (10 nov., lot Y) Une note effacée va à la corbeille 30 jours (pilule « Annuler » 5 s, puis Paramètres → Corbeille).
+  if (!String(v).trim() && actuelle) { gesteCorbeille({ type: 'note', libelle: String(actuelle), numero: num || null, morceaux: ops }, { [CLE_NOTES_PAIRES]: poserNotesVue }); return; }
   gesteVrm(String(v).trim() ? 'Note enregistrée' : 'Note effacée', ops, { [CLE_NOTES_PAIRES]: poserNotesVue });
 };
 // `ajout` : l'icône discrète pour en écrire une quand il n'y en a pas (Annonces,
@@ -35859,7 +35969,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reafficherHorsDouble = (id) => gesteVrm('Achat réaffiché', [{ k: CLE_HORS_MASQUES, type: 'ensemble', id: String(id), apres: false, avant: true }], { [CLE_HORS_MASQUES]: setHorsMasques });
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
-  const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
+  // (10 nov., lot Y) Supprimer = à la corbeille 30 jours (pilule « Annuler » 5 s, puis Paramètres → Corbeille).
+  // Sa photo (sa ligne `achat_hors_photo_{id}`) reste rangée : elle n'est vidée qu'à la purge.
+  const delOffBuy = (id) => {
+    const L = load('vinted_offvinted_buys', []); const i = L.findIndex(x => x && x.id === id); const b = i >= 0 ? L[i] : null;
+    if (!b) { setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; }); return; }
+    gesteCorbeille({ type: 'achat', libelle: b.title || '', numero: b.numero || null, lignes: b.photo ? ['achat_hors_photo_' + String(id).replace(/[^\w-]/g, '')] : [],
+      morceaux: [{ k: 'vinted_offvinted_buys', type: 'element', idCle: 'id', id, index: i, avant: b }] }, { vinted_offvinted_buys: setOffBuys });
+  };
   // (le formulaire d'ajout vit dans `AchatsHorsPlateforme`, avec son état)
   // Lien ACHAT → N° : un achat Vinted relié à une annonce numérotée (bouton 🔗,
   // qui pose buyFromId = transaction de l'achat) fait remonter SON numéro ici.
@@ -37112,6 +37229,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const poserRegistreFo = (fn) => setRegistreFo((prev) => { const u = fn(lireRegistre(prev)); save(CLE_FOURNISSEURS, u); return u; });
   // Délier toutes les paires d'un achat : le lien part, le prix que CE lot avait posé aussi (un prix saisi à la main reste).
   const delierToutFo = (aid) => { for (const x of reliesDuLot(numeros, aid)) { const patch = ecritureDelierGros(x.entree, aid, prixParNumFo); if (patch) poserPatchAchat('f:' + x.cle, patch); } };
+  // (10 nov., lot Y) Les mêmes déliaisons, en morceaux de corbeille (les champs de CHAQUE fiche, jamais son N°).
+  const morceauxDelierFo = (aid) => reliesDuLot(numeros, aid).map((x) => { const patch = ecritureDelierGros(x.entree, aid, prixParNumFo); return patch ? { k: 'vinted_annonce_numeros', type: 'champs', id: x.cle, apres: patch, avant: champsAvant(x.entree, patch) } : null; }).filter(Boolean);
   const foActions = {
     creer: async (c) => {
       const id = idFo('f'), at = new Date().toISOString();
@@ -37132,9 +37251,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ids = Object.keys(reg.achats).filter((k) => reg.achats[k].fournisseur === id);
       const ok = await askConfirm({ title: `Retirer ${p.nom} ?`, desc: ids.length ? `${ids.length} achat${ids.length > 1 ? 's' : ''} en gros partent avec lui et ses paires sont déliées. Un prix d’achat saisi à la main reste.` : 'Ses achats déjà saisis restent dans Achats.', ok: 'Retirer', cancel: 'Garder', danger: true });
       if (!ok) return false;
-      for (const aid of ids) delierToutFo(aid);
-      poserRegistreFo((r) => sansFournisseur(r, id).registre);
-      toast(`${p.nom} retiré`);
+      // (10 nov., lot Y) La confirmation reste (plusieurs prix d'un coup, §2.5) ; le retrait va ensuite à la
+      // corbeille 30 jours : lui, ses achats en gros, ses rattachements et les liens de ses paires reviennent
+      // ensemble (un prix retapé depuis est gardé). Pilule « Annuler » 5 s.
+      const brut = load(CLE_FOURNISSEURS, {}) || {};
+      const sous = (k) => (brut[k] && typeof brut[k] === 'object' ? brut[k] : {});
+      const morceaux = [{ k: CLE_FOURNISSEURS, type: 'cle', sous: 'personnes', id, avant: sous('personnes')[id] || reg.personnes[id] }];
+      for (const aid of ids) { morceaux.push({ k: CLE_FOURNISSEURS, type: 'cle', sous: 'achats', id: aid, avant: sous('achats')[aid] || reg.achats[aid] }); morceaux.push(...morceauxDelierFo(aid)); }
+      for (const [hid, h] of Object.entries(sous('hors'))) if (h && h.fournisseur === id) morceaux.push({ k: CLE_FOURNISSEURS, type: 'cle', sous: 'hors', id: hid, avant: h });
+      gesteCorbeille({ type: 'fournisseur', libelle: p.nom, morceaux }, { [CLE_FOURNISSEURS]: setRegistreFo, vinted_annonce_numeros: setNumeros });
       return true;
     },
     creerAchat: async (fid, c) => {
@@ -37158,8 +37283,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const n = reliesDuLot(numeros, aid).length;
       const ok = await askConfirm({ title: 'Retirer cet achat en gros ?', desc: n ? `${n} paire${n > 1 ? 's' : ''} reliée${n > 1 ? 's' : ''} : le prix posé par cet achat part aussi. Un prix d’achat saisi à la main reste.` : '', ok: 'Retirer', cancel: 'Garder', danger: true });
       if (!ok) return false;
-      delierToutFo(aid);
-      poserRegistreFo((p) => sansAchatGros(p, aid));
+      // (10 nov., lot Y) À la corbeille 30 jours, avec les liens de ses paires (un prix retapé depuis est gardé).
+      const brut = load(CLE_FOURNISSEURS, {}) || {};
+      const avantA = (brut.achats && brut.achats[aid]) || lireRegistre(registreFo).achats[aid];
+      const nomFo = (lireRegistre(registreFo).personnes[a.fournisseur] || {}).nom || '';
+      gesteCorbeille({ type: 'achat-gros', libelle: [nomFo, a.date ? a.date.split('-').reverse().join('/') : ''].filter(Boolean).join(' · '),
+        morceaux: [{ k: CLE_FOURNISSEURS, type: 'cle', sous: 'achats', id: aid, avant: avantA }, ...morceauxDelierFo(aid)] }, { [CLE_FOURNISSEURS]: setRegistreFo, vinted_annonce_numeros: setNumeros });
       return true;
     },
     regler: (aid, x) => poserRegistreFo((p) => avecRepartition(p, aid, x)),
@@ -44708,7 +44837,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {showQR ? (
                   <>
                     <button className="vrm-icon-control" aria-label={`Modifier « ${t} »`} type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title={VERBES.modifier} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
-                    <button type="button" className="vrm-icon-control" aria-label={`Supprimer « ${t} »`} onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title={VERBES.supprimer} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="trash" size={15}/></button>
+                    <button type="button" className="vrm-icon-control" aria-label={`Supprimer « ${t} »`} data-reponse-supprimer={i} onClick={()=>{ /* (10 nov., lot Y) à la corbeille 30 jours, pilule « Annuler » 5 s */ if (!gesteCorbeille({ type:'reponse', libelle:t, morceaux:[{ k:'vinted_quick_replies', type:'element', id:t, index:i, avant:t, defaut:quickReplies }] }, { vinted_quick_replies: setQuickReplies })) { const a=[...quickReplies]; a.splice(i,1); saveQR(a); } }} title={VERBES.supprimer} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="trash" size={15}/></button>
                   </>
                 ) : null}
               </div>

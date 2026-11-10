@@ -374,12 +374,11 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     else toast(editId ? 'Achat modifié' : 'Achat ajouté');
     fermer();
   };
-  const supprimer = async () => {
+  // (10 nov., lot Y) Plus de « Ça ne se rattrape pas » : il part à la corbeille 30 jours (pilule
+  // « Annuler » 5 s, puis Paramètres → Corbeille) ; sa photo n'est vidée qu'à la purge (src/corbeille.js).
+  const supprimer = () => {
     const b = liste.find(x => x.id === editId); if (!b) return;
-    const ok = await askConfirm({ title: `Supprimer « ${b.title || 'cet achat'} » ?`, desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price}\u00a0€)` : ''}. Ça ne se rattrape pas.`, ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
-    if (!ok) return;
     onSupprimer(b.id);
-    if (b.photo) ecrirePhotoAchatHors(b.id, null);
     fermer();
   };
   const lab = { fontSize: 12, color: C.muted, fontWeight: 600 };

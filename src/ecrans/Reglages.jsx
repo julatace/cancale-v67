@@ -1,6 +1,7 @@
 import { PlateformesSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
+import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -150,7 +151,15 @@ function ModelesSetting() {
   const [modeles, setModeles] = useStateCle(CLE_MODELES, () => lireModelesRanges());
   React.useEffect(() => onCloudReady(() => setModeles((l) => (l && l.length ? l : lireModelesRanges()))), []);   // eslint-disable-line react-hooks/exhaustive-deps
   const poser = (l) => { setModeles(l); save(CLE_MODELES, l); };
-  return <MesModeles modeles={modeles} onChange={poser} confirmer={(m) => askConfirm({ title: `Supprimer « ${m.nom} » ?`, ok: 'Supprimer', cancel: 'Annuler', danger: true })}/>;
+  // (10 nov., lot Y) Supprimer = à la corbeille 30 jours (pilule « Annuler » 5 s) : la feuille ne retire
+  // rien elle-même (`confirmer` rend false), le geste le fait sur la valeur rangée.
+  const aLaCorbeille = (m) => {
+    const L = load(CLE_MODELES, []); const i = Array.isArray(L) ? L.findIndex((x) => x && String(x.id) === String(m.id)) : -1;
+    if (i < 0) return true;
+    gesteCorbeille({ type: 'modele', libelle: m.nom || '', morceaux: [{ k: CLE_MODELES, type: 'element', idCle: 'id', id: L[i].id, index: i, avant: L[i] }] }, { [CLE_MODELES]: setModeles });
+    return false;
+  };
+  return <MesModeles modeles={modeles} onChange={poser} confirmer={aLaCorbeille}/>;
 }
 // ⟦← App.jsx #22⟧
 
@@ -1882,6 +1891,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      // (10 nov., lot Y) Ce qu'il a supprimé DANS VRM, restaurable 30 jours (src/corbeille.js).
+      { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:'Corbeille', desc:'Ce que tu as supprimé, à restaurer pendant 30 jours.', val:String(lireListeCorbeille().length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', desc:'Remettre VRM tel qu’il était dans une sauvegarde.', onClick:onImport },
     ], pied: (
       <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
