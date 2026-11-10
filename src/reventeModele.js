@@ -95,7 +95,7 @@ export function reventeDuModele({ cible, releve, enLigneDe = null, max = DERNIER
 export const phraseRevente = (r) => {
   if (!r || r.etat === 'inconnu') return '';
   if (r.etat === 'pasLu') return 'Tes ventes de ce modèle : pas encore lues ici';
-  if (r.etat === 'peu') return `Pas assez de ventes de ce modèle (${r.n})`;
+  if (r.etat === 'peu') return r.n ? `Pas assez de ventes de ce modèle (${r.n})` : 'Aucune vente de ce modèle pour l’instant';
   return `Revendu ${euroCourt(r.prixMedian)} en médiane, sur ${r.n} ventes`;
 };
 export const euroCourt = (v) => (v == null || !Number.isFinite(Number(v)) ? '—'
