@@ -1269,9 +1269,9 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
     // Une fiche LUE mais sans description : la description vient de la règle (N°, lettre) ; pas lue ⇒ dite.
     const lue = f === undefined ? undefined : f === null ? false : !!String(fo.desc || '').trim();
     const prixLu = fo.price != null && fo.price !== '' && Number(fo.price) > 0 ? Number(fo.price) : (p.prix != null && Number(p.prix) > 0 ? Number(p.prix) : null);
-    const ann = annonceRepubliee({ titre: String(fo.title || p.titre || ''), description: String(fo.desc || ''), prix: prixLu, floor: p.floor, numero: p.numero }, regs, { lettre: lettres[k], etiquette: etq });
+    const annK = annonceRepubliee({ titre: String(fo.title || p.titre || ''), description: String(fo.desc || ''), prix: prixLu, floor: p.floor, numero: p.numero }, regs, { lettre: lettres[k], etiquette: etq });
     const photos = (Array.isArray(fo.photos) && fo.photos.length ? fo.photos : (p.photo ? [p.photo] : [])).map((u) => (typeof u === 'string' ? u : (u && (u.url || u.full_size_url)) || '')).filter(Boolean).slice(0, 20);
-    return { k, p, f, ann, photos, lue };
+    return { k, p, f, ann: annK, photos, lue };
   });
   const kit = items.map((x) => ({ numero: x.p.numero, etiquette: x.ann.etiquette, titre: x.ann.titre, description: x.lue === true ? x.ann.description : '', lue: x.lue }));
   const cv = couvertureKit(kit);
