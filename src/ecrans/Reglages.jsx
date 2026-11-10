@@ -66,6 +66,7 @@ import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '..
 import GuideIphone, { useGuideIphone } from '../GuideIphone.jsx';
 // (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
 import SmsColisSetting from '../SmsColis.jsx';
+import RaccourcisSiri from '../RaccourcisSiri.jsx';
 import { etatJetonSms } from '../smsColis.js';
 // ⟦← App.jsx #6⟧
 import PhotoProfil,{AvatarCompte} from '../profil/AvatarPersonnel.jsx';
@@ -1877,6 +1878,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', desc:'Choisir les mots, marques et comptes à cacher.', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", desc:'Agrandir ou réduire les textes de VRM.', val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
+      // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
+      { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:'Siri et Raccourcis', desc:'Ajouter un achat ou trouver un N° en parlant à Siri.', data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
     ]},
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },

@@ -8,6 +8,7 @@ import { pairesDuModele } from '../dejaEnStock.js';
 import { cleFacture, verifierFichier } from '../factureAchat.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
 import { DejaEnStock } from '../DejaEnStock.jsx';
+import { prendreDemandeAchat, EVT_ACHAT_LIEN } from '../raccourcisSiri.js';
 import { Bouton, C, FermeAuRetour, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lirePdfLigne, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
 
@@ -335,6 +336,19 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     return () => { vivant = false; };
   }, [ouvert, avecPhoto]);
   const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  // (10 nov., lot AH) Le raccourci Siri « Ajouter un achat » (src/raccourcisSiri.js) : le formulaire s'ouvre,
+  // pré-rempli de ce qu'il a dit — rien n'est écrit sans « Ajouter l'achat ». Consommé une fois.
+  useEffect(() => {
+    const servir = () => {
+      const d = prendreDemandeAchat(); if (!d) return;
+      setEditId(null); setErreur('');
+      setForm({ ...BROUILLON0(), title: d.titre || '', price: d.prix || '', source: d.lieu || '' });
+      setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (f) f.scrollIntoView({ block: 'center' }); const vide = !d.titre ? 'titre' : !d.prix ? 'prix' : ''; const c = vide && document.querySelector(`[data-champ="${vide}"]`); if (c) c.focus({ preventScroll: true }); } catch (_) {} }, 80);
+    };
+    servir(); window.addEventListener(EVT_ACHAT_LIEN, servir);
+    return () => window.removeEventListener(EVT_ACHAT_LIEN, servir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const ouvrirEdition = (b) => {
     setEditId(b.id); setErreur('');
     setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo, facture: null });
