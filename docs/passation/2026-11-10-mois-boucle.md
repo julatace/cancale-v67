@@ -73,7 +73,24 @@ couverture (« 3/4 prix »).
 - Banc `scripts/bancs/mois-boucle.cjs` (vraie app, base servie avec projection ; l'écran Ventes
   ouvert d'abord PUBLIE CA et bénéfice — rien posé à la main dans ces lignes) : jeux P (prêt), R
   (paris_kicks pas relu 3 j), D (une vente à dater + un prix manquant) ; 390 tactile et 1512, clair
-  et sombre. Voir résultats et mutations ci-dessous.
+  et sombre : **202 verts, 0 rouge**. Sur le build d'`origin/main` : 20 rouges (aucune carte, aucun
+  sélecteur). Sur un build muté (compte pas relu ignoré + reçu daté à la vente) : 14 rouges
+  (R « prêt » avec paris_kicks pas relu ; reçu 200/60 au lieu de 260/0). Vu au banc et corrigé :
+  le compte « pas relu » de la fixture gardait une ligne `txn` fraîche (la règle prend la plus
+  récente de ses lignes `harvest_*`) — fixture corrigée, la règle est la bonne.
+- Captures regardées (390/1512, clair/sombre, P/R/D) : Mois bouclé (prêt, 2 choses, 1 compte) et
+  Comparer (flèches grises, « au moins » sans flèche, « 2/3 prix »). Vu et corrigé : les lignes
+  réglées se lisaient « Ventes à dater ✓ » ⇒ dites au passé (« Ventes datées »).
+- Bancs touchés relancés un à la fois : `argent` 268/0, `ma-semaine` 0 échec, `fraicheur-unique`
+  88/0, `argent-mois` partie C (Comparer) verte — ses 20 rouges sont la partie B (« journal de la
+  semaine en tête de Ma journée », carte fondue dans la frise le 9 nov., déjà rouge sur main) ;
+  `compta-stats-coherence` 14 rouges = les U1 du scénario B déjà rouges sur main ; `compta-simple`
+  2 rouges = « 7,44 € écrit 3 fois », déjà rouge sur main.
+- `npm run build` ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`, `urssaf`,
+  `benefice`, `benefice-unique`, `argent`, `ma-semaine`, `comparer-mois`, `chiffres`,
+  `fonctions-api`, `composants`, `onglets-a`, `onglets-d` : verts.
+- CLAUDE.md : la plus ancienne ligne §9 (« Litiges en cours + Retours par modèle ») déplacée telle
+  quelle dans `historique-divers.md`.
 - `scripts/bancs/argent-mois.cjs` : la partie C suit les deux sélecteurs (le même mois l'an
   dernier se CHOISIT ; 44 px au lieu du segmenté).
 
