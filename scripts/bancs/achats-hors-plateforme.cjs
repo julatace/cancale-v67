@@ -199,16 +199,45 @@ async function main() {
         await pg.waitForTimeout(1800);
         const rec2 = ((dernierMain() || {}).vinted_offvinted_buys || [])[0];
         dit(!!rec2 && rec2.price === '20,00' && rec2.id === (rec || {}).id && rec2.photo === true, `${T} modifier : le prix change, le même achat, la photo reste`, JSON.stringify(rec2 || null).slice(0, 120));
-        // Supprimer (avec confirmation)
+        // (10 nov., lot Y) Supprimer = à la CORBEILLE 30 jours : plus de « Ça ne se rattrape pas » ;
+        // la pilule offre « Annuler » 5 s ; l'achat entre dans `vrm_corbeille` (ligne `main`) ; sa photo
+        // n'est PAS vidée (elle ne l'est qu'à la purge) ; « Annuler » le remet exact ; Paramètres →
+        // Corbeille → « Restaurer » aussi.
+        let dialogue = false; pg.on('dialog', (d) => { dialogue = true; d.dismiss().catch(() => {}); });
+        const avantSuppr = JSON.stringify(rec2 || null);
         await tap(pg, '[data-achat-hors-id]');
         await tap(pg, '[data-achat-hors-supprimer]');
-        const oui = pg.getByRole('button', { name: /Oui, supprimer/ });
-        await oui.first().waitFor({ timeout: 4000 });
-        dit(true, `${T} supprimer demande une confirmation`);
-        await oui.first().click();
-        await pg.waitForTimeout(1800);
-        const l3 = (dernierMain() || {}).vinted_offvinted_buys;
+        await pg.waitForTimeout(400);
+        dit(!dialogue && (await pg.getByRole('button', { name: /Oui, supprimer/ }).count()) === 0, `${T} supprimer ne demande plus « Tu es sûr ? »`);
+        await pg.locator('[data-pilule-annuler]').first().waitFor({ timeout: 4000 });
+        const pil = await pg.locator('[data-pilule]').first().innerText();
+        dit(/corbeille/i.test(pil), `${T} la pilule dit « Mis à la corbeille » et offre « Annuler »`, pil.replace(/\s+/g, ' '));
+        await pg.waitForTimeout(2200);
+        const m3 = dernierMain() || {};
+        const l3 = m3.vinted_offvinted_buys;
+        const corb = Object.values(m3.vrm_corbeille || {});
         dit(Array.isArray(l3) && l3.length === 0 && (await pg.locator('[data-achat-hors-id]').count()) === 0, `${T} supprimé : sorti de la liste et de vinted_offvinted_buys`);
+        dit(corb.length === 1 && corb[0].type === 'achat' && JSON.stringify(corb[0].morceaux[0].avant) === avantSuppr && JSON.stringify(corb[0].lignes) === JSON.stringify(['achat_hors_photo_' + rec.id]), `${T} il est dans la corbeille, valeur d’avant EXACTE`, JSON.stringify(corb[0] || null).slice(0, 160));
+        dit(!ecrits.some((e) => /^achat_hors_photo_/.test(e.id) && e.data && e.data.supprime), `${T} sa photo n’est pas vidée (seulement à la purge, 30 jours)`);
+        await tap(pg, '[data-pilule-annuler]').catch(() => {});
+        await pg.waitForTimeout(2400);
+        const l4 = (dernierMain() || {}).vinted_offvinted_buys || [];
+        dit(l4.length === 1 && JSON.stringify(l4[0]) === avantSuppr && !Object.keys((dernierMain() || {}).vrm_corbeille || {}).length && (await pg.locator('[data-achat-hors-id]').count()) === 1, `${T} « Annuler » : l’achat revient exact, la corbeille se vide`, JSON.stringify(l4).slice(0, 120));
+        // De nouveau à la corbeille, puis Paramètres → Corbeille → « Restaurer ».
+        await tap(pg, '[data-achat-hors-id]');
+        await tap(pg, '[data-achat-hors-supprimer]');
+        await pg.waitForTimeout(6500);
+        await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
+        await pg.locator('[data-reglage-corbeille]').first().waitFor({ timeout: 12000 });
+        await tap(pg, '[data-reglage-corbeille]');
+        await pg.locator('[data-corbeille-restaurer]').first().waitFor({ timeout: 6000 });
+        const ligneCorb = await pg.locator("[data-corbeille-ligne]").first().innerText();
+        dit(/Achat hors plateforme/.test(ligneCorb) && /encore 30 j|encore 29 j/.test(ligneCorb), `${T} Paramètres → Corbeille : la ligne, sa date, les jours restants`, ligneCorb.replace(/\s+/g, ' '));
+        if (CAPTURES) await pg.screenshot({ path: path.join(CAPTURES, `corbeille-${vp.width}.png`), fullPage: false });
+        await tap(pg, '[data-corbeille-restaurer]');
+        await pg.waitForTimeout(2400);
+        const l5 = (dernierMain() || {}).vinted_offvinted_buys || [];
+        dit(l5.length === 1 && JSON.stringify(l5[0]) === avantSuppr && !Object.keys((dernierMain() || {}).vrm_corbeille || {}).length, `${T} « Restaurer » : l’achat revient exact (même id), la corbeille se vide`, JSON.stringify(l5).slice(0, 120));
         dit(errs.length === 0, `${T} aucune erreur de page`, errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
