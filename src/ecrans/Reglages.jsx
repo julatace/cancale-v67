@@ -1857,7 +1857,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'affichage', titre:'Affichage', items:[
       // (9 nov.) « Ma configuration » EN TÊTE du groupe : la configuration de départ, plein écran,
       // rejouable (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
-      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Tout en une fois : ce que tu vends, tes plateformes, ton statut, ton numéro, l’affichage, les notifications.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
+      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Ventes, plateformes, statut, numéro, affichage : tout en une fois.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
       { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
       { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },

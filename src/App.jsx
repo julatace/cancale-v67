@@ -22039,7 +22039,7 @@ function AchatsVestiaire() {
   let corps;
   if (d === undefined) corps = <div data-vc-achats="charge" style={style}>Lecture de tes achats Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire (rien perdu). <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
-  else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus. Ouvre <b style={{ color: C.text }}>tes achats</b> (« Mes commandes ») sur Vestiaire, dans le navigateur où l'extension VRM est installée{extSait('vcachats') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord</> : ''} : elle les lit en passant. Ton panier n'est jamais lu.</div>;
+  else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus : ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur Vestiaire{extSait('vcachats') === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord)</> : ''}. Ton panier n'est jamais lu.</div>;
   else {
     // (9 nov., soir, lot AJ) le plus récent en haut, la règle unique (src/ordreRecent.js)
     const liste = ordreRecent(Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v })), quandVestiaire);

@@ -264,13 +264,13 @@ function AnnoncesVestiaire() {
     window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
   }, [relire]);
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur vestiairecollective.com, dans le navigateur où l'extension VRM est installée</>;
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur Vestiaire, avec l'extension</>;
   let corps;
   if (d === undefined) corps = <div data-vc-annonces="charge" style={style}>Lecture de tes annonces Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire (rien perdu). <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   // (5.299) Vestiaire a répondu, mais dans une forme que l'extension ne sait pas encore lire : on le DIT (jamais « aucune annonce »).
   else if (d.inconnu && !(d.items && Object.keys(d.items).length)) corps = <div data-vc-annonces="format" style={style}>Réponse de Vestiaire illisible pour l'instant : <b style={{ color: C.text }}>aucune annonce n'est devinée</b>.</div>;
-  else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}. Elle les lit en passant, sans rien cliquer.</div>;
+  else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}.</div>;
   else {
     const liste = Object.entries(d.items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => {
       const num = numVcAnnonce(id, it, d.liens, vcLoc.auto);
@@ -708,7 +708,7 @@ function VentesVestiaire({ comptes }) {
     return m;
   }, [paires]);
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur vestiairecollective.com, dans le navigateur où l'extension VRM est installée</>;
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur Vestiaire</>;
   // (1er nov., audit A2) Une vente Vestiaire n'entre dans un total que si son
   // montant est SÛR (`montantRecuVc`) ; sinon elle est NOMMÉE à côté de chaque
   // total « toutes plateformes » (« au moins »). La phrase le dit, des mêmes lignes.
@@ -719,7 +719,7 @@ function VentesVestiaire({ comptes }) {
   let corps;
   if (d === undefined) corps = <div data-vc-ventes="charge" style={style}>Lecture de tes ventes Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire (rien perdu). <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
-  else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}. Elle les lit en passant.</div>;
+  else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}.</div>;
   else {
     const partisVc = departsVc({ ...d, departs: vcLoc.departs });
     const liste = ordreRecent(Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
@@ -863,7 +863,7 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
         : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
         : envoi && envoi.raison === 'messagerie-stream'
           ? <span data-vc-envoi-stream="">Vestiaire passe par un service de messagerie à part : réponds sur Vestiaire.</span>
-          : <>Envoie d'abord <b>une</b> réponse toi-même sur Vestiaire, {NAV.dans} : VRM apprend.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
+          : <>D'abord, envoie <b>une</b> réponse toi-même sur Vestiaire, {NAV.dans} : VRM apprend.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
       {resultat}
     </PiedSansEnvoi>
   );
