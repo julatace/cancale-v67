@@ -27,7 +27,7 @@ export function ilYa(at, maintenant = Date.now()) {
 //   { ton: 'ok' | 'attente' | 'off' | 'passu', phrase }
 export function etatAdresse(d, maintenant = Date.now()) {
   if (d === undefined) return { ton: 'attente', phrase: 'Lecture…' };
-  if (d === null) return { ton: 'passu', phrase: 'Pas su — la lecture n’a pas abouti.' };
+  if (d === null) return { ton: 'passu', phrase: 'Pas su pour l’instant.' };
   if (!d.pret) return { ton: 'off', phrase: 'Pas encore ouverte.' };
   if (d.actif === false) return { ton: 'off', phrase: 'Désactivée : rien ne t’est rangé.' };
   if (!('dernier' in d)) return { ton: 'passu', phrase: 'Dernier e-mail : pas su pour l’instant.' };
@@ -41,115 +41,156 @@ export const codeAMontrer = (d, maintenant = Date.now()) =>
 
 export const NOM_FOURNISSEUR = { gmail: 'Gmail', yahoo: 'Yahoo', outlook: 'Outlook' };
 
-// Le pas-à-pas par messagerie (10 nov. : une étape = une phrase de 12 mots au
-// plus — Julien déteste les murs de texte). `ecran` : le dessin schématique
-// (le champ où coller). `code` : la messagerie envoie une confirmation à
-// l'adresse VRM, que la feuille affiche à cette étape (index de l'étape).
+// Le pas-à-pas par messagerie — (10 nov., soir, lot « adresse-vrm-simple »)
+// TROIS pas au plus, chacun = une phrase de 12 mots au plus + UN bouton :
+//   'ouvrir' → la page de réglages de la messagerie (lien direct quand il
+//   existe) · 'copier' → l'adresse VRM · 'vinted' → le mot « vinted » ·
+//   'code' → la confirmation envoyée par la messagerie à l'adresse VRM,
+//   affichée à ce pas dès qu'elle arrive.
 // Chemins de menu : pages d'aide officielles (Gmail, iCloud, Outlook, Yahoo,
 // relevés le 6 nov., docs/passation/2026-11-06-onglets-c.md) ; Orange et Free :
-// libellés relevés le 10 nov. sur l'aide de la communauté Orange et l'aide
-// Zimbra — ils peuvent changer, la note le dit.
+// aide de la communauté Orange et aide Zimbra (10 nov.) — ils peuvent changer.
 export const FOURNISSEURS = [
   {
-    id: 'gmail', nom: 'Gmail', ou: 'Sur un ordinateur : l’app du téléphone ne sait pas.',
-    lien: 'https://mail.google.com/mail/u/0/#settings/fwdandpop', lienMot: 'Ouvrir les réglages de Gmail',
-    etapes: [
-      '⚙︎ → Voir tous les paramètres → Transfert et POP/IMAP.',
-      'Ajouter une adresse de transfert : colle ton adresse VRM.',
-      'Gmail envoie un code à VRM. Il s’affiche juste ici.',
-      'Colle ce code dans Gmail, puis Valider.',
-      'Choisis « Transférer une copie », puis Enregistrer.',
+    id: 'gmail', nom: 'Gmail', lettre: 'G',
+    lien: 'https://mail.google.com/mail/u/0/#settings/fwdandpop', lienMot: 'Ouvrir Gmail',
+    pas: [
+      { t: 'Sur ordinateur, ouvre « Transfert et POP/IMAP ».', geste: 'ouvrir' },
+      { t: '« Ajouter une adresse de transfert » : colle ton adresse VRM.', geste: 'copier' },
+      { t: 'Valide avec le code, puis « Transférer une copie ».', geste: 'code' },
     ],
-    code: 2, filtre: true,
-    ecran: { titre: 'Transfert et POP/IMAP', champ: 'Ajouter une adresse de transfert', bouton: 'Suivant' },
+    filtre: true,
   },
   {
-    id: 'icloud', nom: 'iCloud', ou: 'Sur icloud.com, depuis un ordinateur.',
+    id: 'icloud', nom: 'iCloud Mail', lettre: 'i',
     lien: 'https://www.icloud.com/mail/', lienMot: 'Ouvrir iCloud Mail',
-    etapes: [
-      'iCloud Mail → ⚙︎ → Réglages → Règles.',
-      'Ajouter une règle : « De » contient « vinted ».',
-      'Alors « Transférer à » : colle ton adresse VRM.',
-      'Terminé. Refais-le pour chaque transporteur si tu veux.',
+    pas: [
+      { t: 'Sur icloud.com : ⚙︎ → Réglages → Règles.', geste: 'ouvrir' },
+      { t: 'Nouvelle règle : « De » contient « vinted ».', geste: 'vinted' },
+      { t: 'Alors « Transférer à » : colle ton adresse VRM.', geste: 'copier' },
     ],
-    relais: true,
-    ecran: { titre: 'Règles', champ: 'Transférer à', bouton: 'Terminé' },
   },
   {
-    id: 'outlook', nom: 'Outlook', ou: 'Sur outlook.com (Hotmail, Live), depuis un ordinateur.',
-    lien: 'https://outlook.live.com/mail/0/options/mail/forwarding', lienMot: 'Ouvrir les réglages d’Outlook',
-    etapes: [
-      'Outlook → ⚙︎ → Courrier → Transfert.',
-      'Active le transfert et colle ton adresse VRM.',
-      'Coche « Conserver une copie », puis Enregistrer.',
+    id: 'outlook', nom: 'Outlook', lettre: 'O',
+    lien: 'https://outlook.live.com/mail/0/options/mail/forwarding', lienMot: 'Ouvrir Outlook',
+    pas: [
+      { t: 'Sur outlook.com, ouvre Courrier → Transfert.', geste: 'ouvrir' },
+      { t: 'Active le transfert et colle ton adresse VRM.', geste: 'copier' },
+      { t: 'Coche « Conserver une copie », puis Enregistrer.', geste: 'code' },
     ],
-    note: 'Certains comptes Outlook bloquent le transfert. Fais l’essai plus bas.',
-    ecran: { titre: 'Transfert', champ: 'Transférer mon courrier à', bouton: 'Enregistrer' },
   },
   {
-    id: 'orange', nom: 'Orange', ou: 'Sur mail.orange.fr, depuis un ordinateur.',
+    id: 'orange', nom: 'Orange', lettre: 'O',
     lien: 'https://mail.orange.fr/', lienMot: 'Ouvrir Mail Orange',
-    etapes: [
-      'Mail Orange → ⚙︎ → Préférences.',
-      'Ouvre « Transférer mes mails vers une autre boîte ».',
-      'Choisis « Envoyer une copie » : tes e-mails restent chez Orange.',
-      'Colle ton adresse VRM, puis Valider.',
+    pas: [
+      { t: 'Mail Orange → ⚙︎ → Préférences → « Transférer mes mails ».', geste: 'ouvrir' },
+      { t: '« Envoyer une copie » : colle ton adresse VRM.', geste: 'copier' },
+      { t: 'Valide. Tes e-mails restent aussi chez Orange.', geste: '' },
     ],
-    note: 'Orange change parfois ses menus : cherche « Transfert ».',
-    ecran: { titre: 'Préférences', champ: 'Envoyer une copie à', bouton: 'Valider' },
   },
   {
-    id: 'free', nom: 'Free', ou: 'Sur zimbra.free.fr, depuis un ordinateur.',
-    lien: 'https://zimbra.free.fr/', lienMot: 'Ouvrir le webmail de Free',
-    etapes: [
-      'Webmail Free → Préférences → Mail.',
-      'Section « Réception des messages » : champ « Faire suivre ».',
-      'Colle ton adresse VRM. Garde une copie chez Free.',
-      'Enregistrer.',
+    id: 'free', nom: 'Free', lettre: 'F',
+    lien: 'https://zimbra.free.fr/', lienMot: 'Ouvrir le webmail Free',
+    pas: [
+      { t: 'Webmail Free → Préférences → Mail.', geste: 'ouvrir' },
+      { t: '« Faire suivre » : colle ton adresse VRM.', geste: 'copier' },
+      { t: 'Garde une copie chez Free, puis Enregistrer.', geste: '' },
     ],
-    note: 'Les libellés peuvent changer : cherche « Faire suivre ».',
-    ecran: { titre: 'Préférences · Mail', champ: 'Faire suivre une copie à', bouton: 'Enregistrer' },
   },
   {
-    id: 'yahoo', nom: 'Yahoo', ou: 'Réservé à Yahoo Mail Plus (payant).',
+    id: 'yahoo', nom: 'Yahoo', lettre: 'Y',
     lien: 'https://mail.yahoo.com/', lienMot: 'Ouvrir Yahoo Mail',
-    etapes: [
-      'Yahoo Mail → Paramètres → Plus de paramètres.',
-      'Boîtes aux lettres → ton adresse → Transfert.',
-      'Colle ton adresse VRM, puis Vérifier.',
-      'Yahoo envoie un lien. Il s’affiche juste ici.',
-      'Ouvre le lien, puis Enregistrer.',
+    pas: [
+      { t: 'Paramètres → Boîtes aux lettres → Transfert (Yahoo Mail Plus).', geste: 'ouvrir' },
+      { t: 'Colle ton adresse VRM, puis « Vérifier ».', geste: 'copier' },
+      { t: 'Ouvre le lien reçu, puis Enregistrer.', geste: 'code' },
     ],
-    code: 3,
-    ecran: { titre: 'Boîtes aux lettres', champ: 'Adresse de transfert', bouton: 'Vérifier' },
   },
   {
-    id: 'autre', nom: 'Autre', ou: 'SFR, La Poste, Proton… : le principe est le même.',
+    id: 'autre', nom: 'Autre messagerie', lettre: '@',
     lien: '', lienMot: '',
-    etapes: [
-      'Ouvre les réglages de ta messagerie.',
-      'Cherche « Transfert », « Faire suivre » ou « Redirection ».',
-      'Colle ton adresse VRM. Garde une copie chez toi.',
-      'Une confirmation demandée ? Elle arrive dans ta boîte VRM.',
+    pas: [
+      { t: 'Dans tes réglages, cherche « Transfert » ou « Faire suivre ».', geste: '' },
+      { t: 'Colle ton adresse VRM, garde une copie chez toi.', geste: 'copier' },
+      { t: 'Un code demandé ? Il s’affiche ici.', geste: 'code' },
     ],
-    ecran: { titre: 'Réglages', champ: 'Transférer à', bouton: 'Enregistrer' },
   },
 ];
 
-// Le relais d'Apple (« Masquer mon adresse e-mail », « Se connecter avec
-// Apple ») : une adresse @privaterelay.appleid.com n'est PAS une boîte. Apple
-// fait suivre vers UNE adresse de ton compte Apple (le réglage « Transférer à »
-// n'accepte que celles-là) : le transfert vers VRM se pose dans CETTE boîte.
-export const RELAIS_APPLE = [
-  'C’est le relais d’Apple : il fait suivre vers ta vraie boîte.',
-  'iPhone : Réglages → ton nom → iCloud → Masquer mon adresse.',
-  'Regarde « Transférer à » : c’est ta vraie boîte.',
-  'Crée le transfert vers VRM dans CETTE boîte-là.',
+// La messagerie d'une adresse, par son DOMAINE (jamais devinée autrement).
+// '' = pas une adresse ; 'autre' = domaine inconnu.
+const DOMAINES_MESSAGERIE = [
+  ['relais-apple', /^privaterelay\.appleid\.com$/],
+  ['gmail', /^(?:gmail\.com|googlemail\.com)$/],
+  ['icloud', /^(?:icloud\.com|me\.com|mac\.com)$/],
+  ['outlook', /^(?:outlook|hotmail|live|msn)\.[a-z.]+$/],
+  ['orange', /^(?:orange\.fr|wanadoo\.fr)$/],
+  ['free', /^(?:free\.fr|aliceadsl\.fr)$/],
+  ['yahoo', /^(?:yahoo|ymail)\.[a-z.]+$/],
 ];
+export function messagerieDeDomaine(adresse) {
+  const a = String(adresse || '').trim().toLowerCase();
+  const i = a.lastIndexOf('@');
+  if (i < 1) return '';
+  const d = a.slice(i + 1);
+  for (const [id, re] of DOMAINES_MESSAGERIE) if (re.test(d)) return id;
+  return 'autre';
+}
+// La messagerie la plus présente parmi SES adresses (relais d'Apple et
+// domaines inconnus à part) ; '' si aucune n'est connue.
+export function messagerieDetectee(adresses) {
+  const n = new Map();
+  for (const a of Array.isArray(adresses) ? adresses : []) {
+    const m = messagerieDeDomaine(a);
+    if (!m || m === 'relais-apple' || m === 'autre') continue;
+    n.set(m, (n.get(m) || 0) + 1);
+  }
+  let best = '', max = 0;
+  for (const [m, k] of n) if (k > max) { best = m; max = k; }
+  return best;
+}
+
+// Un relais d'Apple (« Masquer mon adresse ») n'est pas une boîte : Apple fait
+// suivre vers UNE boîte de son compte Apple. Le geste : y choisir une boîte qui
+// arrive DÉJÀ à VRM (liste déroulante des boîtes reliées).
+export const PAS_RELAIS = [
+  { t: 'Ouvre « Masquer mon adresse » sur iCloud.', geste: 'ouvrir', lien: 'https://www.icloud.com/settings/', lienMot: 'Ouvrir iCloud' },
+  { t: '« Transférer à » : choisis cette boîte.', geste: 'boite' },
+  { t: 'Enregistre. VRM vérifie tout seul.', geste: '' },
+];
+
+// Le lien de confirmation n'est rendu QUE s'il pointe chez la messagerie (le
+// serveur le filtre déjà, api/_lib/adresse-reception.js ; l'app re-vérifie :
+// un faux message ne fait jamais afficher un lien piégé). Ouvert sur SON clic,
+// dans un nouvel onglet — jamais suivi par le serveur.
+const HOTES_CONFIRMATION = {
+  gmail: /^(?:mail-settings\.google\.com|mail\.google\.com|isolated\.mail\.google\.com)$/,
+  yahoo: /(?:^|\.)(?:yahoo\.com|yahoo\.net)$/,
+  outlook: /(?:^|\.)(?:live\.com|outlook\.com|microsoft\.com|office\.com)$/,
+};
+export function lienConfirmationSur(code) {
+  if (!code || !code.lien) return '';
+  try {
+    const u = new URL(code.lien);
+    const re = HOTES_CONFIRMATION[code.fournisseur];
+    return u.protocol === 'https:' && re && re.test(u.hostname) ? u.href : '';
+  } catch (_) { return ''; }
+}
+
+// ── LA PROGRESSION 1 · 2 · 3 · ✓ (et la reprise) ─────────────────────────────
+// `voulue` : l'étape où il s'est arrêté (gardée sur CET appareil, un confort) ;
+// la preuve LUE passe devant : essai reçu ou compte relié ⇒ ✓ (4) ; un code
+// de confirmation arrivé ⇒ au moins l'étape 2 (c'est là qu'il sert).
+export function etapeDuParcours({ voulue, essai, relie, code } = {}) {
+  if (relie || essai === 'recu') return 4;
+  const v = [1, 2, 3].includes(Number(voulue)) ? Number(voulue) : 1;
+  return code && v < 2 ? 2 : v;
+}
+export const CLE_PARCOURS = 'vrm_parcours_adresse_vrm';
 
 // Le filtre Gmail « seulement Vinted et les colis ».
 export const ETAPES_FILTRE_GMAIL = [
-  'Fais d’abord les étapes 1 à 4.',
+  'Fais d’abord les 3 étapes du transfert.',
   'Barre de recherche → ⚙︎ des options → champ « De ».',
   'Colle la règle ci-dessous → Créer un filtre.',
   'Coche « Transférer à » ton adresse VRM → Créer.',
