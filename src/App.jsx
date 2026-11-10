@@ -409,6 +409,8 @@ import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
+import { lireAvecCopie, SEL_VERSION, stockageApp, effacerCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
+import MentionCopie from "./MentionCopie.jsx";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
@@ -1309,7 +1311,7 @@ const writeSession = (s) => {
   }
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
   // (9 nov.) Plus de session (refusée, déconnectée) : plus de laissez-passer hors ligne.
-  if (!s) { try { effacerLaissezPasser(localStorage); } catch (_) {} }
+  if (!s) { try { effacerLaissezPasser(localStorage); } catch (_) {} try { effacerCopies(); } catch (_) {} }
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
   // quoi que ce soit ne soit relu ou repoussé (voir ensureLocalOwner).
@@ -2144,6 +2146,8 @@ const wipeLocalData = () => {
   try { if (typeof caches !== 'undefined') caches.delete(CACHE_QR).catch(() => {}); } catch (_) {}
   // (9 nov.) Et les bordereaux gardés pour le hors connexion (src/bordereauxHorsLigne.js).
   try { if (typeof caches !== 'undefined') caches.delete(CACHE_PDF).catch(() => {}); } catch (_) {}
+  // (10 nov., lot K) Et les listes gardées sur l'appareil (src/copieLignes.js).
+  try { effacerCopies(); } catch (_) {}
 };
 // Mémorise à qui appartiennent les données présentes dans ce navigateur.
 const OWNER_MARK = 'vrm_local_owner';
@@ -2348,7 +2352,14 @@ const prechargerDemarrage = () => {
     // lignes ; sinon (première ouverture sur cet appareil) ventes + achats de
     // tous, jamais `orders_bought` ni `wreq_*`. Projeté (§4.4).
     const memo = comptesLiesMemorises(qui);
-    const famille = lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true })
+    // (10 nov., lot K) Les comptes connus : leurs commandes gardées sur l'appareil, revalidées
+    // par leur VERSION (src/copieLignes.js) — seules les lignes changées sont téléchargées.
+    const uidCopie = memo && AUTH.user?.id ? AUTH.user.id : '';
+    const famille = (uidCopie
+      ? lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids: idsCommandes(memo), stockage: stockageApp(), local: localStorage,
+          lireVersions: (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null),
+          lireLignes: (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null) }).then((r) => (r.ok ? r.rows : null))
+      : lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }))
       .then((rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null)).catch(() => null);
     // Les comptes que la lecture commune couvre. ⚠️ §4.1 : une liste VIDE n'est
     // pas une réponse — aucune ligne pour les comptes retenus ⇒ chacun est relu à part.
@@ -5158,6 +5169,15 @@ const _lireLigneMoissonSeule = async (id, auth) => {
 };
 const _groupeMoisson = creerLectureGroupee(async (ids, cle) => {
   const auth = authDeCleMoisson(cle);
+  // (10 nov., lot K) Dressings et boîtes de réception : gardés sur l'appareil, revalidés
+  // par leur VERSION (src/copieLignes.js) — rien n'est téléchargé quand rien n'a changé.
+  const famille = String(cle).slice(String(cle).lastIndexOf('|') + 1);
+  const uidCopie = (famille === 'listings' || famille === 'inbox') && AUTH.user?.id && auth === (sbAuth().Authorization || '') ? AUTH.user.id : '';
+  if (uidCopie) {
+    const lire = async (sel, l) => { try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${l.join(',')})&select=${sel}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}), cache: 'no-store' }); if (!res.ok) return null; const j = await res.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+    const r = await lireAvecCopie({ uid: uidCopie, famille, ids, stockage: stockageApp(), local: localStorage, lireVersions: (l) => lire(SEL_VERSION, l), lireLignes: (l) => lire(SEL_MOISSON, l) });
+    return r.ok ? { ok: true, rows: r.rows } : { ok: false, statut: 0 };
+  }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });
     if (!res.ok) return { ok: false, statut: res.status };
@@ -54820,6 +54840,7 @@ function AppCoeur() {
         <EnAttenteEnvoi/>
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
+        {!baseKO && <MentionCopie/>}
         {/* (9 nov., lot AG) UNE ligne de fraîcheur en haut de l'app : « Tout est à jour · vérifié il y a N min »,
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
