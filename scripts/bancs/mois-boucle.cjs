@@ -10,7 +10,8 @@
 //   P. tout lu, tout frais, prix d'achat saisis ⇒ « {M} est prêt à déclarer » et le
 //      montant = la prévision URSSAF du même mois (daté au VERSEMENT : la vente
 //      vendue le mois d'avant et versée en M y est) ;
-//   R. le même, mais le compte paris_kicks pas relu depuis 3 jours ⇒ JAMAIS « prêt »,
+//   R. le même, mais le compte paris_kicks pas relu depuis 3 jours (TOUTES ses lignes harvest_222_*,
+//      la règle de « relu » prenant la plus récente) ⇒ JAMAIS « prêt »,
 //      « 1 » compte à relire (nommé), la porte ouvre Comptes liés ;
 //   D. une vente finalisée sans date de versement et un prix d'achat pas saisi ⇒
 //      « à dater 1 », « prix 1 », les portes ouvrent « Vendu et reçu » et Annonces.
@@ -71,7 +72,7 @@ const jeu = (nom) => {
     rows.push({ id: `harvest_${uid}_profile`, data: { capturedAt: cap, payload: {} } });
     rows.push({ id: `harvest_${uid}_billing`, data: { capturedAt: cap, payload: { escrow: { amount: '0.0' }, main: { amount: '0.0' } } } });
   }
-  for (const v of ventes) if (v[4]) rows.push({ id: `harvest_${v[0]}_txn_${v[1]}`, data: { capturedAt: ilYa(60e3), payload: { transaction: { id: v[1], item_id: v[1] + 500000, status: 450, status_title: 'Commande finalisée', status_updated_at: iso(v[4]) } } } });
+  for (const v of ventes) if (v[4]) rows.push({ id: `harvest_${v[0]}_txn_${v[1]}`, data: { capturedAt: ilYa(Math.max(60e3, ageCompte[v[0]])), payload: { transaction: { id: v[1], item_id: v[1] + 500000, status: 450, status_title: 'Commande finalisée', status_updated_at: iso(v[4]) } } } });
   rows.push({ id: 'lbc_ventes', data: { ventes: {} } }, { id: 'ebay_orders', data: { orders: [] } }, { id: 'vc_ventes', data: { ventes: {} } });
   rows.push({ id: 'panel_comptes_etat', data: { comptes: {} } });
   rows.push({ id: 'ext_appareil_0f1e2d3c4b5a6978', data: { v: 1, appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' }, ver: ATTENDUE, code: ATTENDUE, at: ilYa(5 * 60e3), atMs: Date.now() - 5 * 60e3, flux: { vinted: { okAt: Date.now() - 5 * 60e3, koAt: null, refus: [] } }, vus: {} } });
