@@ -441,6 +441,7 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 import { auCentreDeVerification } from "./verificationArticle.js";
 import { preuvesFriseVinted, bifurcationVente, friseProuvee } from "./friseProuvee.js";   // (10 nov., lot BE) la frise d'une vente, étape par étape
 import FriseVente from "./FriseVente.jsx";
+import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js";   // (10 nov., lot BG) d'où viennent mes achats
 import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
 import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi, compteAImprimer } from "./prochainGesteColis.js";
@@ -36694,6 +36695,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { ...r, achats, hors, rattachables, ventesLues, partielSites: !Array.isArray(autresBenefice) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub, asoOuvert, registreFo, sales.items, sales.error, numeros, saleOv, buyByNum, offBuys, autresBenefice, hiddenSales, hiddenAccts]);
+  // ── (10 nov., lot BG) D'OÙ VIENNENT MES ACHATS — publié pour Statistiques (src/sourceAchats.js) ──
+  // Les MÊMES ventes que le relevé de Statistiques (`vrm_stats_ventes` : finalisées, hors
+  // masquées ; Leboncoin, eBay, Vestiaire par `autresBenefice`), le bénéfice de la règle
+  // unique (`beneficeLigneVente` / `ventesAutresBenefice`), la source de LA paire par
+  // identité seulement (`sourceDeVente` : achat Vinted relié, achat en gros, N° d'un achat
+  // hors plateforme et la source QU'IL y a saisie). Rien n'est publié tant qu'une lecture
+  // manque (un compte de ventes raté, Leboncoin/eBay pas lus) : la dernière publication reste.
+  useEffect(() => {
+    if (!Array.isArray(sales.items)) return;
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
+    if (!Array.isArray(autresBenefice)) return;
+    try {
+      const reg = lireRegistre(registreFo);
+      const hors = horsParNumero(offBuys, cleNum);
+      const ctx = { hors, registre: reg, cleNum };
+      const lignes = [];
+      for (const o of sales.items) {
+        if (!o || isHidden(o) || o.transaction_id == null || classifyOrderStatus(o.status) !== 'completed') continue;
+        const t = o.date ? Date.parse(o.date) : NaN; if (!isFinite(t)) continue;
+        const e = effEntry(o);
+        const devise = o.price && o.price.currency_code;
+        const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
+        const src = e ? sourceDeVente(e, ctx) : null;
+        lignes.push({ id: String(o.transaction_id), ts: t, cle: src ? src.cle : '', libelle: src ? src.libelle : '', benefice: lb.benefice == null ? null : Math.round(lb.benefice * 100), partiel: lb.etat === 'partiel' });
+      }
+      for (const x of autresBenefice) {
+        if (!x || !isFinite(x.ts)) continue;
+        // Une commande eBay à plusieurs N° : aucune fiche unique ⇒ « achat pas relié » (jamais attribuée).
+        const f = x.num && !/\+/.test(x.num) ? ficheUniqueDuNumero(numeros, cleNum(x.num)) : null;
+        const src = f ? sourceDeVente(withBuyByNum(f), ctx) : null;
+        const b = x.achat != null && isFinite(x.eur) ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) : null;
+        lignes.push({ id: String(x.id), ts: x.ts, cle: src ? src.cle : '', libelle: src ? src.libelle : '', benefice: b, partiel: false });
+      }
+      publierSources(lignes, { owner: AUTH.user?.id || '' });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, offBuys, registreFo, autresBenefice, hiddenSales, hiddenAccts]);
   // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
   const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
   const articlesLus = (tx) => {
