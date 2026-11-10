@@ -81,6 +81,8 @@ export function FactureAutreVente({ plateforme, vente, deps }) {
         <b>Facture {emise.numero}</b><span>émise le {jourParis(emise.emiseLe)} · à joindre au colis ou à partager</span>
       </button>
       <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => voir(true)}>Partager</button>
+      {/* La feuille qui vient de l'émettre reste ouverte (« Facture … émise », PDF) jusqu'à SA fermeture. */}
+      {ouverte && v.ok ? <FeuilleFactureAutre v={v} cfg={cfg} deps={deps} deja={emise} fermer={() => setOuverte(false)}/> : null}
     </div>;
   }
   if (estPro(cfg) !== true || f === undefined) return null;
@@ -92,7 +94,7 @@ export function FactureAutreVente({ plateforme, vente, deps }) {
   </div>;
 }
 
-function FeuilleFactureAutre({ v, cfg, deps, fermer }) {
+function FeuilleFactureAutre({ v, cfg, deps, fermer, deja = null }) {
   const p = v.acheteurPropose || {};
   const [nom, setNom] = React.useState(p.nom || '');
   const [adresse, setAdresse] = React.useState(p.adresse || '');
@@ -100,7 +102,9 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer }) {
   const [fiche, setFiche] = React.useState(false);
   const [occupe, setOccupe] = React.useState(false);
   const [retour, setRetour] = React.useState(null);
-  const [emise, setEmise] = React.useState(null);
+  const [emise, setEmise] = React.useState(deja);
+  // Le PDF : l'instantané rendu à l'émission, sinon relu (la liste ne porte que les scalaires).
+  const pdf = async (partager) => { const c = (emise && emise.contenu) || await lireContenu(deps, idFactureAutre(v.plateforme, v.ref)); if (!c) { deps.toast("Le PDF n'a pas pu être lu — réessaie dans un instant."); return; } await ouvrirPdf(c, deps, partager); };
   const L = PLATEFORMES[v.plateforme].l;
   const acheteur = { nom, adresse };
   const ma = manquantsAcheteurSaisi(acheteur);
@@ -123,10 +127,10 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer }) {
     <div className="vrm-fp-feuille-corps">
       {fiche ? <FicheFacturation deps={deps} focus={typeof fiche === 'string' ? fiche : null} surPrete={() => setFiche(false)}/>
         : emise ? <>
-          <div className="vrm-fp-etat" data-fa-emise={emise.numero}><b>Facture {emise.numero} émise</b><span>À joindre au colis ou à partager.</span></div>
+          <div className="vrm-fp-etat" data-fa-emise={emise.numero}><b>Émise</b><span>À joindre au colis ou à partager.</span></div>
           <div className="vrm-fp-gestes">
-            <button type="button" className="vrm-b vrm-b-primaire" onClick={() => emise.contenu && ouvrirPdf(emise.contenu, deps)} data-fa-pdf="">Voir le PDF</button>
-            <button type="button" className="vrm-b vrm-b-secondaire" onClick={() => emise.contenu && ouvrirPdf(emise.contenu, deps, true)}>Partager</button>
+            <button type="button" className="vrm-b vrm-b-primaire" onClick={() => pdf(false)} data-fa-pdf="">Voir le PDF</button>
+            <button type="button" className="vrm-b vrm-b-secondaire" onClick={() => pdf(true)}>Partager</button>
           </div>
         </> : <>
           {mv.length ? <div className="vrm-fp-etat is-manque" data-fa-fiche={mv.length}><b>Ta fiche « Ma facture » n'est pas complète</b><span>Il manque {mv.map((m) => m.l).join(', ')}.</span>

@@ -109,7 +109,14 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
 }, sel);
 const deplier = async (pg, tx) => {
   await pg.locator(`[data-lbc-vente="${tx}"]`).first().waitFor({ timeout: 30000 });
-  await pg.locator(`[data-lbc-vente="${tx}"] .vrm-ledger-sale-toggle`).first().click();
+  // Le détail s’ouvre en feuille : un clic pendant la fermeture de la précédente peut se perdre — on réessaie (au plus 4 fois) tant que le détail de CETTE vente n’est pas visible.
+  const ouvert = pg.locator(".vrm-ledger-drawer-host:not([hidden]) .vrm-ledger-drawer-head button");
+  if (await ouvert.count()) { await ouvert.first().click().catch(() => {}); await pg.waitForTimeout(600); }
+  for (let i = 0; i < 4; i++) {
+    await pg.locator(`[data-lbc-vente="${tx}"] .vrm-ledger-sale-toggle`).first().click();
+    const vu = await pg.locator(".vrm-ledger-drawer-host:not([hidden]) .vrm-ledger-drawer-head h2", { hasText: tx }).first().waitFor({ timeout: 3000 }).then(() => true, () => false);
+    if (vu) return;
+  }
 };
 
 (async () => {
@@ -152,7 +159,7 @@ const deplier = async (pg, tx) => {
         await pg.keyboard.press('Escape').catch(() => {});
         await pg.locator('[data-fa-feuille]').waitFor({ state: 'detached', timeout: 10000 }).catch(async () => { await pg.locator('[data-fa-feuille] button[aria-label]').first().click().catch(() => {}); });
         await pg.locator('[data-fa-ref="123456789"][data-fa-etat="emise"]').waitFor({ state: 'attached', timeout: 20000 });
-        if (!(await pg.locator('[data-fa-ref="123456789"][data-fa-etat="emise"]').isVisible())) await pg.locator('[data-lbc-vente="123456789"] .vrm-ledger-sale-toggle').first().click();
+        if (!(await pg.locator('[data-fa-ref="123456789"][data-fa-etat="emise"]').isVisible())) await deplier(pg, '123456789');
         await pg.locator('[data-fa-ref="123456789"][data-fa-etat="emise"]').waitFor({ timeout: 20000 });
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fa-apres-${nf}.png`) });
         dit(true, '5. sur la vente : « Facture FA-2026-0006 » (PDF)');
