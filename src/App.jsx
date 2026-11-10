@@ -479,6 +479,7 @@ import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : b
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
+import { listeInventaire, publierInventaireAnnuel } from "./inventaireAnnuel.js";   // (10 nov., lot W) l'inventaire de fin d'année
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
 import { etatNumeroColis } from "./emballage.js";
 // (6 nov., vitesse 2) ModeEmballage : à la demande ; sa feuille de style reste ICI (même ordre).
@@ -31535,6 +31536,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!valeurDuStock || !AUTH.user?.id) return;
     publierValeurStock(valeurDuStock, { owner: AUTH.user.id, partiel: !!listings.incomplet });
   }, [valeurDuStock, listings.incomplet]);
+  // (10 nov., lot W) L'INVENTAIRE DE FIN D'ANNÉE (src/inventaireAnnuel.js) : les MÊMES paires et la
+  // MÊME valeur (`valeurStock`), ligne par ligne (N°, titre, compte, prix d'achat saisi), publiées
+  // avec elle sous `vrm_inventaire_annuel` ; le Stock les lit. Annonces pas lues ⇒ rien publié.
+  useEffect(() => {
+    if (!valeurDuStock || !AUTH.user?.id) return;
+    publierInventaireAnnuel(listeInventaire(annoncesPresentes, { ficheDe: (it) => fusionEntreeVente(numeros[it.id] || {}, null, buyByNum), numeroDe: (it) => (numeros[it.id] || {}).numero, compteDe: (it) => (it._acc && (it._acc.login || it._acc.username)) || '', cle: cleNum }), { owner: AUTH.user.id, partiel: !!listings.incomplet });
+  }, [valeurDuStock, listings.incomplet]); // eslint-disable-line react-hooks/exhaustive-deps
   // (6 nov., vague 3) LA MÊME PAIRE EN LIGNE DEUX FOIS SUR VINTED (src/enLigneDeuxFois.js) :
   // deux annonces EN LIGNE (la règle <enligne-regle>, jamais « à confirmer » ni masquées)
   // de même PHOTO EXACTE ou reliées par `recreeDe` — risque de double vente. Un compte
