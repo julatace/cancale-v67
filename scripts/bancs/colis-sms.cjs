@@ -168,10 +168,11 @@ const ouvrir = async (b, vp, sombre, tab, init = {}) => {
         await pg.locator('[data-sous-ouvrir="sms-colis"]').first().click();
         await pg.locator('[data-sms-creer]').first().waitFor({ timeout: 10000 });
         const etapes = await pg.evaluate(() => [...document.querySelectorAll('[data-sms-etape]')].map((e) => e.getAttribute('data-sms-etape')));
-        dit(etapes.join(',') === 'automatisation,declencheur,immediat,url,post', 'le pas-à-pas : 5 étapes illustrées', etapes.join(','));
+        dit(etapes.join(',') === 'automatisation,declencheur,immediat,url,post,vestiaire', 'le pas-à-pas : 6 étapes en liste courte numérotée (Vestiaire comprise, 9 nov.)', etapes.join(','));
         await pg.locator('[data-sms-creer]').first().click();
         // `save` écrit le stockage après son délai (debounce) : on attend la valeur, jamais un délai fixe (§6.5).
         await pg.waitForFunction(() => /[A-Za-z0-9]{32}/.test(localStorage.getItem('vrm_sms_token') || ''), null, { timeout: 8000 }).catch(() => {});
+        if (SHOTS) { await pg.locator('[data-sms-colis]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `sms-reglage-${nom}.png`) }); }
         const a = await pg.evaluate(() => ({ url: (document.querySelector('[data-sms-url]') || {}).textContent || '', jeton: localStorage.getItem('vrm_sms_token'), etat: (document.querySelector('[data-sms-colis]') || {}).getAttribute('data-sms-colis') }));
         let jeton = ''; try { jeton = JSON.parse(a.jeton); } catch (_) { jeton = a.jeton || ''; }
         dit(a.etat === 'actif' && /^[A-Za-z0-9]{32}$/.test(jeton) && /^https:\/\/vrm\.center\/api\/widget\?mode=sms&k=/.test(a.url) && !a.url.includes(jeton), 'créer ⇒ jeton de 32 caractères, adresse affichée masquée', JSON.stringify({ url: a.url, etat: a.etat }));

@@ -25,7 +25,7 @@
 //     votre colis » (ses propres envois), c'est la RELÈVE par le transporteur.
 //     Il ne vaut jamais « retiré » (api/_lib/etat-colis-email.js).
 // ─────────────────────────────────────────────────────────────────────────────
-import { normaliserSuivi, etatColisDepuisTexte } from './etat-colis-email.js';
+import { normaliserSuivi, etatColisDepuisTexte, changementDeRelais } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { etatRetrait, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
 import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
@@ -71,6 +71,12 @@ export function relireLigneSuivi(d) {
   const preuve = !!(codeLu(d.code) || aUnQr(d));
   if (d.status === 'available' && d.lieu && LIEU_AU_FUTUR.test(d.lieu) && !preuve) return { ...d, status: 'transit', statusLabel: 'En transit', lieu: null };
   const etat = etatColisDepuisTexte(d.subject || d.sujet || '', d.statusLabel || '');
+  // (10 nov.) « Votre colis a changé de plan » rangé AVANT la règle « arrivé » ou « livré »
+  // (le corps parlait du point, « livré dans le Point Relais suivant ») : la ligne garde le
+  // sujet de l'e-mail qui a posé son état — c'est donc lui qui l'avait mal classée. Le colis
+  // roule vers le nouveau point (api/_lib/etat-colis-email.js, `changementDeRelais`).
+  if (etat === 'transit' && changementDeRelais(d.subject || d.sujet || '') && d.status !== 'transit') return { ...d, status: 'transit', statusLabel: 'Point relais changé', relaisChange: true, retireLe: null };
+  if (d.status === 'transit' && d.relaisChange && !d.statusLabel) return { ...d, statusLabel: 'Point relais changé' };
   if (etat === 'retour' && d.status !== 'delivered') return { ...d, status: 'retour', statusLabel: 'Reparti chez l’expéditeur' };
   if (etat === 'delivered') return { ...d, status: 'delivered', statusLabel: 'Livré / retiré' };
   // « Ton colis arrive aujourd'hui ! #… » : l'arrivée est ANNONCÉE — sans code,

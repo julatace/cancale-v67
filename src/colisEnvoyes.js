@@ -70,6 +70,11 @@ export function transporteurDeVente({ bord = null, pdf = null, departs = null, t
 }
 
 export const nomEnvoye = (t) => (t && t.nom) || INCONNU;
+// (10 nov., Julien : « il y a des endroits où c'est marqué transporteur inconnu ») CE QUI S'ÉCRIT
+// À L'ÉCRAN pour un groupe sans transporteur lu : des mots neutres, jamais « inconnu » en gros.
+// `INCONNU` reste la CLÉ interne des groupes et des pastilles (règles, bancs) et l'`aria-label`.
+export const SANS_TRANSPORTEUR = 'Transporteur à identifier';
+export const libelleTransp = (nom) => (!nom || nom === INCONNU ? SANS_TRANSPORTEUR : nom);
 
 // La date qui range un colis envoyé. `x` : { depart?: {at}, coche?: ms, vente?: ms|iso }.
 // Rend { ms, source: 'depart' | 'coche' | 'vente' | null }.
