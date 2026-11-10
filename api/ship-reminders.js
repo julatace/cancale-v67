@@ -27,6 +27,7 @@ import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
+import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
 import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
@@ -1369,6 +1370,20 @@ export default async function handler(req, res) {
     res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'colis', dus: r && r.dus, traites: r && r.traites, restants: r && r.restants, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint,
       lus: bilans.reduce((t, b) => t + (Number(b.lus) || 0), 0), changes: bilans.reduce((t, b) => t + (Number(b.changes) || 0), 0), ...(r && !r.fait ? { raison: r.raison || r.erreur || 'pas-su' } : {}),
       etiquettes: et && { fait: !!et.fait, dus: et.dus, traites: et.traites, lus: et.lus, ranges: et.ranges, vus: et.vus, restants: et.restants, echecs: et.echecs, budgetAtteint: et.budgetAtteint, ...(et.fait ? {} : { raison: et.raison || et.erreur || 'pas-su' }) } });
+    return;
+  }
+  // (10 nov., lot Q) `?moment=factures` : l'envoi AUTOMATIQUE des factures Pro, et RIEN d'autre —
+  // GitHub toutes les 30 min (.github/workflows/factures-auto.yml). Seuls les vendeurs qui l'ont
+  // ALLUMÉ sont visités (api/_lib/factures-auto.js) ; sélection pas lue ⇒ 503, personne n'est visité.
+  // La réponse ne porte que des NOMBRES.
+  if (moment === 'factures') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'factures', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageFacturesAuto({ lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000 });
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'factures', vendeurs: r && r.vendeurs, traites: r && r.traites, envoyees: r && r.envoyees, refusees: r && r.refusees, pauses: r && r.pauses, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint, ...(r && !r.fait ? { raison: r.raison || 'pas-su' } : {}) });
     return;
   }
   const soir = moment === 'soir';
