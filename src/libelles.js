@@ -33,6 +33,8 @@ export const NOTIONS = Object.freeze({
   vendu:       Object.freeze({ titre: 'Vendu',     bas: 'vendu',     ecartes: [] }),
   benefice:    Object.freeze({ titre: 'Bénéfice',  bas: 'bénéfice',  ecartes: ['bénéfice brut'] }),
   compta:      Object.freeze({ titre: 'Compta',    bas: 'compta',    ecartes: [] }),
+  // (10 nov.) Statistiques et Compta réunies en UN endroit (src/argent.js).
+  argent:      Object.freeze({ titre: 'Argent',    bas: 'argent',    ecartes: [] }),
   statut:      Object.freeze({ titre: 'Statut',    bas: 'statut',    ecartes: ['régime fiscal'] }),
   // Les écrans et les réglages.
   favoris:     Object.freeze({ titre: 'Favoris',   bas: 'favoris',   ecartes: ['likes'] }),

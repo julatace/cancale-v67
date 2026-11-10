@@ -107,7 +107,7 @@ const euros = (v) => (Number.isFinite(v) ? v.toFixed(2).replace('.', ',') + ' �
 // (9 nov., lot AD) `attendu` : la clé du colis que « Préparer mes colis » montre. Le scan dit alors
 // si le bordereau est le BON (la même identité : n° de suivi ⇒ SA vente) ; un bordereau d'un autre
 // colis est dit (« celui du N°… »), sans bouton — rien n'est coché sur la mauvaise vente.
-export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null, attendu = '' }) {
+export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null, attendu = '', note = null }) {
   const M = MOTS[mode] || MOTS.envoi;
   const video = React.useRef(null);
   const saisieRef = React.useRef(null);
@@ -228,6 +228,8 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
                 {c.personne ? <span className="vrm-sensible" data-stream-type="acheteur" data-scan-personne={M.personne}>{c.personne}</span> : null}
                 {Number.isFinite(c.prix) ? <span data-montant="" data-scan-prix={String(c.prix)}>{euros(c.prix)}</span> : null}
               </span>
+              {/* (10 nov., lot BD) La note privée de la paire, par son N°. */}
+              {note && c.num ? <span className="vrm-scan-note" data-scan-note="">{note(c)}</span> : null}
             </div>
           </div>
         ) : res ? (

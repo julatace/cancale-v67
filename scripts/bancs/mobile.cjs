@@ -130,7 +130,7 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
   check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'ordinateur: paramètres toujours accessibles (bas du rail)');await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});{const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg>=64&&lg<=88,'ordinateur: photo de vente pleine, vente ouverte ('+lg+' px)');};
   // (17 oct.) Le rail n'a plus de groupes repliés : Gestion est toujours visible, Factures vit dans Comptabilité.
   const rail=p.locator('.vrm-atelier-rail');
-  check(await rail.getByRole('button',{name:'Compta',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');
+  check(await rail.getByRole('button',{name:'Argent',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');
   await rail.getByRole('button',{name:'Vinted',exact:true}).click();
   await p.getByRole('button',{name:'Annonces',exact:true}).first().click();
   // (26 oct.) Dans l'espace Vinted, l'onglet « Annonces » est le titre : plus de second titre

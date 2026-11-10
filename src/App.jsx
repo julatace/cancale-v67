@@ -479,6 +479,7 @@ import ModeRelais from "./ModeRelais.jsx";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
+import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
@@ -529,9 +530,14 @@ import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
+import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
 import "./styles-popups.css";       // (9 nov., lot AI) l'avatar du compte Vinted ouvert (en haut à droite) — après la DA6
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {LignePlancher} from "./LignePlancher.jsx";
+import { CLE_NOTES_PAIRES, NOTE_MAX, noteDe, opsNote, notesPropres, numerosAmbigus } from './notePaire.js';
+import { NotePaireVue } from './NotePaire.jsx';
+import { CLE_HORS_MASQUES, achatsEnDouble, opsGarder, horsVisibles } from './achatsDoubles.js';
+import { AchatsEnDouble } from './AchatsEnDouble.jsx';
 import {DejaEnStock} from "./DejaEnStock.jsx";
 import {pairesDuModele} from "./dejaEnStock.js";
 import {plancherVente,offreFacePlancher} from "./plancherOffre.js";
@@ -2477,6 +2483,10 @@ const SYNC_KEYS = [
   // avant l'envoi ({ [tx]: at }), et les annonces « Plus tard » de « Sans achat relié »
   // ({ [itemId]: at }) : le même état sur tous ses appareils. Aucun prix, aucun N°.
   'vrm_annulees_reglees', 'vrm_achat_plus_tard',
+  // (10 nov., lot BD) La NOTE PRIVÉE d'une paire ({ 'n:<N°>' | 'a:<id annonce>': { t, at } },
+  // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
+  // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
+  'vrm_notes_paires', 'vrm_achats_hors_masques',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
   'vrm_brouillons_refaire_ecartes',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
@@ -2996,6 +3006,7 @@ function AskTextSheet({ q, close }) {
           aria-label={titre}
           placeholder={q.placeholder || ''}
           data-ask-champ={q.data || undefined}
+          maxLength={q.max || undefined}
           inputMode={q.decimal ? 'decimal' : q.numeric ? 'numeric' : undefined}
           style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.surface,color:C.text,fontSize:17,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
         <div style={{display:'flex',gap:9,marginTop:12}}>
@@ -3749,6 +3760,51 @@ const gesteVrm = (texte, ops, setters = {}, apres = null) => _gestes.lancer({
 function PiluleAnnulerCoque() {
   const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
   return <PiluleAnnuler gestes={_gestes} enHaut={enHaut}/>;
+}
+
+// ── (10 nov., lot BD) LA NOTE PRIVÉE D'UNE PAIRE (src/notePaire.js, src/NotePaire.jsx) ──
+// UN état pour tous les endroits où la paire apparaît (Annonces, fiche paire, Ventes,
+// Colis → Préparer et scan, Stock) : la clé synchronisée `vrm_notes_paires`, relue à
+// chaque sauvegarde ou fusion du nuage. Le N° « porté par deux paires présentes »
+// (`numerosAmbigus`) cache la note (elle pourrait décrire l'autre, §5). L'écriture est
+// un geste annulable 5 s (`gesteVrm`, lot B) ; rien ne part vers une plateforme.
+let _notesVue = null, _ambigusVue = null, _notesEcoute = false;
+const _notesAbonnes = new Set();
+const notifierNotes = () => { [..._notesAbonnes].forEach((f) => { try { f(); } catch (_) {} }); };
+const lireNotesPaires = () => { if (_notesVue == null) _notesVue = notesPropres(load(CLE_NOTES_PAIRES, {})); return _notesVue; };
+const lireNumerosAmbigus = () => { if (_ambigusVue == null) _ambigusVue = numerosAmbigus(load('vinted_annonce_numeros', {}) || {}, { cleNum }); return _ambigusVue; };
+const abonnerNotes = (fn) => {
+  if (!_notesEcoute) {
+    _notesEcoute = true;
+    window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k;
+      if (k === CLE_NOTES_PAIRES) { _notesVue = null; notifierNotes(); } else if (k === 'vinted_annonce_numeros') { _ambigusVue = null; notifierNotes(); } });
+    onCloudReady(() => { _notesVue = null; _ambigusVue = null; notifierNotes(); });
+  }
+  _notesAbonnes.add(fn);
+  return () => { _notesAbonnes.delete(fn); };
+};
+const poserNotesVue = (f) => { _notesVue = notesPropres(typeof f === 'function' ? f(lireNotesPaires()) : f); notifierNotes(); };
+const editerNotePaire = async (paire, actuelle) => {
+  const num = String((paire && paire.numero) || '').trim();
+  const v = await askText({ title: num ? `Note · N°${num}` : 'Note sur cette paire', desc: 'Toi seul la vois. Jamais envoyée sur Vinted ni ailleurs.',
+    value: actuelle || '', placeholder: 'ex : petite tache semelle gauche', ok: 'Enregistrer', max: NOTE_MAX, data: 'note-paire' });
+  if (v == null) return;
+  const ops = opsNote(lireNotesPaires(), paire, v, { cleNum });
+  if (!ops.length) return;
+  gesteVrm(String(v).trim() ? 'Note enregistrée' : 'Note effacée', ops, { [CLE_NOTES_PAIRES]: poserNotesVue });
+};
+// `ajout` : l'icône discrète pour en écrire une quand il n'y en a pas (Annonces,
+// fiche paire, Stock, Préparer) ; ailleurs (Ventes, scan) seule une note existante se montre.
+function NotePaireCoque({ numero = '', itemId = '', recreeDe = '', variante = 'ligne', ajout = false, rangee = false }) {
+  const notes = React.useSyncExternalStore(abonnerNotes, lireNotesPaires);
+  const amb = React.useSyncExternalStore(abonnerNotes, lireNumerosAmbigus);
+  const paire = { numero, itemId, recreeDe };
+  const n = noteDe(notes, paire, { cleNum, ambigu: (k) => amb.has(k) });
+  const peutEcrire = !!(String(numero || '').trim() || /^\d{3,}$/.test(String(itemId || '')));
+  if (!n && !(ajout && peutEcrire)) return null;
+  const vue = <NotePaireVue note={n} variante={variante} ajout={ajout && peutEcrire} numero={String(numero || '')}
+    onEditer={n && n.cachee ? null : () => editerNotePaire(paire, n && n.texte)}/>;
+  return rangee ? <span className="vrm-note-rangee">{vue}</span> : vue;
 }
 
 // localStorage est partagé entre les onglets : le changement de vendeur
@@ -10500,7 +10556,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -14203,10 +14259,11 @@ const GROUPES_PLUS=[
     {id:'achats',     icon:'cart', label:'Achats'},
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
     {id:'emails',     icon:'mail', label:'E-mails'},
-  ]},
-  { titre:'Argent', items:[
-    {id:'dashboard', icon:'chart', label:'Statistiques'},
-    {id:'compta',    icon:'euro',  label:'Compta'},
+    // (10 nov., Julien : « L'onglet Compta est trop flou, tu peux peut-être le relier avec
+    // Stats ») UNE entrée « Argent » remplace « Statistiques » et « Compta » : un écran à quatre
+    // segments (Résumé · Statistiques · Déclarer · Factures, src/argent.js). Les deux écrans
+    // restent (`dashboard`, `compta`) : leurs liens mènent à leur segment.
+    {id:'compta',    icon:'euro',  label:'Argent'},
   ]},
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
@@ -14233,6 +14290,8 @@ const BAR_GROUPE={
   cat_expedition:'cat_bord',
   // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue est mise en avant.
   organisation:'settings',
+  // (10 nov.) Statistiques est un segment d'Argent : l'entrée « Argent » reste allumée.
+  dashboard:'compta',
   // (10 nov., lot BC) « Ma semaine » s'ouvre depuis Ma journée (et la notification du bilan).
   semaine:'journee',
   // (10 nov., lot BB) « Litiges en cours » s'ouvre depuis Ventes et À trancher.
@@ -14245,7 +14304,7 @@ function titreEcran(tab) {
   if (tab === 'semaine') return 'Ma semaine';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  return { dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
@@ -14262,13 +14321,15 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=[...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
   cat_msg: ['messages', 'vinted'], leboncoin: ['annonces', 'leboncoin'], ebay_annonces: ['annonces', 'ebay'],
   cat_achats: ['cat_bord', 'retirer'], retraits: ['cat_bord', 'retirer'], ebay_agent: ['ventes', 'ebay.agent'], vestiaire_ventes: ['ventes', 'vestiaire'],
   vestiaire_annonces: ['annonces', 'vestiaire'],
+  // (10 nov.) Argent : `?tab=argent`, `?tab=stats`, et la vue « Déclarer » (src/argent.js).
+  ...CHEMINS_ARGENT,
 };
 // La vue demandée par une entrée de « Plus » (Republier, Favoris…),
 // consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
@@ -19127,6 +19188,16 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
     </div>
   );
 }
+// (10 nov.) LES QUATRE SEGMENTS D'ARGENT (src/argent.js) : le même contrôle segmenté que
+// partout (`PlatSubNav`). Un segment = un nom passé à `setTab`, résolu par `ONGLETS_DEPLACES`
+// (même écran ⇒ seule la section change).
+function ArgentNav({ seg, setTab }) {
+  return (
+    <div className="vrm-argent-nav" data-argent-nav={seg}>
+      <PlatSubNav sub={seg} setSub={(id) => setTab(ONGLET_SEGMENT[id] || 'argent')} sections={SEGMENTS_ARGENT.map((x) => [x.id, x.l])}/>
+    </div>
+  );
+}
 // Résumé Vinted COMPACT, toujours visible en haut de l'onglet (Julien, 25 sept. :
 // « il n'y a pas direct les ventes et les achats »). Plus d'écran « Aperçu » à
 // traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
@@ -20051,6 +20122,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
   const dejaOuvert = React.useRef(false);
   if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
+  const numerosNote=[...new Set([...numerosFiche, fusion && fusion.num, numTitre].map(n=>String(n||'').trim()).filter(Boolean).map(cleNum))];
   return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-vente-compte={compte||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
@@ -20074,6 +20146,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       onClick={(e)=>{ const c = e.currentTarget.closest('[data-fu-forme]'); if (!c) return; const on = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', on); e.currentTarget.setAttribute('aria-expanded', on ? 'true' : 'false'); }}>
       <Icon name="more" size={18}/></button> : null}
     {frise}
+    {/* (10 nov., lot BD) La note privée de chaque paire de la vente, par SON N° (jamais le titre). */}
+    {numerosNote.length ? <div className="vrm-note-rangee" data-vente-notes="">{numerosNote.map((n) => <NotePaireCoque key={n} numero={n}/>)}</div> : null}
     {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
     {bas}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
@@ -35625,7 +35699,54 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
   // prix, date, source, et surtout un N° → le même numéro que tu écris sur la
   // boîte et que tu mets sur l'annonce, pour relier l'achat à la vente.
-  const [offBuys, setOffBuys] = useStateCle('vinted_offvinted_buys', () => load('vinted_offvinted_buys', []));
+  const [offBuysTous, setOffBuys] = useStateCle('vinted_offvinted_buys', () => load('vinted_offvinted_buys', []));
+  // (10 nov., lot BH) Un achat hors plateforme masqué comme DOUBLE d'un autre (« Garder
+  // celle-ci », src/achatsDoubles.js) sort de la liste et de TOUS les totaux de cet écran ;
+  // rien n'est supprimé (la fiche reste dans `vinted_offvinted_buys`, « Réafficher »).
+  const [horsMasques, setHorsMasques] = useStateCle(CLE_HORS_MASQUES, () => { const v = load(CLE_HORS_MASQUES, []); return Array.isArray(v) ? v.map(String) : []; });
+  const offBuys = useMemo(() => horsVisibles(offBuysTous, horsMasques), [offBuysTous, horsMasques]);
+  // (10 nov., lot BH) « ACHAT SAISI DEUX FOIS » — par IDENTITÉ seulement (n° de transaction
+  // Vinted, n° de commande ou de facture tapé sur l'achat), jamais par titre, prix ou date
+  // (src/achatsDoubles.js). Les achats Vinted masqués ne sont déjà plus dans `buysBase`.
+  const achatsDoubles = useMemo(() => achatsEnDouble({ vinted: buysBase, hors: offBuysTous, masquesHors: new Set(horsMasques) }), [buysBase, offBuysTous, horsMasques]);
+  const achatsLusEnEntier = Array.isArray(buys.items) && !buys.error && !(Array.isArray(buys.failed) && buys.failed.length);
+  // Le nombre pour « À trancher », publié par CET écran (pas su ⇒ rien publié, jamais 0).
+  useEffect(() => { if (curSub === 'achats' && achatsLusEnEntier) publierATrancher('achats-doubles', achatsDoubles.length); }, [curSub, achatsLusEnEntier, achatsDoubles]);
+  // « Garder celle-ci » : les AUTRES achats du groupe sont masqués (rien supprimé), en UN
+  // geste annulable 5 s (lot B). Un achat Vinted : le masquage d'« Masquer cet achat »
+  // (remis à SA place à l'annulation) ; un achat hors plateforme : `vrm_achats_hors_masques`.
+  const garderAchatDouble = (groupe, idGarde) => {
+    const ops = opsGarder(groupe, idGarde);
+    if (!ops.length) return;
+    const txs = ops.filter((o) => o.k === ACHATS_MASQUES).map((o) => String(o.id));
+    const parTx = new Map(groupe.achats.filter((a) => a.source === 'vinted').map((a) => [String(a.cle), a.achat]));
+    const places = {}, placesCache = {};
+    gesteVrm(ops.length > 1 ? `${ops.length} doubles masqués` : 'Double masqué', ops, { [CLE_HORS_MASQUES]: setHorsMasques }, (sens) => {
+      if (!txs.length) return;
+      const n = achatsMasques(); for (const tx of txs) { if (sens === 'apres') n.add(tx); else n.delete(tx); }
+      _achatsMasques = [...n];
+      setBuys((prev) => {
+        if (!prev || !prev.items) return prev;
+        let items = [...prev.items];
+        for (const tx of txs) {
+          if (sens === 'apres') { places[tx] = items.findIndex((x) => String(x.transaction_id) === tx); items = items.filter((x) => String(x.transaction_id) !== tx); }
+          else if (!items.some((x) => String(x.transaction_id) === tx) && parTx.get(tx)) { const p = places[tx]; items.splice(p >= 0 && p <= items.length ? p : items.length, 0, parTx.get(tx)); }
+        }
+        return { ...prev, items };
+      });
+      const c = _acctCache['purchased'];
+      if (c) {
+        let l = c.items || [];
+        for (const tx of txs) {
+          if (sens === 'apres') { placesCache[tx] = l.findIndex((x) => String(x.transaction_id) === tx); l = l.filter((x) => String(x.transaction_id) !== tx); }
+          else if (!l.some((x) => String(x.transaction_id) === tx) && parTx.get(tx)) { const p = placesCache[tx]; l = [...l]; l.splice(p >= 0 && p <= l.length ? p : l.length, 0, parTx.get(tx)); }
+        }
+        c.items = l; _persistAcctCache();
+      }
+    });
+  };
+  // Réafficher un achat hors plateforme masqué comme double (le même geste, à l'envers).
+  const reafficherHorsDouble = (id) => gesteVrm('Achat réaffiché', [{ k: CLE_HORS_MASQUES, type: 'ensemble', id: String(id), apres: false, avant: true }], { [CLE_HORS_MASQUES]: setHorsMasques });
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
   const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
@@ -42823,6 +42944,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             « + Ajouter » est TOUJOURS là, en un tap. Le composant porte la
             règle ; ici on ne fait que brancher la clé synchronisée (§11). */}
         {/* (31 oct., soir) Un achat, pas un colis à aller chercher : sur « Achats » seulement. */}
+        {/* (10 nov., lot BH) Un même achat saisi deux fois : les deux fiches côte à côte, « Garder celle-ci ». */}
+        {!modeRetraits && <AchatsEnDouble groupes={achatsDoubles} masques={(offBuysTous || []).filter((b) => b && horsMasques.includes(String(b.id)))}
+          onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
+          compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
@@ -43516,6 +43641,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
                     <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
+                    {/* (10 nov., lot BD) La note privée de la paire, par SON identité (N°, sinon l'annonce). */}
+                    <NotePaireCoque numero={num} itemId={it.id} recreeDe={e && e.recreeDe} ajout rangee/>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
                       <span data-prix style={{fontSize:22,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prix(it.price,it.currency)||'—'}</span>
                     </div>
@@ -45874,14 +46001,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
 
       {(curSub==='bordereaux' || curSub==='achats') && scanOuvert === 'retrait' ? <ScannerColis mode="retrait" trouver={trouverRetrait} onConfirmer={retirerScan} onFermer={() => setScanOuvert(false)} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
-      {curSub==='bordereaux' && scanOuvert && scanOuvert !== 'retrait' ? <ScannerColis mode="envoi" trouver={trouverScan} attendu={scanAttendu} onConfirmer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => { setScanOuvert(false); setScanAttendu(''); }} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => { setScanOuvert(false); setScanAttendu(''); }}/></ScannerColis> : null}
+      {curSub==='bordereaux' && scanOuvert && scanOuvert !== 'retrait' ? <ScannerColis mode="envoi" note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc"/> : null)} trouver={trouverScan} attendu={scanAttendu} onConfirmer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => { setScanOuvert(false); setScanAttendu(''); }} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => { setScanOuvert(false); setScanAttendu(''); }}/></ScannerColis> : null}
       {/* (9 nov., lot AD) « Préparer mes colis » (Colis → À envoyer) et le mode relais (À retirer, Achats). */}
       {curSub==='bordereaux' && preparerOuvert ? <PreparerColis colis={colisPreparer()} uid={AUTH.user?.id || ''} attente={deposeScan.attente ? deposeScan.attente.cle : ''}
           onFait={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
           onImprimer={(c) => (c && c.site === 'vinted' && c.x ? imprimerColisVinted(c.x) : null)} onScanner={(c) => { setScanAttendu(c.cle); setScanOuvert('envoi'); }}
           onFermer={() => setPreparerOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}
           Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}
-          photoCarton={(c) => { const v = c && venteDuColis(c.geste); return v ? <BoutonPhotoCarton vente={{ ...v, num: c.num || '' }} ton="clair"/> : null; }}/> : null}
+          photoCarton={(c) => { const v = c && venteDuColis(c.geste); return v ? <BoutonPhotoCarton vente={{ ...v, num: c.num || '' }} ton="clair"/> : null; }}
+          note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null)}/> : null}
       {(curSub==='bordereaux' || curSub==='achats') && relaisOuvert ? <ModeRelais colis={colisModeRelais()} onRetire={retirerRelais} onAnnuler={(id) => _gestes.annuler(id)}
           onFermer={() => setRelaisOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
       {curSub==='bordereaux' && !scanOuvert && !tourneeDepot ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
@@ -53133,14 +53261,14 @@ function AppCoeur() {
         // (27 oct.) Seulement pour un micro-entrepreneur (`urssafConcerne`) :
         // un particulier, une société ou un statut jamais choisi n'a rien à déclarer ici.
         const r=urssafConcerne() ? rappelUrssaf({ freq: load('vinted_urssaf_freq','trimestriel'), declare: lireDeclarations(), ligne: lireLigneUrssaf() }) : null;
-        if(r) items.push({icon:'🧾', ic:'receipt', text:r.text, sub:r.sub, n:1, tab:'compta', jr:true, job:'urssaf', urssaf:r});
+        if(r) items.push({icon:'🧾', ic:'receipt', text:r.text, sub:r.sub, n:1, tab:'argent_declarer', jr:true, job:'urssaf', urssaf:r});
       }
       {
         // (9 nov.) UN PARTICULIER : pas d'URSSAF, mais le rappel DAC7 (src/profilFiscal.js), rare —
         // seulement quand une plateforme APPROCHE le seuil sur des ventes LUES (la ligne publiée,
         // la règle de Comptabilité `dac7ParPlateforme`) ; atteint ou pas lu ⇒ rien ici.
         const d=rappelDac7Journee(profilFiscalLu(), dac7ParPlateforme({ ligne: lireLigneUrssaf(), annee: new Date().getFullYear() }));
-        if(d) items.push({icon:'🧾', ic:'info', text:`${d.plateforme} : bientôt transmis aux impôts (DAC7)`, sub:`Encore ${d.resteVentes} vente${d.resteVentes>1?'s':''} ou ${fmt(d.resteCentimes/100)} cette année. Vinted te demandera tes informations fiscales : c’est une déclaration, pas un impôt.`, n:1, tab:'compta', jr:true, job:'dac7', dac7:true});
+        if(d) items.push({icon:'🧾', ic:'info', text:`${d.plateforme} : bientôt transmis aux impôts (DAC7)`, sub:`Encore ${d.resteVentes} vente${d.resteVentes>1?'s':''} ou ${fmt(d.resteCentimes/100)} cette année. Vinted te demandera tes informations fiscales : c’est une déclaration, pas un impôt.`, n:1, tab:'argent_declarer', jr:true, job:'dac7', dac7:true});
       }
       // Une liste identique ne se repose pas : un tableau neuf re-rendait toute
       // la coque et l'écran ouvert pour rien à chaque recalcul (22 oct.).
@@ -53932,7 +54060,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = () => setFicheNum(null);
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <NotePaireCoque numero={p.num} variante="bloc" ajout/> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
@@ -54215,9 +54343,9 @@ function AppCoeur() {
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
         {(tab==='communaute'||tab==='emails')&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
-        {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/>:null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={<><ArgentNav seg="stats" setTab={setTab}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}
-        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/>:null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={<><ArgentNav seg="stats" setTab={setTab}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -54240,7 +54368,7 @@ function AppCoeur() {
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} onTrancher={trancherAT} Photo={PhotoVinted} entete={<ScreenHead icon="help" title="À trancher"/>}/></GardeEcran>}
-        {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/></GardeEcran>}
+        {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab}/>}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}
         {tab==='communaute'&&<GardeEcran nom="communaute"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense></GardeEcran>}
         {/* (5 nov.) E-mails : les liens « Voir dans VRM » passent par `vrm:aller` (un chemin `?tab=…&cible=…`, src/cibleNotif.js). */}
@@ -54257,8 +54385,8 @@ function AppCoeur() {
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense></GardeEcran>}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
-        {tab==='compta'&&<GardeEcran nom="compta:rubriques"><div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={/* (30 oct.) « Comptabilité » était écrit deux fois en tête (segment + titre) : « Vue d’ensemble », comme Statistiques */ [['compta','Vue d’ensemble'],['factures','Factures']]}/></div></GardeEcran>}
-        {tab==='compta'&&platSub!=='factures'&&<GardeEcran nom="compta"><ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}
+        {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
+        {tab==='compta'&&<GardeEcran nom="compta"><ComptaPro vue={vueCompta(platSub)} allerVue={(v)=>setTab(ONGLET_SEGMENT[v]||'argent')} argentNav={<ArgentNav seg={segmentArgent('compta',platSub)} setTab={setTab}/>} liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}
         {/* (31 oct., soir) Colis · Leboncoin : la pastille « Leboncoin » de la rangée
             de filtres de Colis ouvre les colis Leboncoin (bordereau, QR — l'ancien
             « Leboncoin → Colis », `LeboncoinColis`) ; les autres pastilles
@@ -54355,4 +54483,4 @@ export { useProfilFiscal, profilFiscalLu };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
-export { ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
+export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
