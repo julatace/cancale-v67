@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { problemesAnnonce } from '../verifAnnonce.js';
+import { ordreRecent, quandVestiaire } from '../ordreRecent.js';
 import { STYLE_FLOU, vcFloute } from '../flouCompte.js';
 import { lienDe, vcReliable } from '../lienVestiaire.js';
 import React, { useState, useEffect } from 'react';
@@ -714,11 +715,13 @@ function VentesVestiaire({ comptes }) {
   else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}. Elle les lit en passant.</div>;
   else {
     const partisVc = departsVc({ ...d, departs: vcLoc.departs });
-    const liste = Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
+    const liste = ordreRecent(Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
       const num = numVcVente(v, d.liens, vcLoc.auto);
       return { id, ...v, num, ...etapeVenteVc(v, partisVc.get(String(id)) || null) };
-    // (31 oct.) Les ventes À EXPÉDIER d'abord (la date limite la plus proche en tête), puis les autres, la plus récente d'abord.
-    }).sort((a, z) => (z.aExpedier === true) - (a.aExpedier === true) || (a.aExpedier && z.aExpedier ? String(a.limite || '9999').localeCompare(String(z.limite || '9999')) : 0) || String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
+    // ⚠️ (9 nov., soir, lot AJ — décision de Julien : « du plus récent en haut au plus vieux en bas ») La
+    // plus RÉCENTE en haut, tous comptes mélangés (src/ordreRecent.js). Avant (31 oct.) : les ventes à
+    // expédier d'abord, la limite la plus proche en tête — l'étape et la limite restent écrites sur chaque ligne.
+    }), quandVestiaire);
     const aExp = liste.filter((v) => v.aExpedier && !vcLoc.fait[v.id] && !v.departLu);
     const lue = d.lectures && d.lectures['a-expedier'];
     const derniere = [d.lectures && d.lectures.ventes && d.lectures.ventes.at, lue && lue.at].filter(Boolean).sort().pop() || '';

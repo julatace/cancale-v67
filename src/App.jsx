@@ -20163,8 +20163,11 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   const ventes=lbcVentes.ventes || [];
   // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
   const lbcOuvert = useCompteLbcOuvert();
-  const visibles=ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
-    && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o))));
+  // (9 nov., soir, lot AJ) La plus récente en haut, TOUS COMPTES MÉLANGÉS (date de vente lue, sinon la date
+  // relevée par l'extension ou datée à la main) ; sans date en bas — la règle unique (src/ordreRecent.js).
+  const datesLbcV = React.useMemo(() => lireDatesLbc(), [lbcVentes]);
+  const visibles=ordreRecent(ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
+    && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o)))), (o) => quandLeboncoin(o, datesLbcV));
   // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay, 26 oct.) ──────────────────────
   // N° et bénéfice par IDENTITÉ seulement (§5) : `numeroLbcIdentite` (lien posé
   // à la main > référence VRM de l'annonce, '' si ambigu), puis le prix d'achat
@@ -20236,8 +20239,9 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const fmt2 = (n) => n.toFixed(2).replace('.', ',') + '\u00a0€';
   // (28 oct.) Le plus récent d'abord, comme les achats Vinted ; une date
   // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
-  const tsAchat = (o) => { const t = o && o.dateVente ? Date.parse(o.dateVente) : NaN; return isNaN(t) ? -Infinity : t; };
-  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{[...arr].sort((a, b) => tsAchat(b) - tsAchat(a)).map(o => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />)}</div>;
+  // (9 nov., soir, lot AJ) La règle unique (src/ordreRecent.js) : date d'achat lue, tous comptes mélangés.
+  const tsAchat = (o) => quandLeboncoin(o);
+  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{ordreRecent(arr, tsAchat).map(o => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />)}</div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
       {/* (27 oct., « pareil que Vinted ») Plus de second titre « Achats
@@ -21797,7 +21801,8 @@ function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
   // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
-  const E = vc.aEnvoyer || [], F = vc.faits || [];
+  // (9 nov., soir, lot AJ) La vente la plus récente en haut (src/ordreRecent.js) ; la limite reste sur la carte.
+  const E = ordreRecent(vc.aEnvoyer || [], quandVestiaire), F = ordreRecent(vc.faits || [], quandVestiaire);
   if (!E.length && !F.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
@@ -21871,8 +21876,8 @@ function AchatsVestiaire() {
   else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus. Ouvre <b style={{ color: C.text }}>tes achats</b> (« Mes commandes ») sur Vestiaire, dans le navigateur où l'extension VRM est installée{extSait('vcachats') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord</> : ''} : elle les lit en passant. Ton panier n'est jamais lu.</div>;
   else {
-    const liste = Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v }))
-      .sort((a, z) => String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
+    // (9 nov., soir, lot AJ) le plus récent en haut, la règle unique (src/ordreRecent.js)
+    const liste = ordreRecent(Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v })), quandVestiaire);
     if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire à la dernière lecture{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur vestiairecollective.com {NAV.dans} : il apparaît ici.</div>;
     else corps = (
       <div data-vc-achats="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -40385,10 +40390,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {!premierJour && (
                   <FriseJournee liveStats={liveStats} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte}
                     onVentes={() => onNav && onNav('cat_ventes')}
-                    photosEntre={(de, a) => (sales.items || [])
+                    photosEntre={(de, a) => ordreRecent((sales.items || [])
                       .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
                       .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
-                      .sort((x, y) => y.t - x.t).map((x) => orderPhoto(x.o)).filter(Boolean)}/>
+                      .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>
                 )}
                 {/* (3 nov., carte réglable par page) Les chiffres de la tête : un grand chiffre + trois
                     cases, choisis par Julien (« Modifier »). Défaut = vendu aujourd'hui (porté par la frise
