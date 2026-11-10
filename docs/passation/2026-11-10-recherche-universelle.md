@@ -76,7 +76,18 @@ l'appareil (les « récentes » existaient déjà, tues en mode stream).
   estIdentiteExacte, … »).
 - Banc `scripts/bancs/recherche-exacte.cjs` (390 tactile et 1512, clair et sombre ;
   lecture TENUE ; lecture des achats en panne) : **tout vert** (≈ 100 contrôles). Sur
-  le build d'`origin/main` (même banc, `BANC_DIST`) : voir le compte ci-dessous.
+  le build d'`origin/main` (ae0e418d, même banc, `BANC_DIST`) : **40 rouges**. Mutation
+  « identité par titre » bâtie dans l'app (`estIdentiteExacte` accepte le titre) : rouge
+  (la paire « Lot XW300000007FR » en tête, 50 jumelles en tête, pseudo en tête…).
+- Bancs voisins, après le merge d'origin/main (un à la fois, `BANC_PORT` aléatoire) :
+  `recherche-fiche` vert (sa ligne « Ventes puis Messages » accepte maintenant la tête
+  quand le n° de transaction est exact) ; `navigation-fusion`, `litiges-recherche`,
+  `recherche-numero` verts ; `annuler-commandes` 2 rouges (K3 `/api/vinted-proxy`,
+  K5 focus « Préparer ») — **3 rouges sur origin/main** (mêmes contrôles) ;
+  `navigation-tache` 5 rouges (menu « Plus »/« Gérer » après le lot AO Argent) — **5 sur
+  origin/main** ; `recherche-universelle` 11 rouges (facture Pro ⇒ « Argent », ligne
+  `email_track` lue par Ma journée, temps sous charge) — **17 sur origin/main**, mêmes
+  familles, rien de cette branche.
   Captures regardées (`$TMPDIR/vrm-bancs/recherche-exacte/`) : suivi en tête (390 clair,
   1512 sombre), code (390 sombre, 1512), « 007 » (1512), Retraits (390), 50 jumelles
   (390 sombre), « pas encore lus » (390, 1512), « Achats pas lus » (390, 1512 sombre).
