@@ -140,7 +140,11 @@ if (arg.includes('--prouve')) {
     dit(c1 && c1.num === '12', '8001 : le N° vient de l’identité (numeroDe)', c1 && c1.num);
     dit(c1 && c1.preuves.suivi.etat === 'ok' && c1.preuves.suivi.statut === 'Colis livré au point relais', '8001 : suivi + statut lu chez le transporteur pour CE n°', c1 && c1.preuves.suivi);
     dit(c1 && c1.preuves.bordereau.etat === 'ok' && c1.preuves.photo.etat === 'ok', '8001 : bordereau et photo rangés', c1 && c1.preuves);
-    dit(c1 && c1.preuves.carton.etat === 'a-venir', 'la photo du carton : emplacement « à venir » (lot AZ)', c1 && c1.preuves.carton);
+    dit(c1 && c1.preuves.carton.etat === 'encours', 'la photo du carton : lecture pas encore revenue ⇒ « … » (jamais « — »)', c1 && c1.preuves.carton);
+    // (10 nov., lot AZ livré) Les trois réponses de `aPhotoCarton` : { at } · false · null.
+    const pc = (carton) => E.preuvesVente({ carton }).carton.etat;
+    dit(pc({ at: '2026-11-10T09:00:00Z' }) === 'ok' && pc(false) === 'aucun' && pc(null) === 'passu' && pc(undefined) === 'encours',
+      'photo du carton : rangée ⇒ ✓ · aucune ⇒ — · pas su ⇒ « pas lu » (jamais « aucune ») · en cours ⇒ …', [pc({ at: 'x' }), pc(false), pc(null), pc(undefined)]);
     const c6 = r.cartes.find((c) => c.tx === '8006');
     dit(c6 && c6.genre === 'probleme' && c6.preuves.suivi.etat === 'passu' && c6.preuves.photo.etat === 'aucun', '8006 : transporteur pas lu ⇒ « pas lu » ; pas de photo ⇒ « — »', c6 && c6.preuves);
     const sites = Object.fromEntries(r.plateformes.map((p) => [p.site, p.etat]));

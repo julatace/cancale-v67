@@ -23,7 +23,9 @@ const PHRASE_NUM = {
   litige: (n, c) => `L’e-mail du bordereau disait N°${c.litige ? c.litige.mail : '?'}, la vente dit N°${n} : on garde celui de la vente. Vérifie le carton.`,
 };
 
-export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex }) {
+// (10 nov., lot AZ + M) `photoCarton(c)` : le geste « Photo du carton » (facultatif) d'un colis FAIT, rangé avec
+// SA vente (src/photoCarton.js) — le même que celui du scanner ; l'écran le fournit, rien n'est décidé ici.
+export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex, photoCarton = null }) {
   const vivants = Array.isArray(colis) ? colis : [];
   // Ce que la séance a vu (un colis fait sort de « À envoyer » après ses 5 s : la
   // séance le garde, montré fait). Le dernier état vivant l'emporte.
@@ -133,6 +135,7 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
           {c.num ? <span className={'vrm-prep-num is-' + (c.etatNum || 'ok')} data-preparer-grand-num={c.num}>N°{c.num}</span> : <span className="vrm-prep-num is-sans" data-preparer-grand-num="">Sans N°</span>}
         </div>
         {PHRASE_NUM[c.etatNum] ? <p className={'vrm-emb-alerte is-' + c.etatNum} role={c.etatNum === 'double' ? 'alert' : undefined} data-preparer-alerte={c.etatNum}>{PHRASE_NUM[c.etatNum](c.num, c)}</p> : null}
+        {fait && photoCarton ? photoCarton(c) : null}
         <h2 className="vrm-prep-titre" data-preparer-titre="">{c.titre}</h2>
         {puces.length ? <p className="vrm-prep-puces">{puces.map((p, k) => <span key={k} className={k === 1 && c.compte ? 'vrm-sensible' : undefined} data-stream-type={k === 1 && c.compte ? 'compte' : undefined}>{p}</span>)}</p> : null}
         {c.limite ? <p className={'vrm-prep-limite' + (c.limiteAmbre ? ' is-ambre' : '')} data-preparer-limite="">{c.limite}</p> : null}
