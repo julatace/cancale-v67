@@ -156,7 +156,7 @@ const lireColonne = (pg) => pg.evaluate(() => {
         const faibles = c.textes.filter((t) => t.ratio < 4.5);
         dit(c.textes.length > 8 && faibles.length === 0, `${T} N4 libellés et titres de groupe ≥ 4,5:1`, JSON.stringify(faibles.slice(0, 5)));
         dit(c.nInd === 1 && c.indOpacite > 0.5 && c.indSurActif, `${T} N5 une seule pastille, posée sous l'entrée choisie`, JSON.stringify({ n: c.nInd, op: c.indOpacite, sur: c.indSurActif }));
-        dit(['Vendre', 'Gérer', 'Argent', 'Moi'].every((g) => c.groupes.includes(g)) && ['Vendre', 'Gérer', 'Argent'].every((g) => c.titresVus.includes(g)) && c.mot === 'VRM' && c.actif === 'journee', `${T} N7 mêmes groupes, « VRM », Ma journée allumée`, JSON.stringify({ g: c.groupes, t: c.titresVus, mot: c.mot, actif: c.actif }));
+        dit(['Gérer', 'Argent', 'Moi'].every((g) => c.groupes.includes(g)) && ['Gérer', 'Argent'].every((g) => c.titresVus.includes(g)) && !c.groupes.includes('Vendre') && c.mot === 'VRM' && c.actif === 'journee', `${T} N7 mêmes groupes (sans « Vendre », vide depuis le lot AL), « VRM », Ma journée allumée`, JSON.stringify({ g: c.groupes, t: c.titresVus, mot: c.mot, actif: c.actif }));
         // N5 : le glissement. On lit la pastille à mi-course après un clic sur « Ventes ».
         const avant = await pg.evaluate(() => { const i = document.querySelector('[data-nav-indicateur]'); return i ? i.getBoundingClientRect().top : null; });
         const cible = await pg.evaluate(() => { const b = document.querySelector('.vrm-sidebar [data-nav-entree="cat_bord"]'); return b ? b.getBoundingClientRect().top : null; });
@@ -226,7 +226,7 @@ const lireColonne = (pg) => pg.evaluate(() => {
         await capture(pg, `nav-1100-${sombre ? 'sombre' : 'clair'}`);
         dit(c.largeur <= 72 && c.largeur >= 56, `${T} N6 rail d'icônes (56–72 px)`, c.largeur);
         dit(c.libsVisibles === 0 && c.nLibs > 8 && c.nomsSansLib, `${T} N6 libellés cachés, chaque entrée garde son nom (info-bulle)`, JSON.stringify({ vis: c.libsVisibles, n: c.nLibs, noms: c.nomsSansLib }));
-        dit(c.titresEntiers && ['Vendre', 'Gérer', 'Argent'].every((g) => c.titresVus.includes(g)), `${T} N6 titres de groupe visibles et entiers`, JSON.stringify(c.titresVus));
+        dit(c.titresEntiers && ['Gérer', 'Argent'].every((g) => c.titresVus.includes(g)), `${T} N6 titres de groupe visibles et entiers`, JSON.stringify(c.titresVus));
         dit(c.mainGauche >= c.droite + 8 && c.gauche >= 8, `${T} N1/N6 le rail flotte et le contenu ne passe pas dessous`, JSON.stringify({ main: c.mainGauche, col: c.droite, g: c.gauche }));
         dit(c.hauteurs.every((h) => h >= 36), `${T} N2 chaque icône ≥ 36 px`, c.hauteurs.join(','));
         dit(c.nInd === 1 && c.indSurActif, `${T} N5 la pastille sous l'icône choisie`, JSON.stringify({ n: c.nInd, sur: c.indSurActif }));

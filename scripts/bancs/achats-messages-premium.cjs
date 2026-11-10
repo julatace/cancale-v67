@@ -295,7 +295,8 @@ const capturer = async (pg, nom, vp) => {
         dit(l.nConvs === 5, `${T} les 5 conversations des deux comptes sont listées`, String(l.nConvs));
         if (tel) dit(!l.petits.length, `${T} aucune cible tactile < 44 px (liste)`, l.petits.slice(0, 8).join(' | '));
         await pg.selectOption('#vrm-sel-compte', UID);
-        await pg.getByRole('button',{name:'Favoris reçus',exact:true}).click();
+        // (9 nov., lot AL) La section s'appelle « Favoris & offres » (l'ancienne entrée du menu) : on la vise par sa règle.
+        await pg.locator('[data-messages-zone="favoris"]').first().click();
         await pg.getByRole('button',{name:'Envoyer un message aux favoris',exact:true}).click();
         await pg.locator('.vrm-favoris-rows article').first().waitFor();
         dit(await pg.locator('.vrm-favoris-rows article').count()===1, `${T} la liste des favoris captés est raccordée au compte`);
