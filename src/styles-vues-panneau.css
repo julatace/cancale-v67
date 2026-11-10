@@ -33,10 +33,10 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10'%3E%3Cpath d='M1 5.2 4.3 8.5 11 1.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: center; }
 .vrm-sel-case-x:focus-visible + .vrm-sel-rond { outline: 2px solid var(--w-accent, #0071E3); outline-offset: 2px; }
-[data-selection-mode] [data-sel-cle] { cursor: pointer; }
-[data-selection-mode] [data-sel-cle][data-sel-coche="1"] { box-shadow: inset 3px 0 0 var(--w-accent, #0071E3); }
-/* Une ligne de vente : la case avant la photo. */
-[data-selection-mode] .vrm-sel-dans-ligne { display: flex; align-items: center; }
+[data-sel-cle] { cursor: pointer; }
+[data-sel-cle][data-sel-coche="1"] { box-shadow: inset 3px 0 0 var(--w-accent, #0071E3); }
+/* Colis : la barre en haut de la liste (au téléphone elle reste fixée en bas, plus bas). */
+.vrm-sel-serie-haut > .vrm-sel-serie { top: 12px; bottom: auto; margin: 0 0 12px; }
 
 /* ── La barre du bas ─────────────────────────────────────────────────────── */
 .vrm-sel-serie { position: sticky; bottom: 16px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
@@ -57,6 +57,8 @@
   .vrm-sel-serie-gestes .vrm-sel-serie-b:not(.is-texte) { flex: 1 1 auto; }
   /* La liste ne se cache pas derrière la barre. */
   [data-selection-mode] { padding-bottom: 150px; }
+  .vrm-sel-serie-haut > .vrm-sel-serie { top: auto; bottom: calc(76px + env(safe-area-inset-bottom)); }
+  html:has(.vrm-sel-serie-haut) .vrm-app-shell:not(.vrm-ledger-drawer-host) > .vrm-main { padding-bottom: 150px; }
 }
 
 /* ── La fiche à côté de la liste (≥ 1200 px) ─────────────────────────────── */

@@ -20154,7 +20154,7 @@ function CompteVente({ compte, plateforme, ou = '' }) {
   if (!compteFourni(compte)) return null;
   return <span className="vrm-vente-compte vrm-sensible" data-vente-compte={compte ? String(compte) : ''} data-vente-compte-ou={ou || undefined} data-vente-compte-passu={compte ? undefined : ''} title={compte ? `Vendue sur le compte ${compte}` : undefined}>{texteCompteVente(compte, plateforme)}</span>;
 }
-function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, basSeul = false, fusion = null, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, basSeul = false, fusion = null, cocher = null, ...props }) {
   const compte = compteFourni(compteBrut) ? compteBrut : undefined;
   // (5 nov., chantier E2) Le N° du titre en pastille `Numero` (la même qu'au téléphone) ; le texte
   // complet « N°x · nom » reste le nom lu et l'infobulle.
@@ -20187,6 +20187,13 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
   //     marge de la hauteur de la feuille est réservée au bas de la page le
   //     temps qu'elle est ouverte) : la vente qu'on lit et les filtres restent
   //     visibles et touchables.
+  const large=usePanneauLarge();
+  const cote=!!(large&&recap);
+  React.useEffect(()=>{
+    if(!(ouvert&&cote))return undefined;
+    const r=document.documentElement;r.setAttribute('data-panneau-fiche','ventes');
+    return()=>{if(r.getAttribute('data-panneau-fiche')==='ventes')r.removeAttribute('data-panneau-fiche');};
+  },[ouvert,cote]);
   React.useEffect(()=>{
     if(!ouvert)return undefined;
     const racine=document.documentElement;
@@ -20197,6 +20204,9 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       if(declencheur.current&&declencheur.current.contains(t))return;
       if(t.closest('.vrm-ledger-drawer-host,[role="dialog"],[role="alertdialog"],[aria-modal="true"]'))return;
       if(!t.closest('.vrm-app-shell'))return;
+      // (10 nov., lot X) Sur ordinateur, la fiche est À CÔTÉ de la liste : elle reste ouverte pendant
+      // qu'il lit ou défile la liste ; une autre vente touchée la remplace (`vrm:vente-ouverte`).
+      if(cote)return;
       setOuvert(false);
     };
     document.addEventListener('pointerdown',dehors,true);
@@ -20218,7 +20228,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       }catch(_){}
     });
     return()=>{document.removeEventListener('pointerdown',dehors,true);cancelAnimationFrame(raf);if(posee&&racine.getAttribute('data-feuille-vente')===panneau){racine.removeAttribute('data-feuille-vente');racine.style.removeProperty('--vrm-feuille-vente');}};
-  },[ouvert,panneau]);
+  },[ouvert,panneau,cote]);
   // ⚠️ LE TIROIR N'EST MONTÉ QU'À SA PREMIÈRE OUVERTURE, PUIS GARDÉ (31 oct.).
   //    Depuis le 21 oct., chaque ligne montait d'avance son tiroir complet
   //    (photo, coûts, bordereau, facture…), même fermé : c'était l'essentiel du
@@ -20231,7 +20241,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
   if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
   const numerosNote=[...new Set([...numerosFiche, fusion && fusion.num, numTitre].map(n=>String(n||'').trim()).filter(Boolean).map(cleNum))];
-  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-vente-compte={compte||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
+  return <div {...props} data-panneau-ligne={ouvert&&cote?'1':undefined} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-vente-compte={compte||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
+    {cocher}
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
@@ -31119,6 +31130,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!ops.length) return;
     gesteVrm(oui ? 'Colis déposé' : 'Colis remis dans « à envoyer »', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
   };
+  // (10 nov., lot X) « Déposé · N » de la sélection : les MÊMES deux marqueurs pour chaque colis
+  // coché, en UN geste annulable (une pilule, « Annuler » défait tout le lot).
+  const gesteColisFaitSerie = (paires) => {
+    const ops = [];
+    for (const { o, b } of paires || []) {
+      const k = o && o.transaction_id != null ? String(o.transaction_id) : null, kb = b ? bordKey(b) : null;
+      if (k && !shipDone[k]) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: Date.now(), avant: shipDone[k] });
+      if (kb) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: 1, avant: bordsShipped[kb] });
+    }
+    if (!ops.length) return;
+    const n = (paires || []).length;
+    gesteVrm(n > 1 ? `${n} colis déposés` : 'Colis déposé', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
+  };
   // (voir isBordDone plus bas : « colis fait » à la main, ou expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
   // ── QUAND UN BORDEREAU SORT-IL DE LA LISTE ? ─────────────────────────────
@@ -35068,6 +35092,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         else if (!l.some(x => String(x.transaction_id) === tx)) { const items = [...l]; items.splice(placeCache >= 0 && placeCache <= items.length ? placeCache : items.length, 0, o); c.items = items; }
         _persistAcctCache();
       }
+    });
+  };
+  // (10 nov., lot X) « Masquer · N » de la sélection : le geste « Masquer cet achat », en UN geste annulable.
+  const masquerAchatsSerie = (os) => {
+    const deja = achatsMasques();
+    const liste = (os || []).filter((o) => o && o.transaction_id != null && !deja.has(String(o.transaction_id)));
+    if (!liste.length) return;
+    const txs = liste.map((o) => String(o.transaction_id)); const set = new Set(txs);
+    const absents = (l) => liste.filter((o) => !l.some((x) => String(x.transaction_id) === String(o.transaction_id)));
+    gesteVrm(liste.length > 1 ? `${liste.length} achats masqués` : 'Achat masqué', txs.map((tx) => ({ k: ACHATS_MASQUES, type: 'ensemble', id: tx, apres: true, avant: false })), {}, (sens) => {
+      const n = achatsMasques(); for (const tx of txs) { if (sens === 'apres') n.add(tx); else n.delete(tx); }
+      _achatsMasques = [...n];
+      setBuys((prev) => {
+        if (!prev || !prev.items) return prev;
+        if (sens === 'apres') return { ...prev, items: prev.items.filter((x) => !set.has(String(x.transaction_id))) };
+        const m = absents(prev.items); return m.length ? { ...prev, items: [...prev.items, ...m] } : prev;
+      });
+      const c = _acctCache['purchased'];
+      if (c) { const l = c.items || []; if (sens === 'apres') c.items = l.filter((x) => !set.has(String(x.transaction_id))); else { const m = absents(l); if (m.length) c.items = [...l, ...m]; } _persistAcctCache(); }
     });
   };
   const achatsAffiches = useMemo(() => {
@@ -41306,6 +41349,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ))}
           {onNav ? <button type="button" className="vrm-ventes-vers-colis" data-ventes-vers-colis="" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{L.aEnvoyer} : Colis ›</button> : null}
         </div>
+          {/* (10 nov., lot X) « Sélectionner » : cocher des ventes, puis Imprimer / Déposé en série. */}
+          {Array.isArray(sales.items) && sales.items.length > 0 && !baseKO && <BoutonSelectionner ecran="ventes" actif={selEcran === 'ventes'} onClick={() => setSelEcran(selEcran === 'ventes' ? null : 'ventes')}/>}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
               quotidien — et Compta / Registre / CSV passent derrière un seul
@@ -41459,7 +41504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             à l'identique — la note « vue par e-mail » d'un compte, un refus de facture commun. */}
         {[...ventesEmailTete.values()].map((g) => <NoteVentesEmailTete key={g.uid} g={g} nom={g.acc ? accNameOf(g.acc) : ''}/>)}
         <FactureRaisonsTete deps={DEPS_FACTURE} ventes={groupeFacture}/>
-        <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+        <div className="vrm-ventes-liste" data-fu-liste="" {...captureSel('ventes')} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
           <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Prix</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
@@ -41674,7 +41719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
-                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
+                {...gp} {...attrsSel('ventes', txL)} cocher={caseSel('ventes', txL, libDepose || o.title)} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
@@ -41709,6 +41754,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             iPhone, la page passait de 46 209 px (cinquante-quatre écrans) à
             une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
             TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
+        {selEcran === 'ventes' && (() => {
+          const imp = new Set(lignesLotTous().filter((l) => l.cochable !== false && l.pdf !== false).map((l) => String(l.cle)));
+          const lignes = ventesAffichees.slice(0, ventesMax).filter((o) => o && o.transaction_id != null).map((o) => { const tx = String(o.transaction_id);
+            return { cle: tx, o, imprimable: imp.has(tx), deposable: !o._venteEmail && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled' && aExpedier(o) && !estParti(o) }; });
+          const r = gestesSerie('ventes', lignes, garderVisibles(selCles, lignes.map((l) => l.cle)));
+          return <BarreSelection ecran="ventes" resultat={r} occupe={batchBusy} onVider={() => setSelCles(new Set())} onGeste={(g) => {
+            if (g.id === 'imprimer') { batchBordereaux(new Set(g.cles)); return; }
+            if (g.id === 'depose') { const set = new Set(g.cles); gesteColisFaitSerie(lignes.filter((l) => set.has(l.cle)).map((l) => ({ o: l.o, b: bordsParTxn[l.cle] || null }))); setSelCles(new Set()); }
+          }}/>;
+        })()}
         {ventesAffichees.length > ventesMax && (
           <Bouton variante="secondaire" plein onClick={()=>React.startTransition(()=>setVentesMax(n=>n+120))} style={{marginTop:10}}>
             Afficher {Math.min(120,ventesAffichees.length-ventesMax) > 1 ? `les ${Math.min(120,ventesAffichees.length-ventesMax)} suivantes` : 'la suivante'}{ventesAffichees.length-ventesMax > 120 ? ` · encore ${ventesAffichees.length-ventesMax-120} après` : ''}
@@ -43258,7 +43313,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>
         {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>Tous sur <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
-        <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
+        {/* (10 nov., lot X) « Sélectionner » : cocher des achats, puis « Masquer · N » (annulable). */}
+        {!modeRetraits && tranche.length > 0 && <div className="vrm-sel-tete-x" style={{display:'flex',justifyContent:'flex-end',margin:'0 0 8px'}}><BoutonSelectionner ecran="achats" actif={selEcran === 'achats'} onClick={() => setSelEcran(selEcran === 'achats' ? null : 'achats')}/></div>}
+        <div className="vrm-buy-list" {...captureSel('achats')} style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
           {tranche.map(({o,tk,st},i)=>{
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
@@ -43267,7 +43324,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
             <React.Fragment key={o.transaction_id}>
             {i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
-            <div className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+            <div className="vrm-buy-row" {...attrsSel('achats', o.transaction_id)} data-panneau-ligne={ficheCote && ficheCote.ecran === 'achats' && ficheCote.cle === String(o.transaction_id) ? '1' : undefined}
+              onClick={panneauLarge && !selEcran ? (ev) => { const t = ev.target; if (t && t.closest && t.closest('button,a,input,label,[role="menu"]')) return; setFicheCote({ ecran: 'achats', cle: String(o.transaction_id) }); } : undefined}
+              data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+              {caseSel('achats', o.transaction_id, o.title)}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 {orderPhoto(o)&&!achatPhKo.has(orderPhoto(o))?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>{ const u=orderPhoto(o); setAchatPhKo(s=>{ if(s.has(u)) return s; const n=new Set(s); n.add(u); return n; }); }}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
               </div>
@@ -43382,6 +43442,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </React.Fragment>
           );})}
         </div>
+        {selEcran === 'achats' && (() => {
+          const lignes = tranche.map(({ o }) => ({ cle: String(o.transaction_id), o, masquable: true }));
+          const r = gestesSerie('achats', lignes, garderVisibles(selCles, lignes.map((l) => l.cle)));
+          return <BarreSelection ecran="achats" resultat={r} onVider={() => setSelCles(new Set())} onGeste={(g) => {
+            if (g.id === 'masquer') { const set = new Set(g.cles); masquerAchatsSerie(lignes.filter((l) => set.has(l.cle)).map((l) => l.o)); setSelCles(new Set()); }
+          }}/>;
+        })()}
+        {/* (10 nov., lot X) Sur ordinateur (≥ 1200 px), la fiche de l'achat À CÔTÉ de la liste : ce que dit
+            la ligne, en grand, et les gestes du menu « … » (les mêmes fonctions). */}
+        {panneauLarge && ficheCote && ficheCote.ecran === 'achats' && (() => {
+          const x = achatsAffiches.find(({ o }) => String(o.transaction_id) === ficheCote.cle);
+          if (!x) return null;
+          const { o, tk, st } = x;
+          const fermer = () => setFicheCote(null);
+          const suivi = tk && tk.suivi ? String(tk.suivi) : '';
+          const rc = receiptFor(o);
+          const numA = buyNumByTxn[String(o.transaction_id)];
+          const peutCode = !!(st.step === 3 && tk && (qrImage(tk) || codeRetrait(tk.code)));
+          const peutSuivre = !!(suivi && (st.step === 2 || st.step === 3));
+          const tid = String(o.transaction_id);
+          const note = achatNotes[tid] || '';
+          return <PanneauFiche ouvert ecran="achats" sur="Achat" titre={o.title || '(sans titre)'} onFermer={fermer} retour={<FermeAuRetour fermer={fermer}/>}>
+            {orderPhoto(o) ? <PhotoVinted src={orderPhoto(o)} alt="" className="vrm-fiche-x-photo"/> : null}
+            <dl className="vrm-fiche-x-lignes" data-fiche-achat-cote={tid}>
+              <div><dt>État</dt><dd data-fiche-etat="">{st.label}</dd></div>
+              <div><dt>Prix</dt><dd>{montant(montantCommande(o), { devise: o.price?.currency_code || 'EUR' })}</dd></div>
+              <div><dt>Compte</dt><dd>{accNameOf(o._acc) || '—'}</dd></div>
+              <div><dt>Date</dt><dd>{o.date ? dateFr(o.date, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</dd></div>
+              {numA != null ? <div><dt>N°</dt><dd>{numA}</dd></div> : null}
+              {suivi ? <div><dt>Suivi</dt><dd>{suivi}</dd></div> : null}
+              {note ? <div><dt>Note</dt><dd>{note}</dd></div> : null}
+            </dl>
+            <div className="vrm-fiche-x-gestes">
+              {peutCode ? <button type="button" className="is-primaire" onClick={() => openQrView(tk)}>Code de retrait</button> : null}
+              {peutSuivre ? <a href={trackUrl(tk.carrier || '', suivi)} target="_blank" rel="noreferrer">Suivre le colis</a> : null}
+              <button type="button" onClick={() => { if (rc) setReceiptView(rc); else generateAchatJustificatif(o, { account: accNameOf(o._acc), regime: load('vinted_regime', 'micro'), numero: numA || '' }); }}>{NOM_RECU_ACHAT}</button>
+              <button type="button" onClick={() => setNoteEdit({ tid, title: o.title, val: note })}>{note ? 'Modifier la note' : 'Ajouter une note'}</button>
+              <button type="button" data-fiche-masquer={tid} onClick={() => { fermer(); masquerAchat(o); }}>Masquer cet achat</button>
+            </div>
+          </PanneauFiche>;
+        })()}
           </>); })()}
         {/* ⚠️ MÊME RÈGLE QUE LES VENTES : on dessine une tranche, le bouton
             porte le TOTAL, rien n'est caché. Mesuré : l'onglet « Tous »
@@ -45871,7 +45972,51 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
-                return [pastillesEl, ...(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                // (10 nov., lot X) « Sélectionner » : cocher des colis Vinted, puis Imprimer / Déposé en série ;
+                // sur ordinateur, la fiche du colis À CÔTÉ de la liste.
+                const lignesSelColis = exT.filter((x) => !x.__autre).map((x) => { const cle = String(x.txn || x.key);
+                  return { cle, o: x.o, b: x.b, imprimable: false, deposable: !!(x.o && x.o.transaction_id != null && !isShipDone(x.o)) }; });
+                let selColisEl = null;
+                if (lignesSelColis.length) {
+                  let r = null;
+                  if (selEcran === 'colis') { const imp = new Set(lignesLotTous().filter((l) => l.cochable !== false && l.pdf !== false).map((l) => String(l.cle))); for (const l of lignesSelColis) l.imprimable = imp.has(l.cle);
+                    r = gestesSerie('colis', lignesSelColis, garderVisibles(selCles, lignesSelColis.map((l) => l.cle))); }
+                  selColisEl = <div key="__sel-colis" className="vrm-sel-colis-hote" data-selection-mode-hote="colis">
+                    <div style={{display:'flex',justifyContent:'flex-end',margin:'0 0 8px'}}><BoutonSelectionner ecran="colis" actif={selEcran === 'colis'} onClick={() => setSelEcran(selEcran === 'colis' ? null : 'colis')}/></div>
+                    {r ? <div className="vrm-sel-serie-haut"><BarreSelection ecran="colis" resultat={r} occupe={batchBusy} onVider={() => setSelCles(new Set())} onGeste={(g) => {
+                      if (g.id === 'imprimer') { batchBordereaux(new Set(g.cles)); return; }
+                      if (g.id === 'depose') { const set = new Set(g.cles); gesteColisFaitSerie(lignesSelColis.filter((l) => set.has(l.cle)).map((l) => ({ o: l.o, b: l.b || null }))); setSelCles(new Set()); }
+                    }}/></div> : null}
+                  </div>;
+                }
+                let ficheColisEl = null;
+                if (panneauLarge && ficheCote && ficheCote.ecran === 'colis') {
+                  const x = exT.find((y) => !y.__autre && String(y.txn || y.key) === ficheCote.cle);
+                  if (x) {
+                    const o = x.o, b = x.b, fermer = () => setFicheCote(null);
+                    const ph = o ? orderPhoto(o) : bordPhoto(b);
+                    const titreF = o ? o.title : (b.modele || b.article || 'Bordereau');
+                    const numF = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+                    const postedF = o ? isShipDone(o) : isBordShippedManual(b);
+                    const pdfF = !!(b && b.hasPdf) || !!(x.txn && labelsCaptes[x.txn]);
+                    const cleF = String(x.txn || x.key);
+                    ficheColisEl = <PanneauFiche key="__fiche-colis" ouvert ecran="colis" sur="Colis à envoyer" titre={titreF || '(sans titre)'} onFermer={fermer} retour={<FermeAuRetour fermer={fermer}/>}>
+                      {ph ? <PhotoVinted src={ph} alt="" className="vrm-fiche-x-photo"/> : null}
+                      <dl className="vrm-fiche-x-lignes" data-fiche-colis-cote={cleF}>
+                        <div><dt>N°</dt><dd>{numF || '—'}</dd></div>
+                        <div><dt>Compte</dt><dd>{o && o._acc ? accNameOf(o._acc) : '—'}</dd></div>
+                        <div><dt>Transporteur</dt><dd><PastilleTransporteur t={transporteurVente(b, x.txn)} C={C}/></dd></div>
+                        <div><dt>Limite</dt><dd>{texteLimiteEnvoi(x.lim) || '—'}</dd></div>
+                        <div><dt>Bordereau</dt><dd>{pdfF ? 'Prêt' : 'Pas encore reçu'}</dd></div>
+                      </dl>
+                      <div className="vrm-fiche-x-gestes">
+                        {pdfF && !postedF ? <button type="button" className="is-primaire" data-fiche-imprimer={cleF} disabled={batchBusy} onClick={() => batchBordereaux(new Set([cleF]))}>Imprimer le bordereau</button> : null}
+                        {o && o.transaction_id != null ? <button type="button" data-fiche-depose={cleF} onClick={() => gesteColisFait(o, b, !postedF)}>{postedF ? 'Pas encore déposé' : 'Déposé'}</button> : null}
+                      </div>
+                    </PanneauFiche>;
+                  }
+                }
+                return [pastillesEl, selColisEl, ficheColisEl, ...(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
                 const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
                 const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
@@ -45927,8 +46072,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <React.Fragment key={e.key}>
                   {ouvreSansDate}
-                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: selEcran !== 'colis' && !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })}
+                    {...attrsSel('colis', e.txn || e.key)} {...(selEcran === 'colis' ? { onClickCapture: captureSel('colis').onClickCapture } : {})}
+                    data-panneau-ligne={ficheCote && ficheCote.ecran === 'colis' && ficheCote.cle === String(e.txn || e.key) ? '1' : undefined}
+                    onClick={panneauLarge && !selEcran ? (ev) => { const t = ev.target; if (t && t.closest && t.closest('button,a,input,label,[role="menu"],[data-sans-glisse]')) return; setFicheCote({ ecran: 'colis', cle: String(e.txn || e.key) }); } : undefined}
+                    className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                      {caseSel('colis', e.txn || e.key, num ? `N°${num}` : titre)}
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                         {/* (7 nov.) Le logo du transporteur LU (`trV`, la règle de la puce), dans le coin de la photo. */}
