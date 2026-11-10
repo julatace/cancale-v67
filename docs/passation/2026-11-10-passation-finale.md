@@ -54,7 +54,10 @@ Le pas à pas détaillé de chaque geste : `docs/passation/2026-11-10-guide-gest
    envoie-les, je les pose) ; Stripe (prix Solo 16,99 € `vrm_mensuel`, Pro 19,99 € `vrm_pro_mensuel`,
    `STRIPE_SECRET_KEY`, webhook, `STRIPE_PRIX_PRO`) ; relire les CGV (paragraphe Pro).
 10. **Supabase Auth** : Site URL, Redirect URLs, SMTP Brevo, confirmation d'e-mail.
-11. **Facultatif** : migration 016 (mode équipe), préfecture (livre de police, cerfa 11733).
+11. **Communauté pour formateurs** : migration **032** (Supabase → SQL Editor, fichier `032-communaute-formateurs.sql` → Run), puis Communauté → Groupes → « Créer ma page ».
+12. **Facultatif** : migration 016 (mode équipe), préfecture (livre de police, cerfa 11733).
+
+Mis en ligne après la rédaction (10 nov., 22 h–23 h) : annonces à compléter, avis par vente (pas relié, dit), Messages → « Tous » (un fil par acheteur), marge par plateforme, Communauté pour les formateurs (PR #1112–#1114).
 
 ## C. Ce que toi seul peux décider
 
@@ -67,6 +70,9 @@ Le pas à pas détaillé de chaque geste : `docs/passation/2026-11-10-guide-gest
 6. **Revendu combien ?** : afficher le prix médian une seule fois ?
 7. **Livre de police** : saisir l'identité des vendeurs dans VRM (données de tiers) ou seulement sur l'export ?
 8. **Heure du résumé du soir** (aujourd'hui 19 h l'hiver / 20 h l'été).
+9. **Messages** : « Tous » par défaut au lieu de Vinted ?
+10. **Outils** : l'ancien bloc « Annonces à compléter » — le fondre dans la nouvelle vue ou le renommer ?
+11. **Marge par plateforme** : cacher un site que tu n'utilises pas ?
 
 ---
 
@@ -77,11 +83,7 @@ Le pas à pas détaillé de chaque geste : `docs/passation/2026-11-10-guide-gest
 | lot | branche | état | reste |
 |---|---|---|---|
 | Adresse VRM simple et belle (demande de Julien, 2 captures) | `claude/adresse-vrm-simple` | WIP 1 commit (3 fichiers) | voir le brief dans le récit de la session : UN parcours (compte → adresse → messagerie détectée → 3 étapes → « Reçu ✓ »), plus de spinner infini, code de confirmation Gmail affiché + bouton « Confirmer dans Gmail » (sur SON clic), cartes « Adresse sans compte » compactes, planches avant/après |
-| U annonces à compléter + avis par vente | `claude/annonces-avis` | 2 commits | banc, captures ; l'avis par vente NE PEUT PAS se relier (la forme `harvest_*_feedbacks` = {id, rating, feedback}, sans date ni transaction) : le dire, ne rien inventer |
-| AB un fil par acheteur et par paire | `claude/fil-unique` | 3 commits | banc après merge, preuve sur main + mutation |
-| AR Communauté pour les formateurs | `claude/communaute-formateurs` | 3 commits | composant UI ; migration après la 025 (appliquée) ; geste de Julien : la migration |
 | AP republication à la main | `claude/republier-main` | WIP 1 commit | tout le reste (voir file des lots) |
-| I marge par plateforme | `claude/marge-plateforme` | WIP 1 commit | module pur commencé ; écran, banc |
 | J import Excel + partage Photos + aide | `claude/import-partage-aide` | WIP 1 commit | tout le reste |
 | H agenda .ics + nouvel appareil | (rien de poussé) | — | tout (024 appliquée : `vrm_sessions_de`, `vrm_fermer_session`) |
 
@@ -137,6 +139,7 @@ récents), `audit-rouge-doublon` et `audit-violet` (couleurs FedEx/Relais Colis 
 | 029 preuve du compte Vinted | **non** — après l'extension ≥ 5.332 partout |
 | 030 Solo par plateforme | ✅ appliquée ce soir |
 | 031 | supprimée (Pro illimité) |
+| 032 communauté formateurs | **non** — en ligne côté app depuis le 10 nov. 23 h ; sans elle l'écran dit « pas encore activé » |
 
 `app_data` : 11 777 lignes, 85 Mo. Propriétaire de l'installation : `VRM_OWNER_UID` (Vercel).
 
