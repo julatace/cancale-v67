@@ -226,7 +226,8 @@ const ECRANS = (tel) => [
   { nom: 'tournee', url: '?tab=journee', prep: async (pg) => { const o = pg.locator('[data-tournee-ouvrir]'); if (await o.count()) { await o.first().click(); await pg.waitForTimeout(700); } }, portee: '[data-tournee-plein]', refaire: true },
   ...['vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'annonces.' + s, url: '?tab=annonces&site=' + s })),
   { nom: 'annonces.ebay.promo', url: '?tab=plat_ebay&section=promo' },
-  { nom: 'republier', url: '?tab=journee', prep: async (pg) => { await ouvrirEntreeNav(pg, tel, 'republier'); await pg.waitForSelector('[data-selection-vue]', { timeout: 8000 }).catch(() => {}); }, portee: '[data-selection-vue]', refaire: true },   // (5 nov., chantier C) l'entrée « Republier » mène à la vue « Sélectionner » (plus de feuille « Republier et brouillons »)
+  // (9 nov., lot AL) « Republier » n'est plus une entrée du menu : c'est une vue d'Annonces, jointe par son ancien lien.
+  { nom: 'republier', url: '?tab=republier', prep: async (pg) => { await pg.waitForSelector('[data-selection-vue="republier"]', { timeout: 8000 }).catch(() => {}); }, portee: '[data-selection-vue]', refaire: true },
   ...['toutes', 'vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'ventes.' + s, url: '?tab=ventes&site=' + s })),
   { nom: 'ventes.ebay.agent', url: '?tab=plat_ebay&section=agent' },
   { nom: 'ventes.ebay.offres', url: '?tab=plat_ebay&section=offres' },

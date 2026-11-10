@@ -120,7 +120,9 @@ const lire = (pg) => pg.evaluate(() => {
       const b = c.querySelector(':scope > b'), l = c.querySelector(':scope > span');
       const bs = b ? getComputedStyle(b) : null, ls = l ? getComputedStyle(l) : null;
       return { haut: Math.round(r.top), larg: Math.round(r.width), h: Math.round(r.height), fond: hex(rgba(s.backgroundColor)), alpha: (rgba(s.backgroundColor) || {}).a, rayon: parseFloat(s.borderTopLeftRadius), bord: parseFloat(s.borderTopWidth),
-        chiffre: bs ? { t: parseFloat(bs.fontSize), g: +bs.fontWeight, tab: /tabular/.test(bs.fontVariantNumeric), vide: b.classList.contains('is-vide') } : null,
+        chiffre: bs ? { t: parseFloat(bs.fontSize), g: +bs.fontWeight, tab: /tabular/.test(bs.fontVariantNumeric), vide: b.classList.contains('is-vide'), nc: b.style.getPropertyValue('--nc'), dedans: b.getBoundingClientRect().right <= r.right - 4 + 0.5 && b.scrollWidth <= b.clientWidth + 1 } : null,
+        // (10 nov., « l'euro dépasse ») Le pire montant : on pose « 669,40 € » dans une copie du chiffre, même place, même --nc.
+        long: b ? (() => { const k = b.cloneNode(false); k.textContent = '669,40\u00a0€'; k.style.setProperty('--nc', '8'); k.style.position = 'absolute'; k.style.visibility = 'hidden'; c.appendChild(k); const kr = k.getBoundingClientRect(); const ok = kr.width <= r.width - 18; k.remove(); return { ok, larg: Math.round(kr.width), case: Math.round(r.width) }; })() : null,
         libDessus: !!(b && l && l.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 2), lib: ls ? { t: parseFloat(ls.fontSize), g: +ls.fontWeight } : null };
     });
   }
@@ -181,7 +183,13 @@ const ECRANS = ['journee', 'ventes', 'cat_bord'];
             dit(C.every((c) => c.haut >= m.carte.basSombre + 4), `${T} W3 les widgets sont SOUS le fond sombre`, JSON.stringify({ basSombre: m.carte.basSombre, hauts: C.map((c) => c.haut), peint: m.carte.avPeint }));
             dit(C.every((c) => c.fond === CARTE && c.alpha > 0.95 && c.fond !== SOL), `${T} W3 fond de carte ${CARTE}, distinct du sol`, C.map((c) => c.fond + '/' + c.alpha).join(' '));
             dit(C.every((c) => c.rayon >= 22 && c.bord === 0), `${T} W3 rayon ≥ 22, sans bordure`, C.map((c) => c.rayon + '/' + c.bord).join(' '));
-            dit(C.every((c) => c.chiffre && c.chiffre.t >= 28 && (c.chiffre.vide || c.chiffre.g >= 800) && c.chiffre.tab), `${T} W4 chiffre ≥ 28/800 tabulaire (le « — » d'un pas-su reste léger)`, JSON.stringify(C.map((c) => c.chiffre)));
+            const etroit = e === 'journee' && W < 600;
+            dit(C.every((c) => c.chiffre && (etroit ? c.chiffre.t >= 14 : c.chiffre.t >= 28) && (c.chiffre.vide || c.chiffre.g >= 800) && c.chiffre.tab), `${T} W4 chiffre ≥ 28/800 tabulaire (le « — » d'un pas-su reste léger ; au téléphone dans Ma journée, il se resserre selon sa longueur)`, JSON.stringify(C.map((c) => c.chiffre)));
+            dit(C.every((c) => c.chiffre && c.chiffre.dedans), `${T} W4b le chiffre tient dans son widget (jamais coupé, jamais dehors)`, JSON.stringify(C.map((c) => c.chiffre)));
+            if (etroit) {
+              dit(C.every((c) => c.chiffre && c.chiffre.nc !== ''), `${T} W4c chaque chiffre porte sa longueur (--nc)`, JSON.stringify(C.map((c) => c.chiffre.nc)));
+              dit(C.every((c) => c.long && c.long.ok), `${T} W4d « 669,40 € » tient dans un widget étroit (Julien : « l'euro dépasse »)`, JSON.stringify(C.map((c) => c.long)));
+            }
             dit(C.every((c) => c.libDessus && c.lib && c.lib.t >= (e === 'journee' && W < 600 ? 12 : 13) && c.lib.g >= 600), `${T} W4 libellé 13/600 au-dessus du chiffre (12 dans les trois widgets étroits de Ma journée au téléphone)`, JSON.stringify(C.map((c) => [c.libDessus, c.lib])));
             // Ma journée au téléphone : trois widgets sur UNE ligne (règle du 27 oct. : le premier geste
             // de « Ensuite » au-dessus de la barre du bas, banc journee-premium) ; ailleurs, le bento.

@@ -16,21 +16,17 @@
 import React from 'react';
 import { PAS_LU, marqueDuTransporteur, nomDuTransporteur, cleStatTransporteur } from './transporteursVisuels.js';
 
-const POLICE = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif";
-
-// La tuile d'une marque. `repli` : ce qui se montre pour une clé sans marque.
+// La tuile d'une marque : LE LOGO du transporteur (10 nov., src/transporteursVisuels.js
+// `DESSINS_TRANSPORTEURS`, valeurs figées). `repli` : ce qui se montre pour une clé sans logo.
 export function LogoTransporteur({ cle, taille = 20, decale = false, repli = null }) {
   const m = marqueDuTransporteur(cle);
   if (!m) return repli;
-  const n = m.sigle.length;
+  const clair = /^#F/i.test(m.fond);   // fond blanc ou jaune : un fin liseré pour qu'il se détache sur un fond clair
   return (
     <span aria-hidden="true" data-transporteur-logo="charge" data-marque={cle}
-      style={{ width: taille, height: taille, borderRadius: Math.round(taille * 0.26), display: 'inline-flex', overflow: 'hidden', flexShrink: 0, marginLeft: decale ? -6 : 0, verticalAlign: 'middle', background: m.fond }}>
-      <svg viewBox="0 0 32 32" width="100%" height="100%" focusable="false" style={{ display: 'block' }}>
-        <rect width="32" height="32" fill={m.fond}/>
-        <text x="16" y="16.5" textAnchor="middle" dominantBaseline="central" fill={m.encre}
-          fontFamily={POLICE} fontWeight="800" fontSize={n >= 3 ? 11.5 : 14.5} letterSpacing={n >= 3 ? '-0.4' : '-0.2'}>{m.sigle}</text>
-      </svg>
+      style={{ width: taille, height: taille, borderRadius: Math.round(taille * 0.26), display: 'inline-flex', overflow: 'hidden', flexShrink: 0, marginLeft: decale ? -6 : 0, verticalAlign: 'middle', background: m.fond, boxShadow: clair ? 'inset 0 0 0 1px rgba(0,0,0,.08)' : undefined }}>
+      <svg viewBox="0 0 32 32" width="100%" height="100%" focusable="false" style={{ display: 'block' }}
+        dangerouslySetInnerHTML={{ __html: `<rect width="32" height="32" fill="${m.fond}"/>${m.svg || ''}` }}/>
     </span>
   );
 }

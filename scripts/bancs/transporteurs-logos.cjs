@@ -95,7 +95,9 @@ const projette = (row, sel) => {
 
 // Les pastilles d'un conteneur : clé, texte, images (visibles ou non, chargées ou non).
 const PASTILLES = `(racine) => [...racine.querySelectorAll('.vrm-transporteur')].map((p) => ({
-  cle: p.getAttribute('data-transporteur'), txt: p.innerText.trim(),
+  // (10 nov.) Les VRAIS logos : celui de Chronopost est un mot-symbole (« Chrono / post » dessiné en SVG) ;
+  // le texte jugé est celui écrit HORS du logo ([data-marque]).
+  cle: p.getAttribute('data-transporteur'), txt: (() => { const c = p.cloneNode(true); c.querySelectorAll('[data-marque]').forEach((m) => m.remove()); return (c.textContent || '').trim(); })(),
   // (9 nov. au soir) LES MARQUES : le nom n'est plus écrit (aria-label, title, data-transporteur-nom) ; la tuile
   // dessinée (data-marque) le montre — un sigle SVG (« CH », « MR ») et le pictogramme neutre pour l'inconnu.
   nom: p.getAttribute('data-transporteur-nom') || '', aria: p.getAttribute('aria-label') || '', marque: (p.querySelector('[data-marque]') || { getAttribute: () => '' }).getAttribute('data-marque'),
@@ -179,7 +181,10 @@ const sain = async (pg, ecran) => {
             const nomG = h ? h.getAttribute('data-groupe-transp') : '';
             return { tx: c.getAttribute('data-tx-colis'), carte: c.getAttribute('data-transporteur'), pastilles: P2(act || c),
               apresBouton: !!(p && bouton && (p.compareDocumentPosition(bouton) & Node.DOCUMENT_POSITION_FOLLOWING) && (bouton.matches('[data-imprime], [data-bouton-bord], .vrm-fu-principal, button') || bouton.querySelector('button'))),
-              memeRangee: !!(p && bouton && p.parentElement === bouton.parentElement && (nomG === nomP || (nomG === 'Autres' && /pas lu|inconnu/i.test(nomP)))) };
+              // (9 nov., Julien : « du plus récent en haut, peu importe le compte ») « À envoyer » est UNE liste sans en-têtes de
+              // transporteur (remplacés par des pastilles de filtre) : la puce doit être sur la même rangée que le bouton ; un en-tête,
+              // s'il existe encore (tournée), doit rester le sien.
+              memeRangee: !!(p && bouton && p.parentElement === bouton.parentElement && (!h || nomG === nomP || (nomG === 'Autres' && /pas lu|inconnu/i.test(nomP)))) };
           });
         });
         const envoyer = await pg.evaluate(() => ({ route: document.querySelectorAll('[data-vc-route]').length }));
@@ -187,7 +192,7 @@ const sain = async (pg, ecran) => {
           const c = r.find((x) => x.tx === tx);
           dit(c && c.carte === cle, `${T} E1 vente ${tx} : transporteur « ${cle} » sur la carte`, c ? c.carte : 'carte absente');
           const p = c && c.pastilles[0];
-          dit(p && p.cle === cle && c.apresBouton && c.memeRangee, `${T} E2 vente ${tx} : la puce à gauche du bouton bordereau, même rangée, sous l'en-tête de son transporteur`, JSON.stringify(c && { p, apres: c.apresBouton, rangee: c.memeRangee }));
+          dit(p && p.cle === cle && c.apresBouton && c.memeRangee, `${T} E2 vente ${tx} : la puce à gauche du bouton bordereau, même rangée (liste sans en-têtes depuis le 9 nov.)`, JSON.stringify(c && { p, apres: c.apresBouton, rangee: c.memeRangee }));
         }
         const pasLu = r.find((x) => x.tx === '8003'), p3 = pasLu && pasLu.pastilles[0];
         dit(p3 && p3.marque === 'inconnu' && p3.nom === 'Transporteur inconnu' && /Transporteur inconnu/.test(p3.aria) && p3.imgs.length === 0 && !/inconnu/i.test(p3.txt), `${T} E3 inconnu : le pictogramme NEUTRE (aucune marque devinée), « Transporteur inconnu » en aria-label, aucune image`, JSON.stringify(p3));

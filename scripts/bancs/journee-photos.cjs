@@ -109,9 +109,10 @@ const LIGNES = [
   ] : []),
 ];
 // Ce que chaque case DOIT montrer (les photos de l'identité, dans l'ordre de la liste).
-// Base : l'ordre de Colis (`toShip`, le plus pressé d'abord ; limite estimée = vente + 7 j) — 8103
-// (vendue avant-hier), 8102 (hier), 8101 (aujourd'hui) ; puis Vestiaire, puis Leboncoin.
-const PHOTOS_ENVOYER = SANS ? [] : JEU === 'base' ? [url(3), url(2), url(1), VC_PHOTO, LBC_PHOTO] : APOSTER.map((v) => v.photo && v.photo.url).filter(Boolean);
+// Base : l'ordre de Colis. (9 nov., soir, lot AJ — décision de Julien) la vente la plus RÉCENTE d'abord,
+// tous sites (src/ordreRecent.js ; avant : le plus pressé d'abord) — 8101 (aujourd'hui 8 h), Vestiaire et
+// Leboncoin (hier 12 h, à égalité : l'ordre reçu), 8102 (hier 9 h), 8103 (avant-hier). Banc mis à jour.
+const PHOTOS_ENVOYER = SANS ? [] : JEU === 'base' ? [url(1), VC_PHOTO, LBC_PHOTO, url(2), url(3)] : APOSTER.map((v) => v.photo && v.photo.url).filter(Boolean);
 const JUMEAUX = [url(4), url(7)];  // la vente finalisée et l'annonce au même titre que 8101
 
 let ko = 0, ok = 0;
@@ -241,7 +242,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
               nJourneeEnv = env.n;
               dit(env.pile.n === env.n, 'J1 · la vignette parle du MÊME nombre que la carte (data-n)', `${env.pile.n} / ${env.n}`);
               const attendus = PHOTOS_ENVOYER.slice(0, 3);
-              if (JEU === 'base' || SANS) dit(JSON.stringify(env.pile.srcs) === JSON.stringify(attendus), 'J1 · photos = celles des colis eux-mêmes (identité), le plus pressé d’abord', `${env.pile.srcs.join(' | ')} ≠ ${attendus.join(' | ')}`);
+              if (JEU === 'base' || SANS) dit(JSON.stringify(env.pile.srcs) === JSON.stringify(attendus), 'J1 · photos = celles des colis eux-mêmes (identité), le plus récent d’abord', `${env.pile.srcs.join(' | ')} ≠ ${attendus.join(' | ')}`);
               else dit(env.pile.srcs.length === Math.min(3, PHOTOS_ENVOYER.length) && env.pile.srcs.every((s) => PHOTOS_ENVOYER.includes(s)), 'J1 · photos = celles des colis à poster eux-mêmes (identité)', env.pile.srcs.join(' | '));
               dit(!env.pile.srcs.some((s) => JUMEAUX.includes(s)), 'J1 · jamais la photo du JUMEAU au même titre (vente finalisée 8104, annonce 4001)', env.pile.srcs.join(' | '));
               const nn = Number(env.n);
@@ -298,16 +299,18 @@ const mesureJournee = (pg) => pg.evaluate(() => {
           const env = await pg.evaluate(() => {
             const cartes = [...document.querySelectorAll('[data-colis-lignes] [data-colis-ident]')];
             return { cartes: cartes.map((c) => ({ id: c.getAttribute('data-colis-ident'), site: c.getAttribute('data-plateforme-colis') || 'vinted', groupe: (() => { let p = c.previousElementSibling; while (p && !p.hasAttribute('data-groupe-transp')) p = p.previousElementSibling; return p ? p.getAttribute('data-groupe-transp') : ''; })() })),
-              listes: document.querySelectorAll('[data-colis-lignes]').length, blocVc: !!document.querySelector('[data-colis-vestiaire]:not([data-colis-vestiaire="0"])'), groupes: [...document.querySelectorAll('[data-groupe-transp]')].map((g) => g.getAttribute('data-groupe-transp')) };
+              listes: document.querySelectorAll('[data-colis-lignes]').length, blocVc: !!document.querySelector('[data-colis-vestiaire]:not([data-colis-vestiaire="0"])'), groupes: [...document.querySelectorAll('[data-groupe-transp]')].map((g) => g.getAttribute('data-groupe-transp')),
+              pastilles: [...document.querySelectorAll('[data-envoyer-filtre-choix]')].map((g) => g.getAttribute('data-envoyer-filtre-choix')) };
           });
           if (JEU === 'base') {
             const sites = new Set(env.cartes.map((c) => c.site));
             dit(sites.has('vinted') && sites.has('vestiaire') && sites.has('leboncoin'), 'C2 · Vinted, Vestiaire et Leboncoin dans LA MÊME liste', [...sites].join(', '));
             dit(env.listes === 1, 'C2 · une seule liste de colis', String(env.listes));
             dit(!env.blocVc, 'C2 · plus de bloc « Ventes Vestiaire à envoyer » à part');
-            dit(new Set(env.groupes).size === env.groupes.length && env.groupes.length > 1, 'C2 · rangés par transporteur, un en-tête chacun', env.groupes.join(' | '));
-            const vcC = env.cartes.find((c) => c.site === 'vestiaire');
-            dit(vcC && vcC.groupe === 'Chronopost', 'C2 · la vente Vestiaire est sous SON transporteur (Chronopost)', vcC && vcC.groupe);
+            // (9 nov., soir, lot AJ — décision de Julien : le plus récent en haut) Le transporteur n'impose plus
+            // l'ordre : plus d'en-tête de groupe, une PASTILLE par transporteur (filtre). Banc mis à jour.
+            dit(env.groupes.length === 0 && env.pastilles.includes('tous') && env.pastilles.length > 2, 'C2 · le transporteur en pastilles (filtre), plus en groupes qui rangent', env.pastilles.join(' | ') + ' / groupes : ' + env.groupes.join(' | '));
+            dit(env.pastilles.includes('Chronopost'), 'C2 · la pastille Chronopost (le transporteur de la vente Vestiaire) existe', env.pastilles.join(' | '));
           }
           const nCartes = env.cartes.length;
           if (o.pubEnv) dit(nCartes === o.pubEnv.total, 'C2 · autant de cartes que « À envoyer · N »', `${nCartes} / ${o.pubEnv.total}`);

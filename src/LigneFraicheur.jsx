@@ -72,6 +72,7 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
   const [transp, setTransp] = React.useState(undefined);
   const [exclus] = useComptesExclus();
   const [ouvert, setOuvert] = React.useState(false);
+  const [rangeeOuverte, setRangeeOuverte] = React.useState(null);
   const [, tic] = React.useReducer((x) => x + 1, 0);
   const lireTransp = React.useCallback((force) => { fetchTranspLignes(force ? { force: true } : {}).then((t) => setTransp(t === undefined ? null : t), () => setTransp(null)); }, []);
   React.useEffect(() => {
@@ -115,7 +116,10 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
   const texte = f.etat === 'encours' ? 'Vérification de tes données…'
     : f.etat === 'a-jour' ? <>Tout est à jour{quand ? <span className="vrm-fraicheur-quand"> · vérifié {quand}</span> : null}</>
     : f.etat === 'passu' ? <>Pas pu tout vérifier : {f.passu.join(', ')} — rien n’est affirmé pour {f.passu.length > 1 ? 'eux' : 'ça'}.</>
-    : <><b className={premier.plateforme ? 'vrm-sensible' : undefined}>{premier.nom}</b>{premier.plateforme && premier.source !== 'emails' ? <span className="vrm-fraicheur-site"> ({nomPlateforme(premier.plateforme)})</span> : null} {premier.texte}{premier.gesteCourt ? ` — ${premier.gesteCourt}` : ''}</>;
+    // (10 nov., Julien : « je trouve ça moche ») La ligne ne porte plus de phrase d'instruction : le nom et
+    // l'état court, ou « N choses à revoir » ; le geste vit dans le détail, rangée touchée.
+    : f.retards.length > 1 ? <><b>{f.retards.length} choses à revoir</b></>
+    : <><b className={premier.plateforme ? 'vrm-sensible' : undefined}>{premier.nom}</b> <span className="vrm-fraicheur-site">{premier.texte}</span></>;
   const depliable = f.etat === 'retard' || (f.etat === 'passu');
   return (
     <div className="vrm-fraicheur-hote">
@@ -130,21 +134,25 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
         {depliable
           ? <button type="button" className="vrm-bandeau-abo-texte vrm-fraicheur-texte" aria-expanded={ouvert ? 'true' : 'false'} data-fraicheur-deplier="" onClick={() => setOuvert((o) => !o)}>
               <span className="vrm-fraicheur-phrase">{texte}</span>
-              {autres > 0 ? <span className="vrm-fraicheur-autres" data-fraicheur-autres={autres}>+ {autres} autre{autres > 1 ? 's' : ''}</span> : null}
+              {autres > 0 ? <span className="vrm-fraicheur-autres" data-fraicheur-autres={autres} aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span> : null}
             </button>
           : <span className="vrm-bandeau-abo-texte vrm-fraicheur-texte"><span className="vrm-fraicheur-phrase">{texte}</span></span>}
-        {g ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-geste={premier.source} data-alerte-voir={panne ? '' : undefined} onClick={g.faire}>{g.libelle}</button> : null}
+        {g && autres === 0 ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-geste={premier.source} data-alerte-voir={panne ? '' : undefined} onClick={g.faire}>{g.libelle}</button> : null}
         {f.etat === 'passu' ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-reessayer="" onClick={() => { relire(); lireTransp(true); }}>Réessayer</button> : null}
       </div>
       {ouvert && depliable ? (
         <div className="vrm-fraicheur-detail" data-fraicheur-detail={f.retards.length}>
-          {f.retards.map((r) => { const gg = geste(r); return (
-            <div key={r.cle} className="vrm-fraicheur-rangee" data-fraicheur-rangee={r.source} data-fraicheur-rangee-cle={r.cle}>
-              <div className="vrm-fraicheur-rangee-texte">
-                <span><b className={r.plateforme ? 'vrm-sensible' : undefined}>{r.nom}</b>{r.plateforme && r.source !== 'emails' ? ` (${nomPlateforme(r.plateforme)})` : ''} {r.texte}</span>
+          {f.retards.map((r) => { const gg = geste(r); const la = rangeeOuverte === r.cle; return (
+            <div key={r.cle} className={'vrm-fraicheur-rangee' + (la ? ' is-ouverte' : '')} data-fraicheur-rangee={r.source} data-fraicheur-rangee-cle={r.cle}>
+              <button type="button" className="vrm-fraicheur-rangee-tete" aria-expanded={la ? 'true' : 'false'} onClick={() => setRangeeOuverte(la ? null : r.cle)}>
+                <b className={'vrm-fraicheur-rangee-nom' + (r.plateforme ? ' vrm-sensible' : '')}>{r.nom}{r.plateforme && r.source !== 'emails' ? <span className="vrm-fraicheur-site"> · {nomPlateforme(r.plateforme)}</span> : null}</b>
+                <span className="vrm-fraicheur-rangee-etat">{r.texte}</span>
+                <span className="vrm-fraicheur-chevron" aria-hidden="true">›</span>
+              </button>
+              {la ? <div className="vrm-fraicheur-rangee-suite">
                 {r.geste ? <span className="vrm-fraicheur-rangee-geste">{r.geste.charAt(0).toUpperCase() + r.geste.slice(1)}.</span> : null}
-              </div>
-              {gg ? <button type="button" className="vrm-lien-action vrm-fraicheur-rangee-bouton" onClick={gg.faire}>{gg.libelle}</button> : null}
+                {gg ? <button type="button" className="vrm-lien-action vrm-fraicheur-rangee-bouton" onClick={gg.faire}>{gg.libelle}</button> : null}
+              </div> : null}
             </div>); })}
           {f.etat === 'retard' && f.passu.length ? <div className="vrm-fraicheur-rangee" data-fraicheur-rangee="passu"><div className="vrm-fraicheur-rangee-texte"><span>Pas pu vérifier : {f.passu.join(', ')} — rien n’est affirmé pour {f.passu.length > 1 ? 'eux' : 'ça'}.</span></div></div> : null}
           {f.verifieAt ? <div className="vrm-fraicheur-pied">Vérifié {quandReluCourt(f.verifieAt, maintenant)}{f.passu.length ? '.' : ' · le reste est à jour.'}</div> : null}
