@@ -250,7 +250,9 @@ const ECRANS = [
           // Colis (maquette FusionColis, 2 nov. 22 h) : le transporteur est l'en-tête de son groupe, un bouton rond imprime.
           if (E.id === 'colis' && JEU === 'base') {
             const g = await pg.evaluate(() => ({ groupes: [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')), ronds: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord')].length, rondPret: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord [data-imprime]')].filter((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) === 44 && Math.round(r.height) === 44 && getComputedStyle(b).borderTopLeftRadius === '50%'; }).length }));
-            dit(g.groupes.length > 0 && new Set(g.groupes).size === g.groupes.length, 'colis rangés par transporteur, un en-tête par transporteur', g.groupes.join(' | '));
+            // (9 nov., soir, lot AJ — décision de Julien) plus de groupes par transporteur : la liste est rangée par date,
+            // le transporteur devient une pastille (filtre). Banc mis à jour.
+            dit(g.groupes.length === 0, 'colis : aucun en-tête de groupe par transporteur (le plus récent en haut, transporteur en filtre)', g.groupes.join(' | '));
             dit(g.ronds > 0 && g.rondPret > 0, 'un bouton rond par colis, bleu quand le bordereau est là', `${g.rondPret}/${g.ronds}`);
           }
           if (R.length) {

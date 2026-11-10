@@ -28,7 +28,7 @@
 //      pas utilisé, même pas lu.
 // On juge les ÉTATS (`data-*`) et ce qui est ÉCRIT dans la base.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, metaDe, filtreData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = 4941;
@@ -73,6 +73,7 @@ const projette = (row, sel) => {
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'owner') { out[alias] = row.owner || null; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    if (src === 'meta') { out[alias] = metaDe(row.data); continue; }
     const texte = /->>[^>]*$/.test(src);
     let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
     if (texte && v != null && typeof v !== 'string') v = typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -133,8 +134,10 @@ async function rendre(b, { tel = true, relais = null, plan = () => [], tab = 'ca
     if (eq && cmds[eq[1]]) return sert(route, 200, [projette(cmds[eq[1]], sel)]);
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(0), cap: r.data.capturedAt });
     if (eq) return sert(route, 200, LIGNES.filter((r) => r.id === eq[1]).map(forme));
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return sert(route, 200, LIGNES.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return sert(route, 200, LIGNES.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return sert(route, 200, LIGNES.filter((r) => re.test(r.id) && filtreData(u)(r)).map(forme)); }
     return sert(route, 200, []);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));

@@ -165,7 +165,10 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete::before { border-radius: 0 0 var(--w-r-tete) var(--w-r-tete) !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; margin: 10px 16px 0 !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { grid-column: auto !important; min-height: 0 !important; padding: 10px 10px 10px 11px !important; border-radius: 22px !important; gap: 2px !important; }
-  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-size: 28px !important; margin-top: 4px !important; }
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { container-type: inline-size; }
+  /* (10 nov., Julien : « l'euro dépasse ») Le chiffre se resserre selon sa longueur (--nc, posé par le widget) :
+     « 3 » garde 28 px, « 669,40 € » tient sur la largeur du widget, jamais coupé. */
+  :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-size: clamp(14px, calc(100cqi / (var(--nc, 4) * .62)), 28px) !important; margin-top: 4px !important; white-space: nowrap !important; max-width: 100% !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case > span { font-size: 12px !important; letter-spacing: -.01em !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
   :root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete .vrm-fu-cases > .vrm-fu-case > small { font-size: 12px !important; padding-top: 2px !important; }
   /* Trois widgets étroits : pas de chevron (le widget entier se touche), le libellé garde toute la largeur. */

@@ -66,7 +66,7 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
-import { passeTransporteursAnciens, passeTransporteursPdf, reqPdf, avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
+import { passeTransporteursAnciens, passeTransporteursPdf, reqPdf, avecRelus, REQ_RELUS, MAX_PDF_MATIN, BUDGET_PDF_MATIN_MS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
 import { comptesLbcLies, comptesVcLies } from '../src/comptesLies.js';
 import { compteEcarte } from './_lib/ventes-regle.js';
@@ -87,7 +87,7 @@ import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.j
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
-import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS } from './_lib/colis-frequent.js';
+import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
 import { passageSondes } from './_lib/statut-sondes.js';
 import { pushConfigure } from './_lib/push.js';
@@ -762,6 +762,13 @@ async function bilanDuMoisVendeur(maintenant = Date.now()) {
       de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', ...m }),
   });
 }
+// (9 nov. au soir) La passe des étiquettes au nom du vendeur du contexte — le matin ET au passage de 15 min.
+function etiquettesCron({ max, budgetMs }) {
+  return passeTransporteursPdf({
+    lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup, max, budgetMs,
+    lirePdf: async (id) => { const r = await fetchPaginated(scoped(reqPdf(id))); if (!Array.isArray(r)) return null; return (r[0] && typeof r[0].pdf === 'string' && r[0].pdf !== 'None') ? r[0].pdf : ''; },
+  });
+}
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
@@ -777,14 +784,12 @@ async function traiterVendeur() {
     });
   } catch (e) { transporteursAnciens = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   // (9 nov., transporteurs inconnus) Le transporteur écrit sur l'ÉTIQUETTE des anciens bordereaux
-  // (le PDF de CETTE transaction, api/_lib/transporteur-pdf.js) : 6 PDF par passage, un par requête.
+  // (le PDF de CETTE transaction, api/_lib/transporteur-pdf.js), un par requête. (9 nov. au soir,
+  // « transporteurs parfaits ») Plus 6 par jour : jusqu'à MAX_PDF_MATIN dans BUDGET_PDF_MATIN_MS, puis
+  // le passage de 15 min (`?moment=colis`) continue tant que la ligne dit qu'il en reste (`pdfReste`).
   let transporteursPdf = null;
-  try {
-    transporteursPdf = await passeTransporteursPdf({
-      lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup,
-      lirePdf: async (id) => { const r = await fetchPaginated(scoped(reqPdf(id))); if (!Array.isArray(r)) return null; return (r[0] && typeof r[0].pdf === 'string' && r[0].pdf !== 'None') ? r[0].pdf : ''; },
-    });
-  } catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  try { transporteursPdf = await etiquettesCron({ max: MAX_PDF_MATIN, budgetMs: BUDGET_PDF_MATIN_MS }); }
+  catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf };
 }
@@ -1303,18 +1308,34 @@ export default async function handler(req, res) {
   // lue ⇒ 503, personne n'est visité.
   if (moment === 'colis') {
     let r = null;
+    const debutColis = Date.now();
+    let clOk = false;
     try {
       const cl = await cloisonnee();
       if (!cl) { res.status(503).json({ ok: false, moment: 'colis', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      clOk = true;
       r = await passageColisFrequent({
         lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(),
         traiter: (o) => contexteVendeur.run({ owner: o }, () => lireTransporteursDuVendeur({ max: MAX_LECTURES_VENDEUR, maxDeparts: MAX_DEPARTS_VENDEUR, budgetMs: BUDGET_VENDEUR_MS })),
       });
     } catch (e) { r = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    // (9 nov. au soir, « transporteurs parfaits ») PUIS les étiquettes pas encore lues (api/_lib/colis-frequent.js
+    // `passageEtiquettes`) : les vendeurs dont la ligne dit qu'il en reste, dans le temps qui reste au passage
+    // (le job GitHub attend 150 s ; le passage des statuts en prend 100 au plus). Une panne ici ne change pas
+    // le code de réponse des statuts : elle est dite dans `etiquettes`.
+    let et = null;
+    try {
+      const temps = Math.min(BUDGET_ETIQUETTES_MS, 128000 - (Date.now() - debutColis));
+      et = !clOk ? { fait: false, raison: 'pas-su' } : temps < 4000 ? { fait: true, dus: null, raison: 'plus-de-temps' } : await passageEtiquettes({
+        lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: temps,
+        traiter: (o, { budgetMs }) => contexteVendeur.run({ owner: o }, () => etiquettesCron({ max: MAX_PDF_VENDEUR_FREQUENT, budgetMs })),
+      });
+    } catch (e) { et = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     // Le bilan ne porte que des NOMBRES (aucun vendeur nommé, aucun n° de suivi) : il part dans le journal GitHub.
     const bilans = (r && r.bilans) || [];
     res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'colis', dus: r && r.dus, traites: r && r.traites, restants: r && r.restants, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint,
-      lus: bilans.reduce((t, b) => t + (Number(b.lus) || 0), 0), changes: bilans.reduce((t, b) => t + (Number(b.changes) || 0), 0), ...(r && !r.fait ? { raison: r.raison || r.erreur || 'pas-su' } : {}) });
+      lus: bilans.reduce((t, b) => t + (Number(b.lus) || 0), 0), changes: bilans.reduce((t, b) => t + (Number(b.changes) || 0), 0), ...(r && !r.fait ? { raison: r.raison || r.erreur || 'pas-su' } : {}),
+      etiquettes: et && { fait: !!et.fait, dus: et.dus, traites: et.traites, lus: et.lus, ranges: et.ranges, vus: et.vus, restants: et.restants, echecs: et.echecs, budgetAtteint: et.budgetAtteint, ...(et.fait ? {} : { raison: et.raison || et.erreur || 'pas-su' }) } });
     return;
   }
   const soir = moment === 'soir';

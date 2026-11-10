@@ -202,7 +202,10 @@ const deplier = async (pg) => {
   await pg.waitForFunction(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] .vrm-rpf-ligne')].every((l) => l.querySelector('[data-rp-detail]')), null, { timeout: 5000 }).catch(() => {});
 };
 const lire = async (pg) => { await deplier(pg); return lireBrut(pg); };
-const lireBrut = (pg) => pg.evaluate(() => {
+// (9 nov., lot AG) La fraîcheur des comptes est dite par la ligne UNIQUE du haut de l'app (plus de puce
+// sur Colis) : on attend qu'elle ait sa réponse.
+const lireBrut = async (pg) => { await pg.waitForFunction(() => { const e = document.querySelector('[data-fraicheur-unique]'); return e && !['encours', 'charge'].includes(e.getAttribute('data-fraicheur-unique')); }, null, { timeout: 25000 }).catch(() => {}); return lireBrut0(pg); };
+const lireBrut0 = (pg) => pg.evaluate(() => {
   const at = (s, a) => { const e = document.querySelector(s); return e ? e.getAttribute(a) : null; };
   // (2 nov., colis clair) Colis → « À retirer » : une carte par colis, sous son point ;
   // les « à vérifier » dans leur groupe en bas (`data-hors-compte`).
@@ -216,7 +219,7 @@ const lireBrut = (pg) => pg.evaluate(() => {
   return {
     total: at('[data-pickup-total]', 'data-pickup-total'), aVerifier: at('[data-pickup-a-verifier]', 'data-pickup-a-verifier'),
     sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length, sansCompteGeste: document.querySelectorAll('[data-pickup-sans-compte] [data-pickup-sans-compte-geste]').length,
-    blocAVerifier: at('[data-retirer-a-verifier]', 'data-retirer-a-verifier'), relire: at('[data-comptes-a-relire]', 'data-comptes-a-relire'), relireTitre: at('[data-comptes-a-relire]', 'title'), nRelire: document.querySelectorAll('[data-comptes-a-relire]').length,
+    blocAVerifier: at('[data-retirer-a-verifier]', 'data-retirer-a-verifier'), relire: at('[data-fraicheur-a-relire]', 'data-fraicheur-a-relire'), relireTitre: at('[data-fraicheur-a-relire]', 'title'), relireNoms: at('[data-fraicheur-a-relire]', 'data-fraicheur-a-relire-noms'), nRelire: document.querySelectorAll('[data-fraicheur-a-relire]').length, puce: document.querySelectorAll('[data-comptes-a-relire]').length,
     cartes, aVerif, repartis, texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     // L'ordre des points relais : la liste des n° de suivi de chaque bloc, dans l'ordre affiché.
     blocs: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]:not([data-retirer-a-verifier])')].map((b) => [...b.querySelectorAll('[data-rp-suivi]')].map((x) => x.getAttribute('data-rp-suivi'))),
@@ -288,7 +291,7 @@ async function main() {
         // ligne de fraîcheur qui nomme compte_b —, plus sous la ligne du colis.
         const salo = L.aVerif.find((x) => x.raison === 'trop_long' && /Salomon XT-6/.test(x.t));
         dit(!!salo, `${T} l'achat Vinted lu « déposé » il y a 9 j ⇒ « à vérifier »`);
-        dit(salo && !/il y a 9 j/.test(salo.t) && !/il y a 9 j/.test(L.texte) && L.nRelire === 1 && /compte_b/.test(L.relireTitre || '') && /il y a 9 j/.test(L.relireTitre || ''), `${T} … l'âge de la lecture (9 j) est dit UNE fois — par la puce « comptes à relire » qui nomme compte_b (3 nov.) —, pas sous chaque colis`, `puce ×${L.nRelire} « ${L.relireTitre} » · ligne : ${salo ? salo.t.replace(/\n/g, ' ¦ ').slice(0, 140) : 'absente'}`);
+        dit(salo && !/il y a 9 j/.test(salo.t) && !/il y a 9 j/.test(L.texte) && L.nRelire === 1 && /compte_b[^·]*9 j/.test(L.relireTitre || ''), `${T} … l'âge de la lecture (9 j) est dit UNE fois — par la ligne de fraîcheur du haut qui nomme compte_b (lot AG) —, pas sous chaque colis`, `puce ×${L.nRelire} « ${L.relireTitre} » · ligne : ${salo ? salo.t.replace(/\n/g, ' ¦ ').slice(0, 140) : 'absente'}`);
         dit(!/\bperdus?\b/i.test(L.texte), `${T} le mot « perdu » n'apparaît nulle part`);
         // ── repartis : par le transporteur, ou par la commande liée par IDENTITÉ
         dit(L.repartis.some((x) => x.suivi === '30000006'), `${T} « retourné à l'expéditeur » (écrit par le transporteur) ⇒ « reparti »`);
@@ -296,7 +299,7 @@ async function main() {
         dit(L.repartis.some((x) => x.suivi === '30000005' || x.tx === '9603') && !carte('30000005'), `${T} commande liée par son n° de suivi « non réclamée » ⇒ « reparti », plus « à retirer »`);
         dit(!L.repartis.some((x) => x.suivi === '30000001'), `${T} une commande au MÊME TITRE (une autre paire) ne fait pas repartir le Mondial Relay (§5)`);
         // ── fraîcheur, une fois, avec le compte et le geste
-        dit(L.nRelire === 1 && L.relire === '1' && /compte_b/.test(L.relireTitre || ''), `${T} « 1 compte à relire » (compte_b, il y a 9 j) dit une fois, avec son geste`, `${L.relire} « ${L.relireTitre} » ×${L.nRelire}`);
+        dit(L.nRelire === 1 && L.puce === 0 && /(^|,)compte_b(,|$)/.test(L.relireNoms || ''), `${T} compte_b (9 j) nommé UNE fois, par la ligne du haut (plus de puce sur Colis)`, `${L.relire} « ${L.relireTitre} » ×${L.nRelire}`);
         if (process.env.SHOTS) await pg.screenshot({ path: path.join(process.env.SHOTS, `colis-fiables-${P.vp.width}${P.sombre ? '-sombre' : ''}.png`), fullPage: true });
         // ── Ma journée : le même nombre, et la ligne « à vérifier »
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
@@ -355,8 +358,8 @@ async function main() {
         const D10 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-hors-compte][data-a-verifier-code]')]; return { oui: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui').length, ouiSansCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-code]')).length, nonAvecCode: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'non' && x.querySelector('[data-rp-code]')).length, vinted: l.filter((x) => x.getAttribute('data-a-verifier-code') === 'oui' && !x.querySelector('[data-rp-suivi]:not([data-rp-suivi=""])')).length }; });
         dit(D10.oui === 4 && D10.ouiSansCode === 0 && D10.nonAvecCode === 0 && D10.vinted >= 1, `${T} [défaut 10] 4 « à vérifier » ont encore leur code, et chacune le montre : la même règle sur chaque ligne (e-mails ET colis vus par Vinted)`, JSON.stringify(D10));
         // défaut 11
-        const D11 = await pg.evaluate(() => ({ fr: (document.querySelector('[data-comptes-a-relire]') || { getAttribute: () => null }).getAttribute('data-comptes-a-relire'), n: document.querySelectorAll('[data-comptes-a-relire]').length, samba: ([...document.querySelectorAll('[data-cc-carte]')].find((c) => /Samba/.test(c.innerText)) || { innerText: '' }).innerText, ages: [...document.querySelectorAll('[data-capture-age]')].map((x) => x.getAttribute('data-capture-age')) }));
-        dit(D11.fr === '2' && D11.n === 1 && !D11.ages.length && !!D11.samba, `${T} [défaut 11] compte_c relu il y a 3 j : compté UNE fois par la puce « 2 comptes à relire » (compte_b, compte_c), pas redit sous la carte de son colis`, JSON.stringify({ ...D11, samba: D11.samba.replace(/\n/g, ' ¦ ').slice(0, 100) }));
+        const D11 = await pg.evaluate(() => ({ noms: (document.querySelector('[data-fraicheur-a-relire]') || { getAttribute: () => null }).getAttribute('data-fraicheur-a-relire-noms'), n: document.querySelectorAll('[data-fraicheur-unique]').length, samba: ([...document.querySelectorAll('[data-cc-carte]')].find((c) => /Samba/.test(c.innerText)) || { innerText: '' }).innerText, ages: [...document.querySelectorAll('[data-capture-age]')].map((x) => x.getAttribute('data-capture-age')) }));
+        dit(/(^|,)compte_b(,|$)/.test(D11.noms || '') && /(^|,)compte_c(,|$)/.test(D11.noms || '') && D11.n === 1 && !D11.ages.length && !!D11.samba, `${T} [défaut 11] compte_c relu il y a 3 j : nommé UNE fois par la ligne du haut (avec compte_b), pas redit sous la carte de son colis`, JSON.stringify({ ...D11, samba: D11.samba.replace(/\n/g, ' ¦ ').slice(0, 100) }));
         dit(!errs.length, `${T} aucune erreur d'app`, errs[0]);
         // défaut 14 : Ma journée ne décompresse pas les transactions des vieux achats
         journal.length = 0;

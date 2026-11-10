@@ -184,7 +184,7 @@ const lireEcran = (pg) => pg.evaluate(() => {
     sortis: [...document.querySelectorAll('[data-sorti]')].map((e) => ({ cle: e.getAttribute('data-sorti'), via: e.getAttribute('data-sorti-via') || '', texte: ((e.querySelector('[data-sorti-texte]') || {}).textContent || '').trim() })),
     verifie: (document.querySelector('[data-retirer-verifie]') || { getAttribute: () => null }).getAttribute('data-retirer-verifie'),
     verifieTexte: ((document.querySelector('[data-retirer-verifie]') || {}).textContent || '').trim(),
-    relire: (() => { const e = document.querySelector('[data-comptes-a-relire]'); return e ? { n: e.getAttribute('data-comptes-a-relire'), texte: e.textContent.trim(), noms: e.getAttribute('data-comptes-a-relire-noms') } : null; })(),
+    puce: document.querySelectorAll('[data-comptes-a-relire]').length,
     voile: voile ? getComputedStyle(voile).display : 'absent',
     deb: document.documentElement.scrollWidth - window.innerWidth };
 });
@@ -235,12 +235,16 @@ const lireEcran = (pg) => pg.evaluate(() => {
         // F5
         dit(m.verifie === '10' && /il y a 10 min/.test(m.verifieTexte), 'F5 « Suivi vérifié il y a 10 min » (la dernière lecture réussie)', m.verifieTexte);
         // F6
-        dit(!!m.relire && m.relire.noms === 'compte_a' && /compte_a/.test(m.relire.texte), 'F6 la puce nomme le compte à relire', J(m.relire));
-        await pg.locator('[data-comptes-a-relire]').first().click();
+        // (9 nov., lot AG) Plus de puce sur Colis : la ligne de fraîcheur UNIQUE du haut de l'app nomme le compte,
+        // son âge et le geste (src/fraicheur.js) ; une voix, pas deux.
+        dit(m.puce === 0, 'F6 plus de puce « Relire » sur Colis (une seule voix : la ligne du haut)', String(m.puce));
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-fraicheur-unique]'); return e && !['encours', 'charge'].includes(e.getAttribute('data-fraicheur-unique')); }, null, { timeout: 25000 }).catch(() => {});
+        const dep = pg.locator('[data-fraicheur-deplier]');
+        if (await dep.count()) await dep.first().click();
         await pg.waitForTimeout(200);
-        const det = await pg.evaluate(() => { const d = document.querySelector('[data-comptes-a-relire-detail]'); return d ? { t: d.textContent, geste: !!d.querySelector('[data-comptes-a-relire-geste]') } : null; });
-        dit(!!det && /compte_a/.test(det.t) && /3 j/.test(det.t) && /vinted\.fr/.test(det.t) && det.geste, 'F6 touchée : le compte, son âge, le geste (vinted.fr connecté sur ce compte) et « Mes comptes »', det && det.t.slice(0, 160));
-        if (SHOTS) { await pg.evaluate(() => { const e = document.querySelector('[data-comptes-a-relire-detail]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(200); await pg.screenshot({ path: path.join(SHOTS, `retraits-frais-relire-${nom}.png`) }); }
+        const det = await pg.evaluate(() => { const e = document.querySelector('[data-fraicheur-unique]'); const r = [...document.querySelectorAll('[data-fraicheur-rangee]')].find((x) => /^compte:vinted:/.test(x.getAttribute('data-fraicheur-rangee-cle') || '') && /compte_a/.test(x.textContent)); return { etat: e ? e.getAttribute('data-fraicheur-unique') : null, t: r ? r.textContent : '', bouton: !!(r && r.querySelector('button')) }; });
+        dit(det.etat === 'retard' && /compte_a/.test(det.t) && /3 j/.test(det.t) && /vinted\.fr/.test(det.t) && det.bouton, 'F6 la ligne du haut nomme compte_a, son âge (3 j), le geste (vinted.fr connecté sur ce compte) et « Comptes »', J(det).slice(0, 200));
+        if (SHOTS) { await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(200); await pg.screenshot({ path: path.join(SHOTS, `retraits-frais-relire-${nom}.png`) }); }
         // F7
         dit(m.voile === 'none' || m.voile === 'absent', 'F7 le voile « Deux doigts… » de MapLibre n’est jamais affiché en travers de la carte', m.voile);
         if (tel && m.carteEtat === 'pret') {

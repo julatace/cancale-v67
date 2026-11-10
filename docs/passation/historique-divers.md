@@ -1107,6 +1107,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · RGPD** : « Supprimer mon compte », clients partis (e-mail 11 mois, suppression 12 mois), export de ses données ouvert sans abonnement (sa décision). `docs/passation/2026-11-09-rgpd-compte.md`. Geste : relire la politique.
 
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (fraîcheur unique)
+- **9 nov. · Sécurité** : revue (aucune fuite entre vendeurs ; `/api/ai` exige une session) puis liaison Vinted prouvée (029) et carte en iframe hors Orion (5.332). `docs/passation/2026-11-09-securite.md`, `-securite-2.md`. Geste : requêtes SQL de contrôle, 029 avant 023.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (fraîcheur unique)
+- **9 nov. · Offres Solo 16,99 € / Pro 19,99 €** : un compte vendeur Vinted en Solo (ventes des autres en aperçu, hors totaux) ; plan lu du prix Stripe ; migration 028. `docs/passation/2026-11-09-plans-solo-pro.md`. Geste : prix Pro Stripe + `STRIPE_PRIX_PRO`, 028.
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Sécurité** : revue (aucune fuite entre vendeurs ; `/api/ai` exige une session) puis liaison Vinted prouvée (029) et carte en iframe hors Orion (5.332). `docs/passation/2026-11-09-securite.md`, `-securite-2.md`. Geste : requêtes SQL de contrôle, 029 avant 023.
 
@@ -1128,5 +1133,36 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Direction artistique 5 (à valider)** : colonne de gauche refaite (panneau qui flotte, matière floutée, marque, pastille qui glisse, carte du compte, rail d'icônes 1024–1199 px) + boutons plus soignés + recherche du haut ; `src/styles-nav-v2.css`, banc `nav-v2`. `docs/passation/2026-11-09-direction-artistique-5.md`. Branche `claude/direction-artistique-5`. Geste : regarder les planches.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (lot AI, pop-ups, taille)
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (fraîcheur unique, intégration)
 - **9 nov. · Suites serveur** : l'offre Solo appliquée aussi par les bilans (semaine, mois), le repli e-mails du widget et le rappel des offres mini (`compteEcarteRegle`, recopiée d'App.jsx ; propriétaire = Pro ; pas su ⇒ rien bridé ; colis jamais bridés) ; double vente Leboncoin serveur seulement si vue en ligne < 24 h (`src/enLigneLbc.js`). `docs/passation/2026-11-09-suites-serveur.md`. Geste : aucun (028 pour que l'offre soit lue).
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (fraîcheur unique, intégration)
+- **9 nov. · Pastille de l'icône (lot Z)** : l'icône de VRM (écran d'accueil, Dock) porte le nombre de colis à envoyer = le badge de Colis (`vrm_colis_aposter`, frais < 12 h) ; pas su ou 0 ⇒ effacée (`src/pastilleIcone.js`, banc `navigation-tache` Z, rouge par mutation). File des lots : `docs/passation/2026-11-09-file-des-lots.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (transporteurs parfaits)
+- **9 nov. · Direction artistique 4** : feuilles et ateliers (Republier) en portail à la forme unique (groupes blancs, croix ronde, pied plein), confirmations à deux gestes égaux, toasts en carte sans rouge, états vides centrés, « pas su » en carte au bouton gris, barre du bas pleine (styles-premium.css §12). `docs/passation/2026-11-09-direction-artistique-4.md`. Geste : regarder les planches.
+
+## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (ordre récent, lot AJ)
+- **9 nov. (soir) · Transporteurs inconnus + e-mails Vestiaire + SMS** : le transporteur LU sur l'étiquette (PDF du bordereau, sans IA, un seul nom sinon rien ; réception + 6 PDF/jour au cron ; source `pdf`) ; e-mails Vestiaire rappel/annonce/offres ; SMS MRELAY (formes réelles), VintedGo (code = identité), Pickup et VestiaireCo (informations, jamais reliées seules), Chronopost prudent. `docs/passation/2026-11-09-transporteurs-emails.md` (requêtes SQL). Geste : 2ᵉ automatisation « article », copier un SMS Chronopost.
+- **9 nov. · Scanner (lot V)** : le scan d'un bordereau MONTRE la paire attendue (identité seule), rien écrit sans « Colis fait » ; au retrait, n° de suivi ou code ⇒ l'achat, « Retiré ». `docs/passation/2026-11-09-scanner.md`. Geste : aucun.
+
+## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (À trancher en cartes)
+- **9 nov. (soir) · Solo par plateforme (lot E)** : Solo = UN compte vendeur PAR plateforme (Vinted, Leboncoin, eBay, Vestiaire) — **à confirmer par Julien** ; `venteAutreHorsPlan` + `excluAutreDe(v, regle)` (app = bilans serveur), feuille « Quel compte vend sur … ? », 30 j par plateforme, CGV. `docs/passation/2026-11-09-solo-plateformes.md`. Geste : confirmer, migration 030 (après 028).
+
+## Ligne déplacée de CLAUDE.md §9 le 10 nov. (taille, colis propre)
+- **9 nov. (soir) · Plancher + « déjà N » (lot F)** : sous chaque offre Vinted « En dessous de 103 € tu perds de l'argent » (prix d'achat SAISI + frais connus, règle `beneficePaire` ; pas de prix d'achat ⇒ porte de saisie ; sous ⇒ ambre ; mini sous le plancher dit, jamais changé ; Vestiaire : rien, commission pas lue) ; « Tu as déjà N paires de ce modèle en stock » à la saisie d'un achat (ressemblance, rien écrit). `docs/passation/2026-11-09-plancher-stock.md`. Geste : aucun.
+- **9 nov. · Zéro banc rouge** : ~20 bancs remis au vert (périmés à la règle actuelle, fragiles rendus déterministes, aucun contrôle retiré) ; vrais défauts : note « adresse reliée à aucun compte » + son geste cachée sur Colis, limite d'envoi invisible au téléphone, filtre des sites qui sautait, « Préparer sur » un site masqué, paire partie « pas rangée ». `docs/passation/2026-11-09-zero-banc-rouge.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (taille, lots BA/BF)
+- **9 nov. (soir) · DA4 suite** : focus piégé et rendu dans les feuilles, feuille refusée qui remonte (`bloque`), saisie gardée à la fermeture, confirmation `irreversible` en ambre (Leboncoin/eBay supprimer), messages au-dessus du clavier à durée lisible, zone `aria-live` toujours montée, Messages vide dessiné. `docs/passation/2026-11-09-direction-artistique-4.md` (Suite). Geste : aucun.
+
+## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (Litiges en cours)
+- **9 nov. (soir) · Direction artistique 6 « Widgets » (à valider)** : les cases de la carte sombre sortent en widgets blancs (bento ; Ma journée au téléphone : 3 sur une ligne, règle du 27 oct.), groupes rayon 24 + chevrons (plus de « Voir » gris), pilules, ronds, titres 34/800 ; `src/styles-widgets-ios.css`, banc `direction-artistique-6`, planches `docs/passation/planches-da6/`. `docs/passation/2026-11-09-direction-artistique-6.md`. Geste : regarder les planches.
+## Ligne déplacée de CLAUDE.md §9 (10 nov., taille du dossier)
+- **9 nov. · Lot B : « Annuler » 5 s + ⌘K qui agit** : gestes réversibles dans VRM (masquer un achat, marquer vendue, délier LBC/gros, relier un achat…) sans confirmation, pilule « Annuler » ; l'extérieur garde sa confirmation ; ⌘K propose des actions qui OUVRENT seulement. `docs/passation/2026-11-09-annuler-commandes.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **9 nov. · Retraits frais** : plus de « peut-être en double » — un témoin = un carton (compté avec, fini avec, ou à retirer) ; carte = ce que l'onglet compte ; statut relu /15 min (`?moment=colis`). `docs/passation/2026-11-09-retraits-frais.md`. Geste : `CRON_SECRET` GitHub.
+
+## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (lot AI, textes courts, taille)
+- **9 nov. · À trancher (lot AC)** : un écran (Gérer, badge) + une ligne dans Ma journée ; 13 sources publiées par leur écran (`vrm_a_trancher`, local), un geste qui ouvre ; pas su = « — ». `docs/passation/2026-11-09-a-trancher.md`. Geste : décider des ventes à dater.

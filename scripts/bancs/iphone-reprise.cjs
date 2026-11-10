@@ -410,7 +410,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
           // (mis en capitales par la feuille de style) ; les titres Vendre · Gérer · Argent
           // doivent être VISIBLES (« Moi », au pied, peut taire son titre) ; « en entier » =
           // le contrôle des libellés coupés ci-dessus.
-          dit(!!r && ['Vendre', 'Gérer', 'Argent', 'Moi'].every((g) => r.groupes.includes(g)) && ['Vendre', 'Gérer', 'Argent'].every((g) => r.titresVus.includes(g)) && !r.groupes.includes('Plateformes'), `O ${qui} : les groupes Vendre · Gérer · Argent · Moi sont là, en entier, sans doublon « Plateformes »`, JSON.stringify(r && { groupes: r.groupes, titresVus: r.titresVus }));
+          dit(!!r && ['Gérer', 'Argent', 'Moi'].every((g) => r.groupes.includes(g)) && ['Gérer', 'Argent'].every((g) => r.titresVus.includes(g)) && !r.groupes.includes('Plateformes') && !r.groupes.includes('Vendre'), `O ${qui} : les groupes Gérer · Argent · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide (lot AL : Republier et Favoris & offres vivent dans Annonces et Messages)`, JSON.stringify(r && { groupes: r.groupes, titresVus: r.titresVus }));
           await ctx.close();
         });
       }

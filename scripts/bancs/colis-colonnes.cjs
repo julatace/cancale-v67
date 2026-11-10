@@ -332,7 +332,9 @@ async function main() {
         // (3 nov., nouvelle mise en page) Les colis sont rangés sous l'en-tête de LEUR transporteur (le groupe
         // Prêts/En attente reste porté par `data-groupe-carte`, jugé juste au-dessus).
         const grT = await pg.evaluate(() => [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')));
-        dit(grT.length > 0 && new Set(grT).size === grT.length, `${T} les groupes sont nommés (un en-tête par transporteur)`, grT.join(' | '));
+        // (9 nov., soir, lot AJ — décision de Julien : le plus récent en haut) Le transporteur n'impose plus l'ordre :
+        // plus d'en-tête de groupe, une pastille par transporteur (filtre) quand il y en a plusieurs. Banc mis à jour.
+        dit(grT.length === 0, `${T} aucun en-tête de groupe par transporteur (l'ordre est la date ; le transporteur est un filtre)`, grT.join(' | '));
         const partisIci = PARTIS.filter((k) => fois(L, k) > 0);
         await pg.click('[data-colis-onglet-choix="envoyes"]'); await pg.waitForTimeout(600);
         const Lp = await lire(pg);

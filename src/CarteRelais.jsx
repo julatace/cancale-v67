@@ -33,7 +33,7 @@ import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN, surLaCarte } from '.
 import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, selecteurVilles as selecteurVillesRegle, CLE_AUTRES, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
 import './styles-colis-colonnes.css';
 import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.jsx';
-import { cleStatTransporteur } from './transporteursVisuels.js';
+import { cleStatTransporteur, cleTransporteur, svgMarque } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
@@ -189,6 +189,14 @@ const PHRASES_GESTES = { 'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + m
 export const INDICE_GESTES = 'Deux doigts pour déplacer la carte';
 export const INDICE_MS = 2500;
 let INDICE_MONTRE = false;
+// Le transporteur LU commun à tous les colis COMPTÉS d'un point (sa clé), ou null (aucun, ou plusieurs).
+export function transporteurDuPoint(p) {
+  const cles = new Set();
+  for (const c of (p && p.arrives) || []) { if (c && c.horsCompte) continue; const k = c && c.transp && c.transp.cle; cles.add(k || ''); }
+  if (cles.size !== 1) return null;
+  const k = [...cles][0];
+  return k || null;
+}
 const margesCadre = (h) => (h < 240 ? { top: 42, bottom: 58, left: 28, right: 28 } : { top: 48, bottom: 64, left: 40, right: 40 });
 export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur = 260, onEtat, muet = false, cooperatif = false }) {
   const boite = React.useRef(null);
@@ -197,7 +205,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
   const [etat, setEtat] = React.useState('charge');
   React.useEffect(() => { if (onEtat) onEtat(etat); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [etat]);
   const texte = (p) => String(etiquette ? etiquette(p) : nombreEpingle(p).n);
-  const cle = points.map((p) => `${p.cle}:${p.lat}:${p.lon}:${texte(p)}:${nombreEpingle(p).sorte}`).join('|');
+  const cle = points.map((p) => `${p.cle}:${p.lat}:${p.lon}:${texte(p)}:${nombreEpingle(p).sorte}:${transporteurDuPoint(p) || ''}`).join('|');
   React.useEffect(() => {
     let vivant = true, carte = null; const marqueurs = [];
     // (1er nov.) Une carte refaite (un repère arrivé) repart de « charge » : un
@@ -227,11 +235,18 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
             el.setAttribute('data-relais-sorte', ep.sorte);
             const quoi = ep.sorte === 'aretirer' ? 'à retirer' : ep.sorte === 'averifier' ? 'à vérifier' : 'en route';
             el.setAttribute('aria-label', `${p.nom || p.adresseCourte || 'Point relais'} : ${ep.n} colis ${quoi}`);
-            el.textContent = texte(p);
+            // (9 nov. au soir, « la carte des points relais doit être parfaite ») La MARQUE du transporteur sur
+            // l'épingle, quand tous les colis comptés du point ont le même transporteur LU ; sinon le nombre seul.
+            const tP = transporteurDuPoint(p);
+            if (tP) {
+              el.setAttribute('data-relais-epingle-transp', tP);
+              el.innerHTML = svgMarque(tP, 20) + '<span data-relais-epingle-n=""></span>';
+              el.lastChild.textContent = texte(p);
+            } else el.textContent = texte(p);
             // Une seule couleur d'accent, rare (§7) : l'épingle d'un point où des
             // colis ATTENDENT d'être retirés ; les autres restent neutres.
             const fort = ep.sorte === 'aretirer';
-            el.style.cssText = `min-width:34px;height:34px;padding:0 8px;border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#2f5bd3') : '#fff'}`;
+            el.style.cssText = `min-width:34px;height:34px;padding:0 ${tP ? '9px 0 5px' : '8px'};border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#2f5bd3') : '#fff'};display:flex;align-items:center;gap:5px;box-sizing:border-box`;
             if (fort) el.setAttribute('data-relais-arrives', '');
             el.addEventListener('click', (e) => { e.stopPropagation(); onChoisir && onChoisir(p.cle); });
             elements.current.set(p.cle, el);
@@ -373,7 +388,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const aCode = !!(x.code || x.qr || x.code2);
   const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
-    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined };
+    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '' };  // (lot AJ) l'arrivée lue qui range la ligne
   const basculer = () => setOuvert((o) => !o);
   return (
     <div className="vrm-rpf-ligne" {...attrs} data-ouvert={ouvert ? '1' : undefined}>
@@ -704,7 +719,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
                 {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rp-adresse" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
                 {tCommun && (tCommun.cle || tCommun.nom || !comptes.some((c) => c.trInconnu))
                   ? <span className="vrm-rp-transp" data-relais-transporteur={trCode || tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span>
-                  : (trNom && !tParCarte ? <span className="vrm-rp-adresse" data-relais-transporteur={trCode}>{trNom}</span> : null)}
+                  : (trNom && !tParCarte ? <span className="vrm-rp-transp" data-relais-transporteur={trCode}><PastilleTransporteur t={{ cle: cleTransporteur(trCode), nom: trNom }} C={C} seul taille={18}/></span> : null)}
                 {(() => { const n = comptes.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
                 <span className="vrm-rp-resume">
                   {morceaux.map((m, i) => <span key={i} data-relais-compte={i === 0 && p.nComptes ? p.nComptes : undefined}>{i ? ' · ' : ''}{m}</span>)}

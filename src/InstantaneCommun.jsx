@@ -46,7 +46,7 @@ export function CasesInstantanees({ cases, prefixe = 'data-ji' }) {
     <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
       {cases.map((c) => (
         <div key={c.cle} className="vrm-fu-case" {...{ [prefixe + '-case']: c.cle, [prefixe + '-valeur']: c.valeur }}>
-          <b className={c.vide ? 'is-vide' : undefined}>{c.b}</b>
+          <b className={c.vide ? 'is-vide' : undefined} style={{ '--nc': Math.max(1, String(c.b == null ? '' : c.b).length) }}>{c.b}</b>
           <span>{c.l}</span>
           <small className="vrm-fu-case-raison" aria-hidden={c.raison ? undefined : 'true'}>{c.raison || ' '}</small>
         </div>

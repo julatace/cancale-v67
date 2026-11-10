@@ -1,0 +1,46 @@
+/* ── LA LIGNE DE FRAÎCHEUR UNIQUE (9 nov., lot AG) ───────────────────────────
+   La forme du bandeau d'abonnement (`vrm-bandeau-abo`, DA6) : une case, un point.
+   Point : encre (tout est à jour, rien à faire) · ambre (un geste) · creux (pas su).
+   UNE hauteur pour tous les états (44 px, deux lignes au plus) : la réponse qui
+   arrive ne fait pas sauter la page. Le détail s'ouvre sous la ligne, au toucher. */
+.vrm-fraicheur-hote { margin: var(--d-e-3, 10px) var(--d-e-4, 16px) 0; }
+.vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur { margin: 0; padding-top: 0; padding-bottom: 0; height: 44px; min-height: 44px; flex-wrap: nowrap; overflow: hidden; }
+.vrm-fraicheur[data-fraicheur-ton="ok"], .vrm-fraicheur[data-fraicheur-unique="encours"] { background: transparent; box-shadow: none; color: var(--d-gris, var(--vrm-muted)); }
+.vrm-fraicheur-point[data-ton="ok"] { background: var(--d-encre, var(--vrm-ink)); opacity: .55; }
+.vrm-fraicheur-point[data-ton="geste"] { background: var(--d-point-ambre, var(--vrm-warn)); }
+.vrm-fraicheur-point[data-ton="passu"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--d-gris, var(--vrm-muted)); }
+.vrm-fraicheur-texte { display: flex; align-items: center; gap: 8px; height: 44px; min-width: 0; flex: 1 1 auto;
+  padding: 0; margin: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: default; }
+button.vrm-fraicheur-texte { cursor: pointer; }
+.vrm-fraicheur-phrase { flex: 1 1 auto; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.3; }
+.vrm-fraicheur-phrase b { font-weight: 600; }
+.vrm-fraicheur-site, .vrm-fraicheur-quand { color: var(--d-gris, var(--vrm-muted)); }
+.vrm-fraicheur-autres { flex: 0 0 auto; white-space: nowrap; font-size: var(--d-t-12, 12px); font-weight: 600; color: var(--d-gris, var(--vrm-muted));
+  padding: 3px 8px; border-radius: 999px; background: var(--d-remplir, rgba(120,120,128,.12)); font-variant-numeric: tabular-nums; }
+.vrm-fraicheur .vrm-bandeau-abo-geste { height: 44px; }
+.vrm-fraicheur-detail { margin-top: 6px; padding: 4px 0; border-radius: var(--d-r-case, 12px); background: var(--d-carte, var(--vrm-surface)); box-shadow: var(--d-ombre-carte, none);
+  font-size: var(--d-t-13, 13px); line-height: 1.4; color: var(--d-encre, var(--vrm-ink)); }
+.vrm-fraicheur-rangee { display: flex; align-items: center; gap: 10px; padding: 8px 6px 8px var(--d-e-4, 16px); }
+.vrm-fraicheur-rangee + .vrm-fraicheur-rangee { border-top: 1px solid var(--d-filet, var(--vrm-line)); }
+.vrm-fraicheur-rangee-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-fraicheur-rangee-texte b { font-weight: 600; }
+.vrm-fraicheur-rangee-geste { color: var(--d-gris, var(--vrm-muted)); font-size: var(--d-t-12, 12px); }
+.vrm-fraicheur-rangee-bouton { flex: 0 0 auto; min-height: 44px; padding: 0 10px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--d-accent-texte, var(--vrm-accent)); cursor: pointer; }
+.vrm-fraicheur-pied { padding: 6px var(--d-e-4, 16px) 6px; font-size: var(--d-t-12, 12px); color: var(--d-gris, var(--vrm-muted)); }
+@media (max-width: 600px) {
+  .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur { flex-wrap: nowrap; }
+  .vrm-fraicheur .vrm-bandeau-abo-texte { flex-basis: auto; }
+  .vrm-fraicheur-phrase { font-size: 13px; }
+}
+/* (10 nov., Julien : « je trouve ça moche ») Le détail : UNE ligne par source (nom · état court · ›),
+   l'instruction n'apparaît que sous la rangée touchée. */
+.vrm-fraicheur-rangee { display: block; padding: 0; }
+.vrm-fraicheur-rangee-tete { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px 0 var(--d-e-4, 16px);
+  border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.vrm-fraicheur-rangee-nom { flex: 0 1 auto; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fraicheur-rangee-etat { flex: 1 1 auto; min-width: 0; text-align: right; color: var(--d-gris, var(--vrm-muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.vrm-fraicheur-chevron { flex: 0 0 auto; color: var(--d-gris, var(--vrm-muted)); font-size: 18px; transition: transform .18s ease; }
+.vrm-fraicheur-rangee.is-ouverte .vrm-fraicheur-chevron { transform: rotate(90deg); }
+.vrm-fraicheur-rangee-suite { display: flex; align-items: center; gap: 10px; padding: 0 12px 10px var(--d-e-4, 16px); }
+.vrm-fraicheur-rangee-suite .vrm-fraicheur-rangee-geste { flex: 1 1 auto; font-size: var(--d-t-13, 13px); }
+@media (prefers-reduced-motion: reduce) { .vrm-fraicheur-chevron { transition: none; } }

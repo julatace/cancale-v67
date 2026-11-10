@@ -67,6 +67,27 @@ export const arriveeConstatee=(texte)=>phrases(texte).some(arriveeDansPhrase);
 // 2 nov.) était rangé « livré / retiré » et sonnait « ✅ Colis livré ». Un colis
 // perdu n'est ni livré ni arrivé.
 export const colisPerdu=(sujet)=>/\b(?:perdu|egare|introuvable)\b/.test(normaliser(sujet));
+// (10 nov.) LE COLIS A CHANGÉ DE POINT RELAIS. Julien, sur l'e-mail Mondial Relay « Votre
+// colis a changé de plan » (le point prévu est indisponible, le colis est redirigé vers un
+// nouveau point) : « Regarde le colis a pas été livré c'est pas bon ». VRM l'avait montré
+// livré / à retirer : le corps parle du point (« livré dans le Point Relais suivant »,
+// « disponible »…). Un changement de point n'est NI une arrivée NI une livraison : le colis
+// roule vers le NOUVEAU point (en route). Lu sur le SUJET d'abord (§5) ; dans le corps,
+// seulement une phrase qui le CONSTATE (jamais « en cas de point indisponible », une
+// condition — « Où vous livrer en cas de point indisponible ? » reste ce qu'il était).
+const SUJET_CHANGEMENT_RELAIS=/\bchange\s+de\s+plan\b|\bchangement\s+de\s+(?:point|relais|lieu\s+de\s+(?:retrait|livraison)|destination)\b|\bnouveau\s+(?:point\s+(?:relais|de\s+retrait)|relais|lieu\s+de\s+(?:retrait|livraison))\b|\b(?:redirige|reachemine|reoriente)e?s?\b/;
+const CORPS_CHANGEMENT_RELAIS=[
+ /\b(?:a|ont)\s+(?:ete\s+)?(?:change|changes)\s+de\s+plan\b/,
+ /\b(?:a\s+ete|ont\s+ete|est|sont)\s+(?:redirige|reachemine|reoriente)e?s?\b/,
+ /\bpoint\s+relais\s+(?:\S+\s+){0,5}(?:est|etait)\s+(?:temporairement\s+|actuellement\s+|momentanement\s+)?(?:indisponible|ferme)e?\b/,
+ /\b(?:vers|dans|au|a)\s+(?:le|un|votre|ton|ce)?\s*(?:nouveau\s+point\s+(?:relais|de\s+retrait)|point\s+relais\s+suivant)\b/,
+];
+export function changementDeRelais(sujet,texte=''){
+ const s=normaliser(sujet);
+ if(SUJET_CHANGEMENT_RELAIS.test(s))return true;
+ const corps=String(texte||'').split(/(?:message d'origine|original message|forwarded message)/i)[0];
+ return phrases(corps).some((p)=>!CONDITION.test(p)&&CORPS_CHANGEMENT_RELAIS.some((r)=>r.test(p)));
+}
 function lire(texte){
  const t=normaliser(texte);if(!t)return null;
  const negatif=/(?:n[' ]a\s+pas|n[' ]avez\s+pas|pas\s+encore|non)\s+(?:ete\s+)?(?:retire|recupere|receptionne)|(?:n'a|n'avez)\s+(?:toujours\s+|encore\s+)?pas\s+(?:encore\s+)?(?:ete\s+)?(?:retire|recupere|receptionne)/.test(t);
@@ -120,10 +141,14 @@ function lire(texte){
 export function etatColisDepuisTexte(sujet,texte='') {
  const s=normaliser(sujet);
  if(colisPerdu(sujet))return null;
+ // (10 nov.) Un changement de point relais : le colis ROULE vers le nouveau point. Un
+ // sujet qui constate l'arrivée ou le retrait (« … est disponible ») garde la main.
+ if(SUJET_CHANGEMENT_RELAIS.test(s)){const l=lire(sujet);return l==='available'||l==='delivered'||l==='retour'?l:'transit';}
  if(/entre de bonnes mains|preuve de depot|confirmation du depot|depot de votre colis|colis est depose|bordereau d'envoi/.test(s)&&!/point|consigne|relais/.test(s))return 'transit';
  // Le sujet courant prime ; le texte n'est consulté que si le sujet est neutre.
  const parSujet=lire(sujet);if(parSujet)return parSujet;
  const corps=String(texte).split(/(?:message d'origine|original message|forwarded message)/i)[0];
+ if(phrases(corps).some((p)=>!CONDITION.test(p)&&CORPS_CHANGEMENT_RELAIS.some((r)=>r.test(p))))return 'transit';
  const parCorps=lire(corps);
  // (revue du 23 oct.) Un retour lu dans le SEUL corps d'un e-mail au sujet neutre
  // ne vaut que si rien ne dit que le colis attend encore : le sujet d'un rappel,
