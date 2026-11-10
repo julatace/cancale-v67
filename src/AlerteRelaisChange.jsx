@@ -15,7 +15,7 @@ export default function AlerteRelaisChange({ lignes, C }) {
   if (!liste || !liste.length) return null;
   const apple = appareilApple();
   return (
-    <div className="vrm-relais-change" data-relais-change={liste.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 0 12px' }}>
+    <div className="vrm-relais-change" data-relais-change={liste.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '12px 0' }}>
       {liste.map((x) => {
         const t = transporteurDuColis({ declare: x.carrier, suivi: x.suivi });
         const lien = x.lieu ? lienItineraire(x.lieu, apple) : '';

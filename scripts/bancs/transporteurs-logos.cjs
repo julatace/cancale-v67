@@ -95,7 +95,9 @@ const projette = (row, sel) => {
 
 // Les pastilles d'un conteneur : clé, texte, images (visibles ou non, chargées ou non).
 const PASTILLES = `(racine) => [...racine.querySelectorAll('.vrm-transporteur')].map((p) => ({
-  cle: p.getAttribute('data-transporteur'), txt: p.innerText.trim(),
+  // (10 nov.) Les VRAIS logos : celui de Chronopost est un mot-symbole (« Chrono / post » dessiné en SVG) ;
+  // le texte jugé est celui écrit HORS du logo ([data-marque]).
+  cle: p.getAttribute('data-transporteur'), txt: (() => { const c = p.cloneNode(true); c.querySelectorAll('[data-marque]').forEach((m) => m.remove()); return (c.textContent || '').trim(); })(),
   // (9 nov. au soir) LES MARQUES : le nom n'est plus écrit (aria-label, title, data-transporteur-nom) ; la tuile
   // dessinée (data-marque) le montre — un sigle SVG (« CH », « MR ») et le pictogramme neutre pour l'inconnu.
   nom: p.getAttribute('data-transporteur-nom') || '', aria: p.getAttribute('aria-label') || '', marque: (p.querySelector('[data-marque]') || { getAttribute: () => '' }).getAttribute('data-marque'),
