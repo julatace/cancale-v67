@@ -23,15 +23,36 @@ export const PROFIL_VIEUX_J = 7;
 
 const num = (v) => (v == null || v === '' ? null : (isFinite(Number(v)) ? Number(v) : null));
 
-// Un avis lu (forme non mesurée : défensive). Rend null si illisible.
-export const lireAvis = (f) => {
+// Un avis lu. Rend null si illisible.
+// (10 nov., lot BN) FORME MESURÉE (lecture seule, sa base, 3 comptes) : chaque avis rangé par
+// l'extension 5.319 est { id (10 chiffres), rating (entier), feedback (texte) } — **AUCUNE
+// date** (`created_at` n'est jamais là) ; `pagination` { total_entries, total_pages }. L'ordre
+// de la page va du plus récent au plus ancien (mesuré : les id décroissent sur les 3 comptes).
+// Avant, un avis sans date était ÉCARTÉ : 60 avis captés, zéro montré. Désormais : date lue ⇒
+// `ts` ; sinon `ts: null` et l'écran ne dit aucune date (jamais inventée) ; `rang` garde
+// l'ordre de la page.
+export const lireAvis = (f, rang = 0) => {
   if (!f || typeof f !== 'object') return null;
   const note = num(f.rating);
   if (!(note >= 1 && note <= 5 && Number.isInteger(note))) return null;
-  const ts = num(f.created_at_ts) != null ? num(f.created_at_ts) * 1000 : Date.parse(f.created_at || '');
-  if (!isFinite(ts)) return null;
-  return { note, ts, texte: typeof f.feedback === 'string' ? f.feedback : '', id: String(f.id ?? '') };
+  const t = num(f.created_at_ts) != null ? num(f.created_at_ts) * 1000 : Date.parse(f.created_at || '');
+  return { note, ts: isFinite(t) ? t : null, rang, texte: typeof f.feedback === 'string' ? f.feedback.trim() : '', id: String(f.id ?? '') };
 };
+// Le plus récent d'abord : par date quand les deux en ont une, sinon l'ordre de la page.
+const parRecence = (x, y) => (x.ts != null && y.ts != null && x.ts !== y.ts ? y.ts - x.ts : x.rang - y.rang);
+const moyNotes = (xs) => (xs.length ? Math.round(xs.reduce((s, x) => s + x.note, 0) / xs.length * 10) / 10 : null);
+// L'évolution d'un compte, sur les avis LUS seulement : les 10 plus récents contre les 10
+// d'avant (au moins 5 de chaque côté, sinon rien — jamais une flèche sur deux avis).
+export const MIN_EVOLUTION = 5;
+export const evolutionAvis = (lus) => {
+  if (!Array.isArray(lus)) return null;
+  const a = lus.slice(0, 10), b = lus.slice(10, 20);
+  if (a.length < MIN_EVOLUTION || b.length < MIN_EVOLUTION) return null;
+  const r = moyNotes(a), v = moyNotes(b);
+  return { recent: r, avant: v, nRecent: a.length, nAvant: b.length, sens: r > v ? 'hausse' : r < v ? 'baisse' : 'egal' };
+};
+// Un texte d'avis COURT pour l'écran (jamais le pseudo : l'extension ne le range pas).
+export const texteCourtAvis = (t, max = 90) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s; };
 
 // profils : `undefined` en cours · `null` lecture ratée · tableau
 //   [{ uid, login, at, rep, n, pos, neu, neg, avis? }] (avis : tableau brut ou absent).
@@ -55,14 +76,15 @@ export const notesParCompte = ({ profils, comptes = [], maintenant = Date.now(),
     const rep = p ? num(p.rep) : null, n = p ? num(p.n) : null;
     if (!p || (rep == null && n == null)) return { uid, nom: c.nom || (p && p.login) || uid, etat: 'pasLu', note: null, n: null, pos: null, neu: null, neg: null, at: null, vieux: false, liste: null };
     const brut = Array.isArray(p.avis) ? p.avis : null;
-    const lus = brut ? brut.map(lireAvis).filter(Boolean).sort((x, y) => y.ts - x.ts) : null;
+    const lus = brut ? brut.map((f, i) => lireAvis(f, i)).filter(Boolean).sort(parRecence) : null;
+    const totalVinted = p.pag && num(p.pag.total_entries) != null ? num(p.pag.total_entries) : null;
     return {
       uid, nom: c.nom || p.login || uid, etat: 'lu',
       note: rep != null && n > 0 ? Math.round(rep * 50) / 10 : null,        // la note affichée par Vinted, sur 5
       n: n ?? 0, pos: num(p.pos), neu: num(p.neu), neg: num(p.neg),
       at: isFinite(p.atMs) ? p.atMs : null,
       vieux: !(isFinite(p.atMs) && maintenant - p.atMs <= PROFIL_VIEUX_J * 86400000),
-      liste: lus ? { dernieres: lus.slice(0, nDernieres), sousCinq: lus.filter((x) => x.note < 5), lus: lus.length } : null,
+      liste: lus ? { dernieres: lus.slice(0, nDernieres), sousCinq: lus.filter((x) => x.note < 5), lus: lus.length, moyenneLus: moyNotes(lus), evolution: evolutionAvis(lus), total: totalVinted } : null,
     };
   });
   const lus = liste.filter((x) => x.etat === 'lu');

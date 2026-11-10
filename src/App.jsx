@@ -439,7 +439,7 @@ installerFonduPhotos();
 // (6 nov., vitesse 2) ScannerColis : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./design/scanner.css";
 import "./styles-photo-carton.css";   // (10 nov., lot AZ) « Photo du carton » (scanner, Préparer, fiche de la vente)
-import { brancherPhotoCarton, venteDuColis, aPhotoCarton } from "./photoCarton.js";
+import { brancherPhotoCarton, venteDuColis, aPhotoCarton, photoCartonDe } from "./photoCarton.js";
 import { BoutonPhotoCarton, PhotoCartonVente } from "./PhotoCarton.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
@@ -447,6 +447,9 @@ import { auCentreDeVerification } from "./verificationArticle.js";
 import { preuvesFriseVinted, bifurcationVente, friseProuvee } from "./friseProuvee.js";   // (10 nov., lot BE) la frise d'une vente, étape par étape
 import FriseVente from "./FriseVente.jsx";
 import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js";   // (10 nov., lot BG) d'où viennent mes achats
+import { lignesVitesse, publierVitesse } from "./vitesseEnvoi.js";   // (10 nov., lot BM) vitesse d'envoi
+import { LigneVitesse } from "./VitesseEnvoi.jsx";
+import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
 import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
 import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi, compteAImprimer } from "./prochainGesteColis.js";
@@ -549,6 +552,7 @@ import { NotePaireVue } from './NotePaire.jsx';
 import { CLE_HORS_MASQUES, achatsEnDouble, opsGarder, horsVisibles } from './achatsDoubles.js';
 import { AchatsEnDouble } from './AchatsEnDouble.jsx';
 import {DejaEnStock} from "./DejaEnStock.jsx";
+import {ReventeModele} from "./ReventeModele.jsx";
 import {pairesDuModele} from "./dejaEnStock.js";
 import {plancherVente,offreFacePlancher} from "./plancherOffre.js";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
@@ -27300,7 +27304,7 @@ function EcranMaSemaine({ liveStats, onNav, entete }) {
     R: REGLES_SEMAINE,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [maintenant, lundi, liveStats, pub, dorment, pret, ship, lbcF, vcF, ligneUrssaf]);
-  return <MaSemaine M={M} entete={entete} onSemaine={setLundi} onNav={onNav}/>;
+  return <MaSemaine M={M} entete={entete} onSemaine={setLundi} onNav={onNav} vitesse={<LigneVitesse owner={(AUTH.user && AUTH.user.id) || ''}/>}/>;
 }
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
@@ -28955,6 +28959,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { const relire = () => setRecusDelies(load('vrm_recus_delies', {}) || {}); const off = onCloudReady(relire); const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_recus_delies') relire(); }; window.addEventListener('vrm:save', f); return () => { off(); window.removeEventListener('vrm:save', f); }; }, []);
   const indexRecusAchat = useMemo(() => indexRecusParTransaction(Array.isArray(recusAchat) ? recusAchat.filter((r) => !(r && r.id && recusDelies[r.id])) : recusAchat, (r) => ventilationRecuAchat(r && r.texte).trouve), [recusAchat, recusDelies]);
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
+  const [reventeVue, setReventeVue] = useState(null); // (10 nov., lot AV) « Revendu combien ? » d'un achat : { titre }
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
   // (23 oct.) « Paires du lot » s'ouvre PAR-DESSUS le tiroir d'une vente : elle
   // prend le clavier à l'ouverture (Échap ferme la feuille qu'on voit, pas le
@@ -37006,6 +37011,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, offBuys, registreFo, autresBenefice, hiddenSales, hiddenAccts]);
+  // ── (10 nov., lot BM) VITESSE D'ENVOI — publiée pour Statistiques et Ma semaine (src/vitesseEnvoi.js) ──
+  // Le départ d'une vente est la règle unique (`partisVinted`, api/_lib/depart-vente.js) avec SA date
+  // (Colis fait / scan, panneau, e-mail du n° exact, prise en charge) ; une vente partie d'après Vinted
+  // sans date prouvée compte « sans date de dépôt prouvée ». Rien n'est publié tant qu'un compte de
+  // ventes a raté ou que les e-mails sont en lecture (pas lus : publié « partiel », dit).
+  useEffect(() => {
+    if (!Array.isArray(sales.items)) return;
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
+    if (!Array.isArray(tracking) && !trackingKO) return;
+    try {
+      const ventes = sales.items.filter((o) => o && !isHidden(o) && !acctOff(o._acc && o._acc.vinted_user_id));
+      const lignes = lignesVitesse({
+        ventes, partis: partisVinted,
+        estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
+        estPartie: (o) => !aExpedier(o) && classifyOrderStatus(o.status) !== 'cancelled',
+        compteDe: (o) => ({ cle: String((o._acc && o._acc.vinted_user_id) || ''), nom: (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '' }),
+      });
+      if (lignes) publierVitesse(lignes, { owner: AUTH.user?.id || '', partiel: !Array.isArray(tracking) });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, partisVinted, tracking, trackingKO, hiddenSales, hiddenAccts]);
   // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
   const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
   const articlesLus = (tx) => {
@@ -38046,6 +38072,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub, litigesSuivis, retoursSuivis, sitesPresents, retoursEbayLus, bordParTx, labelsCaptes, transp, transpMap, listings.items, txnItem, numeros, cartonsLitiges]);
+  // ── (10 nov., lot BJ) LE DOSSIER DE LITIGE EN UN PDF (src/dossierLitige.js) ──────────────
+  // Fabriqué ICI, dans le navigateur (pdf-lib) : rien n'est envoyé, il télécharge le fichier.
+  // Tout par la TRANSACTION de la carte : sa vente (date seulement), sa frise prouvée, la photo
+  // de SON annonce, la photo du carton (`photoCartonDe`), son bordereau (n°, date ; la page elle-
+  // même seulement s'il la joint : elle porte l'adresse de l'acheteur). Rien de l'acheteur.
+  // Rend 'ok' · 'passu' (une lecture a raté : rien téléchargé, dit sur la carte).
+  const fabriquerDossierLitige = async (c, { avecBordereau = false } = {}) => {
+    try {
+      const l = litigesSuivis && Array.isArray(litigesSuivis.lignes) ? litigesSuivis.lignes.find((x) => x && x.cle === c.cle) : null;
+      const o = l && l.commande && l.commande.transaction_id != null ? l.commande : null;
+      const tx = o ? String(o.transaction_id) : '';
+      let frise = null;
+      try { frise = o ? friseProuveeDe(o, l).frise : null; } catch (_) { frise = null; }
+      const b = tx ? bordParTx[tx] || null : null, lab = tx ? labelsCaptes[tx] || null : null;
+      const et = pdfEtiquettesParTx() || {}; const pdf = tx ? et[tx] || null : null;
+      const suivi = normaliserSuivi((b && (b.suivi || b.suiviPdf)) || (pdf && pdf.s) || '');
+      const bordereau = b || lab ? { suivi, at: (b && b.receivedAt) || (lab && lab.capturedAt) || null } : null;
+      const srcAnnonce = c.preuves && c.preuves.photo && c.preuves.photo.etat === 'ok' ? c.preuves.photo.src : '';
+      const [annonce, cartonLu, bordLu] = await Promise.all([
+        srcAnnonce ? imageEnOctets(photosVinted.blobDe(srcAnnonce) || srcAnnonce) : Promise.resolve(null),
+        tx ? photoCartonDe(tx, 'vinted').catch(() => null) : Promise.resolve(false),
+        avecBordereau && (b || lab) ? octetsBordereau(lab && lab.row, b && b.hasPdf ? b._row : null) : Promise.resolve(null),
+      ]);
+      const carton = cartonLu && cartonLu.src ? await imageEnOctets(cartonLu.src) : null;
+      const contenu = contenuDossierLitige({
+        carte: c, vente: o ? { date: o.date } : null,
+        compte: o && o._acc ? (o._acc.login || '') : (c.compte || ''),
+        frise, bordereau, avecBordereau,
+        photos: { annonce: !srcAnnonce ? 'absente' : annonce ? 'ok' : 'ratee', carton: cartonLu === false ? 'absente' : cartonLu == null ? 'passu' : carton ? 'ok' : 'ratee' },
+      });
+      const octets = await pdfDossierLitige(contenu, { images: { annonce, carton }, bordereauPdf: bordLu && bordLu.octets ? bordLu.octets : null });
+      telechargerFichier(new Blob([octets], { type: 'application/pdf' }), nomFichierDossier(contenu), 'application/pdf');
+      return 'ok';
+    } catch (_) { return 'passu'; }
+  };
   useEffect(() => {
     const n = nombreLitigesPublie(litigesVentesEcran);
     if (n == null) return;
@@ -41129,7 +41190,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
 
-      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
+      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
         {/* (2 nov., style « Fusion », son choix : « la première photo avec les stats
@@ -43274,6 +43335,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
                     {(()=>{ const cf = cleFacture('tx', o.transaction_id); if (!cf) return null; const a = !!(facturesAchat.factures && facturesAchat.factures[cf]);
                       return <button type="button" role="menuitem" data-achat-joindre-facture={tid} style={item} onClick={()=>{ close(); facturesAchat.choisir(cf); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{a?'Remplacer la facture':'Joindre une facture'}</button>; })()}
+                    {modeleSur('', o.title||'') && <button type="button" role="menuitem" data-achat-revente={tid} style={item} onClick={()=>{ close(); setReventeVue({ titre: String(o.title||'') }); }}><Icon name="chart" size={15} style={{color:C.muted}}/>Revendu combien ?</button>}
                     {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>Étiquette N°{numA}</button>}
                     <div style={{height:1,background:C.border,margin:'4px 0'}}/>
                     <button type="button" role="menuitem" data-achat-masquer={tid} style={{...item,color:C.muted}} onClick={()=>{ close(); masquerAchat(o); }}><Icon name="eyeOff" size={15} style={{color:C.muted}}/>Masquer cet achat</button>
@@ -46578,6 +46640,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
       {receiptView && <FeuilleRecuAchat recu={receiptView} fermer={()=>setReceiptView(null)}/>}
+      {reventeVue && <SheetShell onClose={()=>setReventeVue(null)}><div data-revente-feuille="" style={{padding:'0 2px 8px'}}><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>Revendu combien ?</div><div style={{fontSize:13,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{reventeVue.titre}</div>
+        {modeleSur('', reventeVue.titre) ? <ReventeModele ouvert C={C} cible={{ titre: reventeVue.titre }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs}/> : <div data-revente-modele="inconnu" style={{fontSize:13,color:C.muted,marginTop:10}}>Modèle pas reconnu dans le titre : rien à comparer.</div>}</div></SheetShell>}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowSourcing(false)}/>
@@ -46796,6 +46860,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      {/* (9 nov., lot F) Au moment de confirmer CET achat : les AUTRES paires du même modèle
                          déjà sur l'étagère — une information par ressemblance, rien n'est relié ni écrit. */}
                      <DejaEnStock autres C={C} Photo={PhotoVinted} r={pairesDuModele({ cible: { titre: r.titre||'', marque: r.marque||'', taille: r.taille||'' }, stock: stockPourModele, sauf: r.key, marqueDe: extractBrand, modeleDe: extractModel, couleursDe: extractColors })}/>
+                     <ReventeModele C={C} cible={{ titre: r.titre||'', marque: r.marque||'' }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs}/>
                    </div>; })()}
                  {(()=>{ const cs=propositionFiche(r.key) ? null : fillBuySugg[r.key]; if(!cs||!cs.length) return null;
                    // (30 oct.) Seules les pistes sûres (« C'est ça ») restent en clair ; les
