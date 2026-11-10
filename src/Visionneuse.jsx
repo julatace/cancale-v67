@@ -16,6 +16,9 @@ import { EVT_VISIONNEUSE, vignetteTouchee, origineVignette, lienVignette, galeri
 // (20000) et les messages (30000) : une photo touchée dans le scanner s'ouvre DEVANT lui.
 const Z_VISIONNEUSE = 19999;
 
+// La photo remplit l'écran, contenue (jamais rognée), même une petite photo — comme l'app Photos.
+const PLEIN = { width: '100%', height: '100%', objectFit: 'contain', display: 'block' };
+
 const Fleche = ({ sens }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
     {sens < 0 ? <path d="M15 5l-7 7 7 7"/> : <path d="M9 5l7 7-7 7"/>}
@@ -124,8 +127,8 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
         style={{ position: 'absolute', inset: 0, touchAction: 'none', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: z > 1 ? 'grab' : 'zoom-in', userSelect: 'none', WebkitUserSelect: 'none' }}>
         <div key={i} className="vrm-visionneuse-photo" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
           transform: `translate3d(${pos.x + glisse}px, ${pos.y}px, 0) scale(${z})`, transition: geste.current ? 'none' : 'transform .22s cubic-bezier(.2,.8,.2,1)' }}>
-          {Photo ? <Photo src={src} alt="" draggable={false} data-visionneuse-img="" style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }} repli={null}/>
-            : <img src={src} alt="" draggable={false} data-visionneuse-img="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}/>}
+          {Photo ? <Photo src={src} alt="" draggable={false} data-visionneuse-img="" style={PLEIN} repli={null}/>
+            : <img src={src} alt="" draggable={false} data-visionneuse-img="" style={PLEIN}/>}
         </div>
       </div>
       <div className="vrm-visionneuse-haut" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'max(10px, env(safe-area-inset-top)) 12px 0', pointerEvents: 'none' }}>
