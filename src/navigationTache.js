@@ -11,7 +11,8 @@
 // et où mène un ancien identifiant d'onglet. L'app (`setTab`) et les bancs la
 // lisent ; elle n'existe qu'ici.
 //
-// ⚠️ « Toutes » n'existe que pour Ventes : chaque site a sa propre règle
+// ⚠️ « Toutes » n'existe que pour Ventes (et Messages depuis le 10 nov. : des FILS,
+// regroupés par identité, jamais une règle « en ligne » recopiée) : chaque site a sa propre règle
 // « en ligne » (Vinted : dernière lecture COMPLÈTE de moins de 24 h, masquées
 // par Vinted, « à confirmer » ; Leboncoin : listes complètes par compte et
 // annonces disparues ; eBay : statut de l'annonce ; Vestiaire : lecture
@@ -35,7 +36,10 @@ const IDS_SITES = SITES_TACHE.map((s) => s.id);
 export const TACHES_SITE = {
   ventes: { toutes: true },
   annonces: { toutes: false },
-  messages: { toutes: false },
+  // (10 nov., lot AB) Messages a « Tous » : un seul fil par acheteur et par paire,
+  // toutes plateformes (src/filUnique.js). Le défaut reste Vinted (`defaut`) : les
+  // liens d'hier (`?tab=messages`, notifications, Favoris & offres) n'en changent pas.
+  messages: { toutes: true, defaut: 'vinted' },
   achats: { toutes: false },
 };
 export const estTacheSite = (tab) => Object.prototype.hasOwnProperty.call(TACHES_SITE, tab);
@@ -63,6 +67,7 @@ export const siteDeTache = (tab, sub) => {
   const s = typeof sub === 'string' ? sub.split('.')[0] : sub;
   if (s === 'toutes' && t.toutes) return 'toutes';
   if (IDS_SITES.includes(s)) return s;
+  if (t.defaut) return t.defaut;
   return t.toutes ? 'toutes' : 'vinted';
 };
 // La section rendue d'une tâche filtrée : celle demandée si ce site l'a, sinon
