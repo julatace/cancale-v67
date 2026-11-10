@@ -45305,13 +45305,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               (5 nov., chantier D) + LE TEMPS DE PRÉPARATION : depuis combien de jours la
                               vente attend (`attenteColis`, date de vente lue). La limite LUE dit le retard ;
                               l'attente reste neutre (une date estimée n'est jamais « en retard », §5). */}
+                          {/* (10 nov.) la marque discrète « sans e-mail » (le bandeau de Colis est retiré) */}
+                          {acc && uidsSansEmail.has(String(acc.vinted_user_id)) ? <button type="button" className="vrm-colis-sans-email" data-colis-sans-email={String(acc.vinted_user_id)} title={`Les e-mails de ${acc.login || 'ce compte'} n’arrivent pas à VRM : bordereau, date limite et codes de retrait ne viennent pas par e-mail. Toucher pour relier sa boîte.`}
+                            aria-label={`E-mails de ${acc.login || 'ce compte'} pas reliés à VRM — relier sa boîte`}
+                            onClick={() => relierBoiteDe(String(acc.vinted_user_id))} style={{flexShrink:0,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',fontSize:12,color:C.muted,display:'inline-flex',alignItems:'center',verticalAlign:'-2px',marginRight:6}}>
+                            <Icon name="mail" size={13}/></button> : null}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
                             {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(urgTxt)}</span>}
                             {att != null ? <span data-colis-attente={att}>{urgTxt ? ' · ' : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
-                          {acc && uidsSansEmail.has(String(acc.vinted_user_id)) ? <button type="button" className="vrm-colis-sans-email" data-colis-sans-email={String(acc.vinted_user_id)} title={`Les e-mails de ${acc.login || 'ce compte'} n’arrivent pas à VRM : bordereau, date limite et codes de retrait ne viennent pas par e-mail. Toucher pour relier sa boîte.`}
-                            onClick={() => relierBoiteDe(String(acc.vinted_user_id))} style={{flexShrink:0,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',fontSize:12,color:C.muted,display:'inline-flex',alignItems:'center',gap:3}}>
-                            <Icon name="mail" size={12}/> sans e-mail</button> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
                             /* ⚠️ Même règle que sur les Ventes (§11) : « pas rangée »
