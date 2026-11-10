@@ -496,6 +496,7 @@ import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chif
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition, texteProposition } from "./prixAchatPropose.js";
 // ⟦→ ecrans/Compta.jsx #7⟧
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre, achatAnnule } from "./registres.js";
+import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJournee } from "./operations/atelier.js";
 // ⟦→ ecrans/Compta.jsx #8⟧
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
@@ -25099,6 +25100,27 @@ function useInventaireEnCours(actif) {
   return v;
 }
 // ⟦→ ecrans/Stock.jsx #7⟧
+// (10 nov., lot N) Ma journée : les paires qui attendent > 7 j à une étape de l'Atelier
+// (Organisation). Le sous-objet `atelier` de SA ligne `vrm_operations_v1` seulement (jamais
+// `select=data` : la ligne porte aussi le journal). Lecture ratée ou rien d'ancien ⇒ `null`.
+function useAtelierJournee(actif) {
+  const [v, setV] = React.useState(null);
+  React.useEffect(() => {
+    if (!actif || !AUTH.user) return undefined;
+    let vivant = true;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_operations_v1${filtreInventaire()}&select=a:data->atelier`, { headers: sbAuth() });
+        if (!r.ok) return;
+        const j = await r.json();
+        const a = Array.isArray(j) && j.length === 1 && j[0] && j[0].a && typeof j[0].a === 'object' ? j[0].a : null;
+        if (vivant) setV(a ? ligneAtelierJournee(resumeAtelier({ atelier: a }, new Date().toISOString())) : null);
+      } catch (_) {}
+    })();
+    return () => { vivant = false; };
+  }, [actif]);
+  return v;
+}
 
 // (28 oct.) Les planches d'un meuble, colonne par colonne : un morceau par
 // colonne entre deux rangées, ⟷ = toute la largeur. Le même dessin pour « Mes
@@ -28237,6 +28259,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [cycleEnVol, setCycleEnVol] = useState(null);
   // (6 nov.) Un inventaire du Stock EN COURS (src/inventaire.js) : une carte de Ma journée.
   const inventaireJournee = useInventaireEnCours(only === 'journee');
+  const atelierJournee = useAtelierJournee(only === 'journee');
   // (3 nov.) « Supprimer de Leboncoin » depuis la carte « à retirer de Leboncoin » :
   // une confirmation qui nomme chaque N°, puis une annonce à la fois ; le premier
   // résultat qui n'est pas « supprimée » arrête tout et se dit.
@@ -35869,6 +35892,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && e.numero!=null && String(e.numero).trim()) m[String(e.buyFromId)] = e.numero; }
     return m;
   }, [numeros]);
+  // (10 nov., lot N) Les achats proposés à l'Atelier (Organisation), publiés par CET écran
+  // (src/operations/atelier.js) : lus EN ENTIER seulement, sinon rien (la publication d'avant reste).
+  useEffect(() => {
+    if (!Array.isArray(buys.items) || buys.error) return;
+    if ((Array.isArray(buys.failedUids) ? buys.failedUids : []).some(u => !acctOff(u))) return;
+    try {
+      const l = achatsPourAtelier({ vinted: buysBase, hors: offBuys, numParTx: buyNumByTxn, annule: achatAnnule, photo: orderPhoto });
+      const uid = AUTH.user?.id || '';
+      const avant = load(CLE_ACHATS_ATELIER, null);
+      if (!(avant && avant.uid === uid && JSON.stringify(avant.l) === JSON.stringify(l))) save(CLE_ACHATS_ATELIER, { v: 1, uid, l, at: Date.now() });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buys.items, buys.error, buys.failedUids, buysBase, offBuys, buyNumByTxn]);
 
   // ── Trésorerie : l'argent réel, pas le CA ─────────────────────────────
   // Vinted BLOQUE l'argent d'une vente jusqu'à ce que l'acheteur valide (ou que
@@ -40104,6 +40140,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nI = inventaireJournee.n;
           jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: 'Inventaire en cours', detail: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, title: 'Inventaire en cours', sub: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
         }
+        // (10 nov., lot N) L'ATELIER (Organisation) : des paires qui attendent > 7 j à une étape — ambre.
+        if (atelierJournee) jobs.push({ id: 'atelier-attente', n: atelierJournee.n, icon: 'box', color: C.warn, court: atelierJournee.court, detail: atelierJournee.detail, title: atelierJournee.court, tab: 'organisation', prio: 2.45 });
         // (9 nov., lot AC) « À TRANCHER » : UNE ligne, seulement s'il y a quelque chose
         // (la somme SUE des sources, src/aTrancher.js — « au moins » s'il en manque une).
         if (aTrancher && aTrancher.total > 0) {
@@ -54589,7 +54627,7 @@ function AppCoeur() {
           onAller={(u)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:u}));}catch(_){}}}
           onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran>}
-        {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense></GardeEcran>}
+        {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
