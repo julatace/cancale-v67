@@ -39,30 +39,30 @@ export default function FriseVente({ frise, transporteur = null, verse = null, c
   const debut = bif ? Math.max(1, Math.min(n - 2, bif.apres)) : 1;
   const cale = !bif ? 'center' : debut === bif.apres ? 'center' : debut > bif.apres ? 'start' : 'end';
   const bifLi = bif ? (
-    <li key="bif" className="vrm-fp-bif" data-fp-bifurcation={bif.genre} data-fp-ton={bif.geste ? 'geste' : 'neutre'}
+    <li key="bif" className="vrm-frv-bif" data-frv-bifurcation={bif.genre} data-frv-ton={bif.geste ? 'geste' : 'neutre'}
       style={{ gridRow: 2, gridColumn: `${debut} / span 3`, justifySelf: cale }}>
-      <span className="vrm-fp-bif-icone"><Fourche/></span>
-      <span className="vrm-fp-texte"><span className="vrm-fp-nom">{bif.libelle}</span>{bif.sous ? <span className="vrm-fp-sous">{bif.sous}</span> : null}</span>
+      <span className="vrm-frv-bif-icone"><Fourche/></span>
+      <span className="vrm-frv-texte"><span className="vrm-frv-nom">{bif.libelle}</span>{bif.sous ? <span className="vrm-frv-sous">{bif.sous}</span> : null}</span>
     </li>
   ) : null;
   return (
-    <div className="vrm-fp" data-recap-frise="" data-frise-prouvee={cle || ''} data-recap-bordereau={bordereau == null ? undefined : bordereau ? '1' : '0'} data-fp-bif={bif ? bif.genre : undefined}>
-      <ol className="vrm-fp-liste" aria-label="Où en est la vente" style={{ '--fp-n': n }}>
+    <div className="vrm-frv" data-recap-frise="" data-frise-prouvee={cle || ''} data-recap-bordereau={bordereau == null ? undefined : bordereau ? '1' : '0'} data-frv-bif={bif ? bif.genre : undefined}>
+      <ol className="vrm-frv-liste" aria-label="Où en est la vente" style={{ '--frv-n': n }}>
         {bif && bif.apres < 0 ? bifLi : null}
         {etapes.map((e, i) => {
           const sous = sousEtape(e);
           const li = (
-            <li key={e.cle} className="vrm-fp-etape" data-fp-etape={e.cle} data-fp-etat={e.etat} data-fait={e.etat === 'fait' ? '1' : '0'}
-              data-fp-t={e.t != null ? String(e.t) : ''} data-fp-cours={e.cours ? '' : undefined} data-fp-apres-bif={e.apresBif ? '' : undefined}
-              data-fp-derniere={i === derniere ? '' : undefined} data-fp-source={e.source || undefined}
+            <li key={e.cle} className="vrm-frv-etape" data-frv-etape={e.cle} data-frv-etat={e.etat} data-fait={e.etat === 'fait' ? '1' : '0'}
+              data-frv-t={e.t != null ? String(e.t) : ''} data-frv-cours={e.cours ? '' : undefined} data-frv-apres-bif={e.apresBif ? '' : undefined}
+              data-frv-derniere={i === derniere ? '' : undefined} data-frv-source={e.source || undefined}
               data-recap-verse={e.cle === 'versee' && verse ? verse : undefined}
               aria-current={e.cours ? 'step' : undefined}
               title={e.etat === 'fait' && e.source && !/^(transaction|vinted|email|extension|versement|transporteur)$/.test(e.source) ? e.source : undefined}
               style={{ gridRow: 1, gridColumn: i + 1 }}>
-              <span className="vrm-fp-point" aria-hidden="true">{e.etat === 'fait' ? <Coche/> : null}</span>
-              <span className="vrm-fp-texte">
-                <span className="vrm-fp-nom">{e.label}{e.cle === 'enroute' && logo ? <span className="vrm-fp-logo" data-fp-transporteur={transporteur.cle} title={transporteur.nom || undefined}>{logo}</span> : null}</span>
-                <span className="vrm-fp-sous">{sous}</span>
+              <span className="vrm-frv-point" aria-hidden="true">{e.etat === 'fait' ? <Coche/> : null}</span>
+              <span className="vrm-frv-texte">
+                <span className="vrm-frv-nom">{e.label}{e.cle === 'enroute' && logo ? <span className="vrm-frv-logo" data-frv-transporteur={transporteur.cle} title={transporteur.nom || undefined}>{logo}</span> : null}</span>
+                <span className="vrm-frv-sous">{sous}</span>
               </span>
               <span className="vrm-sr">{` — ${ETAT_LU[e.etat] || ''}`}</span>
             </li>

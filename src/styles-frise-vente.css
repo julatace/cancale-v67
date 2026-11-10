@@ -5,75 +5,75 @@
    jamais de rouge. Verticale par défaut (téléphone), horizontale quand le
    conteneur fait au moins 440 px (le panneau de l'ordinateur).
    ════════════════════════════════════════════════════════════════════════════ */
-.vrm-fp {
-  --fp-ink: var(--vrm-ink, #1D1D1F);
-  --fp-muted: var(--vrm-muted, #6E6E73);
-  --fp-line: var(--vrm-line, #E5E5EA);
-  --fp-accent: var(--vrm-accent, #0066CC);
-  --fp-warn: var(--vrm-warn, #B25000);
-  --fp-surface: var(--vrm-surface, #FFFFFF);
+.vrm-frv {
+  --frv-ink: var(--vrm-ink, #1D1D1F);
+  --frv-muted: var(--vrm-muted, #6E6E73);
+  --frv-line: var(--vrm-line, #E5E5EA);
+  --frv-accent: var(--vrm-accent, #0066CC);
+  --frv-warn: var(--vrm-warn, #B25000);
+  --frv-surface: var(--vrm-surface, #FFFFFF);
   container-type: inline-size;
   margin-top: 14px;
 }
-.vrm-fp-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vrm-frv-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 
 /* ── Une étape (verticale) : le point et son trait, le nom, la date ───────── */
-.vrm-fp-etape {
+.vrm-frv-etape {
   position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; align-items: center;
   min-height: 36px; padding: 2px 0;
 }
-.vrm-fp-etape::before {   /* le trait vers l'étape suivante */
-  content: ''; position: absolute; left: 10px; top: 50%; height: 100%; width: 2px; background: var(--fp-line);
+.vrm-frv-etape::before {   /* le trait vers l'étape suivante */
+  content: ''; position: absolute; left: 10px; top: 50%; height: 100%; width: 2px; background: var(--frv-line);
 }
-.vrm-fp-etape:last-child::before, .vrm-fp-etape:has(+ .vrm-fp-bif:last-child)::before { display: none; }
-.vrm-fp-etape[data-fp-etat="fait"]:has(+ .vrm-fp-etape[data-fp-etat="fait"])::before,
-.vrm-fp-etape[data-fp-etat="fait"]:has(+ .vrm-fp-bif + .vrm-fp-etape[data-fp-etat="fait"])::before { background: var(--fp-ink); opacity: .55; }
-.vrm-fp-point {
+.vrm-frv-etape:last-child::before, .vrm-frv-etape:has(+ .vrm-frv-bif:last-child)::before { display: none; }
+.vrm-frv-etape[data-frv-etat="fait"]:has(+ .vrm-frv-etape[data-frv-etat="fait"])::before,
+.vrm-frv-etape[data-frv-etat="fait"]:has(+ .vrm-frv-bif + .vrm-frv-etape[data-frv-etat="fait"])::before { background: var(--frv-ink); opacity: .55; }
+.vrm-frv-point {
   position: relative; z-index: 1; justify-self: center; display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 50%; box-sizing: border-box;
-  border: 2px solid var(--fp-line); background: var(--fp-surface); color: var(--fp-surface);
+  border: 2px solid var(--frv-line); background: var(--frv-surface); color: var(--frv-surface);
 }
-.vrm-fp-etape[data-fp-etat="fait"] .vrm-fp-point { background: var(--fp-ink); border-color: var(--fp-ink); }
-.vrm-fp-etape[data-fp-derniere] .vrm-fp-point { background: var(--fp-accent); border-color: var(--fp-accent); color: var(--vrm-on-accent, #FFFFFF); }
-.vrm-fp-etape[data-fp-etat="geste"] .vrm-fp-point { border-color: var(--fp-warn); border-width: 2.5px; }
-.vrm-fp-texte { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
-.vrm-fp-nom { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--fp-ink); white-space: nowrap; }
-.vrm-fp-sous { font-size: 13px; color: var(--fp-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.vrm-fp-etape[data-fp-etat="paslu"] .vrm-fp-nom { color: var(--fp-muted); font-weight: 500; }
-.vrm-fp-etape[data-fp-etat="geste"] .vrm-fp-nom, .vrm-fp-etape[data-fp-etat="geste"] .vrm-fp-sous { color: var(--fp-warn); font-weight: 600; }
-.vrm-fp-etape[data-fp-apres-bif] { opacity: .45; }
-.vrm-fp-etape[data-fp-apres-bif]::before { background: repeating-linear-gradient(to bottom, var(--fp-line) 0 3px, transparent 3px 6px); }
-.vrm-fp-logo { display: inline-flex; }
+.vrm-frv-etape[data-frv-etat="fait"] .vrm-frv-point { background: var(--frv-ink); border-color: var(--frv-ink); }
+.vrm-frv-etape[data-frv-derniere] .vrm-frv-point { background: var(--frv-accent); border-color: var(--frv-accent); color: var(--vrm-on-accent, #FFFFFF); }
+.vrm-frv-etape[data-frv-etat="geste"] .vrm-frv-point { border-color: var(--frv-warn); border-width: 2.5px; }
+.vrm-frv-texte { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.vrm-frv-nom { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--frv-ink); white-space: nowrap; }
+.vrm-frv-sous { font-size: 13px; color: var(--frv-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vrm-frv-etape[data-frv-etat="paslu"] .vrm-frv-nom { color: var(--frv-muted); font-weight: 500; }
+.vrm-frv-etape[data-frv-etat="geste"] .vrm-frv-nom, .vrm-frv-etape[data-frv-etat="geste"] .vrm-frv-sous { color: var(--frv-warn); font-weight: 600; }
+.vrm-frv-etape[data-frv-apres-bif] { opacity: .45; }
+.vrm-frv-etape[data-frv-apres-bif]::before { background: repeating-linear-gradient(to bottom, var(--frv-line) 0 3px, transparent 3px 6px); }
+.vrm-frv-logo { display: inline-flex; }
 
 /* ── La bifurcation (litige, retour, annulation) ─────────────────────────── */
-.vrm-fp-bif {
+.vrm-frv-bif {
   position: relative; display: flex; align-items: center; gap: 8px; margin: 2px 0 4px 34px;
   padding: 6px 12px; min-height: 32px; box-sizing: border-box; border-radius: 999px; align-self: flex-start; max-width: calc(100% - 34px);
-  background: var(--vrm-card2, #F2F2F7); color: var(--fp-ink);
+  background: var(--vrm-card2, #F2F2F7); color: var(--frv-ink);
 }
-.vrm-fp-bif::before {   /* le coude depuis la ligne principale */
+.vrm-frv-bif::before {   /* le coude depuis la ligne principale */
   content: ''; position: absolute; left: -24px; top: -6px; width: 18px; height: 50%; box-sizing: border-box;
-  border-left: 2px solid var(--fp-line); border-bottom: 2px solid var(--fp-line); border-bottom-left-radius: 8px;
+  border-left: 2px solid var(--frv-line); border-bottom: 2px solid var(--frv-line); border-bottom-left-radius: 8px;
 }
-.vrm-fp-bif .vrm-fp-texte { justify-content: flex-start; flex-wrap: wrap; gap: 0 8px; }
-.vrm-fp-bif .vrm-fp-nom { font-size: 15px; }
-.vrm-fp-bif-icone { display: inline-flex; color: var(--fp-muted); }
-.vrm-fp-bif[data-fp-ton="geste"] { background: var(--vrm-warn-soft, rgba(178,80,0,.1)); }
-.vrm-fp-bif[data-fp-ton="geste"] .vrm-fp-nom, .vrm-fp-bif[data-fp-ton="geste"] .vrm-fp-bif-icone { color: var(--fp-warn); }
-:root[data-theme="dark"] .vrm-fp-bif[data-fp-ton="geste"] { background: rgba(255,179,64,.14); }
+.vrm-frv-bif .vrm-frv-texte { justify-content: flex-start; flex-wrap: wrap; gap: 0 8px; }
+.vrm-frv-bif .vrm-frv-nom { font-size: 15px; }
+.vrm-frv-bif-icone { display: inline-flex; color: var(--frv-muted); }
+.vrm-frv-bif[data-frv-ton="geste"] { background: var(--vrm-warn-soft, rgba(178,80,0,.1)); }
+.vrm-frv-bif[data-frv-ton="geste"] .vrm-frv-nom, .vrm-frv-bif[data-frv-ton="geste"] .vrm-frv-bif-icone { color: var(--frv-warn); }
+:root[data-theme="dark"] .vrm-frv-bif[data-frv-ton="geste"] { background: rgba(255,179,64,.14); }
 
 /* ── Horizontale : le panneau de l'ordinateur ────────────────────────────── */
 @container (min-width: 440px) {
-  .vrm-fp-liste { display: grid; grid-template-columns: repeat(var(--fp-n, 7), minmax(0, 1fr)); row-gap: 10px; }
-  .vrm-fp-etape { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; min-height: 0; padding: 0; }
-  .vrm-fp-etape::before { left: 50%; top: 8px; width: 100%; height: 2px; }
-  .vrm-fp-etape[data-fp-apres-bif]::before { background: repeating-linear-gradient(to right, var(--fp-line) 0 3px, transparent 3px 6px); }
-  .vrm-fp-etape:has(+ .vrm-fp-bif:last-child)::before { display: none; }
-  .vrm-fp-texte { flex-direction: column; align-items: center; gap: 2px; }
-  .vrm-fp-nom { font-size: 12px; gap: 4px; }
-  .vrm-fp-sous { font-size: 12px; }
-  .vrm-fp-bif { margin: 0; max-width: 100%; width: max-content; padding: 5px 12px; }
-  .vrm-fp-bif::before { display: none; }
-  .vrm-fp-bif .vrm-fp-nom { font-size: 13px; }
-  .vrm-fp-bif .vrm-fp-sous { font-size: 12px; }
+  .vrm-frv-liste { display: grid; grid-template-columns: repeat(var(--frv-n, 7), minmax(0, 1fr)); row-gap: 10px; }
+  .vrm-frv-etape { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; min-height: 0; padding: 0; }
+  .vrm-frv-etape::before { left: 50%; top: 8px; width: 100%; height: 2px; }
+  .vrm-frv-etape[data-frv-apres-bif]::before { background: repeating-linear-gradient(to right, var(--frv-line) 0 3px, transparent 3px 6px); }
+  .vrm-frv-etape:has(+ .vrm-frv-bif:last-child)::before { display: none; }
+  .vrm-frv-texte { flex-direction: column; align-items: center; gap: 2px; }
+  .vrm-frv-nom { font-size: 12px; gap: 4px; }
+  .vrm-frv-sous { font-size: 12px; }
+  .vrm-frv-bif { margin: 0; max-width: 100%; width: max-content; padding: 5px 12px; }
+  .vrm-frv-bif::before { display: none; }
+  .vrm-frv-bif .vrm-frv-nom { font-size: 13px; }
+  .vrm-frv-bif .vrm-frv-sous { font-size: 12px; }
 }
