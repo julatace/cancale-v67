@@ -89,7 +89,7 @@ lu ». Le logo du transporteur reste sur la vignette (src/transporteursVisuels.j
 - `scripts/audit-retraits-irreprochables.cjs` : **48 vérifications vertes** (A règle du faux retrait, B la
   VRAIE route e-mail exécutée sur une fausse base à état, C relecture « perdu », D sélection transporteur,
   E fusion transporteur, F verdict du code, H alerte, G branchement). Arbre `origin/main` (git archive) :
-  **22 rouges** (sur 31 avant §H). `--prouve` : **14/14 mutations rouges**.
+  **27 rouges** (§F n'y tourne pas : le module n'existait pas — compté une fois). `--prouve` : **14/14 mutations rouges**.
 - `scripts/bancs/retraits-irreprochables.cjs` (cinq colis inventés de la vraie forme, 390 tactile sombre +
   1512 clair) : **28 verts** ; build d'`origin/main` : **16 rouges** ; build muté (désaccord tranché ⇒ 1
   rouge ; nouveau point perdu ⇒ 1 rouge). Captures regardées : 390 sombre (marques, coche, « 2 codes » ambre,
