@@ -1173,3 +1173,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Hors ligne à froid + « déjà relié »** : sans réseau, VRM s'ouvre en LECTURE SEULE si CE compte et CETTE session ont été vérifiés sur l'appareil il y a < 7 j (`vrm_porte_ok_{uid}`, garde : aucune requête base/`/api/`, aucun message à l'extension ; refus serveur au retour ⇒ refermé, drapeau effacé ; sans abonnement ⇒ aperçu) ; le refus `vrm_vinted_litige_*` dit dans Comptes liés et Ma journée (pseudo, geste, jamais l'autre compte). `docs/passation/2026-11-09-hors-ligne-relie.md` (modèle de menace). Geste : aucun.
+
+## Ligne §9 de CLAUDE.md déplacée telle quelle (10 nov., retraits irréprochables)
+- **9 nov. · Lot AF : même annonce sur deux comptes + histoire du N°** : alerte ambre dans Annonces (compte, prix, depuis quand ; photo exacte, rien supprimé) ; fiche paire « L'histoire du N° » en lecture seule + journal append-only `vrm_numeros_journal`. `docs/passation/2026-11-09-doublons-historique.md`. Geste : aucun.
