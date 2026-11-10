@@ -3930,7 +3930,7 @@ function ReglagesPasLus() {
         {noms.length > 1 ? `${noms.length} réglages n'ont pas pu être lus` : "Un réglage n'a pas pu être lu"}
       </div>
       <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
-        Base muette pour {liste}. <b>Rien n'est perdu</b> ni écrasé : rouvre dans un moment.
+        Base muette pour {liste}. <b>Rien n'est perdu</b>, rien ne sera écrit par-dessus. Rouvre plus tard.
       </div>
     </div>
   );
