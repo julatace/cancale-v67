@@ -21,6 +21,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { NIVEAUX, STATUTS, codeLisible, codeTape, CODE_RE, lienInvitation, serieVue, etatVue, noterNiveau, publierPartage } from './accompagnement.js';
+// (10 nov., lot AR) L'espace formateur (031) : page publique, suivi, programme, annonces.
+import { MaPage, FeuillePage, OutilsFormateur, OutilsEleve, RejoindrePage } from './Formateur.jsx';
 
 const PAS_SU = "Je n'ai pas pu lire tes groupes — rien n'est perdu, c'est la lecture qui a échoué.";
 const eur = (n) => (n == null ? '—' : n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 }));
@@ -162,7 +164,7 @@ function Rejoindre({ api, prenom, codeInitial = '', onFait, onFerme, FermeAuReto
 }
 
 // ── UN GROUPE QUE J'AI CRÉÉ ──────────────────────────────────────────────────
-function GroupeCree({ api, g, onFait, onVoir }) {
+function GroupeCree({ api, g, onFait, onVoir, outils = null }) {
   const [copie, setCopie] = useState('');
   const attente = g.membres.filter((m) => m.statut === 'attente'), membres = g.membres.filter((m) => m.statut === 'accepte');
   const faire = async (corps, ok, confirmer) => {
@@ -204,6 +206,7 @@ function GroupeCree({ api, g, onFait, onVoir }) {
           <button type="button" onClick={() => onVoir(m)} data-cm-accomp-voir-membre>Voir</button>
           <button type="button" className="vrm-cm-lien" onClick={() => faire({ action: 'accomp-retirer', membre: m.id }, `${m.nom} ne fait plus partie du groupe.`, `Retirer ${m.nom} du groupe ? Tu ne verras plus rien de lui ; il le verra.`)} data-cm-accomp-retirer>Retirer</button>
         </div></li>)}</ul>}
+    {outils}
     <div className="vrm-cm-moderation">
       <button type="button" className="vrm-cm-lien" onClick={() => faire({ action: 'accomp-fermer', groupe: g.id }, `« ${g.nom} » est fermé.`, `Fermer « ${g.nom} » ? Plus personne ne pourra y entrer, et tu ne verras plus rien de ses membres.`)} data-cm-accomp-fermer>Fermer le groupe</button>
     </div>
@@ -211,7 +214,7 @@ function GroupeCree({ api, g, onFait, onVoir }) {
 }
 
 // ── UN GROUPE QUE J'AI REJOINT ───────────────────────────────────────────────
-function Adhesion({ api, a, onFait, onVoir }) {
+function Adhesion({ api, a, onFait, onVoir, outils = null }) {
   const [occupe, setOccupe] = useState(false);
   const vivant = !a.ferme && (a.statut === 'attente' || a.statut === 'accepte');
   const changer = async (p) => {
@@ -239,16 +242,27 @@ function Adhesion({ api, a, onFait, onVoir }) {
         <button type="button" onClick={() => onVoir(a)} data-cm-accomp-ce-que-voit>Voir ce que voit {a.createur}</button>
         <button type="button" className="vrm-cm-lien" onClick={quitter} data-cm-accomp-quitter>Quitter le groupe</button>
       </div>
+      {outils}
     </>}
     {!vivant && <div className="vrm-cm-ligne-boutons"><button type="button" className="vrm-cm-lien" onClick={quitter} data-cm-accomp-quitter>Retirer de ma liste</button></div>}
   </div>;
 }
 
 // ── L'ONGLET ─────────────────────────────────────────────────────────────────
-export default function Accompagnement({ api, headers, prenom = '', codeLien = '', portail, FermeAuRetour, onToast }) {
+export default function Accompagnement({ api, headers, prenom = '', codeLien = '', lienFormateur = null, portail, FermeAuRetour, onToast }) {
   const [etat, setEtat] = useState('charge'), [msg, setMsg] = useState('');
   const [d, setD] = useState(null);
-  const [feuille, setFeuille] = useState(codeLien ? { type: 'rejoindre', code: codeLien } : null);
+  const [feuille, setFeuille] = useState(lienFormateur ? { type: 'rejoindre-page' } : codeLien ? { type: 'rejoindre', code: codeLien } : null);
+  // L'espace formateur (031) : undefined en cours · 'non-installe' · 'pas-su' · { page, crees, rejoints }.
+  const [form, setForm] = useState(undefined);
+  const vivantForm = useRef(true);
+  const lireForm = useCallback(async () => {
+    const r = await api({ action: 'form-lire' });
+    if (!vivantForm.current) return;
+    if (r.ok && r.form && Array.isArray(r.form.crees)) setForm(r.form);
+    else setForm((f) => (f && typeof f === 'object' && r.erreur !== 'non-installe' ? f : r.erreur === 'non-installe' ? 'non-installe' : 'pas-su'));
+  }, [api]);
+  useEffect(() => { vivantForm.current = true; lireForm(); return () => { vivantForm.current = false; }; }, []);
   const vivant = useRef(true);
   const lire = useCallback(async (discret) => {
     if (!discret) setEtat((e) => (e === 'lu' ? e : 'charge'));
@@ -265,7 +279,7 @@ export default function Accompagnement({ api, headers, prenom = '', codeLien = '
     setEtat(r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su'); setMsg(r.message || PAS_SU);
   }, [api, headers, d]);
   useEffect(() => { vivant.current = true; lire(); return () => { vivant.current = false; }; }, []);
-  const fait = (t, niveau) => { onToast(t); if (niveau !== undefined) noterNiveau(niveau); lire(true); };
+  const fait = (t, niveau) => { onToast(t); if (niveau !== undefined) noterNiveau(niveau); lire(true); lireForm(); };
   const ouvrirVue = async (x, pour) => {
     if (pour === 'createur') { setFeuille({ type: 'vue', vue: x, pour }); return; }
     setFeuille({ type: 'vue', vue: undefined, pour, nomCreateur: x.createur });
@@ -292,19 +306,32 @@ export default function Accompagnement({ api, headers, prenom = '', codeLien = '
       </div>
     </div>
     {msg && <p className="vrm-cm-note" role="status">{msg}</p>}
+    {form && typeof form === 'object' && <MaPage api={api} page={form.page} prenom={prenom} onFait={fait} ouvrirFeuille={setFeuille} />}
+    {form === 'non-installe' && <p className="vrm-cm-note" data-form-etat="non-installe">Espace formateur : pas encore activé sur ta base.</p>}
+    {form === 'pas-su' && <p className="vrm-cm-note" data-form-etat="pas-su">Espace formateur pas lu. <button type="button" className="vrm-cm-lien" onClick={lireForm}>Réessayer</button></p>}
     {d.crees.length > 0 && <section aria-label="Mes groupes" data-cm-accomp-crees={d.crees.length}>
       <h3 className="vrm-cm-section">Mes groupes</h3>
-      {d.crees.map((g) => <GroupeCree key={g.id} api={api} g={g} onFait={fait} onVoir={(m) => ouvrirVue(m, 'createur')} />)}
+      {d.crees.map((g) => { const f = form && typeof form === 'object' ? form.crees.find((x) => x.groupe === g.id) : null;
+        return <GroupeCree key={g.id} api={api} g={g} onFait={fait} onVoir={(m) => ouvrirVue(m, 'createur')}
+          outils={f ? <OutilsFormateur api={api} g={g} f={f} pagePubliee={!!(form.page && form.page.publiee)} onFait={fait} /> : null} />; })}
     </section>}
     {d.rejoints.length > 0 && <section aria-label="Groupes rejoints" data-cm-accomp-rejoints={d.rejoints.length}>
       <h3 className="vrm-cm-section">Groupes rejoints</h3>
       {d.niveau >= 1 && <p className="vrm-cm-note" data-cm-accomp-publie={publie.chiffres_le ? 'oui' : 'non'}>{publie.chiffres_le ? `Tes chiffres partagés sont à jour du ${dateHeure(publie.chiffres_le)}.` : 'Tes chiffres partagés ne sont pas encore partis : ils partent dès que VRM a lu tes ventes (ouvre Ventes).'}</p>}
-      {d.rejoints.map((a) => <Adhesion key={a.id} api={api} a={a} onFait={fait} onVoir={(x) => ouvrirVue(x, 'membre')} />)}
+      {d.rejoints.map((a) => { const r = form && typeof form === 'object' ? form.rejoints.find((x) => x.adhesion === a.id) : null;
+        return <Adhesion key={a.id} api={api} a={a} onFait={fait} onVoir={(x) => ouvrirVue(x, 'membre')}
+          outils={r && a.statut === 'accepte' ? <OutilsEleve api={api} r={r} createur={a.createur} onFait={fait} /> : null} />; })}
     </section>}
     {d.crees.length === 0 && d.rejoints.length === 0 && <div className="vrm-cm-carton vrm-cm-vide" data-cm-accomp-vide><b>Aucun groupe pour l’instant.</b><p>Crée le tien, ou demande le lien à la personne qui t’accompagne.</p></div>}
 
     {feuille && feuille.type === 'creer' && portail(<Creer api={api} prenom={prenom} FermeAuRetour={FermeAuRetour} onFerme={() => setFeuille(null)} onFait={(r) => { setFeuille(null); fait(`Groupe créé. Son code : ${codeLisible(r.code)} — envoie le lien à tes membres.`); }} />)}
     {feuille && feuille.type === 'rejoindre' && portail(<Rejoindre api={api} prenom={prenom} codeInitial={feuille.code} FermeAuRetour={FermeAuRetour} onFerme={() => setFeuille(null)} onFait={(r) => { setFeuille(null); fait(r.deja ? 'Tu es déjà dans ce groupe.' : `Demande envoyée à « ${r.nom} » : elle attend la validation.`); }} />)}
+    {feuille && feuille.type === 'page' && portail(<Feuille titre="Ma page de formateur" FermeAuRetour={FermeAuRetour} onFerme={() => setFeuille(null)} data={{ 'data-cm-accomp-feuille': 'page' }}>
+      <FeuillePage api={api} page={feuille.page} prenom={prenom} onFait={(t) => { setFeuille(null); fait(t); }} />
+    </Feuille>)}
+    {feuille && feuille.type === 'rejoindre-page' && lienFormateur && portail(<Feuille titre="Rejoindre un groupe" FermeAuRetour={FermeAuRetour} onFerme={() => setFeuille(null)} data={{ 'data-cm-accomp-feuille': 'rejoindre-page' }}>
+      <RejoindrePage api={api} lien={lienFormateur} prenom={prenom} ChoixPartage={ChoixPartage} onFait={(r) => { setFeuille(null); fait(r.deja ? 'Tu es déjà dans ce groupe.' : `Demande envoyée à « ${r.nom} » : elle attend la validation.`); }} />
+    </Feuille>)}
     {feuille && feuille.type === 'vue' && portail(<Feuille titre={feuille.pour === 'membre' ? `Ce que voit ${feuille.nomCreateur}` : (feuille.vue && feuille.vue.nom) || 'Membre'} FermeAuRetour={FermeAuRetour} onFerme={() => setFeuille(null)} data={{ 'data-cm-accomp-feuille': 'vue' }}>
       {feuille.vue === undefined ? <p role="status" className="vrm-cm-note">Lecture…</p> : feuille.vue === null ? <p className="vrm-cm-msg" role="alert">{feuille.msg || PAS_SU}</p>
         : <VueMembre vue={feuille.vue} pour={feuille.pour} nomCreateur={feuille.nomCreateur} />}
