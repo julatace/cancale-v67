@@ -29,6 +29,8 @@ const NOMS = {
   fini: 'Mois en cours',
   montant: 'Montant incomplet',
 };
+// Réglée, la ligne se dit au passé (une liste cochée).
+const NOMS_OK = { adater: 'Ventes datées', prix: 'Prix d’achat saisis', comptes: 'Comptes relus', frais: 'Frais connus' };
 const RAISONS = {
   absente: 'ouvre Ventes une fois',
   publication: 'ouvre Ventes une fois',
@@ -94,13 +96,13 @@ export default function MoisBoucle({ portes = {} }) {
             const corps = <>
               <span className={'vrm-mb-rond is-' + (l.cle === 'fini' ? 'attente' : l.etat)} aria-hidden="true">{rond}</span>
               <span className="vrm-mb-l">
-                <span className="vrm-mb-nom">{NOMS[l.cle] || l.cle}</span>
+                <span className="vrm-mb-nom">{(l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle}</span>
                 {sous ? <span className={'vrm-mb-sous' + (l.cle === 'comptes' ? ' vrm-sensible' : '')}>{sous}</span> : null}
               </span>
               {action ? <span className="vrm-mb-chev" aria-hidden="true">›</span> : null}
             </>;
             const attrs = { 'data-mb-ligne': l.cle, 'data-mb-ligne-etat': l.etat, 'data-mb-n': l.n == null ? '' : String(l.n) };
-            const aria = `${NOMS[l.cle] || l.cle} : ${l.etat === 'ok' ? 'réglé' : l.etat === 'manque' ? (l.n != null ? l.n : 'à régler') : l.etat === 'encours' ? 'vérification' : 'pas su'}${sous ? ', ' + sous : ''}`;
+            const aria = `${(l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle} : ${l.etat === 'ok' ? 'réglé' : l.etat === 'manque' ? (l.n != null ? l.n : 'à régler') : l.etat === 'encours' ? 'vérification' : 'pas su'}${sous ? ', ' + sous : ''}`;
             return (
               <li key={l.cle} className={'vrm-mb-ligne is-' + l.etat}>
                 {action ? <button type="button" className="vrm-mb-porte" {...attrs} data-mb-porte={l.cle} aria-label={aria} onClick={() => ouvrir(l.cle)}>{corps}</button>
