@@ -70,6 +70,44 @@ const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) 
   const orphelines = ordre.filter((k) => !lues.includes(k) && !new RegExp(`publi(?:erATrancher|er)\\('${k}'`).test(app));
   dit(!orphelines.length, '8 · chaque source est publiée par un écran', orphelines.join(','));
 
+  // 9 (10 nov., cartes) — les CHOSES publiées et les cartes.
+  if (typeof A.exemplesPropres !== 'function' || typeof A.cartesATrancher !== 'function' || typeof A.appliquerTranches !== 'function') {
+    dit(false, '9 · le module des cartes existe (exemplesPropres, cartesATrancher, appliquerTranches)');
+  } else {
+    const sale = [{ id: 'a1', num: '12', photo: 'https://images1.vinted.net/x.jpg', titre: 'Nike Dunk taille 42', prix: 60, acheteur: 'jean' }, { id: 'a1', num: '13' }, { id: 'a2', photo: 'javascript:alert(1)' }, { id: 'a3', photo: 'http://x/y.jpg' }, { id: 'a4' }, { id: 'a5' }];
+    const p = A.exemplesPropres(sale);
+    dit(p.length === A.EX_MAX && p.every((x) => Object.keys(x).every((k) => ['id', 'num', 'photo', 'photo2', 'de'].includes(k))), '9 · une chose publiée ne porte que id, N°, photo, « de » (ni titre, ni prix, ni acheteur), au plus EX_MAX', JSON.stringify(p));
+    dit(p[0].id === 'a1' && p[0].num === '12' && p[1].id === 'a2' && !p[1].photo && !p[2].photo, '9 · un doublon d’id est écarté ; une photo qui n’est pas https n’est pas gardée', JSON.stringify(p));
+    const S2 = memoire();
+    A.publierSource(S2, U, 'supprimes-vinted', 2, T, [{ id: '7', num: '12', photo: 'https://i/a.jpg' }]);
+    dit(A.publierSource(S2, U, 'supprimes-vinted', 2, T + 60e3, [{ id: '8', num: '13' }]) === true, '9 · mêmes nombre, autres choses ⇒ republié (pas d’attente d’une heure)');
+    dit(A.publierSource(S2, U, 'supprimes-vinted', 2, T + 120e3) === false && A.lirePublications(S2, U)['supprimes-vinted'].ex[0].id === '8', '9 · sans choses passées, le même nombre garde les siennes');
+    A.publierSource(S2, U, 'supprimes-vinted', 1, T + 180e3);
+    dit(!A.lirePublications(S2, U)['supprimes-vinted'].ex, '9 · un autre nombre sans choses ⇒ les anciennes tombent (jamais de choses périmées)');
+    A.publierSource(S2, U, 'supprimes-vinted', 3, T + 240e3, [{ id: '7', num: '12', photo: 'https://i/a.jpg' }, { id: '9', num: '14' }]);
+    A.publierSource(S2, U, 'colis-postes', 2, T + 240e3);
+    const e = A.lignesATrancher({ pubs: A.lirePublications(S2, U), comptes: [], maintenant: T + 300e3 });
+    const c = A.cartesATrancher(e);
+    const gp = c.groupes.find((g) => g.type === 'paires'), gc = c.groupes.find((g) => g.type === 'colis');
+    const sv = gp && gp.sources.find((s) => s.cle === 'supprimes-vinted');
+    dit(!!sv && sv.cartes.length === 2 && sv.cartes[0].id === '7' && sv.cartes[0].photo && sv.cartes[0].binaire && sv.autres === 1, '9 · une carte par chose publiée (photo, N°, geste binaire), le reste « + N »', JSON.stringify(sv));
+    dit(!!gc && gc.sources[0].cartes.length === 1 && gc.sources[0].cartes[0].n === 2 && !gc.sources[0].cartes[0].id && !gc.compteVisible, '9 · sans choses : UNE carte, son nombre, et le titre du groupe ne le répète pas', JSON.stringify(gc));
+    // Toutes les questions, au singulier et au pluriel, tiennent en 12 mots.
+    const qs = A.SOURCES.flatMap((s) => { const Q = A.QUESTIONS[s.cle]; return Q ? [Q.n(1), Q.n(7), ...(Q.x ? [Q.x({ id: 'x', num: '12', de: 'B1234' }), Q.x({ id: 'x' })] : [])] : [null]; });
+    dit(qs.every((q) => q && A.mots(q) <= A.MOTS_MAX), '9 · chaque source a sa question, 12 mots au plus', qs.filter((q) => !q || A.mots(q) > A.MOTS_MAX).join(' | '));
+    dit(Object.keys(A.BINAIRES).every((k) => k === 'supprimes-vinted'), '9 · seul « supprimé de Vinted » se tranche ici (interne, annulable) ; une remise en ligne change un N° : elle reste dans Annonces');
+    dit(c.groupes.every((g) => g.sources.every((s) => s.ton === (s.cle === 'numeros-double' ? 'rouge' : 'geste'))), '9 · le rouge pour deux paires sous un N°, nulle part ailleurs');
+    const t = A.appliquerTranches(e, new Set(['supprimes-vinted:7']));
+    const l = t.lignes.find((x) => x.cle === 'supprimes-vinted');
+    dit(t.total === e.total - 1 && l.n === 2 && l.ex.length === 1 && l.ex[0].id === '9', '9 · une chose tranchée ici sort tout de suite, le nombre et le total −1', `${e.total} → ${t.total}`);
+    const pub2 = A.lirePublications(S2, U); pub2['supprimes-vinted'] = { ...pub2['supprimes-vinted'], n: 2, ex: [{ id: '9', num: '14' }] };
+    const e2 = A.lignesATrancher({ pubs: pub2, comptes: [], maintenant: T + 300e3 });
+    dit(A.appliquerTranches(e2, new Set(['supprimes-vinted:7'])).total === e2.total, '9 · republiée sans elle par son propriétaire, la chose ne retire plus rien (jamais deux fois)');
+    const app2 = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const corps = (/const trancherAT=\(carte,choix\)=>\{([\s\S]*?)\n  \};/.exec(app2) || [])[1] || '';
+    dit(/gesteVrm\(/.test(corps) && /CYCLE_DECISIONS/.test(corps) && /CHOIX_CYCLE\.CHEZ_MOI/.test(corps) && !/askConfirm|vmrCmd|fetch\(|vinted_pairs_lost|vinted_annonces_vendues/.test(corps), '9 · « Oui, chez moi » : la réponse de Ma journée en geste annulable, rien d’autre (ni confirmation, ni Vinted, ni vendu, ni sorti)', corps.slice(0, 120));
+  }
+
   console.log(ko ? `\n${ko} rouge(s)` : '\nÀ trancher : chaque nombre vient de son écran, pas su ≠ 0.');
   process.exit(ko ? 1 : 0);
 })();
