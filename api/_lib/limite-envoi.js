@@ -190,7 +190,7 @@ export function bordsParTransaction(bords, estCache) {
 // `retard` ne compte QUE des limites lues dans l'email ; une estimée dépassée
 // va dans `estimeeDepassee` (comptée, dite à part : « vérifie sur Vinted »).
 export function compterEcheances({ txs, ventes, bords, maintenant = Date.now() }) {
-  const out = { retard: 0, estimeeDepassee: 0, aujourdhui: 0, demain: 0, plus: 0, sansLimite: 0, premier: {}, estimees: { estimeeDepassee: 0, aujourdhui: 0, demain: 0, plus: 0 } };
+  const out = { retard: 0, estimeeDepassee: 0, aujourdhui: 0, demain: 0, plus: 0, sansLimite: 0, premier: {}, premierLu: {}, estimees: { estimeeDepassee: 0, aujourdhui: 0, demain: 0, plus: 0 } };
   for (const tx of (txs || [])) {
     const k = String(tx);
     const l = limiteExpedition((ventes && ventes[k]) || null, (bords && bords[k]) || null, maintenant);
@@ -199,6 +199,8 @@ export function compterEcheances({ txs, ventes, bords, maintenant = Date.now() }
     out[c]++;
     if (l.limite === 'estimee') out.estimees[c]++;
     if (!out.premier[c] || l.at < out.premier[c].at) out.premier[c] = { at: l.at, heure: l.heure, jour: l.jour, limite: l.limite };
+    // (10 nov., lot AT) La plus proche des limites LUES seulement : l'heure que dit le résumé du soir.
+    if (l.limite !== 'estimee' && (!out.premierLu[c] || l.at < out.premierLu[c].at)) out.premierLu[c] = { at: l.at, heure: l.heure, jour: l.jour, limite: l.limite };
   }
   return out;
 }
