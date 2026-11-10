@@ -11277,7 +11277,7 @@ async function mettreVacancesVinted(msg) {
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === uid);
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable dans cette extension' };
-  let rows; try { rows = await sbGet(`app_data?id=eq.${VACANCES_RECETTE}&select=r:data->recettes->${sens}`); } catch (_) { rows = null; }
+  let rows; try { rows = await sbGet(`app_data?id=eq.${VACANCES_RECETTE}&select=${voulu ? 'r:data->recettes->on' : 'r:data->recettes->off'}`); } catch (_) { rows = null; }
   if (rows === null) return { accepte: false, code: 'recette-lecture', raison: "je n'ai pas pu lire ce que VRM a appris — rien n’est parti" };
   const recette = rows && rows[0] && rows[0].r;
   if (!recette || !recette.chemin || !recette.corps) return { accepte: false, code: 'pas-appris', sens, raison: voulu ? 'Mets un compte en vacances une fois à la main sur vinted.fr : VRM apprend.' : 'Rouvre un compte une fois à la main sur vinted.fr : VRM apprend.' };

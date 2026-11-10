@@ -118,7 +118,7 @@ export default function ModeVacances({ comptes = [] }) {
         <Bouton variante="primaire" icone="sun" data-vac-tout="on" disabled={occupe || !!rx || !lignes.length} onClick={() => lancer(true)}>Tout mettre en vacances</Bouton>
         <Bouton variante="secondaire" data-vac-tout="off" disabled={occupe || !!rx || !lignes.length} onClick={() => lancer(false)}>Tout rouvrir</Bouton>
       </div>
-      {rx ? <p className="vrm-vac-note" role="status" data-vac-ext="">{rx.texte}</p> : null}
+      {rx ? <p className="vrm-vac-note vrm-vac-geste" role="status" data-vac-ext="">{rx.texte}</p> : null}
       {apprendre ? (
         <p className="vrm-vac-note vrm-vac-geste" role="status" data-vac-apprendre={voulu ? 'on' : 'off'}>
           {voulu ? 'Mets ce compte en vacances une fois à la main sur vinted.fr : VRM apprend.' : 'Rouvre ce compte une fois à la main sur vinted.fr : VRM apprend.'}{' '}
