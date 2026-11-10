@@ -10,12 +10,12 @@ Remplace, pour l'état, `2026-11-10-passation-generale.md` et `2026-11-09-passat
 
 ## A. Ce que tu as aujourd'hui (en ligne sur vrm.center)
 
-Mis en ligne le 10 nov. (PR #1088 → #1110, toutes vérifiées avant mise en ligne) :
+Mis en ligne le 10 nov. (PR #1088 → #1117, toutes vérifiées avant mise en ligne) :
 
 | domaine | ce qui marche |
 |---|---|
 | **Ma journée** | ligne de fraîcheur propre ; widgets (l'euro ne dépasse plus) ; « Ma semaine » (écran + notification du dimanche) ; résumé du soir (une notification, seulement s'il y a quelque chose demain) |
-| **Annonces** | grille par compte comme le dressing Vinted (tes 7 corrections) ; Republier dans Annonces ; baisse de prix en série (extension 5.336) ; « Qui dorment » ; note privée par paire ; textes courts |
+| **Annonces** | grille par compte comme le dressing Vinted (tes 7 corrections) ; Republier dans Annonces (à la main conseillé : kit à copier, photos vers la galerie) ; baisse de prix en série (extension 5.336) ; « Qui dorment » ; note privée par paire ; textes courts |
 | **Ventes** | coût réel d'une vente (barre achat · frais · emballage · bénéfice) ; frise prouvée (vendue → versée) ; Litiges en cours + dossier PDF ; retours par modèle ; sélection multiple, filtres enregistrés, fiche à côté (ordinateur) |
 | **Colis** | logos transporteurs ; « Tout imprimer » seul ; « changé de plan » = changement de point ; colis à retirer vérifiés (sources, code sûr, 2 codes ⇒ ambre) ; scan du bordereau en grand + photo du carton ; « Je dépose » au relais ; hors ligne au relais ; relecture toutes les 15 min (`CRON_SECRET` posé ce soir) |
 | **Achats** | une visionneuse photo ; Achats plus beaux ; facture d'achat jointe ; achat saisi deux fois ; « Revendu combien ? » ; calculette d'achat ; Siri « Ajouter un achat » |
@@ -83,7 +83,6 @@ Mis en ligne après la rédaction (10 nov., 22 h–23 h) : annonces à compléte
 | lot | branche | état | reste |
 |---|---|---|---|
 | Adresse VRM simple et belle (demande de Julien, 2 captures) | `claude/adresse-vrm-simple` | WIP 1 commit (3 fichiers) | voir le brief dans le récit de la session : UN parcours (compte → adresse → messagerie détectée → 3 étapes → « Reçu ✓ »), plus de spinner infini, code de confirmation Gmail affiché + bouton « Confirmer dans Gmail » (sur SON clic), cartes « Adresse sans compte » compactes, planches avant/après |
-| AP republication à la main | `claude/republier-main` | WIP 1 commit | tout le reste (voir file des lots) |
 
 Pour reprendre : `git fetch origin && git checkout -B <lot> origin/claude/<lot>`, lire son récit
 s'il existe (`docs/passation/2026-11-10-<lot>.md`) et `git log origin/main..HEAD`, finir, vrai

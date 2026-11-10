@@ -1286,3 +1286,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Factures Pro Leboncoin et eBay (lot S)** : détail d'une vente d'un vendeur Pro (SIRET) ⇒ « Faire la facture » : prix et date LUS de CETTE vente (n° de transaction / commande, relue par le serveur), acheteur RECOPIÉ par lui (la plateforme ne le donne pas ; eBay : proposé depuis la commande), même suite de numéros que Vinted, registre d'Argent → Factures ; PDF, aucun e-mail ; Vestiaire : refus dit (seul le versé est relevé), eBay hors euros/plusieurs articles refusé (`src/facturePro/sources.js`, `/api/compte?mode=facture-autre`). `docs/passation/2026-11-10-factures-autres.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot adresse-vrm-simple)
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot P)
+- **10 nov. · Facture en anglais + seuil de TVA (lot T)** : case « Facture en anglais » par facture (pré-cochée si l'adresse prouvée est hors de France) ⇒ facture BILINGUE, le français mot pour mot (loi Toubon art. 2), traduction figée dans l'instantané, toujours en euros (`src/facturePro/anglais.js`) ; Argent → Factures : jauge du CA de l'année (`jaugeSeuils`), alerte ambre à 80 % puis au dépassement si sans TVA, porte « Mon régime de TVA » (`src/seuilTvaFacture.js`). `docs/passation/2026-11-10-facture-en-tva.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Calculette d'achat + historique de prix + emballages (lot L)** : Achats/⌘K « Calculette » (achat X €, revente Y €, site ⇒ bénéfice net par `cascadeVente`, frais LUS : Vinted/Leboncoin 0, eBay part lue sur SES commandes « environ », Vestiaire « au plus » ; rien écrit, aucun prix conseillé) ; fiche paire : prix LUS dans le dressing datés par leur lecture (`vrm_prix_lus`) + escalier ; Stock : emballages (reste = compté − « Colis fait » datés après, ambre au seuil, coût dans une vente sur SON clic seulement). `docs/passation/2026-11-10-calculette-emballages.md`. Geste : noter ses emballages au Stock.

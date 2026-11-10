@@ -5,7 +5,9 @@
    ═════════════════════════════════════════════════════════════════════════ */
 .vrm-of { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 16px 16px 10px; display: flex; flex-direction: column; gap: 10px; color: var(--fu-encre); min-width: 0; margin-bottom: 12px; }
 .vrm-of-titre { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
-.vrm-of-n, .vrm-pm-n { color: var(--fu-gris); font-weight: 700; margin-left: 6px; font-variant-numeric: var(--fu-chiffres); }
+.vrm-of-n, .vrm-pm-n { color: var(--fu-gris); font-weight: 700; margin-left: 2px; font-variant-numeric: var(--fu-chiffres); }
+/* (10 nov., lot P) Une espace AVANT le compte : le lecteur d'écran lisait « Sans achat relié3 ». (marge 6 px = 2 px + l'espace) */
+.vrm-of-n::before, .vrm-pm-n::before { content: "\00a0"; }
 .vrm-of-liste, .vrm-of-attente, .vrm-pm-liste { list-style: none; margin: 0; padding: 0; }
 .vrm-of-carte { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-top: 1px solid var(--fu-filet); }
 .vrm-of-carte:first-child { border-top: 0; padding-top: 4px; }
