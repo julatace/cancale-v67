@@ -16,7 +16,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { useEtatCapture } from './ToutVaBien.jsx';
-import { fraicheurUnique, phraseRetard } from './fraicheur.js';
+import { fraicheurUnique, phraseRetard, publierFraicheur } from './fraicheur.js';
 import { quandRelu } from './fraicheurComptes.js';
 import { nomPlateforme } from './plateformes.js';
 import { estExclu } from '../api/_lib/comptes-exclus.js';
@@ -94,6 +94,11 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
   const cap = derniere.current;
   const f = fraicheurUnique({ baseKO, horsLigne, capture: cap, achats: cap ? cap.achats : undefined, emails, transp,
     exclu: (p, id) => estExclu(exclus, p, id), attendue: EXT_ATTENDUE, verifieAt: cap ? cap.at : null, maintenant });
+  // (10 nov., lot BK) La ligne PUBLIE son résultat : « Mois bouclé » (Argent → Déclarer) y lit les
+  // comptes pas relus, sans recalculer (§5 : une règle, un propriétaire).
+  const signature = `${f.etat}|${f.raison || ''}|${f.retards.map((r) => r.cle).join(',')}|${f.passu.join(',')}`;
+  const fRef = React.useRef(f); fRef.current = f;
+  React.useEffect(() => { publierFraicheur(fRef.current); }, [signature]);
   if (f.etat === 'cache') return null;
 
   const voirToutVaBien = () => { DEMANDE_REGLAGE_SOUS.id = 'toutvabien'; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} if (onNav) onNav('settings'); };

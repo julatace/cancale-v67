@@ -166,7 +166,7 @@ function ClePhotoroom({ cadre = true }) {
           {etat === 'en-clair' && <div data-photoroom-en-clair={s.cause || 'pas-su'} style={{ ...ligneFine, color: C.warn }}>{s.cause === 'coffre-absent'
             ? "Elle sert, mais n'est pas encore chiffrée : le coffre du serveur n'est pas configuré."
             : s.cause === 'rangement-rate'
-              ? "Elle sert, mais n'est pas encore chiffrée : la base n'a pas pu la ranger dans le coffre cette fois. Je réessaie à la prochaine ouverture de cette carte."
+              ? "Elle sert, pas encore chiffrée : nouvel essai à la prochaine ouverture."
               : "Elle sert, mais n'est pas encore chiffrée dans le coffre du serveur."}</div>}
           {verif && <div data-photoroom-verif={s.verif} style={{ ...ligneFine, color: verif.ton === 'attention' ? C.warn : C.text }}>{verif.texte}</div>}
           {!remplacer && (
@@ -200,7 +200,7 @@ function ClePhotoroom({ cadre = true }) {
       <details className="vrm-repli vrm-photoroom-aide" data-photoroom-aide="">
       <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: C.text }}>Coût et aide</summary>
       <div className="vrm-photoroom-blocs" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
-        {bloc('Ce que ça coûte', <>C'est <b style={{ color: C.text }}>ton</b> compte Photoroom qui paie, à la photo — jamais VRM, jamais un autre vendeur. Environ 0,02 $ la photo avec leur formule de base (relevé le 4 octobre). Une photo déjà détourée et gardée par VRM n'est pas repayée. Une clé « sandbox » est gratuite, mais ses photos portent un filigrane.
+        {bloc('Ce que ça coûte', <>C'est <b style={{ color: C.text }}>ton</b> compte Photoroom qui paie, à la photo — jamais VRM, jamais un autre vendeur. Environ 0,02 $ la photo avec leur formule de base (relevé le 4 octobre). Une photo gardée par VRM n'est pas repayée. Clé « sandbox » : gratuite, avec filigrane.
           <a data-photoroom-tarifs="" href={LIEN_TARIFS} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', width: 'fit-content', minHeight: 44, color: C.text, fontWeight: 600, textDecoration: 'none' }}>Leurs tarifs ↗</a></>, 'cout')}
         {bloc('Où elle sert', <>
           <span style={{ display: 'block' }}>· <b style={{ color: C.text }}>Vestiaire Collective</b> : les photos que l'extension prépare pour ton annonce (fond net exigé).</span>
@@ -268,13 +268,13 @@ function AnnoncesVestiaire() {
     window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
   }, [relire]);
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur vestiairecollective.com, dans le navigateur où l'extension VRM est installée</>;
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur Vestiaire, avec l'extension</>;
   let corps;
   if (d === undefined) corps = <div data-vc-annonces="charge" style={style}>Lecture de tes annonces Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire (rien perdu). <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   // (5.299) Vestiaire a répondu, mais dans une forme que l'extension ne sait pas encore lire : on le DIT (jamais « aucune annonce »).
-  else if (d.inconnu && !(d.items && Object.keys(d.items).length)) corps = <div data-vc-annonces="format" style={style}>Vestiaire a bien répondu quand tu as ouvert tes articles, mais dans une forme que VRM ne sait pas encore lire : <b style={{ color: C.text }}>aucune annonce n'est devinée</b>. La forme de la réponse est gardée (sans aucune valeur) pour que la prochaine mise à jour de l'extension la lise.</div>;
-  else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}. Elle les lit en passant, sans rien cliquer.</div>;
+  else if (d.inconnu && !(d.items && Object.keys(d.items).length)) corps = <div data-vc-annonces="format" style={style}>Réponse de Vestiaire illisible pour l'instant : <b style={{ color: C.text }}>aucune annonce n'est devinée</b>.</div>;
+  else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}.</div>;
   else {
     const liste = Object.entries(d.items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => {
       const num = numVcAnnonce(id, it, d.liens, vcLoc.auto);
@@ -330,9 +330,9 @@ function AnnoncesVestiaire() {
         {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
             la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par
             l'identifiant Vestiaire du produit, jamais par le titre. */}
-        {liste.some((l) => !l.num && l.etat !== 'retiree') ? <div data-vc-annonces-attente="" style={{ ...style, marginTop: 8 }}>« N° en attente » : le numéro arrive dès que VRM a relu tes numéros (quelques secondes, connexion nécessaire). Il se donne par l'identifiant Vestiaire de l'annonce, jamais par le titre.</div> : null}
+        {liste.some((l) => !l.num && l.etat !== 'retiree') ? <div data-vc-annonces-attente="" style={{ ...style, marginTop: 8 }}>« N° en attente » : il arrive dans quelques secondes (connexion nécessaire).</div> : null}
         <div style={{ marginTop: 12 }}><BlocBarrerVc titres={Object.fromEntries(Object.entries(d.items).map(([k, v]) => [k, (v && v.titre) || '']))}/></div>
-        {d.ventesKO ? <div style={{ ...style, marginTop: 4 }}>Tes ventes Vestiaire n'ont pas pu être relues : « vendue » n'est dit que si Vestiaire l'écrit sur l'annonce.</div> : null}
+        {d.ventesKO ? <div style={{ ...style, marginTop: 4 }}>Ventes Vestiaire pas relues : « vendue » seulement si l'annonce le dit.</div> : null}
       </div>
     );
   }
@@ -482,7 +482,7 @@ function PublierVestiaire({ comptes }) {
   else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 13, color: C.muted }}>{paires.length ? 'Tout est publié' : 'Aucun article numéroté'}</div>;
   else corps = (
     <div data-vc-publier="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {publiees === null && <div style={{ fontSize: 12, color: C.muted }}>Je n'ai pas pu lire lesquelles sont déjà notées publiées sur Vestiaire — l'extension le revérifie au clic.</div>}
+      {publiees === null && <div style={{ fontSize: 12, color: C.muted }}>Déjà publiées ? Pas lu : l'extension revérifie au clic.</div>}
       {visibles.map((p) => {
         const job = jobs['vc:' + p.id] || null;
         const ouvert = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 30 * 60000);
@@ -507,7 +507,7 @@ function PublierVestiaire({ comptes }) {
               })()}
               {choixEtiq === p.id ? (
                 <div data-vc-etiq-choix={p.id} style={{ marginTop: 6 }}>
-                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>Touche la photo de l'étiquette : l'extension la mettra en 2ᵉ sur Vestiaire (case « Étiquette »).</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>Touche la photo de l'étiquette (2ᵉ sur Vestiaire).</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {(p.photos || []).filter((u) => clePhotoLbc(u)).map((u, j) => {
                       const c = clePhotoLbc(u); const on = etiquettes[String(p.id)] === c;
@@ -712,7 +712,7 @@ function VentesVestiaire({ comptes }) {
     return m;
   }, [paires]);
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur vestiairecollective.com, dans le navigateur où l'extension VRM est installée</>;
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur Vestiaire</>;
   // (1er nov., audit A2) Une vente Vestiaire n'entre dans un total que si son
   // montant est SÛR (`montantRecuVc`) ; sinon elle est NOMMÉE à côté de chaque
   // total « toutes plateformes » (« au moins »). La phrase le dit, des mêmes lignes.
@@ -722,8 +722,8 @@ function VentesVestiaire({ comptes }) {
     : null}</div>;
   let corps;
   if (d === undefined) corps = <div data-vc-ventes="charge" style={style}>Lecture de tes ventes Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
-  else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}. Elle les lit en passant.</div>;
+  else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire (rien perdu). <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}.</div>;
   else {
     const partisVc = departsVc({ ...d, departs: vcLoc.departs });
     const liste = ordreRecent(Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
@@ -835,7 +835,7 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   let corps;
   if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
   else if (fil === null) corps = <div data-vc-fil="pas-su" style={style}>Je n'ai pas pu lire cette conversation — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Le texte de cette conversation n'a pas encore été lu : ouvre-la une fois sur Vestiaire, dans le navigateur où l'extension est installée{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
+  else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Pas encore lue : ouvre-la une fois sur Vestiaire, avec l'extension{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
   else if (!fil.messages.length) corps = <div data-vc-fil="vide" style={style}>Conversation lue, mais Vestiaire n'y a rendu aucun message lisible.</div>;
   else corps = (
     <div data-vc-fil="lu" data-vc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -864,11 +864,11 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   );
   else if (fil && fil.messages) pied = (
     <PiedSansEnvoi attrs={{ 'data-vc-repondre': cap !== 'ok' ? 'ext-' + cap : 'pas-appris', ...(cap === 'ok' ? { 'data-vc-pas-appris': envoi && envoi.raison ? envoi.raison : '' } : {}) }} lien={lien} texteLien="Répondre sur Vestiaire ↗"
-      raison={cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le navigateur où l'extension est installée — sinon réponds sur Vestiaire.</>
+      raison={cap === 'absente' ? <>Ouvre VRM là où est l'extension, ou réponds sur Vestiaire.</>
         : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
         : envoi && envoi.raison === 'messagerie-stream'
-          ? <span data-vc-envoi-stream="">Vestiaire envoie tes messages par un service de messagerie à part : VRM ne sait pas encore les envoyer d'ici sans risque. Réponds sur Vestiaire — ta réponse apparaîtra ici.</span>
-          : <>Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, {NAV.dans}. VRM te dira ensuite s'il peut répondre d'ici — toujours sur ton clic.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
+          ? <span data-vc-envoi-stream="">Vestiaire passe par un service de messagerie à part : réponds sur Vestiaire.</span>
+          : <>D'abord, envoie <b>une</b> réponse toi-même sur Vestiaire, {NAV.dans} : VRM apprend.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
       {resultat}
     </PiedSansEnvoi>
   );
@@ -929,7 +929,7 @@ function MessagesVestiaire() {
   if (d === undefined) corps = <div role="status" data-vc-messages="charge" style={{ ...style, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
   // (5 nov., chantier G, revue 1.10) La panne par `EtatPanne`, avec SON « Réessayer ».
   else if (d === null) corps = <div data-vc-messages="pas-su"><EtatPanne quoi="Tes messages Vestiaire" raison="Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={() => { setD(undefined); return relire(); }}/></div>;
-  else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le navigateur où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
+  else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le navigateur où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''}.</div>;
   else {
     const nl = nonLusVestiaire(d.compteur, d.compteurs);
     const n = nl ? nl.n : null;

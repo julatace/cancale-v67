@@ -100,7 +100,7 @@ import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ec
 import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
-import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur } from './_lib/plan-regle.js';
+import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur, listeVendeursPro, metaVendeursPro, decouperCleVendeurPro, MAX_VENDEURS_PRO, META_PRO } from './_lib/plan-regle.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -464,11 +464,17 @@ async function vintedPris(req, res) {
   } catch (_) { return repondre(res, 200, { ok: true, pris: false }); }
 }
 
-const comptesVendeursLigne = (autres) => {
+const comptesVendeursLigne = (autres, pro) => {
   const o = {};
   for (const p of PLATEFORMES_SOLO) if (autres && autres[p] && autres[p].id) o[p] = autres[p].id;
+  // (10 nov.) Pro : ses 10 comptes vendeurs (`['vinted:1007', …]`), dans la même colonne (030).
+  if (pro && Array.isArray(pro.liste)) o.pro = pro.liste;
   return o;
 };
+// (10 nov.) Ce que l'app lit de ses comptes vendeurs Pro : { liste: [{ plateforme, id }], le, prochainChangement }.
+const comptesProApp = (pro) => (pro && Array.isArray(pro.liste)
+  ? { liste: pro.liste.map(decouperCleVendeurPro), le: pro.le, prochainChangement: prochainChangement(pro.le) }
+  : null);
 // Ce que l'app lit : { plateforme: { id, le, prochainChangement } } (choisies seulement).
 const comptesVendeursApp = (autres) => {
   const o = {};
@@ -484,7 +490,7 @@ const ligneDeLAbonnement = (sub, livemode) => ({
   // (9 nov., Solo par plateforme) Le compte vendeur de Leboncoin, eBay, Vestiaire
   // (migration 030, `jsonb`) : { leboncoin: id, ebay: ref, vestiaire: id }, seulement
   // les plateformes CHOISIES. Sans la 030 : l'écriture se refait sans cette colonne.
-  comptes_vendeurs: comptesVendeursLigne(planDeLAbonnement(sub, optsPlan()).autres),
+  comptes_vendeurs: comptesVendeursLigne(planDeLAbonnement(sub, optsPlan()).autres, planDeLAbonnement(sub, optsPlan()).pro),
   statut: String(sub.status || 'incomplete'),
   client_stripe: typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || null,
   abonnement_stripe: sub.id || null,
@@ -625,6 +631,11 @@ async function abonnement(req, res) {
       : null,
     // (9 nov., Solo par plateforme) Les comptes vendeurs Leboncoin / eBay / Vestiaire.
     comptesVendeurs: !acc.proprietaire && lu ? comptesVendeursApp(lu.autres) : {},
+    // (10 nov.) Pro = 10 comptes vendeurs. `proLimite` : la limite s'applique (CGV du 10 nov.) ;
+    // faux pour le propriétaire et un Pro d'avant (« tous tes comptes »). `comptesPro` : ses 10 choisis.
+    proLimite: plan === PLAN_PRO && !acc.proprietaire && !!lu && !lu.proAncien,
+    comptesPro: plan === PLAN_PRO && !acc.proprietaire && lu ? comptesProApp(lu.pro) : null,
+    maxVendeursPro: MAX_VENDEURS_PRO,
     offres: {
       solo: { texte: prix && conforme ? prixTexte(prix) : null, ouvert: !!(prix && conforme) },
       // Le geste qui manque (`raison`) ne part qu'au propriétaire.
@@ -644,7 +655,9 @@ async function abonnement(req, res) {
 //   parrainage (article 2), chemins Paramètres → Abonnement.
 // 9 novembre : deux offres, Solo (un compte vendeur + comptes d'achat) et Pro
 //   (les ventes de tous les comptes, prix à venir) — `CGV_PLANS_DEPUIS`.
-const CGV_VERSION = '2026-11-09';
+// 10 novembre : Pro = 10 comptes vendeurs, toutes plateformes (`CGV_PRO_DIX_DEPUIS`) ;
+//   un Pro souscrit avant garde « tous tes comptes ».
+const CGV_VERSION = '2026-11-10';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -816,7 +829,7 @@ async function compteVendeurAutre(req, res, u, corps) {
   const sub = await abonnementStripeDe(ligne);
   if (!sub) return repondre(res, 409, { erreur: 'aucun', message: "Je ne trouve pas ton abonnement chez Stripe : rien n'a changé." });
   const lu = planDeLAbonnement(sub, optsPlan());
-  if (lu.plan === PLAN_PRO) return repondre(res, 409, { erreur: 'pro', message: 'Tu es en Pro : tous tes comptes vendent.' });
+  if (lu.plan === PLAN_PRO) return repondre(res, 409, { erreur: 'pro', message: 'Tu es en Pro : tes 10 comptes vendeurs se choisissent ensemble.' });
   const avant = lu.autres && lu.autres[plateforme];
   if (avant && avant.id === id) return repondre(res, 200, { ok: true, inchange: true, comptesVendeurs: comptesVendeursApp(lu.autres) });
   const attendre = avant ? prochainChangement(avant.le) : null;
@@ -829,10 +842,61 @@ async function compteVendeurAutre(req, res, u, corps) {
   if (!(relu.autres && relu.autres[plateforme] && relu.autres[plateforme].id === id)) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
   return repondre(res, 200, { ok: true, comptesVendeurs: comptesVendeursApp(relu.autres) });
 }
+// (10 nov.) PRO : SES 10 COMPTES VENDEURS. POST { plateforme: 'pro', comptes: [{ plateforme, id }] }
+// (1 à 10, toutes plateformes). Mêmes garanties que Solo : chaque compte est à LUI (lu avec
+// SON jeton), SON abonnement relu chez Stripe, Pro aux CGV du 10 nov. Ajouter dans une place
+// libre : toujours permis ; RETIRER un compte : une fois tous les 30 jours.
+async function comptesVintedDe(req) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const j = r.ok ? await r.json() : null;
+    return Array.isArray(j) ? new Set(j.map((x) => idCompteVendeur('vinted', x && x.vinted_user_id)).filter(Boolean)) : null;
+  } catch (_) { return null; }
+}
+const empreinteListe = (l) => { let h = 5381; for (const ch of l.join(',')) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0; return h.toString(16); };
+async function comptesVendeursPro(req, res, u, corps) {
+  const brut = Array.isArray(corps.comptes) ? corps.comptes : null;
+  if (brut && brut.length > MAX_VENDEURS_PRO) return repondre(res, 400, { erreur: 'trop', message: `${MAX_VENDEURS_PRO} comptes vendeurs au plus.` });
+  const liste = listeVendeursPro(brut);
+  if (!liste) return repondre(res, 400, { erreur: 'compte', message: `Choisis de 1 à ${MAX_VENDEURS_PRO} de tes comptes.` });
+  if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché : rien à choisir." });
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Rien n'a changé ; réessaie dans un instant." });
+  if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est Pro, sans limite : tous tes comptes vendent.' });
+  // Chaque compte est-il à LUI ? Une lecture ratée n'écrit rien.
+  const parP = new Map();
+  for (const k of liste) { const d = decouperCleVendeurPro(k); if (!parP.has(d.plateforme)) parP.set(d.plateforme, []); parP.get(d.plateforme).push(d.id); }
+  for (const [p, ids] of parP) {
+    const siens = p === 'vinted' ? await comptesVintedDe(req) : await comptesAutresDe(req, p, u.id);
+    if (siens === null) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes comptes. Rien n'a changé ; réessaie dans un instant." });
+    if (!ids.every((id) => siens.has(id))) return repondre(res, 403, { erreur: 'pas-a-toi', message: `Un de ces comptes ${NOMS_PLATEFORMES_SOLO[p]} n'est pas relié à ton VRM.` });
+  }
+  const sub = await abonnementStripeDe(ligne);
+  if (!sub) return repondre(res, 409, { erreur: 'aucun', message: "Je ne trouve pas ton abonnement chez Stripe : rien n'a changé." });
+  const lu = planDeLAbonnement(sub, optsPlan());
+  if (lu.plan !== PLAN_PRO) return repondre(res, 409, { erreur: 'pas-pro', message: "Tu n'es pas en Pro : rien n'a changé." });
+  if (lu.proAncien) return repondre(res, 409, { erreur: 'pro-ancien', message: 'Ton Pro a été pris avant la limite de 10 comptes : tous tes comptes vendent.' });
+  const avant = lu.pro ? lu.pro.liste : [];
+  const retires = avant.filter((k) => !liste.includes(k));
+  if (lu.pro && !retires.length && avant.length === liste.length) return repondre(res, 200, { ok: true, inchange: true, comptesPro: comptesProApp(lu.pro) });
+  const attendre = lu.pro && retires.length ? prochainChangement(lu.pro.le) : null;
+  if (attendre) return repondre(res, 429, { erreur: 'trop-tot', prochainChangement: attendre, message: `Tu as changé tes comptes vendeurs il y a moins de 30 jours : tu pourras en retirer un le ${new Date(attendre).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Europe/Paris' })}. Ajouter un compte dans une place libre reste possible.` });
+  // La date ne bouge qu'au premier choix ou quand un compte est RETIRÉ (ajouter ne relance pas les 30 jours).
+  const le = !lu.pro || retires.length || !lu.pro.le ? new Date().toISOString() : lu.pro.le;
+  const meta = metaVendeursPro(liste);
+  if (!meta) return repondre(res, 400, { erreur: 'compte', message: `Choisis de 1 à ${MAX_VENDEURS_PRO} de tes comptes.` });
+  const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(sub.id)}`, { metadata: { ...meta, [META_PRO + '_le']: le } }, `vrm-pro-${u.id}-${empreinteListe(liste)}-${Math.floor(Date.now() / 60000)}`);
+  if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
+  const relu = planDeLAbonnement(r.data, optsPlan());
+  const ok = relu.pro && relu.pro.liste.length === liste.length && liste.every((k) => relu.pro.liste.includes(k));
+  if (!ok) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
+  return repondre(res, 200, { ok: true, comptesPro: comptesProApp(relu.pro) });
+}
 async function compteVendeur(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
   const corps = await lireCorpsJson(req);
+  if (corps && corps.plateforme === 'pro') return comptesVendeursPro(req, res, u, corps);
   if (corps && corps.plateforme != null && corps.plateforme !== 'vinted') {
     if (!PLATEFORMES_SOLO.includes(String(corps.plateforme))) return repondre(res, 400, { erreur: 'plateforme', message: 'Plateforme inconnue.' });
     return compteVendeurAutre(req, res, u, corps);
@@ -855,7 +919,7 @@ async function compteVendeur(req, res) {
   const sub = await abonnementStripeDe(ligne);
   if (!sub) return repondre(res, 409, { erreur: 'aucun', message: "Je ne trouve pas ton abonnement chez Stripe : rien n'a changé." });
   const lu = planDeLAbonnement(sub, optsPlan());
-  if (lu.plan === PLAN_PRO) return repondre(res, 409, { erreur: 'pro', message: 'Tu es en Pro : tous tes comptes vendent.' });
+  if (lu.plan === PLAN_PRO) return repondre(res, 409, { erreur: 'pro', message: 'Tu es en Pro : tes 10 comptes vendeurs se choisissent ensemble.' });
   if (lu.vendeur === uid) return repondre(res, 200, { ok: true, inchange: true, compteVendeur: { uid, le: lu.vendeurLe, prochainChangement: prochainChangement(lu.vendeurLe) } });
   const attendre = lu.vendeur ? prochainChangement(lu.vendeurLe) : null;
   if (attendre) return repondre(res, 429, { erreur: 'trop-tot', prochainChangement: attendre, message: `Tu as changé de compte vendeur il y a moins de 30 jours : prochain changement possible le ${new Date(attendre).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Europe/Paris' })}. Pour vendre sur tous tes comptes dès maintenant : Pro.` });
