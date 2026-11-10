@@ -293,6 +293,15 @@ export function ParcoursAdresseVrm({ headers, proprio = false, onBoite, comptes 
     return null;
   };
 
+  // La boîte du compte choisi (son adresse sur Vinted), à copier.
+  const ligneSource = c ? (
+    <div className="vrm-pv-source" data-relier-compte-adresse-ligne="">
+      <span className="vrm-pv-source-mot">Boîte de {c.login}</span>
+      {c.adresse ? <code data-relier-compte-adresse="" className="vrm-sensible">{c.adresse}</code> : <em data-relier-compte-adresse="absente">pas notée (Comptes liés → Gérer)</em>}
+      {c.adresse ? <BoutonCopier texte={c.adresse} mot="Copier" className="vrm-b vrm-b-discret vrm-pv-petit"/> : null}
+    </div>
+  ) : null;
+
   return (
     <div className="vrm-pv" data-parcours-adresse="" data-etat={etat} data-etape={pret ? etape : undefined}
       {...(c ? { 'data-relier-compte': c.uid, 'data-relier-compte-messagerie': c.messagerie } : {})}>
@@ -311,6 +320,13 @@ export function ParcoursAdresseVrm({ headers, proprio = false, onBoite, comptes 
         <section className="vrm-pv-carte" data-bloc="comptes">
           <h3 className="vrm-pv-titre">Quel compte ?</h3>
           <ChoixCompte comptes={liste} uid={c ? c.uid : ''} onChoisir={onChoisir}/>
+          {ligneSource}
+          {c && mCompte === 'relais-apple' ? (
+            <div className="vrm-pv-relais" data-relier-boites={boites.length}>
+              <p className="vrm-pv-phrase"><b>Choisis où Apple fait suivre.</b></p>
+              {geste(PAS_RELAIS[1], 1)}
+            </div>
+          ) : null}
           {c ? <Verification key={c.uid} compte={c} lireDernier={lireDernier} onRelie={noterRelie}/> : null}
         </section>
       ) : null}
@@ -334,13 +350,7 @@ export function ParcoursAdresseVrm({ headers, proprio = false, onBoite, comptes 
           <section className="vrm-pv-carte" data-bloc="transfert" aria-label="Étape 2 : le transfert">
             <h2 className="vrm-pv-grand-titre">Fais suivre tes e-mails</h2>
             {liste.length ? <ChoixCompte comptes={liste} uid={c ? c.uid : ''} onChoisir={onChoisir}/> : null}
-            {c ? (
-              <div className="vrm-pv-source" data-relier-compte-adresse-ligne="">
-                <span className="vrm-pv-source-mot">Boîte de {c.login}</span>
-                {c.adresse ? <code data-relier-compte-adresse="" className="vrm-sensible">{c.adresse}</code> : <em data-relier-compte-adresse="absente">pas notée (Comptes liés → Gérer)</em>}
-                {c.adresse ? <BoutonCopier texte={c.adresse} mot="Copier" className="vrm-b vrm-b-discret vrm-pv-petit"/> : null}
-              </div>
-            ) : null}
+            {ligneSource}
             {relais ? (
               <div className="vrm-pv-relais" data-relier-boites={boites.length}>
                 <p className="vrm-pv-phrase"><b>Choisis où Apple fait suivre.</b></p>
