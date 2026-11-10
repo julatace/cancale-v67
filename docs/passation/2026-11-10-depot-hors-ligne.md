@@ -76,9 +76,17 @@ la faisaient refuser (« Vérification indisponible »). Le banc range une sessi
 - Rouge sur origin/main et mutations : §5.
 - Captures regardées (scratchpad de la session, hors dépôt) : `mode-depot-{390-sombre,390-clair,1512-clair,1512-sombre}-{1-ouvert,2-scan,3-hors-liste,4-tout}.png`, `-1512-clair-5-sans-camera.png`, `-{390-sombre,1512-clair}-{6-hors-ligne,7-hors-ligne-coche,8-relais-hors-ligne}.png`.
 
-## 5. Chiffres (remplis en fin de session)
+## 5. Chiffres
 
-Voir la fin de ce fichier.
+- `mode-depot` : **122 verts** sur les quatre vues (avant le `git merge origin/main`), revérifié après (voir §7).
+- **Rouge sur origin/main** (5f38baa4, `git archive`, banc copié dedans, 390-sombre) : 6 rouges (pas de « Je dépose »,
+  photo sans n° de suivi ni transporteur ni identité publiée, rien hors ligne).
+- **Mutations** (390-sombre, build muté) : « Déposé » écrit tout de suite (sans les 5 s) ⇒ 2 rouges (D2) ; photo hors
+  ligne sans n° de suivi ni identité publiée ⇒ 8 rouges (H1, H3 : le scan hors ligne ne trouve plus rien, H4, H5) ;
+  réseau coupé = la phase H elle-même (rouge sur main).
+- `codes-hors-ligne` : 6/6 verts (6 rouges sur main, causes §3).
+- `npm run build` ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`, `codes-retrait`,
+  `retraits-irreprochables`, `fonctions-api` verts.
 
 ## 6. Ce qui reste
 
