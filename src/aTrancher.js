@@ -44,6 +44,10 @@ export const SOURCES = [
     pourquoi: 'vérifie le dépôt avant la date limite', geste: { libelle: 'Vérifier', tab: 'cat_bord', onglet: 'envoyes' } },
   { cle: 'colis-retirer', ecran: 'Colis', quoi: (n) => `${n} colis à retirer à vérifier`,
     pourquoi: 'délai dépassé, incident ou achat pas encore relié', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'retirer' } },
+  // (10 nov., lot BB) Une vente en litige ou en retour : la réponse a une date limite.
+  // Publié par l'écran « Litiges en cours » (et Ma journée, Ventes), règle src/litigesEcran.js.
+  { cle: 'litiges-en-cours', ecran: 'Litiges', quoi: (n) => `${n} ${pl(n, 'litige ou retour', 'litiges ou retours')} en cours`,
+    pourquoi: 'réponds avant la date limite', geste: { libelle: 'Voir', tab: 'litiges' } },
   { cle: 'numeros-a-ecrire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'nouveau N°', 'nouveaux N°')} à écrire sur ${pl(n, 'son carton', 'leurs cartons')}`,
     pourquoi: 'le carton porte encore l’ancien numéro', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-numeros-a-ecrire]' } },
   { cle: 'numeros-a-verifier', ecran: 'Annonces', quoi: (n) => `${n} N° à vérifier sur ${pl(n, 'son carton', 'leurs cartons')}`,
@@ -70,6 +74,7 @@ export const NOMS = {
   'numeros-double': 'N° portés par deux paires',
   'colis-postes': 'Colis cochés « posté » pas vus partir',
   'colis-retirer': 'Colis à retirer à vérifier',
+  'litiges-en-cours': 'Litiges et retours en cours',
   'numeros-a-ecrire': 'Nouveaux N° à écrire sur les cartons',
   'numeros-a-verifier': 'N° à vérifier sur leur carton',
   'sms-vestiaire': 'Ventes Vestiaire reçues par SMS',
@@ -199,6 +204,7 @@ export const phraseJournee = (r) => (r && r.total > 0
 export const TYPES = [
   { type: 'numeros', titre: 'Numéros', cles: ['numeros-double', 'numeros-a-ecrire', 'numeros-a-verifier'] },
   { type: 'colis', titre: 'Colis', cles: ['colis-postes', 'colis-retirer', 'sms-vestiaire', 'sms-pickup'] },
+  { type: 'ventes', titre: 'Ventes', cles: ['litiges-en-cours'] },
   { type: 'paires', titre: 'Paires', cles: ['supprimes-vinted', 'remise-en-ligne', 'achats-sans-prix'] },
   { type: 'comptes', titre: 'Comptes', cles: ['adresses-sans-compte', 'comptes-a-relire'] },
   { type: 'compta', titre: 'Compta', cles: ['ventes-a-dater'] },
@@ -208,6 +214,7 @@ export const QUESTIONS = {
   'numeros-double': { n: () => 'N° portés par deux paires', x: () => 'Deux paires sous ce N°' },
   'colis-postes': { n: (n) => (n > 1 ? 'Colis cochés « posté », pas vus partir' : 'Colis coché « posté », pas vu partir') },
   'colis-retirer': { n: () => 'Colis à retirer : à vérifier' },
+  'litiges-en-cours': { n: (n) => (n > 1 ? 'Litiges ou retours en cours' : 'Litige ou retour en cours'), x: () => 'Litige en cours : réponds à temps' },
   'numeros-a-ecrire': { n: () => 'Nouveaux N° à écrire sur leur carton', x: () => 'Écris ce N° sur son carton' },
   'numeros-a-verifier': { n: () => 'N° à vérifier sur leur carton', x: () => 'Vérifie ce N° sur son carton' },
   'sms-vestiaire': { n: (n) => (n > 1 ? 'Ventes Vestiaire reçues par SMS, à relier' : 'Vente Vestiaire reçue par SMS, à relier') },
@@ -231,7 +238,8 @@ export const PAR_SOURCE = 3;     // au plus 3 cartes par source, le reste « + N
 export const MOTS_MAX = 12;
 export const mots = (t) => String(t || '').replace(/[«»?.:,;!]/g, ' ').split(/\s+/).filter(Boolean).length;
 // La cible d'UNE chose dans l'écran propriétaire, quand il la marque (sinon le bloc).
-const CIBLE_CHOSE = { 'remise-en-ligne': (x) => `[data-remise-ligne="${String(x.id).replace(/"/g, '')}"]` };
+const CIBLE_CHOSE = { 'remise-en-ligne': (x) => `[data-remise-ligne="${String(x.id).replace(/"/g, '')}"]`,
+  'litiges-en-cours': (x) => `[data-litige-carte="${String(x.id).replace(/"/g, '')}"]` };
 export function cartesATrancher(etat, { parSource = PAR_SOURCE } = {}) {
   if (!etat || !Array.isArray(etat.lignes)) return { groupes: [], total: 0, partiel: false, manque: [] };
   const parCle = new Map(etat.lignes.map((l) => [l.cle, l]));

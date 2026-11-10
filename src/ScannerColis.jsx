@@ -16,6 +16,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { filtreRepetition } from './scanColis.js';
+import { venteDuColis } from './photoCarton.js';
+import { BoutonPhotoCarton } from './PhotoCarton.jsx';
 import './design/scanner.css';
 
 const FORMATS = ['code_128', 'code_39', 'code_93', 'itf', 'ean_13', 'data_matrix', 'qr_code', 'pdf417'];
@@ -125,6 +127,10 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
   }), []);
   const traiter = React.useCallback((brut) => {
     let r = ref.current.trouver(brut) || { etat: 'inconnu' };
+    // (10 nov., lot AZ) Le carton qu'il vient de noter « Colis fait » reste dans le cadre pendant qu'il le
+    // photographie : relire SON bordereau ne remplace pas l'écran (il garde « Annuler » et la photo).
+    const cour = ref.current.res;
+    if (cour && cour.etat === 'fait' && cour.colis && !Array.isArray(cour.colis) && r.colis && !Array.isArray(r.colis) && String(r.colis.cle) === String(cour.colis.cle)) return;
     const att = ref.current.attendu;
     if (att && (r.etat === 'trouve' || r.etat === 'deja') && r.colis && !Array.isArray(r.colis) && String(r.colis.cle) !== att) r = { etat: 'autre', colis: r.colis };
     compte.current += 1; const n = compte.current;
@@ -169,6 +175,7 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
   // Sans caméra (ordinateur sans webcam, refus) : le clavier prend la main.
   React.useEffect(() => { if (camera === 'sans') { try { if (saisieRef.current) saisieRef.current.focus({ preventScroll: true }); } catch (_) {} } }, [camera]);
   const valider = (e) => { e.preventDefault(); const s = saisie.trim(); if (!s) return; traiter(s); setSaisie(''); };
+  ref.current.res = res;
   const c = res && res.colis && !Array.isArray(res.colis) ? res.colis : null;
   // SON toucher : le geste existant, une fois. Rien n'est écrit avant.
   const confirmer = () => {
@@ -185,11 +192,18 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
     if (res && c) { setRes({ ...res, etat: 'trouve' }); noter(res.n, c, 'trouve', false); }
   };
   const montrePaire = !!(c && res && (res.etat === 'trouve' || res.etat === 'fait' || res.etat === 'deja'));
+  // (10 nov., lot AZ) « Vérification au scan » : au bordereau, la paire attendue occupe TOUTE la feuille —
+  // sa photo et son N° en très grand, impossibles à rater. Même identité (n° de suivi ⇒ SA vente ⇒ SA
+  // fiche) ; les cas sans paire (aucune vente, deux ventes, autre colis) gardent leur message.
+  const verif = mode === 'envoi' && montrePaire;
+  // Après « Colis fait » (ou sur un colis déjà noté) : « Photo du carton », facultative, rangée avec SA vente.
+  const vente = verif && (res.etat === 'fait' || res.etat === 'deja') ? venteDuColis(c) : null;
+  const suivant = () => setRes(null);
   const nAmbigu = res && Array.isArray(res.colis) ? res.colis.length : 2;
   const autre = res && res.etat === 'autre' && res.colis && !Array.isArray(res.colis) ? res.colis : null;
   const message = !res ? '' : autre ? `Pas ce colis : ce bordereau est celui ${autre.num ? `du N°${autre.num}` : 'd’une autre vente'}${autre.titre ? ` (${autre.titre})` : ''}.` : res.etat === 'ambigu' ? M.ambigu(nAmbigu) : res.etat === 'sansVente' ? M.sansVente : M.inconnu;
   return createPortal(
-    <div className={'vrm-scan' + (montrePaire ? ' a-paire' : '')} role="dialog" aria-modal="true" aria-label={M.titre} data-scan-sheet="" data-scan-mode={mode} data-scan-attendu={attendu || undefined} data-scan-camera={camera} style={{ zIndex }}>
+    <div className={'vrm-scan' + (montrePaire ? ' a-paire' : '') + (verif ? ' is-verif' : '')} data-scan-verif={verif ? res.etat : undefined} role="dialog" aria-modal="true" aria-label={M.titre} data-scan-sheet="" data-scan-mode={mode} data-scan-attendu={attendu || undefined} data-scan-camera={camera} style={{ zIndex }}>
       {children}
       <div className="vrm-scan-tete">
         <h2>{M.titre}</h2>
@@ -201,13 +215,13 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
         <video ref={video} playsInline muted autoPlay aria-hidden="true"/>
         {camera === 'sans' ? <p className="vrm-scan-sans" data-scan-sans-camera="">{M.sansCamera}</p> : <span className="vrm-scan-viseur" aria-hidden="true"/>}
       </div>
-      <div className="vrm-scan-res" role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
+      <div className={'vrm-scan-res' + (verif ? ' is-verif' : '')} role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
         {montrePaire ? (
           <div className="vrm-scan-paire" data-scan-paire={String(c.cle)} data-scan-paire-num={c.num || ''}>
             <div className="vrm-scan-photo">{c.photo ? <img src={c.photo} alt="" referrerPolicy="no-referrer" decoding="async"/> : <span aria-hidden="true"/>}</div>
             <div className="vrm-scan-infos">
               <span className={'vrm-scan-kicker is-' + res.etat} data-scan-bon={attendu ? '1' : undefined}>{res.etat === 'deja' ? M.deja : res.etat === 'fait' ? M.fait + ' ✓' : attendu ? 'C’est le bon bordereau' : M.tete}</span>
-              <span className="vrm-scan-ligne1">{c.num ? <b className="vrm-scan-num" data-scan-num={c.num}>N°{c.num}</b> : null}<span className="vrm-scan-titre" data-scan-titre="">{c.titre}</span></span>
+              <span className="vrm-scan-ligne1">{c.num ? <b className="vrm-scan-num" data-scan-num={c.num}>N°{c.num}</b> : verif ? <b className="vrm-scan-num is-sans" data-scan-num="">Sans N°</b> : null}<span className="vrm-scan-titre" data-scan-titre="">{c.titre}</span></span>
               <span className="vrm-scan-sous">
                 {c.taille ? <span data-scan-taille={c.taille}>{/^\d/.test(String(c.taille)) ? `Taille ${c.taille}` : c.taille}</span> : null}
                 {c.compte ? <span className="vrm-sensible" data-stream-type="compte" data-scan-compte="">{c.compte}</span> : null}
@@ -224,8 +238,10 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
         ) : <span className="vrm-scan-attente">{camera === 'sans' ? '' : 'Vise le code-barres.'}</span>}
         {montrePaire && res.etat === 'trouve'
           ? <button type="button" className="vrm-scan-geste" data-scan-confirmer={String(c.cle)} onClick={confirmer}>{M.geste}</button> : null}
+        {vente ? <BoutonPhotoCarton vente={{ ...vente, num: c.num || '' }} ton="sombre"/> : null}
         {montrePaire && res.etat === 'fait' && enAttente && onAnnuler
           ? <button type="button" className="vrm-scan-annuler" data-depose-annuler={attente.cle} onClick={annuler}>Annuler</button> : null}
+        {verif ? <button type="button" className="vrm-scan-suivant" data-scan-suivant="" onClick={suivant}>{res.etat === 'trouve' ? 'Scanner un autre' : 'Scanner le suivant'}</button> : null}
       </div>
       {scannes.length ? (
         <details className="vrm-scan-serie" data-scan-serie={scannes.length}>
