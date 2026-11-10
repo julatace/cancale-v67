@@ -93,4 +93,15 @@ Deuxième série du 10 nov. — Julien : « Semaine … c'est bien, [coût réel
 | BB | litiges en cours : un écran, date limite de réponse, preuves déjà rangées (photo du carton AZ, suivi) ; fusionne avec les « délais de litige » de I (forme à mesurer) | `claude/litiges-marge` | à lancer |
 | BC | « Ma semaine » : un ÉCRAN le dimanche (ventes, bénéfice, colis envoyés, paires qui dorment, comparaison semaine d'avant) — même source que le bilan de la semaine en notification (`api/_lib/bilan-semaine.js`), jamais une 2e règle | `claude/ma-semaine` | à lancer |
 
+Troisième série du 10 nov. — Julien : « Vas-y tout est parfait, fais tout ».
+
+| lot | contenu | branche | état |
+|---|---|---|---|
+| BD | note privée sur une paire, visible partout où la paire apparaît (annonce, vente, colis, scan) ; rangée dans SES données, jamais envoyée à une plateforme | `claude/note-privee` | à lancer |
+| BE | frise d'une vente : vendue → bordereau → déposée → livrée → versée, chaque étape PROUVÉE (sinon « pas su », jamais devinée) | `claude/frise-vente` | à lancer |
+| BF | valeur du stock : somme des prix d'achat SAISIS des paires présentes, couverture dite (« au moins … sur N, M sans prix ») | `claude/valeur-stock` | à lancer (avec BA : même règle `beneficePaire`) |
+| BG | d'où viennent mes achats : bénéfice moyen par source (la source se SAISIT ou se lit, jamais devinée) | `claude/source-achats` | à lancer |
+| BH | achat saisi deux fois : par n° de transaction / reçu seulement (§5), jamais par ressemblance ; rien supprimé, il choisit | `claude/achat-double` | à lancer |
+| BI | retours et litiges par modèle (le modèle est une proposition de regroupement, pas une identité ; les comptes viennent des ventes prouvées) | `claude/retours-modele` | à lancer (avec BB) |
+
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
