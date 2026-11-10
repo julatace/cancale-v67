@@ -139,16 +139,27 @@ const visionneuse = (pg) => pg.evaluate(() => {
 });
 const ecran = (pg) => pg.evaluate(() => { const m = [...document.querySelectorAll('.vrm-main')].find((e) => e.getBoundingClientRect().width > 0); return m ? m.getAttribute('data-ecran') : null; });
 // Toucher (téléphone) ou cliquer (ordinateur) la PREMIÈRE vignette chargée de l'écran, dans `sel`.
-async function toucherVignette(pg, tel, sel = '.vrm-main') {
-  const h = await pg.evaluateHandle((sel) => {
-    const zone = [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().width > 0) || document;
-    return [...zone.querySelectorAll('img[data-vrm-vignette]')].find((i) => { const r = i.getBoundingClientRect(); return r.width >= 32 && r.height >= 32 && i.naturalWidth > 0 && !i.closest('.vrm-visionneuse'); }) || null;
-  }, sel);
-  const el = h.asElement(); if (!el) return false;
-  await el.scrollIntoViewIfNeeded();
-  if (tel) await el.tap(); else await el.click();
-  await pg.waitForTimeout(350);
-  return true;
+async function toucherVignette(pg, tel, sel = '.vrm-main', filtre = '') {
+  // La première vignette d'article de l'écran : amenée au centre (les photos se chargent à la demande),
+  // puis touchée À SA PLACE (un vrai toucher / clic aux coordonnées, comme un doigt).
+  for (let essai = 0; essai < 4; essai++) {
+    const pos = await pg.evaluate(async ([sel, filtre]) => {
+      const zone = [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().width > 0) || document;
+      const img = [...zone.querySelectorAll('img[data-vrm-vignette]')].find((i) => { const r = i.getBoundingClientRect(); return r.width >= 32 && r.height >= 32 && !i.closest('.vrm-visionneuse') && (!filtre || (filtre[0] === '[' ? i.closest(filtre) != null : (i.getAttribute('src') || '').includes(filtre))); });
+      if (!img) return null;
+      img.scrollIntoView({ block: 'center' });
+      await new Promise((ok) => setTimeout(ok, 700));
+      if (!img.isConnected || !(img.naturalWidth > 0)) return { attendre: true };
+      const r = img.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, [sel, filtre]);
+    if (!pos) return false;
+    if (pos.attendre) { await pg.waitForTimeout(500); continue; }
+    if (tel) await pg.touchscreen.tap(pos.x, pos.y); else await pg.mouse.click(pos.x, pos.y);
+    await pg.waitForTimeout(400);
+    return true;
+  }
+  return false;
 }
 async function allerOnglet(pg, tab) {
   await pg.evaluate((t) => { const u = new URL(location.href); u.searchParams.set('tab', t); history.pushState({}, '', u); dispatchEvent(new PopStateEvent('popstate')); }, tab);
@@ -179,11 +190,9 @@ async function blocV(nav, W, sombre) {
   // V2, V3 : la galerie d'une annonce à trois photos.
   await essaie(`${T} V2`, async () => {
     const { ctx, pg, tel } = await ouvrir(nav, { W, sombre, tab: 'cat_annonces' });
-    const h = await pg.evaluateHandle(() => [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].find((i) => /\/ph\/L0-0\.svg/.test(i.getAttribute('src') || '') && i.getBoundingClientRect().width >= 32) || null);
-    const el = h.asElement();
-    dit(!!el, `${T} V2 l'annonce à 3 photos est à l'écran`);
+    const el = await toucherVignette(pg, tel, '.vrm-main', '/ph/L0-0.svg');
+    dit(el, `${T} V2 l'annonce à 3 photos est à l'écran`);
     if (!el) { await capture(pg, `V2-${W}`); await ctx.close(); return; }
-    await el.scrollIntoViewIfNeeded(); if (tel) await el.tap(); else await el.click(); await pg.waitForTimeout(400);
     let v = await visionneuse(pg);
     dit(v && v.n === 3 && v.i === 0 && /1\/3/.test(v.compteur) && v.fleches === 2, `${T} V2 galerie : 3 photos, « 1/3 », deux flèches`, JSON.stringify(v));
     dit(await pg.locator('[data-visionneuse-lien]').count() === 1, `${T} V2 le lien de la photo (l'annonce sur Vinted) reste dans la visionneuse`);
@@ -211,9 +220,7 @@ async function blocV(nav, W, sombre) {
     await pg.click('[data-visionneuse-fermer]'); await pg.waitForTimeout(400);
     dit(!(await visionneuse(pg)), `${T} V4 la croix ferme`);
     // Une photo seule : ni flèche, ni compteur.
-    const h2 = await pg.evaluateHandle(() => [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].find((i) => /\/ph\/L1-0\.svg/.test(i.getAttribute('src') || '') && i.getBoundingClientRect().width >= 32) || null);
-    const el2 = h2.asElement();
-    if (el2) { await el2.scrollIntoViewIfNeeded(); if (tel) await el2.tap(); else await el2.click(); await pg.waitForTimeout(350); v = await visionneuse(pg); dit(v && v.n === 1 && v.fleches === 0 && !v.compteur.trim(), `${T} V2 photo seule : ni flèche ni compteur`, JSON.stringify(v)); }
+    if (await toucherVignette(pg, tel, '.vrm-main', '/ph/L1-0.svg')) { v = await visionneuse(pg); dit(v && v.n === 1 && v.fleches === 0 && !v.compteur.trim(), `${T} V2 photo seule : ni flèche ni compteur`, JSON.stringify(v)); }
     await ctx.close();
   });
   // V5, V6 sur Achats.
@@ -221,9 +228,7 @@ async function blocV(nav, W, sombre) {
     const { ctx, pg, tel } = await ouvrir(nav, { W, sombre, tab: 'cat_achats&vue=achats' });
     await pg.click('[data-achats-onglet="all"]').catch(() => {}); await pg.waitForTimeout(500);
     const row = '[data-achat-tx="73001"]';
-    const img = pg.locator(`${row} img[data-vrm-vignette]`).first();
-    await img.waitFor({ timeout: 10000 }); await img.evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300);
-    if (tel) await img.tap(); else await img.click();
+    dit(await toucherVignette(pg, tel, '.vrm-main', row), `${T} V5 la vignette de l'achat est à l'écran`);
     await pg.waitForTimeout(350);
     dit(!!(await visionneuse(pg)) && !(await pg.locator('[role="menu"].vrm-buy-menu').count()), `${T} V5 la vignette d'un achat ouvre la photo, pas le menu`);
     await pg.keyboard.press('Escape'); if (tel) await pg.click('[data-visionneuse-fermer]').catch(() => {}); await pg.waitForTimeout(300);

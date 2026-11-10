@@ -9798,7 +9798,9 @@ function raisonExtGlobale(sansSouris, opt) {
 // fonction, utilisée partout, pour ne plus jamais réécrire cette lecture.
 const orderPhoto = photoArticle;
 
-const mapWardrobeItem = (it) => ({
+// (10 nov., lot AN) Les photos d'une annonce ne sont pas gardées ici (seulement leur nombre) : on les
+// range au passage pour la visionneuse (src/visionneuse.js, par fichier), sans alourdir la liste.
+const mapWardrobeItem = (it) => (enregistrerGaleries([it]), ({
   id: String(it.id),
   title: it.title || '',
   price: it.price?.amount ?? (typeof it.price === 'number' ? it.price : null),
@@ -9866,7 +9868,7 @@ const mapWardrobeItem = (it) => ({
   // envoie `color1`/`catalog_id` à null sur des annonces qui en ont) — la règle
   // est `lusDuDressing` (src/annoncesActions.js).
   ...lusDuDressing(it),
-});
+}));
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
 // vendus/fermes (is_closed=true) : on ne veut garder que les actives.
