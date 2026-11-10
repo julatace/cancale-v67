@@ -151,7 +151,25 @@ async function rendre(b, { lignes, suppKO = false, tel = false, mobile, onglet =
   if (section) { await pg.click(`[data-section="${section}"]`); await pg.waitForTimeout(2500); }
   return { ctx, pg, errs };
 }
-const lireAnnonces = (pg) => pg.evaluate(() => {
+
+// (9 nov., lot AI) La fraîcheur d'Annonces / du tableau de bord est une LIGNE COURTE : son texte
+// (la règle, le geste, la liste « à confirmer ») vit dans SA pop-up. Le banc l'ouvre pour lire,
+// puis la ferme (Échap) — la règle jugée est la même, seule la place du texte a changé.
+const ouvrirPop = async (pg, sel) => {
+  if (await pg.locator('[data-popup-corps]').count()) return true;
+  const b = pg.locator(`${sel} [data-popup-ouvrir]`).first();
+  if (!(await b.count())) return false;
+  await b.evaluate((e) => e.scrollIntoView({ block: 'center' })).catch(() => {});
+  await b.dispatchEvent('click').catch(() => {});
+  const ok = await pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
+  // (10 nov.) Le détail est replié sous « Pourquoi ? » : le banc le déplie comme lui le ferait.
+  if (ok) await pg.locator('[data-popup-pourquoi] > summary').first().click().catch(() => {});
+  return ok;
+};
+const fermerPop = async (pg) => { if (!(await pg.locator('[data-popup-corps]').count())) return; await pg.keyboard.press('Escape'); await pg.waitForSelector('[data-popup-corps]', { state: 'detached', timeout: 4000 }).catch(() => {}); };
+const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel); const r = await pg.evaluate(f, arg); if (o) await fermerPop(pg); return r; };
+const cliquerPop = async (pg, sel, cible) => { await ouvrirPop(pg, sel); await pg.click(`[data-popup-corps] ${cible}`, { timeout: 8000 }); await pg.waitForTimeout(250); await fermerPop(pg); };
+const lireAnnonces0 = (pg) => pg.evaluate(() => {
   const f = [...document.querySelectorAll('[data-ann-fraicheur]')];
   const el = f[0];
   return {
@@ -169,17 +187,19 @@ const lireAnnonces = (pg) => pg.evaluate(() => {
     // « aucune coche au-dessus du dressing » reste plus strict, et « elle reste
     // sur Ventes » juge qu'elle est rendue, pas qu'elle est montrée au doigt.
     aJour: (document.body.textContent.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
-    texte: el ? el.innerText : '',
+    texte: (document.querySelector('[data-popup-corps] [data-fraicheur-detail]') || el || { innerText: '' }).innerText,
     couleurs: el ? [...el.querySelectorAll('*')].concat([el]).map((x) => getComputedStyle(x).color) : [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   };
 });
-const lireDash = (pg) => pg.evaluate(() => {
+const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fraicheur], [data-dash-fraicheur]'); const r = await lireAnnonces0(pg); if (o) await fermerPop(pg); return r; };
+const lireDash0 = (pg) => pg.evaluate(() => {
   const s = document.querySelector('[data-dash-stat="online"]');
   const f = [...document.querySelectorAll('[data-dash-fraicheur]')];
   return { online: s ? (s.innerText.match(/\d+/) || [null])[0] : null, nFraicheur: f.length,
-    vieux: f[0] ? f[0].getAttribute('data-vieux') : null, supprimees: f[0] ? f[0].getAttribute('data-supprimees') : null, texte: f[0] ? f[0].innerText : '' };
+    vieux: f[0] ? f[0].getAttribute('data-vieux') : null, supprimees: f[0] ? f[0].getAttribute('data-supprimees') : null, texte: (document.querySelector('[data-popup-corps] [data-fraicheur-detail]') || f[0] || { innerText: '' }).innerText };
 });
+const lireDash = async (pg) => { const o = await ouvrirPop(pg, '[data-dash-fraicheur]'); const r = await lireDash0(pg); if (o) await fermerPop(pg); return r; };
 
 (async () => {
   let b;
@@ -312,7 +332,8 @@ const lireDash = (pg) => pg.evaluate(() => {
       for (const onglet of ['cat_annonces', 'dashboard']) {
         const r = await rendre(b, { lignes, accs, onglet });
         if (onglet === 'dashboard') await r.pg.waitForTimeout(1500);
-        const txt = await r.pg.evaluate((sel) => { const el = document.querySelector(sel); return el ? el.innerText : ''; }, onglet === 'dashboard' ? '[data-dash-fraicheur]' : '[data-ann-fraicheur]');
+        const sel = onglet === 'dashboard' ? '[data-dash-fraicheur]' : '[data-ann-fraicheur]';
+        const txt = await dansPop(r.pg, sel, (sel) => { const el = document.querySelector('[data-popup-corps] [data-fraicheur-detail]') || document.querySelector(sel); return el ? el.innerText : ''; }, sel);
         const manquent = uids.filter((u) => !txt.includes('compte_' + u));
         dit(txt && !manquent.length, `${onglet} : les six comptes à repasser sont NOMMÉS (le geste est par compte)`, manquent.length ? `absents : ${manquent.join(', ')} · « ${txt.slice(0, 160)} »` : '');
         await r.ctx.close();
@@ -382,3 +403,4 @@ const lireDash = (pg) => pg.evaluate(() => {
   console.log(ko ? `\n❌ supprimees : ${ko} rouge(s)` : '\n✅ supprimees : tout est vert');
   process.exit(ko ? 1 : 0);
 })();
+

@@ -12,7 +12,7 @@ import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees } from '../stockAnnonces.js';
 import { LIGNE_INVENTAIRE } from '../inventaire.js';
 import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
-import { AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { NotePaireCoque, InfoPop, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -704,7 +704,18 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
         {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted {NAV.dans} avec l'extension, puis reviens ici.</div>}
-        {aa && aa.su && <div className="vrm-s2d-resume-l">
+        {/* (9 nov., lot AI — Julien : « ça fait très moche ») UNE ligne courte (rangées · à ranger, et le
+            signal de ce qui manque) ; la phrase d'avant, entière, dans sa pop-up. Ambre : un geste à faire. */}
+        {aa && aa.su && <InfoPop nom="stock-resume" titre="Tes annonces actuelles" className="vrm-s2d-resume-l"
+          ton={nAConf > 0 || aa.manque.length > 0 || aa.vcVieille ? 'ambre' : 'neutre'}
+          attrs={{ 'data-stock-resume-court': '' }}
+          puces={nAffiche > 0
+            ? [{ texte: `${nRangees} rangée${nRangees > 1 ? 's' : ''}` }, { texte: `${nAffiche - nRangees - nSansNum} à ranger` },
+               nAConf > 0 ? { texte: `${nAConf} à confirmer`, ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null,
+               nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: `${nSansNum + sansNumAutres + vcSansNum.length} sans N°` } : null].filter(Boolean)
+            : [{ texte: 'Aucune annonce lue' }, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null].filter(Boolean)}
+          phrase={aa.manque.length > 0 ? 'Une lecture manque : ouvre ce site avec l’extension.' : nAConf > 0 ? 'À confirmer : repasse sur ce compte pour le relire.' : nAffiche - nRangees - nSansNum > 0 ? 'Range chaque paire : touche « Ranger » dans la liste.' : 'Tout ce qui est en ligne est rangé.'}>
+        <div data-stock-resume-detail="">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
           {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · dont <b>{nAConf}</b> à confirmer ({aConfTxt} — {aConfGeste})</span>}
           {aa.vcVieille && !aConfVoir.some((c) => c.plateforme === 'vestiaire') && <span data-stock-vc-vieille=""> · Vestiaire {depuisQuand(aa.vcVieille.lu)} : ouvre « Mes articles » sur Vestiaire</span>}
@@ -714,7 +725,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {sansNumAutres > 0 && <> · {sansNumAutres} annonce{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? 'Leboncoin et eBay' : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} sans N° pas comptée{sansNumAutres > 1 ? 's' : ''} (rien ne dit quelle paire c'est)</>}
           {vcSansNum.length > 0 && <span data-stock-vc-sans-numero={vcSansNum.length}> · {vcSansNum.length} annonce{vcSansNum.length > 1 ? 's' : ''} Vestiaire sans N° pas comptée{vcSansNum.length > 1 ? 's' : ''} : {vcSansNum.slice(0, 4).map((x) => `« ${x.titre || 'sans titre lu'} »`).join(', ')}{vcSansNum.length > 4 ? '…' : ''} (le N° arrive quand VRM a relu tes numéros — jamais deviné par le titre)</span>}
           {vcNonDites.length > 0 && <span data-stock-vc-non-dites={vcNonDites.length}> · {vcNonDites.length} annonce{vcNonDites.length > 1 ? 's' : ''} Vestiaire à l'état non dit (ni en ligne ni partie) pas comptée{vcNonDites.length > 1 ? 's' : ''}</span>}
-        </div>}
+        </div></InfoPop>}
         {aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) && (
           <div className="vrm-s2d-filtres" data-stock-filtres="">
             {platsPresents.length > 1 && <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par plateforme" data-stock-filtre-plat={filtrePlat || 'toutes'}>
@@ -752,7 +763,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-plus-en-ligne={plusEnLigne.length}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Plus en ligne · {plusEnLigne.length}</div>
-        <div style={{ fontSize: 12, color: C.muted, margin: '2px 0 4px', lineHeight: 1.4 }}>Rangées, mais plus en annonce nulle part : retire-les de leur case, ou garde-les si elles reviennent en vente.</div>
+        <InfoPop nom="stock-plus-en-ligne" titre="Plus en ligne" style={{ margin: '2px 0 4px' }} resume="Retire-les de leur case, ou garde-les">
+          <p>Rangées, mais plus en annonce nulle part : retire-les de leur case, ou garde-les si elles reviennent en vente.</p>
+        </InfoPop>
         {plusEnLigne.map((f) => ligneRangee(f, <>
           <button className="vrm-b vrm-b-secondaire" type="button" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>Je l'ai retirée</button>
           <button className="vrm-b vrm-b-discret" type="button" data-stock-encore-la={cleDeFiche(f)} onClick={() => encoreLa(f)}>Elle est encore là</button>
@@ -760,11 +773,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </div>
     </Card>) : null;
   const blocPasSu = rangeesPasSu.length && aa ? (
-    <div data-stock-rangees-passu={rangeesPasSu.length} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
+    // (9 nov., lot AI) Une ligne courte (« 3 rangées pas vérifiées · N°5, N°27… ») ; la phrase entière en pop-up.
+    <InfoPop nom="stock-pas-verifiees" titre="Paires rangées pas vérifiées" ton="neutre" style={{ margin: 0 }}
+      attrs={{ 'data-stock-rangees-passu': rangeesPasSu.length }}
+      puces={[{ texte: `${rangeesPasSu.length} pas vérifiée${rangeesPasSu.length > 1 ? 's' : ''}` }]}
+      phrase="Une lecture manque : ni « en ligne », ni « partie » n'est dit.">
       {/* (6 nov., onglets B) La lecture qui manque est déjà NOMMÉE en tête (« pas lu : … ») : elle ne se redit
           pas ici (§7, une phrase une fois — mesuré sur sa base : « Vestiaire (jamais lu : ouvre… ») deux fois). */}
-      {rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas lu » plus haut)' : (manqueTxt || 'la lecture de son compte manque')}. Je ne dis ni qu'elles sont en ligne, ni qu'elles sont parties.
-    </div>) : null;
+      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. Je ne dis ni qu'elles sont en ligne, ni qu'elles sont parties.</p>
+    </InfoPop>) : null;
   // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
   const blocListe = aa && aa.su && articlesVus.length ? (
     <Card style={{ padding: '12px 13px' }}>
@@ -781,6 +798,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                 <span className="vrm-s2d-txt-t">{a.cle ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
                 <span className="vrm-s2d-txt-s">{a.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' · ')}{a.comptes.length ? ' · ' + a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}{a.etat === 'aconfirmer' ? ' · à confirmer' : (a.etat === 'masquee' ? ' · masquée par Vinted' : '')}{(a.aussi || []).length ? ' · aussi N°' + a.aussi.join(', N°') : ''}
                   <br />{ou ? <b>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</b> : (a.cle ? 'pas encore rangée' : 'sans N° : pas rangeable')}</span>
+                {/* (10 nov., lot BD) La note privée de la paire, par son N° (jamais le titre). */}
+                {a.cle ? <NotePaireCoque numero={a.numero} ajout rangee/> : null}
               </span>
               {a.cle && f && <button className="vrm-b vrm-b-discret" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); toast(`Touche la case où tu ranges N°${a.numero}.`); } }} style={{ flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</button>}
             </div>); })}

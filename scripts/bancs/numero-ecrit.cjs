@@ -158,6 +158,9 @@ async function annonces(b, largeur, sombre) {
     const bloc = await pg.waitForSelector('[data-numero-ecrit-bloc]', { timeout: 8000 }).then(() => true).catch(() => false);
     dit(bloc, `${tag} : « numéros écrits à vérifier » sous les annonces`);
     if (bloc) {
+      // (9 nov., lot AI) Le bloc est une PUCE : ses lignes et ses boutons vivent dans SA pop-up.
+      await toucher(pg, '[data-numero-ecrit-bloc] [data-popup-ouvrir]', mobile);
+      await pg.waitForSelector('[data-popup-corps="numero-ecrit"] [data-numero-ecrit-ligne]', { timeout: 8000 }).catch(() => {});
       const etats = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-numero-ecrit-ligne]')].map((e) => [e.getAttribute('data-numero-ecrit-ligne'), e.getAttribute('data-numero-ecrit-etat')])));
       dit(etats['9203'] === 'contredit' && etats['9206'] === 'ambigu' && !etats['9201'] && !etats['9204'], `${tag} : 9203 « contredit », 9206 « ambigu », les N° lus n'y sont pas`, JSON.stringify(etats));
       dit(await pg.getAttribute('[data-numero-ecrit-bloc]', 'data-numero-ecrit-sans') === '1', `${tag} : 1 annonce sans N° écrit, nommée à part`);

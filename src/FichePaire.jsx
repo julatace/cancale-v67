@@ -87,7 +87,7 @@ const dateCourte = (iso) => {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -109,6 +109,8 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         </span>
         {p.photo && Photo ? <span className="vrm-fp-photo">{Photo(p.photo)}</span> : null}
       </div>
+      {/* (10 nov., lot BD) La note privée de la paire (l'écran la fournit : NotePaireCoque). */}
+      {note ? <div className="vrm-fp-note-privee" data-fiche-note="">{note}</div> : null}
       {p.double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1">Deux paires présentes portent le N°{p.num} : vérifie là où elles sont rangées avant d’emballer ou d’imprimer.</p> : null}
       <div className="vrm-fp-tuiles">
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}

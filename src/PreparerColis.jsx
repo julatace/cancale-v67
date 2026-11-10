@@ -25,7 +25,7 @@ const PHRASE_NUM = {
 
 // (10 nov., lot AZ + M) `photoCarton(c)` : le geste « Photo du carton » (facultatif) d'un colis FAIT, rangé avec
 // SA vente (src/photoCarton.js) — le même que celui du scanner ; l'écran le fournit, rien n'est décidé ici.
-export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex, photoCarton = null }) {
+export default function PreparerColis({ colis, uid = '', attente = '', onFait, onAnnuler, onImprimer, onScanner, onFermer, Retour, Icon, Photo, zIndex, photoCarton = null, note = null }) {
   const vivants = Array.isArray(colis) ? colis : [];
   // Ce que la séance a vu (un colis fait sort de « À envoyer » après ses 5 s : la
   // séance le garde, montré fait). Le dernier état vivant l'emporte.
@@ -138,6 +138,8 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
         {fait && photoCarton ? photoCarton(c) : null}
         <h2 className="vrm-prep-titre" data-preparer-titre="">{c.titre}</h2>
         {puces.length ? <p className="vrm-prep-puces">{puces.map((p, k) => <span key={k} className={k === 1 && c.compte ? 'vrm-sensible' : undefined} data-stream-type={k === 1 && c.compte ? 'compte' : undefined}>{p}</span>)}</p> : null}
+        {/* (10 nov., lot BD) La note privée de la paire, par son N° (l'écran la fournit). */}
+        {note && c.num ? <div className="vrm-prep-note" data-preparer-note="">{note(c)}</div> : null}
         {c.limite ? <p className={'vrm-prep-limite' + (c.limiteAmbre ? ' is-ambre' : '')} data-preparer-limite="">{c.limite}</p> : null}
         <div className="vrm-prep-bord" data-preparer-bordereau={c.pdf ? 'pret' : 'absent'}>
           <span className="vrm-prep-bord-lib">Bordereau</span>

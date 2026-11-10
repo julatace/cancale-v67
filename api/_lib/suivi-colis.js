@@ -25,7 +25,7 @@
 //     votre colis » (ses propres envois), c'est la RELÈVE par le transporteur.
 //     Il ne vaut jamais « retiré » (api/_lib/etat-colis-email.js).
 // ─────────────────────────────────────────────────────────────────────────────
-import { normaliserSuivi, etatColisDepuisTexte, changementDeRelais } from './etat-colis-email.js';
+import { normaliserSuivi, etatColisDepuisTexte, changementDeRelais, colisPerdu } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { etatRetrait, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
 import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
@@ -77,6 +77,10 @@ export function relireLigneSuivi(d) {
   // roule vers le nouveau point (api/_lib/etat-colis-email.js, `changementDeRelais`).
   if (etat === 'transit' && changementDeRelais(d.subject || d.sujet || '') && d.status !== 'transit') return { ...d, status: 'transit', statusLabel: 'Point relais changé', relaisChange: true, retireLe: null };
   if (d.status === 'transit' && d.relaisChange && !d.statusLabel) return { ...d, statusLabel: 'Point relais changé' };
+  // (10 nov., retraits irréprochables) « Action requise : le colis semble avoir été perdu » rangé
+  // « livré / retiré » avant la règle du 3 nov. (mesuré : une ligne du 2 nov. l'est encore) : un colis
+  // perdu n'est ni livré ni retiré — la ligne redevient une information, sans date de retrait.
+  if (d.status === 'delivered' && colisPerdu(d.subject || d.sujet || '')) return { ...d, status: 'info', statusLabel: 'Colis perdu (d’après Vinted)', perdu: true, retireLe: null };
   if (etat === 'retour' && d.status !== 'delivered') return { ...d, status: 'retour', statusLabel: 'Reparti chez l’expéditeur' };
   if (etat === 'delivered') return { ...d, status: 'delivered', statusLabel: 'Livré / retiré' };
   // « Ton colis arrive aujourd'hui ! #… » : l'arrivée est ANNONCÉE — sans code,
@@ -309,7 +313,12 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
     return out;
   }
   if ((st === 'transit' || st === 'info' || !st) && at != null && (em == null || at > em)) {
-    return { ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuTransp(t) || null,
+    // (10 nov., retraits irréprochables) Un colis REDIRIGÉ (« Votre colis a changé de plan ») : le nouveau
+    // point est LU dans l'e-mail de CE n° (une identité). Le transporteur qui le dit arrivé sans nommer le
+    // point (Mondial Relay : `lieuNom` vide, mesuré) ne l'efface plus — sans lui, la carte disait « point
+    // pas encore connu » pour un colis dont l'e-mail donnait l'adresse.
+    const lieuF = lieuTransp(t) || (l.relaisChange && l.lieu ? l.lieu : null);
+    return { ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuF, relaisChange: false, ...(l.relaisChange ? { redirige: true } : {}),
       limite: (t.limiteSure && t.limite) || null, limiteVers: (!t.limiteSure && t.limite) || null, limiteDuTransporteur: !!(t.limiteSure && t.limite),
       limiteAt: (t.limiteSure && t.limite && t.limiteAt) || null,
       arriveLe: t.etatAt, viaTransporteur: true, transp: t, ...(recent != null ? { transpDispoLu: recent } : {}) };
