@@ -113,3 +113,33 @@ html body button.vrm-rm-etape[aria-current="step"] .vrm-rm-pastille { background
 /* Au doigt comme à la souris : 44 px (Chromium émulé en mobile ne répond pas toujours
    `pointer: coarse`, mesuré par le banc — la règle de base des boutons restait à 36). */
 html body .vrm-fs.vrm-rm-feuille .vrm-b { min-height: 44px !important; }
+
+/* ═══ (10 nov., lot AP) « À la main », conseillé — le kit de plusieurs annonces ═══
+   Le conseil : une carte calme (pas une alerte), l'icône au bleu rare. Les cartes du
+   kit : photo, N°, titre, compte · prix, description lisible, trois gestes de 44 px. */
+.vrm-kit-conseil { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-kit-conseil > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
+.vrm-kit-conseil b { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-kit-conseil-icone { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--vrm-accent, #0071E3); background: var(--vrm-b-teinte, rgba(0,113,227,.08)); }
+.vrm-kit-conseil-vue { margin: 0 0 10px; }
+.vrm-sel-barre.vrm-sel-barre-deux { display: flex; gap: 10px; }
+/* Le second bouton flotte sur la liste : opaque, sinon le texte dessous se lit à travers. */
+/* Dans la couche `vrm-premium` : un !important d'une couche bat un !important hors couche (styles-widgets-ios.css). */
+@layer vrm-premium { :root:root body .vrm-app-shell .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b.vrm-b-secondaire:not(.vrm-b-icone) { background: var(--w-carte, #fff) !important; box-shadow: inset 0 0 0 100px var(--w-remplir, rgba(118,118,128,.12)), 0 6px 18px rgba(0,0,0,.18) !important; } }
+@media (max-width: 767px) { .vrm-sel-barre.vrm-sel-barre-deux > .vrm-b { flex: 1 1 0; min-width: 0; } }
+.vrm-kit-barre { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.vrm-kit-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vrm-kit-carte { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); min-width: 0; }
+.vrm-kit-tete { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 12px; }
+.vrm-kit-photo { position: relative; display: block; width: 72px; aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; background: var(--vrm-photo, #F2F2F7); }
+.vrm-kit-texte { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.vrm-kit-desc { font-size: 13px; line-height: 1.45; color: var(--vrm-ink, #1D1D1F); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.vrm-kit-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-kit-gestes > .vrm-b { flex: 1 1 120px; min-width: 0; }
+.vrm-kit-sans { display: inline-flex; align-items: center; min-height: 44px; }
+.vrm-kit-rate { font-size: 13px; }
+/* Une photo préparée s'enregistre seule : son bouton rond, 44 px, posé sur la vignette. */
+.vrm-rm-photo { position: relative; }
+html body button.vrm-rm-photo-une { position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 999px; border: 0; display: grid; place-items: center; cursor: pointer; color: #fff; background: rgba(0,0,0,.55); -webkit-tap-highlight-color: transparent; }
+html body button.vrm-rm-photo-une[data-main-photo-une-fait] { background: var(--vrm-accent, #0071E3); }
+html body button.vrm-rm-photo-une:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
