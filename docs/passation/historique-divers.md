@@ -1277,3 +1277,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (intégration)
 - **10 nov. · Livre de police (lot R)** : Argent → Déclarer, statut pro seulement ; n° d'ordre append-only sur SON clic (`vrm_livre_police`, CAS), lignes = registre des achats, pseudo Vinted côté acheteur, identité « à compléter », PDF/CSV, jamais « conforme » (`src/livrePolice.js`, sources citées). `docs/passation/2026-11-10-livre-police.md`. Geste : relire R321-3.
+
+- **10 nov. · Corbeille 30 jours (lot Y)** : supprimer DANS VRM (achat hors plateforme, dépense/coût/pack/abonnement, modèle, réponse rapide, fiche à publier, note, fournisseur, achat en gros) ⇒ pilule « Mis à la corbeille · Annuler » 5 s, plus de « Tu es sûr ? » (fournisseur : confirmation gardée), puis Paramètres → Corbeille « Restaurer » 30 j ; UNE règle `src/corbeille.js` (`vrm_corbeille` dans `main`, morceaux conditionnels : ce qui a changé depuis est gardé, N° pris ⇒ refus, photo/ticket vidés à la purge seulement si pas revenus) ; sites, N°, factures : jamais. `docs/passation/2026-11-10-corbeille.md`. Geste : aucun.
