@@ -1212,3 +1212,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Mon adresse VRM (lot AQ, demande 6)** : Paramètres → Mes e-mails → « Mon adresse VRM » (juste avant SMS de colis) ouvre la feuille : le serveur crée SON adresse au 1er toucher, transfert pas à pas (7 messageries), e-mail d'essai « Reçu ✓ » par code ; Worker Cloudflare à coller, sans nouvelle fonction `api/`. `docs/passation/2026-11-10-emails-transfert.md`. Geste : `docs/emails-transfert-mise-en-service.md` (domaine, Worker, `DOMAINE_RECEPTION`).
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Colis à réceptionner irréprochables** : 97 colis croisés sur la vraie base (e-mails, transporteur, suivi et commandes Vinted, conversations ; 0 SMS) ; un faux « retiré » (changé de plan, perdu) ne retient plus l'arrivée (`retraitTenu`), colis redirigé relu chez le transporteur et gardant son nouveau point, carte : sources + « vérifié à », code « sûr » à deux voix, deux codes ⇒ ambre sans choix (`src/sourcesRetrait.js`, aussi mode relais). `docs/passation/2026-11-10-retraits-irreprochables.md`. Geste : `CRON_SECRET`, relier l'adresse des 17 moitiés sans compte.

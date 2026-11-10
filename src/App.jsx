@@ -552,6 +552,7 @@ import { NotePaireVue } from './NotePaire.jsx';
 import { CLE_HORS_MASQUES, achatsEnDouble, opsGarder, horsVisibles } from './achatsDoubles.js';
 import { AchatsEnDouble } from './AchatsEnDouble.jsx';
 import {DejaEnStock} from "./DejaEnStock.jsx";
+import {ReventeModele} from "./ReventeModele.jsx";
 import {pairesDuModele} from "./dejaEnStock.js";
 import {plancherVente,offreFacePlancher} from "./plancherOffre.js";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
@@ -28958,6 +28959,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { const relire = () => setRecusDelies(load('vrm_recus_delies', {}) || {}); const off = onCloudReady(relire); const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_recus_delies') relire(); }; window.addEventListener('vrm:save', f); return () => { off(); window.removeEventListener('vrm:save', f); }; }, []);
   const indexRecusAchat = useMemo(() => indexRecusParTransaction(Array.isArray(recusAchat) ? recusAchat.filter((r) => !(r && r.id && recusDelies[r.id])) : recusAchat, (r) => ventilationRecuAchat(r && r.texte).trouve), [recusAchat, recusDelies]);
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
+  const [reventeVue, setReventeVue] = useState(null); // (10 nov., lot AV) « Revendu combien ? » d'un achat : { titre }
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
   // (23 oct.) « Paires du lot » s'ouvre PAR-DESSUS le tiroir d'une vente : elle
   // prend le clavier à l'ouverture (Échap ferme la feuille qu'on voit, pas le
@@ -43333,6 +43335,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
                     {(()=>{ const cf = cleFacture('tx', o.transaction_id); if (!cf) return null; const a = !!(facturesAchat.factures && facturesAchat.factures[cf]);
                       return <button type="button" role="menuitem" data-achat-joindre-facture={tid} style={item} onClick={()=>{ close(); facturesAchat.choisir(cf); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{a?'Remplacer la facture':'Joindre une facture'}</button>; })()}
+                    {modeleSur('', o.title||'') && <button type="button" role="menuitem" data-achat-revente={tid} style={item} onClick={()=>{ close(); setReventeVue({ titre: String(o.title||'') }); }}><Icon name="chart" size={15} style={{color:C.muted}}/>Revendu combien ?</button>}
                     {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>Étiquette N°{numA}</button>}
                     <div style={{height:1,background:C.border,margin:'4px 0'}}/>
                     <button type="button" role="menuitem" data-achat-masquer={tid} style={{...item,color:C.muted}} onClick={()=>{ close(); masquerAchat(o); }}><Icon name="eyeOff" size={15} style={{color:C.muted}}/>Masquer cet achat</button>
@@ -46637,6 +46640,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
       {receiptView && <FeuilleRecuAchat recu={receiptView} fermer={()=>setReceiptView(null)}/>}
+      {reventeVue && <SheetShell onClose={()=>setReventeVue(null)}><div data-revente-feuille="" style={{padding:'0 2px 8px'}}><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>Revendu combien ?</div><div style={{fontSize:13,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{reventeVue.titre}</div>
+        {modeleSur('', reventeVue.titre) ? <ReventeModele ouvert C={C} cible={{ titre: reventeVue.titre }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs}/> : <div data-revente-modele="inconnu" style={{fontSize:13,color:C.muted,marginTop:10}}>Modèle pas reconnu dans le titre : rien à comparer.</div>}</div></SheetShell>}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowSourcing(false)}/>
@@ -46855,6 +46860,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      {/* (9 nov., lot F) Au moment de confirmer CET achat : les AUTRES paires du même modèle
                          déjà sur l'étagère — une information par ressemblance, rien n'est relié ni écrit. */}
                      <DejaEnStock autres C={C} Photo={PhotoVinted} r={pairesDuModele({ cible: { titre: r.titre||'', marque: r.marque||'', taille: r.taille||'' }, stock: stockPourModele, sauf: r.key, marqueDe: extractBrand, modeleDe: extractModel, couleursDe: extractColors })}/>
+                     <ReventeModele C={C} cible={{ titre: r.titre||'', marque: r.marque||'' }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs}/>
                    </div>; })()}
                  {(()=>{ const cs=propositionFiche(r.key) ? null : fillBuySugg[r.key]; if(!cs||!cs.length) return null;
                    // (30 oct.) Seules les pistes sûres (« C'est ça ») restent en clair ; les
