@@ -132,12 +132,12 @@ export function filtrerEnvoyes(liste, filtre, tr = (x) => x && x.tr) {
 //  étiquettes a rangé pour CE n° de transaction (`pdf[tx]`, `pdfVus[tx]`).
 // ════════════════════════════════════════════════════════════════════════════
 export const RAISONS_INCONNU = Object.freeze({
-  'a-lire': 'étiquette en cours de lecture',
-  muette: 'étiquette sans nom lisible',
-  plusieurs: 'étiquette qui nomme deux transporteurs',
-  illisible: 'PDF illisible',
-  'sans-pdf': 'bordereau sans PDF',
-  'sans-bordereau': 'aucun bordereau reçu par VRM',
+  'a-lire': ['étiquette en cours de lecture', 'étiquettes en cours de lecture'],
+  muette: ['étiquette sans nom lisible', 'étiquettes sans nom lisible'],
+  plusieurs: ['étiquette qui nomme deux transporteurs', 'étiquettes qui nomment deux transporteurs'],
+  illisible: ['PDF illisible', 'PDF illisibles'],
+  'sans-pdf': ['bordereau sans PDF', 'bordereaux sans PDF'],
+  'sans-bordereau': ['vente sans bordereau reçu par VRM', 'ventes sans bordereau reçu par VRM'],
 });
 export function raisonInconnu({ bord = null, pdf = null, vu = null } = {}) {
   const lu = (bord && bord.pdfLu && bord.pdfLu !== 'None') ? String(bord.pdfLu) : '';
@@ -154,5 +154,5 @@ export function raisonInconnu({ bord = null, pdf = null, vu = null } = {}) {
 export function compterRaisons(raisons) {
   const n = new Map();
   for (const r of raisons || []) if (r) n.set(r, (n.get(r) || 0) + 1);
-  return Object.keys(RAISONS_INCONNU).filter((k) => n.get(k)).map((k) => ({ cle: k, n: n.get(k), texte: RAISONS_INCONNU[k] }));
+  return Object.keys(RAISONS_INCONNU).filter((k) => n.get(k)).map((k) => ({ cle: k, n: n.get(k), texte: RAISONS_INCONNU[k][n.get(k) > 1 ? 1 : 0] }));
 }
