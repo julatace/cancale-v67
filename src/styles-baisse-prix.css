@@ -1,0 +1,62 @@
+/* ── BAISSER LE PRIX EN SÉRIE (10 nov., lot C) ──────────────────────────────
+   La feuille reprend la coque « Changer le prix » (.vrm-ao-*, jetons --fu-*,
+   clair et sombre). Couleurs : bleu pour le bouton principal seul, ambre pour
+   « sous ton plancher » (un geste à regarder, §7) ; jamais de rouge. */
+.vrm-bp-reglage { display: flex; gap: 10px; align-items: stretch; margin-bottom: 6px; }
+.vrm-bp-modes { display: flex; background: var(--fu-case, #e9e9ee); border-radius: 999px; padding: 3px; flex: none; }
+.vrm-bp-mode {
+  min-width: 56px; min-height: 44px; border: 0; border-radius: 999px; background: transparent; color: var(--fu-encre, #1d1d1f);
+  font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; padding: 0 12px;
+}
+.vrm-bp-mode[aria-pressed="true"] { background: var(--fu-carte, #fff); box-shadow: var(--fu-ombre, 0 1px 3px rgba(0,0,0,.12)); }
+.vrm-bp-mode:disabled { cursor: default; opacity: .6; }
+.vrm-bp-champ {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; background: var(--fu-carte, #fff); border-radius: 20px;
+  padding: 6px 16px; box-shadow: var(--fu-ombre); box-sizing: border-box;
+}
+.vrm-bp-champ span, .vrm-bp-champ b { font-size: 26px; font-weight: 700; color: var(--fu-gris, #6e6e73); }
+.vrm-bp-champ input {
+  flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; font-size: 28px; font-weight: 800;
+  font-variant-numeric: tabular-nums; outline: none; padding: 4px 0;
+}
+.vrm-bp-champ input[aria-invalid="true"] { text-decoration: underline wavy var(--fu-ambre, #ff9f0a); }
+.vrm-bp-note { margin: 4px 4px 12px; font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.35; }
+.vrm-bp-compte { margin: 0 4px 10px; font-size: 15px; font-weight: 600; color: var(--fu-encre, #1d1d1f); }
+.vrm-bp-liste { list-style: none; margin: 0 0 12px; padding: 0; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); overflow: hidden; }
+.vrm-bp-ligne { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 2px; min-height: 64px; }
+.vrm-bp-ligne + .vrm-bp-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
+.vrm-bp-ligne.is-bloque { opacity: .62; }
+.vrm-bp-case { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 44px; cursor: pointer; }
+.vrm-bp-case input { width: 22px; height: 22px; margin: 11px 4px 11px 11px; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-bp-photo { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex: none; background: var(--fu-case, #e9e9ee); display: block; }
+.vrm-bp-centre { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.vrm-bp-nom { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: 15px; }
+.vrm-bp-num { flex: none; font-variant-numeric: tabular-nums; }
+.vrm-bp-titre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fu-gris, #6e6e73); }
+.vrm-bp-prix { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-bp-prix s { color: var(--fu-gris, #6e6e73); text-decoration-thickness: 1px; }
+.vrm-bp-prix b { font-weight: 800; }
+.vrm-bp-prix small { font-size: 12px; color: var(--fu-gris, #6e6e73); font-weight: 500; }
+.vrm-bp-raison { font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
+.vrm-bp-ambre { font-size: 13px; font-weight: 700; color: var(--fu-ambre-txt, #b25000); }
+.vrm-bp-bas { display: flex; flex-direction: column; gap: 10px; position: sticky; bottom: 0; padding: 10px 0 0; background: var(--fu-fond, #f2f2f7); }
+.vrm-bp-bas[data-bp-progres] { flex-direction: row; align-items: center; flex-wrap: wrap; }
+.vrm-bp-jauge { flex: 1 1 100%; height: 6px; border-radius: 999px; background: var(--fu-case, #e9e9ee); overflow: hidden; }
+.vrm-bp-jauge i { display: block; height: 100%; background: var(--fu-bleu, #0071e3); border-radius: inherit; transition: width .3s ease; }
+@media (prefers-reduced-motion: reduce) { .vrm-bp-jauge i { transition: none; } }
+.vrm-bp-progres { flex: 1; margin: 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-bp-boutons { display: flex; gap: 10px; }
+.vrm-bp-boutons .vrm-ao-principal { flex: 1; }
+.vrm-bp-mode:focus-visible, .vrm-bp-case input:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+
+/* La vue « Qui dorment » : une case par ligne et la barre « Baisser le prix ». */
+.vrm-qd-coche { width: 22px; height: 22px; margin: 0 2px; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-qd-coche-zone { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex: none; cursor: pointer; }
+.vrm-qd-barre { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.vrm-qd-barre .vrm-qd-tout { min-height: 44px; border: 0; background: transparent; color: var(--fu-bleu, #0071e3); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; padding: 0 4px; }
+.vrm-qd-baisser {
+  min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--fu-bleu, #0071e3); color: #fff;
+  font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.vrm-qd-baisser:disabled { opacity: .4; cursor: default; }
+.vrm-qd-baisser:focus-visible, .vrm-qd-tout:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }

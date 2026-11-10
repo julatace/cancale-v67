@@ -144,6 +144,7 @@ import FeuilleLienVc from "./LienVestiaire.jsx";
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
+import './styles-baisse-prix.css';
 import './styles-achats-outils.css';
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
 import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
@@ -227,6 +228,8 @@ const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
 const PreparerColis = aLaDemande(() => import('./PreparerColis.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
 const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
+// (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
+const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // ⟦→ ecrans/Reglages.jsx #10⟧
 // (8 nov., démarrage léger) Écrans sortis d’App.jsx vers src/ecrans/ (découpe mécanique) : chargés
@@ -13603,6 +13606,8 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
   const main = actions.find((x) => x.k === 'main');
   // (6 nov., vague 2 · point 2) « Prix mini… » : un second lien discret (rien ne part chez Vinted).
   const mini = actions.find((x) => x.k === 'mini');
+  // (10 nov., lot C) « Baisser le prix… » : un troisième lien discret (la feuille de baisse en série).
+  const baisser = actions.find((x) => x.k === 'baisser');
   const { tete, parTuile } = raisonCommune(actions);
   // Ce que VRM n'a pas lu : la MÊME phrase sur chaque paire ⇒ une fois, sous la liste.
   const cleNL = (l) => l.join(', ');
@@ -13631,6 +13636,12 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
           <div className="vrm-act-main" data-action-sel="mini" data-action-sel-ok={mini.ok ? 'oui' : 'non'}>
             <Bouton variante="discret" disabled={!mini.ok} title={mini.ok ? mini.desc : mini.raison} onClick={() => { if (mini.ok) onLancer('mini'); }}>{mini.titre}</Bouton>
             <span>{mini.ok ? '« Accepter dès » sur toutes, depuis leur prix.' : mini.raison}</span>
+          </div>
+        ) : null}
+        {baisser ? (
+          <div className="vrm-act-main" data-action-sel="baisser" data-action-sel-ok={baisser.ok ? 'oui' : 'non'}>
+            <Bouton variante="discret" disabled={!baisser.ok} title={baisser.ok ? baisser.desc : baisser.raison} onClick={() => { if (baisser.ok) onLancer('baisser'); }}>{baisser.titre}</Bouton>
+            <span>{baisser.ok ? '−X € ou −X %, une par une, prix relu.' : baisser.raison}</span>
           </div>
         ) : null}
         <div className="vrm-act-verif" data-avant-lancer={nManque}>
@@ -28763,6 +28774,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [repubMainOuvert, setRepubMainOuvert] = useState(null);
   // (6 nov.) Plusieurs annonces « à la main » : traitées une par une ({ liste, i }, « paire 2/5 »).
   const [repubMainFile, setRepubMainFile] = useState(null);
+  // (10 nov., lot C) « Baisser le prix » en série : les annonces cochées (vue « Qui dorment »
+  // ou Sélectionner), et les cases de la vue « Qui dorment » (confort de l'écran, rien d'écrit).
+  const [baisseSel, setBaisseSel] = useState(null);
+  const [qdSel, setQdSel] = useState(() => new Set());
   const [miniSel, setMiniSel] = useState(null);   // (6 nov., vague 2) « Prix mini… » : les annonces cochées // l'annonce republiée à la main (objet de la sélection)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
@@ -32981,6 +32996,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // En ligne (la MÊME base que la grille, `annBase`), masquées (`annMasquees`) et
   // brouillons (la MÊME liste que « Voir mes brouillons », `brVinted`, §11), chacun
   // avec SON compte : un brouillon d'un compte n'est jamais montré sous un autre.
+  // (10 nov., lot C) Une annonce EN LIGNE telle que la feuille « Baisser le prix » la lit :
+  // son identité (id + compte), son N°, son prix LU (euros ; autre devise ⇒ null, rien proposé).
+  const annonceBaisse = (it) => {
+    const uid = String((it && it._acc && it._acc.vinted_user_id) || (it && it._uid) || '');
+    const p = it && it.price; const dev = p && typeof p === 'object' ? String(p.currency_code || p.currency || 'EUR').toUpperCase() : 'EUR';
+    const n = Number(String((p && typeof p === 'object' ? p.amount : p) ?? '').replace(',', '.'));
+    const e = numeros[it.id] || {};
+    return { id: String(it.id), uid, compte: it._acc ? accNameOf(it._acc) : (uid ? `compte ${uid}` : ''), numero: e.numero ? String(e.numero) : '',
+      titre: it.title || '', photo: photoArticle(it) || '', prix: dev === 'EUR' && isFinite(n) && n > 0 ? n : null };
+  };
   const annSelectionnables = useMemo(() => {
     const out = []; const vus = new Set();
     const nomAcc = (acc, uid) => (acc && acc.vinted_user_id ? accNameOf(acc) : '') || (uid ? `compte ${uid}` : 'compte inconnu');
@@ -43577,6 +43602,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
+            selection={qdSel} onSelection={setQdSel} onBaisser={(choisies)=>setBaisseSel(choisies.map(a=>annonceBaisse(a.it)))}
             mode={modeDort} onMode={setModeDort} seuilFavoris={seuilFav} onSeuilFavoris={setSeuilFav} nDort={vueRelancer.dort} nFavoris={vueRelancer.favoris}
             pasLus={modeDort==='favoris' && vueRelancer.favorisPasLus>0 ? `Favoris pas lus sur ${vueRelancer.favorisPasLus} annonce${vueRelancer.favorisPasLus>1?'s':''}.` : ''}
             liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
@@ -47670,6 +47696,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onLancer={(k)=>{ setActionsSelOpen(false);
             if (k==='main') { const a=choisies[0]; if (a) { setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(a); } return; }
             if (k==='mini') { setMiniSel(choisies); return; }
+            // (10 nov., lot C) « Baisser le prix… » : la feuille de baisse en série (rien ne part avant SON clic).
+            if (k==='baisser') { const idx2 = new Map((listings.items||[]).map((it)=>[String((it._acc&&it._acc.vinted_user_id)||'')+':'+String(it.id), it])); setBaisseSel(choisies.filter(a=>a.etat==='en-ligne').map(a=>{ const it=idx2.get(a.uid+':'+a.id); return it ? annonceBaisse(it) : { id:a.id, uid:a.uid, compte:a.compte, numero:a.numero, titre:a.titre, photo:a.photo, prix:null }; })); return; }
             setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
       })()}
       {miniSel && (
@@ -47685,6 +47713,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           toast(n === lignes.length ? `${n} prix mini posé${n>1?'s':''}` : `${n} prix mini posé${n>1?'s':''} · ${lignes.length - n} annonce${lignes.length - n > 1 ? 's' : ''} plus en ligne : rien posé`);
         }}/>
       )}
+      {baisseSel && (()=>{
+        // (10 nov., lot C) « Baisser le prix » en série (src/BaissePrixSerie.jsx, règles src/baissePrix.js).
+        // Promis seulement à une extension 5.336+ de CE navigateur, connectée à CE compte VRM
+        // (`raisonExtGlobale`, capacité `baisseprix`) ; sinon la feuille dit pourquoi et rien ne part.
+        // Chaque baisse : UNE commande `baisserPrixVinted`, la suivante après la réponse.
+        const vc = vintedDeChrome();
+        const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
+        const ownerB = AUTH.user?.id;
+        return <BaissePrixSerie annonces={baisseSel} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
+          plancherDe={(a)=>plancherDeItem(a.id)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
+          onFermer={()=>setBaisseSel(null)}
+          onBaisser={async (l)=>{
+            const r = await vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000);
+            // Le prix RELU (jamais supposé) : l'historique des prix et la liste à l'écran le prennent.
+            if (r && r.accepte && (r.etape==='fait' || r.etape==='ecart') && r.prixVu != null && ownerB && AUTH.user?.id===ownerB) {
+              noterPrix({ uid:l.uid, id:l.id }, { ancien:r.ancien, nouveau:r.prixVu });
+              setListings((x)=>({ ...x, items:Array.isArray(x.items) ? x.items.map((it)=>(String(it.id)===String(l.id) && String((it._acc&&it._acc.vinted_user_id)||'')===String(l.uid))
+                ? { ...it, price: it.price && typeof it.price==='object' ? { ...it.price, amount:String(r.prixVu) } : String(r.prixVu) } : it) : x.items }));
+            }
+            return r;
+          }}
+          onFini={()=>setQdSel(new Set())}/>;
+      })()}
       {repubMainOuvert && (()=>{
         const p = repubMainOuvert; const s = repubMain[String(p.ancienId||p.id)] || null;
         // (6 nov., vague 2 · point 1) Une vente ANNULÉE avant l'envoi (`annulee`) : l'ancienne

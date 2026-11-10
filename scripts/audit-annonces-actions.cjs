@@ -92,7 +92,7 @@ async function auditer(sources) {
     // (6 nov., vague 2) « Prix mini… » (`multiComptes`) n'agit pas au nom d'un compte : une écriture
     // dans ses fiches. Toutes les AUTRES actions restent bloquées par le mélange des comptes.
     // (6 nov.) « à la main » non plus : rien ne part chez Vinted, chaque paire dit son compte.
-    const parCompte = Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'main');
+    const parCompte = Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'main' && x.k !== 'baisser');   // (10 nov.) « Baisser le prix… » : chaque annonce SON compte, la feuille dit « ouvre ce compte »
     dit(parCompte.length >= 4 && parCompte.every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action qui agit au nom d’un compte, les comptes nommés', a.recreer.raison);
     dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison);
     dit(a.main && a.main.ok && a.main.robot === false, 'B19 « à la main » sur deux comptes ⇒ possible, une paire à la fois dans la feuille (rien ne part d’ici)', a.main && a.main.raison); }
@@ -129,6 +129,15 @@ async function auditer(sources) {
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }], '111', (c) => c !== 'recreer');
     dit(!a.recreer.ok && /extension/.test(a.recreer.raison) && a.modifier.ok, 'B14 extension trop ancienne pour une action ⇒ elle seule est grisée'); }
   { const a = L([{ id: '1', uid: '', etat: 'en-ligne' }]); dit(Object.values(a).filter((x) => x.k !== 'mini').every((x) => !x.ok), 'B15 compte inconnu ⇒ rien qui agisse au nom d’un compte'); }
+  // (10 nov., lot C) « Baisser le prix… » : comptes mélangés permis (la feuille dit « ouvre ce compte »
+  // pour ceux qui ne sont pas dans l'onglet), extension 5.336 exigée, seulement des annonces en ligne.
+  { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '222', etat: 'en-ligne' }]);
+    dit(a.baisser && a.baisser.ok && a.baisser.robot === false, 'B23 « Baisser le prix… » sur deux comptes ⇒ la feuille s’ouvre (chaque annonce garde son compte)', a.baisser && a.baisser.raison);
+    const b = L([{ id: '1', uid: '111', etat: 'en-ligne' }], '111', (c) => c !== 'baisseprix');
+    dit(b.baisser && !b.baisser.ok && /extension/.test(b.baisser.raison), 'B24 extension sans `baisseprix` ⇒ « Baisser le prix… » grisé, raison dite', b.baisser && b.baisser.raison);
+    const c = L([{ id: '5', uid: '111', etat: 'brouillon' }]);
+    dit(c.baisser && !c.baisser.ok && /en ligne/.test(c.baisser.raison), 'B25 un brouillon ⇒ « Baisser le prix… » grisé', c.baisser && c.baisser.raison);
+    dit(!R.ACTIONS_TUILES.includes('baisser'), 'B26 « Baisser le prix… » est un lien sous les quatre tuiles, pas une cinquième tuile'); }
   // ── C ──
   dit(JSON.stringify(R.liensRepubMain({ 10000001: { nouvelId: '10000009' }, 10000002: {}, abc: { nouvelId: '1' }, 10000003: { nouvelId: '10000003' } })) === JSON.stringify({ 10000009: '10000001' }), 'C1 seuls les liens qu’il a posés comptent (identifiants valides, jamais elle-même)');
   {
