@@ -90,7 +90,16 @@ ne la lit pas (`uid`) ; ni titre, ni montant, ni acheteur (`audit-a-trancher` §
 
 ## 4. Rouges mesurés
 
-(Remplis à la fin de la session — voir la section « Preuves avant/après ».)
+- **`origin/main`** (arbre `git archive`, banc et audit d'ici copiés dedans, son propre build) :
+  banc **37 rouges / 27 verts** (C 16, G 12 — aucun bouton `[data-a-trancher-ouvrir]`, S 7 —
+  ordre par type et carte « supprimé de Vinted » jamais publiée par la coque, T 2) ; audit :
+  « 9 · le module des cartes existe » rouge.
+- **Mutation 1** — `appliquerTranches` rend l'état tel quel : audit 1 rouge (§9 −1), banc
+  « C geste : la carte sort TOUT DE SUITE » rouge (carte encore là, total 23).
+- **Mutation 2** — `trancherAT` pose comme « avant » la même décision (Annuler ne remet rien) :
+  banc 2 rouges (« Annuler ⇒ la carte revient » ; « Annuler ⇒ la décision est retirée »).
+- Bancs voisins verts sur la branche : `cycle-supprime`, `journee-v2`, `journee-photos`,
+  `journee-coherence`.
 
 ## 5. Ce qui reste / à décider
 
