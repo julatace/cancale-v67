@@ -30,11 +30,12 @@ import {
   contenuFacture, contenuApercu, estTrou, euros, emailValide, LOGO_MAX, MESSAGE_DEFAUT, nomFichier, jourParis,
   adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes,
 } from './facturePro/regle.js';
-import { preuveAcheteur, phraseRefus } from './facturePro/rattachement.js';
+import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/rattachement.js';
+import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriode, trousNumerotation, csvRegistre, totauxRegistre, nomZip } from './facturePro/registre.js';
 import { useRechercheEntreprise, CarteVerifEntreprise } from './RechercheEntreprise.jsx';
 
 const ID_CFG = 'vrm_pro_facture';
-const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true };
+const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true, envoiAuto: false };
 
 // ── Une seule lecture de la fiche pour tout l'écran (trois états) ────────────
 const _ecoutesCfg = new Set(); let _cfg; // undefined en cours · null pas su · objet
@@ -343,7 +344,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           </p>
         </section>
 
-        <EnvoiFacture deps={deps} cfg={cfg} upd={upd} etat={etat}/>
+        <EnvoiFacture deps={deps} cfg={cfg} upd={upd} updPlusieurs={updPlusieurs} etat={etat}/>
 
         <section className="vrm-fp-section">
           <h3>Le message de l'e-mail</h3>
@@ -378,7 +379,29 @@ const AIDE_MDP = {
   icloud: 'iCloud : sur account.apple.com → Connexion et sécurité → Mots de passe pour app.',
   yahoo: 'Yahoo : Sécurité du compte → Générer un mot de passe d’application.',
 };
-function EnvoiFacture({ deps, cfg, upd, etat }) {
+// (10 nov., lot Q) L'ENVOI AUTOMATIQUE — éteint par défaut, allumé seulement par SON geste
+// (confirmé). Il pose `envoiAuto` ET `envoiAutoDepuis` ensemble : les ventes d'avant restent
+// dans « À envoyer ». La pause (fiche incomplète, serveur d'envoi absent…) est dite telle que le
+// serveur l'a écrite, avec le geste qui la lève.
+function EnvoiAuto({ deps, cfg, updPlusieurs, etat }) {
+  const on = autoAllume(cfg);
+  const j = etat && etat.auto;
+  const basculer = async () => {
+    if (on) { updPlusieurs({ envoiAuto: false }); return; }
+    if (!(await deps.askConfirm({ title: 'Envoyer les factures tout seul ?', desc: "Chaque nouvelle vente Pro dont l'acheteur est prouvé reçoit sa facture, sans ton clic. Jamais à une adresse devinée, jamais une vente annulée. Les ventes d'avant restent dans « À envoyer ».", ok: 'Activer' }))) return;
+    updPlusieurs({ envoiAuto: true, envoiAutoDepuis: new Date().toISOString() });
+  };
+  const ratees = j && Array.isArray(j.essais) ? j.essais.filter((e) => e.issue !== 'envoyee') : [];
+  return (
+    <div className="vrm-fp-auto" data-fp-auto={on ? 'on' : 'off'}>
+      <label className="vrm-fp-case"><input type="checkbox" checked={on} onChange={basculer} data-fp-auto-case=""/> <span>Envoyer chaque nouvelle facture tout seul</span></label>
+      {on ? <p className="vrm-fp-muet">Depuis le {jourParis(cfg.envoiAutoDepuis)}{j && j.at ? ` · vérifié le ${jourParis(j.at)} à ${heureParis(j.at)}` : ' · pas encore passé'}.</p> : null}
+      {on && j && j.pause ? <p className="vrm-fp-muet is-ambre" data-fp-auto-pause={j.pause.code}>{j.pause.texte}</p> : null}
+      {on && ratees.length ? <ul className="vrm-fp-journal" data-fp-auto-ratees={ratees.length}>{ratees.slice(0, 5).map((e) => <li key={e.tx} data-fp-journal-etat={e.issue}><b>Vente {e.tx}</b><span>{e.issue === 'pas-prouvee' ? 'pas envoyée' : e.issue === 'incertaine' ? 'envoi incertain' : 'pas envoyée'} · {e.raison}</span></li>)}</ul> : null}
+    </div>
+  );
+}
+function EnvoiFacture({ deps, cfg, upd, updPlusieurs, etat }) {
   const [proprio, setProprio] = React.useState(false);
   React.useEffect(() => { let m = false; if (deps.lireProprietaire) Promise.resolve(deps.lireProprietaire()).then((v) => { if (!m) setProprio(v === true); }).catch(() => {}); return () => { m = true; }; }, [deps]);
   const par = cfg.envoiPar === 'boite' ? 'boite' : 'vrm';
@@ -401,13 +424,14 @@ function EnvoiFacture({ deps, cfg, upd, etat }) {
           : etat === null ? <p className="vrm-fp-muet">L'état de l'envoi n'a pas pu être lu. Rouvre cet écran dans un moment.</p>
           : <div className="vrm-fp-vrm" data-fp-vrm={v && v.pret ? 'pret' : 'ferme'}>
             {v && v.pret
-              ? <p className="vrm-fp-boite-ok"><b>Prêt</b><span>Au plus {v.plafond} factures par jour{Number.isInteger(v.aujourdhui) ? ` (${v.aujourdhui} aujourd'hui)` : ''}. Chaque envoi part sur ton clic, confirmé.</span></p>
+              ? <p className="vrm-fp-boite-ok"><b>Prêt</b><span>Au plus {v.plafond} factures par jour{Number.isInteger(v.aujourdhui) ? ` (${v.aujourdhui} aujourd'hui)` : ''}.</span></p>
               : <p className="vrm-fp-boite-ok"><b>L'envoi par VRM n'est pas encore ouvert</b><span>{proprio
                 ? `Geste du propriétaire : poser sur Vercel ${(v && v.manque && v.manque.length ? v.manque : ['RELANCES_SMTP_HOTE', 'RELANCES_SMTP_UTILISATEUR', 'RELANCES_SMTP_MOT_DE_PASSE', 'RELANCES_EXPEDITEUR']).join(', ')} (docs/ouvrir-aux-clients.md, étape 2b), puis redéployer.`
                 : "En attendant, choisis « Depuis ma propre boîte », ou partage le PDF depuis la vente."}</span></p>}
             {!emailValide(cfg.email) ? <p className="vrm-fp-muet" data-fp-manque-email="">Ajoute ton e-mail plus haut : VRM le met en copie et en « répondre à ».</p> : null}
           </div>
       ) : <BoiteEnvoi deps={deps} cfg={cfg} upd={upd}/>}
+      {updPlusieurs ? <EnvoiAuto deps={deps} cfg={cfg} updPlusieurs={updPlusieurs} etat={etat}/> : null}
     </section>
   );
 }
@@ -478,7 +502,7 @@ export function relireFactures(deps) {
     const [ventes, profils, factures] = await Promise.all([
       deps.lireTout('id=like.email_sale_*&data->>pro=eq.true&select=transaction:data->>transaction,nom:data->>nomComplet,adresse:data->>adresse,email:data->>email,account:data->>account,designation:data->>designation,prix:data->>prix,receivedAt:data->>receivedAt,uid:data->>uid', { strict: true }),
       deps.lireTout('id=like.harvest_*_profile&select=id,uid:data->>uid,business:data->payload->user->business,business_account_id:data->payload->user->business_account_id,business_account:data->payload->user->business_account'),
-      deps.lireTout('id=like.email_invoice_*&select=id,numero:data->>number,status:data->>status,transaction:data->>transaction,emiseLe:data->>emiseLe,envoi:data->envoi,envois:data->envois,retour:data->>retourNom,annuleePar:data->>annuleePar,type:data->>type,buyerEmail:data->>buyerEmail,acheteur:data->contenu->acheteur->>nom,ttc:data->contenu->totaux->>ttc,preuve:data->preuve->>tx', { strict: true }),
+      deps.lireTout('id=like.email_invoice_*&select=id,numero:data->>number,status:data->>status,transaction:data->>transaction,emiseLe:data->>emiseLe,envoi:data->envoi,envois:data->envois,retour:data->>retourNom,annuleePar:data->>annuleePar,type:data->>type,buyerEmail:data->>buyerEmail,acheteur:data->contenu->acheteur->>nom,ttc:data->contenu->totaux->>ttc,ht:data->contenu->totaux->>ht,tva:data->contenu->totaux->>tva,regime:data->contenu->>regime,emiseJour:data->contenu->>emiseJour,venteJour:data->contenu->>venteJour,designation:data->contenu->lignes->0->>designation,origine:data->>origine,preuve:data->preuve->>tx', { strict: true }),
     ]);
     const v = Array.isArray(ventes) && Array.isArray(factures) ? (() => {
       // Les e-mails de vente Pro PAR n° de transaction (une LISTE : deux e-mails au
@@ -495,6 +519,8 @@ export function relireFactures(deps) {
           return [uid, deps.typeCompteVinted({ user: { business: r.business, business_account_id: r.business_account_id, business_account: r.business_account } })];
         }).filter(([u, t]) => u && typeof t === 'boolean')),
         avoirs: new Map(factures.filter((x) => x && x.transaction && /^email_invoice_av/.test(x.id)).map((x) => [String(x.transaction), x])),
+        // (10 nov., lot Q) Toutes les lignes (registre, trous de la numérotation).
+        toutes: factures.filter(Boolean),
       };
     })() : null;
     _donnees = v; _enCours = null;
@@ -724,39 +750,194 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
   );
 }
 
+
 // ════════════════════════════════════════════════════════════════════════════
-//  LA LISTE DES FACTURES ÉMISES (Comptabilité → Factures)
+//  (10 nov., lot Q) « À ENVOYER » — les ventes Pro sans facture envoyée
 // ════════════════════════════════════════════════════════════════════════════
+// La règle : src/facturePro/registre.js (`listeAEnvoyer`, la même que l'envoi
+// automatique du serveur). Prouvée ⇒ elle part (une par une, ou « Tout envoyer »
+// confirmé) ; pas prouvée ⇒ la raison, aucun bouton ; vente annulée avec une
+// facture ⇒ l'avoir est PROPOSÉ (son clic). Les ventes Vinted viennent de la coque
+// (`useVentesCoque`, déjà lues) : aucune lecture de plus.
+const JOURS_COMPTE_PRO = 30;
+function commandesDeCoque(ventes) {
+  if (ventes === undefined) return undefined;
+  if (!Array.isArray(ventes)) return null;
+  const m = new Map();
+  for (const o of ventes) {
+    if (!o || o.transaction_id == null) continue;
+    const k = String(o.transaction_id);
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push({ transaction_id: k, date: o.date || null, price: o.price || null, status: o.status || '', uid: String((o._acc && o._acc.vinted_user_id) || o._uid || ''), title: o.title || '', compte: (o._acc && o._acc.login) || '' });
+  }
+  return m;
+}
+const motEtat = (it) => (it.etat === 'a-envoyer' ? (it.emise ? `Facture ${it.numero}, pas envoyée` : 'Acheteur prouvé')
+  : it.etat === 'a-annuler' ? `Vente annulée · facture ${it.numero}`
+  : it.etat === 'lecture' ? 'Lecture…'
+  : it.raison ? it.raison.replace(/^acheteur pas prouvé : /, 'Pas prouvé : ') : '');
+export function FacturesAEnvoyer({ deps }) {
+  const d = useFactures(deps);
+  const cfg = useFicheFacturation(deps);
+  const etat = useEtatEnvoi(deps);
+  const coque = deps.useVentesCoque ? deps.useVentesCoque() : { ventes: undefined };
+  const [ouverte, setOuverte] = React.useState(null);
+  const [fiche, setFiche] = React.useState(null);
+  const [lot, setLot] = React.useState(null);
+  const [msg, setMsg] = React.useState(null);
+  const commandesParTx = React.useMemo(() => commandesDeCoque(coque.ventes), [coque.ventes]);
+  const liste = React.useMemo(() => {
+    if (!d) return null;
+    const enPlus = [];
+    if (commandesParTx) {
+      const limite = Date.now() - JOURS_COMPTE_PRO * 86400000;
+      for (const [tx, cs] of commandesParTx) { const c = cs[0]; if (c && d.comptesPro.get(c.uid) === true && (Date.parse(c.date || '') || 0) >= limite) enPlus.push(tx); }
+    }
+    return listeAEnvoyer({ ventesPro: d.ventesPro, factures: d.factures, avoirs: d.avoirs, commandesParTx, classer: deps.classifyOrderStatus || (() => 'pending'), adresseLisible: adresseVintedLisible, txsEnPlus: enPlus });
+  }, [d, commandesParTx, deps]);
+  if (d === undefined || cfg === undefined) return null;
+  if (d === null) return <p className="vrm-fp-muet">Tes ventes Pro n'ont pas pu être lues — réessaie dans un instant.</p>;
+  if (!liste || !liste.length) return null;
+  const prets = liste.filter((x) => x.etat === 'a-envoyer');
+  const mv = cfg ? manquantsVendeur(cfg) : [];
+  const bloque = bloqueEnvoi(cfg, etat);
+  const toutEnvoyer = async () => {
+    if (!(await deps.askConfirm({ title: `Envoyer ${prets.length} facture${prets.length > 1 ? 's' : ''} ?`, desc: `Chacune à SON acheteur prouvé${cfg && cfg.envoiPar === 'boite' ? '' : ', par VRM, toi en copie'}. Elles reçoivent leur numéro définitif.`, ok: 'Tout envoyer' }))) return;
+    setMsg(null); let parties = 0; const ratees = [];
+    for (let i = 0; i < prets.length; i++) {
+      const it = prets[i]; setLot({ i: i + 1, n: prets.length });
+      if (!it.emise) {
+        const r = await route(deps, { action: 'emettre', confirme: true, tx: it.tx, compte: it.compte || '' });
+        if (r.code !== 200) { ratees.push(`${it.tx} : ${r.j.manquants ? `il manque ${r.j.manquants.map((m) => m.l).join(', ')}` : (r.j.message || 'pas émise')}`); if (r.code === 503 || r.j.manquants) break; continue; }
+      }
+      const r2 = await route(deps, { action: 'envoyer', confirme: true, tx: it.tx });
+      if (r2.j.issue === 'envoye') { parties++; continue; }
+      ratees.push(`${it.tx} : ${(r2.j.envoi && r2.j.envoi.message) || r2.j.message || 'pas envoyée'}`);
+      if (r2.code === 429 || r2.code === 503 || r2.code === 0) break;
+    }
+    setLot(null);
+    setMsg({ ko: ratees.length > 0, t: `${parties} envoyée${parties > 1 ? 's' : ''}${ratees.length ? ` · ${ratees.length} pas envoyée${ratees.length > 1 ? 's' : ''} — ${ratees.join(' · ')}` : ''}.` });
+    relireFactures(deps); relireEtatEnvoi(deps);
+  };
+  const faireAvoir = async (it) => {
+    if (!(await deps.askConfirm({ title: `Annuler la facture ${it.numero} ?`, desc: 'La vente est annulée sur Vinted. VRM émet un avoir numéroté qui annule la facture ; la facture reste dans ta comptabilité.', ok: "Émettre l'avoir", danger: true }))) return;
+    const r = await route(deps, { action: 'avoir', confirme: true, tx: it.tx });
+    setMsg(r.code === 200 ? { t: `Avoir ${r.j.avoir.numero} émis.` } : { ko: true, t: r.j.message || "L'avoir n'a pas pu être émis." });
+    relireFactures(deps);
+  };
+  const venteDe = (it) => { const cs = (commandesParTx && commandesParTx.get(it.tx)) || []; return { tx: it.tx, uid: cs[0] ? cs[0].uid : undefined, compte: (cs[0] && cs[0].compte) || it.compte || '', titre: it.designation, venteLe: it.venteLe, commandes: cs }; };
+  let geste = null;
+  if (prets.length) {
+    geste = mv.length ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque="fiche" onClick={() => setFiche(mv[0].champ)}>Compléter ma fiche</button>
+      : bloque && bloque.champ ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque={bloque.champ} onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button>
+      : <button type="button" className="vrm-b vrm-b-primaire" data-fp-tout-envoyer={prets.length} disabled={!!lot || !!bloque} onClick={toutEnvoyer}>{lot ? `Envoi ${lot.i}/${lot.n}…` : `Tout envoyer (${prets.length})`}</button>;
+  }
+  return (
+    <section className="vrm-fp-section vrm-fp-a-envoyer" data-fp-a-envoyer={liste.length} data-fp-prets={prets.length}>
+      <div className="vrm-fp-tete-ligne"><h3>À envoyer</h3>{geste}</div>
+      {prets.length && mv.length ? <p className="vrm-fp-muet is-ambre" data-fp-manque-fiche={mv.length}>Il manque {mv.map((m) => m.l).join(', ')}.</p> : null}
+      {prets.length && !mv.length && bloque && bloque.texte ? <p className="vrm-fp-muet is-ambre" data-fp-bloque="">{bloque.texte}</p> : null}
+      <ul className="vrm-fp-rangees">
+        {liste.map((it) => {
+          const peutOuvrir = it.etat === 'a-envoyer' || it.etat === 'a-verifier' || it.etat === 'sans-preuve';
+          const corps = <span className="vrm-fp-rangee-txt"><b>{it.designation || `Vente ${it.tx}`}</b><span>{it.venteLe ? `${jourParis(it.venteLe)} · ` : ''}{motEtat(it)}</span></span>;
+          return <li key={it.tx} data-fp-a-envoyer-tx={it.tx} data-fp-a-envoyer-etat={it.etat} data-fp-preuve={it.code || (it.etat === 'a-envoyer' ? 'ok' : '')}>
+            {peutOuvrir ? <button type="button" className="vrm-fp-rangee is-chevron" onClick={() => setOuverte(it)}>{corps}</button>
+              : <div className="vrm-fp-rangee">{corps}{it.etat === 'a-annuler' ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-proposer-avoir={it.tx} onClick={() => faireAvoir(it)}>Émettre l'avoir</button> : null}</div>}
+          </li>;
+        })}
+      </ul>
+      {msg ? <p className={`vrm-fp-retour-msg${msg.ko ? ' is-ko' : ''}`} role="status" data-fp-lot={msg.ko ? 'ko' : 'ok'}>{msg.t}</p> : null}
+      {ouverte ? <FeuilleFactureVente vente={venteDe(ouverte)} preuve={ouverte.preuve || null} facture={d.factures.get(ouverte.tx) || null} avoir={d.avoirs.get(ouverte.tx) || null} deps={deps} fermer={() => setOuverte(null)}/> : null}
+      {fiche ? <Feuille titre="Ma facture" fermer={() => { setFiche(null); relireEtatEnvoi(deps); }} deps={deps} large data={{ 'data-fp-feuille-fiche': '' }}><FicheFacturation deps={deps} focus={fiche} surPrete={() => setFiche(null)}/></Feuille> : null}
+    </section>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (10 nov., lot Q) LE REGISTRE DES FACTURES — une période, et son zip (PDF + CSV)
+// ════════════════════════════════════════════════════════════════════════════
+// Factures ET avoirs émis, dans l'ordre d'émission ; les trous de la numérotation
+// sont DITS (un n° pris sans pièce) ; une facture émise ne se supprime jamais (il n'y
+// a aucun geste pour ça) : elle s'annule par un avoir. Le zip : chaque PDF (le même
+// instantané que celui envoyé) + le registre en CSV ; une pièce illisible ⇒ AUCUN zip
+// (jamais un zip partiel présenté comme complet).
+async function lireContenus(deps, ids) {
+  const out = new Map();
+  for (let i = 0; i < ids.length; i += 25) {
+    const part = ids.slice(i, i + 25);
+    const r = await deps.lireTout(`id=in.(${part.map(encodeURIComponent).join(',')})&select=id,contenu:data->contenu`, { strict: true });
+    if (!Array.isArray(r)) return null;
+    for (const x of r) if (x && x.contenu) out.set(x.id, x.contenu);
+  }
+  return out;
+}
+function telecharger(octets, nom, type) {
+  const url = URL.createObjectURL(new Blob([octets], { type }));
+  const a = document.createElement('a'); a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+const libelleMois = (m) => { try { const t = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${m}-15T12:00:00Z`)); return t.charAt(0).toUpperCase() + t.slice(1); } catch (_) { return m; } };
 export function ListeFacturesPro({ deps }) {
   const d = useFactures(deps);
   const [occupe, setOccupe] = React.useState('');
+  const [periode, setPeriode] = React.useState('');
+  const [msg, setMsg] = React.useState(null);
+  const tout = React.useMemo(() => (d ? lignesRegistre(d.toutes) : []), [d]);
+  const per = React.useMemo(() => periodesRegistre(tout), [tout]);
+  const trous = React.useMemo(() => (d ? trousNumerotation(d.toutes) : null), [d]);
   if (d === undefined) return null;
   if (d === null) return <p className="vrm-fp-muet">Tes factures Pro n'ont pas pu être lues — réessaie dans un instant.</p>;
-  const lignes = [...d.factures.values(), ...d.avoirs.values()].filter((x) => x.emiseLe)
-    .sort((a, b) => String(b.numero).localeCompare(String(a.numero), 'fr', { numeric: true }));
-  const attente = [...d.ventesPro.keys()].filter((tx) => !(d.factures.get(tx) && d.factures.get(tx).emiseLe)).length;
+  const p = periode || per.mois[0] || '';
+  const lignes = p ? tout.filter((l) => dansPeriode(l, p)) : [];
+  const tot = totauxRegistre(lignes);
+  const manquants = trous ? [...trous.facture.manquants.map((n) => ({ n, s: 'facture' })), ...trous.avoir.manquants.map((n) => ({ n, s: 'avoir' }))] : [];
   const ouvrir = async (x) => {
     setOccupe(x.id);
     const c = await lireContenu(deps, x.id); setOccupe('');
     if (!c) { deps.toast("Le PDF n'a pas pu être lu — réessaie."); return; }
     ouvrirPdf(c, deps);
   };
+  const exporter = async () => {
+    setOccupe('zip'); setMsg(null);
+    try {
+      const contenus = await lireContenus(deps, lignes.map((l) => l.id));
+      const manque = contenus ? lignes.filter((l) => !contenus.has(l.id)) : lignes;
+      if (manque.length) { setMsg({ ko: true, t: `${manque.length} pièce${manque.length > 1 ? 's' : ''} pas lue${manque.length > 1 ? 's' : ''} : rien n'a été téléchargé. Réessaie.` }); return; }
+      const [{ pdfFacture }, { zipStocke }] = await Promise.all([import('./facturePro/pdf.js'), import('./exportDonnees.js')]);
+      const fichiers = [{ nom: `Registre-factures-${p}.csv`, texte: csvRegistre(lignes) }];
+      for (const l of lignes) { const c = contenus.get(l.id); fichiers.push({ nom: nomFichier(c), octets: new Uint8Array(await pdfFacture(c)) }); }
+      telecharger(zipStocke(fichiers), nomZip(p), 'application/zip');
+      setMsg({ t: `Zip prêt : ${lignes.length} pièce${lignes.length > 1 ? 's' : ''} et le registre.` });
+    } catch (_) { setMsg({ ko: true, t: "Le zip n'a pas pu être fabriqué : rien n'a été téléchargé." }); } finally { setOccupe(''); }
+  };
   return (
-    <section className="vrm-fp-section" data-fp-liste={lignes.length}>
-      <h3>Factures Pro émises</h3>
-      {attente ? <p className="vrm-fp-muet" data-fp-attente={attente}>{attente === 1 ? '1 vente Pro attend sa facture' : `${attente} ventes Pro attendent leur facture`} : dans Ventes, touche « Envoyer la facture » à côté de la vente.</p> : null}
-      {!lignes.length ? <p className="vrm-fp-muet">Aucune facture émise pour l'instant.</p> : (
+    <section className="vrm-fp-section vrm-fp-registre" data-fp-liste={tout.length} data-fp-registre-periode={p} data-fp-registre-n={lignes.length}>
+      <div className="vrm-fp-tete-ligne">
+        <h3>Registre des factures</h3>
+        {tout.length ? <select className="vrm-fp-periode" aria-label="Période" value={p} onChange={(e) => { setPeriode(e.target.value); setMsg(null); }} data-fp-periode="">
+          {per.mois.map((m) => <option key={m} value={m}>{libelleMois(m)}</option>)}
+          {per.ans.map((a) => <option key={a} value={a}>Année {a}</option>)}
+        </select> : null}
+      </div>
+      {manquants.length ? <p className="vrm-fp-muet is-ambre" data-fp-trous={manquants.length}>Numéro{manquants.length > 1 ? 's' : ''} pris sans pièce : {manquants.slice(0, 8).map((x) => `${x.s === 'avoir' ? 'avoir ' : ''}n° ${x.n}`).join(', ')}{manquants.length > 8 ? '…' : ''}.</p> : null}
+      {!tout.length ? <p className="vrm-fp-muet">Aucune facture émise pour l'instant.</p> : <>
         <ul className="vrm-fp-liste">
           {lignes.map((x) => {
-            const e = x.envoi; const av = /^email_invoice_av/.test(x.id);
+            const e = x.envoi;
             const etat = x.annuleePar ? `annulée (${x.annuleePar})` : !e ? 'pas envoyée' : e.etat === 'envoyee' ? `envoyée le ${jourParis(e.at)}` : e.etat === 'incertaine' ? 'envoi incertain' : e.etat === 'en-cours' ? 'envoi en cours' : 'pas envoyée';
-            return <li key={x.id}><button type="button" disabled={occupe === x.id} onClick={() => ouvrir(x)} data-fp-ligne={x.numero}>
-              <b>{x.numero}</b><span>{av ? 'Avoir · ' : ''}<span className="vrm-sensible" data-stream-type="acheteur">{x.acheteur || '—'}</span> · {jourParis(x.emiseLe)} · {etat}</span>
-              <em>{x.ttc != null && x.ttc !== '' ? euros(Number(x.ttc)) : '—'}</em>
+            return <li key={x.id}><button type="button" disabled={occupe === x.id} onClick={() => ouvrir(x)} data-fp-ligne={x.numero} data-fp-ligne-type={x.avoir ? 'avoir' : 'facture'}>
+              <b>{x.numero}</b><span>{x.avoir ? `Avoir de ${x.origine} · ` : ''}<span className="vrm-sensible" data-stream-type="acheteur">{x.acheteur || '—'}</span> · {x.emiseJour} · {etat}</span>
+              <em>{x.ttc != null ? euros(x.ttc) : '—'}</em>
             </button></li>;
           })}
         </ul>
-      )}
+        <div className="vrm-fp-registre-pied">
+          <span data-fp-registre-total={tot.ttc}>{tot.n} pièce{tot.n > 1 ? 's' : ''} · <b className="vrm-fp-chiffre">{tot.inconnus ? `au moins ${euros(tot.ttc)}` : euros(tot.ttc)}</b></span>
+          <button type="button" className="vrm-b vrm-b-secondaire" disabled={!lignes.length || !!occupe} onClick={exporter} data-fp-export-zip="">{occupe === 'zip' ? 'Préparation…' : 'Exporter (zip)'}</button>
+        </div>
+      </>}
+      {msg ? <p className={`vrm-fp-retour-msg${msg.ko ? ' is-ko' : ''}`} role="status" data-fp-zip={msg.ko ? 'ko' : 'ok'}>{msg.t}</p> : null}
     </section>
   );
 }
