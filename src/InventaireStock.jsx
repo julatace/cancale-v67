@@ -195,7 +195,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
     if (t === '⌫') { setTexte((x) => x.slice(0, -1)); return; }
     setTexte((x) => (x.length >= 12 ? x : (t === 'B' ? (/^[A-Za-z]*$/.test(x) && x.length < 3 ? x + 'B' : x) : x + t)));
   };
-  const scanne = (brut) => { const n = numeroDuScan(brut, cle); if (!n) { setDernier({ s: String(brut || '').slice(0, 24), j: { etat: 'illisible' } }); vibrer('illisible'); return false; } valider(n); return true; };
+  const scanne = (brut) => { const n = numeroDuScan(brut, cle); if (!n) { setDernier({ s: String(brut || '').slice(0, 20), j: { etat: 'illisible' } }); vibrer('illisible'); return false; } valider(n); return true; };
   const voix = (t) => { const r = requeteDeLaVoix(t); if (r.numero) valider(r.requete); else setDernier({ s: String(t || ''), j: { etat: 'illisible' } }); };
 
   // ── ce qui manque aux lectures, NOMMÉ (pas su ≠ manque) ─────────────────────

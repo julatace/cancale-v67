@@ -61,3 +61,6 @@ p.vrm-ia-sous { margin-top: 6px; font-size: 13px; }
 }
 .vrm-ia-entree > span:last-child { font-size: 22px; color: var(--vrm-muted, #6E6E73); }
 .vrm-ia-entree:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent, #0071E3)); outline-offset: 2px; }
+/* Un code qui n'est pas un N° (souvent long, lu par la caméra) : sur toute la largeur, jamais écrasé. */
+.vrm-inv-retour[data-inv-retour="illisible"] > span { grid-column: 1 / -1; grid-row: auto; }
+.vrm-inv-retour[data-inv-retour="illisible"] .vrm-inv-retour-n { font-size: 17px; overflow-wrap: anywhere; color: var(--vrm-muted); }
