@@ -63,7 +63,7 @@ export const SOURCES = [
   { cle: 'comptes-a-relire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'compte', 'comptes')} à relire`,
     pourquoi: 'leurs ventes datent de plus d’un jour', geste: { libelle: 'Mes comptes', tab: 'vintedaccounts' } },
   { cle: 'ventes-a-dater', ecran: 'Ventes', quoi: (n) => `${n} ${pl(n, 'vente', 'ventes')} à dater`,
-    pourquoi: 'sans date de versement : dans aucun mois déclaré', geste: { libelle: 'Voir', tab: 'compta' } },
+    pourquoi: 'sans date de versement : dans aucun mois déclaré', geste: { libelle: 'Dater', tab: 'compta', clic: '[data-urssaf-dater]' } },
 ];
 // Le nom d'une source quand son nombre n'est pas su (sans nombre dans la phrase).
 export const NOMS = {
@@ -99,17 +99,44 @@ export function comptesARelireDe(ls) {
 const lireBrut = (storage) => { try { const t = storage.getItem(CLE_A_TRANCHER); const v = t ? JSON.parse(t) : null; return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 // Rend true si la ligne a changé. `n` non entier ⇒ rien n'est écrit (pas su ne
 // s'écrit jamais : il garde la dernière valeur lue, qui vieillira).
-export function publierSource(storage, uid, cle, n, maintenant = Date.now()) {
+// (10 nov., cartes) `ex` (facultatif) : les premières CHOSES de ce nombre, telles que
+// l'écran propriétaire les a sous les yeux — { id, num, photo, photo2, de } seulement
+// (`exemplesPropres` : aucun titre, aucun montant, rien de l'acheteur) ; la photo est
+// celle de L'ANNONCE elle-même (son identité, §5), jamais une ressemblance.
+export function publierSource(storage, uid, cle, n, maintenant = Date.now(), ex = undefined) {
   if (!storage || !uid || !CLES_SOURCES.includes(cle)) return false;
   if (!(Number.isInteger(n) && n >= 0)) return false;
   const brut = lireBrut(storage);
   const s = brut && brut.uid === String(uid) && brut.s && typeof brut.s === 'object' ? { ...brut.s } : {};
   const avant = s[cle];
-  // Même nombre et publié il y a moins d'une heure : rien (pas d'écriture à chaque rendu).
-  if (avant && avant.n === n && maintenant - Number(avant.at) < 3600e3) return false;
-  s[cle] = { n, at: maintenant };
+  const exP = ex === undefined ? (avant && avant.n === n ? exemplesPropres(avant.ex) : []) : exemplesPropres(ex);
+  const memeEx = JSON.stringify(exP) === JSON.stringify(exemplesPropres(avant && avant.ex));
+  // Même nombre, mêmes choses, publié il y a moins d'une heure : rien (pas d'écriture à chaque rendu).
+  if (avant && avant.n === n && memeEx && maintenant - Number(avant.at) < 3600e3) return false;
+  s[cle] = { n, at: maintenant, ...(exP.length && n > 0 ? { ex: exP } : {}) };
   try { storage.setItem(CLE_A_TRANCHER, JSON.stringify({ uid: String(uid), s })); } catch (_) { return false; }
   return true;
+}
+// Les choses publiées : au plus EX_MAX, champs bornés ; une photo n'est gardée que si
+// c'est une adresse https (ou une image `data:image/`). Rien d'autre ne passe.
+export const EX_MAX = 4;
+const court = (v, max) => (v == null ? '' : String(v).trim().slice(0, max));
+const photoPropre = (v) => (typeof v === 'string' && v.length <= 2000 && (/^https:\/\/[^\s"'<>]+$/.test(v) || /^data:image\/(png|jpeg|jpg|webp|svg\+xml)[;,]/.test(v)) ? v : '');
+export function exemplesPropres(ex) {
+  if (!Array.isArray(ex)) return [];
+  const out = []; const vus = new Set();
+  for (const x of ex) {
+    if (!x || typeof x !== 'object') continue;
+    const id = court(x.id, 64); if (!id || vus.has(id)) continue; vus.add(id);
+    const e = { id };
+    const num = court(x.num, 12); if (num) e.num = num;
+    const ph = photoPropre(x.photo); if (ph) e.photo = ph;
+    const ph2 = photoPropre(x.photo2); if (ph2) e.photo2 = ph2;
+    const de = court(x.de, 12); if (de) e.de = de;
+    out.push(e);
+    if (out.length >= EX_MAX) break;
+  }
+  return out;
 }
 export function lirePublications(storage, uid) {
   const brut = lireBrut(storage);
@@ -121,7 +148,7 @@ const etatPub = (p, frais, maintenant, ecran) => {
   if (!p || !Number.isFinite(Number(p.at))) return { n: null, raison: `pas encore compté sur cet appareil : ouvre ${ecran}` };
   const age = maintenant - Number(p.at);
   if (age > frais) return { n: null, raison: `compté il y a ${ilYa(age)} : ouvre ${ecran} pour le recompter` };
-  return { n: Number(p.n), raison: '' };
+  return { n: Number(p.n), raison: '', ex: exemplesPropres(p.ex) };
 };
 
 // ── les lignes ──────────────────────────────────────────────────────────────────
@@ -146,7 +173,7 @@ export function lignesATrancher({ pubs = {}, colisRetirer = null, urssafMois = n
     } else {
       e = etatPub(pubs[src.cle], FRAIS_MS, maintenant, src.ecran);
     }
-    return { cle: src.cle, nom: NOMS[src.cle] || src.cle, ordre, n: e.n, raison: e.raison, quoi: Number(e.n) > 0 ? src.quoi(e.n) : '', pourquoi: src.pourquoi, geste: src.geste, ecran: src.ecran, noms: e.noms || null };
+    return { cle: src.cle, nom: NOMS[src.cle] || src.cle, ordre, n: e.n, raison: e.raison, quoi: Number(e.n) > 0 ? src.quoi(e.n) : '', pourquoi: src.pourquoi, geste: src.geste, ecran: src.ecran, noms: e.noms || null, ex: Number(e.n) > 0 && Array.isArray(e.ex) ? e.ex.slice(0, Number(e.n)) : [] };
   });
   const sues = lignes.filter((l) => Number.isInteger(l.n));
   const total = sues.reduce((t, l) => t + l.n, 0);
@@ -159,3 +186,106 @@ export const badgeATrancher = (r) => (r && r.total > 0 ? r.total : null);
 // La ligne de Ma journée : seulement s'il y a quelque chose à trancher.
 export const phraseJournee = (r) => (r && r.total > 0
   ? `${r.partiel ? 'Au moins ' : ''}${r.total} ${r.total > 1 ? 'choses' : 'chose'} à trancher` : '');
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  (10 nov., « Améliore ça » — moins de texte, du visuel) LES CARTES
+// ══════════════════════════════════════════════════════════════════════════════
+//  UNE carte par doute quand l'écran propriétaire a publié ses choses (`ex` : photo
+//  de l'annonce par identité, N°), sinon UNE carte par source avec son nombre. Une
+//  question de 12 mots au plus ; un geste : deux boutons quand le geste est binaire
+//  ET interne à VRM (annulable 5 s), sinon UN bouton qui OUVRE l'endroit où il se
+//  fait. Les doutes groupés par type (un titre court, un compte). Rien n'est décidé
+//  ici : les nombres et leurs règles sont ceux de `lignesATrancher`.
+export const TYPES = [
+  { type: 'numeros', titre: 'Numéros', cles: ['numeros-double', 'numeros-a-ecrire', 'numeros-a-verifier'] },
+  { type: 'colis', titre: 'Colis', cles: ['colis-postes', 'colis-retirer', 'sms-vestiaire', 'sms-pickup'] },
+  { type: 'paires', titre: 'Paires', cles: ['supprimes-vinted', 'remise-en-ligne', 'achats-sans-prix'] },
+  { type: 'comptes', titre: 'Comptes', cles: ['adresses-sans-compte', 'comptes-a-relire'] },
+  { type: 'compta', titre: 'Compta', cles: ['ventes-a-dater'] },
+];
+// La question : `n` (carte d'une source, le nombre est dans la vignette) ou `x` (une chose).
+export const QUESTIONS = {
+  'numeros-double': { n: () => 'N° portés par deux paires', x: () => 'Deux paires sous ce N°' },
+  'colis-postes': { n: (n) => (n > 1 ? 'Colis cochés « posté », pas vus partir' : 'Colis coché « posté », pas vu partir') },
+  'colis-retirer': { n: () => 'Colis à retirer : à vérifier' },
+  'numeros-a-ecrire': { n: () => 'Nouveaux N° à écrire sur leur carton', x: () => 'Écris ce N° sur son carton' },
+  'numeros-a-verifier': { n: () => 'N° à vérifier sur leur carton', x: () => 'Vérifie ce N° sur son carton' },
+  'sms-vestiaire': { n: (n) => (n > 1 ? 'Ventes Vestiaire reçues par SMS, à relier' : 'Vente Vestiaire reçue par SMS, à relier') },
+  'sms-pickup': { n: () => 'Colis Pickup reçus par SMS, sans code' },
+  'supprimes-vinted': { n: () => 'Supprimés de Vinted : encore chez toi ?', x: () => 'Supprimée de Vinted. Encore chez toi ?' },
+  'remise-en-ligne': { n: () => 'Remises en ligne : même paire ?', x: (x) => (x.de ? `Remise en ligne : même paire que N°${x.de} ?` : 'Remise en ligne : même paire qu’une ancienne ?') },
+  'achats-sans-prix': { n: () => 'Annonces sans prix d’achat', x: () => 'Prix d’achat pas saisi' },
+  'adresses-sans-compte': { n: (n) => (n > 1 ? 'Adresses e-mail sans compte relié' : 'Adresse e-mail sans compte relié') },
+  'comptes-a-relire': { n: (n) => (n > 1 ? 'Comptes à relire sur Vinted' : 'Compte à relire sur Vinted') },
+  'ventes-a-dater': { n: (n) => (n > 1 ? 'Ventes sans date de versement' : 'Vente sans date de versement') },
+};
+// Les gestes BINAIRES faits ici même : internes à VRM, réversibles (« Annuler » 5 s),
+// sur UNE chose désignée par son identité. « Non » n'écrit rien : il ouvre l'écran
+// où se disent les autres réponses. Seul « toujours chez moi » l'est aujourd'hui
+// (la même écriture que la pilule de Ma journée, `vrm_cycle_decisions`) ; une
+// remise en ligne « même paire » CHANGE un N° (§5) : elle reste dans Annonces.
+export const BINAIRES = {
+  'supprimes-vinted': { oui: 'Oui, chez moi', non: 'Non' },
+};
+export const PAR_SOURCE = 3;     // au plus 3 cartes par source, le reste « + N »
+export const MOTS_MAX = 12;
+export const mots = (t) => String(t || '').replace(/[«»?.:,;!]/g, ' ').split(/\s+/).filter(Boolean).length;
+// La cible d'UNE chose dans l'écran propriétaire, quand il la marque (sinon le bloc).
+const CIBLE_CHOSE = { 'remise-en-ligne': (x) => `[data-remise-ligne="${String(x.id).replace(/"/g, '')}"]` };
+export function cartesATrancher(etat, { parSource = PAR_SOURCE } = {}) {
+  if (!etat || !Array.isArray(etat.lignes)) return { groupes: [], total: 0, partiel: false, manque: [] };
+  const parCle = new Map(etat.lignes.map((l) => [l.cle, l]));
+  const groupes = [];
+  for (const T of TYPES) {
+    const sources = [];
+    for (const cle of T.cles) {
+      const l = parCle.get(cle);
+      if (!l || !(Number(l.n) > 0)) continue;
+      const Q = QUESTIONS[cle] || { n: () => l.nom };
+      const ton = cle === 'numeros-double' ? 'rouge' : 'geste';
+      const ex = Array.isArray(l.ex) ? l.ex : [];
+      let cartes;
+      if (ex.length && Q.x) {
+        cartes = ex.slice(0, parSource).map((x) => ({ cle, id: x.id, num: x.num || '', photo: x.photo || '', photo2: x.photo2 || '',
+          question: Q.x(x), binaire: BINAIRES[cle] || null,
+          geste: CIBLE_CHOSE[cle] ? { ...l.geste, cible: CIBLE_CHOSE[cle](x) } : l.geste }));
+      } else {
+        cartes = [{ cle, id: '', n: l.n, question: Q.n(l.n), binaire: null, geste: l.geste, noms: l.noms || null }];
+      }
+      const montrees = cartes[0].id ? cartes.length : l.n;
+      sources.push({ cle, n: l.n, ton, cartes, autres: Math.max(0, l.n - montrees), geste: l.geste, nom: l.nom });
+    }
+    if (!sources.length) continue;
+    const n = sources.reduce((t, s) => t + s.n, 0);
+    // Le même nombre ne s'écrit pas deux fois : une source seule, sans cartes de choses,
+    // porte déjà son nombre dans sa vignette ⇒ le titre du groupe n'en remet pas.
+    const compteVisible = sources.length > 1 || !!sources[0].cartes[0].id;
+    groupes.push({ type: T.type, titre: T.titre, n, compteVisible, sources });
+  }
+  return { groupes, total: etat.total, partiel: etat.partiel, manque: etat.manque || [] };
+}
+// Un geste fait ici (optimiste) : la chose sort tout de suite, le nombre de sa source
+// baisse d'autant — tant que la publication la porte encore (elle se recalcule ensuite
+// chez son propriétaire : une chose qui n'est plus publiée ne retire plus rien).
+// `tranches` : Set de « cle:id ».
+export function appliquerTranches(etat, tranches) {
+  if (!etat || !Array.isArray(etat.lignes) || !tranches || !tranches.size) return etat;
+  let change = false;
+  const lignes = etat.lignes.map((l) => {
+    if (!Array.isArray(l.ex) || !l.ex.length || !Number.isInteger(l.n)) return l;
+    const reste = l.ex.filter((x) => !tranches.has(`${l.cle}:${x.id}`));
+    if (reste.length === l.ex.length) return l;
+    change = true;
+    const n = Math.max(0, l.n - (l.ex.length - reste.length));
+    const src = SOURCES.find((s) => s.cle === l.cle);
+    return { ...l, n, ex: reste, quoi: n > 0 && src ? src.quoi(n) : '' };
+  });
+  if (!change) return etat;
+  const total = lignes.filter((l) => Number.isInteger(l.n)).reduce((t, l) => t + l.n, 0);
+  return { ...etat, lignes, total, aTrancher: lignes.filter((l) => l.n > 0) };
+}
+// Les photos de la ligne de Ma journée : les premières choses publiées (identité), 3 au plus.
+export const photosJournee = (etat) => (etat && Array.isArray(etat.aTrancher)
+  ? etat.aTrancher.flatMap((l) => (Array.isArray(l.ex) ? l.ex.map((x) => x.photo).filter(Boolean) : [])).slice(0, 3) : []);
+// Le détail de la ligne de Ma journée : les types concernés, rien d'autre.
+export const typesJournee = (etat) => cartesATrancher(etat).groupes.map((g) => g.titre).join(' · ');
