@@ -32863,7 +32863,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocNouveaux = () => numerosNeufs.length > 0 && (
     <div className="vrm-ann-neufs" data-num-neufs={numerosNeufs.length}>
       <div className="vrm-ann-neufs-tete">{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
-      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui que tu as déjà écrit sur ton rangement, par exemple). Le prix d'achat est facultatif : tu peux le mettre plus tard.</div>
+      <div className="vrm-ann-neufs-phrase">Touche le N° pour le changer. Prix d'achat : facultatif.</div>
       {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {};
         // (6 nov.) LE PRIX D'ACHAT AU MÊME GESTE (src/prixAuNumerotage.js) : un champ vide,
         // jamais pré-rempli ; une suggestion d'achat est PROPOSÉE à côté (« Relier · 32 € »),
@@ -39245,7 +39245,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const offreBloquee=!!actionsOffresIncertaines[cleActionOffreVinted(openConv.owner,openConv.acc?.vinted_user_id,openConv.convId)]; const sansExt = !vmrExtPresent() && !msgRelais; const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
               <div className="vrm-chat-foot" data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
                 {offreBusy&&<div className="vrm-chat-note" role="status">Action sur une offre en cours… Attends le résultat avant de recommencer.</div>}
-                {offreBloquee&&<div className="vrm-chat-note" role="alert" data-offre-incertaine>Une action sur cette offre n’est pas confirmée. Vérifie le résultat avant de recommencer. <a href={lienVinted} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a><button type="button" className="vrm-chat-btn" onClick={autoriserNouvelleActionOffre}>J’ai vérifié sur Vinted</button></div>}
+                {offreBloquee&&<div className="vrm-chat-note" role="alert" data-offre-incertaine>Action pas confirmée : vérifie sur Vinted avant de recommencer. <a href={lienVinted} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a><button type="button" className="vrm-chat-btn" onClick={autoriserNouvelleActionOffre}>J’ai vérifié sur Vinted</button></div>}
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
                     de la liste (§7). */}
@@ -39269,7 +39269,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (offCapturee) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-cible="offre" data-offre="annonce-partie" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(offCapturee.prix)}</b></div>
-                      <div className="vrm-chat-offre-p" style={{color:C.muted}}>Ton dressing, lu après cette offre, ne montre plus cette annonce : l’offre ne peut plus être acceptée.</div>
+                      <div className="vrm-chat-offre-p" style={{color:C.muted}}>Annonce plus dans ton dressing : offre plus acceptable.</div>
                       <button type="button" className="vrm-chat-offre-retirer" data-offre-retirer="" onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}>Retirer de la liste</button>
                     </div>
                   );
@@ -39337,7 +39337,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
                 {msgRelais && !ro && <EtatRelaisConv vinted={msgRelaisVinted}/>}
                 {replyNotice&&<div className="vrm-chat-retour" role="status">{replyNotice}</div>}
-                {reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]&&<div className="vrm-chat-retour" role="alert">Envoi précédent à vérifier sur Vinted. Aucun nouvel envoi automatique. <a href={lienVinted} target="_blank" rel="noreferrer">Vérifier sur Vinted ↗</a><button type="button" onClick={autoriserNouvelleReponse}>Autoriser un nouvel envoi après vérification</button></div>}
+                {reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]&&<div className="vrm-chat-retour" role="alert">Envoi précédent à vérifier : rien ne repart tout seul. <a href={lienVinted} target="_blank" rel="noreferrer">Vérifier sur Vinted ↗</a><button type="button" onClick={autoriserNouvelleReponse}>Autoriser un nouvel envoi après vérification</button></div>}
                 {replyErr && <div role="alert" style={{fontSize:12,color:C.danger,marginBottom:8,lineHeight:1.35}}>{replyErr}</div>}
                 {/* (16 oct.) Sans extension ici (téléphone), VRM ne peut pas
                     envoyer : un champ de saisie inutilisable n'y a pas sa place.
@@ -46435,7 +46435,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>📄 Reçus officiels Vinted</div>
                 {capturedReceipts.length>0 ? (
                   <>
-                    <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Dernier reçu consulté sur Vinted, capté par l'extension (le vrai document, pas le justificatif maison).</div>
+                    <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Le vrai reçu Vinted, le dernier que tu as ouvert.</div>
                     {capturedReceipts.map((rec,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text}}>{rec.name}</div><div style={{fontSize:11,color:C.muted}}>capté le {rec.capturedAt?new Date(rec.capturedAt).toLocaleDateString('fr-FR'):'—'}</div></div>
@@ -46450,14 +46450,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ) : recusPasLus>0 ? (
                   <div data-recus-pas-lus={recusPasLus} style={{fontSize:11,color:C.muted,lineHeight:1.5}}>La base n'a pas répondu pour {recusPasLus} compte{recusPasLus>1?'s':''} — rouvre le bilan dans un instant.</div>
                 ) : (
-                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Aucun reçu capté pour l'instant. Ouvre/télécharge un reçu ou une facture officielle sur Vinted (avec l'extension active) → il apparaîtra ici, prêt pour ta compta.</div>
+                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Aucun reçu. Ouvre un reçu ou une facture sur Vinted : il arrive ici.</div>
                 )}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 <button type="button" onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
                 <button type="button" onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
               </div>
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
+              <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Indicatif, pas un conseil comptable. Sans prix d'achat, bénéfice incomplet.</div>
             </div>
           </div>
         </div>
@@ -46484,7 +46484,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
               </div>
               {!lister ? (
-                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de l'article que tu mets en vente.<br/><span style={{fontSize:12}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
+                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de l'article que tu mets en vente.<br/><span style={{fontSize:12}}>Un prix d'après tes ventes, un titre et une description.</span></div>
               ) : (<>
                 {/* Prix conseillé */}
                 <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:12,padding:'13px 15px',marginBottom:14}}>
@@ -46509,7 +46509,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     )}
                   </>) : (
-                    <div style={{fontSize:13,color:C.muted}}>Pas encore assez d'infos pour un prix. Renseigne un prix d'achat, ou tape un modèle plus courant.</div>
+                    <div style={{fontSize:13,color:C.muted}}>Pas assez d'infos : ajoute un prix d'achat, ou un modèle plus courant.</div>
                   )}
                 </div>
                 {/* Titre optimisé */}
@@ -46526,7 +46526,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{lister.desc}</div>
                   <button type="button" onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:12,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
                 </div>
-                <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:12}}>Le prix vient de tes ventes finalisées du même modèle (recherche par mots). Colle le titre et la description sur Vinted, ajoute tes photos, et fixe le prix conseillé.</div>
+                <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:12}}>Prix tiré de tes ventes du même modèle. Colle tout sur Vinted, avec tes photos.</div>
               </>)}
             </div>
           </div>
@@ -46551,7 +46551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {lotView.loading ? (
               <Skeleton variant="row" count={4}/>
             ) : lotView.items.length===0 ? (
-              <div style={{textAlign:'center',padding:'26px 16px',color:C.muted,fontSize:13,lineHeight:1.5}}>Détail indisponible.<br/><span style={{fontSize:12}}>Vinted n'a pas renvoyé le contenu de ce lot (compte peut-être déconnecté).</span></div>
+              <div style={{textAlign:'center',padding:'26px 16px',color:C.muted,fontSize:13,lineHeight:1.5}}>Détail indisponible.<br/><span style={{fontSize:12}}>Vinted ne l'a pas renvoyé (compte déconnecté ?).</span></div>
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:7}}>
                 {lotView.items.map((it,i)=>{
@@ -46571,7 +46571,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   );
                 })}
-                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>Vinted ne dit pas le prix payé pour chaque article du lot — seul le total est connu. Le N° s'affiche quand le titre correspond à un de tes articles.</div>
+                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>Vinted ne donne que le total du lot, pas le prix par article. <Pourquoi label="Le N° ?">Le N° s'affiche quand le titre correspond à un de tes articles.</Pourquoi></div>
               </div>
             )}
           </div>
@@ -46593,7 +46593,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* Vérificateur d'achat : en friperie, tape le modèle + le prix demandé */}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px',marginBottom:16}}>
                 <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:2}}>🔍 Vérificateur d'achat</div>
-                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>En friperie : tape le modèle et le prix demandé → tes propres ventes te disent si ça vaut le coup.</div>
+                <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Modèle + prix demandé : tes ventes disent si ça vaut le coup.</div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:checker?10:0}}>
                   <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder="Modèle (ex : gel-lyte, spezial…)"
                     style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
@@ -46601,7 +46601,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
                 </div>
                 {checker && (checker.nb===0 ? (
-                  <div style={{fontSize:12,color:C.muted}}>Aucune vente finalisée ne correspond à « {srcQuery.trim()} ». Essaie un mot plus court (ex : juste la marque).</div>
+                  <div style={{fontSize:12,color:C.muted}}>Aucune vente pour « {srcQuery.trim()} ». Essaie juste la marque.</div>
                 ) : (()=>{
                   const ok = checker.estBenef!=null ? (checker.estBenef>=15?'go':checker.estBenef>=5?'mid':'no') : null;
                   const okCol = ok==='go'?INV_STATUS.online.color:ok==='mid'?C.warn:C.danger;
@@ -46655,7 +46655,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (<>
                   <Section title="Par marque" rows={sourcing.brands} hint="Trié par nb de ventes. Le bénéfice/article aide à prioriser les rachats."/>
                   <Section title="Par taille" rows={sourcing.sizes} hint="Taille estimée depuis le titre — approximatif. « ? » = pointure non détectée."/>
-                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Le bénéfice n'est calculé que pour les ventes dont le prix d'achat est renseigné (bouton 🔗 dans Annonces). Les marques reconnues viennent d'une liste interne.</div>
+                  <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Bénéfice : seulement les ventes avec un prix d'achat (🔗 dans Annonces).</div>
                 </>);
               })()}
             </div>
@@ -46678,7 +46678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:'#16a34a',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>✅ Reçu dans le porte-monnaie</div>
                 <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)}&nbsp;€</div>
-                <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — argent crédité sur ton solde Vinted. <b>Ne compte pas</b> tes virements vers ta banque.</div>
+                <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''}, créditée{treasury.nRecu>1?'s':''} sur ton solde. <b>Sans</b> tes virements vers ta banque.</div>
               </div>
               {/* EN ATTENTE = somme des porte-monnaie Vinted (escrow réel si capté,
                   sinon somme des ventes en cours = argent que Vinted te retient). */}
@@ -46841,7 +46841,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>✨ Rédiger une annonce (IA)</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis un article — l'IA propose un titre et une description. <b>Tu copies, tu publies</b> ; rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis un article : l'IA propose titre et description. <b>Tu copies, tu publies.</b> <Pourquoi>Rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</Pourquoi></div>
               </div>
               <button type="button" onClick={()=>setIaOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -47020,15 +47020,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 //    ne compare de date. Ce qui est vrai, quelle que soit la règle
                 //    de la déclaration : ces ventes ne sont dans AUCUNE (une vente
                 //    déclarée ailleurs n'est pas ici, elle est « déjà déclarée »).
-                if (d && report.nApres>0) lignes.push(<div key="apr" data-decl="apres" data-decl-n={report.nApres} data-decl-cents={Math.round(report.caApres*100)}><b style={{color:C.warn}}>+ {report.nApres} vente{report.nApres>1?'s':''} ({fmtE(report.caApres)})</b> de ce mois {report.nApres>1?'ne figurent':'ne figure'} dans aucune de tes déclarations : à ajouter à ta prochaine déclaration (régularisation).</div>);
+                if (d && report.nApres>0) lignes.push(<div key="apr" data-decl="apres" data-decl-n={report.nApres} data-decl-cents={Math.round(report.caApres*100)}><b style={{color:C.warn}}>+ {report.nApres} vente{report.nApres>1?'s':''} ({fmtE(report.caApres)})</b> de ce mois {report.nApres>1?'ne figurent':'ne figure'} dans aucune déclaration : à ajouter à la prochaine.</div>);
                 // Déclaré à la DATE DE VENTE : une vente vendue le mois d'avant relève
                 // de la déclaration de son mois de vente — la dire « à régulariser »
                 // faisait payer ses cotisations deux fois.
                 if (d && report.nVenteAvant>0) {
                   const mv = Object.keys(report.venteAvant||{}).sort();
-                  lignes.push(<div key="va" data-decl="venteavant" data-decl-n={report.nVenteAvant} data-decl-cents={Math.round(report.caVenteAvant*100)}><b>{report.nVenteAvant} vente{report.nVenteAvant>1?'s':''} ({fmtE(report.caVenteAvant)})</b> {report.nVenteAvant>1?'ont été vendues':'a été vendue'} en {mv.map(nomMois).join(', ')} et versée{report.nVenteAvant>1?'s':''} ce mois-ci : déclaré à la date de vente, {report.nVenteAvant>1?'elles relèvent':'elle relève'} de ta déclaration {de(mv.map(nomMois).join(', '))}, pas de celle-ci : <b>rien à régulariser</b>. Note {mv.length>1?'ces mois-là':'ce mois-là'} dans ce rapport pour qu'{report.nVenteAvant>1?'elles n\'y soient':'elle n\'y soit'} plus comptée{report.nVenteAvant>1?'s':''}.</div>);
+                  lignes.push(<div key="va" data-decl="venteavant" data-decl-n={report.nVenteAvant} data-decl-cents={Math.round(report.caVenteAvant*100)}><b>{report.nVenteAvant} vente{report.nVenteAvant>1?'s':''} ({fmtE(report.caVenteAvant)})</b> vendue{report.nVenteAvant>1?'s':''} en {mv.map(nomMois).join(', ')} : <b>rien à régulariser</b>. Note {mv.length>1?'ces mois-là':'ce mois-là'} ici. <Pourquoi>Versée{report.nVenteAvant>1?'s':''} ce mois-ci, mais déclaré à la date de vente : {report.nVenteAvant>1?'elles relèvent':'elle relève'} de ta déclaration {de(mv.map(nomMois).join(', '))}, pas de celle-ci. Note {mv.length>1?'ces mois-là':'ce mois-là'} dans ce rapport pour qu'{report.nVenteAvant>1?'elles n\'y soient':'elle n\'y soit'} plus comptée{report.nVenteAvant>1?'s':''}.</Pourquoi></div>);
                 }
-                if (report.nDouble>0) lignes.push(<div key="dbl" data-decl="double"><b style={{color:C.warn}}>{report.nDouble} vente{report.nDouble>1?'s':''} ({fmtE(report.caDouble)})</b> {report.nDouble>1?'figurent':'figure'} dans deux de tes déclarations ({report.doubles.map(nomMois).join(' et ')}) : {report.nDouble>1?'elles sont comptées':'elle est comptée'} une fois ici. Signale-le à l'URSSAF lors de ta prochaine déclaration.</div>);
+                if (report.nDouble>0) lignes.push(<div key="dbl" data-decl="double"><b style={{color:C.warn}}>{report.nDouble} vente{report.nDouble>1?'s':''} ({fmtE(report.caDouble)})</b> déclarée{report.nDouble>1?'s':''} deux fois ({report.doubles.map(nomMois).join(' et ')}) : signale-le à l'URSSAF. <Pourquoi>{report.nDouble>1?'Elles sont comptées':'Elle est comptée'} une fois ici. Signale-le à l'URSSAF lors de ta prochaine déclaration.</Pourquoi></div>);
                 if (!d && !passe && !lignes.length) return null;
                 const ecart = d && d.montant != null ? Math.round((d.montant - Number(d.ca||0)) * 100) / 100 : null;
                 return (
@@ -47065,7 +47065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div>{fmtE(report.ca)} — {report.nb} vente{report.nb>1?'s':''} finalisée{report.nb>1?'s':''}, à la date de versement.</div>
                         )}
                         <label style={{display:'flex',flexDirection:'column',gap:3}}>
-                          <span style={{fontSize:12,color:C.muted}}>Montant de ta déclaration, tel qu'il est sur ton espace URSSAF (facultatif — je le compare)</span>
+                          <span style={{fontSize:12,color:C.muted}}>Montant sur ton espace URSSAF (facultatif, comparé)</span>
                           <input inputMode="decimal" value={declForm.montant} onChange={e=>setDeclForm(f=>({...f, montant:e.target.value}))} placeholder="ex. 1 234,50" style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'7px 10px',fontSize:17,background:C.bg,color:C.text,maxWidth:200,fontFamily:'inherit'}}/>
                         </label>
                         <label style={{display:'flex',flexDirection:'column',gap:3}}>
@@ -47114,7 +47114,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div><div className="vrm-label" style={{fontSize:11,color:C.muted}}>VIRÉ VERS TA BANQUE</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(Math.abs(releveTotaux.virements))}</div></div>
                   </div>
                   <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.4}}>
-                    Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour où la vente est finalisée (l'argent versé). Les deux viennent de deux sources différentes : un jour d'écart est normal. Un virement vers ta banque déplace ton propre argent — ce n'est pas une recette.
+                    Un jour d'écart avec le CA est normal ; un virement n'est pas une recette. <Pourquoi>Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour où la vente est finalisée (l'argent versé). Les deux viennent de deux sources différentes. Un virement vers ta banque déplace ton propre argent.</Pourquoi>
                   </div>
                 </div>
               ) : (
@@ -47221,7 +47221,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:12,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
-              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucun article hors ligne{q?' pour cette recherche':' disponible'}. Les articles encore en ligne ne sont pas proposés pour cette vente.</div>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucun article hors ligne{q?' pour cette recherche':' disponible'} (ceux en ligne ne sont pas proposés).</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:12,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
@@ -47273,7 +47273,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {s.pts.map(p=>(<g key={p.i}><circle cx={xs(p.i)} cy={ys(p.avg)} r="3.5" fill={C.accent}/><text x={xs(p.i)} y={ys(p.avg)-7} textAnchor="middle" fontSize="8.5" fontWeight="800" fill={C.text}>{Math.round(p.avg)}</text></g>))}
                 </svg>
               )}
-              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des articles <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Une pente qui monte = tu vends plus cher (marché porteur ou meilleurs articles).</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des articles <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Ça monte : tu vends plus cher.</div>
             </div>
           </div>
         </div>
@@ -47495,7 +47495,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               ))}
               {disputes.salesLost.length===0 && disputes.buysBack.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 0'}}>Aucun litige — nickel ! 👌</div>}
-              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.4}}>Basé sur le statut Vinted (« Remboursement validé/effectué », « Retour initié », annulations). Se met à jour tout seul.</div>
+              <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.4}}>D'après le statut Vinted (remboursements, retours, annulations).</div>
             </div>
           </div>
         </div>
@@ -47530,7 +47530,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div style={{fontSize:11,color:C.muted,marginTop:9,lineHeight:1.45}}>
-                  ⚠️ Si tu as déjà <b style={{color:C.text}}>écrit ces numéros sur tes boîtes</b>, il faudra les réécrire. Les articles rangés au garage et ceux d'une vente en cours ne bougent pas.
+                  ⚠️ Déjà <b style={{color:C.text}}>écrits sur tes boîtes</b> ? Il faudra les réécrire. <Pourquoi>Les articles rangés au garage et ceux d'une vente en cours ne bougent pas.</Pourquoi>
                 </div>
               </div>
             )}
@@ -47611,12 +47611,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button className="vrm-icon-control" type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
               </div>
               <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>
-                <b style={{color:C.text}}>{lignes.length} article{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, l'article n'est pas là où l'app le croit.
+                <b style={{color:C.text}}>{lignes.length} article{lignes.length>1?'s':''}</b> chez toi : compte tes boîtes contre cette liste. <Pourquoi>Celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Si un numéro manque, l'article n'est pas là où l'app le croit.</Pourquoi>
               </div>
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.doublon,background:`${C.doublon}12`,border:`1px solid ${C.doublon}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
                   <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux articles</span>
-                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux articles portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : rien ne dit lequel expédier (en rouge ci-dessous).</span>
                 </div>
               )}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
@@ -47691,7 +47691,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {unknownAtGarage.length>0 && (
                 <div style={{marginBottom:4}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.muted}}>❓ Au garage, numéro inconnu ({unknownAtGarage.length})</div>
-                  <div className="vrm-aide" style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucun article numéroté ne correspond (ancien numéro / faute de frappe).</div>
+                  <div className="vrm-aide" style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Au garage, sans article à ce N° (ancien ou faute de frappe).</div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{unknownAtGarage.slice(0,80).map(t=><span key={t} style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 9px'}}>N°{t}</span>)}</div>
                 </div>
               )}
