@@ -39,9 +39,20 @@ export const appareilApple = () => {
 
 // Les colis redirigés, encore en route : [{ suivi, carrier, lieu, ancienLieu, nom, adresse, at }].
 // `lignes` : les lignes de suivi déjà relues (`relireLigneSuivi`). `null` (pas su) ⇒ `null`.
-export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOURS_RELAIS_CHANGE } = {}) {
+// (10 nov., retraits irréprochables) `transp` : Map(n° → lecture chez le transporteur). Un n° que le
+// TRANSPORTEUR dit arrivé (disponible), retiré ou reparti n'est plus « en route » : mesuré au banc, le
+// colis redirigé et disponible était À RETIRER ET annoncé « pas encore arrivé » sur le même écran.
+const ETATS_ARRIVE = new Set(['disponible', 'retire', 'retour_expediteur']);
+export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOURS_RELAIS_CHANGE, transp = null } = {}) {
   if (!Array.isArray(lignes)) return null;
   const finis = new Set();
+  // …par un événement daté APRÈS l'e-mail du changement (une lecture plus ancienne ne dit rien du nouveau point).
+  const arriveApres = (n, ligneMs) => {
+    const t = transp && typeof transp.get === 'function' ? transp.get(n) : null;
+    if (!t || !ETATS_ARRIVE.has(t.etat)) return false;
+    const e = msDe(t.etatAt);
+    return e != null && (ligneMs == null || e > ligneMs);
+  };
   for (const t of lignes) {
     if (!t) continue;
     const n = normaliserSuivi(t.suivi);
@@ -55,6 +66,7 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
     if (!n || finis.has(n) || vus.has(n)) continue;
     const at = msDe(t.emailAt) || msDe(t.receivedAt);
     if (at != null && maintenant - at > jours * 86400000) continue;
+    if (arriveApres(n, at)) continue;
     vus.add(n);
     const lieu = String(t.lieu || '').trim();
     out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at });

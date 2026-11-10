@@ -36,6 +36,9 @@ const MUTATIONS = {
   'remplace-ignore': ['src/sourcesRetrait.js', '  if (!remplace) for (const x of autresDates)', '  if (true) for (const x of autresDates)'],
   'message-ignore': ['src/App.jsx', 'r: o ? relaisDe(o) : null, tr, vs', 'r: null, tr, vs'],
   'carte-sans-sources': ['src/CarteRelais.jsx', "'data-rp-sources': marques.join(',')", "'data-rp-sources': ''"],
+  'alerte-ignore-transporteur': ['src/relaisChange.js', '    if (arriveApres(n, at)) continue;', ''],
+  'alerte-lecture-ancienne': ['src/relaisChange.js', 'return e != null && (ligneMs == null || e > ligneMs);', 'return true;'],
+  'hors-ligne-email-seul': ['src/App.jsx', "const code = desaccord ? '' : (codeRetrait(vC.code) || codeRetrait(t.code));", "const code = codeRetrait(t.code);"],
 };
 if (process.argv.includes('--prouve')) {
   let ok = 0;
@@ -233,6 +236,18 @@ const ligneFausseLivree = (suivi, o) => ({ type: 'suivi', carrier: 'mondialrelay
     dit(rien.verifieMs === null && !rien.marques.length, 'rien de daté ⇒ pas d’heure (« — »), jamais une heure inventée', J(rien));
   });
 
+  console.log('§H un colis redirigé ARRIVÉ n’est plus annoncé « pas encore arrivé » (src/relaisChange.js)');
+  await essaie('H', async () => {
+    const m = await importer('src/relaisChange.js');
+    const ligne = { suivi: '87650060', carrier: 'mondialrelay', status: 'transit', relaisChange: true, lieu: 'INTERMARCHE EXEMPLE, 35350 ST MELOIR DES ONDES', emailAt: '2026-11-10T10:00:00.000Z', receivedAt: '2026-11-10T10:00:30.000Z' };
+    const maintenant = Date.parse('2026-11-11T12:00:00.000Z');
+    const dispo = new Map([['87650060', { etat: 'disponible', etatAt: '2026-11-11T09:00:00.000Z' }]]);
+    dit(m.colisRelaisChange([ligne], { maintenant, transp: dispo }).length === 0, 'le transporteur le dit disponible APRÈS l’e-mail ⇒ plus d’alerte « en route »');
+    const avant = new Map([['87650060', { etat: 'disponible', etatAt: '2026-11-09T09:00:00.000Z' }]]);
+    dit(m.colisRelaisChange([ligne], { maintenant, transp: avant }).length === 1, 'une lecture « disponible » d’AVANT le changement (l’ancien point) ne fait pas taire l’alerte');
+    dit(m.colisRelaisChange([ligne], { maintenant }).length === 1, 'sans lecture du transporteur : l’alerte reste');
+  });
+
   console.log('§G le branchement (Colis → À retirer)');
   await essaie('G', async () => {
     const sansCom = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
@@ -244,6 +259,11 @@ const ligneFausseLivree = (suivi, o) => ({ type: 'suivi', carrier: 'mondialrelay
     dit(/'data-rp-sources': marques\.join\(','\)/.test(carte) && /data-rp-verifie-texte/.test(carte), 'la ligne dit ses sources et l’heure de la dernière vérification');
     dit(/data-rp-code-desaccord/.test(carte) && /data-rp-desaccord-valeur=\{d\.code\}/.test(carte) && /is-ambre/.test(carte), 'deux codes ⇒ bouton ambre « 2 codes » et les deux valeurs dans le détail');
     dit(/'data-rp-code-sur': x\.code && x\.codeSur/.test(carte), 'un code sûr est marqué');
+    dit(/x\.code \|\| x\.qr \|\| x\.code2 \|\| \(Array\.isArray\(x\.codesDesaccord\)/.test(carte), 'deux codes en désaccord : rangé avec les colis prêts (jamais « code à venir »)');
+    const relais = sansCom(fs.readFileSync(path.join(R, 'src/ModeRelais.jsx'), 'utf8'));
+    dit(/data-relais-desaccord/.test(relais) && /desaccord: x\.codesDesaccord \|\| null/.test(app) && /desaccord: x\.desaccord \|\| null/.test(app), 'le mode relais (en ligne et hors ligne) montre les deux codes, jamais un seul');
+    dit(/verdictCode\(\{ lignes: codesDesLignes\(t, codeRetrait\), message: rV \? codeRetrait\(rV\.code\) : '' \}\)/.test(app) && /const code = desaccord \? '' : \(codeRetrait\(vC\.code\) \|\| codeRetrait\(t\.code\)\)/.test(app), 'les codes gardés hors ligne suivent le même verdict que la carte (désaccord ⇒ aucun code seul)');
+    dit(/<AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}\/>/.test(app), 'l’alerte « point changé » lit aussi le transporteur');
   });
 
   console.log(`\n${ok} vérifications, ${ko} en échec`);

@@ -506,7 +506,8 @@ export function sectionDuColis(x, point) {
   if (x.horsCompte) return 'verifier';
   if (Number.isFinite(x.jours) && x.jours <= 0) return 'aujourdhui';
   if (!point || point.inconnu) return 'lieu';
-  return (x.code || x.qr || x.code2) ? 'prets' : 'avenir';
+  // (10 nov.) Deux codes en désaccord : le colis est là et ses codes sont connus (dits tous les deux) — pas « à venir ».
+  return (x.code || x.qr || x.code2 || (Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1)) ? 'prets' : 'avenir';
 }
 // (8 nov.) Hors réseau MESURÉ (`navigator.onLine === false`) : pas de carte (ni fond, ni Base Adresse) ; la liste marche.
 function useEnLigne() {

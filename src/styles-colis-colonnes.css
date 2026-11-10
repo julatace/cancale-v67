@@ -280,9 +280,10 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { paddin
 /* (10 nov., retraits irréprochables) D'où vient chaque information d'un colis à retirer : des marques
    discrètes (texte gris, petit), l'heure de la dernière vérification ; le code « sûr » (deux voix
    concordantes) porte une coche ; deux codes différents ⇒ ambre, les deux valeurs dans le détail. */
-html body .vrm-rpf-ligne .vrm-rpf-sources { display: flex !important; flex-wrap: wrap; align-items: center; gap: 0 2px; margin-top: 3px; font-size: 11px !important; line-height: 15px !important; color: var(--p-gris, #86868b) !important; font-weight: 400 !important; letter-spacing: 0; }
+html body .vrm-rpf-ligne .vrm-rpf-sources { display: block !important; margin-top: 3px; white-space: normal !important; overflow: visible !important; font-size: 11px !important; line-height: 15px !important; color: var(--p-gris, #86868b) !important; font-weight: 400 !important; letter-spacing: 0; }
 html body .vrm-rpf-ligne .vrm-rpf-source + .vrm-rpf-source::before,
 html body .vrm-rpf-ligne .vrm-rpf-source + .vrm-rpf-verifie::before { content: "·"; margin: 0 4px; opacity: .7; }
+html body .vrm-rpf-ligne .vrm-rpf-source, html body .vrm-rpf-ligne .vrm-rpf-verifie { display: inline !important; white-space: nowrap; }
 html body .vrm-rpf-ligne .vrm-rpf-verifie { font-variant-numeric: tabular-nums; }
 html body .vrm-rpf-ligne .vrm-rpf-code .vrm-rpf-code-sur { margin-left: 4px; vertical-align: -1px; }
 html body .vrm-rpf-ligne .vrm-rpf-code.is-ambre { color: var(--vrm-warn, #B25000) !important; border-color: currentColor !important; font-weight: 600 !important; }

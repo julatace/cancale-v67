@@ -76,7 +76,7 @@ import './notif-reglages.css';
 import './design/guide-iphone.css'; // (8 nov.) style de ./GuideIphone.jsx, gardé à sa place (son écran est chargé à la demande)
 import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à sa place (son écran est chargé à la demande)
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
-import {sourcesDuColis,codeLuDeLigne,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
+import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe} from '../api/_lib/achat-arrive-relais.js';
 import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
@@ -16834,7 +16834,7 @@ function BlocCodesHorsLigne() {
             <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
             <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
             {comptes.length ? <Bouton variante="secondaire" icone="qr" data-relais-ouvrir="hors-ligne" onClick={() => setRelais(true)} style={{ minHeight: 44, marginBottom: 8 }}>Mode relais</Bouton> : null}
-            {relais ? <ModeRelais horsLigne colis={comptes.map((x, i) => ({ cle: 'hl:' + (x.id || i), ident: x.id || '', titre: x.titre || (x.carrier ? carrierName(x.carrier) : 'Colis'), lieu: x.lieu || '', code: x.code || '', suivi: x.suivi || '', qr: '', sansQrHorsLigne: !!x.qr }))}
+            {relais ? <ModeRelais horsLigne colis={comptes.map((x, i) => ({ cle: 'hl:' + (x.id || i), ident: x.id || '', titre: x.titre || (x.carrier ? carrierName(x.carrier) : 'Colis'), lieu: x.lieu || '', code: x.code || '', desaccord: x.desaccord || null, suivi: x.suivi || '', qr: '', sansQrHorsLigne: !!x.qr }))}
               note={`Codes gardés sur cet appareil, mis à jour ${quand}.`} onFermer={() => setRelais(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
             {c.codes.map((x, i) => (
               <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
@@ -16844,6 +16844,8 @@ function BlocCodesHorsLigne() {
                 </div>
                 {x.code
                   ? <div className="vrm-sensible" data-stream-type="code" style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 11px'}}>{x.code}</div>
+                  : Array.isArray(x.desaccord) && x.desaccord.length > 1
+                  ? <div className="vrm-sensible" data-code-hl-desaccord="" style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.warn,textAlign:'right'}}>2 codes : {x.desaccord.map((d) => d.code).join(' / ')}</div>
                   : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
               </div>
             ))}
@@ -30608,11 +30610,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const codes = [];
       const comptesE = new Set(pickupUnion.emailList);
       for (const t of pickupUnion.emailList.concat(pickupUnion.aVerifier.filter(x => x.kind === 'email').map(x => x.t))) {
-        const code = codeRetrait(t.code); const lieu = (cleanLieu(t.lieu).nom || '').trim();
+        // (10 nov., retraits irréprochables) LE MÊME VERDICT QUE LA CARTE (src/sourcesRetrait.js) : le code de la
+        // conversation de SA commande compte ; deux codes différents ⇒ les deux, jamais un choisi en silence.
+        const oV = pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(colisKey(t)) : null; const rV = oV ? colisRelais[String(oV.transaction_id)] : null;
+        const vC = verdictCode({ lignes: codesDesLignes(t, codeRetrait), message: rV ? codeRetrait(rV.code) : '' });
+        const desaccord = vC.desaccord || null;
+        const code = desaccord ? '' : (codeRetrait(vC.code) || codeRetrait(t.code)); const lieu = (cleanLieu(t.lieu).nom || '').trim();
         const qr = !!(t && (t.qr || t.qrUrl || t.qrB64));
         // (9 nov., lot AD) + `id` (l'identité publiée) et `compte` (dans « à retirer » = `vrm_colis_retirer`, ou
         // seulement « à vérifier ») : le mode relais hors ligne ne montre QUE les colis comptés.
-        if (code || qr) codes.push({ code: code || '', lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
+        if (code || qr || desaccord) codes.push({ code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr, id: identRetraitEmail(t), compte: comptesE.has(t) });
       }
       for (const o of pickupUnion.extra) {
         const r = colisRelais[String((o && o.transaction_id) || '')] || null;
@@ -38185,7 +38192,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
       const qr = t ? qrVivant(t) : (o ? (qrImage(relaisDe(o)) || '') : '');
       out.push({ cle: x.cle, ident: t ? identRetraitEmail(t) : identRetraitVinted(o), titre: x.nom || 'Colis à retirer', photo: x.photo || null,
-        lieu: x.lieuNom || '', adresse: x.lieuAdresse || '', code: x.code || '', code2: x.code2 || '', qr, suivi: t ? (suiviDeLigne(t) || '') : '', src: x.src });
+        lieu: x.lieuNom || '', adresse: x.lieuAdresse || '', code: x.code || '', code2: x.code2 || '', desaccord: x.codesDesaccord || null, qr, suivi: t ? (suiviDeLigne(t) || '') : '', src: x.src });
     }
     return out;
   };
@@ -41723,7 +41730,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* (10 nov.) « Votre colis a changé de plan » : POINT RELAIS CHANGÉ, en ambre, avec le
             nouveau point LU dans l'e-mail et son itinéraire (src/AlerteRelaisChange.jsx). */}
-        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C}/>}
+        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>}
         {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
             des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
@@ -44336,7 +44343,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <img src={qi} alt="QR de retrait" onError={() => noterImgMorte(qrImage(t))}/></button> : null}
               {/* (5 nov.) LE CODE ET LE QR EN GRAND, au doigt, pour le comptoir ou le casier — un geste pour
                   tout colis qui a un code ou un QR (e-mail, capture de l’app Mondial Relay, conversation Vinted). */}
-              {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(t) : openQrView(ligneRetraitVinted(o)))}
+              {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : openQrView(ligneRetraitVinted(o)))}
                 aria-label="Afficher le code et le QR en grand">En grand</button> : null}
               {/* (5 nov.) Un QR qu'on n'a pas se DIT, avec où le trouver (src/retraitQr.js) — jamais un QR fabriqué.
                   Mondial Relay : la vérité, courte — « QR dans l'app Mondial Relay » (ni e-mail ni site ne le
@@ -44346,7 +44353,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!qi && t && qrParCapture(carrierKey(t.carrier)) && suiviDeLigne(t) ? <button type="button" className="vrm-rp-plein" data-colis-qr-ajouter="" onClick={() => choisirCaptureQr(t)}
                 aria-label="Ajouter le QR (capture de l’app Mondial Relay)">Ajouter le QR (capture)</button> : null}
               {t && qrAjout && qrAjout.suivi && qrAjout.suivi === suiviDeLigne(t) ? <span className={'vrm-rp-sous' + (['pose', 'lecture', 'retire'].includes(qrAjout.etat) ? '' : ' is-ambre')} role="status" data-colis-qr-ajout={qrAjout.etat}>{qrAjout.msg}</span> : null}
-              {!x.code && !qi ? (!t && relV && relV.lieu && !relV.qr
+              {!x.code && !qi && !(Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1) ? (!t && relV && relV.lieu && !relV.qr
                 // La conversation a été LUE (le lieu en vient) et ne porte aucun code :
                 // il arrive par l'e-mail du transporteur (même phrase que l'ancien détail).
                 ? <span className="vrm-rp-sans-code" data-colis-sans-code="" data-colis-sans-code-conv="">Code par l’e-mail du transporteur</span>
