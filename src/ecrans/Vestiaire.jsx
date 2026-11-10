@@ -27,6 +27,10 @@ import { offresVestiaire, euros } from "../offresVestiaire.js";
 // ⟦← App.jsx #4⟧
 // ⟦→ ecrans/Compta.jsx #5⟧
 import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCourte, LIEN_CLE, LIEN_TARIFS } from "../photoroomCle.js";
+// (10 nov., lot S) La facture Pro : Vestiaire ne donne pas le prix payé par l'acheteur (src/FactureAutres.jsx).
+import { DEPS_FACTURE } from '../App.jsx';
+const FactureVcTeteParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureVcTete })));
+const FactureVcTete = (props) => <React.Suspense fallback={null}><FactureVcTeteParesseuse {...props}/></React.Suspense>;
 
 // ⟦← App.jsx #3⟧
 const OffresVestiaire = aLaDemande(() => import('../OffresVestiaire.jsx'));
@@ -754,6 +758,7 @@ function VentesVestiaire({ comptes }) {
       <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes ventes Vestiaire</div>
       {corps}
       {d && d.ventes && Object.keys(d.ventes).length ? phraseMontant : null}
+      {d && d.ventes && Object.keys(d.ventes).length ? <FactureVcTete deps={DEPS_FACTURE} ventes={Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object' && !vcVenteAnnulee(v)).map(([id, v]) => ({ id, ...v }))}/> : null}
     </Card>
   );
 }
