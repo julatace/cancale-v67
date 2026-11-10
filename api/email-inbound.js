@@ -62,7 +62,7 @@ import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle,
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
-import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU } from './_lib/adresse-reception.js';
+import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU, ID_ESSAI, codeEssaiDe } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -1634,6 +1634,20 @@ async function noterVuAdresse(owner, mail) {
     });
   } catch (_) {}
 }
+// (10 nov.) L'E-MAIL D'ESSAI de la feuille « Recevoir tes e-mails Vinted dans
+// VRM » : son code (« Essai VRM K7P2 ») rangé chez LUI, dans une ligne à part
+// (api/_lib/adresse-reception.js, `codeEssaiDe`). Un confort, comme le « vu ».
+async function noterEssaiAdresse(owner, mail) {
+  const code = codeEssaiDe(mail && mail.subject);
+  if (!code) return;
+  try {
+    const at = new Date().toISOString();
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner, id: ID_ESSAI, data: { code, at }, updated_at: at }]),
+    });
+  } catch (_) {}
+}
 async function mettreEnQuarantaine(mail, adresses, raison) {
   try {
     const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -2193,6 +2207,7 @@ export async function traiterEmail(req, res) {
     // (date, sujet, expéditeur — rien d'autre). Un confort : une écriture ratée
     // ici ne fait pas rejouer l'e-mail.
     await noterVuAdresse(unique.owner, mail);
+    await noterEssaiAdresse(unique.owner, mail);
   }
   if (!proprio.owner && await baseCloisonnee()) {
     // ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec sa

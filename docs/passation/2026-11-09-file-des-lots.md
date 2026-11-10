@@ -67,7 +67,7 @@ libère son numéro (le dire ici).
 | AN | photo en grand partout + Achats plus beaux + facture d'achat hors Vinted (9, 10, 16) | `claude/photos-achats` | en cours |
 | AO | Compta reliée à Statistiques (8) | `claude/compta-stats` | en cours |
 | AP | republication à la main conseillée et attirante, photos vers la galerie, N° et descriptions en sélection multiple (17) | `claude/republier-main` | à lancer |
-| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | en cours |
+| AQ | câbler la création des e-mails de transfert (6) | `claude/emails-transfert` | **fait** (branche, sans PR) — `2026-11-10-emails-transfert.md` |
 | AR | Communauté pour les créateurs de formation (7) | `claude/communaute-formateurs` | à lancer |
 
 
@@ -91,7 +91,7 @@ Deuxième série du 10 nov. — Julien : « Semaine … c'est bien, [coût réel
 | AZ | photo du carton fermé avant dépôt, rangée avec la vente (preuve en litige) + au scan du bordereau la photo de la paire et son N° EN GRAND (le scan dit déjà la paire depuis le lot V : le rendre impossible à rater) ; fusionne avec M (photos d'emballage) ; après AK2 (mêmes fichiers Colis) | `claude/photo-colis-scan` | à lancer après AK2 |
 | BA | coût réel d'une vente : prix d'achat SAISI + frais connus + emballage ⇒ bénéfice net, le manque nommé (règle `beneficePaire`, jamais deviné) ; fusionne avec la « marge par plateforme » de I | `claude/cout-vente` | **fait, à intégrer** (`2026-11-10-cout-vente-valeur-stock.md`) |
 | BB | litiges en cours : un écran, date limite de réponse, preuves déjà rangées (photo du carton AZ, suivi) ; fusionne avec les « délais de litige » de I (forme à mesurer) | `claude/litiges-marge` | à lancer |
-| BC | « Ma semaine » : un ÉCRAN le dimanche (ventes, bénéfice, colis envoyés, paires qui dorment, comparaison semaine d'avant) — même source que le bilan de la semaine en notification (`api/_lib/bilan-semaine.js`), jamais une 2e règle | `claude/ma-semaine` | à lancer |
+| BC | « Ma semaine » : un ÉCRAN le dimanche (ventes, bénéfice, colis envoyés, paires qui dorment, comparaison semaine d'avant) — même source que le bilan de la semaine en notification (`api/_lib/bilan-semaine.js`), jamais une 2e règle | `claude/ma-semaine` | **fini, à intégrer** (`2026-11-10-ma-semaine.md`) |
 
 Troisième série du 10 nov. — Julien : « Vas-y tout est parfait, fais tout ».
 

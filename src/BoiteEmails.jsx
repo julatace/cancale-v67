@@ -755,7 +755,7 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
         tete={<ARelier comptes={bandeau} onRelier={relierCompte}/>}/>}
       {vue === 'relier' && <div className="vrm-boite-relier" data-boite-relier="">
         {/* (8 nov.) La voie la plus simple d'abord : SON adresse VRM (src/AdresseReception.jsx). */}
-        {!compteOuvert && <CarteAdresseReception headers={headers} FermeAuRetour={FermeAuRetour} onBoite={() => setVue('boite')} detail="La plus simple : fais-y suivre tes e-mails, rien d’autre à confirmer"/>}
+        {!compteOuvert && <CarteAdresseReception headers={headers} FermeAuRetour={FermeAuRetour} onBoite={() => setVue('boite')}/>}
         <div ref={guide}>
           {compteOuvert
             ? <RelierCompte comptes={aRelierListe} uid={compteOuvert} onChoisir={setCompte} boites={boites} lireDernier={lireDernier} onRelie={noterRelie} onAdresses={onAdresses ? versAdresses : undefined}/>
