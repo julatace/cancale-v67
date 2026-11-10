@@ -64,3 +64,48 @@
 /* (30 oct., revue) En sombre, la pastille neutre gardait son fond clair #F2F2F7 sous un texte clair : « Dans le fil » était un rectangle blanc vide. Les pastilles colorées gardent leurs couleurs. */
 .vrm-operations[data-ops-dark=true] .ops-statut:not(.ops-statut-bloquee):not(.ops-statut-partielle):not(.ops-statut-validee):not(.ops-statut-controlee):not(.ops-statut-terminee):not(.ops-echeance-retard):not(.ops-echeance-proche):not(.ops-statut-horsfil){background:#38383A;color:#E5E5EA}
 .ops-statut-horsfil{background:#F2F2F7;color:#B25000}.vrm-operations[data-ops-dark=true] .ops-statut.ops-statut-horsfil{background:#3A3A3C;color:#ffe1a3}
+/* (10 nov., lot N) L'ATELIER : une colonne par étape, des cartes blanches (style DA6), cibles 44 px.
+   Au téléphone les colonnes défilent de côté (une colonne ≈ l'écran) ; à l'ordinateur elles tiennent sur la ligne. */
+.atl{min-width:0}
+.atl-resume{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;margin:0 0 6px;scrollbar-width:none}
+.atl-resume::-webkit-scrollbar{display:none}
+.atl-pastille{flex:0 0 auto;display:flex;align-items:baseline;gap:6px;min-height:44px;box-sizing:border-box;padding:10px 14px;border-radius:999px;background:var(--ops-surface);border:1px solid var(--ops-line);color:var(--ops-ink);text-decoration:none;font-size:13px}
+.atl-pastille strong{font-size:17px;font-variant-numeric:tabular-nums}
+.atl-ambre{color:#B25000;border-color:#E8C9A8}
+.atl-outils{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.atl-outils button,.atl-carte-actions button,.atl-num button,.atl-achats button,.atl-etapes button{min-height:44px}
+.atl-tableau{display:grid;grid-template-columns:repeat(var(--atl-n,4),minmax(200px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}
+.atl-colonne{scroll-snap-align:start;background:var(--ops-soft);border-radius:24px;padding:12px;min-height:120px;display:flex;flex-direction:column;gap:8px;min-width:0;transition:box-shadow .15s ease}
+.atl-survol{box-shadow:inset 0 0 0 2px #0071E3}
+.atl-colonne>header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px}
+.atl-colonne h3{font-size:15px;font-weight:700;margin:0}
+.atl-n{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ops-muted)}
+.atl-vide{margin:0;padding:8px 4px;color:var(--ops-muted)}
+.atl-carte{background:var(--ops-surface);border-radius:16px;padding:10px;box-shadow:0 1px 3px #1D1D1F14;cursor:grab;min-width:0}
+.atl-carte:active{cursor:grabbing}
+.atl-carte-haut,.atl-achats li{display:flex;gap:10px;align-items:center;min-width:0}
+.atl-carte img,.atl-achats img,.atl-photo-vide{width:48px;height:48px;border-radius:10px;object-fit:cover;flex:0 0 48px;background:var(--ops-soft)}
+.atl-texte{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.atl-texte strong{font-size:13px;font-weight:600;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.atl-texte small{font-size:12px;color:var(--ops-muted)}
+.atl-numero{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+.atl-ambre-texte{color:#B25000!important;font-weight:600}
+.atl-carte-actions{display:flex;gap:6px;margin-top:8px}
+.atl-carte-actions>button{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atl-choix select{min-height:44px;width:44px;text-align:center;text-align-last:center;-webkit-appearance:none;appearance:none;font-weight:700;border-radius:12px;border:1px solid var(--ops-line);background:var(--ops-surface);color:var(--ops-ink);font-size:16px;padding:0 4px}
+.atl-ajout h3{margin:0 0 10px;font-size:15px}
+.atl-achats{list-style:none;margin:0 0 12px;padding:0;max-height:360px;overflow:auto}
+.atl-achats li{padding:8px 0;border-bottom:1px solid var(--ops-line)}
+.atl-num{display:flex;gap:8px;align-items:flex-end}
+.atl-num label{display:flex;flex-direction:column;gap:4px;flex:1;font-size:12px;color:var(--ops-muted)}
+.atl-num input,.atl-etapes input{min-height:44px;box-sizing:border-box;border:1px solid var(--ops-line);border-radius:12px;padding:0 12px;font-size:16px;background:var(--ops-surface);color:var(--ops-ink);width:100%}
+.atl-etapes-liste{margin:0 0 10px;padding:0 0 0 22px;display:flex;flex-direction:column;gap:8px}
+.atl-etapes-liste li{display:flex;gap:6px;align-items:center}
+.atl-etapes-liste li button{width:44px;padding:0;flex:0 0 44px}
+.atl-etapes>.ops-primaire{display:block;margin-top:12px;width:100%}
+@media(max-width:720px){.atl-tableau{grid-template-columns:repeat(var(--atl-n,4),86%);margin:0 -12px;padding:0 12px 6px;scroll-padding:0 12px}}
+@media(prefers-reduced-motion:reduce){.atl-colonne{transition:none}}
+.vrm-operations[data-ops-dark=true] .atl-colonne{background:#1C1C1E}
+.vrm-operations[data-ops-dark=true] :is(.atl-carte,.atl-pastille,.atl-num input,.atl-etapes input,.atl-choix select){background:#2C2C2E;color:#E5E5EA;border-color:#48484A}
+.vrm-operations[data-ops-dark=true] :is(.atl-ambre,.atl-ambre-texte){color:#EBC080!important}
+.vrm-operations[data-ops-dark=true] .atl-survol{box-shadow:inset 0 0 0 2px #0A84FF}

@@ -46,8 +46,22 @@ n'est pas touchée.
 - `node scripts/audit-calculette-emballages.cjs` : 37 verts ; `--prouve` 15/15 mutations rouges ;
   sur l'arbre d'`origin/main` (git archive ae0e418d) : rouge (modules absents).
 - `npm run build` vert.
-- Pas de banc de rendu écrit dans ce lot (limite d'utilisation) : à faire — captures 390/1512,
-  clair/sombre, de la calculette, de la carte Emballages et de l'escalier de la fiche.
+- Banc `scripts/bancs/calculette-emballages.cjs` (données inventées ; 390 px tactile et 1512 px,
+  clair et sombre) : **68 verts**. Il joue : Stock → Emballages → Ajouter (Boîte, 3, 0,80 €, seuil 2) ;
+  Colis → Préparer → « Colis fait » (écrit SA vente) puis « Colis fait » + « Annuler » (rien) ;
+  Stock : reste 2, ambre ; Ventes → récap → « non saisi » → puce « Boîte · 0,80 € » remplit, « OK »
+  écrit `emballage: '0.80'` ; Achats → Calculette (59,20 € exact ; Vestiaire « au plus » ; rien
+  écrit) ; ⌘K « calculette » ; fiche du N°11 : le prix changé (95 €) ajouté au journal, escalier
+  110 → 95 €, 3 prix lus datés. Sur l'arbre d'`origin/main` rebâti : 7 rouges ; par mutation
+  rebâtie (décompte retiré + prix changé jamais noté) : 3 rouges.
+- Vu sur les captures et corrigé : les champs de la feuille Emballages écrasés à 22 px (flex en
+  colonne) ; le bouton « Calculette » absent dans l'espace Vinted (pas d'en-tête : une rangée en
+  haut d'Achats) ; « Plus que 2 » répétait le nombre (§7) ⇒ « Bientôt plus : pense à en racheter » ;
+  l'escalier écrivait 110 € → 95 € déjà dans la liste ⇒ retiré ; points de l'escalier ovales en
+  1512 ⇒ ronds, largeur bornée à 360 px ; « Leboncoin » tronqué au téléphone ⇒ sites en 2×2.
+- Bancs relancés un à un : `fiche-paire` vert, `preparer-relais` 131 conformes, `recap-vente`
+  80/0, `cout-vente` 60/0 ; `stock-annonces` : 20 rouges, EXACTEMENT les mêmes sur `origin/main`
+  (diff des intitulés vide) — pas de ce lot.
 
 ## Geste de Julien
 Au Stock, « Emballages » → Ajouter : ses cartons/sacs, combien, le coût s'il veut.

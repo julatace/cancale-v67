@@ -20,6 +20,7 @@ import { NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card,
 import StockExplication from "../StockExplication.jsx";
 // ⟦← App.jsx #2⟧
 import { InventaireStock } from "../InventaireStock.jsx";
+import { InventaireAnnuel } from "../InventaireAnnuel.jsx";   // (10 nov., lot W) l'inventaire de fin d'année
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
 
 // ⟦← App.jsx #3⟧
@@ -242,6 +243,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // (9 nov.) La feuille ouverte est dite à la coque : si le réseau coupe pendant le tour,
   // l'inventaire hors connexion la rouvre (les saisies sont sur l'appareil). Démontée AVEC
   // le réseau (changement d'écran), elle ne se rouvrira pas toute seule.
+  // (10 nov., lot W) L'INVENTAIRE DE FIN D'ANNÉE (src/InventaireAnnuel.jsx) ; « Je vérifie mes
+  // cartons » ouvre l'inventaire ci-dessus, et le referme sur la fin d'année.
+  const [annuel, setAnnuel] = React.useState(false);
+  const retourAnnuel = React.useRef(false);
   React.useEffect(() => { INVENTAIRE_FEUILLE.ouverte = !!inventaire; }, [inventaire]);
   React.useEffect(() => () => { try { if (typeof navigator === 'undefined' || navigator.onLine !== false) INVENTAIRE_FEUILLE.ouverte = false; } catch (_) {} }, []);
   // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
@@ -860,7 +865,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const ficheDe = (k) => ficheParCle[k] || (fichesParCle[k] || [])[0] || null;
     return <InventaireStock stock={stockInv} meubles={meubles} slots={slots} owner={AUTH.user?.id || ''} cle={cleNum}
       lire={lireLigneInventaire} ecrire={ecrireLigneInventaire} Feuille={SheetShell} Micro={MicDictee} confirmer={askConfirm} nomsComptes={comptesNoms}
-      onFermer={() => setInventaire(false)}
+      onFermer={() => { setInventaire(false); if (retourAnnuel.current) { retourAnnuel.current = false; setAnnuel(true); } }}
       onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
       onVoirCase={(k) => { const f = ficheDe(k); setInventaire(false); montrer(f ? { ...f, numero: f.numero } : { numero: k }); }}
       peutSortir={(k) => !!ficheDe(k)} onSortir={(k) => { const f = ficheDe(k); if (f) sortir({ ...f, id: f.id, numero: f.numero, title: f.title || '' }); }}/>;
@@ -976,6 +981,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
     <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
       lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
+    <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>Inventaire de fin d’année</span><span aria-hidden="true">›</span></button>
+    {annuel ? <InventaireAnnuel owner={AUTH.user?.id || ''} cle={cleNum} Feuille={SheetShell} lire={lireLigneInventaire} onFermer={() => setAnnuel(false)} onSaisirPrix={saisirPrixStock}
+      onVerifier={() => { retourAnnuel.current = true; setAnnuel(false); setInventaire(true); }}
+      onAnnonces={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} }}/> : null}
     {blocCherche}
     {meubles.length === 0 && <StockExplication />}
     {blocVendues}
