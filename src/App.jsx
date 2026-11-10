@@ -18450,9 +18450,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
       ) : voie === 'page' ? (
         /* Relecture croisée de la 5.174 : une 5.164/5.170, connectée par l'ancien
            message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
-        <p style={{margin:0}}>Je la relie d’ici, <b style={{color:C.text}}>sans rien taper</b>. Sinon : recharge, ou son icône {NAV.hautDe} (<b style={{color:C.text}}>e-mail et mot de passe VRM</b>).</p>
+        <p style={{margin:0}}>Je la connecte d’ici, <b style={{color:C.text}}>sans rien à taper</b>. Sinon : recharge, ou son icône {NAV.hautDe} (<b style={{color:C.text}}>e-mail et mot de passe VRM</b>).</p>
       ) : (
-        <p style={{margin:0}}>Je la relie d’ici, <b style={{color:C.text}}>sans rien taper</b>. Sinon : son icône {NAV.hautDe}, puis <b style={{color:C.text}} data-bouton-lier-ext="">{boutonLierExt()}</b>.</p>
+        <p style={{margin:0}}>Je la connecte d’ici, <b style={{color:C.text}}>sans rien à taper</b>. Sinon : son icône {NAV.hautDe}, puis <b style={{color:C.text}} data-bouton-lier-ext="">{boutonLierExt()}</b>.</p>
       )}
     </>
   ) : etape === 'connectee' ? (
@@ -54403,7 +54403,7 @@ function AppCoeur() {
                 // La base a REFUSÉ (elle a répondu) ≠ la base n'a pas répondu.
                 toast(refus && refus!=='refus' ? SAUVEGARDE_AVANT_REMISE
                   : refus ? '⚠ La base a refusé cette restauration. Rien n\'a changé.'
-                  : '⚠ Restauration pas enregistrée (base muette). Rien n\'a changé : réessaie.');
+                  : '⚠ La restauration n\'a pas pu être enregistrée. Rien n\'a changé : réessaie.');
                 return;
               }
               toast('✓ Sauvegarde restaurée ! L\'app va se recharger.');
