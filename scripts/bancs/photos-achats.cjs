@@ -166,6 +166,7 @@ async function blocV(nav, W, sombre) {
       dit(a, `${T} V1 ${nom} : une vignette d'article chargée est à l'écran`);
       if (!a) { await capture(pg, `V1-${nom}-${W}`); await ctx.close(); return; }
       const v = await visionneuse(pg);
+      if (!v && process.env.BANC_SONDE) console.log(await pg.evaluate(() => { const i = [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].find((x) => x.getBoundingClientRect().width >= 32 && x.naturalWidth > 0); const out = []; for (let e = i; e && out.length < 8; e = e.parentElement) { const r = e.getBoundingClientRect(); out.push(`${e.tagName}.${String(e.className || '').slice(0, 40)} ${Math.round(r.width)}x${Math.round(r.height)} ${e.getAttribute('role') || ''}`); } return out.join(' < '); }));
       dit(!!v && v.plein && /rgb\(0, 0, 0\)/.test(v.fond) && v.dessus && v.charge, `${T} V1 ${nom} : la photo s'ouvre en grand (plein écran, fond noir, au-dessus de tout)`, JSON.stringify(v));
       await capture(pg, `V1-${nom}-${W}${sombre ? '-sombre' : ''}`);
       if (tel) { await pg.goBack(); } else { await pg.keyboard.press('Escape'); }
@@ -185,6 +186,7 @@ async function blocV(nav, W, sombre) {
     await el.scrollIntoViewIfNeeded(); if (tel) await el.tap(); else await el.click(); await pg.waitForTimeout(400);
     let v = await visionneuse(pg);
     dit(v && v.n === 3 && v.i === 0 && /1\/3/.test(v.compteur) && v.fleches === 2, `${T} V2 galerie : 3 photos, « 1/3 », deux flèches`, JSON.stringify(v));
+    dit(await pg.locator('[data-visionneuse-lien]').count() === 1, `${T} V2 le lien de la photo (l'annonce sur Vinted) reste dans la visionneuse`);
     await pg.click('[data-visionneuse-fleche="apres"]'); await pg.waitForTimeout(300);
     v = await visionneuse(pg);
     dit(v && v.i === 1 && /L0-1/.test(v.src) && /2\/3/.test(v.compteur), `${T} V2 la flèche montre la photo 2/3`, JSON.stringify(v));
@@ -220,16 +222,17 @@ async function blocV(nav, W, sombre) {
     await pg.click('[data-achats-onglet="all"]').catch(() => {}); await pg.waitForTimeout(500);
     const row = '[data-achat-tx="73001"]';
     const img = pg.locator(`${row} img[data-vrm-vignette]`).first();
+    await img.waitFor({ timeout: 10000 }); await img.evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300);
     if (tel) await img.tap(); else await img.click();
     await pg.waitForTimeout(350);
     dit(!!(await visionneuse(pg)) && !(await pg.locator('[role="menu"].vrm-buy-menu').count()), `${T} V5 la vignette d'un achat ouvre la photo, pas le menu`);
     await pg.keyboard.press('Escape'); if (tel) await pg.click('[data-visionneuse-fermer]').catch(() => {}); await pg.waitForTimeout(300);
-    await pg.click(`${row} .vrm-buy-more`); await pg.waitForTimeout(300);
+    await pg.locator(`${row} .vrm-buy-more`).evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.click(`${row} .vrm-buy-more`); await pg.waitForTimeout(300);
     dit(await pg.locator('[role="menu"].vrm-buy-menu').count() === 1 && !(await visionneuse(pg)), `${T} V5 le ⋯ de la rangée ouvre toujours son menu`);
     await pg.mouse.click(5, 5).catch(() => {}); await pg.waitForTimeout(300);
     // V6 : l'achat dont la photo est absente : rien ne s'ouvre.
     const vide = pg.locator('[data-achat-tx="73004"] .vrm-buy-ph').first();
-    if (await vide.count()) { if (tel) await vide.tap(); else await vide.click(); await pg.waitForTimeout(300); dit(!(await visionneuse(pg)), `${T} V6 photo absente : rien ne s'ouvre`); }
+    if (await vide.count()) { await vide.evaluate((e) => e.scrollIntoView({ block: 'center' })); if (tel) await vide.tap(); else await vide.click(); await pg.waitForTimeout(300); dit(!(await visionneuse(pg)), `${T} V6 photo absente : rien ne s'ouvre`); }
     else dit(false, `${T} V6 l'achat à la photo absente est rendu`);
     await ctx.close();
   });
@@ -289,7 +292,7 @@ async function blocF(nav, W, sombre) {
     const { ctx, pg, erreurs, etat, tel } = await ouvrir(nav, { W, sombre, tab: 'cat_achats&vue=achats' });
     await pg.click('[data-achats-onglet="all"]').catch(() => {}); await pg.waitForTimeout(600);
     const joindre = async (tx, fichier) => {
-      await pg.click(`[data-achat-tx="${tx}"] .vrm-buy-more`); await pg.waitForTimeout(250);
+      await pg.locator(`[data-achat-tx="${tx}"] .vrm-buy-more`).evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.click(`[data-achat-tx="${tx}"] .vrm-buy-more`); await pg.waitForTimeout(250);
       const [fc] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 5000 }), pg.click(`[data-achat-joindre-facture="${tx}"]`)]);
       await fc.setFiles(fichier); await pg.waitForTimeout(1500);
     };

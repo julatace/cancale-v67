@@ -100,12 +100,21 @@ export function vignetteTouchee(cible) {
   if (img.complete === false || !(img.naturalWidth > 0)) return null;   // image absente ⇒ rien
   // Une photo qui EST tout le bouton (case du Stock, choix d'une photo dans l'atelier
   // Republier) : il n'y a pas de « reste de la rangée », le geste du bouton gagne.
-  const porte = img.parentElement && img.parentElement.closest ? img.parentElement.closest('button, a[href], [role="button"], label') : null;
+  // Un LIEN (la photo d'une carte d'Annonces mène à l'annonce sur Vinted) ne gagne
+  // pas : la photo s'ouvre en grand et la visionneuse garde le lien (`lienVignette`).
+  const porte = img.parentElement && img.parentElement.closest ? img.parentElement.closest('button, [role="button"], label') : null;
   if (porte) {
     const p = porte.getBoundingClientRect();
     if (p.width > 0 && p.height > 0 && (r.width * r.height) >= 0.8 * (p.width * p.height)) return null;
   }
   return img;
+}
+
+// Le lien d'une vignette qui en porte un (une annonce sur Vinted…) : gardé dans la visionneuse.
+export function lienVignette(img) {
+  const a = img && img.closest ? img.closest('a[href]') : null;
+  const h = a ? String(a.href || '') : '';
+  return /^https:\/\//i.test(h) ? h : '';
 }
 
 export function ouvrirVisionneuse(photos, index = 0) {

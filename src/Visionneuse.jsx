@@ -9,7 +9,7 @@
 // doigt, double toucher / double clic, molette à l'ordinateur.
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { EVT_VISIONNEUSE, vignetteTouchee, origineVignette, galerieDe, borneZoom, borneDeplacement, ZOOM_DOUBLE } from './visionneuse.js';
+import { EVT_VISIONNEUSE, vignetteTouchee, origineVignette, lienVignette, galerieDe, borneZoom, borneDeplacement, ZOOM_DOUBLE } from './visionneuse.js';
 
 const Z_VISIONNEUSE = 15000;   // au-dessus des feuilles (≤ 10000), sous les confirmations (20000) et les messages (30000)
 
@@ -22,7 +22,7 @@ const Croix = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
 );
 
-function Scene({ photos, index, fermer, Photo, Retour }) {
+function Scene({ photos, index, lien = '', fermer, Photo, Retour }) {
   const [i, setI] = useState(index);
   const [z, setZ] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -126,6 +126,10 @@ function Scene({ photos, index, fermer, Photo, Retour }) {
         <button ref={croix} type="button" data-visionneuse-fermer="" aria-label="Fermer la photo" onClick={fermer}
           style={{ pointerEvents: 'auto', width: 44, height: 44, borderRadius: 22, border: 0, background: 'rgba(255,255,255,.16)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><Croix/></button>
       </div>
+      {lien ? (
+        <a href={lien} target="_blank" rel="noreferrer" data-visionneuse-lien="" onClick={() => fermer()}
+          style={{ position: 'absolute', left: '50%', bottom: 'max(18px, env(safe-area-inset-bottom))', transform: 'translateX(-50%)', minHeight: 44, padding: '0 18px', borderRadius: 22, background: 'rgba(255,255,255,.16)', color: '#fff', display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>Voir l’annonce ↗</a>
+      ) : null}
       {n > 1 ? [-1, 1].map((d) => (
         <button key={d} type="button" data-visionneuse-fleche={d < 0 ? 'avant' : 'apres'} aria-label={d < 0 ? 'Photo précédente' : 'Photo suivante'} onClick={() => aller(d)}
           style={{ position: 'absolute', top: '50%', [d < 0 ? 'left' : 'right']: 10, transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: 22, border: 0, background: 'rgba(255,255,255,.16)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><Fleche sens={d}/></button>
@@ -146,12 +150,12 @@ export default function Visionneuse({ Photo = null, Retour = null }) {
       if (!img) return;
       e.preventDefault(); e.stopPropagation();
       const g = galerieDe(origineVignette(img));
-      if (g.photos.length) setVue({ photos: g.photos, index: g.index, cle: Date.now() });
+      if (g.photos.length) setVue({ photos: g.photos, index: g.index, lien: lienVignette(img), cle: Date.now() });
     };
     window.addEventListener(EVT_VISIONNEUSE, ouvrir);
     document.addEventListener('click', clic, true);
     return () => { window.removeEventListener(EVT_VISIONNEUSE, ouvrir); document.removeEventListener('click', clic, true); };
   }, []);
   if (!vue || typeof document === 'undefined') return null;
-  return createPortal(<Scene key={vue.cle} photos={vue.photos} index={vue.index} fermer={fermer} Photo={Photo} Retour={Retour}/>, document.body);
+  return createPortal(<Scene key={vue.cle} photos={vue.photos} index={vue.index} lien={vue.lien || ''} fermer={fermer} Photo={Photo} Retour={Retour}/>, document.body);
 }

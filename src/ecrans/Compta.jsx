@@ -17,6 +17,7 @@ import { prendreDemande } from '../rechercheEcran.js';
 import { recuPublieEntre } from '../design/carteChiffres.js';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre } from '../registres.js';
+import { lireFactures } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
 
@@ -1950,13 +1951,16 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
     fetchEmailAchats().then((r) => { if (!mort) setRecus(recusAchatDe(r)); }).catch(() => { if (!mort) setRecus(null); });
     return () => { mort = true; };
   }, []);
+  // (10 nov., lot AN) Les factures d'achat jointes (liste sans contenu) : mentionnées sur leur ligne d'achat ; pas lues ⇒ aucune mention.
+  const [facturesJointes, setFacturesJointes] = React.useState(null);
+  React.useEffect(() => { let mort = false; lireFactures({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: sbAuth }).then((m) => { if (!mort) setFacturesJointes(m); }); return () => { mort = true; }; }, []);
   const pret = calc.etat !== 'encours' && achats !== undefined && recus !== undefined && regime !== undefined;
   const D = React.useMemo(() => {
     if (!pret) return undefined;
     const recettes = calc.etat === 'lu' ? recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) : null;
     const registre = registreAchatsDe({ achats, recus, periode, panelOff });
-    return donneesExportComptable({ periode, recettes, achats: registre, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime });
-  }, [pret, calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER, achats, recus, panelOff, ligne, regime]);
+    return donneesExportComptable({ periode, recettes, achats: registre, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime, factures: facturesJointes });
+  }, [pret, calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER, achats, recus, panelOff, ligne, regime, facturesJointes]);
   const [enCours, setEnCours] = React.useState('');
   const telecharger = async (forme) => {
     if (!D || enCours) return;
