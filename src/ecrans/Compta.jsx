@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
+import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
 import { periodeADater } from '../aDaterAnnee.js';
 import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -1821,7 +1822,8 @@ const registreAchatsDe = ({ achats, recus, periode, panelOff }) => {
   let fiches = null; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
   // (5 nov.) Les achats en gros (Achats → Fournisseurs) : UNE ligne chacun, par
   // leur total + frais, lus par LA règle du registre (`lireRegistre`).
-  return registreDesAchats({ achats, hors: load('vinted_offvinted_buys', []) || [], fiches, periode,
+  // (10 nov., lot BH) Un achat hors plateforme masqué comme DOUBLE d'un autre n'est pas compté deux fois.
+  return registreDesAchats({ achats, hors: horsVisibles(load('vinted_offvinted_buys', []) || [], load(CLE_HORS_MASQUES, []) || []), fiches, periode,
     ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
     exclu: (o) => compteEcarteChoix(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
     gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,
@@ -1860,7 +1862,7 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
   // Un achat en gros, un rattachement, une fiche reliée changés (ici ou sur un
   // autre appareil) : le registre des achats se relit.
   const [ticAchats, setTicAchats] = React.useState(0);
-  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_FOURNISSEURS || k === 'vinted_annonce_numeros' || k === 'vinted_offvinted_buys') setTicAchats((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_FOURNISSEURS || k === 'vinted_annonce_numeros' || k === 'vinted_offvinted_buys' || k === CLE_HORS_MASQUES) setTicAchats((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const recettes = React.useMemo(() => {
     if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
     return recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER });
