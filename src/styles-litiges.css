@@ -48,9 +48,8 @@
 :root:root body .vrm-lit .vrm-lit-limite.is-presse { color: var(--lit-ambre); }
 :root:root body .vrm-lit .vrm-lit-titre { margin: 0 !important; font: 500 13px/1.3 var(--vrm-police, system-ui, sans-serif) !important; color: var(--lit-gris) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Les quatre preuves : une rangée de pastilles (deux par ligne au téléphone). */
+/* Les quatre preuves : deux par ligne (la carte reste étroite, même sur ordinateur). */
 :root:root body .vrm-lit .vrm-lit-preuves { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
-@media (min-width: 768px) { :root:root body .vrm-lit .vrm-lit-preuves { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
 :root:root body .vrm-lit .vrm-lit-preuve {
   display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 6px; align-items: center; min-width: 0;
   padding: 8px 10px; border-radius: 14px; background: var(--lit-tuile); color: var(--lit-encre);

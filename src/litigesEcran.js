@@ -115,7 +115,8 @@ export function litigesDesVentes({ res, preuves = null, retourDe = null, sites =
       cle: l.cle, plateforme: l.plateforme || 'vinted', genre: l.genre, libelle: LIBELLE_GENRE[l.genre] || 'Litige',
       tx, num: l.num ? str(l.num) : '', titre: str(l.titre || l.article), compte: l.compte || null,
       limite: l.limite || null, limiteTexte: lim, presse: !!l.presse, depassee: !!l.depassee,
-      etape: etape && etape.etape ? LIBELLE_ETAPE[etape.etape] || '' : '',
+      // L'étape du retour (src/retoursStock.js), seulement quand elle AJOUTE quelque chose (« Retour initié » redirait « Retour »).
+      etape: etape && etape.etape && etape.etape !== 'initie' ? LIBELLE_ETAPE[etape.etape] || '' : '',
       geste: l.geste, depuis: l.recuLe || null,
       preuves: (typeof preuves === 'function' ? preuves(l) : null) || preuvesVente({}),
     };
