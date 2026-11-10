@@ -5014,7 +5014,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
       <details><summary>Installer ou mettre à jour l’extension</summary>
         <div className="vrm-connexions-actions">{(()=>{const b=installerExtensionIci();return b.boutique?<a href={b.lien} target="_blank" rel="noreferrer" data-ext-boutique={b.nav}>{b.nomBoutique} · mises à jour automatiques</a>:null;})()}<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a>{boutiqueOrion()&&<a href={boutiqueOrion()} target="_blank" rel="noreferrer" data-orion-boutique="">Orion · depuis la boutique (mises à jour automatiques)</a>}<a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a><a href={`/VRM-Orion-dossier.zip?v=${EXT_ATTENDUE}`} download data-orion-dossier="">Orion · en dossier</a></div>
-        <p>Le zip se dézippe en un dossier : mets-le à la place de l'ancien, PUIS ⟳ sur VRM dans chaque navigateur (<code>chrome://extensions</code>, <code>edge://extensions</code>).</p>
+        <p>Le zip se dézippe en un seul dossier : mets-le à la place de l'ancien, PUIS ⟳ sur VRM dans chaque navigateur (<code>chrome://extensions</code>, <code>edge://extensions</code>).</p>
         <p>Orion : extensions Firefox autorisées, puis Extensions → + → le fichier XPI.</p>
         <p>Refusé ? Prends « Orion · en dossier » et choisis ce dossier.</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
