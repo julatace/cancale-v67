@@ -29,6 +29,7 @@ import { DISCORD_ERREURS } from './discordErreurs.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Accompagnement from './Accompagnement.jsx';
+import { lienFormateurLu } from './formateur.js';
 import { codeDuLien } from './accompagnement.js';
 import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
 import './communaute.css';
@@ -387,7 +388,10 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   // (5 nov.) Un lien d'invitation (`?tab=communaute&groupe=CODE`, gardé par l'app
   // avant de nettoyer l'adresse) ouvre l'onglet Groupes, code déjà tapé.
   const [codeLien] = useState(() => { try { const c = sessionStorage.getItem('vrm_accomp_lien') || ''; sessionStorage.removeItem('vrm_accomp_lien'); return codeDuLien('?groupe=' + encodeURIComponent(c)); } catch (_) { return ''; } });
-  const [vue, setVue] = useState(codeLien ? 'groupes' : 'carte');   // carte · classement · groupes
+  // (10 nov., lot AR) « Demander à rejoindre » depuis la page publique d'un formateur
+  // (`?tab=communaute&formateur=<adresse>&g=<groupe>`, gardé par l'app) : onglet Groupes.
+  const [lienFormateur] = useState(() => { try { const c = sessionStorage.getItem('vrm_form_lien'); sessionStorage.removeItem('vrm_form_lien'); return lienFormateurLu(c); } catch (_) { return null; } });
+  const [vue, setVue] = useState(codeLien || lienFormateur ? 'groupes' : 'carte');   // carte · classement · groupes
   const [groupeId, setGroupeId] = useState(null);     // null = tous les membres
   const vivant = useRef(true);
   const lire = useCallback(async (discret) => {
@@ -476,7 +480,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     onFait={async (t, id) => { setToast(t); await lire(true); if (id !== undefined) setGroupeId(id); }} />;
   if (vue === 'groupes') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="groupes">
     {entete}{onglets}
-    <Accompagnement api={api} headers={headers} prenom={prenom} codeLien={codeLien} portail={portail} FermeAuRetour={FermeAuRetour} onToast={setToast} />
+    <Accompagnement api={api} headers={headers} prenom={prenom} codeLien={codeLien} lienFormateur={lienFormateur} portail={portail} FermeAuRetour={FermeAuRetour} onToast={setToast} />
     {toast && portail(<div className="vrm-cm-toast" role="status" data-cm-toast>{toast}</div>)}
   </section>;
   if (vue === 'classement') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="classement">

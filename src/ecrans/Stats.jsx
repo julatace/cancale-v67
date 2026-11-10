@@ -28,6 +28,7 @@ import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
 // ⟦← App.jsx #4⟧
 import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
 import SourcesAchats from "../SourcesAchats.jsx";
+import MargePlateforme from "../MargePlateforme.jsx";   // (10 nov., lot I) marge par plateforme — un bloc isolé
 import VitesseEnvoi from "../VitesseEnvoi.jsx";   // (10 nov., lot BM) vitesse d'envoi — un bloc isolé
 import AvisLus from "../AvisVinted.jsx";   // (10 nov., lot BN) les avis Vinted lus   // (10 nov., lot BG) d'où viennent mes achats — un bloc isolé
 // ⟦← App.jsx #5⟧
@@ -622,7 +623,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
-      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
+      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix}/>
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
@@ -1322,7 +1323,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
     { 'data-sv-carte': 'notes', 'data-sv-etat': N.etat });
   return <div className="vrm-sv-rangee vrm-sv-rangee-2" data-sv-annul-notes="">{annul}{notes}</div>;
 }
-function StatsVitrine({ liveStats, panelOff, periode }) {
+function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
   const { releve, stock, benef, extras, lignes } = useReleveStats();
@@ -1594,6 +1595,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       <SourcesAchats owner={(AUTH.user && AUTH.user.id) || ''} de={b.de} a={b.a}/>
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
+      {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
+      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
       <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
