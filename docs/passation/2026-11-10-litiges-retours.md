@@ -76,8 +76,10 @@ chantier `claude/cout-vente`).
   partielle, « Autres » classé).
 - Banc **neuf** `scripts/bancs/litiges-ecran.cjs` (ventes inventées à la forme mesurée ; 390 px
   tactile et 1512 px, clair ET sombre ; ventes illisibles) : **vert** sur la branche ; sur
-  `origin/main` (git archive, build, banc copié dedans) : rouge (l'écran n'existe pas) ; sur un
-  build MUTÉ (achats mêlés + date inventée + remboursement = retour) : rouge (voir le rapport).
+  `origin/main` (git archive, build, banc copié dedans) : **74 rouges** (l'écran n'existe pas ; l'audit,
+  lui : « règle absente ») ; sur un build MUTÉ (achats mêlés + date inventée + remboursement = retour) :
+  **32 rouges** (carte du retour d'achat, « Avant le 15 nov. », Dunk 3, Samba 2 sur 2, nombre publié 4…).
+- Banc touché : `a-trancher.cjs` (la nouvelle source semée à 0) — vert.
 - Audits : variables, tdz, coherence, identite, icones, statuts, a-trancher, litiges,
   retours-stock, ce-qui-rapporte : verts. `npm run build` vert.
 - Captures regardées (390 clair/sombre, 1512 clair/sombre, entrée Ventes, À trancher, pas su) :
