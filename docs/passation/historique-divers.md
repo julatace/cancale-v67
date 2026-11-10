@@ -1138,3 +1138,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (fraîcheur unique, intégration)
 - **9 nov. · Pastille de l'icône (lot Z)** : l'icône de VRM (écran d'accueil, Dock) porte le nombre de colis à envoyer = le badge de Colis (`vrm_colis_aposter`, frais < 12 h) ; pas su ou 0 ⇒ effacée (`src/pastilleIcone.js`, banc `navigation-tache` Z, rouge par mutation). File des lots : `docs/passation/2026-11-09-file-des-lots.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (transporteurs parfaits)
+- **9 nov. · Direction artistique 4** : feuilles et ateliers (Republier) en portail à la forme unique (groupes blancs, croix ronde, pied plein), confirmations à deux gestes égaux, toasts en carte sans rouge, états vides centrés, « pas su » en carte au bouton gris, barre du bas pleine (styles-premium.css §12). `docs/passation/2026-11-09-direction-artistique-4.md`. Geste : regarder les planches.
