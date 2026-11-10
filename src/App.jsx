@@ -115,6 +115,8 @@ import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee 
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher } from "./aTrancher.js";
 import ATrancher from "./ATrancher.jsx";
+import LitigesEnCours, { EntreeLitiges } from "./LitigesEnCours.jsx";
+import { litigesDesVentes, retoursParModele, preuvesVente, nombreLitigesPublie } from "./litigesEcran.js";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX, ORDRE_CHOIX as ORDRE_CHOIX_CYCLE } from "./cycleArticle.js";
@@ -14191,6 +14193,8 @@ const BAR_GROUPE={
   cat_expedition:'cat_bord',
   // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue est mise en avant.
   organisation:'settings',
+  // (10 nov., lot BB) « Litiges en cours » s'ouvre depuis Ventes et À trancher.
+  litiges:'ventes',
 };
 // Le nom COURT d'un écran, pour l'en-tête de la coque (titre qui apparaît au
 // défilement). Une source : les listes de navigation elles-mêmes (§11).
@@ -14198,7 +14202,7 @@ function titreEcran(tab) {
   if (tab === 'journee') return 'Ma journée';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  return { litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
@@ -14215,7 +14219,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -32999,7 +33003,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // commande, `numLigneEbay` — jamais le titre). Sans compte eBay relié : `[]`.
   const [retoursEbayLus, setRetoursEbayLus] = useState(undefined);
   useEffect(() => {
-    if (only !== 'bordereaux') return;
+    // (10 nov., lot BB) + l'écran « Litiges en cours » : les retours eBay y sont des litiges de vente.
+    if (only !== 'bordereaux' && only !== 'litiges') return;
     let vivant = true;
     (async () => {
       const c = RETOURS_EBAY_CACHE;
@@ -33071,7 +33076,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Trois états : `undefined` en cours · `null` pas su · la liste.
   const [emailsLitiges, setEmailsLitiges] = useState(EMAILS_LITIGES_CACHE.v);
   useEffect(() => {
-    if (only !== 'journee' && only !== 'ventes' && only !== 'bordereaux') return undefined;
+    if (only !== 'journee' && only !== 'ventes' && only !== 'bordereaux' && only !== 'litiges') return undefined;
     let vivant = true;
     (async () => {
       const c = EMAILS_LITIGES_CACHE;
@@ -34203,7 +34208,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { fini = true; };
     /* eslint-disable-next-line */
   }, [sub, convs.items, cleComptes]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && (emailBords===null || emailBordsDeMemoire.current)) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats'||curSub==='litiges') && (emailBords===null || emailBordsDeMemoire.current)) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // (9 nov. au soir, « transporteurs parfaits ») Des étiquettes jamais lues ⇒ le serveur les lit (par lots) ;
   // une étiquette lue ⇒ les bordereaux sont relus (le transporteur apparaît sans recharger la page).
   useEffect(() => { if (Array.isArray(emailBords) && (curSub==='bordereaux'||curSub==='ventes'||curSub==='journee')) lireEtiquettesManquantes(emailBords); /* eslint-disable-next-line */ }, [emailBords, sub]);
@@ -34225,8 +34230,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (6 nov., audit des chiffres) ET SUR MA JOURNÉE : sans les bordereaux captés, sa case disait
     // « au moins 1 à imprimer » (les e-mails seuls) quand Colis en comptait 4. Lecture scalaire
     // (`meta->>`, une par compte, en même temps) — les octets du PDF ne partent qu'à l'impression.
-    if ((curSub!=='bordereaux' && curSub!=='ventes' && curSub!=='journee') || !accounts.length) return;
-    if (curSub==='ventes' || curSub==='journee') { await rechargerLabels(); return; }
+    if ((curSub!=='bordereaux' && curSub!=='ventes' && curSub!=='journee' && curSub!=='litiges') || !accounts.length) return;
+    if (curSub==='ventes' || curSub==='journee' || curSub==='litiges') { await rechargerLabels(); return; }
     let best = null;
     // ⚠️ SCALAIRES SEULEMENT : on demande « y a-t-il un PDF, et de quand ? »,
     //    pas le PDF. Les octets ne partent qu'au clic (§34 — mesuré : 1,6 Mo
@@ -34325,7 +34330,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
   // (2 nov.) + Ventes : le récapitulatif d'une vente dit son transporteur LU (e-mail ou ligne du
   // transporteur du même n°) — la même lecture partagée (`cachedRow`), pas une de plus.
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee'||curSub==='ventes') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee'||curSub==='ventes'||curSub==='litiges') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
   // ── LES PHOTOS DES ACHATS, LUES DANS LEUR TRANSACTION (Achats seulement) ──
   // (23 oct.) Ma journée lisait ces transactions pour leurs n° de suivi
   // (`shipment.tracking_code`) — mesuré : 0 sur 1 290 en porte. Les n° viennent
@@ -37592,6 +37597,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     deps.push(litige ? [litige.cle, litige.genre, litige.limite || '', litige.geste.url, litige.ancien ? 1 : 0].join('|') : '');
     return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige };
   };
+  // ── (10 nov., lots BB et BI) « LITIGES EN COURS » ET « RETOURS PAR MODÈLE » ─────────────
+  // Les lignes de VENTE de `litigesSuivis` (src/litiges.js, la règle unique) avec les preuves
+  // rangées PAR SA TRANSACTION (identité, §5) : la photo de son annonce, le n° de suivi de SON
+  // bordereau et le statut lu chez le transporteur pour CE n°, le bordereau (e-mail ou capté),
+  // et l'emplacement de la photo du carton (lot AZ, à venir). Lecture seule : le geste est le
+  // lien vers le site (src/litiges.js `gesteDe`). Calculé sur Litiges, Ma journée et Ventes
+  // (les e-mails de litige y sont lus) ; le nombre est publié pour « À trancher ».
+  const litigesVentesEcran = useMemo(() => {
+    if (curSub !== 'litiges' && curSub !== 'journee' && curSub !== 'ventes') return null;
+    const tm = transp === undefined ? undefined : transpMap;
+    const et = pdfEtiquettesParTx() || {};
+    return litigesDesVentes({
+      // Hors de l'écran Litiges, les sites ne sont pas passés : eBay compte comme « utilisé » tant
+      // que ses retours n'ont pas été lus (rien n'est publié d'un compte partiel présenté complet).
+      res: litigesSuivis, sites: only === 'litiges' ? (sitesPresents || null) : new Set(['vinted', 'ebay']),
+      ebay: only === 'litiges' ? retoursEbayLus : (RETOURS_EBAY_CACHE.v === undefined ? undefined : RETOURS_EBAY_CACHE.v),
+      retourDe: (tx) => (retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.find((x) => x.tx === tx) || null : null),
+      preuves: (l) => {
+        const o = l.commande; if (!o || o.transaction_id == null) return null;
+        const tx = String(o.transaction_id);
+        const b = bordParTx[tx] || null, lab = labelsCaptes[tx] || null, pdf = et[tx] || null;
+        let photo = ''; try { photo = preparerLigneVente(o).photo || ''; } catch (_) { photo = orderPhoto(o) || ''; }
+        return preuvesVente({ bord: b, label: lab, suivi: normaliserSuivi((b && (b.suivi || b.suiviPdf)) || (pdf && pdf.s) || ''), transp: tm, photo });
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, litigesSuivis, retoursSuivis, sitesPresents, retoursEbayLus, bordParTx, labelsCaptes, transp, transpMap, listings.items, txnItem, numeros]);
+  useEffect(() => {
+    const n = nombreLitigesPublie(litigesVentesEcran);
+    if (n == null) return;
+    publierATrancher('litiges-en-cours', n, litigesVentesEcran.cartes.slice(0, 4).map((c) => ({ id: c.cle, num: c.num, photo: c.preuves && c.preuves.photo && c.preuves.photo.etat === 'ok' ? c.preuves.photo.src : '' })));
+  }, [litigesVentesEcran]);
+  // BI : pour chaque modèle (src/ceQuiRapporte.js `modeleSur`, un regroupement, jamais une
+  // identité), combien de ventes prouvées ont fini en retour ou en litige. Sur Litiges seulement.
+  const retoursModeles = useMemo(() => {
+    if (curSub !== 'litiges') return null;
+    const ventes = sales.items === null || !txnPret ? undefined : (sales.error ? null : (sales.items || []).filter((o) => !acctOffOf(o)));
+    return retoursParModele({ ventes, etats: TXN_ETATS_LU === false ? null : etatTxn, emails: emailsLitiges });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, sales.items, sales.error, txnPret, emailsLitiges, accounts]);
   const actionsVentes = React.useRef(null);
   actionsVentes.current = { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden, demanderDepose: deposeVente.demander };
   const actionsVentesProxy = React.useMemo(() => {
@@ -40634,6 +40679,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
 
+      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
         {/* (2 nov., style « Fusion », son choix : « la première photo avec les stats
@@ -53126,6 +53172,8 @@ function AppCoeur() {
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
+        {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
+        {t==='ventes' && !baseKO && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div>}
         {/* (6 nov., filet 2) La section d'un site tombe seule : le titre et le filtre des sites restent, on change de site. */}
@@ -54052,11 +54100,11 @@ function AppCoeur() {
           </DansBarreHaut>
           {baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes}/></div>}
         </GardeEcran>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; if(tab==='cat_bord'&&platSub==='leboncoin') return null; return map[tab] ? <GardeEcran nom={tab} resetKey={platSub}><Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_bord:'bordereaux',cat_expedition:'bordereaux',litiges:'litiges'}; if(tab==='cat_bord'&&platSub==='leboncoin') return null; return map[tab] ? <GardeEcran nom={tab} resetKey={platSub}><Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}
           siteColisDemande={tab==='cat_bord'&&typeof platSub==='string'&&platSub.startsWith('site:')?platSub.slice(5):null}
           onColisLeboncoin={tab==='cat_bord'&&(!sitesPresents||sitesPresents.has('leboncoin'))?()=>setPlatSub('leboncoin'):null}
           ongletColis={tab==='cat_bord'?ongletColis:null} onOngletColis={tab==='cat_bord'?choisirOngletColis:null} onOngletVu={tab==='cat_bord'?setOngletColisMontre:null}
-          sitesPresents={(tab==='cat_bord'||tab==='cat_expedition')?sitesPresents:null}/></GardeEcran> : null; })()}
+          sitesPresents={(tab==='cat_bord'||tab==='cat_expedition'||tab==='litiges')?sitesPresents:null}/></GardeEcran> : null; })()}
         {/* (31 oct., soir) LES COLIS À RETIRER VIVENT DANS COLIS. Sous les quatre
             colonnes, leur DÉTAIL — l'ancienne vue « À retirer » d'Achats, mêmes
             composants et mêmes lectures (§11) : codes et QR, dates limites, points
