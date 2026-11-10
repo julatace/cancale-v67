@@ -85,6 +85,11 @@ notification du dimanche soir, depuis Ma journée et depuis Statistiques, qui mo
   `bilan-mois` (48), `cibles-notif`, `notifications`, `notifs-centre`, `onglets-a`, `onglets-d`,
   `bancs`, `composants` : verts. Banc `bilan-semaine` : 27 verts (le lien attendu est désormais
   `/?tab=semaine&lundi=2026-09-28`).
+- Bancs relancés un à la fois après le `git merge origin/main` : `ma-semaine` 0 échec,
+  `bilan-semaine` 27 verts, `journee-v2` 0 rouge, `journee-coherence` rien à signaler,
+  `journee-chiffres` 24 verts, `stats-vitrine` 112 verts. `carte-stats` : 3 rouges « A. les
+  autres pages — Cannot read properties of null (reading 'id') », LES MÊMES sur `origin/main`
+  (042170f) rebâti — pas touché ici.
 - Déjà rouges sur `origin/main`, pas touchés : `audit-journal-semaine` (« Ma journée monte le
   journal en tête » — la carte a été fondue dans la frise le 9 nov.), `audit-signalement`
   (`republier`, `favoris` absents d'`ECRANS` ; lecture du collecteur), `audit-reprise-ecran`
