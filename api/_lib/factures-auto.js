@@ -40,7 +40,7 @@ export function pauseAuto(cfg, env, boite) {
     return null;
   }
   const conf = configurationEnvoiVrm(env);
-  if (!conf.pret) return { code: 'smtp', texte: "Le serveur d'envoi n'est pas configuré (RELANCES_SMTP_*). Rien n'est parti." };
+  if (!conf.pret) return { code: 'smtp', texte: "L'envoi par VRM n'est pas encore ouvert : rien n'est parti. Choisis « Depuis ma propre boîte » pour envoyer." };
   if (!emailValide(cfg.email)) return { code: 'email', texte: "Ajoute ton e-mail dans « Ma facture » (copie et réponses). Rien n'est parti." };
   return null;
 }
@@ -107,7 +107,7 @@ export async function factureAutoVendeur(owner, { maintenant = Date.now(), env =
     refusees++;
     essais[tx] = { issue: c.issue === 'incertain' ? 'incertaine' : 'refusee', raison: String((c.envoi && c.envoi.message) || c.message || 'pas envoyée').slice(0, 300), at };
     if (r2.code === 429) { pauseFin = { code: 'plafond', texte: String(c.message || 'Plafond du jour atteint.') }; break; }
-    if (r2.code === 503) { pauseFin = c.erreur === 'vrm-smtp' ? { code: 'smtp', texte: "Le serveur d'envoi n'est pas configuré (RELANCES_SMTP_*). Rien n'est parti." } : null; break; }
+    if (r2.code === 503) { pauseFin = c.erreur === 'vrm-smtp' ? { code: 'smtp', texte: "L'envoi par VRM n'est pas encore ouvert : rien n'est parti. Choisis « Depuis ma propre boîte » pour envoyer." } : null; break; }
   }
   await ecrireJournal(owner, journal, { at, pause: pauseFin, essais });
   return { fait: true, envoyees, refusees, pause: pauseFin ? pauseFin.code : null };
