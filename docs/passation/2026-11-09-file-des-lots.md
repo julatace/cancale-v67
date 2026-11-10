@@ -114,4 +114,6 @@ Quatrième série du 10 nov. — Julien : « Vas-y fait toute ».
 | BM | vitesse d'envoi : délai vente → « Colis fait » par compte (dates prouvées seulement) | `claude/vitesse-avis` | à lancer |
 | BN | avis Vinted reçus : note moyenne et évolution par compte (capacité `avis`, 5.319), aucun rappel d'évaluation | `claude/vitesse-avis` | à lancer |
 
+| BO | Pro 19,99 € = 10 comptes vendeurs (Julien, 10 nov. : « oui et 19,99 pour 10 comptes vendeurs ») : règle serveur + app (`venteAutreHorsPlan`, `excluAutreDe`), choix des 10, CGV ; Solo confirmé (un compte vendeur par plateforme) | `claude/pro-10-comptes` | à lancer |
+
 Refusé le 9 nov. : « Ma liste de recherche » (18). Les vidéos d'aide viendront plus tard.
