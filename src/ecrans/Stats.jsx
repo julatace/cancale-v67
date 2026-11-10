@@ -20,7 +20,8 @@ import { notesParCompte } from '../notesRecues.js';
 import { useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF)
 import { texteValeurStock } from '../coutVente.js';
 // ⟦← App.jsx #2⟧
-import {comparerMois,ymEnFace} from '../comparerMois.js';
+import {comparerDeuxMois,ymEnFace} from '../comparerMois.js';
+import '../styles-mois-boucle.css';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
@@ -627,7 +628,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       <VenduParSemaineSante liveStats={liveStats}/>
       {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine) : un lien, rien de recalculé ici. */}
       {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>Ma semaine ›</button> : null}
-      <ComparerMoisCarte liveStats={liveStats}/>
+      <ComparerMoisCarte liveStats={liveStats} panelOff={panelOff}/>
       <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
@@ -1690,72 +1691,110 @@ const raisonComparer = (x) => {
   if (x.raison === 'aDater' || x.raison === 'partiel') return (x.manque || []).join(', ') || RAISONS_COMPARER.pasSu;
   return RAISONS_COMPARER[x.raison] || RAISONS_COMPARER.pasSu;
 };
-function ComparerMoisCarte({ liveStats }) {
-  const [mode, setModeB] = React.useState(() => { try { return localStorage.getItem('vrm_comparer_mode') === 'an' ? 'an' : 'precedent'; } catch (_) { return 'precedent'; } });
-  const setMode = (v) => { setModeB(v); try { localStorage.setItem('vrm_comparer_mode', v); } catch (_) {} };
+// (10 nov., lot BL) « COMPARER DEUX MOIS » : deux sélecteurs (le mois et celui d'en face, au choix),
+// côte à côte vendu, reçu, bénéfice (couverture dite), ventes, achats ; l'écart NEUTRE (flèche
+// grise, jamais rouge ni vert), et aucune flèche quand un côté est « au moins » ou « — ».
+// Aucun chiffre neuf : `comparerDeuxMois` (src/comparerMois.js) avec les règles de toujours —
+// achats = le registre des achats du mois (`registreAchatsDe`, la carte « Registres »).
+const MOIS_CHOIX = 25;   // le mois en cours et les 24 d'avant (le même mois l'an dernier y est)
+const ymListeComparer = (maintenant) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < MOIS_CHOIX; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
+const libelleMoisCourt = (ym, maintenant) => { const [y, m] = String(ym).split('-').map(Number); return `${MOIS_COURTS[m - 1]}${y !== new Date(maintenant).getFullYear() ? ` ${y}` : ''}`; };
+const FlecheComparer = ({ sens }) => (
+  <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" className="vrm-cm-fleche" data-sens={sens}>
+    {sens === 'egal' ? <path d="M2 6h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      : <path d={sens === 'hausse' ? 'M6 10V2M2.5 5.5 6 2l3.5 3.5' : 'M6 2v8M2.5 6.5 6 10l3.5-3.5'} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>}
+  </svg>
+);
+function ComparerMoisCarte({ liveStats, panelOff = null }) {
+  const lireChoix = () => { try { const o = JSON.parse(localStorage.getItem('vrm_comparer_mois') || 'null'); return o && typeof o === 'object' ? o : null; } catch (_) { return null; } };
+  const maintenant = Date.now();
+  const ymC = ymCourant(maintenant);
+  const choixListe = ymListeComparer(maintenant);
+  const [choix, setChoixB] = React.useState(() => {
+    const o = lireChoix();
+    const ancien = (() => { try { return localStorage.getItem('vrm_comparer_mode') === 'an' ? 'an' : 'precedent'; } catch (_) { return 'precedent'; } })();
+    const a = o && choixListe.includes(o.a) ? o.a : ymC;
+    const b = o && choixListe.includes(o.b) ? o.b : ymEnFace(a, ancien);
+    return { a, b };
+  });
+  const setChoix = (k, v) => setChoixB((c) => { const n = { ...c, [k]: v }; try { localStorage.setItem('vrm_comparer_mois', JSON.stringify(n)); } catch (_) {} return n; });
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const ligneUrssaf = useLigneUrssaf();
   const regime = useRegimeFiscal();
-  const maintenant = Date.now();
+  // Les achats : lus une fois (undefined en cours · null pas su · tableau), puis le registre de CHAQUE mois.
+  // (Le registre vit avec Comptabilité : chargé à la demande, la même fonction que la carte « Registres ».)
+  const [achatsLus, setAchatsLus] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    import('./Compta.jsx').then((m) => m.lireAchatsRegistre().then((a) => { if (!mort) setAchatsLus({ achats: a, registre: m.registreAchatsDe }); }))
+      .catch(() => { if (!mort) setAchatsLus(null); });
+    return () => { mort = true; };
+  }, []);
   const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
     ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
-  const K = comparerMois({ ymA: ymCourant(maintenant), mode, maintenant, vendu,
+  const K = comparerDeuxMois({ ymA: choix.a, ymB: choix.b, maintenant, vendu,
     recuDe: (b) => recuAvecADater(recuPublieEntre(ligneUrssaf, b, maintenant), ligneUrssaf),
     beneficeDe: ({ ym, jusqua }) => { const B = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, jusqua); return B ? chiffreBenefice(B, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' }; },
+    achatsDe: ({ ym }) => (achatsLus === undefined ? undefined : achatsLus === null ? null : achatsLus.registre({ achats: achatsLus.achats, recus: [], periode: ym, panelOff })),
     R: { bilanLignes } });
-  if (!K) return null;
-  const colA = nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant), colB = nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant);
+  const colA = K ? nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant) : '', colB = K ? nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant) : '';
   const val = (x, type) => x.valeur == null ? '—' : type === 'eur' ? fmt(x.valeur) : String(x.valeur);
   const cents = (x, type) => x == null ? '' : type === 'eur' ? String(Math.round(x * 100)) : String(x);
-  // Les mots de l'app (src/libelles.js) : « Vendu », pas « CA vendu ».
   const nomLigne = (Lg) => (Lg.cle === 'vendu' ? L.vendu : Lg.cle === 'benefice' ? L.benefice : Lg.cle === 'recu' ? L.recu : Lg.nom);
-  // Les « — » de la carte et leur raison, une ligne par chiffre (la même raison des deux côtés se dit une fois).
-  const pourquoi = K.lignes.map((Lg) => {
+  // Sous un chiffre : « au moins », la couverture du bénéfice (« 3/4 prix »), ou rien.
+  const sous = (x, Lg) => {
+    if (Lg.cle === 'benefice' && x.n > 0 && x.nCout < x.n) return `${x.nCout}/${x.n} prix`;
+    if (x.partiel) return 'au moins';
+    return '';
+  };
+  const pourquoi = K ? K.lignes.map((Lg) => {
     const ra = raisonComparer(Lg.a), rb = raisonComparer(Lg.b);
     if (!ra && !rb) return null;
     const txt = ra && rb && ra !== rb ? `${colA} : ${ra} ; ${colB} : ${rb}` : (ra || rb);
     return { cle: Lg.cle, nom: nomLigne(Lg), txt };
-  }).filter(Boolean);
-  // 390 px : le libellé garde sa place (« Bénéfice », « Vendu ») — trois colonnes de chiffres étroites.
-  const grille = { display: 'grid', gridTemplateColumns: 'minmax(64px,1fr) minmax(0,84px) minmax(0,84px) minmax(0,74px)', columnGap: 6, alignItems: 'center' };
-  const chiffre = { fontVariantNumeric: 'tabular-nums' };
+  }).filter(Boolean) : [];
+  const select = (k, v) => (
+    <select className="vrm-cm-mois" aria-label={k === 'a' ? 'Premier mois' : 'Mois comparé'} data-comparer-mois={k} value={v} onChange={(e) => setChoix(k, e.target.value)}>
+      {choixListe.map((m) => <option key={m} value={m}>{libelleMoisCourt(m, maintenant)}</option>)}
+    </select>
+  );
   return (
-    <section className="vrm-comparer" data-comparer={K.mode} data-comparer-a={K.ymA} data-comparer-b={K.ymB} data-comparer-meme-point={K.memePoint ? '1' : '0'}
-      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-        <h2 className="vrm-display" data-titre-section="" style={{ flex: '1 1 auto', margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Comparer</h2>
-        <Segmente label="Comparer avec" value={K.mode} onChange={setMode} options={[{ v: 'precedent', l: 'Mois d’avant', data: { 'data-comparer-choix': 'precedent' } }, { v: 'an', l: 'Il y a un an', data: { 'data-comparer-choix': 'an' } }]}/>
+    <section className="vrm-cm" data-comparer={K ? K.mode : 'aucun'} data-comparer-a={choix.a} data-comparer-b={choix.b} data-comparer-meme-point={K && K.memePoint ? '1' : '0'}>
+      <div className="vrm-cm-tete">
+        <h2 className="vrm-display vrm-cm-titre" data-titre-section="">Comparer</h2>
+        <div className="vrm-cm-choix">{select('a', choix.a)}<span className="vrm-cm-vs" aria-hidden="true">et</span>{select('b', choix.b)}</div>
       </div>
-      <div style={{ ...grille, fontSize: 11, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
-        <span/>
-        <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="a">{colA}</span>
-        <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="b">{colB}</span>
-        <span style={{ textAlign: 'right' }}>Écart</span>
-      </div>
-      {K.lignes.map((Lg) => (
-        <div key={Lg.cle} data-comparer-ligne={Lg.cle} data-a={cents(Lg.a.valeur, Lg.type)} data-b={cents(Lg.b.valeur, Lg.type)} data-ecart={cents(Lg.ecart, Lg.type)} data-pct={Lg.pct == null ? '' : String(Lg.pct)}
-          data-a-partiel={Lg.a.partiel ? '1' : undefined} data-b-partiel={Lg.b.partiel ? '1' : undefined}
-          data-a-raison={Lg.a.valeur == null ? (Lg.a.raison || 'pasSu') : undefined} data-b-raison={Lg.b.valeur == null ? (Lg.b.raison || 'pasSu') : undefined}
-          style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
-          <span style={{ fontSize: 15, color: C.text, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomLigne(Lg)}</span>
-          {[Lg.a, Lg.b].map((x, i) => (
-            <span key={i} style={{ textAlign: 'right', minWidth: 0 }} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? raisonComparer(x) : undefined}>
-              <span style={{ display: 'block', fontSize: 15, fontWeight: i === 0 ? 600 : 400, color: x.valeur == null ? C.muted : i === 0 ? C.text : C.muted, whiteSpace: 'nowrap', ...chiffre }}>{val(x, Lg.type)}</span>
-              {x.partiel ? <span style={{ display: 'block', fontSize: 11, color: C.muted }}>au moins</span> : null}
+      {K ? <>
+        <div className="vrm-cm-grille vrm-cm-cols" aria-hidden="true">
+          <span/>
+          <span data-comparer-col="a">{colA}</span>
+          <span data-comparer-col="b">{colB}</span>
+          <span>Écart</span>
+        </div>
+        {K.lignes.map((Lg) => (
+          <div key={Lg.cle} className="vrm-cm-grille vrm-cm-ligne" data-comparer-ligne={Lg.cle} data-a={cents(Lg.a.valeur, Lg.type)} data-b={cents(Lg.b.valeur, Lg.type)} data-ecart={cents(Lg.ecart, Lg.type)} data-pct={Lg.pct == null ? '' : String(Lg.pct)} data-sens={Lg.sens || ''}
+            data-a-partiel={Lg.a.partiel ? '1' : undefined} data-b-partiel={Lg.b.partiel ? '1' : undefined}
+            data-a-raison={Lg.a.valeur == null ? (Lg.a.raison || 'pasSu') : undefined} data-b-raison={Lg.b.valeur == null ? (Lg.b.raison || 'pasSu') : undefined}>
+            <span className="vrm-cm-nom">{nomLigne(Lg)}</span>
+            {[Lg.a, Lg.b].map((x, i) => (
+              <span key={i} className={'vrm-cm-v' + (i === 0 ? ' is-a' : '') + (x.valeur == null ? ' is-vide' : '')} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? raisonComparer(x) : undefined}>
+                <b>{val(x, Lg.type)}</b>
+                {sous(x, Lg) ? <small>{sous(x, Lg)}</small> : null}
+              </span>
+            ))}
+            <span className={'vrm-cm-ecart' + (Lg.sens ? '' : ' is-vide')}>
+              {Lg.sens ? <b><FlecheComparer sens={Lg.sens}/>{Lg.type === 'eur' ? signeEur(Lg.ecart) : (Lg.ecart > 0 ? '+' : Lg.ecart < 0 ? '−' : '') + Math.abs(Lg.ecart)}</b> : <b aria-label="pas comparable">—</b>}
+              {Lg.pct != null ? <small>{signePct(Lg.pct)}</small> : null}
             </span>
-          ))}
-          <span style={{ textAlign: 'right', minWidth: 0, whiteSpace: 'nowrap' }}>
-            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: Lg.ecart == null ? C.muted : C.text, ...chiffre }}>{Lg.ecart == null ? '—' : Lg.type === 'eur' ? signeEur(Lg.ecart) : (Lg.ecart > 0 ? '+' : Lg.ecart < 0 ? '−' : '') + Math.abs(Lg.ecart)}</span>
-            {Lg.pct != null ? <span style={{ display: 'block', fontSize: 11, color: C.muted, ...chiffre }}>{signePct(Lg.pct)}</span> : null}
-          </span>
-        </div>
-      ))}
-      {pourquoi.length ? (
-        <div data-comparer-pourquoi="" style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {pourquoi.map((p) => <div key={p.cle} data-comparer-pourquoi-ligne={p.cle} style={{ fontSize: 11, color: C.muted, lineHeight: 1.45 }}><b style={{ fontWeight: 600, color: C.text }}>{p.nom} —</b> {p.txt}</div>)}
-        </div>
-      ) : null}
+          </div>
+        ))}
+        {pourquoi.length ? (
+          <div className="vrm-cm-pourquoi" data-comparer-pourquoi="">
+            {pourquoi.map((p) => <div key={p.cle} data-comparer-pourquoi-ligne={p.cle}><b>{p.nom} —</b> {p.txt}</div>)}
+          </div>
+        ) : null}
+      </> : <p className="vrm-cm-vide" data-comparer-futur="">Un mois à venir ne se compare pas.</p>}
     </section>
   );
 }

@@ -25,7 +25,7 @@ const muter = (quoi, avant, apres) => {
   if (!src.includes(avant)) { console.log('❌ mutation impossible : motif absent — ' + avant.slice(0, 90)); process.exit(2); }
   if (quoi === 'app') APP = APP.replace(avant, apres); else if (quoi === 'carte') CARTE = CARTE.replace(avant, apres); else MODULE = MODULE.replace(avant, apres);
 };
-if (MUT === 'coupe') muter('m', "if (!(maintenant < A.a)) return { A: { ...A, complet: true }, B: { ...B, complet: true }, memePoint: false };", "return { A: { ...A, complet: true }, B: { ...B, complet: true }, memePoint: false };");
+if (MUT === 'coupe') muter('m', "if (!enCoursA && !enCoursB) return { A: { ...A, complet: true }, B: { ...B, complet: true }, memePoint: false };", "return { A: { ...A, complet: true }, B: { ...B, complet: true }, memePoint: false };");
 else if (MUT === 'partiel') muter('m', 'const complets = a.valeur != null && b.valeur != null && !a.partiel && !b.partiel;', 'const complets = a.valeur != null && b.valeur != null;');
 else if (MUT === 'pct0') muter('m', 'const pct = complets && b.valeur > 0 ?', 'const pct = complets ?');
 else if (MUT === 'jours') muter('carte', "valeur = Object.entries(publie.recuJours).reduce((t, [k, v]) => (k >= k0 && k <= k1 ? t + Math.round(Number(v) * 100) : t), 0) / 100;", "valeur = Number((publie.recu || {})[ym] || 0);");
@@ -135,7 +135,7 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
 
   console.log('── Le branchement');
   const A0 = sansCommentaires(APP);
-  dit(/<ComparerMoisCarte liveStats=\{liveStats\}\/>/.test(A0), 'Statistiques monte « Comparer » sous le choix de période');
+  dit(/<ComparerMoisCarte liveStats=\{liveStats\}(?: panelOff=\{panelOff\})?\/>/.test(A0), 'Statistiques monte « Comparer » sous le choix de période');
   // (5 nov., chantier F) Le reçu peut passer par `recuAvecADater` (§5 : des ventes « à dater » font d'un 0 un « pas su ») : la SOURCE reste `recuPublieEntre`.
   dit(/recuDe: \(b\) => (?:recuAvecADater\()?recuPublieEntre\(ligneUrssaf, b, maintenant\)/.test(A0) && /beneficeDuMoisPub\(\{ pub, compta, ligneUrssaf, regime \}, ym, jusqua\)/.test(A0) && /R: \{ bilanLignes \}/.test(A0), 'avec les règles propriétaires (reçu publié, bénéfice du mois, bilanLignes)');
   dit((A0.match(/beneficeDuMoisPub\(\{ pub: pubB, compta: comptaB, ligneUrssaf: v, regime: regimeB \}, ym\)/g) || []).length === 2, 'le récap mensuel lit le bénéfice par la MÊME fonction');
