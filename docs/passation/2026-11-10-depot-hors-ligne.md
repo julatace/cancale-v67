@@ -101,3 +101,8 @@ la faisaient refuser (« Vérification indisponible »). Le banc range une sessi
   retiré » : à unifier si Julien le veut.
 - Tournée de dépôt (5 nov.) et « Je dépose » font des choses voisines : décision de Julien.
 - Geste de Julien : aucun (essayer au comptoir, avec et sans réseau).
+
+## 7. Après le vrai `git merge origin/main` (rebâti, un banc à la fois, port aléatoire)
+
+`mode-depot` 122/122 · `codes-hors-ligne` 6/6 · `preparer-relais` 131/131 · `scanner-colis-achats` 204/204 ·
+`photo-colis-scan` 124/124 · `hors-ligne-froid` 80/80.
