@@ -471,27 +471,15 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in av-faq-grille">
             <h2 className="av-h2">Questions fréquentes</h2>
             <div className="av-faq-texte">
-<<<<<<< HEAD
-              <p><b>Pourquoi une extension ?</b> VRM lit Vinted là où tu es déjà connecté : dans ton navigateur, sur ton ordinateur. Personne ne te demande ton mot de passe Vinted, et l’extension n’agit qu’au nom du compte ouvert dans l’onglet. <a href="/aide/extension">L’installer</a>.</p>
-              <p><b>Vinted peut-il bloquer mon compte à cause de VRM ?</b> Personne ne peut garantir une décision de Vinted. VRM travaille comme toi : une requête à la fois, au plus 50 actions par heure et par compte, et il s’arrête de lui-même si Vinted demande de ralentir.</p>
-              <p><b>Mes données sont-elles en sécurité ?</b> Ta boutique est cloisonnée : aucun autre vendeur ne la voit. Tu peux ajouter une double vérification par application d’authentification. <a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p>
-              <p><b>Comment j’arrête ?</b> Tu résilies en ligne, depuis l’app : l’abonnement s’arrête à la fin de la période payée, et résilier pendant l’essai ne coûte rien. « Fermer mon compte » efface ensuite tes données.</p>
-              <p><b>Et sur mon téléphone ?</b> Tu consultes tout, tu retrouves tes codes de retrait au relais, même sans réseau, et tu reçois une notification à chaque vente si tu l’actives. Les actions sur Vinted passent par ton ordinateur allumé.</p>
-              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, et un seul marche aussi : chacun se met à jour quand tu l’ouvres sur ton ordinateur, et ses chiffres restent séparés. Avec Solo, un compte vend sur chaque plateforme (un Vinted, un Leboncoin, un eBay, un Vestiaire) et les autres servent à acheter (achats et retraits) ; avec Pro, 10 comptes vendent, toutes plateformes confondues.</p>
-              <p><b>C’est seulement pour les baskets ?</b> Non. Vêtements, sacs, livres : le numéro de rangement, le bordereau et la compta marchent pour n’importe quel article.</p>
-              {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> Pas encore compté : VRM apprend à lire Vestiaire, mais ses ventes n’entrent dans aucun total aujourd’hui.</p>}
-              <p><b>Une question qui n’est pas ici ?</b> <a href="/aide">L’aide</a> répond pas à pas ; <a href="/statut">l’état du service</a> dit si tout fonctionne en ce moment.</p>
-=======
               <p><b>Pourquoi une extension ?</b> Elle lit Vinted là où tu es connecté, au nom du compte ouvert. Aucun mot de passe demandé. <a href="/aide/extension">L’installer</a>.</p>
               <p><b>Vinted peut-il bloquer mon compte à cause de VRM ?</b> Personne ne peut le garantir. VRM agit comme toi : une requête à la fois, 50 actions par heure au plus, pause si Vinted ralentit.</p>
               <p><b>Mes données sont-elles en sécurité ?</b> Ta boutique est cloisonnée : aucun autre vendeur ne la voit. Double vérification possible. <a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p>
               <p><b>Comment j’arrête ?</b> Tu résilies depuis l’app : fin à la période payée, rien à payer pendant l’essai. « Fermer mon compte » efface tes données.</p>
               <p><b>Et sur mon téléphone ?</b> Tout se consulte, tes codes de retrait même sans réseau, une notification par vente. Les actions passent par ton ordinateur.</p>
-              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, chiffres séparés. Avec Solo, un compte vend sur chaque plateforme, les autres achètent ; avec Pro, tous vendent.</p>
+              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, chiffres séparés. Avec Solo, un compte vend sur chaque plateforme, les autres achètent ; avec Pro, 10 comptes vendent, toutes plateformes.</p>
               <p><b>C’est seulement pour les baskets ?</b> Non : tout article (vêtements, sacs, livres…).</p>
               {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> En cours : ses ventes n’entrent encore dans aucun total.</p>}
               <p><b>Une autre question ?</b> <a href="/aide">L’aide</a> ; <a href="/statut">l’état du service</a>.</p>
->>>>>>> origin/claude/textes-courts-3
             </div>
           </div>
         </section>
