@@ -176,7 +176,10 @@
   font: 400 15px/1.25 var(--vrm-police, system-ui) !important; color: var(--w-encre, #1D1D1F) !important; letter-spacing: 0 !important;
   white-space: nowrap !important; overflow: visible !important; text-decoration: none !important; border: 0 !important;
 }
-:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-etat-haut { width: auto !important; flex: 1 1 auto; gap: 8px !important; justify-content: flex-start !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] :is([data-fiche-duo], [data-chiffres]) > .vrm-fiche-cell::before { display: none !important; content: none !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-ann-ledger-info { width: 100% !important; max-width: none !important; align-self: stretch !important; box-sizing: border-box !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell [data-edition] > span { border-bottom: 0 !important; text-decoration: none !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-etat-haut {width: auto !important; flex: 1 1 auto; gap: 8px !important; justify-content: flex-start !important; }
 :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-fiche-etat] .vrm-fiche-etat-val { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; }
 :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-fiche-etat] .vrm-fiche-etat-mot { font: 600 15px/1.25 var(--vrm-police, system-ui) !important; text-align: right; -webkit-line-clamp: 1 !important; }
 :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell [data-edition] {
@@ -192,16 +195,23 @@
   :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-cell :is([data-edition] span, [data-marge]) { font-size: 17px !important; }
 }
 /* Les gestes : des boutons pleine largeur, libellé jamais coupé, icône entière (§7 : jamais inline-flex). */
-:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes {
-  display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; max-width: 560px !important;
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] {
+  display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important; gap: 8px !important; max-width: 560px !important;
 }
-:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes > .vrm-fiche-geste {
-  display: flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important;
-  width: 100% !important; min-width: 0 !important; white-space: normal !important; overflow: visible !important; text-align: center !important;
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste {
+  display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 8px !important;
+  flex: 0 0 auto !important; width: 100% !important; min-width: 0 !important; white-space: normal !important; overflow: visible !important; text-align: center !important;
   padding: 0 14px !important; box-sizing: border-box !important;
 }
-:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes > .vrm-fiche-geste svg { flex: 0 0 auto !important; }
-:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes > .vrm-fiche-geste-plus::after { content: 'Autres gestes'; font-weight: 600; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste-prix { flex-direction: column !important; gap: 1px !important; }
+@media (min-width: 768px) {
+  /* ordinateur : une rangée de boutons à leur largeur (libellé entier), qui revient à la ligne */
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] { flex-direction: row !important; flex-wrap: wrap !important; max-width: none !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste { width: auto !important; white-space: nowrap !important; }
+}
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-fiche-duo] + [data-chiffres] { border-top: 0 !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste svg { flex: 0 0 auto !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] .vrm-fiche-gestes[data-fiche-gestes] > .vrm-fiche-geste-plus::after { content: 'Autres gestes'; font-weight: 600; }
 /* Fermée : le logo Vinted est porté par l'en-tête du compte (la grille est déjà rangée par compte) ;
    les autres sites (Leboncoin, eBay) restent : ils disent une présence prouvée ailleurs. */
 :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-plateformes] [data-marque="vinted"] { display: none !important; }
@@ -233,6 +243,16 @@
 }
 /* La pastille de tête « N · Même paire ? » (elle mène à la première vignette concernée). */
 :root:root body .vrm-pop-puce.is-ambre { color: var(--a-ambre-encre, #A65A00) !important; background: var(--a-ambre-fond, rgba(255,149,0,.16)) !important; }
+
+/* UN SEUL GABARIT (retour du 10 nov. : « les deux cartes n'ont pas la même hauteur ni la même structure ») :
+   le titre réserve ses deux lignes, l'état prend sa ligne, les chiffres (vues, favoris, jours) la suivante. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-titre] { min-height: calc(2 * 1.3em) !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] { min-height: 34px !important; align-content: flex-start !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-stats-annonce] { flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; flex-wrap: wrap !important; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-etat-court { flex: 0 0 100% !important; }
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] [data-etat-ligne] { min-height: 38px !important; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette { transition: none !important; }
