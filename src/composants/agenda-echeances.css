@@ -1,0 +1,11 @@
+/* ── « Échéances dans l'agenda » (10 nov., lot H) — DA6, neutre ; l'accent
+   n'est que sur le bouton principal ; cibles 44 px. ── */
+.vrm-agenda { display: flex; flex-direction: column; gap: 12px; }
+.vrm-agenda .vrm-agenda-date { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-encre, inherit); }
+.vrm-agenda .vrm-agenda-note { margin: 0 4px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
+.vrm-agenda .vrm-agenda-actions { display: flex; flex-direction: column; gap: 10px; }
+.vrm-agenda .vrm-agenda-gestes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; }
+html body .vrm-app-shell .vrm-agenda .vrm-agenda-gestes .vrm-lien-action { min-height: 44px; padding: 0 6px; }
+/* (lot H) La session qu'une alerte « Nouvel appareil » désigne : en évidence, ambre (un geste à faire). */
+html body .vrm-app-shell .vrm-sec-ligne[data-appareil-nouveau="oui"] { background: var(--fu-ambre-fond, #fff4e0); }
+html body .vrm-app-shell .vrm-sec-ligne[data-appareil-nouveau="oui"] .vrm-sec-bouton { background: var(--fu-ambre-txt, #8a5a00); color: #fff; }
