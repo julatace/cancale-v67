@@ -45,3 +45,6 @@
   min-height: 44px; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important;
   background: var(--w-remplir, rgba(118,118,128,.12)) !important; box-shadow: none !important; font-size: 15px !important; font-weight: 600;
 }
+/* (10 nov., lot AI) « 1 nouveau N° » seul sur sa ligne : la pastille seule, sans le cadre blanc pleine largeur
+   de la ligne d'avis (le cadre ne sert qu'à réunir « Prix d'achat N/M » et « N nouveaux N° »). */
+:root:root body .vrm-ann-avis:has(> .vrm-ann-avis-neufs:only-child) { background: transparent !important; box-shadow: none !important; min-height: 0; }
