@@ -28,10 +28,10 @@
 // fausse base PostgREST).
 // ═══════════════════════════════════════════════════════════════════════════
 import crypto from 'crypto';
-import { RYTHME_MS } from './transporteurs.js';
+import { RYTHME_MS, CADENCE_COLIS_MS, MARGE_RYTHME_MS } from './transporteurs.js';
+export { CADENCE_COLIS_MS, MARGE_RYTHME_MS };
 
 export const PREMIERE_LECTURE_MS = 24 * 3600000;   // un e-mail « disponible » de moins d'un jour
-export const MARGE_RYTHME_MS = 60000;              // un passage qui tombe 30 s trop tôt ne rate pas la ligne
 export const MAX_VENDEURS_PASSAGE = 200;
 export const BUDGET_PASSAGE_MS = 100000;           // le job GitHub attend 150 s
 export const PARALLELE = 4;
@@ -61,7 +61,7 @@ export function vendeursDus(reponses, { exclus = [] } = {}) {
 }
 // L'ordre du quart d'heure : une empreinte (créneau, vendeur) — il tourne à chaque passage.
 export function ordreDuCreneau(owners, maintenant = Date.now()) {
-  const creneau = Math.floor(maintenant / (15 * 60000));
+  const creneau = Math.floor(maintenant / CADENCE_COLIS_MS);
   const cle = (o) => crypto.createHash('sha256').update(`${creneau}|${o}`).digest('hex');
   return [...new Set(owners || [])].map((o) => [cle(o), o]).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map((x) => x[1]);
 }

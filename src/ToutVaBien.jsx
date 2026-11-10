@@ -11,8 +11,8 @@
 //     appareil où l'extension tourne (version, « à jour » ou la version à
 //     installer, le bon paquet, trois gestes). « Tout est à jour » ne se dit que
 //     si TOUT a été lu et que rien n'attend un geste — jamais sur un « pas su ».
-//   · `AlerteCapture` — la ligne ambre en haut de l'app tant qu'une panne dure
-//     (fermable pour CETTE panne, sur cet appareil), qui mène à la page.
+//   · la panne d'un compte est dite en haut de l'app par la ligne de fraîcheur
+//     unique (src/LigneFraicheur.jsx), qui mène à la page.
 // Lectures : les lignes d'appareils (petites, projetées) d'abord ; les comptes
 // seulement sur la page, ou quand un appareil actif porte une preuve.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -24,8 +24,6 @@ import { ageLecture } from './comptesLies.js';
 import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
 import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS } from './App.jsx';
 import './styles-tout-va-bien.css';
-
-const CLE_FERMEES = 'vrm_alerte_capture_fermees';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
 // ne publient pas leur appareil) : `panel_diag_capture`. Trois états.
@@ -68,7 +66,7 @@ export function useEtatCapture({ complet = false, actif = true } = {}) {
       const appareils = lireAppareils(rows, maintenant);
       const besoin = complet || aUnePreuve(appareils, maintenant);
       if (mort) return;
-      if (!besoin) { setBase({ appareils, ancien, vinted: [], lu: true }); return; }
+      if (!besoin) { setBase({ appareils, ancien, vinted: [], lu: true, at: Date.now() }); return; }
       setLireComptes(true);
       const [comptes, caps, etats] = await Promise.all([fetchVintedAccounts(), lireCapturesDetail(), lireEtatsVinted()]);
       if (mort) return;
@@ -78,7 +76,8 @@ export function useEtatCapture({ complet = false, actif = true } = {}) {
         return uid ? { plateforme: 'vinted', id: uid, nom: a.login || '', lu: caps.by[uid] || null, banni: !!(etats[uid] && etats[uid].etat === 'banni'), masque: masques.has(uid),
           ventesLu: caps.ventes[uid] || null, annoncesLu: caps.annonces[uid] || null } : null;
       }).filter(Boolean) : null;
-      setBase({ appareils, ancien, vinted, lu: true });
+      // (9 nov.) La date des ACHATS de chaque compte, pour la ligne de fraîcheur (src/fraicheur.js) ; null = pas su.
+      setBase({ appareils, ancien, vinted, achats: caps ? (caps.achats || {}) : null, lu: true, at: Date.now() });
     })();
     return () => { mort = true; };
   }, [tour, actif, complet]);
@@ -215,33 +214,7 @@ export function ToutVaBien({ onComptes }) {
 }
 
 // ── LA LIGNE AMBRE ───────────────────────────────────────────────────────────
-function lireFermees() { try { const v = JSON.parse(localStorage.getItem(CLE_FERMEES) || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch (_) { return []; } }
-export function AlerteCapture({ onVoir }) {
-  const { etat } = useEtatCapture({ complet: false });
-  const [fermees, setFermees] = React.useState(lireFermees);
-  if (!etat || !etat.pannes) return null;
-  const visibles = etat.pannes.filter((p) => !fermees.includes(p.cle));
-  if (!visibles.length) return null;
-  const p = visibles[0];
-  const voir = () => {
-    DEMANDE_REGLAGE_SOUS.id = 'toutvabien';
-    try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {}
-    if (onVoir) onVoir();
-  };
-  const fermer = () => { const n = [...new Set([...fermees, ...visibles.map((x) => x.cle)])].slice(-50); setFermees(n); try { localStorage.setItem(CLE_FERMEES, JSON.stringify(n)); } catch (_) {} };
-  return (
-    <div className="vrm-tvb-alerte" role="status" data-alerte-capture={visibles.length} data-alerte-cle={p.cle}>
-      <Pastille ton="geste"/>
-      <div className="vrm-tvb-alerte-texte">
-        <b><span className="vrm-sensible">{p.nom}</span> ({nomPlateforme(p.plateforme)}) n’arrive plus dans VRM{visibles.length > 1 ? ` · et ${visibles.length - 1} autre${visibles.length > 2 ? 's' : ''}` : ''}</b>
-        <span>Pas relu depuis {String(p.age || 'plus de 12 h').replace(/^il y a /, '')} — {p.refus ? `${p.cause.split(' · ')[0]}` : p.cause}{p.appareil ? ` (${p.appareil.nom})` : ''}.</span>
-        <span className="vrm-tvb-alerte-geste">{p.geste.charAt(0).toUpperCase() + p.geste.slice(1)}.</span>
-      </div>
-      <div className="vrm-tvb-alerte-gestes">
-        <button type="button" className="vrm-lien-action" data-alerte-voir="" onClick={voir}>Voir</button>
-        <button type="button" className="vrm-tvb-fermer" aria-label="Masquer cette alerte" data-alerte-fermer="" onClick={fermer}>×</button>
-      </div>
-    </div>
-  );
-}
-export default AlerteCapture;
+// (9 nov., lot AG) FONDUE dans la ligne de fraîcheur unique du haut de l'app
+// (src/LigneFraicheur.jsx, règle src/fraicheur.js) : une panne prouvée y est la
+// source la plus grave, nommée avec sa cause, son appareil et « Voir » (cette
+// page). Les attributs `data-alerte-capture` / `data-alerte-voir` y sont gardés.

@@ -98,13 +98,15 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log(`${c ? '✅' : '�
     dit(a.length > 0 && a.every((x) => (x.e === 'on' ? /^Dans la file Leboncoin/.test(x.t) : /^Ajouter à la file Leboncoin/.test(x.t))), `${nom} Annonces : la case Leboncoin dit son ÉTAT (« Dans la file » / « Ajouter à la file »)`, JSON.stringify(a.slice(0, 3)));
     // ── Achats → À retirer
     await aller('plat_vinted', 'Achats');
+    await pg.waitForFunction(() => { const e = document.querySelector('[data-fraicheur-unique]'); return e && !['encours', 'charge'].includes(e.getAttribute('data-fraicheur-unique')); }, null, { timeout: 25000 }).catch(() => {});
     const h = await pg.evaluate(() => {
       const txt = document.body.innerText;
       const tete = document.querySelector('[data-fraicheur-comptes]');
-      return { tete: !!tete, achats: !!document.querySelector('[data-fraicheur-achats]'), commun: (document.querySelector('[data-a-verifier-commun]') || {}).getAttribute ? document.querySelector('[data-a-verifier-commun]').getAttribute('data-a-verifier-commun') : null,
+      return { tete: !!tete, ligne: !!document.querySelector('[data-fraicheur-a-relire]'), achats: !!document.querySelector('[data-fraicheur-achats]'), commun: (document.querySelector('[data-a-verifier-commun]') || {}).getAttribute ? document.querySelector('[data-a-verifier-commun]').getAttribute('data-a-verifier-commun') : null,
         lignes: [...document.querySelectorAll('[data-a-verifier] [data-a-verifier-vinted], [data-a-verifier] [data-oublie]')].map((x) => x.innerText.split('\n').slice(0, 2).join(' / ')), n: Number((document.querySelector('[data-a-verifier]') || { getAttribute: () => 0 }).getAttribute('data-a-verifier')) };
     });
-    dit(h.tete && !h.achats, `${nom} Achats : les comptes pas relus sont dits UNE fois (la tête de Vinted), pas une seconde fois au-dessus des achats`, JSON.stringify({ tete: h.tete, achats: h.achats }));
+    // (9 nov., lot AG) La voix unique est la ligne de fraîcheur du haut de l'app (`data-fraicheur-a-relire`).
+    dit(h.ligne && !h.achats, `${nom} Achats : les comptes pas relus sont dits UNE fois (la ligne de fraîcheur du haut), pas une seconde fois au-dessus des achats`, JSON.stringify({ ligne: h.ligne, achats: h.achats }));
     const comptes = new Set(h.lignes.map((l) => (/(\b[a-z0-9_.-]{4,})\s·/.exec(l) || [])[1]).filter(Boolean));
     dit(h.n >= 2 && h.commun && !h.lignes.some((l) => l.includes(h.commun + ' ·')), `${nom} Achats : groupe « à vérifier » sur un seul compte ⇒ le compte nommé une fois en tête, pas sur chaque ligne`, JSON.stringify(h));
     dit(!errs.length, `${nom} aucune erreur de page`, errs[0]);

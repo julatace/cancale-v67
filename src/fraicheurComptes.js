@@ -29,6 +29,18 @@ function gesteRelire(plateforme, dans) {
   return '';
 }
 
+// (9 nov., fraîcheur unique) LE MÊME geste, en court, pour la ligne du haut
+// (src/fraicheur.js) : la ligne entière tient sur un téléphone ; la phrase
+// longue (`gesteRelire`, le navigateur où est l'extension) est dans le détail.
+export function gesteCourt(plateforme, quoi = 'relire') {
+  if (quoi === 'delie') return 'relie-le (Comptes liés)';
+  if (plateforme === 'vinted') return quoi === 'ventes' ? 'ouvre Vinted › Mes commandes sur ce compte' : quoi === 'achats' ? 'ouvre tes achats Vinted sur ce compte' : 'ouvre vinted.fr sur ce compte';
+  if (plateforme === 'leboncoin') return 'ouvre « Mes annonces » sur ce compte';
+  if (plateforme === 'vestiaire') return 'ouvre Vestiaire sur ce compte';
+  if (plateforme === 'ebay') return 'touche « Relire » (Comptes liés)';
+  return '';
+}
+
 // ── LES VENTES PLUS VIEILLES QUE LES ANNONCES (6 novembre) ──────────────────
 // Mesuré le 6 nov. : un compte Vinted relu à 07:50 (annonces, boîte, profil)
 // avait sa liste de VENTES figée à la veille 15 h 11 — la ligne disait « ouvert
@@ -98,7 +110,8 @@ export function ligneFraicheur(c, { maintenant = Date.now(), dans = 'dans ce nav
     geste = true;
   }
   if (c.horsTotaux && !c.masque) bloque = bloque ? `${bloque} · hors des totaux (ton choix)` : 'hors des totaux (ton choix)';
-  return { plateforme, id: String(c.id), nom, etat, age, quand, bloque, geste, ventesRetard };
+  // `lu` (9 nov.) : la date de la lecture, pour ranger « le plus ancien d'abord » (src/fraicheur.js).
+  return { plateforme, id: String(c.id), nom, etat, age, quand, bloque, geste, ventesRetard, lu: tsDe(c.lu) };
 }
 
 // Toutes les lignes, dans l'ordre : ce qui demande un geste d'abord, puis le

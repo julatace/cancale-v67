@@ -205,7 +205,9 @@ const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ 
 // (6 nov.) La même, sur la LIGNE de la vente (à côté de la vente) : rien pendant le
 // chargement (pas de squelette sur chaque ligne de la liste).
 // (8 nov.) La ligne ambre « compte pas relu » : son morceau à part (il importe App.jsx).
-const AlerteCaptureParesseuse = lazy(() => import('./ToutVaBien.jsx').then((m) => ({ default: m.AlerteCapture })));
+// (9 nov., lot AG) La ligne ambre « compte qui n'arrive plus » est FONDUE dans la ligne de fraîcheur unique
+// (src/LigneFraicheur.jsx, règle src/fraicheur.js) : une voix en haut de l'app, plus deux.
+const LigneFraicheurParesseuse = lazy(() => import('./LigneFraicheur.jsx'));
 // (8 nov.) « shop_x est relié à VRM » : la feuille d'accueil d'un compte relié pour la première fois (src/CompteRelie.jsx).
 const AccueilComptesReliesParesseux = lazy(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
 const FactureVenteLigneParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
@@ -316,6 +318,7 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,SANS_COMPTE_VC,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
+import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
@@ -503,6 +506,7 @@ import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à «
 // le CSS de l'app arrive dans SON morceau, après celui de main.jsx ; posé là-bas, il perdrait contre les couches
 // ci-dessus. Le système est écrit dans DESIGN.md.
 import "./styles-design-2026.css";
+import "./styles-fraicheur.css";    // (9 nov., lot AG) la ligne de fraîcheur unique : chargée avec la coque (sa place est tenue dès le premier rendu)
 import "./styles-parcours-clairs.css";
 import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos, glisser, tournée, statistiques, apparence — EN DERNIER
 // (8 nov., direction artistique) Ma journée, Ventes, Colis au niveau « premium » : une couche
@@ -24971,15 +24975,17 @@ async function lireCapturesDetail() {
   try {
     const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
     if (!rows) return null;
-    const by = {}, ventes = {}, annonces = {};
+    const by = {}, ventes = {}, annonces = {}, achats = {};
     rows.forEach(r => {
       const m = ligneDeSaSession(r && r.id); if (!m) return; const t = harvestTs(r) || 0; if (!t) return;
       if (!by[m[1]] || t > by[m[1]]) by[m[1]] = t;
       const id = String(r.id);
       if (id === `harvest_${m[1]}_orders_sold`) ventes[m[1]] = t;
       else if (id === `harvest_${m[1]}_listings`) annonces[m[1]] = t;
+      // (9 nov., fraîcheur unique) ses ACHATS aussi : la ligne du haut les nomme (src/fraicheur.js).
+      else if (id === `harvest_${m[1]}_orders_purchased`) achats[m[1]] = t;
     });
-    return { by, ventes, annonces };
+    return { by, ventes, annonces, achats };
   } catch (_) { return null; }
 }
 // `actif` (5 nov.) : le panneau de l'indicateur ne lit ces lignes qu'OUVERT —
@@ -25681,7 +25687,6 @@ const moyennesParModele = (commandes, ecarte) => {
 const colisKey = (t) => String((t && ((t.suiviLuDansSujet ? t.subject : t.suivi) || (t.source === 'vinted-commande' && t.cleLigne) || t.subject)) || '').trim();
 // (revue du 23 oct.) Au-delà de ce nombre de jours, la ligne de fraîcheur d'Achats
 // nomme le compte : ses colis ne le redisent pas (§7).
-const FRAICHEUR_ACHATS_J = 2;
 // (23 oct.) Les 14 jours supposés (`PICKUP_MAX_DAYS`) et la grâce de 10 jours
 // après la limite sont retirés : la garde MESURÉE est de 4 à 7 jours, et la
 // règle vit dans api/_lib/retrait-colis.js (`etatRetrait`, `GARDE_MAX_J`).
@@ -28198,8 +28203,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (3 nov.) « Colis fait » d'un colis Leboncoin depuis Colis (même clé que l'écran Colis Leboncoin) : on relit.
   const [, majLbcFait] = React.useReducer((x) => x + 1, 0);
   // (3 nov.) Colis → À retirer : la liste des achats en route sans point connu, au toucher de sa puce.
-  const [enRouteOuvert, setEnRouteOuvert] = useState(false);
-  const [relireOuvert, setRelireOuvert] = useState(false);
   // (3 nov., Julien : « sélectionner une ville pour voir les colis de cette ville ») Le choix est une
   // préférence légère de CET appareil (jamais une donnée) : illisible ⇒ « Toutes ».
   const [villeRetrait, setVilleRetraitEtat] = useState(() => { try { return localStorage.getItem('vrm_retirer_ville') || ''; } catch (_) { return ''; } });
@@ -29845,7 +29848,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (x.kind === 'email') return !!(codeRetrait(x.t && x.t.code) || qrVivant(x.t));
     const r = relaisDe(x.o); return !!(r && (codeRetrait(r.code) || r.qr));
   };
-  const joursAchatsRelus = (uid) => { const cap = uid ? _harvestSeen[`${uid}_orders_purchased`] : null; return Number.isFinite(cap) ? Math.floor((Date.now() - cap) / 86400000) : null; };
   // ⚠️ (29 oct.) DEUX DATES, JAMAIS CONFONDUES :
   //   · `arriveeSure` — l'arrivée PROUVÉE : le message d'arrivée de la
   //     conversation (`sur: 'oui'`), ou l'arrivée lue chez le TRANSPORTEUR
@@ -41527,32 +41529,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const colis = achatsAffiches.filter(({st}) => st && st.step>=1 && st.step<4 && !st.retour).map(({o,tk}) => { const su = (tk && tk.suivi) || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? { suivi: su, carrier: (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '' } : null; }).filter(Boolean);
           return <TeteTransporteurs transp={transp} colis={colis} relire={lireTransp}/>;
         })()}
-        {aFilter==='attente' && (()=>{
-          // (3 nov.) Sous Colis → À retirer : la fraîcheur se dit par la puce « N comptes à relire » (en haut).
-          if (retraitsOutils) return null;
-          const vieux = (accounts||[]).filter(a => a && !acctOff(a.vinted_user_id)).map(a => {
-            const j = joursAchatsRelus(String(a.vinted_user_id));
-            return j != null ? { a, j } : null;
-          }).filter(x => x && x.j >= FRAICHEUR_ACHATS_J).sort((x, y) => y.j - x.j);
-          if (!vieux.length) return null;
-          // (30 oct.) La tête de Vinted (`VintedResume` → `FraicheurDonnees`) nomme
-          // déjà ces comptes, avec le MÊME geste (repasser sur Vinted connecté sur
-          // chacun : ventes ET achats sont relus) : une cause, une phrase (§7). On
-          // ne redit que si un compte d'achats anciens n'y est pas.
-          const tete = liveStats && Number(liveStats.dataAgeJours) > 1 && Array.isArray(liveStats.dataAgeComptes) ? new Set(liveStats.dataAgeComptes.filter(x => x && x.login).map(x => String(x.login))) : null;
-          if (tete && tete.size > 1 && vieux.every(x => tete.has(String(accName(x.a))))) return null;
-          // (29 oct.) Une ligne : les comptes de même âge sont groupés (« il y a
-          // 25 j sur a, b, c »), le pourquoi est replié derrière ⓘ.
-          const parAge = []; for (const x of vieux) { const g = parAge.find(y => y.j === x.j); if (g) g.l.push(x.a); else parAge.push({ j: x.j, l: [x.a] }); }
-          return (
-            <div data-fraicheur-achats={vieux.map(x => `${x.a.vinted_user_id}:${x.j}`).join(',')} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'}}>
-              {vieux.length <= 2
-                ? <>Achats relus {parAge.map((g, i) => <span key={g.j}>{i ? ' et ' : ''}il y a {g.j} j sur {g.l.map((a, k) => <React.Fragment key={a.vinted_user_id}>{k ? ', ' : ''}<b style={{color:C.text,fontWeight:600}}>{accName(a)}</b></React.Fragment>)}</span>)} — ouvre Vinted sur {vieux.length > 1 ? 'chacun' : 'ce compte'}. </>
-                : <>Achats de {vieux.length} comptes pas relus depuis {vieux[vieux.length - 1].j} j ou plus — ouvre Vinted sur chacun. </>}
-              <Pourquoi label="Quels comptes">{vieux.length > 2 ? <>{parAge.map((g, i) => <span key={g.j}>{i ? ' · ' : ''}il y a {g.j} j : {g.l.map((a) => accName(a)).join(', ')}</span>)}. </> : null}Un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici : les achats d'un compte ne sont relus que quand le navigateur de l'extension est connecté dessus, avec l'extension VRM.</Pourquoi>
-            </div>
-          );
-        })()}
+        {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
+            des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
+            fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
         {/* (1er nov.) Dans Colis, la colonne « À retirer » (`ColonneRetirer`) porte les
             points relais et leur carte : le détail ne la redessine pas (une carte, §7). */}
         {aFilter==='attente' && !modeRetraits && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
@@ -44401,35 +44380,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (3 nov.) Les puces du haut : « N en route » (achats dont Vinted ne dit pas encore le point — la liste
                 au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
                 les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
-            {(() => {
-              const nRoute = 0;  // (3 nov., 13 h 02) « En route » est une section repliée à la fin de « À retirer »
-              // (9 nov., Julien : « 1 compte à relire » sans dire lequel — §2.7) La puce NOMME le compte quand il
-              // est seul (« Relire shop_x · 3 j ») ; la toucher ouvre, juste dessous, CHAQUE compte avec son âge et
-              // LE geste (ouvrir vinted.fr connecté sur ce compte, là où est l'extension), puis « Mes comptes ».
-              // (9 nov., lot AC) La règle vit dans src/aTrancher.js (`comptesARelireDe`), la même pour « À trancher ».
-              const comptesRelire = comptesARelireDe(liveStats) || [];
-              const nRelire = comptesRelire.length;
-              if (!nRoute && !nRelire) return null;
-              const liste = (groupesRelais && groupesRelais.sansRelais) || [];
-              const seul = nRelire === 1 ? comptesRelire[0] : null;
-              return (<>
-                <div className="vrm-colis-puces" data-colis-puces="">
-                  {nRoute > 0 ? <button type="button" className="vrm-colis-pill" data-retirer-en-route-sans={nRoute} aria-expanded={enRouteOuvert} onClick={() => setEnRouteOuvert((v) => !v)}>{nRoute} en route</button> : null}
-                  {nRelire > 0 ? <button type="button" className="vrm-colis-pill is-ambre" data-comptes-a-relire={nRelire} data-comptes-a-relire-noms={comptesRelire.map((x) => x.login).filter(Boolean).join(',')} aria-expanded={relireOuvert} onClick={() => setRelireOuvert((v) => !v)}>{seul && seul.login ? `Relire ${seul.login} · ${seul.jours} j` : `${nRelire} compte${nRelire > 1 ? 's' : ''} à relire`}</button> : null}
-                </div>
-                {nRelire > 0 && relireOuvert ? <div className="vrm-colis-note" data-comptes-a-relire-detail={nRelire} style={{margin:'0 2px 8px'}}>
-                  {comptesRelire.map((x, i) => <div key={x.login || i} data-compte-a-relire={x.login || ''}>{x.login ? <b>{x.login}</b> : 'Un compte'} : lu il y a {x.jours} j.</div>)}
-                  <div style={{marginTop:4}}>Ouvre vinted.fr connecté sur {nRelire > 1 ? 'chacun de ces comptes' : (seul && seul.login ? seul.login : 'ce compte')}, dans le navigateur où est l’extension VRM : elle le relit toute seule. D’ici là, un colis déjà retiré ou expédié peut encore apparaître.{' '}
-                    <button type="button" className="vrm-lien-action" data-comptes-a-relire-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Mes comptes</button></div>
-                </div> : null}
-                {nRoute > 0 && enRouteOuvert ? <div className="vrm-colis-en-route-liste" data-en-route-liste={liste.length}>
-                  {liste.map((a) => <div key={a.id} className="vrm-rpf-ligne is-attendu" data-en-route-achat={a.id}><div className="vrm-rpf-rang">
-                    <span className={'vrm-rpf-vignette' + (a.photo && !imgMortes.has(a.photo) ? '' : ' is-sans')} aria-hidden="true">{a.photo && !imgMortes.has(a.photo) ? <PhotoVinted src={a.photo} alt="" loading="lazy" onError={() => noterImgMorte(a.photo)}/> : null}</span>
-                    <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{a.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">en route</span></span></span>
-                  </div></div>)}
-                </div> : null}
-              </>);
-            })()}
+            {/* (9 nov., lot AG) Plus de puce « Relire compte_a · 3 j » (ni « N en route », déjà repliée dans « À
+                retirer » depuis le 3 nov.) : un compte pas relu est NOMMÉ, avec son geste, par la ligne de fraîcheur
+                UNIQUE du haut de l'app (src/LigneFraicheur.jsx, règle src/fraicheur.js) — une voix, pas deux (§7).
+                « Suivi vérifié il y a N min » (sous « À retirer ») reste : c'est l'âge du statut CHEZ LE TRANSPORTEUR
+                des colis de cette liste, propre à Colis (la ligne du haut ne nomme le suivi que s'il est en RETARD). */}
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
             {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
@@ -52998,7 +52953,9 @@ function AppCoeur() {
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
           {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
-          {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansFraicheur={sec==='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
+          {/* (9 nov., lot AG) La tête de Vinted ne dit plus la fraîcheur des comptes (« ✓ Ventes Vinted à jour »,
+              « N comptes pas relus depuis N j ») : la ligne de fraîcheur UNIQUE du haut de l'app la dit, avec le
+              geste (src/fraicheur.js). Sans montants (3 nov.) ni fraîcheur, `VintedResume` n'a plus rien à rendre ici. */}
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
             if (achats) return null; // (3 nov.) la carte d'Achats vit dans l'écran Achats (ses chiffres d'achat)
@@ -53615,14 +53572,17 @@ function AppCoeur() {
         <EnAttenteEnvoi/>
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
+        {/* (9 nov., lot AG) UNE ligne de fraîcheur en haut de l'app : « Tout est à jour · vérifié il y a N min »,
+            ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
+            (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
+            est tenue dès le premier rendu (repli de même hauteur) : rien ne saute à l'arrivée de la réponse. */}
+        {!baseKO && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab}/></Suspense>}
         <BandeauAbonnement setTab={setTab}/>
         <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
           comptes={(vintedAccounts || []).filter((a) => a && a.vinted_user_id != null).map((a) => ({ uid: String(a.vinted_user_id), nom: (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)] || a.login || ('#' + a.vinted_user_id) }))}/>
         <ApercuSansAbonnement tab={tab} setTab={setTab}/>
         <BandeauLiaison/>
         {!baseKO && <BandeauStatut/>}
-        {/* (8 nov.) Un compte qui n'arrive plus alors que l'extension travaille : la ligne ambre (src/ToutVaBien.jsx). */}
-        {!baseKO && <Suspense fallback={null}><AlerteCaptureParesseuse onVoir={() => setTab('settings')}/></Suspense>}
         <BandeauConfirmationAdresse onVoir={() => { ouvrirEmailsRelier('adresses'); setTab('emails'); }}/>
         <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
@@ -53969,4 +53929,5 @@ function AppCoeur() {
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
 export { useProfilFiscal, profilFiscalLu };
 export { lireLitigesVinted, changerCompteVrm };
+export { fetchTranspLignes, relireTransporteursSiVieux };
 export { ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
