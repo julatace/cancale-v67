@@ -1,0 +1,88 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LOT L (10 nov.) — calculette d'achat · historique de prix · stock d'emballages.
+   Style DA6 : widgets blancs rayon 24, pilules, chiffres alignés. Neutre partout ;
+   l'accent sur le bénéfice ; AMBRE = un geste à faire (racheter, une perte) ;
+   jamais rouge (§7). Cibles de 44 px.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-calc { display: flex; flex-direction: column; gap: 14px; color: var(--vrm-ink, #1D1D1F); }
+.vrm-calc-grille { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vrm-calc-champ { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-calc-saisie { display: flex; align-items: center; gap: 6px; }
+.vrm-calc-saisie input, .vrm-emb2-form input {
+  flex: 1; min-width: 0; width: 100%; height: 48px; box-sizing: border-box; border-radius: 14px; padding: 0 12px;
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  font: 600 20px var(--vrm-police, inherit); font-variant-numeric: tabular-nums;
+}
+.vrm-calc-saisie > span { font-size: 17px; color: var(--vrm-muted, #6E6E73); }
+.vrm-calc-sites, .vrm-calc-puces, .vrm-emb2-defaut, .vrm-emb2-choix { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vrm-calc-site, .vrm-calc-puce {
+  appearance: none; min-height: 44px; padding: 0 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  font: 600 15px var(--vrm-police, inherit);
+}
+.vrm-calc-site.is-on, .vrm-calc-puce.is-on { background: var(--vrm-ink, #1D1D1F); color: var(--vrm-surface, #fff); border-color: transparent; }
+.vrm-calc-site:focus-visible, .vrm-calc-puce:focus-visible, .vrm-emb2-l:focus-visible, .vrm-emb2-ajout:focus-visible, .vrm-emb2-b:focus-visible {
+  outline: 2px solid var(--vrm-focus, var(--vrm-accent, #0066CC)); outline-offset: 2px;
+}
+.vrm-calc-emb { display: flex; flex-direction: column; gap: 8px; }
+.vrm-calc-emb .vrm-calc-champ { max-width: 50%; }
+.vrm-calc-res {
+  border-radius: 24px; padding: 16px 18px; background: var(--vrm-surface, #fff);
+  box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-calc-attente { margin: 0; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-calc-tete { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-calc-montant { margin: 2px 0 10px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.vrm-calc-montant b { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: var(--vrm-accent, #0066CC); }
+.vrm-calc-res.is-perte .vrm-calc-montant b { color: var(--vrm-warn, #B25000); }
+.vrm-calc-borne { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-calc-lignes { margin: 0; display: flex; flex-direction: column; gap: 6px; font-variant-numeric: tabular-nums; }
+.vrm-calc-lignes > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px; }
+.vrm-calc-lignes dt { display: inline-flex; align-items: center; color: var(--vrm-muted, #6E6E73); }
+.vrm-calc-lignes dd { margin: 0; text-align: right; font-weight: 600; }
+.vrm-calc-lignes dd small { display: block; font-weight: 400; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-calc-note { margin: 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); text-align: center; }
+
+/* ── L'escalier des prix (fiche paire) ── */
+.vrm-fp-prixserie { margin: 6px 0 8px; color: var(--vrm-ink, #1D1D1F); }
+.vrm-fp-prixserie svg { display: block; overflow: visible; }
+.vrm-fp-prixserie figcaption { display: flex; gap: 8px; align-items: baseline; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--vrm-muted, #6E6E73); }
+.vrm-fp-prixserie figcaption b { color: var(--vrm-ink, #1D1D1F); font-weight: 700; }
+
+/* ── Le stock d'emballages (Stock) ── */
+.vrm-emb2 {
+  box-sizing: border-box; border-radius: 24px; padding: 14px 18px; margin: 0 0 12px;
+  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-emb2-tete { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb2-ajout { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 4px; cursor: pointer; font: 600 15px var(--vrm-police, inherit); color: var(--vrm-accent, #0066CC); }
+.vrm-emb2-vide, .vrm-emb2-note { margin: 4px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb2-liste { list-style: none; margin: 0; padding: 0; }
+.vrm-emb2-liste > li + li { border-top: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
+.vrm-emb2-l {
+  appearance: none; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 6px 0;
+  border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.vrm-emb2-nom { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vrm-emb2-nom b { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-emb2-nom small { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb2-n { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.vrm-emb2-l.is-alerte .vrm-emb2-n { color: var(--vrm-warn, #B25000); }
+.vrm-emb2-chevron { font-size: 22px; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb2-alerte { margin: -4px 0 8px; font-size: 13px; font-weight: 600; color: var(--vrm-warn, #B25000); }
+.vrm-emb2-defaut, .vrm-emb2-choix { margin-top: 8px; }
+.vrm-emb2-defaut > span, .vrm-emb2-choix > span { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb2-choix { margin: 6px 0 10px; }
+.vrm-emb2-form { display: flex; flex-direction: column; gap: 12px; }
+.vrm-emb2-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb2-form input { font-size: 17px; }
+.vrm-emb2-err { margin: 0; font-size: 13px; font-weight: 600; color: var(--vrm-warn, #B25000); }
+.vrm-emb2-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.vrm-emb2-b {
+  appearance: none; min-height: 44px; padding: 0 18px; border-radius: 999px; cursor: pointer; font: 600 15px var(--vrm-police, inherit);
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+}
+.vrm-emb2-b.is-plein { background: var(--vrm-accent, #0066CC); color: var(--vrm-on-accent, #fff); border-color: transparent; }
+.vrm-cv-champ:has(.vrm-cv-champ-puces) { flex-wrap: wrap; justify-content: flex-end; }
+.vrm-cv-champ-puces { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex-basis: 100%; }

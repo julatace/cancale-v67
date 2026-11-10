@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom';
 import './styles-fiche-paire.css';
 import './styles-annonces-outils.css';
 import { texteDuree } from './etatArticle.js';
+import { escalierPrix, eurosPrix } from './historiquePrix.js';
 
 const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'grid', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore', benefice: 'chart' };
 // (9 nov.) « Ouvrir » : l'écran d'où vient l'étape (`source`, posée par
@@ -81,6 +82,26 @@ function HistoireNumero({ h }) {
     </section>
   );
 }
+// (10 nov., lot L) L'HISTORIQUE DE PRIX en un coup d'œil : un escalier (le prix tenu
+// jusqu'au suivant), le premier et le dernier prix LUS ou relus écrits dessous. Aucune
+// couleur (§7) : l'encre ; les dates sont dans la liste juste en dessous.
+function EscalierPrix({ points }) {
+  const g = escalierPrix(points);
+  if (!g) return null;
+  const W = 280, H = 56, P = 4;
+  const x = (v) => P + v * (W - 2 * P), y = (v) => H - P - v * (H - 2 * P);
+  const d = g.marches.map((m, i) => `${i ? 'L' : 'M'}${x(m.x0).toFixed(1)} ${y(m.y).toFixed(1)} L${x(m.x1).toFixed(1)} ${y(m.y).toFixed(1)}`).join(' ');
+  const premier = points[0], dernier = points[points.length - 1];
+  return (
+    <figure className="vrm-fp-prixserie" data-fiche-prix-serie={points.length} aria-label={`Prix : de ${eurosPrix(premier.prix)} à ${eurosPrix(dernier.prix)}, ${points.length} prix`}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden="true">
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+        {g.marches.map((m, i) => <circle key={i} cx={x(m.x0)} cy={y(m.y)} r="3" fill="currentColor"/>)}
+      </svg>
+      <figcaption><span data-prix-premier={premier.prix}>{eurosPrix(premier.prix)}</span><span aria-hidden="true">→</span><b data-prix-dernier={dernier.prix}>{eurosPrix(dernier.prix)}</b></figcaption>
+    </figure>
+  );
+}
 const dateCourte = (iso) => {
   const t = Date.parse(iso || ''); if (!Number.isFinite(t)) return '—';
   const d = new Date(t);
@@ -143,6 +164,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
             <span className="vrm-fp-txt">
               <span className="vrm-fp-ligne1"><b>{e.titre}</b>{e.date ? <time className="vrm-fp-date" dateTime={e.date}>{quand(e.date)}</time> : null}</span>
               {e.lignes ? e.lignes.map((l, j) => <span key={j} className="vrm-fp-detail" data-fiche-ligne={l.site} data-fiche-tx={l.tx || undefined}>{l.texte}{l.date && e.cle === 'vente' && e.lignes.length > 1 ? ` · ${quand(l.date)}` : ''}</span>) : null}
+              {e.cle === 'prix' && Array.isArray(e.serie) && e.serie.length > 1 ? <EscalierPrix points={e.serie}/> : null}
               {e.evenements && e.evenements.length ? <ul className="vrm-fp-evs">{e.evenements.map((ev, j) => <Evenement key={j} ev={ev}/>)}</ul> : null}
               {e.detail ? <span className="vrm-fp-detail">{e.etat === 'passu' ? <>— <span data-fiche-raison="">{e.detail}</span></> : e.detail}</span> : null}
               {e.source && onSource ? <button type="button" className="vrm-lien-action vrm-fp-source" data-fiche-source={e.cle} data-fiche-source-tab={e.source.stock ? 'garage' : e.source.tab} onClick={() => onSource(e.source)}>{e.source.stock ? 'Voir au Stock' : `Ouvrir dans ${LIB_SOURCE_ETAPE[e.source.tab] || 'l’écran'}`} ›</button> : null}

@@ -79,6 +79,8 @@ export const ACTIONS_RECHERCHE = [
   { id: 'export-comptable', libelle: 'Exporter pour mon comptable', sous: 'Compta → tableur et PDF d’une période', icone: 'doc', mots: ['exporter', 'export', 'comptable', 'comptabilite', 'compta', 'csv', 'excel', 'tableur', 'pdf'] },
   { id: 'ma-configuration', libelle: 'Ma configuration', sous: 'Plateformes, statut, numéro, affichage, notifications', icone: 'gear', mots: ['configuration', 'configurer', 'config', 'statut', 'plateformes', 'demarrage'] },
   { id: 'ma-journee', libelle: 'Ma journée', sous: 'Ce qu’il y a à faire aujourd’hui', icone: 'home', mots: ['journee', 'aujourd', 'accueil', 'ma journee'] },
+  // (10 nov., lot L) La calculette d'achat : elle OUVRE une feuille qui n'écrit rien.
+  { id: 'calculette', libelle: 'Calculette d’achat', sous: 'Combien je gagne si je l’achète X € ?', icone: 'euro', mots: ['calculette', 'calculer', 'calcul', 'combien', 'gagner', 'gagne', 'benefice', 'marge', 'rentable', 'acheter'] },
   { id: 'achats', libelle: 'Mes achats', sous: 'Achats', icone: 'bag', mots: ['achats', 'achat', 'acheter'] },
   { id: 'reglages', libelle: 'Réglages', sous: 'Paramètres de VRM', icone: 'gear', mots: ['reglages', 'parametres', 'preferences', 'settings', 'options'] },
   { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, sous: 'La fiche de la paire', icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire'] },
@@ -150,6 +152,7 @@ export function destinationAction(a) {
     case 'ma-configuration': return { feuille: 'configuration' };
     case 'ma-journee': return { tab: 'journee' };
     case 'achats': return { tab: 'achats' };
+    case 'calculette': return { feuille: 'calculette' };
     case 'reglages': return { tab: 'settings' };
     case 'ouvrir-num': return a.num ? { feuille: 'fiche', num: a.num } : null;
     case 'baisser-prix': return a.num ? { feuille: 'prix', num: a.num } : null;

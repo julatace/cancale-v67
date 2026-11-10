@@ -475,6 +475,10 @@ import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : b
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
+import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";   // (10 nov., lot L) les prix lus dans le dressing
+import CalculetteAchat from "./CalculetteAchat.jsx";   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
+import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot L) l'emballage d'un colis (facultatif)
+import { CLE_EMBALLAGES } from "./emballages.js";
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
 import { etatNumeroColis } from "./emballage.js";
 // (6 nov., vitesse 2) ModeEmballage : à la demande ; sa feuille de style reste ICI (même ordre).
@@ -2557,6 +2561,10 @@ const SYNC_KEYS = [
   // pour retrouver son travail sur un autre appareil.
   'vinted_annonce_drafts',
   'vinted_prix_historique',
+  // (10 nov., lot L) LES PRIX LUS dans le dressing (src/historiquePrix.js) : une ligne par
+  // prix CHANGÉ, datée par SA lecture ; écrits au chargement des annonces, lus par la fiche.
+  // (10 nov., lot L) LE STOCK D'EMBALLAGES (src/emballages.js) : écrit sur SON clic seulement.
+  'vrm_prix_lus','vrm_emballages',
   // Factures PRO — plusieurs micro-entreprises. `vinted_entreprises` = liste des
   // entités [{id, companyName, companyType, companyAddress, siret, footer}] ;
   // `vinted_entreprise_active` = id de l'entité utilisée pour les nouvelles
@@ -31393,6 +31401,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!valeurDuStock || !AUTH.user?.id) return;
     publierValeurStock(valeurDuStock, { owner: AUTH.user.id, partiel: !!listings.incomplet });
   }, [valeurDuStock, listings.incomplet]);
+  // (10 nov., lot L) L'HISTORIQUE DE PRIX : chaque lecture des annonces AJOUTE le prix d'une
+  // annonce qui a changé depuis la dernière lue (ou vue pour la 1re fois), daté par la lecture
+  // de SON compte (`listings.lues`) — jamais l'heure de l'écran. Lecture en erreur ⇒ rien.
+  useEffect(() => {
+    if (!Array.isArray(listings.items) || listings.error || !AUTH.user?.id || !isCloudReady()) return;
+    const avant = load(CLE_PRIX_LUS, null);
+    const r = noterPrixLus(avant, [...listings.items, ...(listings.aConfirmer || [])], listings.lues || {});
+    if (r.ajoutes) save(CLE_PRIX_LUS, r.journal);
+  }, [listings.items, listings.aConfirmer, listings.lues, listings.error]);
   // (6 nov., vague 3) LA MÊME PAIRE EN LIGNE DEUX FOIS SUR VINTED (src/enLigneDeuxFois.js) :
   // deux annonces EN LIGNE (la règle <enligne-regle>, jamais « à confirmer » ni masquées)
   // de même PHOTO EXACTE ou reliées par `recreeDe` — risque de double vente. Un compte
@@ -38499,6 +38516,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [filtreEnvoyes, setFiltreEnvoyes] = useState('tous');
   // (lot AJ) La pastille de transporteur de « À envoyer » (un filtre, jamais un ordre).
   const [filtreEnvoyer, setFiltreEnvoyer] = useState('tous');
+  // (10 nov., lot L) Le stock d'emballages (src/emballages.js) : le choix d'emballage d'un colis dans « Préparer ».
+  const [emballagesR, setEmballagesR] = useStateCle(CLE_EMBALLAGES, () => load(CLE_EMBALLAGES, null));
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
   // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
   // (5 nov.) Leboncoin aussi (la tournée) : sa coche « Colis fait » de toujours (`vrm_lbc_colis_done`).
@@ -41935,7 +41954,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             de suivi ou CE code de retrait (src/scanColis.js), « J'ai retiré » sur SON toucher. */}
         {!dansPlateforme && (modeRetraits
           ? <ScreenHead icon="qr" title="Colis à retirer" desc="Les colis à aller chercher : code de retrait, date limite, point relais." right={gestesRetraitAchats}/>
-          : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé." right={gestesRetraitAchats}/>)}
+          : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé." right={<div className="vrm-achats-gestes" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Bouton variante="secondaire" icone="euro" data-achats-calculette="" onClick={() => { try { window.dispatchEvent(new Event('vrm:calculette')); } catch (_) {} }}>Calculette</Bouton>{gestesRetraitAchats}</div>}/>)}
         {/* (9 nov.) Pas dans Colis → À retirer : ce bloc y est rendu SOUS la liste (avant « Argent à vérifier ») et Colis porte
             déjà « Scanner » en tête de l'onglet (mode retrait) ; il ne reste que dans l'espace plateforme → Achats. */}
         {dansPlateforme && !modeRetraits && !baseKO && pickupUnion.total > 0 ? <div className="vrm-achats-scan" data-achats-scan="">{gestesRetraitAchats}</div> : null}
@@ -46184,6 +46203,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onFait={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
           onImprimer={(c) => (c && c.site === 'vinted' && c.x ? imprimerColisVinted(c.x) : null)} onScanner={(c) => { setScanAttendu(c.cle); setScanOuvert('envoi'); }}
           onFermer={() => setPreparerOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}
+          emballage={(c) => <ChoixEmballageColis reglage={emballagesR} cle={c.cle} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}/>}
           Photo={(src) => imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" decoding="async" onError={() => noterImgMorte(src)}/>}
           photoCarton={(c) => { const v = c && venteDuColis(c.geste); return v ? <BoutonPhotoCarton vente={{ ...v, num: c.num || '' }} ton="clair"/> : null; }}
           note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc" ajout/> : null)}/> : null}
@@ -51440,6 +51460,9 @@ function AppCoeur() {
   // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
   // « Tout sur le N° » ou le mode emballage ; elle lit les MÊMES sources.
   const [ficheNum,setFicheNum]=useState(null);
+  // (10 nov., lot L) LA CALCULETTE D'ACHAT : ouverte par Achats (`vrm:calculette`) ou ⌘K ; elle n'écrit rien.
+  const [calcOuverte,setCalcOuverte]=useState(false);
+  useEffect(()=>{const ouvrir=()=>setCalcOuverte(true);window.addEventListener('vrm:calculette',ouvrir);return()=>window.removeEventListener('vrm:calculette',ouvrir);},[]);
   const [neuveRecente,setNeuveRecente]=useState(null);   // (3 nov.) la fiche dupliquée à l'instant (avant l'écriture différée de `save`)
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
@@ -51858,6 +51881,8 @@ function AppCoeur() {
   // Les commandes eBay brutes, pour « vendu » (même règle que Ma journée).
   // `undefined` pas encore lu · `null` pas su · tableau lu.
   const [ebayCommandes,setEbayCommandes]=useState(undefined);
+  // (10 nov., lot L) Les frais eBay de la calculette : lus sur SES commandes (src/calculetteAchat.js).
+  const ctxCalculette=useMemo(()=>({ ebayCommandes: Array.isArray(ebayCommandes)?ebayCommandes:null, commandeEbayEngagee }),[ebayCommandes]);
   // `panel_accounts_off` : les comptes écartés depuis le panneau (§35), lus ici
   // aussi pour que « vendu » écarte exactement les mêmes comptes que Ma journée.
   const [panelOffCoque,setPanelOffCoque]=useState({});
@@ -53860,6 +53885,7 @@ function AppCoeur() {
     if (qBrut && String(qBrut).trim()) setGsRecents(noterRecent(String(qBrut).trim()));
     setGsOpen(false);
     if (d.feuille === 'fiche') { setFicheNum(String(d.num)); return; }
+    if (d.feuille === 'calculette') { setCalcOuverte(true); return; }
     if (d.feuille === 'prix') { setPrixNum(String(d.num)); return; }
     if (d.feuille === 'configuration') { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} return; }
     if (d.stock) { setGarageLocate(String(d.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(d.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
@@ -54236,6 +54262,7 @@ function AppCoeur() {
             ouvrirNumero={(n)=>{ setRpOuvert(false); try{ window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)})); }catch(_){} }}
             ouvrirAnnonces={()=>{ setRpOuvert(false); setTab('cat_annonces'); }} onClose={()=>setRpOuvert(false)}/>
         </React.Suspense>}
+        {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
         {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>setFicheNum(null)}><Differe rendre={()=>{
           // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
           // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
@@ -54250,7 +54277,7 @@ function AppCoeur() {
           const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
             stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
             coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne, colisVente: ex ? ex.colisVente : undefined,
-            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [],
+            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [], prixLus: load(CLE_PRIX_LUS, null),
             sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null }, {
             etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
             venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
