@@ -154,6 +154,7 @@ import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
 import { requeteDeLaVoix } from "./rechercheVocale.js";
 import { lireDemandeAchat, lireRechercheLien, poserDemandeAchat } from "./raccourcisSiri.js";
+import RaccourcisClavier from "./RaccourcisClavier.jsx";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
 import QuiDorment from "./design/QuiDorment.jsx";
 import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
@@ -12500,12 +12501,23 @@ const INIT_GARAGE = {};
 // (illisible), `danger` un fond rouge (§7 : le rouge, c'est deux paires sous un
 // même N°), et `title`/`aria-*` étaient perdus. Plein + accent (ou sans couleur)
 // ⇒ primaire ; tout le reste ⇒ secondaire. `data-vrm-tone` reste (lecture seule).
+// Un contenu React porte-t-il du texte lisible ? (une icône `aria-hidden` n'en porte pas)
+const aDuTexte = (n) => {
+  if (n == null || n === false || n === true) return false;
+  if (typeof n === 'string') return n.trim() !== '';
+  if (typeof n === 'number') return true;
+  if (Array.isArray(n)) return n.some(aDuTexte);
+  if (React.isValidElement(n)) return !(n.props && n.props['aria-hidden']) && n.type !== Icon && aDuTexte(n.props && n.props.children);
+  return false;
+};
 function Btn({children,onClick,color,small,danger,outline,disabled,primaire:primaireDemande=false,style={},className='',...rest}) {
   // (30 oct.) Secondaire par défaut : une couleur d'accent ne fait plus un primaire (une
   // barre en avait quatre). Le primaire se DEMANDE (`primaire`), un par écran.
   const primaire = !!primaireDemande && !outline && !danger;
+  // (10 nov., lot P — VoiceOver) Un `Btn` sans texte (une icône seule) prend son `title` pour nom lu.
+  const nomLu = !rest['aria-label'] && !rest['aria-labelledby'] && typeof rest.title === 'string' && rest.title.trim() && !aDuTexte(children) ? { 'aria-label': rest.title.trim() } : null;
   return (
-    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} type="button" onClick={onClick} disabled={!!disabled} {...rest}
+    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} type="button" onClick={onClick} disabled={!!disabled} {...rest} {...nomLu}
       className={`vrm-b vrm-b-${primaire ? 'primaire' : 'secondaire'}${small ? ' vrm-b-petit' : ''}${className ? ' ' + className : ''}`} style={style}>{children}</button>
   );
 }
@@ -26943,7 +26955,7 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
           <span className="vrm-fu-surtitre vrm-jv2-nom" data-jv2-nom="">{nom}</span>
           <button type="button" className="vrm-jv2-sem" aria-pressed={semaine} data-jv2-semaine={S.lundi} onClick={() => setChoix(semaine ? null : 'sem')}>{semaine ? 'Revenir aux jours' : S.titre}</button>
           {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine en cours). */}
-          {onSemaine ? <button type="button" className="vrm-jv2-sem vrm-jv2-ma-semaine" data-ouvre-ma-semaine="" onClick={onSemaine}>Ma semaine ›</button> : null}
+          {onSemaine ? <button type="button" className="vrm-jv2-sem vrm-jv2-ma-semaine" data-ouvre-ma-semaine="" onClick={onSemaine}>Ma semaine <span aria-hidden="true">›</span></button> : null}
         </div>
         <div className="vrm-jv2-corps">
           <div className="vrm-jv2-chiffre">
@@ -44185,6 +44197,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?"Ouvrir l'annonce sur Vinted":undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
+                    {/* (10 nov., lot P) Le nom lu du lien : QUELLE annonce (et, après, ses pastilles d'état « En double »…). */}
+                    {urlFiche && <span className="vrm-sr">{`Ouvrir sur Vinted : ${it.title || it.brand || 'l’annonce'}. `}</span>}
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide remplir rayon={0}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
                     {enDouble && <span className="vrm-vignette-marque is-ambre" data-vignette-en-double="" title="La même paire est en ligne deux fois sur Vinted (même photo) : retire celle en trop sur vinted.fr — l'alerte au-dessus les nomme">En double</span>}
@@ -44260,7 +44274,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:12,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
                     {/* Téléphone seulement (caché sur ordinateur, où tout reste à la vue). */}
+                    {/* (10 nov., lot P) Au lecteur d'écran, le bouton dit QUELLE paire il ouvre (« N°12, titre, 65 € »). */}
                     <button type="button" className="vrm-fiche-plus-bouton" data-fiche-plus-bouton="" aria-expanded={ouverte} aria-controls={idRepli}
+                      aria-label={`${ouverte ? 'Moins de détails' : 'Détails et gestes'} — ${num ? 'N°' + num + ', ' : ''}${it.title || it.brand || 'annonce'}, ${prix(it.price,it.currency) || 'prix pas lu'}`}
                       onClick={basculerFiche}>
                       <span>{ouverte ? 'Moins de détails' : 'Détails et gestes'}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
                     </button>
@@ -54555,6 +54571,8 @@ function AppCoeur() {
       <TopProgress/>
       <Toaster/>
       <PiluleAnnulerCoque/>
+      {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
+      <RaccourcisClavier Feuille={SheetShell}/>
       {/* (10 nov., lot AN) La photo d'un article en grand, depuis n'importe quel écran (src/Visionneuse.jsx). */}
       <Visionneuse Photo={PhotoVinted} Retour={FermeAuRetour}/>
       <DefilementPartout/>

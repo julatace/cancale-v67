@@ -133,6 +133,7 @@ async function auditLecteur(pg) {
   await cdp.send('Accessibility.enable');
   const { nodes } = await cdp.send('Accessibility.getFullAXTree');
   const sansNom = [], imagesSansNom = [];
+  if (process.env.BANC_DUMP) for (const n of nodes) { if (!n.ignored && ROLES_CONTROLE.has(n.role && n.role.value)) console.log('     · ' + n.role.value + ' « ' + ((n.name && n.name.value) || '') + ' »'); }
   for (const n of nodes) {
     if (n.ignored) continue;
     const role = n.role && n.role.value; const nom = ((n.name && n.name.value) || '').trim();
@@ -154,8 +155,8 @@ async function auditLecteur(pg) {
   };
   // A3 : un focalisable sous `aria-hidden="true"` (le lecteur ne le voit pas, le Tab y va).
   const cachesFocalisables = await pg.evaluate(() => {
-    const sel = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-    return [...document.querySelectorAll(sel)].filter((e) => e.closest('[aria-hidden="true"]') && !e.closest('[inert]') && e.getClientRects().length)
+    const sel = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]';
+    return [...document.querySelectorAll(sel)].filter((e) => e.tabIndex >= 0 && e.closest('[aria-hidden="true"]') && !e.closest('[inert]') && e.getClientRects().length)
       .map((e) => (e.outerHTML || '').replace(/\s+/g, ' ').slice(0, 140));
   });
   const res = { sansNom: await decrire(sansNom), nSansNom: sansNom.length, images: await decrire(imagesSansNom), nImages: imagesSansNom.length, cachesFocalisables };
@@ -183,7 +184,10 @@ async function main() {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     // ── A. Lecteur d'écran ──────────────────────────────────────────────────
-    for (const largeur of [390, 1512]) {
+    // BANC_SEUL=A ou B, BANC_LARGEUR=390 ou 1512 : une partie seulement (pour aller vite).
+    const SEUL = process.env.BANC_SEUL || '';
+    for (const largeur of [390, 1512].filter((l) => !process.env.BANC_LARGEUR || String(l) === process.env.BANC_LARGEUR)) {
+      if (SEUL === 'B') break;
       for (const sombre of [false, true]) {
         const T = `${largeur < 700 ? '📱' : '🖥️'}${sombre ? '🌙' : '☀️'}`;
         for (const [tab, nom] of ECRANS) {
@@ -197,8 +201,8 @@ async function main() {
             dit(r.nImages === 0, `${T} ${nom} · A2 chaque image a un nom (ou est décorative)`, `${r.nImages} : ${r.images.join(' ║ ')}`);
             dit(r.cachesFocalisables.length === 0, `${T} ${nom} · A3 rien de focalisable caché au lecteur`, r.cachesFocalisables.slice(0, 4).join(' ║ '));
             if (tab === 'annonces') {
-              const n = await nomLu(pg, '[data-carte-annonce="9401"] [data-vignette-ouvrir], [data-carte-annonce="9401"] [role="button"], [data-carte-annonce="9401"] button');
-              dit(!!n && /12/.test(n.nom) && /65/.test(n.nom) && /Adidas/i.test(n.nom), `${T} Annonces · A4 la vignette se lit « N°, titre, prix »`, JSON.stringify(n));
+              const n = await nomLu(pg, '[data-carte-annonce="9401"] [data-fiche-plus-bouton]');
+              dit(!!n && /12/.test(n.nom) && /65/.test(n.nom) && /Adidas/i.test(n.nom), `${T} Annonces · A4 « Détails et gestes » dit sa paire « N°, titre, prix »`, JSON.stringify(n));
             }
             dit(errs.length === 0, `${T} ${nom} · A5 aucune erreur de page`, errs.slice(0, 2).join(' | '));
             await ctx.close();
@@ -208,6 +212,7 @@ async function main() {
     }
     // ── B. Clavier (ordinateur) ─────────────────────────────────────────────
     for (const sombre of [false, true]) {
+      if (SEUL === 'A') break;
       const T = `🖥️${sombre ? '🌙' : '☀️'}`;
       await essaie(`${T} clavier`, async () => {
         const { pg, ctx, errs, ecrits } = await ouvrir(b, { largeur: 1512, sombre, tab: 'journee' });
