@@ -184,10 +184,12 @@ async function main() {
         dit(A.codes.every((c) => fois(r.codes, c) === 1), `${T} chaque colis listé UNE fois (autre ville, autre département, sans lieu, deux comptes compris)`, JSON.stringify(r.codes));
         dit(A.absents.every((c) => !r.codes.includes(c)), `${T} le colis retiré n'est ni listé ni compté`, JSON.stringify(r.codes));
         const pt = (re) => r.pts.find((p) => re.test(p.cle));
-        const dinan = pt(/^marcheduport\|/);
-        dit(!!dinan && dinan.cle === 'marcheduport|22100' && /Rue des Rosiers/.test(dinan.adr) && /22100 Dinan/.test(dinan.adr) && dinan.codes.includes('333333'), `${T} le locker d'une autre ville porte SON adresse (relue dans son e-mail gardé)`, JSON.stringify(dinan));
-        const rennes = pt(/^halles\|/);
-        dit(!!rennes && rennes.cle === 'halles|35000' && /Rue de Paris/.test(rennes.adr), `${T} une rue sans numéro, avec son code postal, reste l'adresse du point`, JSON.stringify(rennes));
+        // (9 nov. au soir) La clé d'un point est son NOM entier + son code postal : « LOCKER 24/7 MARCHE DU PORT » lu
+        // dans l'e-mail, dit « Casier 24/7 Marché du Port » ⇒ `casier247marcheduport|22100` (le préfixe fait partie du nom).
+        const dinan = pt(/(^|casier247)marcheduport\|/);
+        dit(!!dinan && /^(casier247)?marcheduport\|22100$/.test(dinan.cle) && /Rue des Rosiers/.test(dinan.adr) && /22100 Dinan/.test(dinan.adr) && dinan.codes.includes('333333'), `${T} le locker d'une autre ville porte SON adresse (relue dans son e-mail gardé)`, JSON.stringify(dinan));
+        const rennes = pt(/(^|casier247)halles\|/);
+        dit(!!rennes && /^(casier247)?halles\|35000$/.test(rennes.cle) && /Rue de Paris/.test(rennes.adr), `${T} une rue sans numéro, avec son code postal, reste l'adresse du point`, JSON.stringify(rennes));
         const pv = pt(/^pointpresse\|56000$/), pb = pt(/^pointpresse\|29200$/);
         dit(!!pv && !!pb && pv.codes.join() === '666666' && pb.codes.join() === '777777', `${T} deux relais du même nom dans deux villes : deux points, chacun SON colis`, JSON.stringify([pv, pb]));
         const bazar = pt(/^bazardesamis/);
@@ -195,7 +197,7 @@ async function main() {
         const inc = r.pts.find((p) => p.cle === '__inconnu');
         dit(!!inc && inc.codes.join() === '888888', `${T} le colis sans lieu est sous « Point pas encore connu »`, JSON.stringify(inc));
         if (!tel) {
-          const places = r.pts.filter((p) => p.rp === 'oui').map((p) => p.cle).sort();
+          const places = r.pts.filter((p) => p.rp === 'oui').map((p) => p.cle.replace(/^casier247/, '')).sort();
           dit(places.join() === ['halles|35000', 'marcheduport|22100', 'pointpresse|29200', 'pointpresse|56000', 'tabaccentral|56000'].join() && r.surCarte === A.surCarte, `${T} les 5 points à adresse sont sur la carte, quelle que soit leur ville`, JSON.stringify({ places, surCarte: r.surCarte }));
           const att = [POS['29200'][0], POS['56000'][1], POS['35000'][0], POS['22100'][1]].map((v) => v.toFixed(3));
           const c = String(r.cadre || '').split(',');

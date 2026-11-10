@@ -92,6 +92,10 @@ async function main() {
       await essaie(T, async () => {
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+        // (9 nov. au soir) La colonne « À retirer » refaite le 3 nov. (une ligne par colis) : le code et « J'ai retiré »
+        // sont DANS la ligne ouverte — on la touche d'abord, comme lui.
+        await pg.locator('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir, .vrm-pickup-code').first().waitFor({ timeout: 25000 });
+        if (!(await pg.locator('.vrm-pickup-code').count())) await pg.locator('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir').first().click();
         await pg.locator('.vrm-pickup-code').first().waitFor({ timeout: 12000 });
         const m = await pg.evaluate(() => {
           const c = document.querySelector('.vrm-pickup-code'), k = document.querySelector('.vrm-pickup-collect');
@@ -100,9 +104,13 @@ async function main() {
           const croise = a && z && !(a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top);
           const carte = c && (c.closest('[data-cc-carte]') || c.closest('.vrm-pickup-card')); /* (2 nov.) Colis → « À retirer », par point */ const rc = carte && carte.getBoundingClientRect();
           const tr = document.querySelector('[data-relais-transporteur]'), ad = document.querySelector('[data-relais-adresse]');
-          return { tr: tr ? tr.getAttribute('data-relais-transporteur') + '|' + tr.innerText : '', ad: ad ? ad.innerText : '', badgeV: !!document.querySelector('.vrm-pickup-point [title="Vinted Go"], [data-relais-point] [title="Vinted Go"]'), code: c && c.querySelector('strong').textContent, croise, dedans: !!(rc && z && z.right <= rc.right + 1 && a.right <= rc.right + 1), txt: carte ? carte.innerText : '' };
+          // (9 nov. au soir, Julien : « les LOGOS des transporteurs et non les noms ») Le nom est porté par la marque
+          // (`data-transporteur-nom`, `aria-label`), plus écrit en texte : `vu` = le texte visible du bloc.
+          const nomT = tr && tr.querySelector('[data-transporteur-nom]');
+          return { tr: tr ? tr.getAttribute('data-relais-transporteur') + '|' + (nomT ? nomT.getAttribute('data-transporteur-nom') : tr.innerText) : '', vu: tr ? tr.innerText.trim() : '', logo: tr ? (tr.querySelector('[data-marque]') || { getAttribute: () => '' }).getAttribute('data-marque') : '', ad: ad ? ad.innerText : '', badgeV: !!document.querySelector('.vrm-pickup-point [title="Vinted Go"], [data-relais-point] [title="Vinted Go"], [data-cc-colonne="retirer"] [data-marque="vinted"]'), code: c && c.querySelector('strong').textContent, croise, dedans: !!(rc && z && z.right <= rc.right + 1 && a.right <= rc.right + 1), txt: carte ? carte.innerText : '' };
         });
         dit(/^mondialrelay\|Mondial Relay/.test(m.tr) && !m.badgeV, `${T} le transporteur nommé par la conversation est dit (jamais « Vinted Go » en dur)`, m.tr);
+        dit(m.logo === 'mondialrelay' && !/Mondial/.test(m.vu), `${T} le transporteur est montré par sa MARQUE, pas par son nom écrit`, JSON.stringify([m.logo, m.vu]));
         dit(/12 rue du Port, 35260 Cancale/i.test(m.ad), `${T} l’adresse du point relais est écrite en entier`, m.ad);
         dit(m.code === '012345', `${T} le code garde son zéro de tête`, m.code);
         dit(m.croise === false, `${T} « J’ai retiré » ne recouvre pas le code de retrait`);
