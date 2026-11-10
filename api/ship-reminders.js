@@ -74,7 +74,8 @@ import { compteEcarte } from './_lib/ventes-regle.js';
 // (9 nov., suites serveur) L'offre Solo / Pro du vendeur (la ligne `abonnements` rangée par le
 // webhook, la règle d'api/_lib/plan-regle.js) : bilans et rappel des offres au prix mini.
 import { regleDuVendeur } from './_lib/plan-vendeur.js';
-import { venteHorsPlan } from './_lib/plan-regle.js';
+import { venteHorsPlan, venteAutreHorsPlan } from './_lib/plan-regle.js';
+import { resumeDuSoir, offresVcDemain } from './_lib/resume-soir.js';
 import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
 // (6 nov., filet 4) La veille des plantages : le propriétaire prévenu d'un type JAMAIS VU (api/_lib/veille-plantages.js).
 import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_LENTEURS } from './_lib/veille-plantages.js';
@@ -414,6 +415,38 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   const deja = await getRow('colis_retrait_dedup');
   if (deja === undefined) return 'mémo illisible — rien envoyé';
   if (!(await pushCategorieActive('colis'))) return 'désactivé par le vendeur';
+  const r = await retraitsDuJour(maintenant, 0);
+  if (typeof r === 'string') return r;
+  const { liste, txsPar } = r;
+  const today = parisDate(0);
+  const envoyes = objet(deja && deja.envoyes);
+  const nouveaux = liste.filter((x) => !envoyes[x.cle]);
+  if (!nouveaux.length) return { retrait: 'rien à dire', n: 0 };
+  // Le mémo AVANT l'envoi, et CONFIRMÉ (purgé au-delà de 60 jours).
+  const limiteMemo = parisDate(-MEMO_RETRAIT_J);
+  const memo = {};
+  for (const [k, v] of Object.entries(envoyes)) if (String(v) >= limiteMemo) memo[k] = v;
+  for (const x of nouveaux) memo[x.cle] = today;
+  if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
+  let envoi = null;
+  // (3 nov.) « Colis à vérifier » ne sonne plus : un délai dépassé ne dit pas où
+  // est le colis (mesuré le 29 oct. : 5 sur 5 avaient été retirés) — ce n'est
+  // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
+  for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
+    const t = texteRappelRetrait(x);
+    envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, echeance: x.limiteAt || null, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: txUniqueDe(txsPar, x.suivi) }) });
+  }
+  // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
+  return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
+    envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+}
+// La transaction d'un colis quand elle est UNIQUE (sinon '' : l'écran s'ouvre sur la colonne).
+const txUniqueDe = (txsPar, suivi) => { const t = txsPar.get(suivi); return t && t.size === 1 ? [...t][0] : ''; };
+// (10 nov., lot AT) LES COLIS À RETIRER D'UN JOUR, la règle du matin (`rappelsRetraitDuJour`)
+// partagée avec le résumé du soir : `jourCible` 0 = aujourd'hui (« dernier jour », « à vérifier »),
+// 1 = demain (« demain » : la date limite LUE tombe demain). Rend { liste, txsPar } ou la
+// raison (texte) d'une lecture ratée — « pas su » n'annonce rien.
+async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   // (revue du 23 oct., n° 2) Les scalaires dont la règle partagée a besoin pour
   // RELIRE une ligne comme l'app (code, QR, extraits gardés, date de l'e-mail).
   // (24 oct.) + le statut lu chez le TRANSPORTEUR (lignes `transp_*`, scalaires) :
@@ -446,8 +479,8 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   // commande d'un colis se trouve par IDENTITÉ (code de retrait, n° de suivi),
   // sa fin par la règle de l'app (`finDeCommandeAchat`). Ces lectures ne partent
   // que s'il y a un rappel à envoyer ; ratées ⇒ rien n'est envoyé.
-  const candidats = rappelsRetraitDuJour(entree);
-  if (!candidats.length) return { retrait: 'rien à dire', n: 0 };
+  const candidats = rappelsRetraitDuJour({ ...entree, jourCible });
+  if (!candidats.length) return { liste: [], txsPar: new Map() };
   const [relaisRow, suivisV, suivisM] = await Promise.all([
     getRow('panel_colis_relais'),
     fetchPaginated(scoped('app_data?id=like.harvest_%25_suivi_%25&select=id,tx:meta->>tx,suivi:meta->>suivi')),
@@ -469,28 +502,9 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
     achats = a;
     for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
   }
-  const liste = rappelsRetraitDuJour({ ...entree, liens,
+  const liste = rappelsRetraitDuJour({ ...entree, liens, jourCible,
     finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
-  const envoyes = objet(deja && deja.envoyes);
-  const nouveaux = liste.filter((x) => !envoyes[x.cle]);
-  if (!nouveaux.length) return { retrait: 'rien à dire', n: 0 };
-  // Le mémo AVANT l'envoi, et CONFIRMÉ (purgé au-delà de 60 jours).
-  const limiteMemo = parisDate(-MEMO_RETRAIT_J);
-  const memo = {};
-  for (const [k, v] of Object.entries(envoyes)) if (String(v) >= limiteMemo) memo[k] = v;
-  for (const x of nouveaux) memo[x.cle] = today;
-  if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
-  let envoi = null;
-  // (3 nov.) « Colis à vérifier » ne sonne plus : un délai dépassé ne dit pas où
-  // est le colis (mesuré le 29 oct. : 5 sur 5 avaient été retirés) — ce n'est
-  // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
-  for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
-    const t = texteRappelRetrait(x);
-    envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, echeance: x.limiteAt || null, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
-  }
-  // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
-  return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
-    envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  return { liste, txsPar };
 }
 
 // ── OFFRE AU-DESSUS DE TON PRIX MINI (27 oct., demande de Julien) ───────────
@@ -1115,22 +1129,25 @@ function bordsDuVendeur(d) {
 }
 
 // ── LE RAPPEL DE LA VEILLE AU SOIR (retenu par Julien le 11 octobre) ────────
-// « Demain : N colis à poster ». Second cron (vercel.json, 18:00 UTC = 20 h à
-// Paris l'été, 19 h l'hiver — le plan Hobby décale d'au plus une heure), MÊME
-// route (`?moment=soir`, plafond de 12 fonctions), même garde CRON_SECRET.
-// Le nombre est CELUI du widget et du bilan (`txsAExpedier` : `aExpedier` ou le
-// résumé de l'extension, colis cochés « posté » et masqués exclus, eBay par
-// `colisEbay`, §11). Le « dont » vient de la date limite de CES ventes — la
-// règle de l'app (`limiteExpedition`, 22 octobre : l'heure lue dans l'email,
-// sinon vente + 7 jours) — et de celles d'eBay ; jamais un chiffre de plus que N.
-// Rien ne part : s'il n'y a rien à poster, si une lecture Vinted a échoué (pas
-// su), si la préférence « soir » est coupée, ou s'il est déjà parti ce jour-là
-// (mémo `soir_reminder_dedup` écrit AVANT l'envoi et confirmé). eBay illisible
-// ⇒ « au moins N », eBay nommé (jamais un total partiel présenté complet).
-// Le texte du rappel du soir : `texteSoir`, fabriqué dans api/_lib/notif-apercus.js
-// (l'aperçu de Paramètres → Notifications l'appelle aussi) — réexporté ici.
+// ── devenu LE RÉSUMÉ DU SOIR (10 nov., lot AT : api/_lib/resume-soir.js) ─────
+// Second cron (vercel.json, 18:00 UTC = 20 h à Paris l'été, 19 h l'hiver — le
+// plan Hobby décale d'au plus une heure), MÊME route (`?moment=soir`, plafond de
+// 12 fonctions), même garde CRON_SECRET, même catégorie `soir`, même mémo : UNE
+// notification par soir. Elle ne dit plus « N colis à poster » mais ce qu'il y a
+// à faire DEMAIN : colis dont la date limite LUE tombe demain (et ceux déjà en
+// retard, les dates estimées passées), colis à retirer dont le dernier jour lu
+// est demain, offres Vestiaire reçues qui expirent avant demain soir. Rien de
+// tout ça ⇒ rien ne sonne. Les colis viennent de la règle du widget et du bilan
+// (`txsAExpedier`, §11) et des dates limites de `compterEcheances` (l'heure lue
+// dans l'e-mail, 22 octobre) ; `n` (le total à poster) reste dans la réponse du
+// cron. Rien ne part : ventes Vinted illisibles (pas su), préférence « soir »
+// coupée, déjà parti ce jour-là (mémo `soir_reminder_dedup` écrit AVANT l'envoi
+// et confirmé). eBay (etc.) illisible ⇒ « au moins », nommé. Un retrait ou une
+// offre pas lus ne sont pas dits (et le cron le rapporte).
+// Le texte : `texteSoir`, fabriqué dans api/_lib/notif-apercus.js (l'aperçu de
+// Paramètres → Notifications l'appelle aussi) — réexporté ici.
 export { texteSoir };
-async function rappelDuSoir() {
+async function rappelDuSoir(maintenant = Date.now()) {
   const today = parisDate(0);
   const deja = await getRow('soir_reminder_dedup');
   if (deja === undefined) return { soir: 'mémo illisible — rien envoyé' };
@@ -1141,29 +1158,45 @@ async function rappelDuSoir() {
   if (!t) return { soir: 'lecture ratée — rien envoyé' };
   // (1er nov., audit A4) + Leboncoin et Vestiaire : le nombre de Colis (§11).
   const manque = colisManque(t);
-  const auMoins = manque.length > 0;
   const n = t.vinted.size + (t.ebay ? t.ebay.total : 0) + (t.leboncoin ? t.leboncoin.total : 0) + (t.vestiaire ? t.vestiaire.total : 0);
-  if (!n) return { soir: 'rien à poster', n: 0 };
-  // Le « dont » : seulement CES ventes (sous-ensemble de N). Demain, une limite
-  // d'aujourd'hui (ou d'avant) est déjà passée : elle compte « en retard ».
-  // Bordereaux illisibles ⇒ pas de « dont » Vinted (une date estimée prendrait
-  // la place de l'heure lue dans l'email).
-  // ⚠️ (revue du 22 oct.) Une limite ESTIMÉE (vente + 7 j) passée demain n'est
-  // pas « déjà en retard » : `aVerifier`, dite à part.
+  // Les échéances : seulement CES ventes. Demain, une limite d'aujourd'hui (ou
+  // d'avant) est déjà passée : « en retard ». ⚠️ (revue du 22 oct.) Une limite
+  // ESTIMÉE (vente + 7 j) passée demain n'est pas « en retard » : `aVerifier`.
+  // (10 nov.) « Demain » = les limites LUES seulement (une estimée n'est qu'un
+  // plancher) ; l'heure = la plus proche des lues. Bordereaux illisibles ⇒ les
+  // dates Vinted ne sont pas sues : Vinted nommé (« au moins »).
   let retard = 0, aVerifier = 0, demain = 0, heureDemain = null;
+  const manqueDates = [...manque];
   if (Array.isArray(d.bords)) {
-    const c = compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
+    const c = compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant });
     retard = c.retard + (c.aujourdhui - c.estimees.aujourdhui);
     aVerifier = c.estimeeDepassee + c.estimees.aujourdhui;
-    demain = c.demain;
-    heureDemain = c.premier.demain ? c.premier.demain.heure : null;
-  }
+    demain = c.demain - c.estimees.demain;
+    heureDemain = c.premierLu.demain ? c.premierLu.demain.heure : null;
+  } else if (t.vinted.size) manqueDates.unshift('Vinted');
   if (t.ebay) { retard += t.ebay.overdue + t.ebay.today; demain += t.ebay.tomorrow; }
   if (t.vestiaire) { retard += t.vestiaire.overdue + t.vestiaire.today; demain += t.vestiaire.tomorrow; }
-  if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n }))) return { soir: 'mémo non écrit — rien envoyé' };
-  const txt = texteSoir({ n, auMoins, retard, aVerifier, demain, manque, heureDemain: (t.ebay && t.ebay.tomorrow) || (t.vestiaire && t.vestiaire.tomorrow) ? null : heureDemain });
-  const envoi = await sendPushToAll({ cat: 'soir', ...txt, tag: 'soir-' + today, url: DESTINATIONS.colis({}) });
-  return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, manque, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  const colis = { demain, retard, aVerifier, manque: manqueDates,
+    heure: (t.ebay && t.ebay.tomorrow) || (t.vestiaire && t.vestiaire.tomorrow) ? null : heureDemain };
+  // Les colis à retirer dont le dernier jour (lu) est DEMAIN : la règle du matin, un jour plus loin.
+  let retraits = null;
+  try {
+    const rr = await retraitsDuJour(maintenant, 1);
+    if (typeof rr !== 'string') retraits = rr.liste.filter((x) => x.etat === 'demain').map((x) => ({ suivi: x.suivi, lieu: x.lieu, tx: txUniqueDe(rr.txsPar, x.suivi) }));
+  } catch (_) { retraits = null; }
+  // Les offres Vestiaire reçues qui expirent avant demain soir (projetées, jamais `select=data`).
+  let offres = null;
+  try {
+    const [ligne, regle] = await Promise.all([getRowProjete('vc_offres', ['offres', 'capturedAt']), regleDuVendeur(proprietaireCourant()).catch(() => null)]);
+    offres = offresVcDemain(ligne, { maintenant, demain: parisDate(1), horsPlan: (cpt) => venteAutreHorsPlan(regle, 'vestiaire', cpt) });
+  } catch (_) { offres = null; }
+  const r = resumeDuSoir({ colis, retraits, offres });
+  const bilan = { n, retard, aVerifier, demain, auMoins: manqueDates.length > 0, manque: manqueDates,
+    retraits: retraits === null ? 'pas su' : retraits.length, offres: offres === null ? 'pas su' : offres.length };
+  if (!r.envoyer) return { soir: r.raison, ...bilan };
+  if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n, compte: r.compte }))) return { soir: 'mémo non écrit — rien envoyé' };
+  const envoi = await sendPushToAll({ cat: 'soir', title: r.title, body: r.body, tag: 'soir-' + today, url: r.url });
+  return { soir: 'envoyé', ...bilan, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 // (5 nov.) `?moment=reveil` : à la fin de ses heures calmes, UNE notification
 // dit ce qui est arrivé pendant (api/_lib/reveil-calme.js). Rien d'autre.
