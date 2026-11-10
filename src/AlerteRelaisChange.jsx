@@ -10,8 +10,8 @@ import PastilleTransporteur from './PastilleTransporteur.jsx';
 import { transporteurDuColis } from './transporteursVisuels.js';
 import { colisRelaisChange, lienItineraire, appareilApple } from './relaisChange.js';
 
-export default function AlerteRelaisChange({ lignes, C }) {
-  const liste = colisRelaisChange(lignes);
+export default function AlerteRelaisChange({ lignes, C, transp = null }) {
+  const liste = colisRelaisChange(lignes, { transp });
   if (!liste || !liste.length) return null;
   const apple = appareilApple();
   return (

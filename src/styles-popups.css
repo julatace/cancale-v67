@@ -1,0 +1,50 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — POP-UPS PROPRES (9 nov., soir — lot AI) · docs/passation/2026-11-09-popups-propre.md
+   Importé EN DERNIER par src/App.jsx (après styles-widgets-ios.css, la DA6).
+   • « Puis-je agir sur Vinted ? » en haut à droite : plus un point seul (Julien :
+     « pas ouf ») mais l'AVATAR du compte (son initiale) dans une pastille ronde,
+     l'état en petit badge posé sur son bord (encre / ambre / gris) — aucun rouge.
+   La ligne courte + pop-up vit avec son composant (src/composants/info-pop.css).
+   ════════════════════════════════════════════════════════════════════════════ */
+:root:root body .vrm-etat-pastille .vrm-etat-avatar {
+  position: relative; flex: 0 0 auto; display: inline-grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--w-remplir-fort, rgba(118,118,128,.16)); color: var(--vrm-ink, #1D1D1F);
+  font: 700 12px/1 var(--vrm-police, -apple-system, system-ui, sans-serif); letter-spacing: 0;
+}
+:root:root body .vrm-etat-pastille .vrm-etat-avatar[data-etat-avatar="compte"] {
+  background: var(--vrm-ink, #1D1D1F); color: var(--vrm-surface, #fff);
+}
+:root:root body .vrm-etat-pastille .vrm-etat-avatar svg { display: block; color: var(--vrm-muted, #6E6E73); }
+:root:root body .vrm-etat-pastille .vrm-etat-initiale { display: block; }
+/* Le badge d'état : 9 px, cerclé de la couleur du fond pour se détacher, en bas à droite. */
+:root:root body .vrm-etat-pastille .vrm-etat-avatar > .vrm-etat-point {
+  position: absolute !important; right: -2px; bottom: -2px; display: block !important;
+  width: 9px !important; height: 9px !important; border-radius: 50% !important; opacity: 1 !important;
+  box-shadow: 0 0 0 2px var(--w-fond, var(--vrm-bg, #F2F2F7)) !important; transform: none;
+}
+/* Tout va bien : le badge se tait presque (gris doux) ; seul l'ambre appelle un geste. */
+:root:root body .vrm-etat-pastille[data-etat-ton="ok"] .vrm-etat-avatar > .vrm-etat-point { opacity: .55 !important; box-shadow: none !important; }
+:root:root body .vrm-etat-pastille[data-etat-ton="attention"] .vrm-etat-avatar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--etat-ton) 45%, transparent); }
+:root:root body .vrm-etat-pastille[data-etat-actions="verif"] .vrm-etat-avatar > .vrm-etat-point { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:root body .vrm-etat-pastille[data-etat-actions="verif"] .vrm-etat-avatar svg { animation: vrm-etat-tourne 1.4s linear infinite; }
+}
+@keyframes vrm-etat-tourne { to { transform: rotate(360deg); } }
+/* Téléphone : l'en-tête ne montre que l'icône — l'avatar tient dans la cible de 44 px. */
+@media (max-width: 767px) {
+  :root:root body .vrm-app-header .vrm-etat-pastille .vrm-etat-avatar { width: 30px; height: 30px; font-size: 13px; }
+}
+
+/* (9 nov., 22 h 37 — Julien : « Encore du texte ») Annonces : « 4 brouillons à refaire » et « 21 nouveaux N° »
+   en PUCES compactes (pilule grise, compteur), plus en gros blocs sur toute la largeur. Même information. */
+:root:root body .vrm-main .vrm-annbar-refaire.vrm-pop-puce { flex: 0 0 auto !important; width: auto !important; align-self: flex-start; margin: 2px 0 6px; }
+:root:root body .vrm-ann-avis > button.vrm-ann-avis-neufs,
+:root:root body .vrm-ann-avis > button.vrm-ann-avis-neufs:only-child {
+  flex: 0 0 auto !important; width: auto !important; justify-content: flex-start !important; gap: 6px;
+  min-height: 44px; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important;
+  background: var(--w-remplir, rgba(118,118,128,.12)) !important; box-shadow: none !important; font-size: 15px !important; font-weight: 600;
+}
+/* (10 nov., lot AI) « 1 nouveau N° » seul sur sa ligne : la pastille seule, sans le cadre blanc pleine largeur
+   de la ligne d'avis (le cadre ne sert qu'à réunir « Prix d'achat N/M » et « N nouveaux N° »). */
+:root:root body .vrm-ann-avis:has(> .vrm-ann-avis-neufs:only-child) { background: transparent !important; box-shadow: none !important; min-height: 0; }

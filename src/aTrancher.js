@@ -60,6 +60,11 @@ export const SOURCES = [
     pourquoi: 'vendu ailleurs, remis en ligne ou toujours là', geste: { libelle: 'Répondre', tab: 'journee', cible: '[data-job="supprime-vinted"]' } },
   { cle: 'remise-en-ligne', ecran: 'Annonces', quoi: (n) => `${n} ${pl(n, 'annonce remise', 'annonces remises')} en ligne : même paire ?`,
     pourquoi: 'si oui, elle garde son N° ; ton clic relie', geste: { libelle: 'Répondre', tab: 'cat_annonces', cible: '[data-remise-bloc]' } },
+  // (10 nov., lot BH) Un même achat enregistré deux fois (même n° de transaction / de
+  // commande / de facture — jamais par ressemblance) : publié par l'écran Achats,
+  // règle src/achatsDoubles.js. Il compterait deux fois dans « dépensé » et le bénéfice.
+  { cle: 'achats-doubles', ecran: 'Achats', quoi: (n) => `${n} ${pl(n, 'achat saisi', 'achats saisis')} deux fois`,
+    pourquoi: 'il compterait deux fois dans tes dépenses', geste: { libelle: 'Choisir', tab: 'achats', cible: '[data-achats-doubles]' } },
   { cle: 'achats-sans-prix', ecran: 'Annonces', quoi: (n) => `${n} ${pl(n, 'annonce numérotée', 'annonces numérotées')} sans prix d’achat`,
     pourquoi: 'le bénéfice ne compte pas ces paires', geste: { libelle: 'Saisir', tab: 'cat_annonces', vue: 'sansachat' } },
   { cle: 'adresses-sans-compte', ecran: 'E-mails', quoi: (n) => `${n} ${pl(n, 'adresse e-mail', 'adresses e-mail')} sans compte relié`,
@@ -81,6 +86,7 @@ export const NOMS = {
   'sms-pickup': 'Colis Pickup reçus par SMS',
   'supprimes-vinted': 'Articles supprimés de Vinted',
   'remise-en-ligne': 'Annonces remises en ligne',
+  'achats-doubles': 'Achats saisis deux fois',
   'achats-sans-prix': 'Annonces sans prix d’achat',
   'adresses-sans-compte': 'Adresses e-mail sans compte',
   'comptes-a-relire': 'Comptes à relire',
@@ -207,7 +213,7 @@ export const TYPES = [
   { type: 'ventes', titre: 'Ventes', cles: ['litiges-en-cours'] },
   { type: 'paires', titre: 'Paires', cles: ['supprimes-vinted', 'remise-en-ligne', 'achats-sans-prix'] },
   { type: 'comptes', titre: 'Comptes', cles: ['adresses-sans-compte', 'comptes-a-relire'] },
-  { type: 'compta', titre: 'Compta', cles: ['ventes-a-dater'] },
+  { type: 'compta', titre: 'Compta', cles: ['achats-doubles', 'ventes-a-dater'] },
 ];
 // La question : `n` (carte d'une source, le nombre est dans la vignette) ou `x` (une chose).
 export const QUESTIONS = {
@@ -221,6 +227,7 @@ export const QUESTIONS = {
   'sms-pickup': { n: () => 'Colis Pickup reçus par SMS, sans code' },
   'supprimes-vinted': { n: () => 'Supprimés de Vinted : encore chez toi ?', x: () => 'Supprimée de Vinted. Encore chez toi ?' },
   'remise-en-ligne': { n: () => 'Remises en ligne : même paire ?', x: (x) => (x.de ? `Remise en ligne : même paire que N°${x.de} ?` : 'Remise en ligne : même paire qu’une ancienne ?') },
+  'achats-doubles': { n: (n) => (n > 1 ? 'Achats saisis deux fois : garde le bon' : 'Achat saisi deux fois : garde le bon') },
   'achats-sans-prix': { n: () => 'Annonces sans prix d’achat', x: () => 'Prix d’achat pas saisi' },
   'adresses-sans-compte': { n: (n) => (n > 1 ? 'Adresses e-mail sans compte relié' : 'Adresse e-mail sans compte relié') },
   'comptes-a-relire': { n: (n) => (n > 1 ? 'Comptes à relire sur Vinted' : 'Compte à relire sur Vinted') },

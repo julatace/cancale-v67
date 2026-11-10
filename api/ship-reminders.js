@@ -383,7 +383,7 @@ async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
   // Le mémo AVANT l'envoi, et CONFIRMÉ : un bilan par semaine, jamais deux.
   if (!(await ecrireDedup('bilan_semaine_dedup', { semaine: sem.lundi, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
   const t = texteBilan(b, sem);
-  const envoi = await sendPushToAll({ cat: 'bilan', title: t.titre, body: t.corps, tag: 'bilan-' + sem.lundi, url: '/?tab=journee' });
+  const envoi = await sendPushToAll({ cat: 'bilan', title: t.titre, body: t.corps, tag: 'bilan-' + sem.lundi, url: DESTINATIONS.semaine({ lundi: sem.lundi }) });   // (10 nov., lot BC) l'écran « Ma semaine », sur CETTE semaine
   // Le bilan rendu ne porte AUCUN montant (la réponse d'un cron se lit dans un
   // tableau de bord) : seulement les états, et le nombre de colis.
   return { semaine: sem.lundi, vendu: b.vendu.etat, recu: b.recu.etat, colis: b.colis.n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };

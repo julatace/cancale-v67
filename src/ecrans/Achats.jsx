@@ -307,7 +307,7 @@ const lirePhotosAchatsHors = async () => {
 
 function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null }) {
   // (10 nov., lot AN) `facture` (src/FactureAchat.jsx) : joindre une facture d'achat (PDF ou photo) à l'achat saisi.
-  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', photo: null, photoAvant: false, facture: null });
+  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false, facture: null });
   const factureRef = useRef(null);
   const [form, setForm] = useState(null);       // null = fermé ; sinon le brouillon
   const [editId, setEditId] = useState(null);
@@ -336,7 +336,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
   const ouvrirEdition = (b) => {
     setEditId(b.id); setErreur('');
-    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', photo: null, photoAvant: !!b.photo, facture: null });
+    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo, facture: null });
   };
   const fermer = () => { setForm(null); setEditId(null); setErreur(''); };
   const choisirPhoto = async (ev) => {
@@ -362,7 +362,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
       if (ok) { photoOk = true; const b64 = form.photo; setPhotos(p => ({ ...(p || {}), [idPhotoAchatHors(id)]: b64 })); }
       else photoRatee = true;
     }
-    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: String(form.numero || '').trim(), photo: photoOk || undefined };
+    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: String(form.numero || '').trim(), ref: String(form.ref || '').trim().slice(0, 40) || undefined, photo: photoOk || undefined };
     if (editId) onModifier(editId, rec); else onAjouter({ id, ...rec });
     // La facture jointe part dans SA ligne, par l'identité de l'achat (jamais son titre).
     if (form.facture && facture) await facture.joindre(cleFacture('hors', id), form.facture);
@@ -423,6 +423,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
               })}
             </div>
           </div>
+          {/* (10 nov., lot BH) La référence de l'achat : c'est ELLE (jamais le nom ni le prix) qui dit qu'un achat est saisi deux fois. */}
+          {champ('N° de commande ou de facture (facultatif)', <input data-champ="ref" value={form.ref || ''} onChange={e => setForm(d => ({ ...d, ref: e.target.value }))} placeholder="ex : n° de transaction Vinted" autoComplete="off" spellCheck={false} maxLength={40} style={inp} />)}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}
             <Bouton variante="secondaire" icone="camera" data-achat-hors-photo onClick={() => fichierRef.current && fichierRef.current.click()} style={{ minHeight: 44 }}>

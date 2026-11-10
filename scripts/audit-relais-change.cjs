@@ -30,7 +30,7 @@ const MUTATIONS = {
   'pas-de-drapeau': ['api/email-inbound.js', "const relaisChange = status === 'transit' && changementDeRelais(mail.subject, txt);", "const relaisChange = false;"],
   'relecture-oubliee': ['api/_lib/suivi-colis.js', "if (etat === 'transit' && changementDeRelais(d.subject || d.sujet || '') && d.status !== 'transit')", "if (false)"],
   'arrivee-ignoree': ['src/relaisChange.js', "if (!n || finis.has(n) || vus.has(n)) continue;", "if (!n || vus.has(n)) continue;"],
-  'alerte-pas-rendue': ['src/App.jsx', "<AlerteRelaisChange lignes={tracking} C={C}/>", "null"],
+  'alerte-pas-rendue': ['src/App.jsx', "<AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>", "null"],
 };
 if (process.argv.includes('--prouve')) {
   let ok = 0;
@@ -132,7 +132,7 @@ const CORPS = [
   console.log('§E le branchement');
   await essaie('E', async () => {
     const app = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    dit(/\(aFilter==='attente' \|\| aFilter==='route'\) && <AlerteRelaisChange lignes=\{tracking\} C=\{C\}\/>/.test(app), 'l’alerte est rendue sur À retirer et En route, sur les lignes RELUES (`tracking`)');
+    dit(/\(aFilter==='attente' \|\| aFilter==='route'\) && <AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}\/>/.test(app), 'l’alerte est rendue sur À retirer et En route, sur les lignes RELUES (`tracking`) et ce que dit le transporteur (10 nov.)');
     const comp = fs.readFileSync(path.join(R, 'src/AlerteRelaisChange.jsx'), 'utf8');
     dit(/C\.warn/.test(comp) && /Point relais changé/.test(comp) && /data-relais-change-itineraire/.test(comp), 'ambre (C.warn), « Point relais changé », bouton Itinéraire');
   });
