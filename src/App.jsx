@@ -2919,7 +2919,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
             contient tout l'historique. On l'écrit, et on met les plus
             récentes en tête plutôt que de trier par numéro. */}
         {paires.length > 0 && !paires[0].sur && (
-          <><br/><span style={{color:C.warn}}>Les plus récents en tête — ouvre une fois l'écran Annonces pour n'avoir que tes articles en stock.</span></>
+          <><br/><span style={{color:C.warn}}>Ouvre Annonces une fois pour ne garder que ton stock.</span></>
         )}
       </div>
         </div>
@@ -2931,7 +2931,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
       {liste.length === 0 && (
         <div style={{fontSize:13,color:C.muted,padding:'14px 2px',lineHeight:1.5}}>
           {paires.length === 0
-            ? "Aucun article en attente de rangement : tout ce que tu as en stock est déjà posé dans une case."
+            ? "Tout ton stock est déjà rangé."
             : "Rien ne correspond à cette recherche."}
         </div>
       )}
@@ -9655,11 +9655,11 @@ function PhotosBloquees() {
   const geste = codeGeste === 'reseau'
     ? <>Je réessaie dès que le réseau revient.{intactes}</>
     : codeGeste === 'refus'
-      ? <>L'extension VRM n'a pas pu les récupérer non plus pour l'instant : je lui redemande de temps en temps, elles s'afficheront ici dès qu'elle y arrive.{intactes}</>
+      ? <>Pas encore récupérées : je redemande, elles arriveront ici.{intactes}</>
       : codeGeste === 'reponse'
-        ? <>Je réessaie de temps en temps ; si ce sont des liens expirés, ils se renouvellent quand l'extension VRM repasse sur tes comptes Vinted.{intactes}</>
+        ? <>Je réessaie ; repasser sur Vinted renouvelle les liens.{intactes}</>
         : codeGeste === 'muette-ailleurs'
-          ? <>C'est l'extension VRM qui va les chercher : le message sur l'extension, plus bas, dit quoi faire.</>
+          ? <>L'extension les cherche : voir son message plus bas.</>
           : codeGeste === 'muette'
             ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
             : codeGeste === 'telephone'
@@ -16620,12 +16620,12 @@ function BandeauConfirmationAdresse({ onVoir }) {
   const bon = c.etat === 'ok' || c.etat === 'deja';
   const voir = onVoir ? <button type="button" data-voir-adresses="" onClick={() => { poserConfAdr(null); onVoir(); }} style={{ marginLeft: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '4px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes adresses</button> : null;
   const texte = c.etat === 'attente' || c.etat === 'encours' ? 'Je confirme ton adresse de réception…'
-    : c.etat === 'ok' ? <>Adresse <b>{c.adresse || 'de réception'}</b> confirmée ✓ — les e-mails qui y arrivent sont rangés chez toi, et ceux mis de côté te sont proposés.{voir}</>
+    : c.etat === 'ok' ? <>Adresse <b>{c.adresse || 'de réception'}</b> confirmée ✓ : ses e-mails sont à toi.{voir}</>
     : c.etat === 'deja' ? <>Cette adresse{c.adresse ? <> (<b>{c.adresse}</b>)</> : null} était déjà confirmée ✓ — rien à faire.</>
     : c.etat === 'perime' ? <>Ce lien a expiré (il vaut 72 heures) : demande-en un nouveau.{voir}</>
-    : c.etat === 'inconnu' ? <>Ce lien ne correspond à aucune demande de ce compte VRM : ouvre-le en étant connecté avec le compte qui a ajouté l'adresse.</>
+    : c.etat === 'inconnu' ? <>Lien d'un autre compte : ouvre-le connecté avec le compte qui a ajouté l'adresse.</>
     : c.etat === 'refus' ? <>{c.message || "Ce lien n'a pas pu servir."}{voir}</>
-    : <>Je n'ai pas pu confirmer ton adresse pour l'instant (le serveur ne répond pas) — rien n'est perdu. <button type="button" onClick={() => confirmerAdresseParLien()} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Réessayer</button></>;
+    : <>Adresse pas confirmée (serveur muet), rien n'est perdu. <button type="button" onClick={() => confirmerAdresseParLien()} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Réessayer</button></>;
   const fermable = c.etat !== 'attente' && c.etat !== 'encours';
   return (
     <div className="vrm-tete-row">
@@ -16946,11 +16946,11 @@ function BaseInjoignable() {
           Je n'arrive pas à joindre tes données{longue ? ` — ${depuis}` : ''}
         </div>
         <div style={{fontSize:13,color:C.text,lineHeight:1.55}}>
-          Le serveur qui garde tes annonces, tes ventes et tes numéros ne répond pas.
-          <b> Rien n'est perdu</b> — ni tes paires, ni tes numéros, ni ta compta : c'est la lecture qui échoue, pas tes données.
+          Le serveur ne répond pas.
+          <b> Rien n'est perdu</b> : c'est la lecture qui échoue.
           <br/><br/>
           {longue && !proprio ? <span data-panne-vendeur="">
-            <b>VRM est momentanément indisponible, réessaie dans quelques minutes.</b> Le souci est de notre côté, pas du tien : tu n'as rien à faire, et rien de ce que tu as enregistré n'est perdu.
+            <b>VRM est momentanément indisponible, réessaie dans quelques minutes.</b> Rien à faire de ton côté.
           </span> : longue ? <>
             Ça ne revient pas tout seul : <b>c'est ton hébergeur de données qui a un problème</b>.
             <br/><br/>
@@ -16973,7 +16973,7 @@ function BaseInjoignable() {
             <br/><br/>
             Tant que ce n'est pas réglé, les e-mails Vinted qui arrivent ne peuvent pas être rangés.
           </> : <>
-            Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, l'app te dira quoi faire.
+            Vérifie ta connexion, puis recharge la page.
           </>}
         </div>
         <Bouton variante="primaire" icone="sync" onClick={()=>window.location.reload()} style={{marginTop:14}}>Recharger</Bouton>
@@ -18022,8 +18022,8 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
 
   // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
   let geste = null;
-  if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre, sur ton ordinateur, le navigateur où est l'extension VRM (elle s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
-  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Paramètres → État des connexions), puis recharge-la dans la page des extensions de son navigateur (⟳ sur Chrome).</span>;
+  if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre le navigateur de ton ordinateur : les actions reviennent ici.</span>;
+  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE}, puis ⟳ dans les extensions.</span>;
   // (29 oct.) Une ligne : le geste, sans la liste de ce qu'il débloque (le titre
   // « Lecture seule » et la ligne « Extension » le disent déjà, §7).
   else if (code === 'telephone') geste = <span data-etat-geste="telephone">{mobileIci() === 'ios' && boutiqueOrion() ? 'Pour agir, ouvre VRM sur ton ordinateur ou dans Orion (l’extension y vit).' : 'Pour agir, ouvre VRM sur ton ordinateur.'}{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
@@ -18160,7 +18160,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
           {st.niveau === 'ok' && st.relais ? (
             <div data-etat-relais-texte="" className="vrm-etat-texte" style={{ color: C.muted }}>
               Tes demandes partent à ton ordinateur, qui agit au nom de <b style={{ color: C.text }}>{loginVinted}</b>.{' '}
-              <Pourquoi label="Comment ça marche">La demande part dans ta base ; l'extension du navigateur de ton ordinateur la prend (en général dans la demi-minute) et l'exécute avec les mêmes garde-fous. Rien n'est dit « fait » avant qu'elle l'ait écrit.</Pourquoi>
+              <Pourquoi label="Comment ça marche">L'extension de ton ordinateur l'exécute en ~30 s, mêmes garde-fous.</Pourquoi>
             </div>
           ) : st.niveau === 'ok' ? (
             <div className="vrm-etat-texte" style={{ color: C.muted }}>
@@ -18974,7 +18974,7 @@ function FraicheurDonnees({ jours, compte, comptes = null, siAJour = true }) {
     return (
       <div data-fraicheur-comptes={liste.map((x) => x.login + ':' + x.jours).join(',')} style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'9px 12px',lineHeight:1.5}}>
         {/* (30 oct.) Une ligne (le « pas à jour » reste dit) ; les comptes, leur âge et la conséquence derrière ⓘ. */}
-        <span style={{display:'inline-flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>{liste.length} comptes pas relus depuis {Math.min(...liste.map((x) => Number(x.jours) || 0))} j ou plus — repasse sur Vinted connecté sur chacun. <Pourquoi label="Quels comptes">{noms}. Une de leurs ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître.</Pourquoi></span>
+        <span style={{display:'inline-flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>{liste.length} comptes pas relus depuis {Math.min(...liste.map((x) => Number(x.jours) || 0))} j ou plus — repasse sur Vinted connecté sur chacun. <Pourquoi label="Quels comptes">{noms}. Ventes récentes peut-être manquantes.</Pourquoi></span>
       </div>
     );
   }
@@ -19518,13 +19518,13 @@ function TeteTransporteurs({ transp, colis, relire }) {
   if (transp !== null && !montrerMr && !mrRefus && !nonLus.length && !phrasesCp.length) return null;
   const st = {fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'};
   const geste = sansSouris
-    ? <>ouvre VRM sur l'ordinateur où l'extension VRM est installée — c'est elle qui lit Mondial Relay.</>
+    ? <>ouvre VRM sur l'ordinateur où est l'extension.</>
     : sait === 'absente'
     ? <>installe ou allume l'extension VRM sur cet ordinateur — c'est elle qui lit Mondial Relay.</>
     : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) : elle lira Mondial Relay depuis {NAV.ce}.</>;
   return <>
     {transp === null && <div data-transp-passu="" style={{...st,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-      <span style={{flex:'1 1 220px'}}>Le statut chez les transporteurs n'a pas pu être relu (la base n'a pas répondu) : ce que tu vois vient des e-mails et de Vinted. Rien n'est perdu.</span>
+      <span style={{flex:'1 1 220px'}}>Transporteurs pas relus : affichage d'après e-mails et Vinted.</span>
       {relire && <button type="button" data-transp-reessayer="" onClick={relire} style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'0 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>Réessayer</button>}
     </div>}
     {montrerMr && <div data-transp-mr={sansSouris ? 'telephone' : sait} data-transp-mr-n={String(mrSans)} style={st}>
@@ -19533,12 +19533,12 @@ function TeteTransporteurs({ transp, colis, relire }) {
     {mrRefus > 0 && <div data-transp-mr-refus={sansSouris ? 'telephone' : (sait === 'ok' && navTransp ? navTransp : sait)} data-transp-mr-n={String(mrRefus)} style={st}>
       Mondial Relay refuse en ce moment la lecture du serveur VRM ({mrRefus} colis) : {sait === 'ok' && !sansSouris
         ? (navTransp === 'permission'
-          ? <>autorise VRM à lire le suivi des transporteurs (fenêtre de l'icône VRM, « Autoriser ») : l'extension de ce navigateur les lira alors à la place.</>
+          ? <>touche « Autoriser » dans la fenêtre de l'icône VRM.</>
           : navTransp === 'passu'
-            ? <>l'extension VRM de ce navigateur pourrait les lire à la place, mais elle ne sait pas dire si elle en a la permission — ouvre la fenêtre de l'icône VRM pour vérifier.</>
+            ? <>ouvre la fenêtre de l'icône VRM pour vérifier la permission.</>
             : <>l'extension VRM {NAV.de} les lit à la place, depuis ton ordinateur.</>)
         : sansSouris
-          ? <>l'extension VRM peut les lire à la place — ouvre VRM sur l'ordinateur où elle est installée.</>
+          ? <>ouvre VRM sur l'ordinateur où elle est installée.</>
           : sait === 'absente'
           // (30 oct.) Sur un ORDINATEUR sans l'extension, « ouvre VRM sur l'ordinateur » ne
           // voulait rien dire : on y est déjà. Le geste est ici.
@@ -49648,7 +49648,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
   if (d === undefined) corps = <div data-equipe-etat="chargement" style={{ fontSize: 15, color: C.muted }}>Lecture des colis…</div>;
   else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
   else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 15, color: C.text }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
-  else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Tu n'as plus accès aux colis de cette équipe : l'invitation a été retirée, ou l'abonnement du vendeur n'est plus actif. Plus rien de sa boutique n'est lisible d'ici.</div>;
+  else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Plus d'accès aux colis de cette équipe (invitation retirée ou abonnement fini).</div>;
   else {
     const ventes = d.ventes.filter((o) => aExpedier(o) && !d.postes.has(String(o.transaction_id)));
     // (5 nov.) `needs_action` sur un ACHAT veut dire « une action » : « Commande livrée ! »
@@ -49681,7 +49681,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
     };
     corps = (<>
       {(d.bords === null || d.labels === null || d.relais === null || d.tracks === null) && (
-        <div data-equipe-partiel="" style={{ marginBottom: 12 }}><LignePanne>Une partie des colis n'a pas pu être lue (bordereaux ou codes) — ce qui manque n'est pas « vide ». <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Relire</button></LignePanne></div>
+        <div data-equipe-partiel="" style={{ marginBottom: 12 }}><LignePanne>Colis pas tous lus : ce qui manque n'est pas « vide ». <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Relire</button></LignePanne></div>
       )}
       <div style={h3}>À envoyer · {ventes.length}</div>
       {!ventes.length && <div data-equipe-vide="ventes" style={{ fontSize: 15, color: C.muted }}>Aucun colis à expédier pour l'instant.</div>}
@@ -49744,7 +49744,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
       </>)}
       {tracksAVerifier.length > 0 && (<>
         <div style={h3}>À vérifier · {tracksAVerifier.length}</div>
-        <div data-equipe-a-verifier={tracksAVerifier.length} style={{ fontSize: 13, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>Sans doute {tracksAVerifier.length > 1 ? 'repartis' : 'reparti'} chez le vendeur — pas comptés dans « à retirer ». S'il y a un code, le colis est peut-être encore au relais.</div>
+        <div data-equipe-a-verifier={tracksAVerifier.length} style={{ fontSize: 13, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>Sans doute {tracksAVerifier.length > 1 ? 'repartis' : 'reparti'} chez le vendeur, pas comptés. Avec un code : peut-être au relais.</div>
         {tracksAVerifier.map((t, i) => {
           const code = codeRetrait(t.code); const qr = qrImage(t); const e = etatColisEmail(t);
           const raison = e.etat === 'delai_depasse'
@@ -53445,7 +53445,7 @@ function AppCoeur() {
                 { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
                 { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
                 { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
-              ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr avec l’extension. Seules les ventes où tu es le vendeur comptent." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
+              ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
           {sec==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
@@ -53701,11 +53701,11 @@ function AppCoeur() {
               {sugg && sugg.ventes.length > 0 && <div data-recherche-suggestions="ventes">{entete('Dernières ventes', null, 'sugg-ventes')}{sugg.ventes.map((r,i)=>ligne(r,'vente',i))}</div>}
               {blocActions}
               {/* (9 nov.) L'état vide UTILE : ce qu'on peut taper, et le clavier (ordinateur). */}
-              <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>Tape un N° (« b125 », « 007 »), un pseudo, un n° de suivi, de transaction ou de commande eBay, Leboncoin, Vestiaire, un code de retrait, un montant ou des mots du titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
+              <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>N°, pseudo, suivi, commande, code de retrait, montant ou titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
             </div>}
             {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
             {q && !estNumQ && blocActions}
-            {q && total===0 && !estNumQ && !actionsGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« 125 », « B125 »), un pseudo, un n° de suivi, de transaction ou de commande, un code de retrait, un montant (« 52 € ») ou deux mots du titre.</>:'Je lis tes ventes, achats et colis…'}</div>}
+            {q && total===0 && !estNumQ && !actionsGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
             {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {q && estNumQ && blocActions}
             {/* Les résultats, groupés par type : chaque ligne dit PAR QUOI elle a été trouvée et
@@ -54031,9 +54031,9 @@ function AppCoeur() {
                 setNotifEnabled(true); save('vinted_notif_enabled',true);
                 pushNotif('Alertes activées','Une nouvelle vente s’affichera ici quand VRM est ouvert.');
               } else if(res==='denied'){
-                toast("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
+                toast("Notifications bloquées : autorise le site dans les réglages du navigateur.");
               } else if(res==='unsupported'){
-                toast("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
+                toast("Pas de notifications ici : le bandeau de l'app reste.");
               }
             } else {
               setNotifEnabled(false); save('vinted_notif_enabled',false);
@@ -54172,7 +54172,7 @@ function AppCoeur() {
                 // La base a REFUSÉ (elle a répondu) ≠ la base n'a pas répondu.
                 toast(refus && refus!=='refus' ? SAUVEGARDE_AVANT_REMISE
                   : refus ? '⚠ La base a refusé cette restauration. Rien n\'a changé.'
-                  : '⚠ La restauration n\'a pas pu être enregistrée dans ton compte (la base n\'a pas répondu). Rien n\'a changé — réessaie dans un instant.');
+                  : '⚠ Restauration pas enregistrée (base muette). Rien n\'a changé : réessaie.');
                 return;
               }
               toast('✓ Sauvegarde restaurée ! L\'app va se recharger.');
