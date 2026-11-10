@@ -3793,6 +3793,9 @@ function PiluleAnnulerCoque() {
 // d'un autre onglet (`noterAvantDistant` + `emettreClesRelues`).
 const ecrireCleCorbeille = async (k, v) => {
   let avantTxt; try { avantTxt = localStorage.getItem(k); } catch (_) { avantTxt = null; }
+  // `v` vient d'être calculé sur la valeur COURANTE : la base « distante » d'une écriture
+  // précédente n'a plus cours (sinon la fusion à trois voies défaisait ce geste).
+  delete _avantDistant[k];
   const r = await _ecrivainVrm.ecrire(k, v);
   if (!r || r.ok !== false) { noterAvantDistant(k, avantTxt); emettreClesRelues([k]); }
   return r;

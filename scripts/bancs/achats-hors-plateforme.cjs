@@ -222,7 +222,7 @@ async function main() {
         await tap(pg, '[data-pilule-annuler]').catch(() => {});
         await pg.waitForTimeout(2400);
         const l4 = (dernierMain() || {}).vinted_offvinted_buys || [];
-        dit(l4.length === 1 && JSON.stringify(l4[0]) === avantSuppr && !Object.keys((dernierMain() || {}).vrm_corbeille || {}).length && (await pg.locator('[data-achat-hors-id]').count()) === 1, `${T} « Annuler » : l’achat revient exact, la corbeille se vide`, JSON.stringify(l4).slice(0, 120));
+        dit(l4.length === 1 && JSON.stringify(l4[0]) === avantSuppr && !Object.keys((dernierMain() || {}).vrm_corbeille || {}).length && (await pg.locator('[data-achat-hors-id]').count()) === 1, `${T} « Annuler » : l’achat revient exact, la corbeille se vide`, `exact=${JSON.stringify(l4[0]) === avantSuppr} corb=${Object.keys((dernierMain() || {}).vrm_corbeille || {}).length} n=${l4.length} lignes=${await pg.locator('[data-achat-hors-id]').count()}`);
         // De nouveau à la corbeille, puis Paramètres → Corbeille → « Restaurer ».
         await tap(pg, '[data-achat-hors-id]');
         await tap(pg, '[data-achat-hors-supprimer]');
@@ -237,7 +237,7 @@ async function main() {
         await tap(pg, '[data-corbeille-restaurer]');
         await pg.waitForTimeout(2400);
         const l5 = (dernierMain() || {}).vinted_offvinted_buys || [];
-        dit(l5.length === 1 && JSON.stringify(l5[0]) === avantSuppr && !Object.keys((dernierMain() || {}).vrm_corbeille || {}).length, `${T} « Restaurer » : l’achat revient exact (même id), la corbeille se vide`, JSON.stringify(l5).slice(0, 120));
+        dit(l5.length === 1 && JSON.stringify(l5[0]) === avantSuppr && !Object.keys((dernierMain() || {}).vrm_corbeille || {}).length, `${T} « Restaurer » : l’achat revient exact (même id), la corbeille se vide`, `exact=${JSON.stringify(l5[0]) === avantSuppr} corb=${Object.keys((dernierMain() || {}).vrm_corbeille || {}).length} n=${l5.length} ` + (JSON.stringify(l5[0]) !== avantSuppr ? JSON.stringify(l5[0]) + ' ≠ ' + avantSuppr : ''));
         dit(errs.length === 0, `${T} aucune erreur de page`, errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
