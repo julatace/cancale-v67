@@ -2619,6 +2619,9 @@ const SYNC_KEYS = [
   // retirer » quand l'app en comptait 7, mesuré le 23 oct.) et la relit avec la
   // même règle (api/_lib/retrait-colis.js). Aucun code, aucune identité.
   'vrm_colis_retirer',
+  // (10 nov., lot H) Les dates limites d'envoi LUES ([N°, jour, heure, at]) : PUBLIÉES par Ma
+  // journée (src/agendaEcheances.js), CONSOMMÉES par l'agenda .ics (api/_lib/agenda-ics.js).
+  'vrm_agenda_envoi',
   // Le bénéfice des ventes Vinted, cumulé JOUR PAR JOUR (19 octobre) : PUBLIÉ
   // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
   // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.

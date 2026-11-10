@@ -17,7 +17,8 @@ const CE_QUI_Y_EST = [
 
 export default function AgendaEcheances({ enTete = () => ({}), toast = () => {}, confirmer = async () => true, envoyer, ouvrir }) {
   const f = envoyer || ((...a) => fetch(...a));
-  const aller = ouvrir || ((u) => { try { window.location.href = u; } catch (_) {} });
+  // Un lien touché (pas `location.href`) : la page reste en place si aucune app ne prend webcal://.
+  const aller = ouvrir || ((u) => { try { const l = document.createElement('a'); l.href = u; l.rel = 'noopener'; document.body.appendChild(l); l.click(); l.remove(); } catch (_) {} });
   const [etat, setEtat] = React.useState(undefined);
   const [occupe, setOccupe] = React.useState('');
   const appel = React.useCallback(async (init) => {

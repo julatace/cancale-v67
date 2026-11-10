@@ -41,9 +41,15 @@ const S_ICI = 'a1b2c3d4-0000-4000-8000-000000000001', S_NEUF = 'c3d4e5f6-0000-40
       // ── P. La publication des dates LUES ────────────────────────────────
       if (PARTIES.includes('P')) {
         const b = base();
-        const { ctx, pg } = await NV.ouvrir(nav, { W, sombre, base: b, tab: 'journee' });
+        // Les achats du 2e compte lus (vides) : la lecture est COMPLÈTE (la publication n'attend que ça).
+        if (!b.lignes.some((l) => l.id === 'harvest_222_orders_purchased')) b.lignes.push({ id: 'harvest_222_orders_purchased', data: { capturedAt: new Date().toISOString(), payload: { my_orders: [] } } });
+        const { ctx, pg } = await NV.ouvrir(nav, { W, sombre, base: b, tab: process.env.BANC_TAB || 'journee' });
+        // La publication part vers la base avec les autres clés de `main` (quelle que soit la route : écriture ou rpc).
+        const envois = [];
+        pg.on('request', (q) => { const d = q.postData() || ''; if (/rest\/v1\//.test(q.url()) && d.includes('vrm_agenda_envoi')) envois.push(d); });
         let pub = null;
-        for (let i = 0; i < 30 && !pub; i++) { await attendre(500); const m = b.lignes.find((l) => l.id === 'main'); pub = m && m.data && m.data.vrm_agenda_envoi; }
+        for (let i = 0; i < 40 && !(pub && envois.length); i++) { await attendre(500); pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_agenda_envoi')); } catch (_) { return null; } }); }
+        dit(envois.length > 0, `P ${tag} : la publication part vers la base`, envois.length);
         const c = pub && Array.isArray(pub.colis) ? pub.colis : [];
         dit(c.length === 1 && c[0][2] === '10:00' && /^\d{4}-\d{2}-\d{2}$/.test(c[0][1]) && Number(c[0][3]) > Date.now(), `P ${tag} : Ma journée publie la date limite LUE (10 h 00 du bordereau)`, JSON.stringify(pub));
         dit(pub && !/Nike|Adidas|New Balance|Asics|Salomon|vendeuse|62000/.test(JSON.stringify(pub)), `P ${tag} : rien d'autre que N°, jour, heure (ni titre, ni compte, ni transaction)`, JSON.stringify(pub));
@@ -73,10 +79,13 @@ const S_ICI = 'a1b2c3d4-0000-4000-8000-000000000001', S_NEUF = 'c3d4e5f6-0000-40
           const avant = await pg.evaluate(() => ({ etat: document.querySelector('[data-agenda]').getAttribute('data-agenda'), types: [...document.querySelectorAll('[data-agenda-type]')].map((x) => x.getAttribute('data-agenda-type')), href: (document.querySelector('[data-agenda-ajouter]') || {}).getAttribute && document.querySelector('[data-agenda-ajouter]').getAttribute('href') }));
           dit(avant.etat === 'inactif' && avant.types.join() === 'urssaf,envoi,retrait' && !avant.href, `F ${tag} : pas encore de lien ; les trois sortes d’échéances sont dites`, JSON.stringify(avant));
           await capture(pg, `F-${tag}-avant`);
-          await pg.evaluate(() => { window.__vrmAllerA = null; });
+          // Le téléphone confie webcal:// à son app Calendrier ; ici, le banc note le lien ouvert (aucune app ne le prend).
+          await pg.evaluate(() => { window.__webcal = []; document.addEventListener('click', (e) => { const l = e.target && e.target.closest && e.target.closest('a[href^="webcal:"]'); if (l) { e.preventDefault(); window.__webcal.push(l.getAttribute('href')); } }, true); });
           await pg.click('[data-agenda-ajouter]');
           await pg.waitForSelector('[data-agenda="actif"]', { timeout: 6000 }).catch(() => {});
           const ap = await pg.evaluate(() => { const a = document.querySelector('[data-agenda-ajouter]'); const g = document.querySelector('[data-agenda-google]'); const r = a ? a.getBoundingClientRect() : null; return { href: a && a.getAttribute('href'), google: g && g.getAttribute('href'), h: r && r.height, gestes: [...document.querySelectorAll('.vrm-agenda-gestes .vrm-lien-action')].map((x) => x.getBoundingClientRect().height) }; });
+          const ouverts = await pg.evaluate(() => window.__webcal);
+          dit(ouverts.length === 1 && ouverts[0] === `webcal://vrm.center/agenda/${JETON}.ics`, `F ${tag} : le premier toucher ouvre DÉJÀ le lien dans l’agenda`, JSON.stringify(ouverts));
           dit(posts[0] === 'creer' && ap.href === `webcal://vrm.center/agenda/${JETON}.ics`, `F ${tag} : « Ajouter à mon agenda » crée le lien, puis le bouton EST le lien webcal://`, JSON.stringify({ posts, ap }));
           dit(ap.google && ap.google.startsWith('https://calendar.google.com/calendar/render?cid=') && ap.google.includes(encodeURIComponent(`webcal://vrm.center/agenda/${JETON}.ics`)), `F ${tag} : Google Agenda reçoit le même lien`, ap.google);
           if (tel) dit(ap.h >= 43.5 && ap.gestes.every((h) => h >= 43.5), `F ${tag} : 44 px au doigt`, JSON.stringify(ap));

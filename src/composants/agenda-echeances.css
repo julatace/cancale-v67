@@ -5,7 +5,8 @@
 .vrm-agenda .vrm-agenda-note { margin: 0 4px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
 .vrm-agenda .vrm-agenda-actions { display: flex; flex-direction: column; gap: 10px; }
 .vrm-agenda .vrm-agenda-gestes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; }
-html body .vrm-app-shell .vrm-agenda .vrm-agenda-gestes .vrm-lien-action { min-height: 44px; padding: 0 6px; }
+html body .vrm-app-shell .vrm-agenda .vrm-agenda-gestes .vrm-lien-action { min-height: 44px; padding: 0 6px; border: 0; background: none; font: 600 15px/1 var(--vrm-police); color: var(--fu-bleu, #0071e3); cursor: pointer; }
+html body .vrm-app-shell .vrm-agenda .vrm-agenda-gestes .vrm-lien-action[data-agenda-couper] { color: var(--fu-gris, #6e6e73); }
 /* (lot H) La session qu'une alerte « Nouvel appareil » désigne : en évidence, ambre (un geste à faire). */
 html body .vrm-app-shell .vrm-sec-ligne[data-appareil-nouveau="oui"] { background: var(--fu-ambre-fond, #fff4e0); }
 html body .vrm-app-shell .vrm-sec-ligne[data-appareil-nouveau="oui"] .vrm-sec-bouton { background: var(--fu-ambre-txt, #8a5a00); color: #fff; }
