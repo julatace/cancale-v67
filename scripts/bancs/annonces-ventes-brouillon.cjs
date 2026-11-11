@@ -60,8 +60,15 @@ if(/select=owner/.test(u))return route.fulfill({status:400,contentType:'applicat
 const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;const forme=r=>(sel&&!/^id,data|^data$|^data,/.test(sel))?projette(r,sel):({...r,updated_at:iso(0),cap:r.data.capturedAt});
 const eq=/[?&]id=eq\.([^&]*)/.exec(u);if(eq)return j(rows.filter(r=>r.id===eq[1]).map(forme));const lk=/[?&]id=like\.([^&]*)/.exec(u);if(lk){const re=new RegExp('^'+lk[1].replace(/[.]/g,'\\.').replace(/[*%]/g,'.*')+'$');return j(rows.filter(r=>re.test(r.id)).map(forme));}return j([]);});
 await pg.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"pret":true}'}));
-for(const vue of plan){const [v,sub]=vue.split(':');await pg.goto(`http://localhost:${PORT}/?tab=${v}`,{waitUntil:'domcontentloaded'});await pg.waitForTimeout(4500);
-if(sub){await pg.locator('.vrm-market-space button').filter({hasText:new RegExp('^'+sub+'$','i')}).first().click().catch(e=>console.log('clic',sub,e.message.slice(0,60)));await pg.waitForTimeout(3000);}
+// (11 nov., rouges A) La navigation par tâche (31 oct.) a retiré les sous-onglets de « l'espace Vinted »
+// (`.vrm-market-space button`) : le clic ne trouvait plus rien et les quatre vues mesuraient Ventes.
+// Chaque vue a son onglet ; Ventes reste `plat_vinted` (Ventes, filtre Vinted).
+// « Pas de SECOND titre » : depuis la navigation par tâche, l'écran porte SON titre (h1 de ScreenHead) ;
+// on compte les titres « Ventes / Achats / Messages » visibles : plus d'un = un second titre.
+// « À expédier » s'écrit « À envoyer » depuis le vocabulaire des colis (le ton jugé reste `data-ton="action"`).
+const ONGLET_DE={ventes:'plat_vinted',annonces:'cat_annonces',achats:'cat_achats',messages:'cat_msg'};
+for(const vue of plan){const [v,sub]=vue.split(':');await pg.goto(`http://localhost:${PORT}/?tab=${sub&&ONGLET_DE[sub]||v}`,{waitUntil:'domcontentloaded'});await pg.waitForTimeout(4500);
+if(sub)await pg.waitForTimeout(3000);
 const nom=`${v}${sub?'-'+sub:''}-${vp.width}${sombre?'-sombre':''}`;
 const W=vp.width;
 const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRect().top):null;const vis=(e)=>!!e&&e.getBoundingClientRect().height>0;
@@ -70,14 +77,14 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
   const etat=(t)=>{const r=ventes.find(x=>(x.querySelector('.vrm-ledger-sale-state')||{}).textContent===t);return r?r.querySelector('.vrm-ledger-sale-state').getAttribute('data-ton'):'absent';};
   const barre=document.querySelector('.vrm-sales-workbar');
   return {nVentes:ventes.length,sous:ventes.slice(0,4).map(x=>(x.querySelector('[data-vente-sous]')||{}).textContent||''),
-    tonExp:etat('À expédier'),tonVendue:etat('Vendue'),
+    tonExp:(e=>e!=='absent'?e:etat('À expédier'))(etat('À envoyer')),tonVendue:etat('Vendue'),
     reglagesBarre:barre?!!(barre.querySelector(':scope > div > button[role=switch]')||barre.querySelector(':scope > .vrm-vues')):null,
     retirer:vis(document.querySelector('[data-retirer-argent]')),
     titreAnn:[...document.querySelectorAll('h1,h2,h3')].some(h=>/Annonces en ligne/.test(h.textContent)&&vis(h)),
-    titreVentes:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^(Ventes|Vos ventes)$/.test(h.textContent.trim())&&vis(h)),
+    titreVentes:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].filter(h=>/^(Ventes|Vos ventes)$/.test(h.textContent.trim())&&vis(h)).length>1,
     lignesComptes:vis(document.querySelector('[data-comptes-annonces]')),
-    titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)),
-    titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
+    titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].filter(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)).length>1,
+    titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].filter(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)).length>1,
     recusTop:top(document.querySelector('[data-recus-email]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
     colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),convEcart:(()=>{const a=document.querySelector('.vrm-messages-sections'),b=document.querySelector('.vrm-msg-search');return a&&b?Math.round(b.getBoundingClientRect().top-a.getBoundingClientRect().bottom):null;})(),
     chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
