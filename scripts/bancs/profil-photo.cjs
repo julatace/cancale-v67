@@ -21,6 +21,10 @@ require('./_porte-banc.cjs');
 //       ouverte, session effacée ; refus du serveur ⇒ la porte d'avant ; inscription
 //       explicite ⇒ rien d'annulé ; « Créer un nouveau compte avec Discord » repart en
 //       « inscription ».
+//   R6  « Relier Discord » quand on est DÉJÀ connecté (Paramètres → Mon compte) : la
+//       LIAISON de Supabase (`/auth/v1/user/identities/authorize`, avec SA session),
+//       jamais une connexion (`/auth/v1/authorize`, qui créerait un compte) ; « manual
+//       linking » éteint ⇒ le dire, rester ; retour de Discord ⇒ le même compte, relié.
 //  390 px tactile et 1512 px, clair et sombre. BANC_PORT, BANC_DIST, BANC_CAPTURES.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -49,17 +53,18 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
 const json = (r, o, st = 200) => r.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': Array.isArray(o) ? (o.length ? `0-${o.length - 1}/${o.length}` : '*/0') : '0-0/1' }, body: JSON.stringify(o) });
 
 // identites : [{provider, avatar}] ; photo : '' ou data:image/png… (téléversée)
-async function ouvrir(b, { largeur, sombre, identites = [], photo = '', url = '/?tab=journee' }) {
+async function ouvrir(b, { largeur, sombre, identites = [], photo = '', url = '/?tab=journee', stock = {} }) {
   const mobile = largeur < 700;
   const ctx = await b.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', deviceScaleFactor: 2 });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(String(e.message || e).slice(0, 200)));
   const etat = { photo: { image: photo, partageCarte: false, nomMasque: false }, posts: [] };
-  await pg.addInitScript(([s, sombre]) => { try { if (!sessionStorage.getItem('banc_init')) {
+  await pg.addInitScript(([s, sombre, stock]) => { try { if (!sessionStorage.getItem('banc_init')) {
     localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id);
     localStorage.setItem('vinted_dark', sombre ? 'true' : 'false');
     localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
-    sessionStorage.setItem('banc_init', '1'); } } catch (_) {} }, [SESSION, !!sombre]);
+    for (const [k, v] of Object.entries(stock)) { localStorage.setItem(k, v); sessionStorage.setItem(k, v); }
+    sessionStorage.setItem('banc_init', '1'); } } catch (_) {} }, [SESSION, !!sombre, stock]);
   const fiche = { id: UID, email: EMAIL, identities: [{ provider: 'email', identity_id: 'e-1', identity_data: {} }, ...identites.map((i, n) => ({ provider: i.provider, identity_id: 'i-' + n, last_sign_in_at: new Date(Date.now() - n * 864e5).toISOString(), identity_data: i.provider === 'google' ? { picture: i.avatar } : { avatar_url: i.avatar } }))] };
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
@@ -223,6 +228,58 @@ async function discord(b, largeur, sombre) {
     await ctx.close(); }
 }
 
+// R6 — « Relier Discord » depuis un compte DÉJÀ connecté : une liaison, jamais un compte neuf.
+async function relier(b, largeur, sombre) {
+  const mobile = largeur < 700, tag = `${largeur}${sombre ? ' sombre' : ' clair'}`;
+  const cas = async (reponse) => {
+    const o = await ouvrir(b, { largeur, sombre, url: '/?tab=settings&vue=compte' });
+    const appels = { lier: [], connexion: [], discord: '' };
+    await o.pg.route('**/auth/v1/authorize**', (r) => { appels.connexion.push(r.request().url()); return r.fulfill({ status: 204, body: '' }); });
+    await o.pg.route('**/auth/v1/user/identities/authorize**', (r) => { appels.lier.push({ url: r.request().url(), auth: r.request().headers().authorization || '' }); return reponse === 'off' ? json(r, { code: 404, error_code: 'manual_linking_disabled', msg: 'Manual linking is disabled' }, 404) : json(r, { url: 'https://discord.com/oauth2/authorize?client_id=banc&state=x' }); });
+    await o.pg.route(/^https:\/\/discord\.com\//, (r) => { appels.discord = r.request().url(); return r.fulfill({ status: 200, contentType: 'text/html', body: '<title>Discord (banc)</title>' }); });
+    return { ...o, appels };
+  };
+  try {
+    const { pg, ctx, appels, errs } = await cas('on');
+    const bouton = pg.locator('[data-connexion-relier="discord"]').filter({ visible: true }).first();
+    await bouton.waitFor({ timeout: 8000 }).catch(() => {});
+    await capture(pg, `${largeur}-${sombre ? 'sombre' : 'clair'}-relier`);
+    dit(await bouton.count() === 1, `${tag} · R6 Paramètres → Mon compte propose « Relier Discord »`);
+    await bouton.scrollIntoViewIfNeeded().catch(() => {});
+    if (mobile) await bouton.tap({ timeout: 8000 }); else await bouton.click({ timeout: 8000 });
+    for (let i = 0; i < 30 && !appels.discord; i++) await pg.waitForTimeout(200);
+    const l = appels.lier[0];
+    dit(appels.lier.length === 1 && /provider=discord/.test(l.url) && l.auth === 'Bearer ' + SESSION.access_token && /code_challenge=/.test(l.url) && /redirect_to=[^&]*tab%3Dsettings/.test(l.url), `${tag} · R6 la LIAISON de Supabase est demandée avec SA session (identities/authorize)`, JSON.stringify(appels.lier));
+    dit(appels.connexion.length === 0, `${tag} · R6 aucune connexion Discord (/auth/v1/authorize) : pas de compte neuf`, JSON.stringify(appels.connexion));
+    dit(/^https:\/\/discord\.com\/oauth2\/authorize/.test(appels.discord), `${tag} · R6 la page part chez Discord pour autoriser`, appels.discord);
+    dit(errs.length === 0, `${tag} · R6 aucune erreur d'app`, errs.join(' | '));
+    await ctx.close();
+  } catch (e) { dit(false, `${tag} · R6 relier : le scénario a tourné jusqu'au bout`, String(e && e.message).replace(/\x1b\[[0-9;]*m/g, '').slice(0, 600)); }
+  try {
+    const { pg, ctx, appels } = await cas('off');
+    const bouton = pg.locator('[data-connexion-relier="discord"]').filter({ visible: true }).first();
+    await bouton.waitFor({ timeout: 8000 });
+    if (mobile) await bouton.tap({ timeout: 8000 }); else await bouton.click({ timeout: 8000 });
+    await pg.waitForTimeout(1200);
+    const alerte = await pg.evaluate(() => [...document.querySelectorAll('[aria-label="Connexions à VRM"] [role="alert"]')].map((e) => e.innerText).join(' | '));
+    dit(/pas encore activée/.test(alerte) && !appels.discord && appels.connexion.length === 0 && /localhost|127\.0\.0\.1/.test(pg.url()), `${tag} · R6 « manual linking » éteint : c'est dit, on reste sur VRM, aucune connexion`, JSON.stringify([alerte, appels, pg.url()]));
+    await capture(pg, `${largeur}-${sombre ? 'sombre' : 'clair'}-relier-eteint`);
+    await ctx.close();
+  } catch (e) { dit(false, `${tag} · R6 éteint : le scénario a tourné jusqu'au bout`, String(e && e.message).replace(/\x1b\[[0-9;]*m/g, '').slice(0, 600)); }
+  // Retour de Discord : le contexte de liaison (même propriétaire) ⇒ le même compte, relié.
+  try {
+    const liaison = JSON.stringify({ owner: UID, provider: 'discord', verifier: 'verificateur-liaison', at: Date.now() });
+    const { pg, ctx, errs } = await ouvrir(b, { largeur, sombre, url: '/?code=code-liaison&tab=settings&vue=compte', identites: [{ provider: 'discord', avatar: 'https://cdn.discordapp.com/avatars/1/a.png' }], stock: { vrm_oauth_liaison: liaison } });
+    const t = await pg.evaluate(() => document.body.innerText);
+    const sess = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_session') || 'null'); } catch (_) { return null; } });
+    dit(/Ton compte Discord est associé à VRM/.test(t) && sess && sess.user && sess.user.id === UID && await pg.locator('[data-porte-sans-compte],[data-porte-nouveau-oauth]').count() === 0, `${tag} · R6 retour de Discord : le même compte VRM, « Ton compte Discord est associé »`, t.slice(0, 200));
+    dit(await pg.locator('[data-connexion-compte="discord"][data-connexion-etat="relie"]').count() >= 1, `${tag} · R6 Discord apparaît « relié » (lu sur la fiche)`);
+    dit(errs.length === 0, `${tag} · R6 retour : aucune erreur d'app`, errs.join(' | '));
+    await capture(pg, `${largeur}-${sombre ? 'sombre' : 'clair'}-relie`);
+    await ctx.close();
+  } catch (e) { dit(false, `${tag} · R6 retour : le scénario a tourné jusqu'au bout`, String(e && e.message).replace(/\x1b\[[0-9;]*m/g, '').slice(0, 600)); }
+}
+
 (async () => {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('  ❌ dist absent — npm run build'); process.exit(1); }
   await new Promise((r) => srv.listen(Number(process.env.BANC_PORT || 0), '127.0.0.1', r));
@@ -232,6 +289,7 @@ async function discord(b, largeur, sombre) {
       console.log(`\n── ${largeur} ${sombre ? 'sombre' : 'clair'}`);
       await profil(b, largeur, sombre);
       await discord(b, largeur, sombre);
+      if (!sombre || largeur > 700) await relier(b, largeur, sombre);
     }
   } finally { await b.close(); srv.close(); }
   console.log(`\n${ko ? '❌' : '✅'} profil-photo : ${ok} vert(s), ${ko} en échec · captures : ${CAPTURES}`);

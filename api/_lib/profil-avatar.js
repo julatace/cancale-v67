@@ -40,14 +40,18 @@ export async function routeAvatarPublic(req,res){
 export async function routeProfilAvatar(req,res){
  res.setHeader('Cache-Control','no-store');if(!['GET','POST'].includes(req.method))return res.status(405).json({ok:false});
  const u=await utilisateurDe(req);if(!u)return res.status(401).json({ok:false});
- try{const id=idDe(u.id);if(req.method==='GET'){const d=await lirePrive(id);return res.status(200).json({ok:true,image:pngProfilValide(d?.image)?d.image:'',partageCarte:d?.partageCarte===true,nomMasque:d?.nomMasque===true});}
+ try{const id=idDe(u.id);if(req.method==='GET'){
+   // (11 nov., lot DJ6) `si=<empreinte>` : la photo déjà sur l'appareil. Lecture PROJETÉE (§4.4,
+   // trois scalaires) ; même empreinte ⇒ `inchange`, la photo (≤ 110 Ko) ne repart pas.
+   const si=String(req.query?.si||'');if(/^[0-9a-f]{64}$/.test(si)){const rows=await requetePrivee(`id=eq.${encodeURIComponent(id)}&select=hash:data->>hash,nomMasque:data->>nomMasque,partageCarte:data->>partageCarte`);if(rows.length===1&&rows[0].hash===si)return res.status(200).json({ok:true,inchange:true,hash:si,partageCarte:String(rows[0].partageCarte)==='true',nomMasque:String(rows[0].nomMasque)==='true'});}
+   const d=await lirePrive(id),img=pngProfilValide(d?.image)?d.image:'';return res.status(200).json({ok:true,image:img,hash:img?String(d.hash||''):'',partageCarte:d?.partageCarte===true,nomMasque:d?.nomMasque===true});}
   let b;try{b=typeof req.body==='string'?JSON.parse(req.body):req.body;}catch(_){}
   // (11 nov., lot DJ6) « Masquer mon nom » : SEUL ce champ change, la photo reste.
-  if(b&&typeof b.nomMasque==='boolean'&&!('image' in b)&&!b.retirer){for(let i=0;i<6;i++){const d=await lirePrive(id);const next=await casPrive(id,d,{...(d||{}),image:d?.image||'',hash:d?.hash||'',partageCarte:d?.partageCarte===true,pid:d?.pid||'',nomMasque:b.nomMasque,at:new Date().toISOString()});if(next)return res.status(200).json({ok:true,image:pngProfilValide(next.image)?next.image:'',partageCarte:next.partageCarte===true,nomMasque:next.nomMasque===true});}return res.status(503).json({ok:false,message:'Le réglage a changé au même moment. Réessaie.'});}
+  if(b&&typeof b.nomMasque==='boolean'&&!('image' in b)&&!b.retirer){for(let i=0;i<6;i++){const d=await lirePrive(id);const next=await casPrive(id,d,{...(d||{}),image:d?.image||'',hash:d?.hash||'',partageCarte:d?.partageCarte===true,pid:d?.pid||'',nomMasque:b.nomMasque,at:new Date().toISOString()});if(next)return res.status(200).json({ok:true,image:pngProfilValide(next.image)?next.image:'',hash:pngProfilValide(next.image)?String(next.hash||''):'',partageCarte:next.partageCarte===true,nomMasque:next.nomMasque===true});}return res.status(503).json({ok:false,message:'Le réglage a changé au même moment. Réessaie.'});}
   if(!b||(!b.retirer&&!pngProfilValide(b.image)))return res.status(400).json({ok:false,message:'Choisis une photo PNG, JPEG ou WebP depuis ton appareil.'});
   const q=await prendreQuota(u.id+'|profil-avatar',{max:12});if(!q.ok){res.setHeader('Retry-After',String(q.reessayer));return res.status(429).json({ok:false,message:'Trop de changements de photo. Réessaie plus tard.'});}
   const image=b.retirer?'':b.image,hash=image?empreintePrivee(pngProfilValide(image)):'';
-  for(let i=0;i<6;i++){const d=await lirePrive(id);const next=await casPrive(id,d,{image,hash,partageCarte:!b.retirer&&b.partageCarte===true,pid:d?.pid||'',nomMasque:d?.nomMasque===true,at:new Date().toISOString()});if(next)return res.status(200).json({ok:true,image,partageCarte:next.partageCarte,nomMasque:next.nomMasque===true});}
+  for(let i=0;i<6;i++){const d=await lirePrive(id);const next=await casPrive(id,d,{image,hash,partageCarte:!b.retirer&&b.partageCarte===true,pid:d?.pid||'',nomMasque:d?.nomMasque===true,at:new Date().toISOString()});if(next)return res.status(200).json({ok:true,image,hash,partageCarte:next.partageCarte,nomMasque:next.nomMasque===true});}
   return res.status(503).json({ok:false,message:'La photo a changé au même moment. Réessaie.'});
  }catch(_){return res.status(503).json({ok:false,message:'La photo n’a pas pu être enregistrée. Réessaie dans un moment.'});}
 }

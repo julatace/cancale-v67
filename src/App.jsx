@@ -2012,7 +2012,7 @@ const compteOAuthNeuf=(u)=>{
 // Les refus de Supabase au retour, en français, avec le geste.
 const erreurRetourOAuth=(err,provider)=>{
   const t=String(err||'');const nom=provider==='google'?'Google':'Discord';
-  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce compte ${nom} a déjà son propre compte VRM, il ne peut pas être relié à celui-ci. Connecte-toi avec ${nom}, choisis « J'ai déjà un compte VRM » pour supprimer ce compte vide, puis reviens ici le relier.`;
+  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
   if(/manual.*link.*disabled|manual_linking/i.test(t))return `La liaison de comptes n'est pas encore activée sur le serveur de VRM. Ton compte reste inchangé.`;
   return t;
 };
