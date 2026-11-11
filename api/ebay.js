@@ -34,9 +34,9 @@ import { creerRechercheEbay } from './_lib/ebay-recherche.js';
 import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
 import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
 import { televerserPhotoEbay } from './_lib/ebay-photo.js';
-import { optionsPublication, aspectsPropres, xmlOptions, appelTrading, lireAspects, lireConditions, lirePolitiques, lireEmplacements, lirePolitiquesActivees, etatJeton } from './_lib/ebay-parametres.js';
+import { optionsPublication, aspectsPropres, xmlOptions, appelTrading, lireAspects, lireConditions, lirePolitiques, lireEmplacements, lirePolitiquesActivees, lireCategories, etatJeton } from './_lib/ebay-parametres.js';
 import { sbCle } from './_lib/cle.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+import { lireEtatJeton, keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -2042,6 +2042,63 @@ const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOri
 
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 
+// ── TOUS LES PARAMÈTRES DE PUBLICATION (11 nov., ebay-complet) ──────────────
+// LECTURE SEULE. Ce que la feuille « Tous les réglages eBay » demande à eBay
+// pour un article : les catégories proposées pour un titre (ou une recherche
+// tapée par lui, `q`), et pour LA catégorie choisie ses caractéristiques
+// (obligatoires · recommandées · une ou plusieurs valeurs · liste fermée), ses
+// états (et descripteurs), puis les politiques et emplacements du compte.
+// Chaque partie a TROIS états : valeur lue · `null` pas su (eBay muet, droit
+// manquant) — jamais une liste vide inventée (§5). La catégorie n'est JAMAIS
+// choisie ici : sans `categoryId`, seules les suggestions reviennent et l'app
+// DEMANDE (fenêtre « Quelle catégorie ? »).
+async function handleParametres(b, ctx) {
+  const at = await jetonDe(ctx);
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const token = at.token;
+  const MKT = marcheCourant().marketplace;
+  const H = { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' };
+  const q = String(b.q || b.title || '').trim().slice(0, 80);
+  const categoryId = b.categoryId == null || b.categoryId === '' ? '' : String(b.categoryId);
+  if (categoryId && !/^\d{1,9}$/.test(categoryId)) return { status: 400, body: { ok: false, reason: 'categorie', error: 'Catégorie illisible — rien n\'a été demandé à eBay.' } };
+  if (!q && !categoryId) return { status: 400, body: { ok: false, reason: 'titre', error: 'Un titre ou une recherche d\'abord.' } };
+  const tree = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id=${MKT}`, token, H);
+  const treeId = (tree.ok && tree.data && tree.data.categoryTreeId) || '';
+  let categories = null, aspects = null, conditions = null;
+  if (treeId && q) {
+    const sg = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/category_tree/${treeId}/get_category_suggestions?q=${encodeURIComponent(q)}`, token, H);
+    // 204 = eBay n'a AUCUNE suggestion : une liste lue vide (la fenêtre demande).
+    categories = sg.status === 204 ? [] : sg.ok ? lireCategories(sg.data) : null;
+  }
+  if (treeId && categoryId) {
+    const [ap, cp] = await Promise.all([
+      ebayJson(`${EBAY_API}/commerce/taxonomy/v1/category_tree/${treeId}/get_item_aspects_for_category?category_id=${categoryId}`, token, H),
+      ebayJson(`${EBAY_API}/sell/metadata/v1/marketplace/${MKT}/get_item_condition_policies?filter=categoryIds:%7B${categoryId}%7D`, token, H),
+    ]);
+    aspects = ap.ok ? lireAspects(ap.data) : null;
+    conditions = cp.ok ? lireConditions(cp.data) : null;
+  }
+  let compte = null;
+  if (b.compte !== undefined || b.avecCompte === true) {
+    const [prog, pay, ret, ful, loc] = await Promise.all([
+      ebayJson(`${EBAY_API}/sell/account/v1/program/get_opted_in_programs`, token, H),
+      ebayJson(`${EBAY_API}/sell/account/v1/payment_policy?marketplace_id=${MKT}`, token, H),
+      ebayJson(`${EBAY_API}/sell/account/v1/return_policy?marketplace_id=${MKT}`, token, H),
+      ebayJson(`${EBAY_API}/sell/account/v1/fulfillment_policy?marketplace_id=${MKT}`, token, H),
+      ebayJson(`${EBAY_API}/sell/inventory/v1/location`, token, H),
+    ]);
+    compte = {
+      type: (ctx.compte && ctx.compte.type) || '',
+      politiquesActivees: lirePolitiquesActivees(prog),
+      paiement: lirePolitiques(pay, 'paymentPolicies', 'paymentPolicyId'),
+      retour: lirePolitiques(ret, 'returnPolicies', 'returnPolicyId'),
+      expedition: lirePolitiques(ful, 'fulfillmentPolicies', 'fulfillmentPolicyId'),
+      emplacements: lireEmplacements(loc),
+    };
+  }
+  return { status: 200, body: { ok: true, arbre: treeId || null, categories, categoryId: categoryId || null, aspects, conditions, compte, devise: marcheCourant().devise } };
+}
+
 async function handleApp(req, res) {
   if (req.method === 'GET') {
     res.status(200).json({ ok: true, ready: keysReady(), canConsent: canConsent(), env: 'production' });
@@ -2106,7 +2163,7 @@ async function handleApp(req, res) {
     if (action === 'status') {
       const has = await hasRefresh(owner, '');
       if (has === null) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire l\'état (base injoignable).' }); return; }
-      if (!cloison) { res.status(200).json({ ok: true, connected: !!has }); return; }
+      if (!cloison) { const ej = has ? await lireEtatJeton(owner, '').catch(() => undefined) : undefined; res.status(200).json({ ok: true, connected: !!has, jeton: ej ? etatJeton(ej.savedAt, ej.jours) : null }); return; }
       // (9 octobre) Ses comptes eBay, chacun avec son état — jamais un jeton.
       // Le principal relié dont l'identité n'est pas encore apprise : on la
       // demande à eBay maintenant (une fois ; ensuite elle est rangée).
@@ -2121,7 +2178,11 @@ async function handleApp(req, res) {
       for (const c of comptesActifs(reg)) {
         const relie = c.suffixe ? await hasRefresh(owner, c.suffixe) : has;
         if (c.implicite && !relie) continue;
-        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null, type: c.type || '', ...(() => { const m = marcheDuCompte(c); return { site: m ? m.site : '?', siteLu: c.site !== undefined && c.site !== '', marche: m ? { nom: m.nom, devise: m.devise, domaine: m.domaine, pays: m.pays } : null }; })() });
+        // (11 nov., ebay-complet) Le jeton qui expire est dit AVANT : sa date, lue
+        // en deux scalaires (jamais le jeton). Pas su ⇒ `null`, jamais « ok ».
+        const ej = relie === true ? await lireEtatJeton(owner, c.suffixe || '').catch(() => undefined) : undefined;
+        const jeton = ej ? etatJeton(ej.savedAt, ej.jours) : null;
+        comptes.push({ jeton, cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null, type: c.type || '', ...(() => { const m = marcheDuCompte(c); return { site: m ? m.site : '?', siteLu: c.site !== undefined && c.site !== '', marche: m ? { nom: m.nom, devise: m.devise, domaine: m.domaine, pays: m.pays } : null }; })() });
       }
       res.status(200).json({ ok: true, connected: comptes.some((c) => c.relie === true), comptes });
       return;
@@ -2182,6 +2243,7 @@ async function handleApp(req, res) {
       commandessuite:(ctx)=>chargerCommandesSuivantes(ctx),
       revise: (ctx) => handleRevise(b, ctx),
       pubinfo: (ctx) => handlePubInfo(b, ctx),
+      parametres: (ctx) => handleParametres(b, ctx),
       pubverify: (ctx) => handleVerify(b, ctx),
       finances: (ctx) => handleFinances(ctx),
       publish: (ctx) => handlePublish(b, ctx),
@@ -2215,7 +2277,7 @@ async function handleApp(req, res) {
     // illisible) ou pas géré par VRM est REFUSÉ : jamais publié en France à la
     // place.
     const marche=marcheDuCompte(rc.compte);
-    const creeAnnonce=new Set(['publish','pubverify','pubinfo','programmer','relanceverif','relancer']);
+    const creeAnnonce=new Set(['publish','pubverify','pubinfo','parametres','programmer','relanceverif','relancer']);
     if(creeAnnonce.has(action)&&(!marche||rc.compte.siteInconnu)){
       res.status(!marche?409:503).json({ok:false,reason:!marche?'marche-non-gere':'marche-pas-su',error:!marche
         ?'Ce compte eBay est inscrit sur un site eBay que VRM ne gère pas encore (VRM gère eBay.fr, eBay.co.uk, eBay.com, eBay.de, eBay.it, eBay.es) — rien n\'a été envoyé.'

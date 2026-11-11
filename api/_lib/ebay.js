@@ -433,7 +433,9 @@ async function resoudreCompte(brut, owner) {
     const regP = await lireComptes(owner);
     if (regP === undefined) return { ok: true, compte: { ...PRINCIPAL, siteInconnu: true } };
     const p = (regP.comptes || []).find((e) => e.principal);
-    return { ok: true, compte: { ...PRINCIPAL, ...(p && p.site !== undefined ? { site: p.site } : {}) } };
+    // (11 nov., ebay-complet) Le TYPE (pro / particulier) tel qu'eBay l'a dit :
+    // la TVA et l'obligation d'accepter les retours en dépendent (jamais deviné).
+    return { ok: true, compte: { ...PRINCIPAL, ...(p && p.site !== undefined ? { site: p.site } : {}), ...(p && p.type ? { type: p.type } : {}) } };
   }
   if (!CLE_COMPTE.test(v)) return { ok: false, status: 400, body: { ok: false, reason: 'compte', error: 'Compte eBay mal désigné — rien n\'a été envoyé à eBay.' } };
   if (!(await baseCloisonnee())) return { ok: false, status: 404, body: { ok: false, reason: 'compte-inconnu', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée — rien n\'a été envoyé à eBay.' } };
@@ -442,7 +444,7 @@ async function resoudreCompte(brut, owner) {
   const e = reg.comptes.find((x) => x.cle === v);
   if (!e) return { ok: false, status: 404, body: { ok: false, reason: 'compte-inconnu', error: 'Ce compte eBay n\'est pas relié à ton compte VRM — rien n\'a été envoyé à eBay.' } };
   if (e.deconnecteLe) return { ok: false, status: 409, body: { ok: false, reason: 'compte-deconnecte', error: `Le compte eBay « ${e.pseudo || 'sans nom'} » est déconnecté — reconnecte-le d'abord. Rien n'a été envoyé à eBay.` } };
-  return { ok: true, compte: { cle: e.cle, pseudo: e.pseudo, principal: e.principal, suffixe: suffixeCompte(e), ...(e.site !== undefined ? { site: e.site } : {}) } };
+  return { ok: true, compte: { cle: e.cle, pseudo: e.pseudo, principal: e.principal, suffixe: suffixeCompte(e), ...(e.site !== undefined ? { site: e.site } : {}), ...(e.type ? { type: e.type } : {}) } };
 }
 
 // Déconnecter UN compte : ses jetons sont vidés, il est marqué déconnecté dans
@@ -482,6 +484,23 @@ async function lireRefresh(owner, suffixe = '') {
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
     return (rows[0] && rows[0].refresh_token) || '';
+  } catch (_) { return undefined; }
+}
+// (11 nov., ebay-complet) QUAND le jeton de renouvellement a été rangé, et pour
+// combien de jours eBay l'a donné — deux scalaires, jamais le jeton (§4.4).
+// `undefined` pas su · `null` aucune ligne · { savedAt, jours }.
+async function lireEtatJeton(owner, suffixe = '') {
+  if (!sbKey()) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
+  if (suffixe && !/^_[0-9a-f]{16}$/.test(suffixe)) return undefined;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}${suffixe}${p.filtre}&select=saved_at:data->>saved_at,jours:data->>refresh_expires_days`, { headers: { ...sbCle(sbKey()) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    if (!rows[0]) return null;
+    return { savedAt: Number(rows[0].saved_at) || null, jours: Number(rows[0].jours) || null };
   } catch (_) { return undefined; }
 }
 // Un compte est-il relié ? true / false / null (« pas su »).
@@ -711,6 +730,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { oublierAcces, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, oublierJetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+export { lireEtatJeton, oublierAcces, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, oublierJetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };

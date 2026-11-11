@@ -97,6 +97,7 @@ export function optionsPublication(it, compte = {}) {
     }
   }
   // Offres sans seuil : eBay les transmet, le vendeur répond (rien d'automatique).
+  if (format === 'enchere' && it.offre) return { err: 'Une enchère ne prend pas de règle d\'offre (seuil d\'acceptation) : retire-la, ou passe au prix fixe.' + RIEN };
   if (p.offres === true) {
     if (format === 'enchere') return { err: 'Les offres ne se posent que sur un prix fixe.' + RIEN };
     o.offres = true;
@@ -227,6 +228,19 @@ export function xmlOptions(o, devise) {
   if (o.privee) x.fin += '<PrivateListing>true</PrivateListing>';
   if (o.delaiEnvoi != null) x.delai = o.delaiEnvoi;
   return x;
+}
+
+// ── LES CATÉGORIES QU'eBAY PROPOSE POUR UN TITRE ─────────────────────────────
+// `get_category_suggestions` : la catégorie (id, nom) et son chemin (les
+// ancêtres, du plus proche au plus haut ⇒ retournés). `null` = pas su.
+export function lireCategories(json) {
+  if (!json || typeof json !== 'object') return null;
+  const s = Array.isArray(json.categorySuggestions) ? json.categorySuggestions : [];
+  return s.map((x) => {
+    const c = (x && x.category) || {};
+    const anc = Array.isArray(x && x.categoryTreeNodeAncestors) ? x.categoryTreeNodeAncestors : [];
+    return { id: String(c.categoryId || ''), nom: String(c.categoryName || ''), chemin: anc.map((a) => String((a && a.categoryName) || '')).filter(Boolean).reverse().join(' › ') };
+  }).filter((c) => /^\d{1,9}$/.test(c.id) && c.nom).slice(0, 8);
 }
 
 // ── LIRE CE QU'eBAY DIT D'UNE CATÉGORIE ──────────────────────────────────────
