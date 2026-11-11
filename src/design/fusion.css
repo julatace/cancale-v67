@@ -1389,3 +1389,5 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-pdf { display: flex; align-items: center; justify-content: center; margin: 0 auto; text-decoration: none; }
 .vrm-tip-outils { display: flex; gap: 16px; margin-top: -4px; }
 .vrm-tip-outils .vrm-tip-lien { margin-right: 0; font-size: 13px; }
+html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien { background: none !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; min-height: 44px; color: var(--fu-bleu, #0071E3) !important; font: 600 14px/1 var(--vrm-police) !important; }
+html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien:disabled { color: var(--fu-gris) !important; }
