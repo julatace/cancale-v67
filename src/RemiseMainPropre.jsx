@@ -17,7 +17,7 @@ import { useLangue } from './i18n/react.js';
 import { lireRemises, remiseSaisie, remiseDeVente, remiseFaiteDeVente, poserRemise, marquerRemise, annulerRemise, purgerRemises, finRemises,
   instantRemise, jourParisRemise, CLE_REMISES, CLE_REMISE_FIN, LIEU_MAX } from '../api/_lib/remises-main-propre.js';
 import { opsRemis } from './lbcPlus.js';
-import { C, SheetShell, askConfirm, cleNum, gesteVrm, load, save, toast } from './App.jsx';
+import { C, askConfirm, cleNum, gesteVrm, load, save, toast } from './App.jsx';
 
 const EVT = 'vrm:remises';
 const lireCarte = () => { const v = load(CLE_REMISES, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
@@ -31,9 +31,12 @@ function useRemises() {
   const [carte, setCarte] = React.useState(lireCarte);
   React.useEffect(() => {
     const maj = () => setCarte(lireCarte());
+    // `save` écrit l'appareil 500 ms plus tard : on relit à SON signal (`vrm:save`), pas avant.
+    const sauve = (e) => { if (e && e.detail && (e.detail.k === CLE_REMISES || e.detail.k === 'vrm_lbc_dates')) maj(); };
     window.addEventListener(EVT, maj);
+    window.addEventListener('vrm:save', sauve);
     window.addEventListener('storage', maj);
-    return () => { window.removeEventListener(EVT, maj); window.removeEventListener('storage', maj); };
+    return () => { window.removeEventListener(EVT, maj); window.removeEventListener('vrm:save', sauve); window.removeEventListener('storage', maj); };
   }, []);
   return carte;
 }
@@ -62,8 +65,8 @@ function FeuilleRemise({ o, num, avant, lieux, onFermer }) {
     onFermer();
   };
   return (
-    <SheetShell onClose={onFermer} maxWidth={460}>
-      <div data-remise-feuille={String(o.txId)}>
+    <div data-remise-feuille={String(o.txId)} style={{ flex: '1 1 100%', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px', marginTop: 6 }}>
+      <div>
         <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{tr('lbcplus.remise.titre')}</div>
         <div style={{ fontSize: 13, color: C.muted, margin: '4px 0 12px', lineHeight: 1.45 }}>{num ? `N°${num} · ` : ''}{String(o.title || '').slice(0, 60)}</div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -82,7 +85,7 @@ function FeuilleRemise({ o, num, avant, lieux, onFermer }) {
           <button type="button" data-remise-enregistrer="" onClick={enregistrer} style={btn(true)}>{tr('lbcplus.remise.enregistrer')}</button>
         </div>
       </div>
-    </SheetShell>
+    </div>
   );
 }
 
