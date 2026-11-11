@@ -95,21 +95,26 @@ export function sourcesDuColis({ t = null, o = null, r = null, tr = null, vs = n
     const s = Array.isArray(t.codesLus) && t.codesLus.length ? t.codesLus.map((x) => x.source) : [sourceDeLigne(t)];
     for (const x of s) if (x) m.add(x);
     if (Array.isArray(t.sourcesLues)) for (const x of t.sourcesLues) if (x) m.add(x);
-    const at = msDe(t.receivedAt) ?? msDe(t.emailAt); if (at != null && sourceDeLigne(t) !== 'transporteur') dates.push(at);
+    const at = msDe(t.receivedAt) ?? msDe(t.emailAt); if (at != null && sourceDeLigne(t) !== 'transporteur') dates.push({ at, par: sourceDeLigne(t) === 'sms' ? 'sms' : 'email' });
   }
   const trLu = tr && (tr.lu || tr.etat) ? tr : (t && t.transp && (t.transp.lu || t.transp.etat) ? t.transp : null);
-  if (trLu) { m.add('transporteur'); const l = msDe(trLu.lu); if (l != null) dates.push(l); }
-  if (o) { m.add('vinted'); if (msDe(capMs) != null) dates.push(msDe(capMs)); }
-  if (vs) { m.add('vinted'); const c = msDe(vs.capturedAt) ?? msDe(vs.cap); if (c != null) dates.push(c); }
+  if (trLu) { m.add('transporteur'); const l = msDe(trLu.lu); if (l != null) dates.push({ at: l, par: 'transporteur', carrier: String(trLu.carrier || '') }); }
+  if (o) { m.add('vinted'); if (msDe(capMs) != null) dates.push({ at: msDe(capMs), par: 'vinted' }); }
+  if (vs) { m.add('vinted'); const c = msDe(vs.capturedAt) ?? msDe(vs.cap); if (c != null) dates.push({ at: c, par: 'vinted' }); }
   const codeMsg = r && r.code ? r.code : '';
-  if (r && (codeMsg || r.lieu || r.arriveLe)) { m.add('message'); const a = msDe(r.at); if (a != null) dates.push(a); }
+  if (r && (codeMsg || r.lieu || r.arriveLe)) { m.add('message'); const a = msDe(r.at); if (a != null) dates.push({ at: a, par: 'message' }); }
   const v = verdictCode({ lignes: codesDesLignes(t, codeValide), message: codeValide ? (codeValide(codeMsg) || '') : codeMsg });
-  return { marques: ORDRE.filter((x) => m.has(x)), code: v, verifieMs: dates.length ? Math.max(...dates) : null };
+  // (11 nov., retraits fiables) QUI a vérifié en dernier (« vérifié par Chronopost à 14:05 », « par e-mail à 9:12 »).
+  const der = dates.length ? dates.reduce((a, b) => (b.at > a.at ? b : a)) : null;
+  return { marques: ORDRE.filter((x) => m.has(x)), code: v, verifieMs: der ? der.at : null, verifiePar: der ? (der.par === 'transporteur' ? (der.carrier || 'transporteur') : der.par) : null };
 }
 
 // « vérifié à 14:32 » (aujourd'hui), « vérifié hier 18:05 », « vérifié le 6 nov. » ; null ⇒ ''.
-export function texteVerifie(ms, maintenant = Date.now()) {
+const PAR = { email: 'par e-mail', sms: 'par SMS', vinted: 'par Vinted', message: 'par message Vinted', transporteur: 'par le transporteur', mondialrelay: 'par Mondial Relay', chronopost: 'par Chronopost', vinted_go: 'par Vinted Go', colissimo: 'par Colissimo' };
+export const parQui = (par) => (par ? (PAR[par] || (par === 'vinted' ? 'par Vinted' : '')) : '');
+export function texteVerifie(ms, maintenant = Date.now(), par = null) {
   if (!Number.isFinite(ms)) return '';
+  if (par && parQui(par)) return texteVerifie(ms, maintenant).replace(/^vérifié/, `vérifié ${parQui(par)}`);
   const d = new Date(ms), n = new Date(maintenant);
   const hm = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const jour = (x) => x.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });

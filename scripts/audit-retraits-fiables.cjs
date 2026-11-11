@@ -35,6 +35,8 @@ const MUTATIONS = {
   'code-change-absent': ['src/relaisChange.js', "    const code = codeOk(t.code) ? String(t.code).trim() : (avecCode[0] ? String(avecCode[0].code).trim() : '');", "    const code = codeOk(t.code) ? String(t.code).trim() : '';"],
   'jamais-ancien': ['src/sourcesRetrait.js', 'maintenant - ms > CONFIRMATION_MAX_MS', 'false'],
   'relecture-suggestion': ['src/lieuxRetrait.js', "return { ...t, lieu: l, lieuLuDansTexte: true, lieuSuggestionEcarte", "return t; ({ ...t, lieu: l, lieuLuDansTexte: true, lieuSuggestionEcarte"],
+  'deplace-ignore': ['src/relaisColis.js', "  const plusRecent = tr.etat === 'disponible'", "  const plusRecent = false && tr.etat === 'disponible'"],
+  'verifie-sans-qui': ['src/sourcesRetrait.js', "  if (par && parQui(par)) return", "  if (false) return"],
   'registre-revient': ['src/App.jsx', '    const completer = (lu) => lu;', '    const completer = (lu) => completerParPointConnu(lu, new Map());'],
 };
 if (process.argv.includes('--prouve')) {
@@ -177,6 +179,10 @@ const ATTENDU = {"MR suggestions sous un en-tête, vrai point sous un autre": ["
     const S = await importer('src/sourcesRetrait.js');
     const now = Date.parse('2026-11-11T12:00:00.000Z');
     dit(S.verifieAncien(now - 49 * 3600e3, now) && !S.verifieAncien(now - 47 * 3600e3, now) && !S.verifieAncien(null, now), '> 48 h ⇒ « pas confirmé » ; < 48 h ⇒ vérifié ; aucune date ⇒ rien (pas su)');
+    const sc = S.sourcesDuColis({ t: { suivi: '41000060', carrier: 'chronopost', receivedAt: '2026-11-11T09:12:00.000Z' }, tr: { carrier: 'chronopost', lu: '2026-11-11T13:05:00.000Z', etat: 'disponible' } });
+    dit(sc.verifiePar === 'chronopost' && S.texteVerifie(sc.verifieMs, now, sc.verifiePar) === 'vérifié par Chronopost à 14:05', 'la dernière vérification dit QUI : « vérifié par Chronopost à 14:05 »', J(sc));
+    const se = S.sourcesDuColis({ t: { suivi: '41000061', carrier: 'mondialrelay', receivedAt: '2026-11-11T08:12:00.000Z' } });
+    dit(se.verifiePar === 'email' && S.texteVerifie(se.verifieMs, now, se.verifiePar) === 'vérifié par e-mail à 09:12', '« vérifié par e-mail à 09:12 » quand seul l’e-mail l’a vu', J(se));
     dit(/^pas confirmé depuis le \d+ nov\.$/.test(S.texteNonConfirme(Date.parse('2026-11-08T12:00:00.000Z'))), '« pas confirmé depuis le 8 nov. »', S.texteNonConfirme(Date.parse('2026-11-08T12:00:00.000Z')));
   });
 
@@ -191,6 +197,21 @@ const ATTENDU = {"MR suggestions sous un en-tête, vrai point sous un autre": ["
     const vrai = { ...ligne, lieu: 'BAR EXEMPLE, 7 Rue Exemple, 64000 Pau' };
     const [r2] = await L.lieuxRelusDansTextes([vrai], lire);
     dit(r2.lieu === vrai.lieu && !r2.lieuSuggestionEcarte, 'un point déjà juste ne bouge pas', J(r2));
+  });
+
+  console.log('§H le transporteur dit le colis ailleurs, plus tard que l’e-mail : le plus récent prouvé gagne (src/relaisColis.js)');
+  await essaie('H', async () => {
+    const M = await importer('src/relaisColis.js');
+    const lu = { lieuNom: 'Laverie Exemple', lieuAdresse: '13 Rue Exemple, Lille' };
+    const tr = { carrier: 'vinted', etat: 'disponible', etatAt: '2026-11-11T13:05:00Z', lieuNom: 'Laverie Autre', lieuRue: '24 Rue Autre', lieuVille: 'Lille' };
+    const r = M.lieuCompleteParTransporteur(lu, tr, Date.parse('2026-11-10T09:00:00Z'));
+    dit(/24 Rue Autre/.test(r.lieuAdresse) && r.lieuDeplace && r.lieuDeplace.carrier === 'vinted' && !r.lieuConflit, 'lecture « disponible » APRÈS l’e-mail, autre adresse ⇒ l’adresse du transporteur, « déplacé » dit', J(r));
+    const r2 = M.lieuCompleteParTransporteur(lu, { ...tr, etatAt: '2026-11-09T13:05:00Z' }, Date.parse('2026-11-10T09:00:00Z'));
+    dit(r2.lieuConflit && !r2.lieuDeplace && /13 Rue Exemple/.test(r2.lieuAdresse), 'lecture d’AVANT l’e-mail ⇒ rien n’est choisi, le désaccord est dit', J(r2));
+    const r3 = M.lieuCompleteParTransporteur(lu, tr, null);
+    dit(r3.lieuConflit && !r3.lieuDeplace, 'date de l’e-mail inconnue ⇒ rien n’est choisi', J(r3));
+    const carte = fs.readFileSync(path.join(R, 'src/CarteRelais.jsx'), 'utf8');
+    dit(/data-rp-deplace=/.test(carte) && /déplacé · selon/.test(carte), 'la ligne dit « déplacé · selon … à hh:mm »');
   });
 
   console.log('§G le branchement');

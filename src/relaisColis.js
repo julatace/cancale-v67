@@ -281,7 +281,11 @@ export function lieuTransporteurRepare(tr) {
   if (!m || !RUE.test(m[1].trim()) || PAYS_VILLE.test(m[3].trim())) return { ...tr, lieuVille: '' };   // un pays n'est jamais une ville
   return { ...tr, lieuRue: m[1].trim(), lieuCp: /^\d{5}$/.test(String(tr.lieuCp || '')) ? String(tr.lieuCp) : (m[2] || ''), lieuVille: m[3].trim() };
 }
-export function lieuCompleteParTransporteur(lu, tr) {
+// (11 nov., retraits fiables) `emailMs` : la date de l'e-mail qui a donné `lu`. Quand le transporteur dit le
+// colis DISPONIBLE à une AUTRE adresse, par un événement daté APRÈS cet e-mail, le plus récent PROUVÉ gagne :
+// son adresse, et `lieuDeplace` ({ carrier, at }) pour que l'écran le dise (« déplacé · selon … à 14:05 »).
+// Sans date des deux côtés : le conflit est dit, rien n'est choisi (comme avant).
+export function lieuCompleteParTransporteur(lu, tr, emailMs = null) {
   const base = { lieuNom: String((lu && lu.lieuNom) || ''), lieuAdresse: String((lu && lu.lieuAdresse) || '') };
   if (!tr || typeof tr !== 'object' || !['disponible', 'retire'].includes(tr.etat)) return base;
   tr = lieuTransporteurRepare(tr);
@@ -291,7 +295,11 @@ export function lieuCompleteParTransporteur(lu, tr) {
   if (!RUE.test(trRue) || (!trCp && trVille.length < 2)) return base;
   const e = decouperAdresse(base.lieuAdresse);
   const eRue = RUE.test(String(e.rue || '').trim()) ? String(e.rue).trim() : '';
-  const conflit = (quoi) => ({ ...base, lieuConflit: { quoi, email: [eRue, [e.cp, e.ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), transporteur: [trRue, [trCp, trVille].filter(Boolean).join(' ')].filter(Boolean).join(', '), carrier: String(tr.carrier || '') } });
+  const trAt = Date.parse(String(tr.etatAt || ''));
+  const plusRecent = tr.etat === 'disponible' && Number.isFinite(trAt) && Number.isFinite(emailMs) && trAt > emailMs;
+  const conflit = (quoi) => plusRecent
+    ? { lieuNom: String(tr.lieuNom || '') || base.lieuNom, lieuAdresse: `${trRue}, ${[trCp, trVille].filter(Boolean).join(' ')}`, lieuComplete: 'transporteur', lieuDeplace: { carrier: String(tr.carrier || ''), at: trAt, avant: base.lieuNom || base.lieuAdresse } }
+    : ({ ...base, lieuConflit: { quoi, email: [eRue, [e.cp, e.ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), transporteur: [trRue, [trCp, trVille].filter(Boolean).join(' ')].filter(Boolean).join(', '), carrier: String(tr.carrier || '') } });
   if (eRue && normRue(eRue) !== normRue(trRue)) return conflit('rue');
   if (e.cp && trCp && e.cp !== trCp) return conflit('cp');
   if (e.ville && trVille && normNomRelais(e.ville) !== normNomRelais(trVille)) return conflit('ville');
