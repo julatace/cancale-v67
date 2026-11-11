@@ -15651,7 +15651,9 @@ const typeImportFini = (t) => !!(t && t.fini);
 const importFini = (st) => !!(st && IMPORT_TYPES.every(([k]) => typeImportFini(st[k])));
 // Le point de départ d'UN type, d'après ce que la base porte déjà (scalaires).
 function departTypeImport(n, total) {
-  const nb = Number(n), tot = Number(total);
+  // `null` / '' (champ absent) n'est PAS 0 : « pas su » ne vaut jamais « complet ».
+  const num = (v) => (v === null || v === undefined || String(v).trim() === '' ? NaN : Number(v));
+  const nb = num(n), tot = num(total);
   if (Number.isFinite(nb) && Number.isFinite(tot) && tot >= 0 && nb >= tot && nb > 0) return { page: null, lus: tot, total: tot, pagesTotal: null, fini: true, deja: true };
   const page = Number.isFinite(nb) && nb >= IMPORT_PER_PAGE ? Math.max(1, Math.floor(nb / IMPORT_PER_PAGE)) : 1;
   return { page, lus: (page - 1) * IMPORT_PER_PAGE, total: Number.isFinite(tot) && tot > 0 ? tot : null, pagesTotal: null, fini: false };
