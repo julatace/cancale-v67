@@ -142,6 +142,8 @@ aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
 
 - **Agent principal (11 nov. ~17 h 45)** : **5.355.0 = intégration des 6 chantiers extension** (`claude/integration-extension`) ; **5.358.0 réservée** (agent principal) : outil « même photo sur deux comptes » (`claude/photos-comptes`). Nouveaux chantiers chez moi (validés par Julien) : `claude/photos-comptes`, `claude/sante-comptes` (score de santé de chaque compte Vinted), `claude/thermique` (bordereaux pour imprimante thermique, personnalisables). Second agent : ne pas y toucher.
 
+- **Agent principal (11 nov. ~17 h 50) — gros chantiers validés par Julien, chez moi, ne pas y toucher** : `claude/base-tables` (vraies tables à côté d'`app_data`, migrations 037+ écrites, jamais appliquées), `claude/decoupe-app` (découpe d'App.jsx par outil rejouable ; coupe finale plus tard : ⚠️ évite les gros changements d'App.jsx en fin de journée), `claude/publier-partout` (depuis l'annonce Vinted), `claude/hors-ligne` (toute l'app hors ligne, file d'écritures). Serveur du second agent (`agent2-robustesse-serveur` + relecture) : **EN LIGNE** (PR #1135).
+
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
