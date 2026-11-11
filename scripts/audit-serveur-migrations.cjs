@@ -61,6 +61,8 @@ if (process.argv.includes('--prouve')) {
       const p = path.join(t, f), src = fs.readFileSync(p, 'utf8');
       if (!src.includes(de)) { ancre = false; console.log(`❌ mutation « ${nom} » : ancre introuvable dans ${f}`); break; }
       fs.writeFileSync(p, src.replace(de, vers));
+      // Une mutation du SQL vaut aussi pour l'essai annulé (même corps) : seuls les contrôles de COMPORTEMENT peuvent la voir.
+      if (/042-ecritures-atomiques\.sql$/.test(f)) { const e = path.join(t, 'scripts/serveur-migrations-sql/essai-annule.sql'); fs.writeFileSync(e, fs.readFileSync(e, 'utf8').replace(de, vers)); }
     }
     if (ancre) {
       const r = spawnSync(process.execPath, [__filename], { env: { ...process.env, AUDIT_RACINE: t }, encoding: 'utf8', timeout: 300000 });
