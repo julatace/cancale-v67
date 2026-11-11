@@ -531,6 +531,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **11 nov. · Connexions Google/Discord (lot connexions-oauth, ext. 5.346)** : refus de Supabase traduits PAR CODE (`src/auth/erreursOAuth.js`, recopiée dans l'extension par `audit-connexions-oauth --recopie`) — jamais l'anglais, jamais « annulée » pour une adresse non vérifiée ; bon fournisseur nommé ; même adresse ⇒ Supabase relie, c'est dit ; Délier relit la fiche, dit l'e-mail qui change (`src/auth/delierOAuth.js`) ; l'extension n'adopte plus un compte que « Continuer avec … » vient de créer (annulé par le serveur). Banc `connexions-oauth` (P1–P13). Récit `2026-11-11-connexions-oauth.md`. Geste : Redirect URLs Supabase, redirect Google/Discord, installer 5.346.0.
 - **11 nov. · Pas que des sneakers (lot DJ2)** : 1re question « Tu vends quoi ? » (18 tuiles, Lunettes comprise, une fois, rien pré-coché) ; exemples, notes, placeholders, dessins (états vides, « Comment marche le Stock »), eBay (« Pointure » seulement pour Sneakers) suivent ce qu'il vend ; le N° « dit où est l'article » (plus « carton ») ; « Quel VRM te ressemble ? » en deux cartes. Sneakers seules = textes d'avant mot pour mot. `audit-vendeur-generaliste` (20 mutations), banc `vendeur-generaliste`. Récit : `2026-11-11-vendeur-generaliste.md`.
 - **11 nov. · Profil (lot DJ6)** : photo = téléversée > Discord/Google relié > initiale ; « Masquer mon nom » ; Paramètres n'est plus dans la navigation : la photo ouvre le menu du profil (Paramètres en tête, « g p », `?tab=settings`) ; « Relier Discord/Google » = LIAISON Supabase (`identities/authorize`), jamais un compte neuf ; « Continuer avec Discord » sans compte ⇒ compte vide annulé par le serveur et dit. Photo relue en projection (`si=`). Geste : « manual linking ». `docs/passation/2026-11-11-profil-photo.md`
 - **11 nov. · Facture Pro (lot DJ1)** : SIRET cherché à la VALIDATION (squelette, arrêt 8 s) ⇒ « C'est bien toi ? » (Oui écrit, Non rien ; RCS = ville du greffe recopiée du Kbis, jamais inventée ; EI « pas de RCS ») ; le statut choisi montre ses mentions ; factures Leboncoin/eBay/Vestiaire seulement sur un compte dit pro (`comptesFacture`, serveur 409) ; « Bon de retour » sur chaque vente Pro ; plus de pied VRM (Reply-To) ; e-mails Pro relus app ouverte (bouton manquant). `docs/passation/2026-11-11-facture-siret.md`. Geste : aucun.
@@ -542,12 +543,12 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.342.0** (11 nov.). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.346.0** (11 nov.). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l'extension **5.342.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l'extension **5.346.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
