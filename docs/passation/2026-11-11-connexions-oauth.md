@@ -213,3 +213,8 @@ données de sa capture) ; bancs `comptes-securite` et `agenda-appareil` mis à j
 l'écran regroupé : verts. (`comptes-securite` comptait aussi l'appel `verifier` de
 l'alerte comme un « Déconnecter » : corrigé dans le banc.) Captures regardées : bordure
 grise du lien « Se déconnecter partout » et résumé coupé à 390 vus et corrigés.
+
+## État final (après le dernier `git merge origin/main`)
+- `main` servait la 5.344 (import de départ) : la **5.346.0** contient la 5.344 + ce lot (conflits de version seulement) ; zips régénérés.
+- Banc `connexions-oauth` (P1–P15) : **110 verts, 0 échec**, 390 tactile + 1512, sur la compilation fusionnée.
+- `audit-coherence` : vert après `git fetch --unshallow` (le clone de session était superficiel ; `main` refuse désormais de conclure sur un tel clone).
