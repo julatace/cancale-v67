@@ -39,3 +39,5 @@
 /* Âge du stock : la tranche des 90 jours et plus en ambre (un geste à faire, §7) seulement si elle n'est pas vide. */
 .vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-piste > span[data-vieux] { background: var(--vrm-warn); }
 .vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-nom { white-space: nowrap; }
+.vrm-stats-vitrine .vrm-sv-ligne-taille.vrm-sp-age-ligne { grid-template-columns: 8.4em minmax(0, 1fr) max-content !important; column-gap: 12px; }
+.vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-nom { overflow: visible; text-overflow: clip; font-size: 14px; }

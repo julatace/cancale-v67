@@ -119,15 +119,15 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
           ? <PileVignettes className="vrm-fu-pile" srcs={pile.srcs} n={pile.n || 0} Photo={pile.Photo} mortes={pile.mortes} onMorte={pile.onMorte} data-fu-pile="" /> : null}
       </div>}
       {cases.length ? (
-        <CasesEnPages cases={cases}>{(liste) => liste.map((c) => {
+        <CasesEnPages cases={cases}>{(liste) => liste.map((c, i) => {
             if (c.raison) raisonsVues.current.add(c.cle);
             // (10 nov., lot P) Au lecteur d'écran : « Vendu · mois : 80 € » — le libellé AVANT le
             // chiffre, et « pas su » à la place d'un « — » muet (§5). Le dessin reste tel quel.
             const lu = `${texteDe(c.l)} : ${c.n == null ? 'pas su' : texteDe(c.n)}${c.raison ? ', ' + texteDe(c.raison) : ''}`;
             const corps = <><span className="vrm-sr-seul" data-fu-case-lu="">{lu}</span><b aria-hidden="true" className={c.n == null ? 'is-vide' : undefined} style={{ '--nc': Math.max(1, texteDe(c.n).length) }}>{c.n == null ? '—' : <ChiffreRoule valeur={c.n} />}</b><span aria-hidden="true">{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="" aria-hidden="true">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
             return c.onClick
-              ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
-              : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;
+              ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} style={placeEnPage(i, liste.length)} {...(c.attrs || {})}>{corps}</button>
+              : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} style={placeEnPage(i, liste.length)} {...(c.attrs || {})}>{corps}</div>;
           })}</CasesEnPages>
       ) : null}
       {children}
@@ -137,42 +137,41 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
 
 // ── PLUS DE TROIS CASES (11 nov., lot stats-plus) ───────────────────────────
 // Julien : « on a la possibilité d'avoir qu'une seule stat dans le carré bleu ».
-// Jusqu'à trois cases : la rangée d'avant, inchangée. Quatre : une grille 2×2.
-// Cinq ou six : au téléphone, des PAGES de quatre (2×2) qu'on fait glisser, avec
-// des points de pagination (boutons : « Page 2 sur 2 ») ; sur ordinateur, une
-// seule rangée (les pages s'effacent, `display: contents`). Le glissé reste dans
-// la carte (`data-noswipe` : il ne change pas d'onglet).
+// Jusqu'à trois cases : la rangée d'avant, inchangée. Plus de trois, au téléphone :
+// des PAGES de quatre (2×2) qu'on fait glisser, avec des points (« Page 2 sur 2 ») ;
+// sur ordinateur, la grille des widgets d'avant (aucun point). Les cases restent
+// les ENFANTS DIRECTS de `.vrm-fu-cases` (toutes les règles des widgets s'y
+// appliquent) : chacune porte sa place (`--pr` rangée, `--pc` colonne) que seule
+// la feuille de styles du téléphone lit (src/design/carte-pages.css). Le glissé
+// reste dans la carte (`data-noswipe` : il ne change pas d'onglet).
 export const PAR_PAGE = 4;
+export const placeEnPage = (i, n) => (n > 3 ? { '--pr': Math.floor((i % PAR_PAGE) / 2) + 1, '--pc': Math.floor(i / PAR_PAGE) * 2 + (i % 2) + 1 } : undefined);
 export function CasesEnPages({ cases, children }) {
   const n = cases.length;
   const rail = useRef(null);
   const [page, setPage] = React.useState(0);
   if (n <= 3) return <div className="vrm-fu-cases" style={{ '--n': n }}>{children(cases)}</div>;
-  const pages = [];
-  for (let i = 0; i < n; i += PAR_PAGE) pages.push(cases.slice(i, i + PAR_PAGE));
+  const nPages = Math.ceil(n / PAR_PAGE);
+  const pas = (el) => el.clientWidth + (parseFloat(getComputedStyle(el).columnGap) || 0);
   const surDefile = () => {
     const el = rail.current;
     if (!el || !el.clientWidth) return;
-    const p = Math.round(el.scrollLeft / el.clientWidth);
-    if (p !== page) setPage(Math.max(0, Math.min(pages.length - 1, p)));
+    const p = Math.max(0, Math.min(nPages - 1, Math.round(el.scrollLeft / pas(el))));
+    if (p !== page) setPage(p);
   };
-  const aller = (p) => { const el = rail.current; if (!el) return; setPage(p); try { el.scrollTo({ left: p * el.clientWidth, behavior: 'smooth' }); } catch (_) { el.scrollLeft = p * el.clientWidth; } };
+  const aller = (p) => { const el = rail.current; if (!el) return; setPage(p); const x = p * pas(el); try { el.scrollTo({ left: x, behavior: 'smooth' }); } catch (_) { el.scrollLeft = x; } };
   return (
-    <div className="vrm-fu-cases-pages" data-fu-pages={pages.length} data-fu-n={n} style={{ '--n': n }}>
-      <div ref={rail} className="vrm-fu-cases is-pages" data-noswipe="" onScroll={surDefile} style={{ '--n': n }}>
-        {pages.map((liste, i) => (
-          <div key={i} className="vrm-fu-page" data-fu-page={i} aria-label={pages.length > 1 ? `Chiffres, page ${i + 1} sur ${pages.length}` : undefined} role={pages.length > 1 ? 'group' : undefined}>
-            {children(liste)}
-          </div>
-        ))}
+    <>
+      <div ref={rail} className={'vrm-fu-cases is-pages' + (nPages > 1 ? ' a-pages' : '')} data-fu-pages={nPages} data-fu-n={n} data-noswipe="" onScroll={surDefile} style={{ '--n': n }}>
+        {children(cases)}
       </div>
-      {pages.length > 1 ? (
-        <div className="vrm-fu-points" data-fu-points="">
-          {pages.map((_, i) => (
-            <button key={i} type="button" className="vrm-fu-point" aria-current={i === page ? 'true' : undefined} aria-label={`Page ${i + 1} sur ${pages.length}`} data-fu-point={i} onClick={() => aller(i)}><span aria-hidden="true"/></button>
+      {nPages > 1 ? (
+        <div className="vrm-fu-points" data-fu-points="" role="group" aria-label="Pages des chiffres">
+          {Array.from({ length: nPages }, (_, i) => (
+            <button key={i} type="button" className="vrm-fu-point" aria-current={i === page ? 'true' : undefined} aria-label={`Page ${i + 1} sur ${nPages}`} data-fu-point={i} onClick={() => aller(i)}><span aria-hidden="true"/></button>
           ))}
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

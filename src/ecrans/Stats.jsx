@@ -1544,7 +1544,7 @@ function GraphiqueVenduRecu({ VR, lib, titre }) {
           const aria = `${lib(x)} : ${x.avenir ? 'pas encore commencé' : `vendu ${val(x.vendu, false)}, reçu ${val(x.recu, x.recuPartiel)}`}`;
           return (
             <button key={i} type="button" className="vrm-sp-vr-col" aria-label={aria} aria-pressed={i === i0} data-sp-vr-col={i}
-              onClick={() => setChoisi(i)} onFocus={() => setChoisi(i)} onMouseEnter={() => setChoisi(i)}>
+              onClick={() => setChoisi(i)} onFocus={() => setChoisi(i)} onPointerEnter={(e) => { if (e.pointerType === 'mouse') setChoisi(i); }}>
               <span className="vrm-sp-vr-zone" style={{ height: H }} aria-hidden="true">
                 {!x.avenir ? <span className="vrm-sp-vr-b is-vendu" style={{ height: `${h(x.vendu)}%` }}/> : null}
                 {!x.avenir ? <span className={'vrm-sp-vr-b is-recu' + (x.recu == null ? ' is-passu' : '')} style={{ height: x.recu == null ? '100%' : `${h(x.recu)}%` }}/> : null}
