@@ -111,7 +111,7 @@ async function principal() {
   for (const f of fichiers) {
     const src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
     if (!/from ['"][./]*(?:\.\.\/)*i18n\/index\.js['"]|from ['"]\.\/index\.js['"]/.test(src) && !/i18n[\\/]index\.js$/.test(f)) continue;
-    for (const m of src.matchAll(/\b(?:tr|t)\(\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) { nAppels++; if (!(m[1] in fr)) absentes.push(`${path.relative(R, f)} : ${m[1]}`); }
+    for (const m of src.matchAll(/\b(?:trj|tr|t)\(\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) { nAppels++; if (!(m[1] in fr)) absentes.push(`${path.relative(R, f)} : ${m[1]}`); }
     // tr(cond ? 'a' : 'b') : les deux branches
     for (const m of src.matchAll(/\btr\(\s*[^'()]*?\?\s*'([a-z][\w-]*(?:\.[\w-]+)+)'\s*:\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) for (const k of [m[1], m[2]]) { nAppels++; if (!(k in fr)) absentes.push(`${path.relative(R, f)} : ${k}`); }
   }

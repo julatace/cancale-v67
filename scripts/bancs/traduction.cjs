@@ -110,6 +110,18 @@ async function avecSession(nav, l, W, D, cles) {
   dit(attendus.every((a) => navTxt.some((t) => t.split('\n')[0] === a)), `${T} la navigation dit les noms du dictionnaire`, `${navTxt.slice(0, 10).join(' | ')} ⇐ ${attendus.join(' | ')}`);
   dit(!s.brutes.length, `${T} Ma journée : aucune clé brute`, s.brutes.join(', '));
   await capture(pg, `trad-${l}-${W}-journee`);
+  // (11 nov., lot 2) Les écrans migrés : chacun dit au moins une phrase de SON dictionnaire
+  // (dans la langue choisie), aucune clé brute, rien ne déborde à droite.
+  const ECRANS_MIGRES = (process.env.ECRANS || 'journee:journee,ventes:ventes,achats:achats,annonces:annonces').split(',').map((x) => x.split(':'));
+  for (const [tab, pref] of ECRANS_MIGRES) {
+    if (tab !== 'journee') { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {}); await attendre(2500); }
+    const phrases = Object.entries(D).filter(([k, v]) => k.startsWith(pref + '.') && typeof v === 'string' && v.replace(/\{\w+\}/g, '').trim().length >= 6).map(([, v]) => v.split(/\{\w+\}/).sort((a, b) => b.length - a.length)[0].trim()).filter((v) => v.length >= 6);
+    const r2 = await pg.evaluate(({ phrases, cles }) => { const t = (document.body.innerText || '').replace(/\s+/g, ' '); return { vues: phrases.filter((p) => t.includes(p.replace(/\s+/g, ' '))).slice(0, 5), brutes: [...new Set((t.match(/\b[a-z][\w-]*(?:\.[\w-]+){1,4}\b/g) || []).filter((m) => cles.includes(m)))], debord: document.documentElement.scrollWidth > innerWidth + 1 }; }, { phrases, cles });
+    dit(r2.vues.length >= 1, `${T} ${tab} : au moins une phrase de « ${pref}.* » dans la langue choisie`, JSON.stringify(r2.vues));
+    dit(!r2.brutes.length, `${T} ${tab} : aucune clé brute`, r2.brutes.join(', '));
+    dit(!r2.debord, `${T} ${tab} : rien ne déborde à droite`);
+    await capture(pg, `trad-${l}-${W}-${tab}`);
+  }
   // Le menu « Plus » (téléphone) / la colonne (ordinateur).
   if (o.tel) {
     const plus = pg.locator('.vrm-nav-more').first();

@@ -3,7 +3,9 @@ import ecran_journee from './es/journee.js';
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
 import ecran_achats from './es/achats.js';
+import ecran_annonces from './es/annonces.js';
 export default {
+  ...ecran_annonces,
   ...ecran_achats,
   ...ecran_commun,
   ...ecran_ventes,

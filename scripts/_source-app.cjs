@@ -124,10 +124,10 @@ function enFrancais(texte, racine) {
   const jsxSur = (v) => !/[{}<>]/.test(v);
   let out = '';
   let i = 0;
-  const re = /\btr\('([\w.-]+)'/g;
+  const re = /\b(trj?)\('([\w.-]+)'/g;
   let m;
   while ((m = re.exec(texte))) {
-    const k = m[1]; if (!(k in D)) continue;
+    const fn = m[1], k = m[2]; if (!(k in D)) continue;
     const debut = m.index; let j = re.lastIndex;
     let fin, vars = null;
     if (texte[j] === ')') fin = j + 1;
@@ -142,7 +142,9 @@ function enFrancais(texte, racine) {
     }
     const v = D[k];
     let rempl, a0 = debut, a1 = fin;
-    if (vars) rempl = '`' + v.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '${' + vars[n] + '}' : mm)) + '`';
+    // trj('k', { a: e }) — une phrase JSX : `{trj(…)}` redevient `texte {e} texte`, comme avant.
+    if (fn === 'trj' && vars && texte[debut - 1] === '{' && texte[fin] === '}' && jsxSur(v.replace(/\{\w+\}/g, ''))) { a0 = debut - 1; a1 = fin + 1; rempl = v.replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '{' + vars[n] + '}' : mm)); }
+    else if (vars) rempl = '`' + v.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '${' + vars[n] + '}' : mm)) + '`';
     else {
       const av = texte.slice(Math.max(0, debut - 40), debut), ap = texte.slice(fin, fin + 1);
       const attr = av.match(/([\w-]+)=\{$/);

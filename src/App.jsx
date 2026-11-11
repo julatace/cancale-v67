@@ -665,6 +665,7 @@ import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
+import { trj } from './i18n/react.js';
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -3564,14 +3565,14 @@ function FichesNeuves() {
     gesteCorbeille({ type: 'fiche', libelle: f.titre || '', numero: f.numero, morceaux: [{ k: 'vrm_fiches_neuves', type: 'champs', id: f.id, avant: { retireeAt: toutes[f.id].retireeAt }, apres: { retireeAt: new Date().toISOString() } }] }, {}, () => maj());
   };
   return (
-    <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label="À publier">
-      <h3>À publier</h3>
+    <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label={tr('annonces.publier')}>
+      <h3>{tr('annonces.publier')}</h3>
       {liste.map((f) => (
         <div key={f.id} className="vrm-ao-neuve" data-fiche-neuve-num={f.numero}>
           <span className="vrm-ao-neuve-num">N°{f.numero}</span>
-          <span className="vrm-ao-neuve-txt"><b>{f.titre || 'Sans titre'}</b><small>{[f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')}\u00a0€` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
-          <button type="button" className="vrm-ao-second" data-fiche-neuve-copier={f.numero} onClick={async () => { try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}>Copier</button>
-          <button type="button" className="vrm-ao-second" aria-label={`Retirer la fiche N°${f.numero}`} data-fiche-neuve-retirer={f.numero} onClick={() => retirer(f)}>×</button>
+          <span className="vrm-ao-neuve-txt"><b>{f.titre || tr('annonces.sansTitre')}</b><small>{[f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')}\u00a0€` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
+          <button type="button" className="vrm-ao-second" data-fiche-neuve-copier={f.numero} onClick={async () => { try { await navigator.clipboard.writeText(texteAColler(f)); toast(tr('annonces.texteCopie')); } catch (_) { toast(tr('annonces.copieImpossibleIci')); } }}>{tr('achats.copier2')}</button>
+          <button type="button" className="vrm-ao-second" aria-label={tr('annonces.retirerFiche', { numero: String(f.numero) })} data-fiche-neuve-retirer={f.numero} onClick={() => retirer(f)}>×</button>
         </div>
       ))}
     </section>
@@ -5541,11 +5542,11 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   // (10 nov., Julien : « ça n'a rien changé ») Des PASTILLES sans phrase ; la feuille dit UNE phrase (le fait +
   // le geste, 12 mots au plus) et replie le détail d'avant sous « Pourquoi ? ».
   const puces = [];
-  if (nSuppr > 0) puces.push({ texte: `${nSuppr} retirée${s} de Vinted` });
-  if (nAC > 0) puces.push({ texte: `${nAC} à confirmer`, ton: 'ambre' });
-  if (vieux.length === 1) puces.push({ texte: `Lu ${quandFr(Number(lues[vieux[0]]))}` });
-  else if (vieux.length > 1) puces.push({ texte: `${vieux.length} comptes à relire`, ton: relit ? undefined : 'ambre' });
-  if (pubKO) puces.push({ texte: 'Relecture pas lue', ton: 'ambre' });
+  if (nSuppr > 0) puces.push({ texte: tr('annonces.retireeVinted', { nSuppr: String(nSuppr), s: String(s) }) });
+  if (nAC > 0) puces.push({ texte: tr('annonces.confirmer', { nAC: String(nAC) }), ton: 'ambre' });
+  if (vieux.length === 1) puces.push({ texte: tr('annonces.lu', { quandFr: String(quandFr(Number(lues[vieux[0]]))) }) });
+  else if (vieux.length > 1) puces.push({ texte: tr('annonces.comptesRelire', { vieuxN: String(vieux.length) }), ton: relit ? undefined : 'ambre' });
+  if (pubKO) puces.push({ texte: tr('annonces.relectureLue'), ton: 'ambre' });
   const ambre = nAC > 0 || pubKO || (!!geste && !relit);
   const unCompte = aRelire.length === 1 ? nom(aRelire[0]) : '';
   const phrase = pubKO ? 'Relecture de tes comptes pas lue : rien n’est retiré.'
@@ -5553,36 +5554,36 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
     : aRelire.length ? (relit ? 'Relues à ta prochaine visite sur Vinted.' : `Ouvre Vinted sur ${unCompte || 'chaque compte'} pour les relire.`)
     : `${nSuppr} annonce${s} retirée${s} de Vinted, enlevée${s} d’ici.`;
   return (
-    <InfoPop nom="fraicheur-annonces" titre="Tes annonces Vinted" ton={ambre ? 'ambre' : 'neutre'} puces={puces} phrase={phrase}
+    <InfoPop nom="fraicheur-annonces" titre={tr('annonces.annoncesVinted')} ton={ambre ? 'ambre' : 'neutre'} puces={puces} phrase={phrase}
       style={{ ...(style || {}) }}
       attrs={{ [attr]: '', 'data-vieux': vieux.join(','), 'data-supprimees': nSuppr, 'data-cap': cap, 'data-cap-suppr': capS,
         'data-promesse': promet ? '1' : '0', 'data-ailleurs': ailleurs ? '1' : '0', 'data-relit': relit ? '1' : '0', 'data-perime': perime ? '1' : '0', 'data-pub-ko': pubKO ? '1' : '0',
         'data-a-confirmer': nAC, 'data-a-confirmer-comptes': uidsAC.join(',') }}>
     <div data-fraicheur-detail={attr} style={{ fontSize: 15, color: C.text, lineHeight: 1.5 }}>
       {pubKO && <span data-pub-ko-dit>{lecturesPubliquesKO() === 'cache'
-        ? "La dernière relecture de tes autres comptes n'a pas pu être relue (la base n'a pas répondu) : on garde celle d'avant. "
-        : "Les relectures de tes autres comptes n'ont pas pu être lues (la base n'a pas répondu) : ce qui n'est plus sûr est « à confirmer », rien n'est retiré. "}</span>}
-      {nSuppr > 0 && <span data-suppr-dit>{nSuppr} annonce{s} plus en ligne sur Vinted (supprimée{s} ou retirée{s}) : enlevée{s} d'ici automatiquement. </span>}
+        ? tr('annonces.derniereRelectureAutres')
+        : tr('annonces.relecturesAutresComptes')}</span>}
+      {nSuppr > 0 && <span data-suppr-dit>{trj('annonces.annoncePlusLigne', { nSuppr: nSuppr, s: s })}</span>}
       {nAC > 0 && <span data-a-confirmer-dit>
         <button type="button" data-a-confirmer-ouvrir aria-expanded={ouvert} onClick={() => setOuvert((o) => !o)}
           className="vrm-lien-action" style={{ border: 'none', background: 'transparent', padding: 0, font: 'inherit', color: C.text, fontWeight: 600, cursor: 'pointer', textAlign: 'left', minHeight: 0 }}>
-          {ouvert ? '▾' : '▸'} {nAC} annonce{sAC}{uidsAC.length === 1 ? ` de ${nom(uidsAC[0])}` : ''} à confirmer
+          {ouvert ? '▾' : '▸'} {nAC} {tr('annonces.annonce')}{sAC}{uidsAC.length === 1 ? tr('annonces.texte', { nom: String(nom(uidsAC[0])) }) : ''} {tr('annonces.confirmer2')}
         </button>
         {' '}— {uidsAC.length === 1
           ? ageAC(uidsAC[0])
           : uidsAC.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> ({parC[u].length}, {ageAC(u)})</React.Fragment>)}
-        {' '}: {nAC > 1 ? 'elles ne sont' : "elle n'est"} pas comptée{sAC} en ligne, et rien n'est supprimé.{' '}
+        {' '}: {nAC > 1 ? tr('annonces.ellesSont') : tr('annonces.texte2')} {tr('annonces.comptee')}{sAC} {tr('annonces.ligneRienSupprime')}{' '}
       </span>}
       {vieux.length > 0 && <span data-vieux-dit>
         {vieux.length === 1
-          ? <><b style={{ color: C.text }}>{nom(vieux[0])}</b> : annonces lues {quandFr(Number(lues[vieux[0]]))}</>
-          : <>Annonces lues : {vieux.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> {quandFr(Number(lues[u]))}</React.Fragment>)}</>}
-        {' '}— ce que tu as supprimé ou mis en ligne depuis n'y est pas{nSuppr > 0 ? ' (hors celles enlevées ci-dessus)' : ''}.{' '}
+          ? <><b style={{ color: C.text }}>{nom(vieux[0])}</b> {tr('annonces.annoncesLues')} {quandFr(Number(lues[vieux[0]]))}</>
+          : <>{tr('annonces.annoncesLues2')} {vieux.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> {quandFr(Number(lues[u]))}</React.Fragment>)}</>}
+        {' '}{tr('annonces.asSupprimeMis')}{nSuppr > 0 ? tr('annonces.horsCellesEnlevees') : ''}.{' '}
       </span>}
       {geste && <span data-geste-dit>
         {geste}
-        {promet && ` Une suppression faite sur vinted.fr ${NAV.dans} sort d’ici tout de suite — recharge d’abord les onglets Vinted ouverts avant la dernière mise à jour de l’extension.`}
-        {plusieurs && ` Deux extensions VRM répondent ${NAV.dans} : tant qu’il en reste deux, une suppression peut ne pas être vue.`}
+        {promet && tr('annonces.suppressionFaiteVinted', { dans: String(NAV.dans) })}
+        {plusieurs && tr('annonces.deuxExtensionsVrm', { dans: String(NAV.dans) })}
       </span>}
       {ouvert && nAC > 0 && (
         <div data-a-confirmer-liste style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
@@ -5595,7 +5596,7 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
               <span style={{ flex: '0 0 auto' }}>{nom(String((it._acc && it._acc.vinted_user_id) || ''))}</span>
             </div>
           ))}
-          {ac.length > 40 && <div style={{ paddingTop: 4 }}>… et {ac.length - 40} autre{ac.length - 40 > 1 ? 's' : ''}.</div>}
+          {ac.length > 40 && <div style={{ paddingTop: 4 }}>{trj('annonces.autres', { n: ac.length - 40 })}</div>}
         </div>
       )}
     </div>
@@ -13536,7 +13537,7 @@ function JaugeEtat({ statut, lib }) {
       <span className="vrm-fiche-etat-haut">
         {lib}
         {niv ? (
-          <span className="vrm-fiche-jauge" role="img" aria-label={`État ${niv} sur ${NIVEAU_ETAT_MAX}`} title={`${e.libelle} — ${niv} sur ${NIVEAU_ETAT_MAX}`}>
+          <span className="vrm-fiche-jauge" role="img" aria-label={tr('annonces.etat', { niv: String(niv), NIVEAU_ETAT_MAX: String(NIVEAU_ETAT_MAX) })} title={tr('annonces.texte3', { libelle: String(e.libelle), niv: String(niv), NIVEAU_ETAT_MAX: String(NIVEAU_ETAT_MAX) })}>
             {Array.from({ length: NIVEAU_ETAT_MAX }, (_, i) => (
               <span key={i} className={i < niv ? 'plein' : ''} style={{ height: 5 + i * 2.5, background: i < niv ? C.text : C.border }}/>
             ))}
@@ -13559,7 +13560,7 @@ function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64,
     // (revue du 19 oct.) La zone au doigt fait 44 px de LARGE aussi : sur
     // « achat — » elle faisait 10 px (le tiret), 25 px sur « N°2 ». Le
     // pointillé reste sous le texte seul (le span), pas sous la zone.
-    <button type="button" data-edition={data} onClick={() => setEdit(true)} title={titre || 'Cliquer pour modifier'}
+    <button type="button" data-edition={data} onClick={() => setEdit(true)} title={titre || tr('annonces.cliquerModifier')}
       style={{border:'none',background:'transparent',padding:0,minHeight:0,minWidth:44,margin:0,color:'inherit',font:'inherit',cursor:'text',lineHeight:'inherit',textAlign:'inherit'}}><span style={{borderBottom:`1px dashed ${C.border}`}}>{rendu}</span></button>
   );
 }
@@ -13979,7 +13980,7 @@ const MARQUES_PLAT = {
 };
 function MarquePlateforme({ p, taille = 18 }) {
   const m = MARQUES_PLAT[p]; if (!m) return null;
-  return <span data-marque={p} title={`En ligne sur ${m.nom}`} aria-label={`En ligne sur ${m.nom}`}
+  return <span data-marque={p} title={tr('annonces.ligne', { nom: String(m.nom) })} aria-label={tr('annonces.ligne', { nom: String(m.nom) })}
     style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:taille,height:taille,padding:'0 4px',borderRadius:6,
       background:m.bg,color:m.fg,border:`1px solid ${m.bord||m.bg}`,fontSize:Math.round(taille*0.5),fontWeight:800,letterSpacing:-0.2,lineHeight:1,flexShrink:0}}>{m.court}</span>;
 }
@@ -14584,18 +14585,18 @@ function CompteRenduOperation({ onReprendre, onRefaire }) {
   const resume = [faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''}` : null, enCours.length ? `${enCours.length} en cours` : null, ratees.length ? `${ratees.length} pas faite${ratees.length > 1 ? 's' : ''}` : null, restent.length ? `${restent.length} pas commencée${restent.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ');
   return (
     <div data-compte-rendu={j.action} style={{ border: `1px solid ${C.warn}`, borderRadius: 12, padding: '12px 14px', margin: '10px 0', background: C.card, fontSize: 13, color: C.text, lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ fontWeight: 700 }}>« {A.titre} » s’est arrêtée{j.majAt ? ` (${quand(j.majAt)})` : ''} <Pourquoi label="Pourquoi ?">L’app a été fermée pendant l’opération.</Pourquoi></div>
+      <div style={{ fontWeight: 700 }}>« {A.titre} {tr('annonces.arretee')}{j.majAt ? ` (${quand(j.majAt)})` : ''} <Pourquoi label={tr('annonces.pourquoi')}>{tr('annonces.appEteFermee')}</Pourquoi></div>
       <div style={{ color: C.muted }}>{resume}</div>
-      {enCours.map((p) => <div key={p.id} data-cr-encours={p.id}>En cours à l’arrêt : <b>{nom(p)}</b>{p.etape ? ` — « ${etapeNom(p.etape) || p.etape} »` : ''}. Regarde ton dressing Vinted{onRefaire ? <>, ou <button type="button" style={lien} onClick={onRefaire}>Brouillons à refaire</button></> : ''}.</div>)}
+      {enCours.map((p) => <div key={p.id} data-cr-encours={p.id}>{tr('annonces.coursArret')} <b>{nom(p)}</b>{p.etape ? ` — « ${etapeNom(p.etape) || p.etape} »` : ''}{tr('annonces.regardeDressingVinted')}{onRefaire ? <>{tr('annonces.texte4')} <button type="button" style={lien} onClick={onRefaire}>{tr('annonces.brouillonsRefaire2')}</button></> : ''}.</div>)}
       <details className="vrm-repli">
-        <summary style={{ display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Voir le détail</summary>
-        <div data-cr-faits={faits.length}>{faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''} : ${faits.map(nom).join(', ')}.` : `Aucune annonce ${A.faits} avant l’arrêt.`}</div>
-        {ratees.length > 0 && <div data-cr-ratees={ratees.length}>Pas faites : {ratees.map((p) => `${nom(p)}${p.raison ? ` (${String(p.raison).slice(0, 90)})` : ''}`).join(' · ')}.</div>}
-        <div data-cr-restent={restent.length}>{restent.length ? `Pas commencées : ${restent.map(nom).join(', ')}.` : 'Toutes les annonces choisies avaient commencé.'}</div>
+        <summary style={{ display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{tr('annonces.voirDetail')}</summary>
+        <div data-cr-faits={faits.length}>{faits.length ? `${faits.length} ${A.faits}${faits.length > 1 ? 's' : ''} : ${faits.map(nom).join(', ')}.` : tr('annonces.aucuneAnnonceAvant', { faits: String(A.faits) })}</div>
+        {ratees.length > 0 && <div data-cr-ratees={ratees.length}>{tr('annonces.faites')} {ratees.map((p) => `${nom(p)}${p.raison ? ` (${String(p.raison).slice(0, 90)})` : ''}`).join(' · ')}.</div>}
+        <div data-cr-restent={restent.length}>{restent.length ? tr('annonces.commencees', { x: String(restent.map(nom).join(', ')) }) : tr('annonces.toutesAnnoncesChoisies')}</div>
       </details>
       <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}>
-        {restent.length > 0 && onReprendre && <Bouton data-cr-reprendre onClick={() => onReprendre(j.action, restent.map((p) => p.id))} style={{ minHeight: 44 }}>Reprendre les {restent.length} pas commencée{restent.length > 1 ? 's' : ''}</Bouton>}
-        <Bouton variante="discret" data-cr-effacer onClick={() => ecrireJournalRepub(null)}>J’ai vu, effacer</Bouton>
+        {restent.length > 0 && onReprendre && <Bouton data-cr-reprendre onClick={() => onReprendre(j.action, restent.map((p) => p.id))} style={{ minHeight: 44 }}>{trj('annonces.reprendreCommencees', { n: restent.length })}</Bouton>}
+        <Bouton variante="discret" data-cr-effacer onClick={() => ecrireJournalRepub(null)}>{tr('annonces.aiVuEffacer')}</Bouton>
       </div>
     </div>
   );
@@ -14703,31 +14704,31 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
           rien ne part d'ici), rendu attirant — trois gestes prêts, le N° qui suit la paire. */}
       {rep && <div className="vrm-kit-conseil vrm-kit-conseil-vue" data-republier-conseil="main">
         <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
-        <div><b>À la main : conseillé, le moins risqué.</b><span>Photos dans ta galerie, N° et description à copier.</span></div>
+        <div><b>{tr('annonces.mainConseilleMoins')}</b><span>{tr('annonces.photosDansGalerie')}</span></div>
       </div>}
       {suivis.length > 0 && suivis.map((s) => (
         <div key={s.ancienId} data-suivi-main={s.ancienId} data-suivi-main-etat={s._etat} className="vrm-act-paire">
-          <span className="vrm-act-paire-nom">{s.num ? <Numero n={s.num} taille="petit"/> : null}<b>{s.titre || 'Annonce'}</b></span>
-          <span>Republiée à la main : {s._etat === 'lie' ? 'nouvelle annonce désignée ; le N° passe dessus dès que l’ancienne n’est plus du tout sur Vinted.' : 'choisis la nouvelle annonce pour lui remettre son N°.'}</span>
-          <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>Reprendre</Bouton></div>
+          <span className="vrm-act-paire-nom">{s.num ? <Numero n={s.num} taille="petit"/> : null}<b>{s.titre || tr('annonces.annonce2')}</b></span>
+          <span>{tr('annonces.republieeMain')} {s._etat === 'lie' ? tr('annonces.nouvelleAnnonceDesignee') : tr('annonces.choisisNouvelleAnnonce')}</span>
+          <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>{tr('annonces.reprendre')}</Bouton></div>
         </div>
       ))}
       <div className="vrm-sel-tete" data-sel-tete="">
         {/* (10 nov., lot AI) La consigne RÉÉCRITE en une phrase courte, sans pop-up (le geste suffit) ;
             sur la vue « Republier » (navigation fusionnée) : c'est toujours lui qui choisit et lance. */}
-        <span data-sel-consigne="" style={{ minWidth: 0, flex: '1 1 auto' }}>{rep ? <>Coche des annonces, puis choisis <b>À la main</b> ou <b>Par VRM</b>.</> : filtre === 'brouillon' ? <>Coche tes brouillons, puis <b>Actions</b>.</> : <>Coche des annonces d’un compte, puis <b>Actions</b>.</>}</span>
+        <span data-sel-consigne="" style={{ minWidth: 0, flex: '1 1 auto' }}>{rep ? <>{tr('annonces.cocheAnnoncesPuis')} <b>{tr('annonces.main2')}</b> {tr('annonces.texte5')} <b>{tr('annonces.vrm2')}</b>.</> : filtre === 'brouillon' ? <>{tr('annonces.cocheBrouillonsPuis')} <b>{tr('ventes.actions')}</b>.</> : <>{tr('annonces.cocheAnnoncesCompte')} <b>{tr('ventes.actions')}</b>.</>}</span>
         {/* (11 nov., lot DJ8) Un seul compte : son « Tout décocher » suffit (le même geste ne s'écrit pas deux fois). */}
-        {nCoches > 0 && groupes.length !== 1 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
-        {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>Un par un</Bouton> : null}
+        {nCoches > 0 && groupes.length !== 1 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>{tr('annonces.toutDecocher')}</Bouton>}
+        {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>{tr('annonces.texte6')}</Bouton> : null}
       </div>
       {charge ? <div className="vrm-sel-vide" data-selection-charge="">{PAS_SU.enCours}</div>
-        : !liste.length ? <div className="vrm-sel-vide" data-selection-vide="">{filtre === 'brouillon' ? (brLecture ? PAS_SU.enCours : 'Aucun brouillon lu dans tes dressings Vinted. Un brouillon enregistré sur vinted.fr apparaît ici à ta prochaine visite.') : 'Aucune annonce lue. Ouvre vinted.fr sur ton compte : tes annonces arrivent ici.'}</div>
+        : !liste.length ? <div className="vrm-sel-vide" data-selection-vide="">{filtre === 'brouillon' ? (brLecture ? PAS_SU.enCours : tr('annonces.aucunBrouillonLu')) : tr('annonces.aucuneAnnonceLue')}</div>
         : groupes.map((g) => (
           <div key={g.uid || 'x'} className="vrm-sel-groupe" data-selection-compte={g.uid} data-selection-compte-n={g.items.length}>
-            <div className="vrm-sel-compte"><b>{g.compte}</b><span className="vrm-sel-n">{g.items.length} annonce{g.items.length > 1 ? 's' : ''}</span>
+            <div className="vrm-sel-compte"><b>{g.compte}</b><span className="vrm-sel-n">{trj('annonces.annonces', { n: g.items.length })}</span>
               {g.items.some((a) => !a.raisonPas) && (toutCocheG(g)
-                ? <Bouton variante="discret" data-selection-compte-decocher={g.uid} onClick={() => decocherG(g)}>Tout décocher</Bouton>
-                : <Bouton variante="discret" data-selection-compte-cocher={g.uid} onClick={() => cocherTout(g)}>Tout cocher</Bouton>)}
+                ? <Bouton variante="discret" data-selection-compte-decocher={g.uid} onClick={() => decocherG(g)}>{tr('annonces.toutDecocher')}</Bouton>
+                : <Bouton variante="discret" data-selection-compte-cocher={g.uid} onClick={() => cocherTout(g)}>{tr('annonces.toutCocher')}</Bouton>)}
             </div>
             <ul className="vrm-sel-liste">
               {g.items.map((a) => { const on = coches.has(cle(a)); const off = !!a.raisonPas; return (
@@ -14736,7 +14737,7 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
                     <input type="checkbox" className="vrm-sel-case" checked={on} disabled={off} onChange={() => basculer(a)} aria-label={`Sélectionner ${a.titre || 'cette annonce'}`}/>
                     {a.photo ? <PhotoVinted src={a.photo} alt="" className="vrm-sel-photo" loading="lazy"/> : <PhotoVide taille={52} className="vrm-sel-photo"/>}
                     <span className="vrm-sel-centre">
-                      <span className="vrm-sel-nom">{a.numero ? <Numero n={a.numero} taille="petit" className="vrm-sel-num"/> : null}<span className="vrm-sel-titre">{a.titre || 'Sans titre'}</span></span>
+                      <span className="vrm-sel-nom">{a.numero ? <Numero n={a.numero} taille="petit" className="vrm-sel-num"/> : null}<span className="vrm-sel-titre">{a.titre || tr('annonces.sansTitre')}</span></span>
                       <span className="vrm-sel-sous"><span className="vrm-sel-etat" data-etat-annonce={a.etat}>{ETATS_ANNONCE[a.etat] || a.etat}</span><span className="vrm-sel-prix">{prixTxt(a.prix)}</span></span>
                       {off && <span className="vrm-sel-raison" data-selection-raison="">{a.raisonPas}</span>}
                     </span>
@@ -14748,10 +14749,10 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
         ))}
       {rep
         ? (aRepublier.length > 0 && <div className="vrm-sel-barre vrm-sel-barre-deux">
-            <Bouton variante="secondaire" data-republier-lancer={aRepublier.length} onClick={() => onRepublier && onRepublier(aRepublier)}>Par VRM · {aRepublier.length}</Bouton>
-            <Bouton variante="primaire" icone="shield" data-republier-main-lancer={aRepublier.length} onClick={() => onALaMain && onALaMain(aRepublier)}>À la main · {aRepublier.length}</Bouton>
+            <Bouton variante="secondaire" data-republier-lancer={aRepublier.length} onClick={() => onRepublier && onRepublier(aRepublier)}>{trj('annonces.vrm', { aRepublierN: aRepublier.length })}</Bouton>
+            <Bouton variante="primaire" icone="shield" data-republier-main-lancer={aRepublier.length} onClick={() => onALaMain && onALaMain(aRepublier)}>{trj('annonces.main', { aRepublierN: aRepublier.length })}</Bouton>
           </div>)
-        : (nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>Actions · {nCoches}</Bouton></div>)}
+        : (nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>{trj('annonces.actions', { nCoches: nCoches })}</Bouton></div>)}
     </section>
   );
 }
@@ -14896,13 +14897,13 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
     return { ...x, sugg, texte: texteSuggestion(sugg, p) };
   }) : null), [file, achats, liens, propositionDe]);
   if (lignes == null) return <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>;
-  if (!lignes.length) return <div className="vrm-ar-vide" data-ar-etat="vide">Chaque annonce numérotée a son achat relié ou son prix d’achat.</div>;
+  if (!lignes.length) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
   const nSugg = lignes.filter((l) => l.sugg).length;
   const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
   return (
-    <section className="vrm-ar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label="Annonces sans achat relié">
-      <p className="vrm-ar-tete">{achats === undefined ? `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${PAS_SU.enCours.toLowerCase()}` : `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${nSugg} avec une suggestion`}{achats !== undefined && nSugg < lignes.length ? <span> · une suggestion : même marque, même taille, achetée avant la mise en ligne</span> : null}</p>
-      {onSerie ? <div className="vrm-ar-serie"><Bouton variante="secondaire" icone="pencil" data-ar-serie="" onClick={onSerie}>Saisie en série des prix d’achat</Bouton></div> : null}
+    <section className="vrm-ar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label={tr('annonces.annoncesSansAchat')}>
+      <p className="vrm-ar-tete">{achats === undefined ? tr('annonces.annonces3', { n: String(lignes.length), toLowerCase: String(PAS_SU.enCours.toLowerCase()) }) : tr('annonces.annoncesAvecSuggestion', { n: String(lignes.length), nSugg: String(nSugg) })}{achats !== undefined && nSugg < lignes.length ? <span> {tr('annonces.suggestionMemeMarque')}</span> : null}</p>
+      {onSerie ? <div className="vrm-ar-serie"><Bouton variante="secondaire" icone="pencil" data-ar-serie="" onClick={onSerie}>{tr('annonces.saisieSeriePrix')}</Bouton></div> : null}
       <ul className="vrm-ar-liste">
         {lignes.map((l) => {
           const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
@@ -14912,24 +14913,24 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
             <li key={l.id} className="vrm-ar-ligne" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''}>
               <div className="vrm-ar-annonce">
                 {it.photo ? <PhotoVinted src={it.photo} alt="" className="vrm-ar-photo" loading="lazy"/> : <PhotoVide taille={48}/>}
-                <span className="vrm-ar-centre"><span className="vrm-ar-nom">{num ? <Numero n={num} taille="petit"/> : null}<span className="vrm-ar-titre">{it.title || 'Sans titre'}</span></span>
+                <span className="vrm-ar-centre"><span className="vrm-ar-nom">{num ? <Numero n={num} taille="petit"/> : null}<span className="vrm-ar-titre">{it.title || tr('annonces.sansTitre')}</span></span>
                   {/* (6 nov., finitions) La date de SON « Plus tard » est dite ; au bout de 7 jours l'annonce revient. */}
                   <span className="vrm-ar-sous">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}</span></span>
               </div>
               {l.sugg ? (
                 <div className="vrm-ar-sugg" data-ar-rang={l.sugg.rang}>
                   {orderPhoto(l.sugg.achat) ? <PhotoVinted src={orderPhoto(l.sugg.achat)} alt="" className="vrm-ar-photo-achat" loading="lazy"/> : <PhotoVide taille={36}/>}
-                  <span className="vrm-ar-centre"><span className="vrm-ar-titre">{t.titre || 'Achat sans titre'}</span>
+                  <span className="vrm-ar-centre"><span className="vrm-ar-titre">{t.titre || tr('annonces.achatSansTitre')}</span>
                     <span className="vrm-ar-sous">{[jour(t.date), compteDe(l.sugg.achat), t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? (t.proposition.source === 'recu' ? 'prix du reçu' : 'article seul') : (t.prixLu != null ? `payé ${montant(t.prixLu)}` : '')].filter(Boolean).join(' · ')}</span></span>
                 </div>
-              ) : <div className="vrm-ar-sans" data-ar-sans-sugg="">{achats === undefined ? PAS_SU.enCours : 'Aucune suggestion'}</div>}
+              ) : <div className="vrm-ar-sans" data-ar-sans-sugg="">{achats === undefined ? PAS_SU.enCours : tr('annonces.aucuneSuggestion')}</div>}
               <div className="vrm-ar-gestes">
                 {l.sugg ? <Bouton variante="secondaire" icone="link" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}>{relierTxt}</Bouton>
-                  : <Bouton variante="secondaire" icone="link" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}>Choisir un achat</Bouton>}
+                  : <Bouton variante="secondaire" icone="link" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}>{tr('annonces.choisirAchat')}</Bouton>}
                 {/* (11 nov., lot DJ5) La suggestion n'est qu'une proposition : un AUTRE achat se choisit ici. */}
-                {l.sugg ? <Bouton variante="discret" icone="search" data-ar-autre={String(l.sugg.achat.transaction_id)} onClick={() => onChoisir(it, l.sugg.achat)}>Autre achat</Bouton> : null}
-                <Bouton variante="discret" icone="pencil" data-ar-saisir="" onClick={() => onSaisir(it)}>Saisir</Bouton>
-                {!l.plusTard ? <Bouton variante="discret" data-ar-plus-tard-geste="" onClick={() => onPlusTard(l.id)}>Plus tard</Bouton> : null}
+                {l.sugg ? <Bouton variante="discret" icone="search" data-ar-autre={String(l.sugg.achat.transaction_id)} onClick={() => onChoisir(it, l.sugg.achat)}>{tr('annonces.autreAchat')}</Bouton> : null}
+                <Bouton variante="discret" icone="pencil" data-ar-saisir="" onClick={() => onSaisir(it)}>{tr('annonces.saisir')}</Bouton>
+                {!l.plusTard ? <Bouton variante="discret" data-ar-plus-tard-geste="" onClick={() => onPlusTard(l.id)}>{tr('annonces.plusTard')}</Bouton> : null}
               </div>
             </li>
           );
@@ -23121,11 +23122,11 @@ function BlocBarrerVc({ titres = {} }) {
   const vcLoc = useVcLocal();
   const liste = numerosABarrer(vcLoc.liens);
   if (!liste.length) return null;
-  return <section className="vrm-lvc-barrer" data-vc-a-barrer={liste.length} aria-label="N° à barrer">
-    <h3>{liste.length > 1 ? `${liste.length} N° à barrer` : 'Un N° à barrer'}</h3>
+  return <section className="vrm-lvc-barrer" data-vc-a-barrer={liste.length} aria-label={tr('annonces.barrer')}>
+    <h3>{liste.length > 1 ? tr('annonces.barrer2', { listeN: String(liste.length) }) : tr('annonces.barrer3')}</h3>
     {liste.map((x) => <div key={x.productId} className="vrm-lvc-barrer-ligne" data-vc-barrer={x.productId} data-vc-barrer-de={x.de} data-vc-barrer-vers={x.vers}>
       <span><s>N°{x.de}</s> → <b>N°{x.vers}</b>{titres[x.productId] ? ` · ${String(titres[x.productId]).slice(0, 48)}` : ''}</span>
-      <button type="button" className="vrm-lvc-geste" data-vc-barre={x.productId} onClick={() => { const e = lienDe(vcCarte('vrm_vc_liens'), x.productId); if (e) gesteVrm(`N°${x.de} barré`, [{ k: 'vrm_vc_liens', type: 'champs', id: String(x.productId), apres: { ecrit: new Date().toISOString() }, avant: { ecrit: e.ecrit } }], { vrm_vc_liens: vcSetter('vrm_vc_liens') }); }}>C'est écrit</button>
+      <button type="button" className="vrm-lvc-geste" data-vc-barre={x.productId} onClick={() => { const e = lienDe(vcCarte('vrm_vc_liens'), x.productId); if (e) gesteVrm(`N°${x.de} barré`, [{ k: 'vrm_vc_liens', type: 'champs', id: String(x.productId), apres: { ecrit: new Date().toISOString() }, avant: { ecrit: e.ecrit } }], { vrm_vc_liens: vcSetter('vrm_vc_liens') }); }}>{tr('annonces.ecrit')}</button>
     </div>)}
   </section>;
 }
@@ -23173,8 +23174,8 @@ function LienVcOuvert({ cible, comptes, onFermer }) {
 function GesteLienVcVinted({ it, num, style }) {
   const vcLoc = useVcLocal();
   const pid = produitDeVinted(vcLoc.liens, it && it.id);
-  if (pid) return <button type="button" className="vrm-fiche-geste" data-annonce-delier-vc={String(it.id)} data-lien-vc-produit={pid} onClick={() => defaireVc(pid)} style={style}>Délier Vestiaire</button>;
-  return <button type="button" className="vrm-fiche-geste" data-annonce-relier-vc={String(it.id)} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vinted', id: String(it.id), num: String(num), titre: it.title || '', photo: typeof it.photo === 'string' ? it.photo : (it.photo && typeof it.photo.url === 'string' ? it.photo.url : ''), marque: it.brand || it.brand_title || '', taille: it.size || it.size_title || '', couleur: '' } })); } catch (_) {} }} style={style}>Relier à Vestiaire</button>;
+  if (pid) return <button type="button" className="vrm-fiche-geste" data-annonce-delier-vc={String(it.id)} data-lien-vc-produit={pid} onClick={() => defaireVc(pid)} style={style}>{tr('annonces.delierVestiaire')}</button>;
+  return <button type="button" className="vrm-fiche-geste" data-annonce-relier-vc={String(it.id)} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vinted', id: String(it.id), num: String(num), titre: it.title || '', photo: typeof it.photo === 'string' ? it.photo : (it.photo && typeof it.photo.url === 'string' ? it.photo.url : ''), marque: it.brand || it.brand_title || '', taille: it.size || it.size_title || '', couleur: '' } })); } catch (_) {} }} style={style}>{tr('annonces.relierVestiaire')}</button>;
 }
 function HoteLienVc({ comptes }) {
   const [cible, setCible] = React.useState(null);
@@ -45599,15 +45600,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         {/* (26 oct., « trop brouillon ») Dans l'espace Vinted, l'onglet « Annonces »
             dit déjà où l'on est : pas de second titre. */}
-        {!dansPlateforme && <ScreenHead icon="vitrine" title="Annonces en ligne" />}
+        {!dansPlateforme && <ScreenHead icon="vitrine" title={tr('annonces.annoncesLigne')} />}
         <NoAcc/>
         {/* (2 nov.) Sans compte Vinted, rien à compléter : « 0 à relire sur Vinted » n'était qu'un zéro de plus. */}
         {/* (3 nov., critique #7) « Annonces à compléter » et « Offres automatiques » vivent dans « Outils » (…). */}
         {false && astuceNum && listings.items?.length>0 && (
           <div data-astuce-numeros style={{display:'flex',gap:8,alignItems:'center',background:'var(--vrm-b-teinte)',borderRadius:12,padding:'6px 4px 6px 12px',/* (2 nov.) au téléphone la phrase passe sur deux lignes : elle touchait le bord */margin:'0 0 12px',fontSize:13,lineHeight:1.45,color:C.muted}}>
             <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="tag" size={16}/></span>
-            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}><span data-numero-phrase="">Chaque article a un <b style={{color:C.text,fontWeight:600}}>numéro</b>, jamais redonné.</span> <Pourquoi label="À quoi il sert">Il suit l’ordre de mise en ligne : il sert à retrouver la paire sur ton étagère, sur Leboncoin et sur eBay. Il se change d’un clic sur la carte et n’est jamais donné à une autre paire.</Pourquoi></div>
-            <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:17,lineHeight:1,minWidth:44,minHeight:44,padding:0,fontFamily:'inherit'}}>✕</button>
+            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}><span data-numero-phrase="">{tr('annonces.chaqueArticle')} <b style={{color:C.text,fontWeight:600}}>{tr('annonces.numero')}</b>{tr('annonces.jamaisRedonne')}</span> <Pourquoi label={tr('annonces.quoiSert')}>{tr('annonces.suitOrdreMise')}</Pourquoi></div>
+            <button type="button" aria-label={tr('annonces.aiComprisMasquer')} onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:17,lineHeight:1,minWidth:44,minHeight:44,padding:0,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
         {/* (27 oct.) Acceptation automatique des offres — interrupteur, éteint par
@@ -45625,22 +45626,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Trier · Republier… · ⋯ Outils. Au téléphone, une rangée : recherche, puis les
             trois en icône (leur nom dans aria-label). Styles : styles-annonces-coherence.css. */}
         {listings.items?.length>0 && <div className="vrm-ann-toolbar vrm-annbar" data-ann-barre="">
-            <ChampRecherche className="vrm-annbar-recherche" valeur={annSearch} onChange={setAnnSearch} placeholder="Rechercher" label="Rechercher une annonce (titre, marque, N°)" micro data-ann-recherche=""/>
+            <ChampRecherche className="vrm-annbar-recherche" valeur={annSearch} onChange={setAnnSearch} placeholder={tr('annonces.rechercher')} label={tr('annonces.rechercherAnnonceTitre')} micro data-ann-recherche=""/>
             <div className="vrm-annbar-gestes">
-            <label className="vrm-annbar-bouton vrm-annbar-tri" data-ann-tri={annSort} title="Trier les annonces">
+            <label className="vrm-annbar-bouton vrm-annbar-tri" data-ann-tri={annSort} title={tr('annonces.trierAnnonces')}>
               <Icon name="filter" size={17}/>
-              <span className="vrm-annbar-mot">{({oldest:'Les plus anciennes',recent:'Ordre Vinted',price_desc:'Prix décroissant',price_asc:'Prix croissant',favs:'Plus de favoris',views:'Plus de vues',boost:'Vues sans favoris',sleeping:'En ligne depuis longtemps',nonum:'Sans numéro'})[annSort] || 'Trier'}</span>
-            <select className="vrm-ann-tri" aria-label="Trier les annonces" value={['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort)?annSort:''} onChange={e=>setAnnSort(e.target.value)}>
-              {!['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort) && <option value="" disabled>Trier</option>}
-              <option value="oldest">Les plus anciennes</option>
-              <option value="recent">Ordre Vinted</option>
-              <option value="price_desc">Prix décroissant</option>
-              <option value="price_asc">Prix croissant</option>
-              {(annStats.hasFav || annSort==='favs') && <option value="favs">Plus de favoris</option>}
-              {(annStats.hasView || annSort==='views') && <option value="views">Plus de vues</option>}
-              {(annStats.hasView || annSort==='boost') && <option value="boost">Vues sans favoris</option>}
-              {(annStats.sleeping>0 || annSort==='sleeping') && <option value="sleeping">En ligne depuis longtemps</option>}
-              <option value="nonum">Sans numéro</option>
+              <span className="vrm-annbar-mot">{({oldest:'Les plus anciennes',recent:'Ordre Vinted',price_desc:'Prix décroissant',price_asc:'Prix croissant',favs:'Plus de favoris',views:'Plus de vues',boost:'Vues sans favoris',sleeping:'En ligne depuis longtemps',nonum:'Sans numéro'})[annSort] || tr('annonces.trier')}</span>
+            <select className="vrm-ann-tri" aria-label={tr('annonces.trierAnnonces')} value={['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort)?annSort:''} onChange={e=>setAnnSort(e.target.value)}>
+              {!['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort) && <option value="" disabled>{tr('annonces.trier')}</option>}
+              <option value="oldest">{tr('annonces.plusAnciennes')}</option>
+              <option value="recent">{tr('annonces.ordreVinted')}</option>
+              <option value="price_desc">{tr('annonces.prixDecroissant')}</option>
+              <option value="price_asc">{tr('annonces.prixCroissant')}</option>
+              {(annStats.hasFav || annSort==='favs') && <option value="favs">{tr('annonces.plusFavoris')}</option>}
+              {(annStats.hasView || annSort==='views') && <option value="views">{tr('annonces.plusVues')}</option>}
+              {(annStats.hasView || annSort==='boost') && <option value="boost">{tr('annonces.vuesSansFavoris')}</option>}
+              {(annStats.sleeping>0 || annSort==='sleeping') && <option value="sleeping">{tr('annonces.ligneDepuisLongtemps')}</option>}
+              <option value="nonum">{tr('annonces.sansNumero')}</option>
             </select>
             </label>
             {/* (5 nov., chantier C — revue 2.5) « Republier… » mène à la vue « Sélectionner » :
@@ -45649,11 +45650,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 brouillons » (un second chemin, d'autres mots) est retirée. */}
             {/* (9 nov., lot AL) … et depuis que « Republier » est une vue d'Annonces, il mène à ELLE
                 (cocher, puis « Republier » ouvre l'atelier) ; « Sélectionner » garde la feuille « Actions ». */}
-            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='republier'} aria-label="Republier des annonces" title="Republier : coche les annonces, puis Republier"
-              onClick={()=>setAnnSort('republier')}><Icon name="sync" size={17}/><span className="vrm-annbar-mot">Republier…</span></button>
+            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='republier'} aria-label={tr('annonces.republierAnnonces')} title={tr('annonces.republierCocheAnnonces')}
+              onClick={()=>setAnnSort('republier')}><Icon name="sync" size={17}/><span className="vrm-annbar-mot">{tr('annonces.republier')}</span></button>
             <div className="vrm-ann-outils">
-              <button type="button" className="vrm-annbar-bouton" aria-label="Outils des annonces" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : offres automatiques, répartir un lot, studio photo, inventaire, audit du stock">
-                <Icon name="more" size={17}/><span className="vrm-annbar-mot vrm-ann-outils-mot">Outils</span></button>
+              <button type="button" className="vrm-annbar-bouton" aria-label={tr('annonces.outilsAnnonces')} onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title={tr('annonces.outilsOffresAutomatiques')}>
+                <Icon name="more" size={17}/><span className="vrm-annbar-mot vrm-ann-outils-mot">{tr('ventes.outils')}</span></button>
               {annToolsOpen && (<>
                 <div className="vrm-menu-voile" onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
                 {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
@@ -45676,34 +45677,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-offres-auto-ligne">
               <span className="vrm-offres-auto-icone" aria-hidden="true"><Icon name="tag" size={15}/></span>
               <div className="vrm-offres-auto-texte">
-                <span className="vrm-offres-auto-nom">Offres automatiques</span>
+                <span className="vrm-offres-auto-nom">{tr('annonces.offresAutomatiques')}</span>
                 <span className="vrm-offres-auto-statut" data-offres-auto-statut>{etat}</span>
               </div>
-              <button type="button" className="vrm-offres-auto-info" data-offres-auto-info aria-expanded={offresInfo} aria-controls="vrm-offres-auto-detail" aria-label="Comment marchent les offres automatiques" title="Comment ça marche" onClick={() => setOffresInfo((v) => !v)}>i</button>
+              <button type="button" className="vrm-offres-auto-info" data-offres-auto-info aria-expanded={offresInfo} aria-controls="vrm-offres-auto-detail" aria-label={tr('annonces.commentMarchentOffres')} title={tr('annonces.commentCaMarche')} onClick={() => setOffresInfo((v) => !v)}>i</button>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
-                className="vrm-offres-auto-switch" aria-label="Acceptation automatique des offres">
+                className="vrm-offres-auto-switch" aria-label={tr('annonces.acceptationAutomatiqueOffres')}>
                 <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
               </button>
             </div>
             {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
             {/* (11 nov., lot DJ8) L'écran complet : seuils par paire, aperçu, historique (Messages → Favoris & offres → Offres auto). */}
-            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>Régler par paire, voir l’historique ›</button>
+            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>{tr('annonces.reglerPaireVoir')}</button>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
-                <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
+                <p>{tr('annonces.remplis')} <b>{tr('annonces.accepter')}</b> {tr('annonces.annonceOffreAtteint')} <b>{tr('annonces.refuserSous')}</b>{tr('annonces.refuseeEntreDeux')}</p>
                 {offresAuto && (
                   <div data-offre-refus className="vrm-offres-auto-refus">
-                    <label htmlFor="vrm-offre-refus-msg">Message quand VRM refuse <span>(vide = refus sans message)</span></label>
+                    <label htmlFor="vrm-offre-refus-msg">{tr('annonces.messageQuandVrm')} <span>{tr('annonces.videRefusSans')}</span></label>
                     <textarea id="vrm-offre-refus-msg" data-offre-refus-msg value={refusMsg} onChange={e=>{ setRefusMsg(e.target.value); save('vinted_offre_refus_msg', e.target.value); }}
-                      rows={2} placeholder="Ex. : Merci pour ton offre ! Je ne peux pas descendre aussi bas, mais n'hésite pas à m'en refaire une 🙂"/>
+                      rows={2} placeholder={tr('annonces.exMerciOffre')}/>
                   </div>
                 )}
               </div>
             )}
             {offresAuto && ext!=='ok' && (
               <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext" style={{color:C.warn}}>{ext==='absente'
-                ? "Rien ne part d'ici : ouvre VRM dans le navigateur (ordinateur) où l'extension est installée."
-                : `Mets l'extension à jour (${EXT_CAPACITES.offresgarde.replace(/\.0$/,'')}) : une plus ancienne pourrait accepter une offre sur une paire déjà vendue ailleurs.`}</div>
+                ? tr('annonces.rienPartIci')
+                : tr('annonces.metsExtensionJour', { replace: String(EXT_CAPACITES.offresgarde.replace(/\.0$/,'')) })}</div>
             )}
           </div>
           );
@@ -45711,7 +45712,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (11 nov., décision C10 — Julien : « tranche ») L'ancien bloc « Annonces à compléter » est
                       FONDU dans la vue d'Annonces « À compléter » (un seul endroit, une seule règle :
                       src/annoncesACompleter.js) ; ici, une ligne qui y mène. */}
-                  {!noAcc && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>À compléter<span>{annACompleter.n}</span></button> : null}
+                  {!noAcc && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>{tr('annonces.completer')}<span>{annACompleter.n}</span></button> : null}
                   </div>
                   {[
                     /* ⚠️ (11 nov., lot DJ4 — Julien, mot pour mot : « L'inventaire physique n'est pas fiable.
@@ -45720,7 +45721,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        seule entrée). Rien n'est supprimé : leurs modales (`lotOpen`, `inventOpen`, `auditOpen`)
                        et les données (prix d'achat posés, numéros) restent ; plus rien ne les ouvre. Ne pas les
                        remettre sans sa demande. Les prix d'un achat groupé : Achats → Fournisseurs. */
-                    {k:'studio', icon:'camera', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
+                    {k:'studio', icon:'camera', lab:'Studio photo', desc:tr('annonces.cadreGuidePrise'), on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     /* (5 nov., chantier C — revue 2.7) « Compléter les prix d'achat » n'est plus
                        dans ce menu : le bandeau « Prix d'achat · N/M → Compléter », au-dessus de
                        la grille, est la seule porte (le même nombre ne s'écrit pas deux fois). */
@@ -45742,30 +45743,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             </div>
             {/* (9 nov., lot AI — Julien : « encore du texte ») Une puce compacte (compteur + mots), plus un gros bouton large. */}
-            {nRefaire > 0 && <button type="button" className="vrm-pop-puce vrm-annbar-refaire" data-refaire-ouvrir={nRefaire} aria-haspopup="dialog" onClick={()=>setRefaireOpen(true)}><span className="vrm-pop-puce-n">{nRefaire}</span><span>brouillon{nRefaire>1?'s':''} à refaire</span></button>}
+            {nRefaire > 0 && <button type="button" className="vrm-pop-puce vrm-annbar-refaire" data-refaire-ouvrir={nRefaire} aria-haspopup="dialog" onClick={()=>setRefaireOpen(true)}><span className="vrm-pop-puce-n">{nRefaire}</span><span>{trj('annonces.brouillonsRefaire', { n: nRefaire })}</span></button>}
             {!repubAction && <CompteRenduOperation onRefaire={()=>setRefaireOpen(true)} onReprendre={(act, ids)=>{ setRepubReprise(ids); setRepubAction(act); }} />}
           </div>}
 
-        {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label="Vues rapides des annonces">
+        {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label={tr('annonces.vuesRapidesAnnonces')}>
           {/* (5 nov., chantier C — revue 2.10) « Sélectionner » en DEUXIÈME : au téléphone, la
               rangée défile et le coupait au bord (« Séle… »). « Tout le stock » devient « Toutes »
               (le Stock est un autre écran). */}
-          <button type="button" data-vue-toutes="" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Toutes</button>
+          <button type="button" data-vue-toutes="" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>{tr('journee.toutes')}</button>
           {/* (5 nov.) « Sélectionner » : en ligne, brouillons et masquées ensemble, puis UNE feuille « Actions ». */}
-          <button type="button" data-vue-selection aria-pressed={annSort==='selection'} onClick={()=>setAnnSort('selection')}>Sélectionner{selAnn.length ? <span className="vrm-of-n">{selAnn.length}</span> : null}</button>
+          <button type="button" data-vue-selection aria-pressed={annSort==='selection'} onClick={()=>setAnnSort('selection')}>{tr('annonces.selectionner')}{selAnn.length ? <span className="vrm-of-n">{selAnn.length}</span> : null}</button>
           {/* (9 nov., lot AL — Julien : « Republier dans Annonces ») L'ancienne entrée « Republier » du menu
               est ICI : ses annonces en ligne à cocher, puis « Republier » ouvre l'atelier (ordre, espacement, lancer). */}
-          <button type="button" data-vue-republier="" aria-pressed={annSort==='republier'} onClick={()=>setAnnSort('republier')}>Republier</button>
+          <button type="button" data-vue-republier="" aria-pressed={annSort==='republier'} onClick={()=>setAnnSort('republier')}>{tr('annonces.republier2')}</button>
           {/* (5 nov., Julien : « les annonces en brouillon doivent apparaître dans Annonces,
               avec leur marque « brouillon » ») Ses brouillons, compte par compte, à cocher. */}
-          {((brVinted.liste||[]).length>0 || annSort==='brouillons') && <button type="button" data-vue-brouillons={(brVinted.liste||[]).length} aria-pressed={annSort==='brouillons'} onClick={()=>setAnnSort('brouillons')}>Brouillons<span className="vrm-of-n">{(brVinted.liste||[]).length}</span></button>}
+          {((brVinted.liste||[]).length>0 || annSort==='brouillons') && <button type="button" data-vue-brouillons={(brVinted.liste||[]).length} aria-pressed={annSort==='brouillons'} onClick={()=>setAnnSort('brouillons')}>{tr('annonces.brouillons')}<span className="vrm-of-n">{(brVinted.liste||[]).length}</span></button>}
           {/* (4 nov.) Les annonces masquées par Vinted, compte par compte (toujours chez toi, pas « en ligne »). */}
-          {(annMasquees.length>0 || annSort==='masquees') && <button type="button" data-vue-masquees={annMasquees.length} aria-pressed={annSort==='masquees'} onClick={()=>setAnnSort('masquees')}>Masquées<span className="vrm-of-n">{annMasquees.length}</span></button>}
-          <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
+          {(annMasquees.length>0 || annSort==='masquees') && <button type="button" data-vue-masquees={annMasquees.length} aria-pressed={annSort==='masquees'} onClick={()=>setAnnSort('masquees')}>{tr('annonces.masquees')}<span className="vrm-of-n">{annMasquees.length}</span></button>}
+          <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>{tr('annonces.sansNumero')}{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
           {/* (6 nov., vague 2 · point 4) Les annonces numérotées dont l'achat n'est pas relié (src/achatsARelier.js). */}
-          {((fileAchat && fileAchat.length > 0) || annSort==='sansachat') && <button type="button" data-vue-sans-achat={fileAchat ? fileAchat.length : ''} aria-pressed={annSort==='sansachat'} onClick={()=>setAnnSort('sansachat')}>Sans achat relié{fileAchat && fileAchat.length ? <span className="vrm-of-n">{fileAchat.length}</span> : null}</button>}
-          {((annACompleter && annACompleter.n>0) || annSort==='acompleter') && <button type="button" data-vue-a-completer={annACompleter && annACompleter.n!=null ? annACompleter.n : ''} aria-pressed={annSort==='acompleter'} onClick={()=>setAnnSort('acompleter')}>À compléter{annACompleter && annACompleter.n>0 ? <span className="vrm-of-n">{annACompleter.n}</span> : null}</button>}
-          {(annStats.sleeping>0 || vueRelancer.favoris>0) && <button type="button" data-vue-relancer={annStats.sleeping} aria-pressed={annSort==='sleeping'} onClick={()=>{ if (!(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort('sleeping'); }}>À relancer</button>}
+          {((fileAchat && fileAchat.length > 0) || annSort==='sansachat') && <button type="button" data-vue-sans-achat={fileAchat ? fileAchat.length : ''} aria-pressed={annSort==='sansachat'} onClick={()=>setAnnSort('sansachat')}>{tr('annonces.sansAchatRelie')}{fileAchat && fileAchat.length ? <span className="vrm-of-n">{fileAchat.length}</span> : null}</button>}
+          {((annACompleter && annACompleter.n>0) || annSort==='acompleter') && <button type="button" data-vue-a-completer={annACompleter && annACompleter.n!=null ? annACompleter.n : ''} aria-pressed={annSort==='acompleter'} onClick={()=>setAnnSort('acompleter')}>{tr('annonces.completer')}{annACompleter && annACompleter.n>0 ? <span className="vrm-of-n">{annACompleter.n}</span> : null}</button>}
+          {(annStats.sleeping>0 || vueRelancer.favoris>0) && <button type="button" data-vue-relancer={annStats.sleeping} aria-pressed={annSort==='sleeping'} onClick={()=>{ if (!(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort('sleeping'); }}>{tr('annonces.relancer')}</button>}
           {/* (6 nov.) Pour les conseils (src/accompagnement.js) : les nombres de cet écran, lus
               seulement (liste pas chargée ou en erreur ⇒ rien). */}
           <ChiffreConseil cle="annonces.dorment" valeur={Array.isArray(listings.items) && !listings.error ? annStats.sleeping : undefined}/>
@@ -45776,7 +45777,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
         {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='republier' && annSort!=='brouillons' && annSort!=='sansachat' && annSort!=='acompleter' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
           <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
-          <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Tout afficher</button>
+          <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>{tr('annonces.toutAfficher')}</button>
         </div>}
 
         </div>
@@ -45786,7 +45787,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             peuvent juste plus s'y vendre. */}
         {annBannies.n>0 && (
           <div style={{margin:'0 0 12px',fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'9px 12px',lineHeight:1.5}}>
-            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} retirée{annBannies.n>1?'s':''} par Vinted (compte bloqué). Publie-{annBannies.n>1?'les':'la'} sur <b>Leboncoin</b> ou <b>eBay</b>. <Pourquoi>Le compte est bloqué : {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Les articles restent chez toi : onglet de la plateforme → À publier.</Pourquoi>
+            <b>{trj('annonces.annonces', { n: annBannies.n })}</b> {tr('annonces.texte7')} {annBannies.comptes.length>1?tr('annonces.comptesRefuses'):'ton compte '+annBannies.comptes[0]} {tr('annonces.retiree')}{annBannies.n>1?'s':''} {tr('annonces.vintedCompteBloque')}{annBannies.n>1?'les':'la'} {tr('journee.texte2')} <b>Leboncoin</b> {tr('annonces.texte5')} <b>eBay</b>. <Pourquoi>{trj('annonces.compteBloqueElles', { n: annBannies.n })}</Pourquoi>
           </div>
         )}
         {/* ── SIGNALEMENTS, REPLIÉS ────────────────────────────────────────
@@ -45813,11 +45814,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             n'a pas à être repliable. */}
         {numDoublons.length > 0 && (
           <div style={{border:`1.5px solid ${C.doublon}`,background:`${C.doublon}0e`,borderRadius:12,padding:'12px 14px',marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.doublon}}>
-              {numDoublons.length} numéro{numDoublons.length>1?'s':''} porté{numDoublons.length>1?'s':''} par deux annonces
-            </div>
+            <div style={{fontSize:13,fontWeight:700,color:C.doublon}}>{trj('annonces.numerosPortesDeux', { n: numDoublons.length })}</div>
             <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
-              Même N° sur deux paires : donne un numéro NEUF à l'une des deux. <Pourquoi>Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Les numéros ne se réutilisent jamais.</Pourquoi>
+              {tr('annonces.memeDeuxPaires')} <Pourquoi>{tr('annonces.deuxPairesRangees')}</Pourquoi>
             </div>
             {numDoublons.map(g => (
               <div key={g.numero} style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
@@ -45827,17 +45826,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {it.photo && <PhotoVinted src={it.photo} alt="" style={{width:34,height:34,borderRadius:12,objectFit:'cover',flexShrink:0}}/>}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
-                      <div style={{fontSize:11,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/>{it._vrmMasquee ? <span data-doublon-masquee> · masquée par Vinted, toujours chez toi</span> : null}</div>
+                      <div style={{fontSize:11,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/>{it._vrmMasquee ? <span data-doublon-masquee> {tr('annonces.masqueeVintedToujours')}</span> : null}</div>
                     </div>
                     {/* (5 nov., chantier C) Les deux gestes du doublon : le bouton partagé (plus de bordure bleue faite main). */}
-                    <Bouton variante="secondaire" taille="petit" style={{flexShrink:0}} title={`Donner le N°${nextNumero} (neuf) à cet article`} onClick={async ()=>{
+                    <Bouton variante="secondaire" taille="petit" style={{flexShrink:0}} title={tr('annonces.donnerNeufArticle', { nextNumero: String(nextNumero) })} onClick={async ()=>{
                       const libre = String(nextNumero);
-                      if (!await askConfirm({ title:`Donner le N°${libre} à cet article ?`, desc:`« ${it.title} »\n\nIl quitte le N°${g.numero}, qui reste à l'autre article. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
+                      if (!await askConfirm({ title:tr('annonces.donnerArticle', { libre: String(libre) }), desc:tr('annonces.quitteResteAutre', { title: String(it.title), numero: String(g.numero) }), ok:`Passer au N°${libre}` })) return;
                       setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre, manuelAt:new Date().toISOString()}; save('vinted_annonce_numeros',u); return u; });
                       recordUsed(libre);   // le numéro est pris à vie (§5.40)
-                      toast(`✓ Cet article est maintenant le N°${libre}.`);
-                    }}>Passer au N°{nextNumero}</Bouton>
-                    {it._vrmMasquee ? <Bouton variante="secondaire" taille="petit" data-masquee-partie={String(it.id)} onClick={()=>masqueePlusLa(it)} style={{flexShrink:0}}>Elle n'est plus là</Bouton> : null}
+                      toast(tr('annonces.articleMaintenant', { libre: String(libre) }));
+                    }}>{trj('annonces.passer', { nextNumero: nextNumero })}</Bouton>
+                    {it._vrmMasquee ? <Bouton variante="secondaire" taille="petit" data-masquee-partie={String(it.id)} onClick={()=>masqueePlusLa(it)} style={{flexShrink:0}}>{tr('annonces.plus')}</Bouton> : null}
                   </div>
                 ))}
               </div>
@@ -45882,13 +45881,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div data-comptes-annonces style={{marginBottom:12,display:'flex',flexWrap:'wrap',alignItems:'center',gap:'4px 10px',fontSize:12,color:C.muted,lineHeight:1.45}}>
               <span>
-                Annonces de <b style={{color:C.text}}>{uids.length - nOff} compte{uids.length - nOff>1?'s':''}</b>
-                {nOff>0 && <> · {nOff} masqué{nOff>1?'s':''}</>}
-                {refuses.length>0 && <> · <b style={{color:C.warn}}>connexion refusée : {refuses.map(nom).join(', ')}</b></>}
+                {tr('annonces.annonces4')} <b style={{color:C.text}}>{trj('annonces.comptes', { n: uids.length - nOff })}</b>
+                {nOff>0 && <> · {nOff} {tr('annonces.masque')}{nOff>1?'s':''}</>}
+                {refuses.length>0 && <> · <b style={{color:C.warn}}>{trj('annonces.connexionRefusee', { x: refuses.map(nom).join(', ') })}</b></>}
               </span>
               <button type="button" onClick={()=>onNav && onNav('vintedaccounts')}
                 style={{border:'none',background:'transparent',padding:0,color:C.accentTexte,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                Gérer les comptes →
+                {tr('annonces.gererComptes')}
               </button>
             </div>
           );
@@ -45914,9 +45913,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
             dessus le dit déjà, avec le geste (§7 — une cause, une phrase). */}
         {listings.items && !listings.error && listings.items.length===0 && !annAConfirmer.length && (
-          <EmptyState icon="tag" title="Aucune annonce en ligne"
+          <EmptyState icon="tag" title={tr('annonces.aucuneAnnonceLigne')}
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
-            action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">Ouvrir Vinted ↗</Bouton>}/>
+            action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">{tr('annonces.ouvrirVinted')}</Bouton>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
           {numAttente ? <Skeleton variant="card" count={6}/> : (<>
@@ -45945,7 +45944,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             };
             const ligneGeste = geste ? (
               <div className="vrm-ann-geste" data-ann-prochain-geste={geste.cle} role="status">
-                <span className="vrm-ann-geste-texte"><b>Prochain geste</b><span>{geste.texte}</span></span>
+                <span className="vrm-ann-geste-texte"><b>{tr('annonces.prochainGeste')}</b><span>{geste.texte}</span></span>
                 <Bouton variante="discret" data-ann-prochain-geste-bouton="" onClick={faireGeste}>{geste.bouton}</Bouton>
               </div>
             ) : null;
@@ -45961,14 +45960,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div className="vrm-ann-avis" data-ann-avis="">
                 {prixManque && (
                   <div className="vrm-ann-achats" data-ann-achats={`${n}/${m}`} role="status">
-                    <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">Prix d’achat</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">connus</span></span>
-                    <Bouton variante="discret" data-ann-achats-completer="" title="Le bénéfice ne compte que les prix d’achat connus" onClick={()=>setFillBuyOpen(true)}>Compléter</Bouton>
+                    <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">{tr('ventes.prixAchat')}</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">{tr('ventes.connus')}</span></span>
+                    <Bouton variante="discret" data-ann-achats-completer="" title={tr('ventes.beneficeComptePrix')} onClick={()=>setFillBuyOpen(true)}>{tr('journee.completer')}</Bouton>
                   </div>
                 )}
                 {nN > 0 && (
                   <button type="button" className="vrm-ann-avis-neufs" data-num-neufs-ouvrir={nN} aria-expanded={neufsOuverts} onClick={()=>setNeufsOuverts(v=>!v)}
-                    title="Les N° que VRM vient de poser sur tes dernières mises en ligne : vérifie-les ou change-les">
-                    <span><b>{nN}</b> {nN > 1 ? 'nouveaux N°' : 'nouveau N°'}</span><span className="vrm-ann-avis-voir">{neufsOuverts ? 'Fermer' : 'Vérifier'}</span><Icon name="chevron" size={14} className="vrm-ann-avis-chevron" style={{transform:neufsOuverts?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
+                    title={tr('annonces.vrmVientPoser')}>
+                    <span><b>{nN}</b> {nN > 1 ? tr('annonces.nouveaux') : tr('annonces.nouveau')}</span><span className="vrm-ann-avis-voir">{neufsOuverts ? tr('commun.fermer') : tr('annonces.verifier')}</span><Icon name="chevron" size={14} className="vrm-ann-avis-chevron" style={{transform:neufsOuverts?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
                   </button>
                 )}
               </div>
@@ -45979,17 +45978,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-pop-puces" data-popup-puces="">{blocNumeroEcrit()}{blocRemiseEnLigne()}</div>
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
-            <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
-              {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
-            </summary>
+            <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{trj('annonces.numerosVerifier', { n: aVerifierCarton.length })}</summary>
             {/* (6 nov., v36-visuel) Une ligne ; le récit de la panne derrière le « ⓘ ». */}
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, margin: '2px 0 6px' }}>
-              <b style={{ color: C.text, fontWeight: 600 }}>Seule l'étiquette de l'article dit le vrai.</b>{' '}
-              <Pourquoi label="Pourquoi vérifier" titre="Numéros à vérifier">Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des articles ont reçu un nouveau numéro, parfois celui d'un autre article. Pour chaque article : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).</Pourquoi>
+              <b style={{ color: C.text, fontWeight: 600 }}>{tr('annonces.seuleEtiquetteArticle')}</b>{' '}
+              <Pourquoi label={tr('annonces.pourquoiVerifier')} titre={tr('annonces.numerosVerifier2')}>{tr('annonces.1118Octobre')}</Pourquoi>
             </div>
             {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
               <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
-                Sur eBay, tes annonces portent les numéros posés à leur publication : {ebayVerif.annonces.map((a) => `${a.sku} « ${a.titre} »`).join(' · ')}.
+                {tr('annonces.ebayAnnoncesPortent')} {ebayVerif.annonces.map((a) => `${a.sku} « ${a.titre} »`).join(' · ')}.
               </div>
             )}
             {aVerifierCarton.map((it) => (
@@ -46021,12 +46018,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const vc = vintedDeChrome();
               const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: vc === undefined ? undefined : (vc ? String(vc.uid||'') : null),
                 capOk: (cap)=>extSait(cap)==='ok', nomCompte: (u)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(u)); return a ? accNameOf(a) : ''; } }).find(x=>x.k==='recreer');
-              if (!r || !r.ok) { toast((r && r.raison) || 'Republier n’est pas possible pour cette sélection.'); return; }
+              if (!r || !r.ok) { toast((r && r.raison) || tr('annonces.republierPossibleSelection')); return; }
               setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction('recreer'); }}
             onALaMain={(choisies)=>{
               // (10 nov., lot AP) « À la main » : la règle de la tuile « Republier à la main » (chaque paire SON compte connu).
               const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: undefined, capOk: ()=>true }).find(x=>x.k==='main');
-              if (!r || !r.ok) { toast((r && r.raison) || 'À la main n’est pas possible pour cette sélection.'); return; }
+              if (!r || !r.ok) { toast((r && r.raison) || tr('annonces.mainPossibleSelection')); return; }
               setKitMain(choisies.map(a=>{ const fl = prixAchatDe(numeros[a.id]||{}, buyByNum); return { ...a, floor: fl!=null && !isNaN(fl) ? Number(fl) : null }; })); }} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
@@ -46046,7 +46043,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
                 vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
         ) : (<>
-        <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
+        <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>{tr('annonces.articleStock')}</span><span>{tr('accueil.nav.prix')}</span></div>
         {/* (10 nov., lot AM — demande 15 de Julien : « la disposition par compte de Vinted me plaît … la même pour
             Toutes, en gardant toutes les fonctions ») LA GRILLE DE VIGNETTES, RANGÉE PAR COMPTE, comme le dressing
             Vinted : un en-tête par compte (son initiale, comme la carte du compte de la colonne), puis ses annonces
@@ -46059,8 +46056,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {annGroupes.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
           <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.items.length} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
-            <span className="vrm-ann-compte-nom">{nomG || 'Compte Vinted'}</span>
-            <span className="vrm-ann-compte-n">{g.items.length} annonce{g.items.length>1?'s':''}</span>
+            <span className="vrm-ann-compte-nom">{nomG || tr('annonces.compteVinted')}</span>
+            <span className="vrm-ann-compte-n">{trj('annonces.annonces', { n: g.items.length })}</span>
           </div>,
           ...g.items.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
@@ -46133,13 +46130,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 onClick={(ev)=>{ if (ouverte) return; const t = ev.target; if (t && t.closest && t.closest('a,button,input,select,textarea,label,[data-edition],[role="dialog"]')) return; basculerFiche(); }}
                 style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
-                  <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?"Ouvrir l'annonce sur Vinted":undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
+                  <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?tr('annonces.ouvrirAnnonceVinted'):undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {/* (10 nov., lot P) Le nom lu du lien : QUELLE annonce (et, après, ses pastilles d'état « En double »…). */}
                     {urlFiche && <span className="vrm-sr">{`Ouvrir sur Vinted : ${it.title || it.brand || 'l’annonce'}. `}</span>}
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide remplir rayon={0}/>}
-                    {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
-                    {enDouble && <span className="vrm-vignette-marque is-ambre" data-vignette-en-double="" title="La même paire est en ligne deux fois sur Vinted (même photo) : retire celle en trop sur vinted.fr — l'alerte au-dessus les nomme">En double</span>}
-                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
+                    {it._vrmAConfirmer && <span data-ann-a-confirmer="" title={tr('annonces.compteEteRelu')} style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>{tr('annonces.confirmer3')}{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
+                    {enDouble && <span className="vrm-vignette-marque is-ambre" data-vignette-en-double="" title={tr('annonces.memePaireLigne')}>{tr('annonces.double')}</span>}
+                    {it.promoted===true && <span data-boostee title={tr('annonces.vintedDitAnnonce')} style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>{tr('annonces.boostee')}</span>}
                   </a>
                   {/* (31 oct., Vitrine) Le N° de rangement SUR la photo, en haut à
                       gauche, comme l'étiquette du carton : une pastille à chasse
@@ -46150,7 +46147,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       chiffres alignés ; jamais blanche en sombre), la même que partout. */}
                   <span className="vrm-fiche-numero" data-fiche-num={num||''}>
                     <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
-                      titre="Numéro de rangement (écrit sur la boîte) — touche pour le changer" rendu={num?<Numero n={num} taille="grand" titre={`Numéro ${num} — le changer`}/>:<span className="vrm-fiche-num-vide">+ N°</span>}/>
+                      titre={tr('annonces.numeroRangementEcrit')} rendu={num?<Numero n={num} taille="grand" titre={tr('annonces.numeroChanger', { num: String(num) })}/>:<span className="vrm-fiche-num-vide">+ N°</span>}/>
                   </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
                     <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
@@ -46163,33 +46160,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* L'ÉTAT EN JAUGE, et JUSTE À CÔTÉ le prix d'achat qu'on tape en place. */}
                     <div className="vrm-fiche-duo" data-fiche-duo style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}>
                       <div className="vrm-fiche-cell vrm-fiche-etat" data-fiche-etat style={cell}>
-                        <JaugeEtat statut={it.condition} lib={<span style={lib}>État</span>}/>
+                        <JaugeEtat statut={it.condition} lib={<span style={lib}>{tr('ventes.etat')}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat={achatConnu?'connu':'inconnu'} style={cell}>
-                        <span className="vrm-fiche-etat-haut"><span style={lib}>Prix d'achat</span><Icon name="pencil" size={12} style={{color:C.muted,flexShrink:0}}/></span>
+                        <span className="vrm-fiche-etat-haut"><span style={lib}>{tr('annonces.prixAchat')}</span><Icon name="pencil" size={12} style={{color:C.muted,flexShrink:0}}/></span>
                         <EnLigne data="achat" value={buy} onCommit={v=>String(v??'').trim() ? ecrirePrixTape(item, v) : updatePair(item,{buyPrice:'',buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={72}
-                          titre="Prix d'achat — touche pour le saisir" rendu={<span data-vide={achat!=null&&!isNaN(achat)?undefined:''} style={{...valeur,fontSize:15}}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
+                          titre={tr('annonces.prixAchatTouche')} rendu={<span data-vide={achat!=null&&!isNaN(achat)?undefined:''} style={{...valeur,fontSize:15}}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
                       </div>
                     </div>
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
                     <div data-chiffres className="vrm-fiche-chiffres" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
-                      <div className="vrm-fiche-cell" style={cell} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter d'un geste — et, si tu as activé l'acceptation automatique, acceptée à ta place">
-                        <span style={lib}>Accepter dès</span>
+                      <div className="vrm-fiche-cell" style={cell} title={tr('annonces.prixMiniOffre')}>
+                        <span style={lib}>{tr('annonces.accepter2')}</span>
                         <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:montantSeuil(v)})} inputMode="decimal" placeholder="€" largeur={56}
-                          titre="Prix mini d'acceptation d'offre — touche pour le saisir" rendu={<span data-vide={mn!=null&&isFinite(mn)&&mn>0?undefined:''} style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
+                          titre={tr('annonces.prixMiniAcceptation')} rendu={<span data-vide={mn!=null&&isFinite(mn)&&mn>0?undefined:''} style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
                       </div>
-                      <div className="vrm-fiche-cell" style={cell} title="Seuil de refus : si l'acceptation auto est activée, une offre sous ce montant est refusée toute seule (avec ton message, si tu en as écrit un)">
-                        <span style={lib}>Refuser sous</span>
+                      <div className="vrm-fiche-cell" style={cell} title={tr('annonces.seuilRefusAcceptation')}>
+                        <span style={lib}>{tr('annonces.refuserSous2')}</span>
                         <EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:montantSeuil(v)})} inputMode="decimal" placeholder="€" largeur={56}
-                          titre="Seuil de refus d'offre — touche pour le saisir" rendu={<span data-vide={rf!=null&&isFinite(rf)&&rf>0?undefined:''} style={valeur}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/>
+                          titre={tr('annonces.seuilRefusOffre')} rendu={<span data-vide={rf!=null&&isFinite(rf)&&rf>0?undefined:''} style={valeur}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/>
                       </div>
-                      <div className="vrm-fiche-cell" style={cell} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
-                        <span style={lib}>Boost payé</span>
+                      <div className="vrm-fiche-cell" style={cell} title={tr('annonces.coutBoostMise')}>
+                        <span style={lib}>{tr('annonces.boostPaye')}</span>
                         <EnLigne data="boost" value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} inputMode="decimal" placeholder="€" largeur={56}
-                          titre="Boost payé — touche pour le saisir" rendu={<span data-vide={boost>0?undefined:''} style={valeur}>{boost>0?prixCourt(boost):'—'}</span>}/>
+                          titre={tr('annonces.boostPayeTouche')} rendu={<span data-vide={boost>0?undefined:''} style={valeur}>{boost>0?prixCourt(boost):'—'}</span>}/>
                       </div>
-                      <div className="vrm-fiche-cell" style={cell} title="Si elle part à ce prix : prix − achat − boost">
-                        <span style={lib}>Marge</span>
+                      <div className="vrm-fiche-cell" style={cell} title={tr('annonces.partPrixPrix')}>
+                        <span style={lib}>{tr('annonces.marge')}</span>
                         <span data-marge={marge==null?'':String(marge)} style={{...valeur,color:marge!=null&&marge<0?C.warn:marge==null?C.muted:C.text}}>{marge==null?'—':montant(marge,{signe:true})}</span>
                       </div>
                     </div>
@@ -46198,7 +46195,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {it.condition ? <span className="vrm-fiche-etat-court" data-etat-court="">{String(it.condition)}</span> : null}
                         {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye" size={13}/>{it.views}</span>}
                         {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="heart" size={13}/>{it.favourites}</span>}
-                        {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
+                        {age!=null && <span title={tr('annonces.ligneDepuisJours', { age: String(age) })} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?tr('annonces.dort'):''}</span>}
                         {!annUnCompte && <span data-stats-compte="" style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{accNameOf(it._acc)}</span>}
                       </span>
                       {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
@@ -46206,16 +46203,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <MarquePlateforme p="vinted"/>
                         {ailleurs && <MarquePlateforme p="leboncoin"/>}
                         {num && ebayNums.has(cleNum(num)) && <MarquePlateforme p="ebay"/>}
-                        {ailleurs && <span data-aussi-sur className="vrm-sr">aussi sur Leboncoin</span>}
+                        {ailleurs && <span data-aussi-sur className="vrm-sr">{tr('annonces.aussiLeboncoin')}</span>}
                       </span>
                     </div>
-                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:12,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
+                    {soldBord && <div title={tr('annonces.bordereauEnvoiEte')} style={{fontSize:12,fontWeight:600,color:C.warn}}>{tr('annonces.vendueBordereauRecu')}</div>}
                     {/* Téléphone seulement (caché sur ordinateur, où tout reste à la vue). */}
                     {/* (10 nov., lot P) Au lecteur d'écran, le bouton dit QUELLE paire il ouvre (« N°12, titre, 65 € »). */}
                     <button type="button" className="vrm-fiche-plus-bouton" data-fiche-plus-bouton="" aria-expanded={ouverte} aria-controls={idRepli}
                       aria-label={`${ouverte ? 'Moins de détails' : 'Détails et gestes'} — ${num ? 'N°' + num + ', ' : ''}${it.title || it.brand || 'annonce'}, ${prix(it.price,it.currency) || 'prix pas lu'}`}
                       onClick={basculerFiche}>
-                      <span>{ouverte ? 'Moins de détails' : 'Détails et gestes'}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
+                      <span>{ouverte ? tr('annonces.moinsDetails') : tr('annonces.detailsGestes')}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
                     </button>
                   </div>
                 </div>
@@ -46232,21 +46229,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-fiche-gestes" data-fiche-gestes="" data-fiche-gestes-n={num ? 2 : 1}>
                     {num
                       ? <button type="button" className="vrm-fiche-geste vrm-fiche-geste-prix" data-annonce-prix-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:prix-partout',{detail:String(num)})); } catch (_) {} }} style={geste}
-                          title={sugg!=null && sugg < Number(it.price) ? `Elle dort : ${sugg}\u00a0€ serait un prix plus juste (−15\u00a0%)` : 'Le prix de ce N° sur tous les sites où il est en ligne'}>
-                          Changer le prix{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</button>
+                          title={sugg!=null && sugg < Number(it.price) ? tr('annonces.dortSeraitPrix', { sugg: String(sugg) }) : tr('annonces.prixTousSites')}>
+                          {tr('annonces.changerPrix')}{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{trj('annonces.conseille', { montant: montant(sugg) })}</span> : null}</button>
                       : <a className="vrm-fiche-geste vrm-fiche-geste-prix" href={urlFiche ? `${urlFiche.replace(/\/$/,'')}/edit` : undefined} target="_blank" rel="noreferrer" data-annonce-prix-vinted="" style={geste}
-                          title="Sans N°, le prix se change sur Vinted">Changer le prix ↗{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</a>}
+                          title={tr('annonces.sansPrixChange')}>{tr('annonces.changerPrix2')}{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{trj('annonces.conseille', { montant: montant(sugg) })}</span> : null}</a>}
                     {num && (
                       <button type="button" className="vrm-fiche-geste" data-fiche-stock={atGarage?'range':'a-ranger'} onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={geste}
-                        title={atGarage?`La N°${num} est rangée dans ton stock — la voir`:`La N°${num} n'est pas encore rangée dans ton stock — la ranger`}>
-                        <Icon name="box" size={14}/>{atGarage?'Voir au stock':'Ranger au stock'}
+                        title={atGarage?tr('annonces.rangeeDansStock', { num: String(num) }):tr('annonces.encoreRangeeDans', { num: String(num) })}>
+                        <Icon name="box" size={14}/>{atGarage?tr('ventes.voirStock'):tr('annonces.rangerStock')}
                       </button>
                     )}
-                    <button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus" data-fiche-menu-ouvrir={String(it.id)} aria-haspopup="dialog" aria-label="Autres gestes" title="Autres gestes : Leboncoin, relier un achat, passeport, Vestiaire, histoire, marquer vendue"
+                    <button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus" data-fiche-menu-ouvrir={String(it.id)} aria-haspopup="dialog" aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestesLeboncoin')}
                       onClick={()=>setFicheMenu(String(it._acc.vinted_user_id)+'_'+String(it.id))} style={geste}><Icon name="more" size={18}/></button>
                   </div>
                   {ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id) && (
-                  <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||'Annonce'} sousTitre={num ? <Numero n={num} taille="petit"/> : 'Sans N° : touche « + N° » sur la photo'} data-fiche-menu={String(it.id)}>
+                  <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||tr('annonces.annonce2')} sousTitre={num ? <Numero n={num} taille="petit"/> : tr('annonces.sansTouchePhoto')} data-fiche-menu={String(it.id)}>
                   <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button,a'); if (b && !b.hasAttribute('data-fiche-place')) setTimeout(()=>setFicheMenu(null), 0); }}>
                     {MP_PLACES_UI.map(pl => {
                       const on = mpChoisi(e, pl.cle);
@@ -46260,24 +46257,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <button key={pl.cle} type="button" className="vrm-fiche-geste" data-fiche-place={pl.cle} data-fiche-place-etat={on?'on':'off'} aria-pressed={on}
                           onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
                           title={!num
-                            ? `Mets un N° à cet article d'abord : c'est la référence qui permet de le retrouver ensuite sur ${pl.nom}.`
-                            : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
-                                 : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
+                            ? tr('annonces.metsArticleAbord', { nom: String(pl.nom) })
+                            : on ? tr('annonces.dansFileClique', { nom: String(pl.nom) })
+                                 : tr('annonces.iraCliqueMettre', { nom: String(pl.nom) })}
                           style={{...geste,color:on?C.text:C.muted}}>
                           {/* (30 oct.) Le libellé dit l'ÉTAT, pas un ordre : coché, « À publier sur X »
                               se lisait comme un statut et ne changeait que d'une coche. */}
-                          {on ? <>Dans la file {pl.nom} ✓</> : <>Ajouter à la file {pl.nom}</>}
+                          {on ? <>{tr('annonces.dansFile')} {pl.nom} ✓</> : <>{tr('annonces.ajouterFile')} {pl.nom}</>}
                         </button>
                       );
                     })}
-                    <button type="button" className="vrm-fiche-geste" data-fiche-relier-achat="" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
-                    <button type="button" className="vrm-fiche-geste" data-fiche-passeport="" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
+                    <button type="button" className="vrm-fiche-geste" data-fiche-relier-achat="" onClick={()=>openPicker(item)} style={geste}>{tr('ventes.relierAchat2')}</button>
+                    <button type="button" className="vrm-fiche-geste" data-fiche-passeport="" onClick={()=>setPassportFor({it,e,num})} style={geste}>{tr('annonces.passeport')}</button>
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
                     {/* (3 nov.) L'histoire de CE N° et sa copie (N° neuf). */}
-                    {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>Histoire · Dupliquer</button>}
+                    {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>{tr('annonces.histoireDupliquer')}</button>}
                     {/* (11 nov.) « Me le rappeler » : par le N° et l'identifiant de l'annonce (§5). */}
                     <BoutonRappel variante="geste" style={geste} cible={{ sorte: 'article', num: num || '', item: String(it.id || '') }} libelle={num ? `N°${num}` : (it.title || '')}/>
-                    <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={()=>{ gesteVendues([it.id], true); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
+                    <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={()=>{ gesteVendues([it.id], true); }} title={tr('annonces.marquerVendueRetire')} style={geste}>{tr('annonces.marquerVendue')}</button>
                   </div>
                   </SheetShell>
                   )}
@@ -46287,7 +46284,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       au-dessus de la grille (`data-sans-num`). */}
                   {prepa && (
                     <div data-fiche-infos style={{fontSize:12,color:C.muted,lineHeight:1.35}}>
-                      {prepa && <span data-prepa={prepaEtat.code} title={/prête/.test(prepa) ? 'Photos et description captées : elle peut partir sur Leboncoin.' : 'Passe sur Vinted, connecté sur ce compte : l’extension capte les photos et la description.'}>Leboncoin : {prepa}</span>}
+                      {prepa && <span data-prepa={prepaEtat.code} title={/prête/.test(prepa) ? tr('annonces.photosDescriptionCaptees') : tr('annonces.passeVintedConnecte')}>Leboncoin : {prepa}</span>}
                     </div>
                   )}
                 </div>
@@ -46297,7 +46294,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
         </>)}
           </>)}
-        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
+        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label={tr('annonces.stockAjustements')}><span className="vrm-label-full">{tr('annonces.stockAjustements')}</span><span className="vrm-label-short" aria-hidden="true">{tr('nav.garage')}</span></summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
               affichait un instantané périmé en le faisant passer pour du direct
@@ -46313,11 +46310,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               demande) : il n'y a plus rien à appliquer. */}
           {numeroReprises.length > 0 && (
             <div data-reprises-num={numeroReprises.length} style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{numeroReprises.length} article{numeroReprises.length>1?'s':''} déjà connu{numeroReprises.length>1?'s':''} ?</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{trj('annonces.articlesDejaConnus', { n: numeroReprises.length })}</div>
               {/* ⚠️ Une paire VENDUE n'est jamais remise à son ancien numéro toute
                   seule : elle est partie, et si elle revient (litige, retour) elle
                   revient dans un autre carton. On le PROPOSE, il tranche. */}
-              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Ces annonces ont reçu un numéro NEUF. Si c'est bien le même article et qu'il est toujours dans SA boîte, remets son numéro d'origine.</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>{tr('annonces.cesAnnoncesOnt')}</div>
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {numeroReprises.slice(0,8).map((r,i)=>(
                   <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'7px 9px'}}>
@@ -46326,10 +46323,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><Numero n={r.current.numero} taille="petit"/> (neuf) → <Numero n={r.orphan.e.numero} taille="petit"/>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
-                      {r.vendue && <div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>Cet article a été VENDU sous le N°{r.orphan.e.numero} — ne le remets que s'il t'est revenu et qu'il est dans sa boîte</div>}
+                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><Numero n={r.current.numero} taille="petit"/> {tr('annonces.neuf')} <Numero n={r.orphan.e.numero} taille="petit"/>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                      {r.vendue && <div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>{trj('annonces.articleEteVendu', { numero: r.orphan.e.numero })}</div>}
                     </div>
-                    <Bouton variante="secondaire" taille="petit" onClick={()=>applyReprise(r)} style={{flexShrink:0}}>Remettre N°{r.orphan.e.numero}</Bouton>
+                    <Bouton variante="secondaire" taille="petit" onClick={()=>applyReprise(r)} style={{flexShrink:0}}>{trj('annonces.remettre', { numero: r.orphan.e.numero })}</Bouton>
                   </div>
                 ))}
               </div>
@@ -46342,21 +46339,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               demandent un GESTE restent des pastilles. §7 : la couleur est
               réservée à ce qui est à rattraper. */}
           <div data-ann-resume style={{fontSize:13,color:C.muted,marginBottom:8,lineHeight:1.5}}>
-            <b style={{color:C.text,fontWeight:700}}>{annStats.n} en ligne sur Vinted</b>
-            {annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}
-            {annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}
+            <b style={{color:C.text,fontWeight:700}}>{trj('annonces.ligneVinted', { x: annStats.n })}</b>
+            {annStats.aussiLbc>0?tr('annonces.aussiLeboncoin2', { aussiLbc: String(annStats.aussiLbc) }):''}
+            {annStats.boostees>0?tr('annonces.boostees', { n: String(annStats.boostees) }):''}
             {annStats.valConnus>0 ? <span data-ann-valeur={Math.round(annStats.val)} data-ann-valeur-sur={annStats.valConnus<annStats.n?annStats.valConnus:undefined}>{` · ${annStats.valConnus<annStats.n?'au moins ':''}${montant(annStats.val, { centimes: 'jamais' })} de valeur${annStats.valConnus<annStats.n?` (prix lu sur ${annStats.valConnus})`:''}`}</span> : null}
             {annStats.hasFav?<> · <Icon name="heart" size={12} style={{verticalAlign:'-2px'}}/> {annStats.favs}</>:null}
             {annStats.hasView?<> · <Icon name="eye" size={12} style={{verticalAlign:'-2px'}}/> {annStats.views}</>:null}
-            {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin`}</span> : ''}
+            {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{tr('annonces.pretesLeboncoin', { pretLbc: String(annStats.pretLbc) })}</span> : ''}
           </div>
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-            {annStats.sansNum>0 && <span data-sans-num={annStats.sansNum} title="Le N° est la référence qui retrouve la paire sur Leboncoin : touche « + N° » sur sa fiche." style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.sansNum} sans N° — il {annStats.sansNum>1?'leur':'lui'} en faut un pour Leboncoin</span>}
+            {annStats.sansNum>0 && <span data-sans-num={annStats.sansNum} title={tr('annonces.referenceRetrouvePaire')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{trj('annonces.sansLeurFaut', { n: annStats.sansNum })}</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
-            {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
+            {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={tr('annonces.articleOntToutes', { pretLbc: String(annStats.pretLbc), aRecapturer: String(annStats.aRecapturer) })} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{trj('annonces.recapturerLeboncoin', { aRecapturer: annStats.aRecapturer })}</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
-            {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)}\u00a0€`:''}</button>}
-            <Bouton variante="secondaire" taille="petit" icone="spark" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0}}>Aide à la vente</Bouton>
+            {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} {tr('annonces.dorment2')}{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)}\u00a0€`:''}</button>}
+            <Bouton variante="secondaire" taille="petit" icone="spark" onClick={()=>setShowLister(true)} title={tr('annonces.prixConseilleTitre')} style={{flexShrink:0}}>{tr('annonces.aideVente')}</Bouton>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
               Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
@@ -46375,7 +46372,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setTipsOpen(v=>!v)}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
                 <span style={{display:'inline-flex',color:C.muted}}><Icon name="spark" size={15}/></span>
-                <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Conseils & signalements</span>
+                <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>{tr('annonces.conseilsSignalements')}</span>
                 <span style={{fontSize:11,fontWeight:700,color:C.onAccent,background:C.accent,borderRadius:12,padding:'1px 8px'}}>{n}</span>
                 <span style={{fontSize:13,color:C.muted,transform:tipsOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
               </button>
@@ -46389,7 +46386,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {retoursSuivis.etat==='lu' && retoursSuivis.lignes.length > 0 && (
             <button type="button" data-retours-renvoi={retoursSuivis.lignes.length} onClick={()=>onNav&&onNav('cat_bord')}
               style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:8,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'8px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{retoursSuivis.lignes.length} article{retoursSuivis.lignes.length>1?'s':''} qui te revien{retoursSuivis.lignes.length>1?'nent':'t'} — suivis dans Colis</span>
+              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{trj('annonces.articlesReviennentSuivis', { n: retoursSuivis.lignes.length })}</span>
               <span style={{fontSize:13,color:C.muted}}>›</span>
             </button>
           )}
@@ -46400,9 +46397,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             de suite, sinon on croit avoir perdu son stock. */}
         {comptesMuets.map(m=>(
           <div key={m.uid} style={{marginBottom:12,border:`1px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:12,padding:'11px 13px'}}>
-            <div style={{fontSize:13,fontWeight:600,color:C.text}}>🙈 {accNameOf(m.acc)} ne renvoie plus aucune annonce</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text}}>{trj('annonces.renvoiePlusAucune', { accNameOf: accNameOf(m.acc) })}</div>
             <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.5}}>
-              {m.nb} article{m.nb>1?'s':''} numéroté{m.nb>1?'s':''} sur ce compte, et zéro annonce en ligne. C'est ce qui arrive quand <b>Vinted masque un compte</b> quelques jours. Tes numéros et tes prix d'achat sont conservés — ils reviendront tels quels. Rien à faire, sauf si le compte est fermé pour de bon : dans ce cas masque-le (puce du compte plus bas) ou déconnecte-le dans Paramètres.
+              {m.nb} {tr('achats.article')}{m.nb>1?'s':''} {tr('annonces.numerote')}{m.nb>1?'s':''} {tr('annonces.compteZeroAnnonce')} <b>{tr('annonces.vintedMasqueCompte')}</b> {tr('annonces.quelquesJoursNumeros')}
             </div>
           </div>
         ))}
@@ -46416,8 +46413,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" onClick={()=>setOuvert(v=>!v)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit'}}>
               <span aria-hidden="true" style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="eye" size={17}/></span>
               <span style={{flex:1,minWidth:0}}>
-                <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{disparues.length} annonce{disparues.length>1?'s':''} disparue{disparues.length>1?'s':''} sans vente</span>
-                <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Plus en ligne, et aucune vente correspondante. Masquées par Vinted, ou retirées.</span>
+                <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{trj('annonces.annoncesDisparuesSans', { n: disparues.length })}</span>
+                <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>{tr('annonces.plusLigneAucune')}</span>
               </span>
               <span style={{color:C.muted,fontSize:17}}>{ouvert?'▾':'▸'}</span>
             </button>
@@ -46430,18 +46427,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{d.numero} · {d.e.title||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? 'rangée au stock' : 'pas au stock'}</div>
+                      <div style={{fontSize:11,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? tr('annonces.rangeeStock') : tr('annonces.stock')}</div>
                     </div>
-                    <button type="button" title="L'article n'est plus à vendre : on libère son numéro pour un autre article."
-                      onClick={()=>{ declarerPartie(d.id, d.numero, d.e.title||''); toast(`N°${d.numero} retirée du stock`); }}
+                    <button type="button" title={tr('annonces.articlePlusVendre')}
+                      onClick={()=>{ declarerPartie(d.id, d.numero, d.e.title||''); toast(tr('annonces.retireeStock', { numero: String(d.numero) })); }}
                       style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                      Retirer
+                      {tr('achats.retirer')}
                     </button>
                   </div>
                 ))}
-                {disparues.length>40 && <div style={{fontSize:11,color:C.muted,paddingTop:6}}>… et {disparues.length-40} autres.</div>}
+                {disparues.length>40 && <div style={{fontSize:11,color:C.muted,paddingTop:6}}>{trj('annonces.autres2', { x: disparues.length-40 })}</div>}
                 <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-                  « Retirer » libère le numéro pour un autre article. Si l'annonce revient (compte démasqué), elle retrouvera son numéro d'origine grâce à la reconnaissance par photo.
+                  {tr('annonces.retirerLibereNumero')}
                 </div>
               </div>
             )}
@@ -46457,39 +46454,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                 <span style={{fontSize:20}}>🚫</span>
                 <div style={{flex:1,minWidth:160}}>
-                  <div style={{fontSize:13,fontWeight:700,color:C.danger}}>Compte « {accNameOf(a)} » bloqué par Vinted</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:1}}>Ses annonces ont été retirées automatiquement (le compte ne répond plus). Tu peux le déconnecter définitivement.</div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.danger}}>{trj('annonces.compteBloqueVinted', { accNameOf: accNameOf(a) })}</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:1}}>{tr('annonces.annoncesOntEte')}</div>
                 </div>
-                <button type="button" onClick={async ()=>{ if(await askConfirm({title:`Déconnecter « ${accNameOf(a)} » ?`, desc:"Ses jetons, ses annonces et ses ventes captées sont supprimés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). À faire pour un compte banni ou fermé. Réversible depuis « Comptes retirés ».", ok:'Déconnecter', cancel:'Annuler', danger:true})){ const r=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(!r.ok?'Échec de la déconnexion — réessaie':r.memo?`« ${accNameOf(a)} » déconnecté — recharge l'app pour le voir disparaître`:`« ${accNameOf(a)} » déconnecté — mais la base n'a pas répondu pour le mémo. S'il réapparaît, resupprime-le.`); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:12,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
+                <button type="button" onClick={async ()=>{ if(await askConfirm({title:tr('annonces.deconnecter', { accNameOf: String(accNameOf(a)) }), desc:tr('annonces.jetonsAnnoncesVentes'), ok:'Déconnecter', cancel:'Annuler', danger:true})){ const r=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(!r.ok?tr('annonces.echecDeconnexionReessaie'):r.memo?tr('annonces.deconnecteRechargeApp', { accNameOf: String(accNameOf(a)) }):tr('annonces.deconnecteMaisBase', { accNameOf: String(accNameOf(a)) })); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:12,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{tr('annonces.deconnecter2')}</button>
               </div>
             ))}
           </div>
         )}
           {emailSoldIds.size>0 && (
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:12,padding:'7px 11px'}}>
-              <span style={{color:INV_STATUS.online.color,fontWeight:600}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
-              <span style={{flex:1,minWidth:0}}>e-mail de vente ou bordereau reçu — plus besoin d'attendre la synchro.</span>
+              <span style={{color:INV_STATUS.online.color,fontWeight:600}}>{trj('annonces.annoncesRetireesAuto', { n: emailSoldIds.size })}</span>
+              <span style={{flex:1,minWidth:0}}>{tr('annonces.eMailVente')}</span>
               <button type="button" onClick={()=>setShowEmailSold(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showEmailSold?'masquer':'voir'}</button>
             </div>
           )}
           {soldManual.size>0 && (()=>{ const hidden=(listings.items||[]).filter(it=>soldManual.has(String(it.id))); if(!hidden.length) return null; return (
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:12,padding:'7px 11px'}}>
-              <span style={{color:C.warn,fontWeight:600}}>✓ {hidden.length} annonce{hidden.length>1?'s':''} marquée{hidden.length>1?'s':''} vendue{hidden.length>1?'s':''}</span>
+              <span style={{color:C.warn,fontWeight:600}}>{trj('annonces.annoncesMarqueesVendues', { n: hidden.length })}</span>
               <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hidden.map(it=>it.title).join(' · ')}</span>
-              <button type="button" data-reafficher-vendues="" onClick={()=>{ gesteVendues(hidden.map(it=>it.id), false); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
+              <button type="button" data-reafficher-vendues="" onClick={()=>{ gesteVendues(hidden.map(it=>it.id), false); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{tr('annonces.annuler')}</button>
             </div>
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
-              😴 {annStats.sleeping} article{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)}&nbsp;€ qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
-              {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
+              😴 {annStats.sleeping} {tr('achats.article')}{annStats.sleeping>1?'s':''} {tr('annonces.ligneDepuisPlus')} {SLEEP_DAYS} {tr('annonces.jours')}{annStats.sleepingVal>0?<>{tr('annonces.soit')} <b>{trj('annonces.dorment', { x: annStats.sleepingVal.toFixed(0) })}</b></>:''} {tr('annonces.pense')} <b>{tr('annonces.baisserPrix')}</b> {tr('annonces.texte5')} <b>{tr('annonces.republier3')}</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>{tr('annonces.voir')}</button>
+              {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>{trj('annonces.calculeAnnoncesDont', { n: annStats.datesKnown, x: annStats.n })}</div>}
             </div>
           )}
           {/* Aucune date connue : on le DIT (avant, l'app déduisait l'ancienneté
               de la date de numérotation → chiffres faux, « qui dort » à 0). */}
           {annStats.n>0 && annStats.datesKnown===0 && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'8px 12px',marginBottom:10,lineHeight:1.45}}>
-              ⏳ <b>Ancienneté des annonces inconnue.</b> Vinted ne la donne que sur la page de l'annonce : ouvre quelques-unes de tes annonces sur vinted.fr avec l'extension — elle lit « Ajouté il y a… » au passage et le retient. Le « qui dort » se remplira tout seul.
+              ⏳ <b>{tr('annonces.ancienneteAnnoncesInconnue')}</b> {tr('annonces.vintedDonnePage')}
             </div>
           )}
           {/* ── Assistant de repricing : liste consolidée à baisser ── */}
@@ -46498,8 +46495,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowReprice(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>🏷️</span>
                 <span style={{flex:1,minWidth:0}}>
-                  <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>Repricing — {repriceList.length} article{repriceList.length>1?'s':''} à baisser</span>
-                  <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,fontWeight:500}}>Très vues sans acheteur ou qui dorment · jamais sous ton prix d'achat</span>
+                  <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>{trj('annonces.repricingArticlesBaisser', { n: repriceList.length })}</span>
+                  <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,fontWeight:500}}>{tr('annonces.tresVuesSans')}</span>
                 </span>
                 <span style={{fontSize:13,color:C.muted}}>{showReprice?'▲':'▼'}</span>
               </button>
@@ -46517,59 +46514,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
+                          <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||tr('annonces.annonce2')}</div>
                           <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{why.join(' · ')}</div>
                           {/* (27 oct., demande de Julien) Toucher ses favoris SANS robot :
                               Vinted prévient tout seul les personnes qui ont mis en favori
                               dès que le prix baisse. On le DIT ici — c'est SA baisse (le
                               bouton « Baisser » à droite), aucun message programmé (§3). */}
-                          {rp.favs>0 && <div data-reprice-favs={rp.favs} style={{fontSize:11,color:C.muted,display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><Icon name="heart" size={11} style={{color:C.muted}}/><span>{rp.favs} en favori — ta baisse les prévient</span></div>}
+                          {rp.favs>0 && <div data-reprice-favs={rp.favs} style={{fontSize:11,color:C.muted,display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><Icon name="heart" size={11} style={{color:C.muted}}/><span>{trj('annonces.favoriBaissePrevient', { favs: rp.favs })}</span></div>}
                         </div>
                         <div style={{flexShrink:0,textAlign:'right'}}>
                           <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
-                          {atFloor && <div style={{fontSize:11,color:C.muted}}>= prix d'achat (plancher)</div>}
+                          {atFloor && <div style={{fontSize:11,color:C.muted}}>{tr('annonces.prixAchatPlancher')}</div>}
                         </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:12,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Baisser</a>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title={tr('annonces.ouvrirAnnonceVinted2')} style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:12,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>{tr('annonces.baisser')}</a>
                       </div>
                       {/* Les AUTRES plateformes de la même paire (proposition 9). */}
                       {(eb || surLbcAussi) && (
                         <div data-reprice-ailleurs={it.id} style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',padding:'0 12px 8px 62px',fontSize:12,color:C.muted,lineHeight:1.4}}>
-                          {eb && eb.ambigu === 'ebay' && <span data-reprice-ebay-ambigu="ebay">eBay : deux annonces portent ce N° — je n'en baisse aucune, vérifie sur eBay.</span>}
-                          {eb && eb.ambigu === 'numero' && <span data-reprice-ebay-ambigu="numero">eBay : ce N° est porté par plusieurs articles dans VRM — l'annonce eBay est peut-être l'autre, je n'y touche pas.</span>}
+                          {eb && eb.ambigu === 'ebay' && <span data-reprice-ebay-ambigu="ebay">{tr('annonces.ebayDeuxAnnonces')}</span>}
+                          {eb && eb.ambigu === 'numero' && <span data-reprice-ebay-ambigu="numero">{tr('annonces.ebayPortePlusieurs')}</span>}
                           {eb && !eb.ambigu && (eb.fait && eb.fait.etat === 'ok'
                             ? (eb.fait.memo
-                              ? <span data-reprice-ebay="fait" data-reprice-ebay-memo="1">eBay : déjà baissé pour ce prix Vinted — <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b> aujourd'hui ✓</span>
+                              ? <span data-reprice-ebay="fait" data-reprice-ebay-memo="1">{tr('annonces.ebayDejaBaisse')} <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b> {tr('annonces.aujourdHui')}</span>
                               : (eb.fait.regleMsg
-                                ? <span data-reprice-ebay="fait" data-reprice-ebay-regle-msg={eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? 'ok' : 'warn'} style={{color: eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? C.text : C.warn}}>eBay : baissé à <b>{eb.fait.prix}&nbsp;€</b> — {eb.fait.regleMsg}</span>
-                                : <span data-reprice-ebay="fait">eBay : baissé à <b style={{color:C.text}}>{eb.fait.prix}&nbsp;€</b> ✓</span>))
+                                ? <span data-reprice-ebay="fait" data-reprice-ebay-regle-msg={eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? 'ok' : 'warn'} style={{color: eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? C.text : C.warn}}>{tr('annonces.ebayBaisse')} <b>{eb.fait.prix}&nbsp;€</b> — {eb.fait.regleMsg}</span>
+                                : <span data-reprice-ebay="fait">{tr('annonces.ebayBaisse')} <b style={{color:C.text}}>{eb.fait.prix}&nbsp;€</b> ✓</span>))
                             : eb.bloqueRegle
-                              ? <span data-reprice-ebay-regle={eb.itemId} style={{color:C.warn}}>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b> — ta règle d'offre accepte dès {Number(eb.bloqueRegle.accepte).toFixed(2).replace('.', ',')}&nbsp;€ : baisse-la ou retire-la d'abord (eBay → Annonces).</span>
+                              ? <span data-reprice-ebay-regle={eb.itemId} style={{color:C.warn}}>{tr('annonces.aussiEbay')} <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b> {tr('annonces.regleOffreAccepte')} {Number(eb.bloqueRegle.accepte).toFixed(2).replace('.', ',')}{tr('annonces.baisseRetireAbord')}</span>
                             : eb.utile
                               ? <>
-                                  <span>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b></span>
+                                  <span>{tr('annonces.aussiEbay')} <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b></span>
                                   <button type="button" data-reprice-ebay={eb.itemId} disabled={eb.fait && eb.fait.etat === 'envoi'} onClick={()=>baisserSurEbay(eb, rp)}
                                     style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:12,cursor:'pointer',fontFamily:'inherit'}}>
-                                    {eb.fait && eb.fait.etat === 'envoi' ? 'Envoi…' : `Baisser sur eBay à ${eb.sugg}\u00a0€`}
+                                    {eb.fait && eb.fait.etat === 'envoi' ? tr('annonces.envoi') : tr('annonces.baisserEbay', { sugg: String(eb.sugg) })}
                                   </button>
-                                  {eb.fait && (eb.fait.etat === 'ko' || eb.fait.etat === 'incertain') && <span data-reprice-ebay-issue={eb.fait.etat} style={{color:C.warn}}>{eb.fait.msg}{eb.fait.etat === 'incertain' && eb.url ? <> <a href={eb.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>Voir l'annonce eBay ↗</a></> : null}</span>}
+                                  {eb.fait && (eb.fait.etat === 'ko' || eb.fait.etat === 'incertain') && <span data-reprice-ebay-issue={eb.fait.etat} style={{color:C.warn}}>{eb.fait.msg}{eb.fait.etat === 'incertain' && eb.url ? <> <a href={eb.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>{tr('annonces.voirAnnonceEbay')}</a></> : null}</span>}
                                 </>
-                              : <span>Aussi sur eBay à {eb.prixActuel}&nbsp;€ (déjà au plus bas conseillé)</span>)}
-                          {surLbcAussi && <span>Aussi sur Leboncoin : baisse-la là-bas dans « Mes annonces ».</span>}
+                              : <span>{trj('annonces.aussiEbayDeja', { prixActuel: eb.prixActuel })}</span>)}
+                          {surLbcAussi && <span>{tr('annonces.aussiLeboncoinBaisse')}</span>}
                         </div>
                       )}
                       </div>
                     );
                   })}
-                  {ebayVivantes === null && <div style={{padding:'6px 12px',fontSize:11,color:C.muted}}>Tes annonces eBay n'ont pas pu être lues : je ne propose pas de baisse sur eBay pour l'instant.</div>}
-                  {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {repriceList.length-30} autres articles à baisser…</div>}
+                  {ebayVivantes === null && <div style={{padding:'6px 12px',fontSize:11,color:C.muted}}>{tr('annonces.annoncesEbayOnt')}</div>}
+                  {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>{trj('annonces.autresArticlesBaisser', { x: repriceList.length-30 })}</div>}
                 </div>
               )}
               {/* G22 — suivies, pas encore vendues → remise NATIVE (prévient tous les favoris) */}
               {suiviesList.length>0 && (
                 <div data-suivies style={{border:`1px solid ${C.border}`,borderRadius:12,background:C.card,overflow:'hidden',marginTop:10}}>
                   <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
-                    <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>👀 Suivies, pas encore vendues — {suiviesList.length}</span>
-                    <span style={{display:'block',fontSize:11,color:C.muted,marginTop:3,lineHeight:1.45}}>Ces articles sont dans les favoris de plusieurs personnes mais ne se sont pas vendus. Une petite remise sur Vinted prévient d'un coup <b>toutes</b> les personnes qui l'ont mis en favori (la remise aux favoris de Vinted). VRM ne change jamais ton prix — c'est toi, sur Vinted.</span>
+                    <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>{trj('annonces.suiviesEncoreVendues', { suiviesListN: suiviesList.length })}</span>
+                    <span style={{display:'block',fontSize:11,color:C.muted,marginTop:3,lineHeight:1.45}}>{tr('annonces.cesArticlesSont')} <b>{tr('annonces.toutes')}</b> {tr('annonces.personnesOntMis')}</span>
                   </div>
                   {suiviesList.slice(0,30).map(({it,favs})=>{
                     const num = numeros[it.id]?.numero;
@@ -46579,14 +46576,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
-                          <div style={{fontSize:11,color:C.muted}}>{favs} ❤️ en favori{(it.views!=null)?` · ${it.views} vues`:''}</div>
+                          <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||tr('annonces.annonce2')}</div>
+                          <div style={{fontSize:11,color:C.muted}}>{favs} {tr('annonces.favori')}{(it.views!=null)?tr('annonces.vues', { views: String(it.views) }):''}</div>
                         </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour proposer une remise (elle prévient tous les favoris)" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:12,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Proposer une remise</a>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title={tr('annonces.ouvrirAnnonceVinted3')} style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:12,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>{tr('annonces.proposerRemise')}</a>
                       </div>
                     );
                   })}
-                  {suiviesList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {suiviesList.length-30} autres articles suivis…</div>}
+                  {suiviesList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>{trj('annonces.autresArticlesSuivis', { x: suiviesList.length-30 })}</div>}
                 </div>
               )}
             </div>
@@ -46600,7 +46597,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               qui n'en a pas. */}
         </details>)}
         {listings.items && listings.items.length>0 && annShown.length===0 && (
-          <div data-ann-vue-vide="" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.6}}><b style={{display:'block',color:C.text}}>Aucune annonce dans cette vue</b>{annBase.length ? 'Tes annonces sont toujours là : la recherche ou le tri réduit la liste.' : 'Vérifie le compte sélectionné ou les comptes écartés : aucune annonce ne reste dans les comptes affichés.'}{(annSearch.trim() || annSort !== 'oldest') ? <div><Bouton variante="secondaire" data-ann-effacer-vue="" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Effacer la recherche et le tri</Bouton></div> : null}</div>
+          <div data-ann-vue-vide="" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.6}}><b style={{display:'block',color:C.text}}>{tr('annonces.aucuneAnnonceDans')}</b>{annBase.length ? tr('annonces.annoncesSontToujours') : tr('annonces.verifieCompteSelectionne')}{(annSearch.trim() || annSort !== 'oldest') ? <div><Bouton variante="secondaire" data-ann-effacer-vue="" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>{tr('annonces.effacerRechercheTri')}</Bouton></div> : null}</div>
         )}
         {/* ⚠️ SUR ORDINATEUR, `minmax(160px, …)` FAISAIT DES COLONNES, PAS DES
             CARTES. Mesuré à 1512 px : 6 colonnes de ~180 px, donc tous les champs
@@ -46646,7 +46643,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const uniforme = lignes.length > 1 && lignes.every(l => l.cle === lignes[0].cle);
           const phrase = (l, nommer) => {
             const pl = l.pl;
-            const ou = nommer ? <> sur {pl.nom.toLowerCase()}.fr</> : <> sur le site de chaque place</>;
+            const ou = nommer ? <> {tr('journee.texte2')} {pl.nom.toLowerCase()}{tr('annonces.fr')}</> : <> {tr('annonces.siteChaquePlace')}</>;
             return l.etat==='ok'
                     ? (l.ph
                       /* ⚠️ LA PHRASE QUI DÉCRIT CE QUE FAIT L'EXTENSION DOIT SUIVRE CE
@@ -46658,11 +46655,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                          ⚠️ Et la phrase dépend de la VERSION INSTALLÉE, PLACE PAR PLACE :
                          Leboncoin attache depuis la 5.58, eBay depuis la 5.59. Un seul
                          seuil pour les deux aurait menti dans un sens ou dans l'autre. */
-                      ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune{ou} — <b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis : <b>c'est toi qui publies</b>.</>
-                      : <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune{ou} — photos téléchargées dans un dossier, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>. La <b>{EXT_CAPACITES[pl.capPhotos]}</b> les attache directement au formulaire.</>)
+                      ? <>{tr('annonces.puceSousChaque')}{ou} — <b>{tr('annonces.photosAttacheesFormulaire')}</b> {tr('annonces.rienOrdinateurTexte')} <b>{tr('annonces.toiPublies')}</b>.</>
+                      : <>{tr('annonces.puceSousChaque')}{ou} {tr('annonces.photosTelechargeesDans')} <b>{tr('annonces.toiPublies')}</b>{tr('annonces.texte8')} <b>{EXT_CAPACITES[pl.capPhotos]}</b> {tr('annonces.attacheDirectementFormulaire')}</>)
                   : l.etat==='absente'
-                    ? <>Ton choix est enregistré. C'est l'extension, dans ton navigateur, qui prépare ensuite chaque annonce{nommer ? <> sur {pl.nom}</> : ''} — ouvre l'app sur l'ordinateur où elle est installée.</>
-                    : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore {nommer ? <>préparer {pl.nom}</> : 'les préparer'}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Paramètres → État des connexions</b> — tes coches ne bougent pas.</>;
+                    ? <>{tr('annonces.choixEnregistreExtension')}{nommer ? <> {tr('journee.texte2')} {pl.nom}</> : ''} {tr('annonces.ouvreAppOrdinateur')}</>
+                    : <>{tr('annonces.choixEnregistre')} <b>{tr('annonces.maisExtensionInstallee')} {nommer ? <>{tr('annonces.preparer')} {pl.nom}</> : tr('annonces.preparer2')}</b> {tr('annonces.luiFaut')} <b>{EXT_CAPACITES[pl.cap]}</b>{tr('annonces.metsJourDepuis')} <b>{tr('annonces.parametresEtatConnexions')}</b> {tr('annonces.cochesBougent')}</>;
           };
           return (<>
             {/* La phrase commune une seule fois, au-dessus des lignes. Sur la
@@ -46681,9 +46678,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 sans ouvrir. `data-places` reste sur le contenu : le banc le
                 trouve par cet attribut (invariant : aucune case eBay). */}
             <details data-places-wrap style={{marginBottom:12}}>
-              <summary aria-label="Publier aussi ailleurs" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
+              <summary aria-label={tr('annonces.publierAussiAilleurs')} style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
                 <span style={{display:'inline-flex',color:C.muted}}><Icon name="tag" size={15}/></span>
-                <span style={{fontSize:13,fontWeight:600,color:C.text}}><span className="vrm-label-full">Publier aussi ailleurs</span><span className="vrm-label-short" aria-hidden="true">Publier</span></span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}><span className="vrm-label-full">{tr('annonces.publierAussiAilleurs')}</span><span className="vrm-label-short" aria-hidden="true">{tr('annonces.publier2')}</span></span>
                 <span style={{flex:1,textAlign:'right',fontSize:12,color:C.muted,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lignes.map(l=>`${l.pl.nom} ${l.n}/${annStats.n}`).join(' · ')}</span>
                 <span className="vrm-chevron" style={{fontSize:15,color:C.muted}}>›</span>
               </summary>
@@ -46694,13 +46691,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <div style={{flex:1,minWidth:0,fontSize:13,color:C.text}}>
                       <b style={{fontWeight:700}}>{l.pl.nom}</b>
-                      <span style={{color:C.muted,marginLeft:8,fontVariantNumeric:'tabular-nums'}}>{l.n}/{annStats.n} annonce{annStats.n>1?'s':''}</span>
+                      <span style={{color:C.muted,marginLeft:8,fontVariantNumeric:'tabular-nums'}}>{trj('annonces.annonces2', { n: annStats.n, x: l.n })}</span>
                     </div>
-                    <div role="group" aria-label={`Sélection pour ${l.pl.nom}`} style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',flexShrink:0}}>
+                    <div role="group" aria-label={tr('annonces.selection', { nom: String(l.pl.nom) })} style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',flexShrink:0}}>
                       <button type="button" onClick={()=>setMpToutes(l.pl.cle, true)} aria-pressed={l.n===annStats.n}
-                        style={{border:'none',background:l.n===annStats.n?(C.card2||C.bg):'transparent',color:C.text,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0}}>Toutes</button>
+                        style={{border:'none',background:l.n===annStats.n?(C.card2||C.bg):'transparent',color:C.text,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0}}>{tr('journee.toutes')}</button>
                       <button type="button" onClick={()=>setMpToutes(l.pl.cle, false)} aria-pressed={l.n===0}
-                        style={{border:'none',borderLeft:`1px solid ${C.border}`,background:l.n===0?(C.card2||C.bg):'transparent',color:C.text,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0}}>Aucune</button>
+                        style={{border:'none',borderLeft:`1px solid ${C.border}`,background:l.n===0?(C.card2||C.bg):'transparent',color:C.text,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0}}>{tr('journee.aucune')}</button>
                     </div>
                   </div>
                   {!uniforme && <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginTop:4}}>{phrase(l, true)}</div>}
@@ -46714,7 +46711,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
       </>)}
       {curSub==='annonces' && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
-        <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+        <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>{tr('ventes.verifications')}</h3>
         <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
         <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
       </section>}
@@ -51577,18 +51574,18 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
         <div style={{ fontSize: 12, color: C.muted }}>
-          VRM dit <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
-          {it._vrmMasquee ? <> · <span data-verif-masquee>masquée par Vinted</span></> : null}
+          {tr('annonces.vrmDit')} <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
+          {it._vrmMasquee ? <> · <span data-verif-masquee>{tr('annonces.masqueeVinted')}</span></> : null}
           {preuve ? <> · <span data-verif-preuve>{preuve}</span></> : null}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est bien le N°{fiche.numero}</button>
-        <input className="vrm-autre-num" value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="Autre N°" aria-label={`Numéro écrit sur l'étiquette de ${it.title}`}
+        <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{trj('annonces.bien', { numero: fiche.numero })}</button>
+        <input className="vrm-autre-num" value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder={tr('annonces.autre')} aria-label={tr('annonces.numeroEcritEtiquette', { title: String(it.title) })}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
-        <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 12, border: 'none', background: C.text, color: C.card, fontSize: 13, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>Corriger</button>
-        {it._vrmMasquee && onPlusLa ? <button type="button" data-masquee-partie={String(it.id)} disabled={occupe} onClick={() => agir(() => onPlusLa(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Elle n'est plus là</button> : null}
+        <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 12, border: 'none', background: C.text, color: C.card, fontSize: 13, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>{tr('annonces.corriger')}</button>
+        {it._vrmMasquee && onPlusLa ? <button type="button" data-masquee-partie={String(it.id)} disabled={occupe} onClick={() => agir(() => onPlusLa(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{tr('annonces.plus')}</button> : null}
       </div>
     </div>
   );
