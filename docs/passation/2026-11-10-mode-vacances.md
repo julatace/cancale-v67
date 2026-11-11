@@ -75,7 +75,10 @@ vinted.fr : VRM apprend. » (chaque sens s'apprend : mettre en vacances ≠ rouv
   d'`origin/main` : 29 rouges.
 - Banc `scripts/bancs/mode-vacances.cjs` (données inventées, faux pont qui RETIENT la commande) :
   **78 verts** (390 tactile et 1512, clair et sombre ; D pas relu, E extension 5.337, F onglet sur
-  un autre compte). Captures regardées ; défaut vu et corrigé : l'ambre du geste était repeint en
+  un autre compte). Sur le build d'`origin/main` (git archive) : **10 rouges**. Mutation de l'app
+  rebâtie (`git archive HEAD`, « un autre compte part » dans `actionVacances`, `vite build`, banc à
+  1512 avec `BANC_DIST`) : **4 rouges** (F1 : une commande part alors que l'onglet est sur un
+  autre compte). Captures regardées ; défaut vu et corrigé : l'ambre du geste était repeint en
   gris par `styles-design-2026.css` (`!important`) — le contrôle B6 exige maintenant une couleur
   chaude.
 - `npm run build` ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`,
