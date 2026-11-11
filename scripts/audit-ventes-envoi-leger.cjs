@@ -100,6 +100,33 @@ function fetchServeur(etat) {
       lignes[id] = JSON.parse(o.body).data; etat.ecritures++;
       return R(200, [{ id }]);
     }
+    // (11 nov., migration 042) Les fonctions de la base : absentes (404, la forme
+    // d'avant la 042) sauf si le banc la sert (`VRM_BANC_042=1`, imitée ici ; le
+    // vrai SQL est exécuté par scripts/audit-serveur-migrations.cjs).
+    if (/\/rest\/v1\/rpc\//.test(u)) {
+      if (process.env.VRM_BANC_042 !== '1') return R(404, { code: 'PGRST202' });
+      const a = JSON.parse(o.body), row = lignes[a.p_id];
+      etat.rpc = (etat.rpc || 0) + 1;
+      if (/vrm_commandes_lire/.test(u)) {
+        etat.appels[etat.appels.length - 1] = { m: 'GET', u: u + ' ' + o.body };   // une LECTURE (la ligne est dans le corps)
+        if (etat.lectureKO && etat.lectureKO(u + ' ' + o.body)) return R(522, '<html>522</html>');
+        if (row === undefined) return R(200, 'null');
+        const mo = Array.isArray(row.payload && row.payload.my_orders) ? row.payload.my_orders : [];
+        const pris = {}, voulus = new Set(a.p_tx || []);
+        mo.forEach((x) => { const k = x && x.transaction_id != null ? String(x.transaction_id) : null; if (k != null && voulus.has(k) && !(k in pris)) pris[k] = x; });
+        return R(200, { cap: row.capturedAt == null ? null : String(row.capturedAt), rev: row.rev == null ? null : String(row.rev), pg: (row.payload && row.payload.pagination) || null, resume: row.resume || null,
+          sq: mo.map((x) => [x && x.transaction_id != null ? String(x.transaction_id) : null, x && typeof x.date === 'string' ? x.date : null]), mo: pris });
+      }
+      if (etat.avantEcriture) { const f = etat.avantEcriture; etat.avantEcriture = null; f(lignes); }
+      if (etat.ecritureKO) return R(503, {});
+      const r2 = lignes[a.p_id];
+      if (r2 === undefined || (r2.rev == null ? null : String(r2.rev)) !== a.p_rev || (r2.capturedAt == null ? null : String(r2.capturedAt)) !== a.p_cap) return R(200, 0);
+      const ancien = r2.payload.my_orders;
+      const liste = a.p_ordre.map((x) => (typeof x === 'number' ? ancien[x] : a.p_commandes[x]));
+      if (liste.some((x) => x === undefined)) return R(400, { message: 'vrm_commandes_ordre' });
+      lignes[a.p_id] = { ...a.p_data, payload: { ...a.p_data.payload, my_orders: liste } }; etat.ecritures++;
+      return R(200, 1);
+    }
     if (m === 'POST') {
       const c = JSON.parse(o.body);
       if (lignes[c.id] !== undefined) return R(409, {});

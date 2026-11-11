@@ -96,6 +96,26 @@ export async function lireCommeVendeur(req, chemin) {
   } catch (_) { return null; }
 }
 
+// (11 nov., migration 042) Appelle une fonction de la base AU NOM du vendeur
+// (son jeton : RLS). Rend `{ valeur }` · `{ absente: true }` (404 : la migration
+// qui la pose n'est pas encore passée — l'appelant reprend son chemin d'avant) ·
+// `null` (pas su : panne, refus, réponse illisible).
+export async function rpcCommeVendeur(req, nom, args) {
+  const jeton = jetonDe(req);
+  if (!jeton || !/^[a-z0-9_]+$/.test(String(nom || ''))) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/${nom}`, {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args || {}),
+    });
+    if (r.status === 404) return { absente: true };
+    if (!r.ok) return null;
+    const t = await r.text();
+    return { valeur: t === '' ? null : JSON.parse(t) };
+  } catch (_) { return null; }
+}
+
 // Crée une ligne AU NOM du vendeur (son jeton : RLS). Rend 1 si elle est
 // créée, 0 si elle existe déjà (409 : un autre appareil l'a créée avant), ou
 // `null` si la base n'a pas répondu ou a refusé.
