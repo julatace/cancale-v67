@@ -38,6 +38,7 @@ const MUTATIONS = {
   'To lu malgré l’enveloppe': [['api/_lib/proprietaire-email.js', '  if (env.some((a) => !estAdresseCollectrice(a))) return env;', '']],
   'webhook : pas su = personne': [['api/compte.js', "  if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });\n  if (!owner) {", '  if (!owner) {']],
   'ancien abonnement écrase': [['api/compte.js', "    if (evenementDUnAncienAbonnement(avant, ligne)) return { ok: true, ignore: 'ancien-abonnement' };", '']],
+  'quarantaine sans les adresses dans l’identité': [['api/email-inbound.js', "update(mid + '|' + String(raison || '') + '|' + [...new Set((adresses || []).map((a) => String(a).toLowerCase()))].sort().join(','))", "update(mid + '|' + String(raison || ''))"]],
   'Stripe sans délai': [['api/_lib/stripe.js', ', signal: AbortSignal.timeout(DELAI_STRIPE_MS) });', ' });']],
 };
 
@@ -187,6 +188,16 @@ const ligne = (owner, id) => base.find((r) => r.owner === owner && r.id === id);
       'Q le PDF est GARDÉ (ligne sœur, une pièce par ligne), la ligne de quarantaine reste légère', `${pj.length} pièce(s)`);
     await envoyer(bordereau('b@vrm.center', '700000001', true, { messageId: '<q1@banc>' }));
     dit(base.filter((r) => r.owner === NEUTRE && /^email_quarantaine_/.test(r.id)).length === 1, 'Q le même e-mail rejoué par le collecteur : pas de copie de plus (identité = Message-ID)');
+    // (relecture) Le MÊME Message-ID livré à DEUX adresses inconnues (deux exemplaires) :
+    // deux mises de côté, chacune avec SON adresse — sinon la 2e écrase la 1re et
+    // le propriétaire de la 1re adresse ne peut plus réclamer son e-mail.
+    await envoyer(bordereau('c@vrm.center', '700000001', true, { messageId: '<q1@banc>', envelopeTo: 'c@vrm.center' }));
+    const qs = base.filter((r) => r.owner === NEUTRE && /^email_quarantaine_/.test(r.id) && !(r.data && r.data.supprime));
+    const adrs = qs.map((r) => JSON.stringify((r.data && r.data.adresses) || []));
+    dit(qs.length === 2 && adrs.some((a) => a.includes('b@vrm.center')) && adrs.some((a) => a.includes('c@vrm.center')),
+      'Q le même Message-ID livré à une 2e adresse inconnue : sa propre mise de côté, la 1re adresse reste réclamable', `${qs.length} · ${adrs.join(' | ')}`);
+    const ident = base.filter((r) => r.owner === NEUTRE && /^email_quarantaine_/.test(r.id) && JSON.stringify(r.data.adresses || []).includes('b@vrm.center'));
+    if (ident.length !== 1) dit(false, 'Q (constat) la mise de côté de b@ est retrouvée', ident.length);
     base.push(registre(B, ['b@vrm.center']));
     // Pièce illisible : 503, rien n'est vidé.
     pannes = [(u, m) => m === 'GET' && u.includes('email_qpj_')];
@@ -197,7 +208,7 @@ const ligne = (owner, id) => base.find((r) => r.owner === owner && r.id === id);
     const r = faireRes(); await rattacher.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer jeton-B' }, body: { id: q[0].id, silencieux: true } }, r);
     const bord = ligne(B, 'email_bord_700000001');
     dit(r.code === 200 && bord && bord.data.pdfB64 === PDF, 'Q B réclame l’e-mail : son bordereau est rangé AVEC son PDF', `HTTP ${r.code} · pdf ${bord ? String(bord.data.pdfB64).slice(0, 12) : 'pas de bordereau'}`);
-    dit(!!(ligne(NEUTRE, q[0].id).data || {}).supprime && base.filter((x) => /^email_qpj_/.test(x.id)).every((x) => x.data.supprime && !x.data.contentB64), 'Q après le rejeu réussi : quarantaine et pièce vidées (le PDF est chez B)');
+    dit(!!(ligne(NEUTRE, q[0].id).data || {}).supprime && base.filter((x) => /^email_qpj_/.test(x.id) && x.data && x.data.quarantaine === q[0].id).every((x) => x.data.supprime && !x.data.contentB64), 'Q après le rejeu réussi : quarantaine et pièce vidées (le PDF est chez B)');
   });
 
   // ══ B : un 2e e-mail sans pièce n'efface pas le PDF ══════════════════════

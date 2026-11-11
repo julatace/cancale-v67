@@ -1705,7 +1705,11 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
   try {
     const mid = String((mail && mail.messageId) || '').trim();
     const id = 'email_quarantaine_' + (mid
-      ? 'm' + crypto.createHash('sha256').update(mid + '|' + String(raison || '')).digest('hex').slice(0, 20)
+      // (relecture) Les ADRESSES font partie de l'identité : le même Message-ID livré à
+      // deux adresses inconnues (deux exemplaires) donne deux mises de côté — sinon la
+      // 2e écrasait la 1re et la 1re adresse ne pouvait plus réclamer son e-mail.
+      // Un rejeu du collecteur (mêmes adresses) réécrit toujours la même ligne.
+      ? 'm' + crypto.createHash('sha256').update(mid + '|' + String(raison || '') + '|' + [...new Set((adresses || []).map((a) => String(a).toLowerCase()))].sort().join(',')).digest('hex').slice(0, 20)
       : Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
     // Les pièces d'abord : si l'une ne s'écrit pas, la quarantaine ne s'écrit pas
     // non plus et la route répond 503 (le collecteur rejoue) — jamais un e-mail
