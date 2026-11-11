@@ -164,7 +164,9 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
             const attr = (s, a) => (document.querySelector(s) || { getAttribute: () => null }).getAttribute(a);
             return {
               pub: pub && { total: pub.total, aVerifier: pub.aVerifier, colis: (pub.colis || []).map((c) => c[3]) },
-              onglet: attr('[data-colis-onglet-choix="retirer"]', 'data-colis-onglet-n'), carte: attr('[data-fu-colis-retirer]', 'data-fu-colis-retirer'),
+              // (11 nov., lot DJ3) Plus d'onglet « À retirer » ni de grande carte dans Achats : le nombre est porté par l'entrée
+              // « Achats » de la navigation (la même publication) — la règle (un nombre, le même partout) ne change pas.
+              onglet: attr('[data-badge-nav="achats"]', 'data-badge-n'), carte: pub ? String(pub.total) : null,
               journal: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].filter((p) => /journal/i.test((p.querySelector('.vrm-rpf-nom') || {}).textContent || '')).length,
               lignesJournal: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point [data-cc-carte]')].filter((l) => /journal/i.test(((l.closest('.vrm-rpf-point') || {}).textContent) || '')).length,
               avenir: document.querySelectorAll('.vrm-rpf-section:not(.is-repli) [data-rp-code-a-venir]').length,
@@ -173,7 +175,7 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
             };
           });
           dit(m.pub && m.pub.total === ATTENDU, `le nombre publié (vrm_colis_retirer) = ${ATTENDU} (les Mondial Relay disponibles seuls)`, JSON.stringify(m.pub));
-          dit(m.onglet === String(ATTENDU) && m.carte === String(ATTENDU), '« À retirer · 3 » : onglet et carte sombre disent le même nombre', `${m.onglet}/${m.carte}`);
+          dit(m.onglet === String(ATTENDU) && m.carte === String(ATTENDU), '« À retirer · 3 » : la pastille d’Achats et la publication disent le même nombre', `${m.onglet}/${m.carte}`);
           dit(m.journal === 1 && m.lignesJournal === 3, '« Maison du Journal » : UN point, ses 3 colis dedans (même avec un code à venir)', `${m.journal} carte(s), ${m.lignesJournal} ligne(s)`);
           dit(m.avenir === 1, 'le colis sans code garde sa puce « Code à venir » dans la carte du point', String(m.avenir));
           dit(m.double === '9', '« Peut-être en double · 9 » : les moitiés Vinted sans identité, montrées, jamais comptées', String(m.double));
@@ -209,6 +211,8 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
               e5001: etat('5001'), e5002: etat('5002'), e5003: etat('5003'),
               voirPlus: [...document.querySelectorAll('button')].map((x) => x.textContent).find((t) => /Voir plus/.test(t)) || '',
               vers: (() => { const e = document.querySelector('[data-achats-vers-colis]'); return e ? { n: e.getAttribute('data-achats-vers-colis'), t: e.textContent } : null; })(),
+              // (11 nov., lot DJ3) « À retirer » est EN TÊTE d'Achats : la section précède la liste des achats.
+              enTete: (() => { const s = document.querySelector('[data-colis-section="achats"]'), l = document.querySelector('[data-achat-tx]'); return !!(s && l && (s.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING)); })(),
               vert: [...document.querySelectorAll('.vrm-buy-row *')].some((e) => /rgb\(46, 158, 91\)|rgb\(52, 199, 89\)|rgb\(48, 209, 88\)/.test(getComputedStyle(e).color) || (e.getBoundingClientRect().width === 6 && e.getBoundingClientRect().height === 6 && getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)')),
             };
           });
@@ -223,7 +227,7 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
           dit(r.v === 'recherche' && /zzzz introuvable/.test(r.t), 'une recherche sans résultat le dit, avec « Effacer la recherche »', JSON.stringify(r));
           await pg.locator('[data-achats-effacer]').first().click().catch(() => {}); await pg.waitForTimeout(500);
           dit(await pg.locator('[data-achat-tx]').count() > 0, '« Effacer la recherche » rend la liste');
-          dit(!!m.vers && m.vers.n === '3' && !/\d/.test(m.vers.t), 'le chemin vers Colis reste, sans redire le nombre de la carte', JSON.stringify(m.vers));
+          dit(!m.vers && m.enTete, 'les colis à retirer sont EN TÊTE d’Achats (plus de lien « → Colis » qui redirait le nombre)', JSON.stringify({ vers: m.vers, enTete: m.enTete }));
           dit(!m.vert, 'aucune couleur hors palette sur les lignes (ni vert « Reçu », ni pastille de compte)');
           await pg.locator('[data-achats-plus]').first().click(); await pg.waitForTimeout(400);
           dit(await pg.locator('[data-achats-outils]').count() === 1, '« … » ouvre Fournisseurs · Délai · Lots');
