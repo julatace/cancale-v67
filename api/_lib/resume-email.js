@@ -62,6 +62,10 @@ export function resumeClassement(code, corps, extra) {
       if (!r.tx) r.av = 'sans-tx';
       break;
     }
+    // (11 nov., lot achats-auto) Achat Leboncoin / eBay / Vestiaire lu dans l'e-mail :
+    // l'identité est le n° de COMMANDE lu derrière son libellé (api/_lib/achats-email.js).
+    case 'achat-site': r = { t, si: court(c.site, 12), tx: ident(c.commande), a: court(x.article), mt: c.total != null ? court(c.total, 12) : undefined, fm: court(c.famille, 14), nv: c.nouvelle ? 1 : undefined }; if (!r.tx) r.av = 'analyse'; break;
+    case 'achat-a-verifier': r = { t, si: court(c.site, 12), fm: court(c.famille, 14), av: 'analyse' }; break;
     case 'vente': {
       if (c.garde) { r = { t, av: 'analyse' }; break; }
       r = { t, a: court(x.article), px: court(c.prix, 12), n: court(c.numero, 12), ps: court(c.pseudo, 30), fac: c.facture && c.facture.number ? court(c.facture.number, 30) : undefined, vf: c.verification ? 1 : undefined };

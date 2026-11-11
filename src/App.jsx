@@ -302,6 +302,8 @@ const PhotoEditor = aLaDemande(() => import('./ecrans/PhotoEditor.jsx').then((m)
 const ToutSurLeNumero = aLaDemande(() => import('./ecrans/Loupe.jsx').then((m) => ({ default: m.ToutSurLeNumero })));
 const MessagesLeboncoin = aLaDemande(() => import('./ecrans/MessagesLeboncoin.jsx').then((m) => ({ default: m.MessagesLeboncoin })));
 const AchatsHorsPlateforme = aLaDemande(() => import('./ecrans/Achats.jsx').then((m) => ({ default: m.AchatsHorsPlateforme })));
+// (11 nov., lot achats-auto) Achats Leboncoin / eBay / Vestiaire lus dans les e-mails (src/AchatsParEmail.jsx).
+const AchatsParEmail = aLaDemande(() => import('./AchatsParEmail.jsx'));
 const FeuilleRecuAchat = aLaDemande(() => import('./ecrans/Achats.jsx').then((m) => ({ default: m.FeuilleRecuAchat })));
 const RelierAchatCorps = aLaDemande(() => import('./ecrans/Achats.jsx').then((m) => ({ default: m.RelierAchatCorps })));
 const RepublierVinted = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.RepublierVinted })));
@@ -45825,6 +45827,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsEnDouble groupes={achatsDoubles} masques={(offBuysTous || []).filter((b) => b && horsMasques.includes(String(b.id)))}
           onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
           compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
+        {!modeRetraits && <AchatsParEmail lireTout={lireTout} offBuys={offBuysTous || []} onAjouter={addOffBuy} onModifier={updOffBuy} C={C}/>}
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
