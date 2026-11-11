@@ -46,14 +46,16 @@ const EBAY = [
   { itemId: '113', sku: '', title: 'Annonce eBay sans SKU', photo: null },
   { itemId: '114', sku: 'VRM-63', title: 'Asics encore sur eBay', photo: null },
 ];
-const LBC_ITEMS = { '701': { id: '701', subject: 'Spezial seule sur Leboncoin', customRef: 'VRM-61', status: 'active', seenAt: iso(1) },
-  '702': { id: '702', subject: 'Gazelle vendue sur Leboncoin', ref: '62', status: 'active', seenAt: iso(1) } };
+const LBC_ITEMS = { '701': { id: '701', subject: 'Spezial seule sur Leboncoin', customRef: 'VRM-61', status: 'active', seenAt: iso(1), account: 'lbc1' },
+  '702': { id: '702', subject: 'Gazelle vendue sur Leboncoin', ref: '62', status: 'active', seenAt: iso(1), account: 'lbc1' } };
 const LBC_VENTES = { V1: { txId: 'V1', itemId: '702', isSeller: true, price: 5000, stepLabel: 'Colis envoyé', title: 'Gazelle' } };
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: iso(0), created_at: iso(500) }];
 const lignes = () => [
   { id: 'main', data: { vinted_annonce_numeros: FICHES } },
   { id: 'lbc_ventes', data: { ventes: LBC_VENTES } },
-  { id: 'lbc_listings', data: { items: LBC_ITEMS } },
+  // (11 nov., DJ4) Une lecture COMPLÈTE fraîche de « Mes annonces » (règle du 6 nov., src/enLigneLbc.js) :
+  // sans elle N°61 est « à confirmer », et le Stock ne range plus que les paires EN LIGNE.
+  { id: 'lbc_listings', data: { items: LBC_ITEMS, lectures: { lbc1: { at: iso(0.5), total: 2, n: 2 } } } },
   { id: 'ebay_listings', data: { items: EBAY, capturedAt: iso(0.1), complet: true } },
   { id: 'vrm_room', data: JSON.parse(JSON.stringify(PLAN)) },
   { id: 'vrm_blocked_accounts', data: { uids: ['199082413'], logins: ['shop_cancale'] } },
