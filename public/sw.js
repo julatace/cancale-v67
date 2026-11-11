@@ -118,8 +118,8 @@ function rechaufferMorceaux(cache) {
     await cache.put(LISTE_HL, r);
     for (const n of l) {
       if (await cache.match(n)) continue;
-      const x = await fetch(n, { credentials: 'same-origin' });
-      if (!x || x.status !== 200 || x.type !== 'basic') return;
+      const x = await fetch(n, { credentials: 'same-origin' });   // réseau coupé : lève, on s'arrête là
+      if (!x || x.status !== 200 || x.type !== 'basic') continue;  // un fichier absent n'arrête pas les autres
       await cache.put(n, x);
     }
   })().catch(() => {}).finally(() => { _rechauffe = null; });

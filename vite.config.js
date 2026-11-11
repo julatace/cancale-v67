@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 // __BUILD__ = horodatage du build, injecté à la compilation. Sert de « version »
 // visible dans l'app pour diagnostiquer les problèmes de cache/mise à jour.
 // ⚠️ ON INJECTE L'ISO COMPLET, PAS UNE CHAÎNE DÉJÀ MISE EN FORME. La version
@@ -53,9 +54,12 @@ const EXCLU_HORS_LIGNE = /maplibre|three\.module|Room3D|OrbitControls|AccueilFil
 const listeHorsLigne = () => ({
   name: 'vrm-liste-hors-ligne',
   apply: 'build',
-  generateBundle(_o, bundle) {
-    const fichiers = Object.keys(bundle).filter((f) => /^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) && !EXCLU_HORS_LIGNE.test(f)).map((f) => '/' + f).sort();
-    this.emitFile({ type: 'asset', fileName: 'hors-ligne-assets.json', source: JSON.stringify({ v: 1, fichiers }) });
+  // Après l'écriture : seulement les fichiers VRAIMENT livrés (un morceau qui ne portait que du CSS
+  // est retiré par Vite après `generateBundle` — le nommer ferait un 404 au rangement).
+  writeBundle(o, bundle) {
+    const dir = o.dir || 'dist';
+    const fichiers = Object.keys(bundle).filter((f) => /^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) && !EXCLU_HORS_LIGNE.test(f) && existsSync(join(dir, f))).map((f) => '/' + f).sort();
+    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers }));
   },
 });
 const prechargerApp = () => ({

@@ -3560,10 +3560,18 @@ const _gestesHL = { owner: null, charge: false, attente: 0, atrancher: 0, enCour
 let _pushApresGestes = false, _rejeuT = null, _rejeuEssai = 0;
 const signalerGestesHL = () => { try { window.dispatchEvent(new Event('vrm:gestes-hl')); } catch (_) {} };
 // Les gestes regroupés par ce qu'ils touchent (une fiche, un colis, un prix) : UNE ligne, UN choix.
-const groupeCleHL = (g) => (g.ligne ? 'ligne|' + g.ligne + '|' + g.chemin[0] : g.k + '|' + JSON.stringify((g.chemin || []).slice(0, 1)));
+// Le prix d'un N° vit à deux endroits (la fiche, et `vinted_buyprice_by_num`) : UN geste, par son N°.
+const groupeCleHL = (g, fiches) => {
+  if (g.ligne) return 'ligne|' + g.ligne + '|' + g.chemin[0];
+  const s0 = g.chemin && g.chemin[0];
+  if (g.k === 'vinted_buyprice_by_num' && typeof s0 === 'string') return 'num|' + cleNum(s0);
+  if (g.k === 'vinted_annonce_numeros' && typeof s0 === 'string') { const n = fiches && fiches[s0] && fiches[s0].numero; return n != null && String(n).trim() ? 'num|' + cleNum(n) : 'fiche|' + s0; }
+  return g.k + '|' + JSON.stringify((g.chemin || []).slice(0, 1));
+};
 const groupesGestesHL = (liste, etat) => {
   const m = new Map();
-  for (const g of liste || []) { if (!g || g.etat !== etat) continue; const c = groupeCleHL(g); if (!m.has(c)) m.set(c, []); m.get(c).push(g); }
+  let fiches = {}; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = {}; }
+  for (const g of liste || []) { if (!g || g.etat !== etat) continue; const c = groupeCleHL(g, fiches); if (!m.has(c)) m.set(c, []); m.get(c).push(g); }
   return [...m.values()].map((l) => l.sort((a, b) => a.seq - b.seq));
 };
 const rafraichirGestesHL = async () => {

@@ -225,14 +225,14 @@ async function main() {
         await attendre(async () => (await pastille(pg))?.attente === 1, 5000);
         const p1 = await pastille(pg);
         dit(p1 && p1.attente === 1 && /1/.test(p1.texte), `${T} A : « Hors ligne · 1 geste en attente »`, JSON.stringify(p1));
-        dit(await enAttente(pg) === 1, `${T} A : le geste est rangé dans IndexedDB (au nom du compte)`);
+        dit(await enAttente(pg) >= 1, `${T} A : le geste est rangé dans IndexedDB (au nom du compte)`, String(await enAttente(pg)));
         dit(prixBase(base, 1) === '', `${T} A : rien n'est arrivé en base pendant la coupure`);
         await pg.screenshot({ path: path.join(CAPT, `A-attente-${T}.png`) });
         // L'app est FERMÉE puis rouverte, toujours sans réseau.
         await pg.close(); pg = await A.page();
         await pg.goto(URL0() + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' }).catch(() => {});
         await attendre(async () => (await pastille(pg))?.attente === 1, 10000);
-        dit((await pastille(pg))?.attente === 1 && await enAttente(pg) === 1, `${T} A : rouverte hors ligne, le geste attend toujours (survit à la fermeture)`, JSON.stringify(await pastille(pg)));
+        dit((await pastille(pg))?.attente === 1 && await enAttente(pg) >= 1, `${T} A : rouverte hors ligne, le geste attend toujours (survit à la fermeture)`, JSON.stringify(await pastille(pg)));
         dit(await prixLocal(pg, 1) === '41', `${T} A : et le prix est sur l'appareil`);
         const t0 = base.main.ecritures.length;
         await A.rebrancher();
