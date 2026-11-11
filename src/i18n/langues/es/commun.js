@@ -14,4 +14,16 @@ export default {
   "commun.relierCompte": "Vincular una cuenta",
   "commun.dicterRecherche": "Dictar la búsqueda",
   "commun.dicter": "Dictar",
+  "commun.dateInconnue": "fecha desconocida",
+  // ── App.jsx + LitigesEnCours.jsx + LigneFraicheur.jsx
+  "commun.comptes": "Cuentas",
+  "commun.toutJour": "Todo está al día",
+  "commun.verifie": " · comprobado {quand}",
+  "commun.puToutVerifier": "No se pudo comprobar todo:",
+  "commun.rienAffirme": "— no se afirma nada sobre",
+  "commun.ca": "eso",
+  "commun.chosesRevoir": "{x} cosas por revisar",
+  "commun.puVerifierRien": { one: "No se pudo comprobar: {x} — no se afirma nada sobre ello.", other: "No se pudo comprobar: {x} — no se afirma nada sobre ellos." },
+  "commun.verifie2": "Comprobado",
+  "commun.resteJour": " · el resto está al día.",
 };

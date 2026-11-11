@@ -14,4 +14,16 @@ export default {
   "commun.relierCompte": "Link an account",
   "commun.dicterRecherche": "Dictate the search",
   "commun.dicter": "Dictate",
+  "commun.dateInconnue": "unknown date",
+  // ── App.jsx + LitigesEnCours.jsx + LigneFraicheur.jsx
+  "commun.comptes": "Accounts",
+  "commun.toutJour": "Everything is up to date",
+  "commun.verifie": " · checked {quand}",
+  "commun.puToutVerifier": "Couldn’t check everything:",
+  "commun.rienAffirme": "— nothing is claimed for",
+  "commun.ca": "that",
+  "commun.chosesRevoir": "{x} things to review",
+  "commun.puVerifierRien": { one: "Couldn’t check: {x} — nothing is claimed for it.", other: "Couldn’t check: {x} — nothing is claimed for them." },
+  "commun.verifie2": "Checked",
+  "commun.resteJour": " · the rest is up to date.",
 };

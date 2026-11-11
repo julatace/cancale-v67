@@ -14,4 +14,16 @@ export default {
   "commun.relierCompte": "Collega un account",
   "commun.dicterRecherche": "Detta la ricerca",
   "commun.dicter": "Detta",
+  "commun.dateInconnue": "data sconosciuta",
+  // ── App.jsx + LitigesEnCours.jsx + LigneFraicheur.jsx
+  "commun.comptes": "Account",
+  "commun.toutJour": "È tutto aggiornato",
+  "commun.verifie": " · verificato {quand}",
+  "commun.puToutVerifier": "Non è stato possibile verificare tutto:",
+  "commun.rienAffirme": "— niente è affermato per",
+  "commun.ca": "questo",
+  "commun.chosesRevoir": "{x} cose da rivedere",
+  "commun.puVerifierRien": { one: "Non verificato: {x} — niente è affermato per questo.", other: "Non verificati: {x} — niente è affermato per loro." },
+  "commun.verifie2": "Verificato",
+  "commun.resteJour": " · il resto è aggiornato.",
 };

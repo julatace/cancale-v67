@@ -15,6 +15,8 @@ import React from 'react';
 import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import { phraseLimite, texteRetours, NOM_SITE } from './litigesEcran.js';
 import './styles-litiges.css';
+import { tr } from './i18n/index.js';
+import { trj } from './i18n/react.js';
 
 const svg = (d, extra = {}) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...extra}>{d}</svg>
@@ -58,7 +60,7 @@ function Carte({ c, Photo, onDossier = null }) {
       <div className="vrm-lit-haut">
         {ph ? <P src={ph} alt="" loading="lazy" className="vrm-lit-photo" repli={tuile}/> : tuile}
         <div className="vrm-lit-textes">
-          <span className="vrm-lit-num">{c.num ? `N°${c.num}` : 'Sans N°'}</span>
+          <span className="vrm-lit-num">{c.num ? `N°${c.num}` : tr('ventes.sans')}</span>
           <span className="vrm-lit-genre">{c.libelle}{c.etape ? ` · ${c.etape}` : ''}{c.plateforme === 'ebay' ? ' · eBay' : ''}</span>
           <span className={'vrm-lit-limite' + (c.presse ? ' is-presse' : '')} data-litige-phrase-limite="">{phraseLimite(c)}</span>
         </div>
@@ -91,16 +93,16 @@ function Dossier({ c, onDossier }) {
   return (
     <div className="vrm-lit-dossier" data-litige-dossier={etat || 'pret'}>
       <button type="button" className="vrm-lit-dossier-b" data-litige-dossier-b={c.cle} onClick={lancer} disabled={etat === 'encours'} aria-busy={etat === 'encours' ? 'true' : undefined}>
-        {ICONES.bordereau}<span>{etat === 'encours' ? 'Création…' : 'Dossier PDF'}</span>
+        {ICONES.bordereau}<span>{etat === 'encours' ? tr('ventes.creation') : tr('ventes.dossierPdf')}</span>
       </button>
       {bordOk ? (
         <label className="vrm-lit-dossier-case">
           <input type="checkbox" checked={avecB} onChange={(e) => setAvecB(e.target.checked)} data-litige-dossier-bordereau=""/>
-          <span>Joindre le bordereau <small>(il porte l’adresse)</small></span>
+          <span>{tr('ventes.joindreBordereau')} <small>{tr('ventes.porteAdresse')}</small></span>
         </label>
       ) : null}
-      {etat === 'ok' ? <span className="vrm-lit-dossier-msg" role="status" data-litige-dossier-ok="">PDF téléchargé ✓</span> : null}
-      {etat === 'passu' ? <span className="vrm-lit-dossier-msg is-passu" role="status" data-litige-dossier-passu="">PDF pas créé : réessaie.</span> : null}
+      {etat === 'ok' ? <span className="vrm-lit-dossier-msg" role="status" data-litige-dossier-ok="">{tr('ventes.pdfTelecharge')}</span> : null}
+      {etat === 'passu' ? <span className="vrm-lit-dossier-msg is-passu" role="status" data-litige-dossier-passu="">{tr('ventes.pdfCreeReessaie')}</span> : null}
     </div>
   );
 }
@@ -113,11 +115,11 @@ function RetoursParModele({ bi }) {
   const montrees = tout ? lignes : lignes.slice(0, MAX);
   const maxTaux = Math.max(0.0001, ...lignes.map((l) => l.taux || 0));
   return (
-    <section className="vrm-lit-bi" data-retours-modeles={bi.etat} data-retours-inconnues={bi.inconnues || 0} aria-label="Retours par modèle">
-      <h2 className="vrm-lit-h2">Retours par modèle</h2>
-      {bi.etat === 'encours' ? <p className="vrm-lit-note" role="status">Lecture…</p> : null}
-      {bi.etat === 'passu' ? <p className="vrm-lit-note" data-retours-passu="">— Tes ventes n’ont pas pu être lues.</p> : null}
-      {bi.etat === 'lu' && !lignes.length ? <p className="vrm-lit-note">Aucune vente lue.</p> : null}
+    <section className="vrm-lit-bi" data-retours-modeles={bi.etat} data-retours-inconnues={bi.inconnues || 0} aria-label={tr('ventes.retoursModele')}>
+      <h2 className="vrm-lit-h2">{tr('ventes.retoursModele')}</h2>
+      {bi.etat === 'encours' ? <p className="vrm-lit-note" role="status">{tr('messages.lecture')}</p> : null}
+      {bi.etat === 'passu' ? <p className="vrm-lit-note" data-retours-passu="">{tr('ventes.ventesOntPu')}</p> : null}
+      {bi.etat === 'lu' && !lignes.length ? <p className="vrm-lit-note">{tr('ventes.aucuneVenteLue')}</p> : null}
       {lignes.length ? (
         <div className="vrm-lit-bi-carte">
           {montrees.map((l) => (
@@ -128,12 +130,12 @@ function RetoursParModele({ bi }) {
             </div>
           ))}
           {lignes.length > MAX ? (
-            <button type="button" className="vrm-lit-bi-plus" data-retours-tout={lignes.length - MAX} onClick={() => setTout((x) => !x)}>{tout ? 'Moins' : `+ ${lignes.length - MAX} modèles`}</button>
+            <button type="button" className="vrm-lit-bi-plus" data-retours-tout={lignes.length - MAX} onClick={() => setTout((x) => !x)}>{tout ? tr('stock.moins') : tr('ventes.modeles', { x: String(lignes.length - MAX) })}</button>
           ) : null}
         </div>
       ) : null}
-      {bi.etat === 'lu' && bi.inconnues > 0 ? <p className="vrm-lit-note" data-retours-cause-non-lue={bi.inconnues}>{bi.inconnues} {bi.inconnues > 1 ? 'ventes remboursées' : 'vente remboursée'} : cause pas lue (annulation ou retour), pas comptée{bi.inconnues > 1 ? 's' : ''}.</p> : null}
-      {bi.manques && bi.manques.length ? <p className="vrm-lit-note" data-retours-manques={bi.manques.join('|')}>Pas lu : {bi.manques.join(', ')}.</p> : null}
+      {bi.etat === 'lu' && bi.inconnues > 0 ? <p className="vrm-lit-note" data-retours-cause-non-lue={bi.inconnues}>{trj('ventes.ventesRembourseesCause', { n: bi.inconnues })}</p> : null}
+      {bi.manques && bi.manques.length ? <p className="vrm-lit-note" data-retours-manques={bi.manques.join('|')}>{trj('ventes.lu3', { x: bi.manques.join(', ') })}</p> : null}
     </section>
   );
 }
@@ -145,28 +147,28 @@ export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onD
   return (
     <div className="vrm-lit" data-litiges-ecran={r.etat} data-litiges-n={r.etat === 'lu' ? n : ''} data-litiges-partiel={partiel ? '1' : '0'}>
       {entete}
-      {r.etat === 'encours' ? <p className="vrm-lit-note" role="status">Lecture de tes ventes…</p> : null}
-      {r.etat === 'passu' ? <p className="vrm-lit-note" data-litiges-passu="">— Tes ventes n’ont pas pu être lues : rien n’est perdu, c’est la lecture qui a échoué.</p> : null}
+      {r.etat === 'encours' ? <p className="vrm-lit-note" role="status">{tr('stats.lectureVentes')}</p> : null}
+      {r.etat === 'passu' ? <p className="vrm-lit-note" data-litiges-passu="">{tr('ventes.ventesOntPu2')}</p> : null}
       {r.etat === 'lu' && n > 0 ? (
         <div className="vrm-lit-resume" data-litiges-resume={n}>
-          {partiel ? <span>Au moins</span> : null}<b className="vrm-lit-total">{n}</b><span>en cours</span>
+          {partiel ? <span>{tr('stats.moins2')}</span> : null}<b className="vrm-lit-total">{n}</b><span>{tr('ventes.cours')}</span>
         </div>
       ) : null}
       {r.etat === 'lu' && n > 0 ? <div className="vrm-lit-grille">{r.cartes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier}/>)}</div> : null}
       {r.etat === 'lu' && n === 0 ? (
         <div className="vrm-lit-vide vrm-vide-dessin" data-litiges-vide={partiel ? 'partiel' : 'zero'}>
           <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="34" fill="currentColor" opacity=".10"/><path d="M22 37.5 31.5 47 50 26" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          <p className="vrm-lit-vide-titre">{partiel ? 'Aucun litige dans ce qui est lu' : 'Aucun litige en cours'}</p>
+          <p className="vrm-lit-vide-titre">{partiel ? tr('ventes.aucunLitigeDans') : tr('ventes.aucunLitigeCours')}</p>
         </div>
       ) : null}
       {r.anciennes.length ? (
         <details className="vrm-lit-anciennes vrm-repli" data-litiges-anciennes={r.anciennes.length}>
-          <summary>{r.anciennes.length} {r.anciennes.length > 1 ? 'plus anciens' : 'plus ancien'} (échéance passée)</summary>
+          <summary>{trj('ventes.plusAnciensEcheance', { n: r.anciennes.length })}</summary>
           <div className="vrm-lit-grille">{r.anciennes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier}/>)}</div>
         </details>
       ) : null}
       {r.plateformes.length > 1 || partiel ? (
-        <GroupeIos titre="Ce que VRM lit" data-litiges-plateformes="" className="vrm-lit-sites">
+        <GroupeIos titre={tr('ventes.vrmLit')} data-litiges-plateformes="" className="vrm-lit-sites">
           {r.plateformes.map((p) => (
             <RangeeIos key={p.site} data-litiges-site={p.site} data-litiges-site-etat={p.etat}
               titre={NOM_SITE[p.site] || p.site} detail={p.raison || null} valeur={p.etat === 'lu' ? '✓' : p.etat === 'encours' ? '…' : '—'}/>
@@ -186,7 +188,7 @@ export function EntreeLitiges({ ligne, onOuvrir }) {
   return (
     <button type="button" className="vrm-lit-entree" data-entree-litiges={n == null ? '' : n} onClick={onOuvrir}>
       <span className="vrm-lit-entree-icone" aria-hidden="true">{ICONES.carton}</span>
-      <span className="vrm-lit-entree-mot">Litiges et retours</span>
+      <span className="vrm-lit-entree-mot">{tr('ventes.litigesRetours')}</span>
       {n > 0 ? <span className="vrm-lit-entree-n">{n}</span> : null}
       <svg className="vrm-lit-entree-chevron" width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m1.5 1.5 5 5-5 5"/></svg>
     </button>

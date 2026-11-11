@@ -102,6 +102,15 @@ async function principal() {
       'D9 la phrase des offres en français est celle du serveur (OFFRES) : la copie ne peut pas diverger');
   } catch (e) { dit(false, 'D9 OFFRES se lit', e.message); }
 
+  // D10 (11 nov., lot 2) Les phrases d'écran : le français du dictionnaire est CELUI de src/phrasesEcran.js
+  // (le banc et l'audit des phrases jugent ce fichier) — une copie qui diverge rougit.
+  try {
+    const PE = await import(pathToFileURL(path.join(R, 'src', 'phrasesEcran.js')).href + '?v=' + Math.random());
+    const attendu = { ...Object.fromEntries(Object.entries(PE.PHRASES_ECRAN).map(([k, v]) => ['phrase.' + k, v])), ...Object.fromEntries(Object.entries(PE.PHRASES_ECRAN_ARTICLES).map(([k, v]) => ['phrase.' + k + '.articles', v])) };
+    const ecarts = Object.keys(attendu).filter((k) => fr[k] !== attendu[k]).concat(Object.keys(fr).filter((k) => /^phrase\./.test(k) && !(k in attendu)));
+    dit(!ecarts.length, `D10 les ${Object.keys(attendu).length} phrases d'écran en français sont celles de src/phrasesEcran.js`, ecarts);
+  } catch (e) { dit(false, 'D10 src/phrasesEcran.js se lit', e.message); }
+
   // ── C. le code ──
   console.log('\n── C. les clés écrites dans le code');
   const fichiers = [];

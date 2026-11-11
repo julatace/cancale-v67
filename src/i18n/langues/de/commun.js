@@ -14,4 +14,16 @@ export default {
   "commun.relierCompte": "Konto verknüpfen",
   "commun.dicterRecherche": "Suche diktieren",
   "commun.dicter": "Diktieren",
+  "commun.dateInconnue": "Datum unbekannt",
+  // ── App.jsx + LitigesEnCours.jsx + LigneFraicheur.jsx
+  "commun.comptes": "Konten",
+  "commun.toutJour": "Alles ist aktuell",
+  "commun.verifie": " · geprüft {quand}",
+  "commun.puToutVerifier": "Konnte nicht alles prüfen:",
+  "commun.rienAffirme": "— nichts wird behauptet für",
+  "commun.ca": "das",
+  "commun.chosesRevoir": "{x} Dinge zu prüfen",
+  "commun.puVerifierRien": { one: "Nicht prüfbar: {x} — dazu wird nichts behauptet.", other: "Nicht prüfbar: {x} — dazu wird nichts behauptet." },
+  "commun.verifie2": "Geprüft",
+  "commun.resteJour": " · der Rest ist aktuell.",
 };

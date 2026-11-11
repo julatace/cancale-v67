@@ -346,7 +346,7 @@ import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstalla
 import { ParcoursArrivee, CarteParcours } from "./ParcoursArrivee.jsx";
 import { CLE_PARCOURS, etatParcours, preuveCompte as preuveCompteParcours, preuveConfiguration, preuveExtension as preuveExtensionParcours, preuveEmails, preuveVinted, preuvePremiere, lireParcours as lirePositionParcours, ecritureParcours, etapeAMontrer, suivanteApres, carteParcours } from "./parcoursArrivee.js";
 import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, choixNumerotation, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
-import { PHRASES_ECRAN, phraseEcranPour } from "./phrasesEcran.js";
+import { PHRASES_ECRAN, PHRASES_ECRAN_ARTICLES, phraseEcranPour } from "./phrasesEcran.js";
 import { AIDE_ECRANS } from "./aideEcrans.js";
 // ⟦→ ecrans/Reglages.jsx #12⟧
 import { noterPlantage, viderPlantages, ecouterViolationsCspDans, derniersPlantages, erreursRecentes } from "./plantages.js";
@@ -659,7 +659,7 @@ import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, aCle, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
@@ -13575,6 +13575,8 @@ const libelleSourceAchat = (s) => SOURCE_ANCIENNE[s] || String(s || '').trim();
 // `toLocaleDateString(l, o)` = `new Intl.DateTimeFormat(l, o).format(d)` quand `o` nomme un champ de date).
 let _fmtJourSemaine = null, _fmtMoisLong = null;
 const dateJourFr = (d) => {
+  // (11 nov., traduction) Hors français : la date dans la langue choisie (Intl), « mercredi 11 novembre » ⇒ « Wednesday 11 November ».
+  if (langueCourante() !== 'fr') { try { return new Intl.DateTimeFormat(localeCourante(), { weekday: 'long', day: 'numeric', month: 'long' }).format(d); } catch (_) {} }
   if (!_fmtJourSemaine) { try { _fmtJourSemaine = new Intl.DateTimeFormat('fr-FR', { weekday: 'long' }); _fmtMoisLong = new Intl.DateTimeFormat('fr-FR', { month: 'long' }); } catch (_) { _fmtJourSemaine = _fmtMoisLong = null; } }
   const js = _fmtJourSemaine ? _fmtJourSemaine.format(d) : d.toLocaleDateString('fr-FR', { weekday: 'long' });
   const ml = _fmtMoisLong ? _fmtMoisLong.format(d) : d.toLocaleDateString('fr-FR', { month: 'long' });
@@ -13582,7 +13584,7 @@ const dateJourFr = (d) => {
 };
 // (2 nov., audit des données ; limites n°14) Une date de vente illisible ne
 // s'affiche jamais « Invalid Date » : « date inconnue » (la règle de `fmtD`, Colis).
-const dateFr = (d, opts) => { const t = d == null || d === '' ? NaN : (typeof d === 'number' ? d : Date.parse(d)); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', opts) : 'date inconnue'; };
+const dateFr = (d, opts) => { const t = d == null || d === '' ? NaN : (typeof d === 'number' ? d : Date.parse(d)); return Number.isFinite(t) ? new Date(t).toLocaleDateString(localeCourante(), opts) : tr('commun.dateInconnue'); };
 const dateLocaleISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 // ⟦→ ecrans/Achats.jsx #4⟧
 // Le prix tapé, relu en centimes (« 12,5 » → « 12,50 ») : `prixAchatSaisi`,
@@ -16269,7 +16271,11 @@ function CibleNotif({ tab, sub }) {
 // le texte de la phrase ne change pas) ; sans phrase, il reste seul.
 function PhraseEcran({ cle, className = '' }) {
   const p = useProfilVendeur();   // (11 nov., lot DJ2) « paires » seulement pour Sneakers
-  const t = cle && phraseEcranPour(cle, p.vend || vendActuel());
+  const vendP = p.vend || vendActuel();
+  // (11 nov., traduction) La phrase française vit dans src/phrasesEcran.js (le banc la juge là) ;
+  // hors français, sa traduction (`phrase.<écran>`, `.articles` pour la forme « article »).
+  const kP = cle && ('phrase.' + cle + (vendP !== 'sneakers' && PHRASES_ECRAN_ARTICLES[cle] !== undefined ? '.articles' : ''));
+  const t = cle && (langueCourante() !== 'fr' && aCle(kP) ? tr(kP) : phraseEcranPour(cle, vendP));
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
   if (!t) return aide ? <p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p> : null;
   return <p className={'vrm-phrase-ecran' + (className ? ' ' + className : '')} data-phrase-ecran={cle}>{t}{aide}</p>;
@@ -20693,13 +20699,13 @@ function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
       <div {...(lignes.length > 0 ? { role: 'button', tabIndex: 0, 'aria-expanded': detail, 'data-a-venir-replier': detail ? 'ouvert' : 'ferme', onClick: () => setDetail((v) => !v), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail((v) => !v); } } } : {})}
         style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, cursor: lignes.length > 0 ? 'pointer' : undefined }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>À venir</div>
-          {lignes.length > 0 && !detail ? <div data-a-venir-replie="" style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{T.n} vente{T.n > 1 ? 's' : ''} · détail par compte</div> : null}
+          <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('journee.venir')}</div>
+          {lignes.length > 0 && !detail ? <div data-a-venir-replie="" style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{trj('ventes.ventesDetailCompte', { n: T.n })}</div> : null}
           {/* Le groupe unique : qui doit l'argent, en une phrase (aucun montant redit). */}
           {resume ? <div data-a-venir-resume="" {...attrsGroupe(resume)} style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{NOM_SITE_AVENIR[resume.plateforme] || resume.plateforme}{resume.compte && resume.plateforme === 'Vinted' ? <span className="vrm-sensible"> · {resume.compte}</span> : null} · {quand(resume)}</div> : null}
         </div>
-        <span className="vrm-display" data-a-venir-total="" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? `Au moins — sans ${T.manque.join(', ')}` : undefined}>
-          {T.partiel && T.valeur != null ? <span style={{ fontSize: 13, fontWeight: 500, color: C.muted }}>au moins </span> : null}{T.valeur == null ? '—' : montant(T.valeur)}
+        <span className="vrm-display" data-a-venir-total="" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? tr('journee.moinsSans2', { x: String(T.manque.join(', ')) }) : undefined}>
+          {T.partiel && T.valeur != null ? <span style={{ fontSize: 13, fontWeight: 500, color: C.muted }}>{tr('journee.moins')} </span> : null}{T.valeur == null ? '—' : montant(T.valeur)}
         </span>
         {lignes.length > 0 ? <span aria-hidden="true" style={{ color: C.muted, transform: detail ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span> : null}
       </div>
@@ -20717,9 +20723,9 @@ function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
       </div>}
       {(manque.length > 0 || nc.length > 0) && (
         <div data-a-venir-manque={manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 8, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
-          {manque.length > 0 ? <>Sans {manque.join(', ')} (pas lu)</> : null}
+          {manque.length > 0 ? <>{tr('compta.sans')} {manque.join(', ')} {tr('ventes.lu2')}</> : null}
           {manque.length > 0 && nc.length > 0 ? ' · ' : null}
-          {nc.length > 0 ? <>{nc.length} vente{nc.length > 1 ? 's' : ''} au montant pas lu ({[...new Set(nc.map((x) => x.plateforme))].join(', ')})</> : null}
+          {nc.length > 0 ? <>{nc.length} {tr('journee.vente')}{nc.length > 1 ? 's' : ''} {tr('ventes.montantLu')}{[...new Set(nc.map((x) => x.plateforme))].join(', ')})</> : null}
         </div>
       )}
     </section>
@@ -56246,7 +56252,7 @@ function AppCoeur() {
         : <MessagesVestiaire/>}
     </section>
   );
-  const TITRES_TACHE={ ventes:'Ventes', annonces:'Annonces', messages:'Messages', achats:'Achats' };
+  const TITRES_TACHE={ ventes:tr('nav.ventes'), annonces:tr('nav.annonces'), messages:tr('nav.messages'), achats:tr('nav.achats') };
   const rendreTache=(t)=>{
     const site=siteDeTache(t,platSub);
     const sec=sectionDeTache(t,platSub);

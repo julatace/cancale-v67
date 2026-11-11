@@ -14,4 +14,16 @@ export default {
   "commun.relierCompte": "Relier un compte",
   "commun.dicterRecherche": "Dicter la recherche",
   "commun.dicter": "Dicter",
+  "commun.dateInconnue": "date inconnue",
+  // ── App.jsx + LitigesEnCours.jsx + LigneFraicheur.jsx
+  "commun.comptes": "Comptes",
+  "commun.toutJour": "Tout est à jour",
+  "commun.verifie": " · vérifié {quand}",
+  "commun.puToutVerifier": "Pas pu tout vérifier :",
+  "commun.rienAffirme": "— rien n’est affirmé pour",
+  "commun.ca": "ça",
+  "commun.chosesRevoir": "{x} choses à revoir",
+  "commun.puVerifierRien": { one: "Pas pu vérifier : {x} — rien n’est affirmé pour ça.", other: "Pas pu vérifier : {x} — rien n’est affirmé pour eux." },
+  "commun.verifie2": "Vérifié",
+  "commun.resteJour": " · le reste est à jour.",
 };
