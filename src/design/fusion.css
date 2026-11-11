@@ -1338,15 +1338,6 @@ body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-voile { z-index: 20001 !important; 
 body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-feuille { z-index: 20002 !important; }
 html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 
-/* (11 nov., lot DJ3 — Julien : « on ne voit pas tout le titre de la paire ») Dans « À expédier » (Ventes),
-   « À retirer » (Achats) et l'écran Colis : le titre d'un colis se lit EN ENTIER — il passe à la ligne,
-   trois lignes au plus (au-delà, la fiche le montre plein). Jamais « … » sur une ligne. */
-html body .vrm-app-shell :is(.vrm-main .vrm-colis-section, .vrm-main:has(.vrm-fu-colis), .vrm-main[data-ecran="cat_bord"], .vrm-main[data-ecran="ventes"], .vrm-main[data-ecran="achats"]) :is(.vrm-colis-carte .vrm-colis-titre, .vrm-rpf-quoi .vrm-rpf-titre, .vrm-colis-section .vrm-colis-titre) {
-  display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 3 !important;
-  white-space: normal !important; overflow: hidden !important; text-overflow: clip !important; overflow-wrap: anywhere !important; max-width: 100% !important;
-}
-html body .vrm-app-shell .vrm-titre-entier { display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: normal !important; overflow: hidden; overflow-wrap: anywhere; }
-
 /* ── (11 nov., lot DJ3) « TOUT IMPRIMER » EN TROIS TEMPS (feuille `.vrm-tip`) ─────────────────────────
    Choisir · Imprimer · Déposer. Une colonne, des groupes iOS, des cibles de 44 px, l'aperçu en pages A4. */
 .vrm-tip-temps { display: flex; flex-direction: column; gap: 14px; animation: vrm-tip-entre .24s cubic-bezier(.2,.8,.2,1) both; }
@@ -1395,3 +1386,4 @@ html body .vrm-app-shell .vrm-titre-entier { display: -webkit-box !important; -w
 .vrm-tip-alerte { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--fu-ambre-fond); color: var(--fu-ambre-txt, #B25000); font: 600 14px/1.35 var(--vrm-police); }
 .vrm-tip-progression { display: flex; align-items: center; gap: 10px; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); }
 .vrm-tip-progression progress { flex: 1; height: 4px; }
+.vrm-tip-pdf { display: flex; align-items: center; justify-content: center; margin: 0 auto; text-decoration: none; }

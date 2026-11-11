@@ -39265,7 +39265,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte, apercu: placer ? 'force' : true });
       documentPrepare=true;verifierContexte();
-      setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
+      // (11 nov., lot DJ3) Dans le parcours « Tout imprimer », la feuille dit la suite (« C'est imprimé ? », le lien du PDF) :
+      // pas de seconde fenêtre « N bordereaux prêts » par-dessus (la même chose deux fois).
+      if (!(parcours && choisis && !echecs.length && !(r.rates || []).length)) setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
       // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
       // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
       // un PDF qui commence par %PDF mais que pdf-lib refuse (chiffré, abîmé)
@@ -39277,7 +39279,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       const differe = parcours && !echecs.length && choisis;
-      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { n: imprimes, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
+      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { n: imprimes, url: r.url, nom: r.filename, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
       if (!differe && reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
       if (!differe) (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
@@ -45960,6 +45962,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
                         <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
+                        {fait.url ? <a className="vrm-tip-lien vrm-tip-pdf" data-lot-ouvrir-pdf="" href={fait.url} target="_blank" rel="noopener">Ouvrir le PDF</a> : null}
                         <div className="vrm-tip-pied">
                           <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>Pas encore</Bouton>
                           <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>Oui, imprimé</Bouton>
