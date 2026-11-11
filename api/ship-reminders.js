@@ -41,7 +41,7 @@ import { bordsParTransaction, compterEcheances, heureCourte } from './_lib/limit
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
-import { ordreStable } from './_lib/ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
@@ -191,11 +191,13 @@ async function ecrireDedup(id, data) {
 // demi-liste prise pour complète — même règle que `sbGetTout` côté app).
 async function fetchPaginated(path) {
   const out = []; const page = 1000;
-  for (let from = 0; from < 500000; from += page) {
+  for (let from = 0; ; from += page) {
+    if (from >= 500000) return null;   // (11 nov., familles-serveur) au plafond : « pas su », jamais une demi-liste — cron
     let r;
     // (7 nov.) Un ordre TOTAL : sans `order=`, une ligne peut sauter ou revenir d'une page à l'autre.
     try { r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;

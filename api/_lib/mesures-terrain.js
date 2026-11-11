@@ -26,6 +26,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { createHmac } from 'node:crypto';
 import { sbCle } from './cle.js';
+import { finALaFrontiere } from './ordre-stable.js';   // (11 nov.) 416 à une frontière exacte = fin de liste
 import { proprietaireInstallation } from './signalement.js';
 import { normaliserLot, fusionnerHisto, resumeJour, jourParis, LOTS_MAX_JOUR, totalLot } from '../../src/mesuresTerrain.js';
 // (8 nov.) Les alertes de plantage voyagent avec le lot (`p`) : src/alertesPlantages.js.
@@ -180,6 +181,7 @@ export async function lireDerniersJours({ env = process.env, fetcher = fetchAvec
     const ids = []; const page = 1000;
     for (let from = 0; from < 200000; from += page) {
       const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=like.${PREFIXE_MESURES}*&select=id&order=id.desc`, { headers: { ...sbCle(service), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
+      if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
       if (!r.ok) return null;
       const j = await r.json().catch(() => null);
       if (!Array.isArray(j)) return null;
@@ -278,6 +280,7 @@ export async function purgerMesuresAnciennes({ url, headers, proprietaire, fetch
   try {
     for (let from = 0; from < 200000; from += page) {
       const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${p}&id=like.${PREFIXE_MESURES}*&select=id&order=id.asc`, { headers: { ...headers, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
+      if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
       if (!r || !r.ok) return { fait: false, raison: 'lecture', statut: r ? r.status : null, seuil };
       let j = null; try { j = await r.json(); } catch (_) { j = null; }
       if (!Array.isArray(j)) return { fait: false, raison: 'lecture', seuil };

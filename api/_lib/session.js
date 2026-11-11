@@ -79,6 +79,7 @@ export async function modifierCommeVendeur(req, chemin, corps) {
   } catch (_) { return null; }
 }
 
+export const PLAFOND_SUPABASE = 1000;
 export async function lireCommeVendeur(req, chemin) {
   const jeton = jetonDe(req);
   if (!jeton) return null;
@@ -86,7 +87,12 @@ export async function lireCommeVendeur(req, chemin) {
     const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
     if (!r.ok) return null;
     const j = await r.json();
-    return Array.isArray(j) ? j : null;
+    if (!Array.isArray(j)) return null;
+    // (11 nov., M46) Supabase coupe à 1 000 lignes SANS le dire (§4.5) : une liste
+    // pleine sans `limit=` posé est peut-être tronquée ⇒ « pas su », jamais une
+    // demi-liste présentée comme entière.
+    if (j.length >= PLAFOND_SUPABASE && !/(^|[?&])limit=\d+/.test(chemin)) return null;
+    return j;
   } catch (_) { return null; }
 }
 

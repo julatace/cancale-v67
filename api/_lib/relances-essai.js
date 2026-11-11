@@ -190,11 +190,17 @@ async function lire(chemin) {
 // Les comptes en essai (pagination : jamais une demi-liste prise pour complète).
 export async function listerEssais() {
   const out = [];
-  for (let from = 0; from < 100000; from += 1000) {
-    const page = await lire(`abonnements?statut=eq.trialing&select=owner,statut,fin_periode,annule_fin_periode,mode_test&order=owner.asc&offset=${from}&limit=1000`);
+  // (11 nov., familles-serveur) pagination PAR CLÉ (`owner=gt.` le dernier lu),
+  // jamais par `offset=` : une ligne qui change pendant la lecture ne fait ni
+  // sauter ni doubler une autre.
+  let apres = '';
+  for (let n = 0; n < 100; n++) {
+    const page = await lire(`abonnements?statut=eq.trialing${apres ? `&owner=gt.${encodeURIComponent(apres)}` : ''}&select=owner,statut,fin_periode,annule_fin_periode,mode_test&order=owner.asc&limit=1000`);
     if (!page) return null;
     out.push(...page);
     if (page.length < 1000) break;
+    apres = String(page[page.length - 1].owner || '');
+    if (!apres) return null;
   }
   return out;
 }

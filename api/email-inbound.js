@@ -61,7 +61,7 @@ import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_l
 import { lireEmailVcAutre, fusionAnnonceVc, fusionOffreVc } from './_lib/vestiaire-email-autres.js';
 import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
-import { ordreStable } from './_lib/ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU, ID_ESSAI, codeEssaiDe } from './_lib/adresse-reception.js';
@@ -897,10 +897,12 @@ export async function numeroDEmail(numeroLu, titre, viaTitre) {
 //    d'owner rendrait les annonces de TOUS les vendeurs.
 async function lirePagine(requete) {
   const out = []; const page = 1000;
-  for (let from = 0; from < 100000; from += page) {
+  for (let from = 0; ; from += page) {
+    if (from >= 100000) return null;   // (11 nov., familles-serveur) au plafond : « pas su », jamais une demi-liste
     let r;
     try { r = await fetchAvecDelai(await duVendeur(ordreStable(`${SUPABASE_URL}/rest/v1/app_data?${requete}`)), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;

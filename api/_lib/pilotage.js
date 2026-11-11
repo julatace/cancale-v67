@@ -34,7 +34,7 @@
 //     une lecture ratée n'écrit RIEN ; une valeur pas sue reste `null`.
 // ═══════════════════════════════════════════════════════════════════════════
 import { sbCle } from './cle.js';
-import { ordreStable } from './ordre-stable.js';   // (11 nov.) chaque page Range porte un tri total
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';   // (11 nov.) chaque page Range porte un tri total
 import { proprietaireInstallation } from './signalement.js';
 import { listerPlantagesTerrain } from './alertes-plantages.js';
 import { stripeApi as stripeApiReel, stripePret, stripeModeTest } from './stripe.js';
@@ -66,6 +66,7 @@ async function lireTout(env, fetcher, chemin) {
   for (let p = 0; p < PAGES_MAX; p++) {
     let r;
     try { r = await fetcher(`${url}/rest/v1/${ordreStable(chemin)}`, { headers: { ...sbCle(service), 'Range-Unit': 'items', Range: `${p * PAGE}-${p * PAGE + PAGE - 1}` } }); } catch (_) { return null; }
+    if (finALaFrontiere(r, p * PAGE)) return out;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r || !r.ok) return null;
     const j = await r.json().catch(() => null);
     if (!Array.isArray(j)) return null;

@@ -35,6 +35,7 @@ import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation,
 import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdresse, adresseRetenue, prouveeParCompte, relaisApple, adresseVerifiable, DUREE_LIEN_MS, DELAI_RENVOI_MS, MAX_ENVOIS_ADRESSE_JOUR, MAX_ADRESSES_JOUR, MAX_DEMANDES_VENDEUR_JOUR, idCompteurVendeur, reserverDemande } from './_lib/preuve-adresse.js';
 import { modifierNeutre } from './_lib/neutre-cas.js';
 import { sbCle } from './_lib/cle.js';
+import { finALaFrontiere } from './_lib/ordre-stable.js';   // (11 nov.) 416 à une frontière exacte = fin de liste
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { idIndexJeton } from './_lib/jeton-index.js';
 import { domaineReception, nouveauJeton, jetonValide, adresseDeJeton, ecrireIndexReception, marquerRemplacee, ID_ADRESSE, ID_VU, ID_CODE, ID_ESSAI, etatMiseEnService } from './_lib/adresse-reception.js';
@@ -92,6 +93,7 @@ async function lirePages(requete, compte) {
         headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` },
       });
     } catch (_) { return null; }
+    if (finALaFrontiere(r, debut)) return { rows };   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
@@ -217,6 +219,7 @@ async function compterPersonne(lu, compte) {
         headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${p * PAGE_COMPTE}-${(p + 1) * PAGE_COMPTE - 1}` },
       });
     } catch (_) { return null; }
+    if (finALaFrontiere(r, p * PAGE_COMPTE)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;

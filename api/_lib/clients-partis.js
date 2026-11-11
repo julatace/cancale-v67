@@ -129,11 +129,16 @@ async function ecrireAvis(url, service, owner, data) {
 
 export async function listerFinis(url, service) {
   const out = [];
-  for (let from = 0; from < 100000; from += 1000) {
-    const page = await lire(url, service, `abonnements?statut=in.(${STATUTS_FINIS.join(',')})&select=owner,statut,client_stripe,abonnement_stripe,mode_test&order=owner.asc&offset=${from}&limit=1000`);
+  // (11 nov., M88) pagination PAR CLÉ (`owner=gt.` le dernier lu), jamais par
+  // `offset=` sur une table que le passage modifie : aucune ligne ne saute.
+  let apres = '';
+  for (let n = 0; n < 100; n++) {
+    const page = await lire(url, service, `abonnements?statut=in.(${STATUTS_FINIS.join(',')})${apres ? `&owner=gt.${encodeURIComponent(apres)}` : ''}&select=owner,statut,client_stripe,abonnement_stripe,mode_test&order=owner.asc&limit=1000`);
     if (!page) return null;
     out.push(...page);
     if (page.length < 1000) break;
+    apres = String(page[page.length - 1].owner || '');
+    if (!apres) return null;
   }
   return out;
 }

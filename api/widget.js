@@ -19,7 +19,7 @@ import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
 import { routeSms } from './_lib/sms-mondialrelay.js';
 import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
-import { ordreStable } from './_lib/ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 // (9 nov., suites serveur) L'offre Solo / Pro : la règle (api/_lib/plan-regle.js, la même que l'app)
@@ -61,11 +61,13 @@ const parisDate = (off = 0) => new Date(Date.now() + off * 86400000).toLocaleDat
 // pire qu'une lecture ratée (même règle que `sbGetTout` côté app).
 async function fetchPaginated(path) {
   const out = []; const page = 1000;
-  for (let from = 0; from < 500000; from += page) {
+  for (let from = 0; ; from += page) {
+    if (from >= 50000) return null;   // (11 nov., familles-serveur) au plafond : « pas su », jamais une demi-liste — widget : 50 pages au plus par lecture (M57)
     let r;
     // (7 nov.) Un ordre TOTAL : sans `order=`, une ligne peut sauter ou revenir d'une page à l'autre.
     try { r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
