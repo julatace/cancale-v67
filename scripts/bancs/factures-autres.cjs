@@ -23,12 +23,17 @@ const SIRET = (() => { for (let k = 0; k < 100000; k++) { const s = SIREN + Stri
 const CFG = { nom: 'Boutique Banc', forme: 'EI', siret: SIRET, adresse: '1 rue du Banc', codePostal: '35000', ville: 'Rennes', tva_regime: 'franchise', prefixe: 'FA', couleur: '#0071e3', email: 'boutique@banc.test', comptesFacture: { 'leboncoin:compte_banc': true, 'ebay:principal': true } };
 const lbc = (tx, x = {}) => ({ txId: String(tx), title: `Nike Dunk banc ${tx}`, price: 2500, prixListe: 2928, dateVente: '2026-11-03T10:12:00.000Z', account: 'compte_banc', accountName: 'Compte Banc', isSeller: true, stepStatus: 'done', stepLabel: 'Terminé', at: cap, ...x });
 const VENTES = { 123456789: lbc(123456789), 223456789: lbc(223456789, { stepStatus: 'cancelled', stepLabel: '', dateVente: '2026-11-02T10:00:00.000Z' }) };
+const vcV = (id, x = {}) => ({ productId: id, date: '2026-11-02T10:00:00.000Z', etat: 'sold', titre: `Sac banc ${id}`, montant: { valeur: 203.23, devise: 'EUR', cle: 'sellerEarning' }, sources: ['ventes'], vuAt: cap, ...x });
+const VC_VENTES = { 72987283: vcV('72987283', { prixVente: { valeur: 250, devise: 'EUR', cle: 'sellerPrice' } }), 72987284: vcV('72987284', { date: '2026-11-01T10:00:00.000Z' }) };
 let cfg = CFG;
 let emis = {};
 let requetesApi = [];
 const lignes = () => [
   { id: 'lbc_ventes', data: { ventes: VENTES, updatedAt: cap } },
   { id: 'vrm_pro_facture', data: cfg },
+  // (11 nov., extension 5.340) Vestiaire : une vente AVEC le prix de vente lu (`sellerPrice`), une sans.
+  { id: 'vc_ventes', data: { ventes: VC_VENTES, lectures: { ventes: { at: cap, total: 2, complet: true } }, capturedAt: cap } },
+  { id: 'vc_listings', data: { liens: {} } },
   ...Object.entries(emis).map(([id, d]) => ({ id, data: d })),
 ];
 let ko = 0, ok = 0;
@@ -169,6 +174,26 @@ const deplier = async (pg, tx) => {
         const r = pg.locator('[data-fa-ref="223456789"][data-fa-etat="refus"]');
         await r.waitFor({ timeout: 20000 });
         dit(await r.getAttribute('data-fa-code') === 'annulee' && await pg.locator('[data-fa-ref="223456789"] button').count() === 0, '1. vente annulée : la raison, aucun bouton');
+      });
+      await essaie('Vente Vestiaire', async () => {
+        await pg.goto(`http://localhost:${PORT}/?tab=ventes&site=vestiaire`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('[data-vc-vente="72987283"]', { timeout: 30000 });
+        const tete = pg.locator('[data-fa-plateforme="vestiaire"][data-fa-etat="refus"]').first();
+        await tete.waitFor({ state: 'attached', timeout: 20000 });
+        dit(await tete.getAttribute('data-fa-n') === '1' && await tete.getAttribute('data-fa-code') === 'prix', '7. Vestiaire : le refus dit UNE fois, pour la seule vente sans prix de vente', await tete.getAttribute('data-fa-n'));
+        await pg.click('[data-vc-vente="72987283"] .vrm-ledger-sale-toggle');
+        const faire = pg.locator('[data-fa-plateforme="vestiaire"][data-fa-ref="72987283"][data-fa-etat="a-faire"] [data-fa-faire]');
+        await faire.waitFor({ timeout: 20000 });
+        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fa-vc-detail-${nf}.png`) });
+        await faire.click();
+        const f = pg.locator('[data-fa-feuille="72987283"]');
+        await f.waitFor({ timeout: 20000 });
+        dit(await f.locator('[data-fa-prix="25000"]').count() === 1 && await f.locator('[data-fa-source="saisi"]').count() === 1, '7. Vestiaire avec prix de vente lu : « Faire la facture », 250,00 € (jamais les 203,23 € versés), acheteur à recopier');
+        const m = await mesurer(pg, '[data-fa-feuille="72987283"]');
+        dit(m && !m.hors.length && !m.deb, '7. la feuille Vestiaire tient dans la largeur', JSON.stringify(m));
+        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fa-vc-feuille-${nf}.png`) });
+        await pg.click('[data-vc-vente="72987284"] .vrm-ledger-sale-toggle', { force: true }).catch(() => {});
+        dit(await pg.locator('[data-fa-ref="72987284"]').count() === 0, '7. la vente sans prix de vente n’a pas de bouton (le refus est dit sous la liste)');
       });
       dit(!errs.length, '6. aucune erreur d’app', errs.join(' | ').slice(0, 300));
       await ctx.close();

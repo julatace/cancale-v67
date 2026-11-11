@@ -196,6 +196,10 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   base.set(cle(A, 'vc_ventes'), { ventes: { 72987282: { productId: '72987282', montant: { valeur: 203.23, devise: 'EUR', cle: 'sellerEarning' }, date: '2026-11-01T10:00:00Z', titre: 'Sac banc' } } });
   r = await appel({ action: 'emettre', confirme: true, plateforme: 'vestiaire', ref: '72987282', acheteur: ACH });
   dit(r.code === 409 && r.corps.code === 'prix' && compteur() === av2, 'S4 Vestiaire ⇒ refus (prix payé inconnu), aucun numéro');
+  // (11 nov., extension 5.340) Le prix de vente LU (`prixVente`, `sellerPrice`) ⇒ la facture, à CE prix ; le n° est la CLÉ relue.
+  base.get(cle(A, 'vc_ventes')).ventes['72987283'] = { productId: '72987283', montant: { valeur: 203.23, devise: 'EUR', cle: 'sellerEarning' }, prixVente: { valeur: 250, devise: 'EUR', cle: 'sellerPrice' }, date: '2026-11-02T10:00:00Z', titre: 'Sac banc 2' };
+  r = await appel({ action: 'emettre', confirme: true, plateforme: 'vestiaire', ref: '72987283', acheteur: ACH, centimes: 1 });
+  dit(r.code === 200 && r.corps.facture && r.corps.facture.contenu.totaux.ttc === 25000 && /72987283/.test(r.corps.facture.contenu.reference) && compteur() === av2 + 1, 'S4 Vestiaire avec le prix de vente lu ⇒ facture au prix de vente relu (jamais le versé, jamais le prix du navigateur)', JSON.stringify(r.corps).slice(0, 300));
 
   // ── S6 50 VENTES IDENTIQUES ─────────────────────────────────────────────
   raz();
