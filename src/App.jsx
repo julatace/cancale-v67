@@ -39605,8 +39605,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
   // bordereaux sont chargés, on lance l'impression groupée une seule fois.
+  // (11 nov., revue colis) Deux moteurs `only="bordereaux"` existent depuis le lot DJ3 (Ventes « À expédier »,
+  // Achats « À retirer ») et Achats est un écran GARDÉ : caché, ses écoutes `window` restent branchées. Seul un
+  // moteur MONTRÉ qui porte les colis à envoyer (jamais la section « À retirer ») prend la demande « Tout
+  // imprimer » — sinon Achats caché l'avalait et la feuille ne s'ouvrait jamais (banc tout-imprimer-garde).
+  const prendImpression = () => only==='bordereaux' && colisDans!=='achats' && !cache();
   React.useEffect(()=>{
-    if(only!=='bordereaux' || !_pendingBordPrint || !Array.isArray(emailBords)) return;
+    if(!prendImpression() || !_pendingBordPrint || !Array.isArray(emailBords)) return;
     _pendingBordPrint=false;
     const t=setTimeout(()=>{ try{ ouvrirLot(); }catch(_){} }, 400);
     return ()=>clearTimeout(t);
@@ -39616,8 +39621,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // feuille « Tout imprimer » (rien n'est imprimé avant son clic).
   const ouvrirLotRef = React.useRef(null); ouvrirLotRef.current = ouvrirLot;
   React.useEffect(()=>{
-    if(only!=='bordereaux') return undefined;
-    const f=()=>{ if(!_pendingBordPrint || !Array.isArray(emailBords)) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} };
+    if(only!=='bordereaux' || colisDans==='achats') return undefined;
+    const f=()=>{ if(!prendImpression() || !_pendingBordPrint || !Array.isArray(emailBords)) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} };
     window.addEventListener('vrm:tout-imprimer', f); return ()=>window.removeEventListener('vrm:tout-imprimer', f);
   },[emailBords, only]);
   // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
