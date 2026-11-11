@@ -56,7 +56,7 @@ export default function PrixMiniManquants({ annonces, numeros, virgule = false, 
     if (bilan.sous.length) {
       const ok = await askConfirm({
         title: tr('prixMini.sous.titre', { n: bilan.sous.length }),
-        desc: bilan.sous.map((s) => `${s.numero ? 'N°' + s.numero : tr('prixMini.sansNumero')} · ${eur(s.valeur)} < ${eur(s.cout)}`).join('\n'),
+        desc: bilan.sous.map((s) => tr('prixMini.sous.ligne', { num: s.numero ? 'N°' + s.numero : tr('prixMini.sansNumero'), mini: eur(s.valeur), cout: eur(s.cout) })).join('\n'),
         ok: tr('prixMini.sous.ok'), cancel: tr('prixMini.sous.corriger'),
       });
       if (!ok) return;

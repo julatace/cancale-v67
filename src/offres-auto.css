@@ -115,6 +115,17 @@ html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; widt
 html body .vrm-pmm .vrm-pmm-champ input { flex: 1 1 auto; min-width: 0; width: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; font: inherit; font-size: 17px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; color: var(--w-encre, var(--vrm-ink)); outline: none; min-height: 44px !important; height: 44px; padding: 0 !important; margin: 0; }
 .vrm-pmm-champ > span[aria-hidden] { color: var(--w-gris, var(--vrm-muted)); font-size: 15px; }
 .vrm-pmm-champ:focus-within { box-shadow: 0 0 0 2px var(--w-accent, var(--vrm-accent)); }
+html body .vrm-pmm .vrm-pmm-champ input:focus, html body .vrm-pmm .vrm-pmm-champ input:focus-visible { outline: none !important; box-shadow: none !important; }
+/* Au téléphone : le titre sur toute la largeur, puis « prix · acheté » à côté du champ,
+   le bénéfice dessous (le centre se fond dans la grille) ; le compte seulement sur ordinateur. */
+@media (max-width: 899px) {
+  .vrm-pmm-ligne { grid-template-columns: 48px minmax(0, 1fr) 112px; grid-template-areas: "photo nom nom" "photo sous champ" "photo . benef"; gap: 4px 12px; }
+  .vrm-pmm-centre { display: contents; }
+  .vrm-pmm-nom { grid-area: nom; }
+  .vrm-pmm-sous { grid-area: sous; white-space: normal; }
+  .vrm-pmm-compte { display: none; }
+  .vrm-pmm-photo { align-self: start; margin-top: 2px; }
+}
 .vrm-pmm-ligne[data-pmm-etat="sous"] .vrm-pmm-champ, .vrm-pmm-ligne[data-pmm-etat="erreur"] .vrm-pmm-champ { box-shadow: inset 0 0 0 1.5px var(--vrm-warn, #B25E09); }
 .vrm-pmm-benef { grid-area: benef; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; min-height: 18px; font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; min-width: 0; }
 .vrm-pmm-benef b { font-size: 14px; font-weight: 700; color: var(--w-encre, var(--vrm-ink)); }
@@ -132,6 +143,7 @@ html body .vrm-pmm .vrm-pmm-champ input { flex: 1 1 auto; min-width: 0; width: 1
 }
 @layer vrm-premium {
   :root:root body .vrm-app-shell .vrm-pmm .vrm-pmm-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 44px !important; height: 44px; }
+  :root:root body .vrm-app-shell .vrm-pmm .vrm-pmm-champ input:focus, :root:root body .vrm-app-shell .vrm-pmm .vrm-pmm-champ input:focus-visible { outline: none !important; box-shadow: none !important; }
 }
 /* Rien de tapé : le pied reste à sa place (pas de barre flottante pour rien). */
 .vrm-pmm-pied[data-pmm-pied="0"] { position: static; box-shadow: none; margin: 4px 0 0; padding: 6px 0 0; border-radius: 0; background: transparent; border-top: .5px solid var(--w-filet, var(--vrm-line)); }

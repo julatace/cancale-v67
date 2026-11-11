@@ -87,6 +87,9 @@ const attr = (pg, sel, a) => pg.getAttribute(sel, a).catch(() => null);
         await pg.waitForFunction(() => document.querySelectorAll('[data-pmm-ligne]').length >= 10, null, { timeout: 15000 }).catch(() => {});
         await pg.evaluate(() => window.scrollTo(0, 0)); await attendre(500);
         await pg.screenshot({ path: path.join(SHOTS, `pmm-${tag}-1-haut.png`) });
+        // Ce que Ma journée a lu avant (la lecture des ventes, `cmd: ventes`) n'est pas de cet écran :
+        // le compte repart d'ici — rien ne doit partir pendant la saisie ni l'enregistrement.
+        await pg.evaluate(() => { window.__envois = []; });
         // ── L : la liste ──
         const L = await pg.evaluate(() => [...document.querySelectorAll('[data-pmm-ligne]')].map((e) => ({ id: e.getAttribute('data-pmm-ligne'), achat: e.getAttribute('data-pmm-achat'), v: e.querySelector('input').value, txt: e.innerText.replace(/\s+/g, ' ') })));
         const ids = L.map((x) => x.id);
@@ -108,7 +111,7 @@ const attr = (pg, sel, a) => pg.getAttribute(sel, a).catch(() => null);
         dit(suiv === '51004', `S ${tag} : Entrée ⇒ le champ suivant (N°5)`, suiv);
         await pg.keyboard.type('40'); await attendre(150);
         const s5 = await attr(pg, '[data-pmm-ligne="51004"]', 'data-pmm-benef');
-        const s5t = await pg.evaluate(() => (document.querySelector('[data-pmm-ligne="51004"] [data-pmm-benef-txt]') || {}).innerText || '');
+        const s5t = await pg.evaluate(() => ((document.querySelector('[data-pmm-ligne="51004"] [data-pmm-benef-txt]') || {}).innerText || '').replace(/\s+/g, ' '));
         dit(s5 === '8' && /\+8 €/.test(s5t), `S ${tag} : « 40 » ⇒ +8 € en direct (40 − 30 − emballage 2)`, [s5, s5t]);
         dit(await attr(pg, '[data-pmm-enregistrer]', 'data-pmm-enregistrer') === '2', `S ${tag} : UN « Enregistrer » pour les 2 saisies`);
         await pg.locator('[data-pmm-pied]').scrollIntoViewIfNeeded().catch(() => {}); await attendre(300);
