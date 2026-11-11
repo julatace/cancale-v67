@@ -61,7 +61,11 @@ coupure disait « réessaie » et perdait la saisie si la fiche se fermait ; une
   390 tactile et 1512) : A coupure avant · B requête tenue · C réponse perdue · D 503, 401, 429 (note privée) ·
   E hors ligne longtemps puis retour · F deux appareils (le plus récent ailleurs gagne, rien d'effacé, la clé d'ici
   arrive) · G aucun doublon, pool des N° intact, aucune erreur JS. Voir §6 pour les chiffres.
-  - Sur `origin/main` (build d'avant, `BANC_DIST`) : rouges B (3), D-401 (2), D-429 (3), « Enregistré » (1).
+  - Sur `origin/main` (build d'avant, `BANC_DIST`, 390) : **9 rouges** — B (3), D-401 (2), D-429 (3), « Enregistré » (1).
+    A (coupure avant), C (réponse perdue), E (longtemps hors ligne) et F (deux appareils) étaient DÉJÀ verts sur main :
+    la file d'envoi du 2 nov. les tenait. Ils restent dans le banc comme garde-fous.
+  - **Mutations construites** (builds mutés, `BANC_DIST`) : borne jamais posée ⇒ B rouge (3) ; 429 redevenu refus ⇒
+    D rouge (3) ; 401 sans renvoi ⇒ D rouge (2).
 - **`scripts/audit-reseau-instable.cjs`** : règle EXÉCUTÉE (R1–R14, `natureEchec` réel composé avec
   `raisonStatut`), branchement (B1–B15) — 39 verts ; `--prouve` : **8/8 mutations rouges** (borne jamais posée,
   429 refus ×2, PATCH nu, 401 sans renvoi, lecture du nuage nue, « Enregistré » trop tôt, Ma facture sans relance).
@@ -79,12 +83,28 @@ coupure disait « réessaie » et perdait la saisie si la fiche se fermait ; une
   pas sans risque de doublon chez l'acheteur). Non touché.
 - **« Ma facture » sur deux appareils** : la ligne `vrm_pro_facture` reste une fusion champ par champ sans `rev`
   (comme avant) ; deux appareils qui changent le MÊME champ pendant une coupure : le dernier arrivé gagne.
+- **« N changements » compte trop sur la base inventée** : sous un 429, une note tapée sur Annonces affichait
+  « 10 changements » (l'écran complète les fiches et publie son journal de prix). `vrm_prix_lus` est maintenant compté
+  comme publié (7 restent : 6 fiches complétées par l'écran + la note). Sur de vraies fiches déjà complètes, l'écart
+  devrait disparaître — pas mesuré.
+- À 1512, la ligne existante « Pas encore synchronisé · Réessayer » sous le titre de Paramètres est écrasée
+  (« Pas en… Rée/ssa/yer ») : préexistant, pas touché.
 - Le vieux banc `file-envoi.cjs` reste rouge sur main comme ici (il n'ouvre plus « Compléter les prix d'achat »,
   préexistant, dit le 6 nov.) ; la file elle-même est prouvée par `audit-file-envoi` et par ce banc.
 
 ## 6. Chiffres
 
-(remplis à la fin de la session, après le vrai `git merge origin/main`)
+- `reseau-instable` : **72/72** (390 tactile + 1512) avant le merge ; rejoué après le vrai `git merge origin/main` (voir
+  le rapport de session).
+- `audit-reseau-instable --prouve` : 39 verts, 8/8 mutations rouges (après merge).
+- Après merge : `npm run build` ; audits `variables`, `tdz`, `coherence` (⚠️ exige l'historique complet :
+  `git fetch --unshallow origin main` dans un clone superficiel, sinon « historique illisible »), `identite`, `icones`,
+  `textes-courts`, `fonctions-api`, `secrets`, `geste-annulable`, `file-envoi` : verts.
+- Bancs voisins (rejoués main contre branche, même machine) : `codes-hors-ligne` vert ; `hors-ligne-froid` 80/80 des
+  deux côtés (avec `BANC_PORTE_STRICTE=1`) ; `hors-reseau` 42 rouges **des deux côtés** ; `hors-ligne` 36 à 45 rouges
+  sur main, 37 à 44 sur la branche (instable, « Ma journée s'ouvre sur la photo » rouge des deux côtés) — préexistant,
+  pas de régression mesurée. Ces deux bancs n'acceptent pas `BANC_PORT=0` (port 0 littéral) : donner un vrai port.
+- Captures regardées : `A-en-attente`, `A-enregistre`, `D-429`, `E-hors-ligne` en 390 et 1512.
 
 ## Geste de Julien
 Aucun.
