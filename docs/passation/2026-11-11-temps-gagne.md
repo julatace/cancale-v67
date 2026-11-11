@@ -46,7 +46,18 @@ compte, pour convaincre — un calculateur simple et honnête.
   (nature « devinée », sans < avec, premier compte compté, gain sans soustraire « avec »,
   note sans « pas des résultats de clients », « The only… » en anglais, clé allemande
   manquante, import en dur dans Accueil.jsx).
-- Banc `scripts/bancs/accueil-temps.cjs` (390 et 1512, clair et sombre) : voir « ÉTAT À LA REPRISE ».
+- Banc `scripts/bancs/accueil-temps.cjs` (390 et 1512, clair et sombre) : **44 ✅ · 0 ❌** —
+  morceau absent au premier écran puis chargé à l'approche ; total et chaque geste = la règle ;
+  +10 ventes au clavier ⇒ 55 → 90 min selon la règle ; note visible ; curseurs ≥ 44 px ; aucun
+  débordement ; rien sous 12 px ; aucune erreur. Captures 390/1512 clair/sombre regardées.
+- L'audit lancé sur `origin/main` (`git archive`) est rouge (la règle n'existe pas).
+- Banc `accueil` : 187 ✅ · 3 ❌, **tous déjà rouges sans ce lot** : poids de l'entrée (33,8 Ko,
+  voir plus bas), le film (`?film`, déjà rouge au lot accueil-public), « Vestiaire » cité 5 fois
+  (hero, moment du matin, pied — textes de `main` ; le calculateur ne nomme pas Vestiaire).
+- Audits verts : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api,
+  secrets, quoi-de-neuf, traduction, csp, accueil-navigateurs, accueil-demo, plans-solo-pro.
+  `audit-lancement` : 1 rouge hors lot (`noterLienDemande is not defined` dans `authSignUp`, App.jsx).
+- « Quoi de neuf » : pas de ligne (la nouveauté est sur la page publique, pas dans l'app).
 
 ## ⚠️ Constaté, pas de ce lot
 
@@ -57,7 +68,9 @@ est entré dans `main.jsx`) — hors de ce lot.
 
 ## ÉTAT À LA REPRISE
 
-(rempli en fin de lot)
+Fini et poussé. Si une durée de référence change : changer `sans`/`avec` ET `pourquoi` dans
+`src/accueil/tempsGagne.js`, puis le cas calculé à la main de l'audit. Une durée MESURÉE (chronométrée)
+passe `nature: 'mesurée'` avec la date dans `pourquoi`.
 
 ## Geste de Julien
 

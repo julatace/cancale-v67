@@ -39,7 +39,7 @@ async function principal() {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ dist/ absent : npm run build d’abord'); process.exit(1); }
   const R = await import(pathToFileURL(path.join(RACINE, 'src', 'accueil', 'tempsGagne.js')).href);
   await new Promise((res) => srv.listen(PORT, res));
-  const nav = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-gpu-compositing'] });
   for (const [nom, o] of [['390 clair', { w: 390, h: 844, m: true }], ['390 sombre', { w: 390, h: 844, m: true, s: true }], ['1512 clair', { w: 1512, h: 900 }], ['1512 sombre', { w: 1512, h: 900, s: true }]]) {
     console.log(`\n── ${nom}`);
     await essaie(nom, async () => {
