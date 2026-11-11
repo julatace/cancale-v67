@@ -178,7 +178,6 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const sansNom=x=>x.nom&&x.body.startsWith(x.nom+' ')?x.body.slice(x.nom.length).trim():x.body;
   const rythmeTexte=vueFile?.intervalleMinutes===0?'6 à 10 s entre deux, comme Vintex':vueFile?.intervalleMaxMinutes?`entre ${vueFile.intervalleMinutes} et ${vueFile.intervalleMaxMinutes} min, au hasard`:vueFile?.intervalleMinutes?`toutes les ${vueFile.intervalleMinutes} min`:'';
 
-  const blocDestinataires=!!selectionnees.length&&<div className="vrm-favoris-destinataires" aria-label="Destinataires sélectionnés"><strong>{selection.length} destinataire{selection.length>1?'s':''} · {nomCompte||'ce compte Vinted'}</strong><ul>{selectionnees.map(x=><li key={x.id}><div><b>{x.nom||'Nom indisponible'}</b><span>{sansNom(x)}</span></div><button type="button" disabled={selectionVerrouillee} aria-label={`Retirer ${x.nom||'ce favori'} de la sélection`} onClick={()=>choisir(x.id)}>Retirer</button></li>)}</ul></div>;
   const assistance=<DiagnosticFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} base={base} headers={headers} controle={controle} controleEnvoi={controleEnvoi} copierControle={(controleEnvoi||controle&&controle.preuve!=='confirmee')?async()=>{try{await navigator.clipboard.writeText(JSON.stringify({...(controle||{diagnostic:'VRM-favoris-controle-v1'}),...(controleEnvoi?{lancement:controleEnvoi}:{})},null,2));setRetour('Contrôle copié, sans identifiant, lien ni message privé.');}catch{setRetour('Copie indisponible dans ce navigateur.');}}:null}/>;
   const alertes=<>
     {etat.scope===scope&&etat.erreur&&<p role="alert">{etat.erreur}</p>}
@@ -186,18 +185,12 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     {retour&&<p role="status">{retour}</p>}
 
   </>;
-  const ligneFavori=(x,coche)=><article key={x.id} className={selection.includes(x.id)?'is-selected':''} data-favori={x.id}>
-    {coche?<label className="vrm-favoris-check"><input type="checkbox" aria-label={`Sélectionner ${x.nom||x.body.slice(0,100)}`} checked={selection.includes(x.id)} disabled={selectionVerrouillee||importation||bloque(x)||!selection.includes(x.id)&&selection.length>=10} onChange={()=>choisir(x.id)}/></label>:<span aria-hidden="true"/>}
-    <PhotoNotification src={x.photo} PhotoVinted={PhotoVinted}/>
-    <div className="vrm-favoris-texte">{x.nom&&<strong title={x.nom}>{x.nom}</strong>}<p title={x.body}>{sansNom(x)}</p><div className="vrm-favoris-meta">{vendue(x)&&<span className="vrm-favoris-badge is-vendu">Article vendu</span>}<time dateTime={x.date||undefined} title={x.date?'Date indiquée par la notification : '+new Date(x.date).toLocaleString('fr-FR'):undefined}>{ageFavori(x.date,maintenant)}</time>{verifications[x.id]&&!['envoye','ignore'].includes(statut(x)?.etat)&&<span className="vrm-favoris-badge">{verifications[x.id]==='confirmee'?'Lien enregistré':verifications[x.id]==='non_confirmee'?'Capture non confirmée':'Capture en attente'}</span>}{statut(x)?.etat==='envoye'?<span className="vrm-favoris-badge is-envoye" title={statut(x).envoyeLe?`Envoi confirmé le ${new Date(statut(x).envoyeLe).toLocaleString('fr-FR')}`:'Envoi VRM confirmé'}>Message déjà envoyé</span>:statut(x)?.etat==='ignore'?<span className="vrm-favoris-badge">Conversation commencée</span>:statut(x)?.etat==='incertain'?<span className="vrm-favoris-badge">Envoi à vérifier</span>:['attente','reserve'].includes(statut(x)?.etat)?<span className="vrm-favoris-badge">Dans la file</span>:statut(x)?.etat==='verifie'?<span className="vrm-favoris-badge">Clôturé manuellement · envoi non confirmé</span>:statut(x)?.etat==='refuse'?<span className="vrm-favoris-badge" title={RAISONS_FAVORIS[statut(x).raison]||'La tentative a été interrompue.'}>Envoi interrompu</span>:statut(x)?.etat==='annule'?<span className="vrm-favoris-badge">Annulé dans la file · non envoyé</span>:null}</div>{statut(x)?.etat==='refuse'&&<small className="vrm-favoris-raison">{RAISONS_FAVORIS[statut(x).raison]||'La tentative a été interrompue. Consulte le résultat dans la file avant de relancer.'}</small>}</div>
-    {vendue(x)?<small className="vrm-favoris-vendu-action" aria-label="Message indisponible : article vendu">—</small>:x.lien&&ouvrirFavori?<button className="vrm-favoris-ouvrir" type="button" disabled={!!ouverture||importation||selectionVerrouillee} onClick={()=>ouvrir(x)} aria-label={`Ouvrir ce favori pour vérifier sur Vinted${x.nom?' · '+x.nom:''}`}><span>{ouverture===x.id?'Ouverture…':'Vérifier sur Vinted'}</span><svg className="vrm-favoris-ouvrir-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></button>:x.lien?<a href={x.lien} target="_blank" rel="noreferrer" aria-label="Ouvrir la notification sur Vinted"><span>Ouvrir sur Vinted</span><svg className="vrm-favoris-ouvrir-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>:<small>Lien indisponible</small>}
-  </article>;
 
   const contenuFeuille=<div className="vrm-favoris-voile" data-noswipe="1" hidden={!feuille} onClick={fermerFeuille}>
     {feuille&&FermeAuRetour&&<FermeAuRetour fermer={fermerFeuille}/>}
     <div className="vrm-favoris-liste vrm-favoris-feuille" role="dialog" aria-modal="true" aria-label="Message aux favoris" data-favoris-feuille data-favoris-etape={etape} onClick={e=>e.stopPropagation()}>
       <div className="vrm-favoris-feuille-tete">
-        <div><strong>Message aux favoris</strong><small>{nomCompte||'Compte Vinted sélectionné'}</small><div className="vrm-favoris-etapes">{ETAPES.map(([k,l])=><span key={k} aria-current={etape===k?'step':undefined}>{l}</span>)}</div></div>
+        <div><strong>{etape==='choix'?tr('favoris.outils'):tr('favoris.titre')}</strong><small>{nomCompte||'Compte Vinted sélectionné'}</small></div>
         <button type="button" className="vrm-favoris-fermer" aria-label="Fermer" disabled={preparation} onClick={fermerFeuille}>×</button>
       </div>
       <div className="vrm-favoris-feuille-corps">
@@ -213,16 +206,11 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
             {ouvrirFavori&&<button type="button" onClick={()=>cibleVerification&&ouvrir(cibleVerification)} disabled={!cibleVerification||!!ouverture||importation||etat.charge||selectionVerrouillee}>{ouverture?'Vérification…':selection.length?'Vérifier le premier sélectionné':'Vérifier un favori'}</button>}
             {verifierExtension&&<button type="button" onClick={tester} disabled={importation}>Tester la connexion</button>}
           </div>
-          <div className="vrm-favoris-filtres"><label>Rechercher un favori<input type="search" value={recherche} onChange={e=>{setRecherche(e.target.value);setMax(50);}} placeholder="Nom, article…"/></label><div role="group" aria-label="Filtrer les favoris">{[['tous','Tous'],['contacter','À contacter'],['envoyes','Déjà envoyés'],['contactes','Conversation commencée'],['encours','Dans la file'],['verifier','Envoi à vérifier'],['clos','Clôturés'],['interrompus','Interrompus'],['vendus','Articles vendus'],['selection','Sélection']].filter(([id])=>id!=='selection'||selection.length>0||filtre==='selection').map(([id,label])=><button type="button" key={id} aria-pressed={filtre===id} onClick={()=>{setFiltre(id);setMax(50);}}>{label}{` (${compter(id)})`}</button>)}</div></div>
-          <div className="vrm-favoris-selection"><span data-favoris-choisis={selection.length}>{selection.length} choisi{selection.length>1?'s':''} · 10 au plus par envoi</span><button type="button" disabled={selectionVerrouillee||importation||!visibles.some(x=>!bloque(x))} onClick={()=>{setSelection(visibles.filter(x=>!bloque(x)).slice(0,10).map(x=>x.id));setRetour('');}}>Les 10 premiers</button>{!!selection.length&&<button type="button" disabled={selectionVerrouillee} onClick={()=>setSelection([])}>Aucun</button>}</div>
-          {horsVue>0&&<div className="vrm-favoris-hors-vue" role="status">{horsVue} favori{horsVue>1?'s':''} sélectionné{horsVue>1?'s':''} hors de cette vue.<button type="button" onClick={()=>{setRecherche('');setFiltre('selection');setMax(50);}}>Voir toute ma sélection</button></div>}
-          <div className="vrm-favoris-rows">{visibles.map(x=>ligneFavori(x,true))}</div>
-          {!visibles.length&&<p>Aucun favori ne correspond à ce filtre.</p>}{visibles.length<filtrees.length&&<button type="button" onClick={()=>setMax(x=>x+50)}>Afficher les suivants</button>}
-          {blocDestinataires}
+          {/* (11 nov., lot favoris-clair) « Plus d'outils » : plus de liste par personne (pseudos) ni de
+              sélection ici — le choix se fait sur la page en trois temps, par annonce, sans identité. */}
         </>}
 
         {etape==='message'&&<div className="vrm-favoris-compose">
-          {blocDestinataires}
           <label>Ton message<textarea ref={champMessage} data-favoris-message disabled={preparation} maxLength={2000} rows={4} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Bonjour {username}, merci pour ton favori !"/></label>
           <div className="vrm-favoris-variables" role="group" aria-label="Variables du message"><button type="button" data-favoris-variable="username" disabled={preparation} onClick={()=>inserer('{username}')}>{'{username}'}</button><button type="button" data-favoris-variable="variante" disabled={preparation} onClick={()=>inserer('{Bonjour|Salut}')}>{'{a|b}'} variante</button></div>
           <small>{'{username}'} = son pseudo · {'{Bonjour|Salut}'} = un choix au hasard par message.</small>
@@ -241,7 +229,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
           </div>
           {apercu.erreur&&<p role="alert">{apercu.erreur}</p>}
           {exigePerso&&!favorisPerso&&<p role="alert" data-favoris-maj>Variables ou offre : extension 5.281 requise. Mets-la à jour, puis ⟳.</p>}
-          {!!apercu.message&&<div className="vrm-favoris-apercu"><strong>Aperçu{destinataires[0]?.nom&&aDesVariablesFavori(message)?` pour ${destinataires[0].nom}`:''}</strong><output aria-label="Aperçu du message" data-favoris-apercu>{personnaliserMessageFavori(apercu.message,destinataires[0]?.nom||'',()=>0)}</output>{/\{[^{}]*\|/.test(message)&&<small>Les variantes changent à chaque message ; l’aperçu montre la première.</small>}</div>}
+          {!!apercu.message&&<div className="vrm-favoris-apercu"><strong>Aperçu</strong><output aria-label="Aperçu du message" data-favoris-apercu>{personnaliserMessageFavori(apercu.message,'',()=>0)}</output>{/\{[^{}]*\|/.test(message)&&<small>Les variantes changent à chaque message ; l’aperçu montre la première.</small>}</div>}
           <button type="button" disabled={!apercu.message||!!apercu.erreur} onClick={copier}>Copier le message</button>
         </div>}
 
@@ -254,7 +242,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
             <div><small>{rythme==='aleatoire'?'Un temps au hasard entre ces bornes. ':''}Le premier part tout de suite. Garde l’onglet vinted.fr ouvert.</small> <Pourquoi>{rythme==='aleatoire'?'Avant chaque message, un temps est tiré au hasard entre ces deux bornes. ':''}Le premier message part tout de suite. Les messages partent de l’onglet vinted.fr ouvert dans le navigateur où est l’extension VRM, comme Vintex : garde-le ouvert pendant l’envoi.</Pourquoi></div>
             {erreurRythme&&!selectionVerrouillee&&<p role="alert">{erreurRythme}</p>}
           </div>
-          {!!destinataires.length&&<div className="vrm-favoris-compte-rendu" data-favoris-compte-rendu aria-label="Compte rendu par favori"><strong>{selectionnees.length?`${destinataires.length} favori${destinataires.length>1?'s':''} à contacter`:'Dernier envoi'}</strong><ul>{destinataires.map(x=>{const j=statut(x),e=selectionnees.includes(x)&&!j?'pret':j?.etat||'pret';const attenteIci=fileActive&&e==='attente'&&p.secondes>0&&x.id===destinataires.find(y=>statut(y)?.etat==='attente')?.id;return <li key={x.id} data-favoris-envoi={e}><span>{nomFavori(x)}</span><b {...(attenteIci?{'data-favoris-attente':p.secondes}:{})}>{attenteIci?`Attente ${p.secondes<60?p.secondes+' s':dureeFavoris(p.secondes)}…`:e==='pret'?'Prêt':e==='refuse'?(RAISONS_FAVORIS[j.raison]||ETAT_ENVOI.refuse):ETAT_ENVOI[e]||e}</b></li>;})}</ul></div>}
+          {/* (11 nov., lot favoris-clair) Le compte rendu par personne est retiré : la feuille « VRM travaille » suit chaque message par son annonce. */}
           <div className="vrm-favoris-note" data-favoris-avertissement><b>Aucune garantie contre un blocage Vinted.</b> Garde cet écran ouvert. <Pourquoi>Garde cet écran ouvert et visible, avec l’extension à jour et le bon compte Vinted connecté. Une conversation qui contient déjà des messages est ignorée. Aucune garantie contre un blocage Vinted.</Pourquoi></div>
           {reglages.erreur&&<p role="alert">{reglages.erreur} {!reglagesLus.current&&'Actualise la liste pour relire les réglages.'}</p>}
           {reglages.prets&&!reglages.enregistres&&!fileActive&&<button type="button" data-favoris-enregistrer disabled={reglages.sauvegarde||preparation||!apercu.message||!!apercu.erreur||!!erreurRythme} onClick={async()=>{if(await enregistrer())setRetour('Message, réduction et rythme enregistrés pour ce compte. Rien n’est envoyé.');}}>{reglages.sauvegarde?'Enregistrement…':'Enregistrer sans envoyer'}</button>}
@@ -262,8 +250,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         {uid&&owner&&executerFavori&&<div hidden={etape!=='envoi'}><AutomatisationFavoris ref={moteur} decrireJob={x=>{const l=ligneParId.get(String(x.notificationId));const id=l&&itemIdFavori(l);const a=id?lireArticle(id):null;return {num:a?.numero||'',titre:a?.titre||''};}} raisonSuivi={raisonSuivi} onPreparation={setPreparation} ecranActif={ecranActif} revisionVerification={revisionVerification} onErreur={setControleEnvoi} key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={configuration} preparerReglages={preparerReglages} executer={t=>executerFavoriDisponible(t,vendusActuels.current,executerFavori)} disponible={favorisDisponible&&(!exigePerso||favorisPerso)} raisonExtension={favorisDisponible&&exigePerso&&!favorisPerso?'Ces variables ou cette offre demandent l’extension 5.281. Mets-la à jour puis recharge-la (⟳).':favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/></div>}
       </div>
       <div className="vrm-favoris-feuille-pied">
-        {etape!=='choix'?<button type="button" disabled={selectionVerrouillee} onClick={()=>setEtape(etape==='envoi'?'message':'choix')}>← Retour</button>:<span/>}
-        {etape==='choix'&&<button type="button" className="is-principal" disabled={!selection.length} onClick={()=>setEtape('message')}>Continuer · {selection.length}</button>}
+        <span/>
         {etape==='message'&&(selection.length?<button type="button" className="is-principal" disabled={!apercu.message||!!apercu.erreur} onClick={()=>setEtape('envoi')}>Continuer</button>
           :<button type="button" className="is-principal" data-favoris-enregistrer-message disabled={!reglages.prets||reglages.sauvegarde||!apercu.message||!!apercu.erreur||!!erreurRythme} onClick={async()=>{if(await enregistrer()){setRetour('Message enregistré. Rien n’est envoyé.');setFeuille(false);}}}>{reglages.sauvegarde?'Enregistrement…':'Enregistrer'}</button>)}
       </div>
@@ -308,7 +295,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const bloquees=recapAnnonces.filter(a=>a.garde.bloque);
   const [rowsJauge]=useLignesActions(uid,!!uid&&!!data);
   const jauge=rowsJauge===undefined?undefined:jaugeDuCompte(rowsJauge,uid,maintenant);
-  const recap=recapEnvoi({ids:choix.ids,annonces:choix.annonces,reste:choix.reste,avecOffre:!!offreObjet,rythme,intervalle,intervalleMax,jauge:jauge||null});
+  const recap=recapEnvoi({ids:choix.ids,annonces:choix.annonces,avecOffre:!!offreObjet,rythme,intervalle,intervalleMax,jauge:jauge||null});
   const ventesH=Array.isArray(ventesFavoris)?ventesFavoris:[];
   const historiqueF=data?achatsApresMessage(jobsVue,ventesH):null;
   const marche=data?ceQuiMarche(jobsVue,ventesH):[];

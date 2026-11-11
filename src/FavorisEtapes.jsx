@@ -122,7 +122,6 @@ export default function PageFavoris(p) {
         <button type="button" className="vrm-fc-lien" data-fc-anciens-bascule disabled={verrou} onClick={() => p.setAnciensAussi(!p.anciensAussi)}>{p.anciensAussi ? tr('favoris.qui.nouveauxSeuls') : tr('favoris.qui.inclureAnciens')}</button>
       </div>}
       <ul className="vrm-fc-annonces" data-fc-liste>{choisissables.map((a) => <LigneAnnonce key={a.cle} a={a} choisie={choisis.includes(a.cle)} onBasculer={p.basculer} PhotoVinted={PhotoVinted} verrou={verrou} />)}</ul>
-      {choix.reste > 0 && <p className="vrm-fc-note" data-fc-reste={choix.reste}>{tr('favoris.qui.reste', { n: choix.reste })}</p>}
     </> : <p className="vrm-fc-note" data-fc-rien>{tr('favoris.qui.toutFait')}</p>}
     {autres.length > 0 && <details className="vrm-fc-repli">
       <summary>{tr('favoris.qui.autres', { n: autres.length })}</summary>
@@ -207,7 +206,7 @@ export default function PageFavoris(p) {
   // ── LE PIED ET LE RÉCAPITULATIF ────────────────────────────────────────────
   const r = recap;
   const ligneRecap = tr('favoris.recap.ligne', { messages: tr('favoris.recap.messages', { n: r.messages }), annonces: tr('favoris.recap.annonces', { n: r.annonces }), duree: texteDuree(r.secondes) });
-  const limite = r.limite === 'dedans' ? tr('favoris.recap.dedans', { n: r.gestes, max: p.pourApp }) : r.limite === 'depasse' ? tr('favoris.recap.depasse', { n: r.gestes, libres: r.libres }) : tr('favoris.recap.passu', { n: r.gestes });
+  const limite = r.limite === 'dedans' ? tr('favoris.recap.dedans', { n: r.gestes, max: p.pourApp }) : r.limite === 'depasse' ? tr('favoris.recap.depasse', { n: r.gestes, libres: r.libres, m: r.attendront }) : tr('favoris.recap.passu', { n: r.gestes });
   const pied = <div className="vrm-fc-pied" data-fc-pied>
     <div className="vrm-fc-pied-texte">{p.fileActive ? <span data-fc-en-cours>{tr('favoris.recap.enCours')}</span> : r.messages ? <span data-fc-pied-ligne>{ligneRecap}</span> : <span>{tr('favoris.recap.rien')}</span>}</div>
     <button type="button" className="vrm-fc-bouton is-principal" data-fc-verifier disabled={!peutOuvrir} onClick={() => setRecapOuvert(true)}>{tr('favoris.recap.verifier')}</button>
@@ -221,7 +220,7 @@ export default function PageFavoris(p) {
         <button type="button" className="vrm-fa-fermer" aria-label={tr('commun.fermer')} onClick={fermer}><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M12 2 2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg></button></div>
       <div className="vrm-fa-feuille-corps">
         <p className="vrm-fc-recap-gros" data-fc-recap-ligne data-fc-messages={r.messages} data-fc-nannonces={r.annonces} data-fc-secondes={r.secondes == null ? '' : r.secondes}>{ligneRecap}</p>
-        <p className={'vrm-fc-recap-limite' + (r.limite === 'depasse' ? ' is-geste' : '')} data-fc-limite={r.limite} data-fc-gestes={r.gestes}>{limite}</p>
+        <p className={'vrm-fc-recap-limite' + (r.limite === 'depasse' ? ' is-geste' : '')} data-fc-limite={r.limite} data-fc-gestes={r.gestes} data-fc-attendront={r.attendront == null ? '' : r.attendront}>{limite}</p>
         <ul className="vrm-fc-annonces">{p.recapAnnonces.map((a) => <li key={a.cle}><div className="vrm-fc-annonce is-fixe" data-fc-recap-annonce={a.itemId || a.cle} data-fc-recap-n={a.n}><Photo src={a.photo} PhotoVinted={PhotoVinted} taille={40} /><span className="vrm-fc-annonce-texte"><span className="vrm-fc-titre">{a.titre || tr('favoris.qui.sansTitre')}</span><span className="vrm-fc-compte"><b>{tr('favoris.recap.messages', { n: a.n })}</b>{a.offre?.apres != null && <span>{tr('favoris.recap.offreA', { prix: eur(a.offre.apres) })}</span>}</span>
           {a.offre?.apres != null && <span className={'vrm-fc-compte' + (a.garde.bloque ? ' is-ambre' : '')} data-fc-marge={a.garde.reste == null ? '' : a.garde.reste} data-fc-marge-etat={a.garde.etat} data-fc-bloque={a.garde.bloque || ''}>
             <span className={a.garde.bloque ? 'is-geste' : ''}>{a.garde.reste == null ? tr('favoris.marge.passu', { raison: a.garde.etat === 'illisible' ? tr('favoris.marge.illisible') : tr('favoris.marge.achat') }) : a.garde.reste < 0 ? tr(a.garde.etat === 'partiel' ? 'favoris.marge.perteAuMoins' : 'favoris.marge.perte', { perte: eur(-a.garde.reste / 100) }) : a.garde.etat === 'partiel' ? tr('favoris.marge.resteAuPlus', { reste: eur(a.garde.reste / 100) }) : tr('favoris.marge.reste', { reste: eur(a.garde.reste / 100) })}{a.garde.bloque === 'mini' ? ' · ' + tr('favoris.marge.sousMini') : a.garde.bloque === 'perte' ? ' · ' + tr('favoris.marge.aPerte') : ''}</span></span>}</span></div></li>)}</ul>

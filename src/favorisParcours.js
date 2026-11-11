@@ -10,8 +10,11 @@
 // l'extension restent les seuls juges. Ici, on COMPTE et on DIT :
 //   · QUI : les annonces qui ont des favoris, le NOMBRE de personnes par
 //     annonce — jamais leur identité (aucun pseudo ne sort d'ici) ;
-//   · au plus 10 messages par envoi (la file serveur refuse au-delà : on ne
-//     propose jamais plus, et on dit combien attendront le prochain envoi) ;
+//   · AUCUN nombre fixe de messages par envoi (le plafond de 10/60 min est
+//     RETIRÉ, décision de Julien, CLAUDE.md §3) : seul borne le plafond
+//     d'actions de l'extension (50/h, réserve 5 ⇒ 45) ; le récapitulatif dit
+//     combien de messages tiennent dans l'heure et combien attendront la
+//     suivante (la file serveur attend une place, elle ne s'arrête pas) ;
 //   · l'offre : prix proposé, remise en € et en %, calculés par LA règle
 //     (`prixOffreFavori`, src/favorisMessage.js, recopiée dans l'extension) ;
 //   · la durée : une ESTIMATION au rythme choisi, dite « environ » ;
@@ -25,7 +28,6 @@
 //     acheteur pas su ⇒ la vente n'est pas comptée (et le manque est dit).
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const MAX_PAR_ENVOI = 10;          // api/_lib/favoris-file.js (lancerFile) refuse au-delà
 export const GESTES_PAR_MESSAGE = 2;      // conversation + message
 export const GESTES_AVEC_OFFRE = 3;       // + l'offre Vinted (X3 : réservées d'un coup)
 export const RYTHME_VINTEX = { min: 6, max: 10 };   // secondes (delaiFavori, intervalle 0)
@@ -60,19 +62,16 @@ export function annoncesQui(cartes = [], bloque = () => false, { depuis = null }
   return liste;
 }
 
-// Les destinataires d'un envoi : les personnes à écrire des annonces CHOISIES,
-// dans l'ordre des annonces, au plus `max`. Le reste attend le prochain envoi.
-export function destinatairesChoisis(annonces = [], choisis = [], max = MAX_PAR_ENVOI) {
+// Les destinataires d'un envoi : TOUTES les personnes à écrire des annonces
+// CHOISIES, dans l'ordre des annonces — aucun nombre fixe (voir l'en-tête).
+export function destinatairesChoisis(annonces = [], choisis = []) {
   const voulu = new Set((Array.isArray(choisis) ? choisis : []).map(String));
   const ids = [], parAnnonce = new Map();
-  let reste = 0;
   for (const a of Array.isArray(annonces) ? annonces : []) {
     if (!a || !a.choisissable || !voulu.has(String(a.cle))) continue;
-    for (const id of a.aEcrire) {
-      if (ids.length < max) { ids.push(id); parAnnonce.set(a.cle, (parAnnonce.get(a.cle) || 0) + 1); } else reste++;
-    }
+    for (const id of a.aEcrire) { ids.push(id); parAnnonce.set(a.cle, (parAnnonce.get(a.cle) || 0) + 1); }
   }
-  return { ids, annonces: [...parAnnonce.keys()], parAnnonce, reste };
+  return { ids, annonces: [...parAnnonce.keys()], parAnnonce };
 }
 
 // ── QUOI : l'offre en clair ────────────────────────────────────────────────
@@ -121,17 +120,21 @@ export function estimationSecondes({ n = 0, rythme = 'vintex', intervalle = 0, i
 
 // ── LE RÉCAPITULATIF ───────────────────────────────────────────────────────
 //   jauge : { n, pourApp } (src/jaugeActions.js) ou null (pas lue).
-export function recapEnvoi({ ids = [], annonces = [], reste = 0, avecOffre = false, rythme = 'vintex', intervalle = 0, intervalleMax = null, jauge } = {}) {
+// La SEULE borne : les gestes libres de l'heure. attendront = les messages
+// qui ne tiennent pas dans l'heure (ils partent dès qu'une place se libère).
+export function recapEnvoi({ ids = [], annonces = [], avecOffre = false, rythme = 'vintex', intervalle = 0, intervalleMax = null, jauge } = {}) {
   const messages = ids.length;
-  const gestes = messages * (avecOffre ? GESTES_AVEC_OFFRE : GESTES_PAR_MESSAGE);
+  const parMessage = avecOffre ? GESTES_AVEC_OFFRE : GESTES_PAR_MESSAGE;
+  const gestes = messages * parMessage;
   const secondes = estimationSecondes({ n: messages, rythme, intervalle, intervalleMax });
   let limite = 'passu';
-  let libres = null;
+  let libres = null, attendront = null;
   if (jauge && Number.isFinite(Number(jauge.n)) && Number.isFinite(Number(jauge.pourApp))) {
     libres = Math.max(0, Number(jauge.pourApp) - Number(jauge.n));
-    limite = gestes <= libres ? 'dedans' : 'depasse';
+    attendront = Math.max(0, messages - Math.floor(libres / parMessage));
+    limite = attendront === 0 ? 'dedans' : 'depasse';
   }
-  return { messages, annonces: annonces.length, reste, gestes, secondes, limite, libres };
+  return { messages, annonces: annonces.length, gestes, secondes, limite, libres, attendront };
 }
 
 // ── LE SUIVI : un état de la file serveur → une issue de SuiviTravail ───────

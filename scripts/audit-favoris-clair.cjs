@@ -3,7 +3,8 @@
 //  EXÉCUTE src/favorisParcours.js et src/favorisJournee.js (données inventées) :
 //   · QUI : le nombre de personnes, aucune identité ; seuls les NOUVEAUX favoris
 //     (après le dernier envoi) par défaut, les anciens comptés à part ;
-//   · au plus 10 destinataires par envoi (la file serveur refuse au-delà) ;
+//   · AUCUN nombre fixe de messages par envoi (plafond 10/60 min RETIRÉ, CLAUDE.md §3) : seule
+//     borne les gestes libres de l'heure (45) ; au-delà, la file ATTEND (serveur exécuté) ;
 //   · l'offre au centime, la remise en € et en % (prixOffreFavori) ;
 //   · la durée « environ » au rythme choisi, « pas su » si illisible ;
 //   · les gestes : 2 par message, 3 avec l'offre, face aux 45/h (jauge pas lue ⇒ pas su) ;
@@ -43,17 +44,34 @@ async function controles() {
   dit(P.annoncesQui([{ cle: 'x', itemId: '9', personnes: [{ id: 'z', etat: 'a_envoyer', date: null }] }], () => false, { depuis: T0 }).find(Boolean).aEcrire.length === 0, 'favori sans date lisible : jamais « nouveau »');
   dit(P.annoncesQui(cartes, (id) => id === 'a', { depuis: null }).find((x) => x.itemId === '1').aEcrire.join() === 'b', 'un favori bloqué (déjà dans la file, en conversation) n’est pas proposé');
   const C = P.destinatairesChoisis(A, ['item:1', 'item:2', 'item:4']);
-  dit(C.ids.length === 10 && C.reste === 4 && C.annonces.length === 3, '10 destinataires au plus par envoi, le reste dit', { n: C.ids.length, reste: C.reste });
-  dit(P.MAX_PAR_ENVOI === 10, 'la borne est celle de la file serveur (10)');
+  dit(C.ids.length === 14 && C.annonces.length === 3 && !('MAX_PAR_ENVOI' in P), 'aucun nombre fixe de messages par envoi : les 14 personnes des 3 annonces', { n: C.ids.length });
+  const R12 = P.recapEnvoi({ ids: Array.from({ length: 12 }, (_, i) => 'x' + i), annonces: ['a'], avecOffre: true, jauge: { n: 20, pourApp: 45 } });
+  dit(R12.limite === 'depasse' && R12.attendront === 4 && R12.libres === 25, 'la seule borne : 25 gestes libres ⇒ 8 messages cette heure, 4 attendront la suivante', R12);
+  // La file SERVEUR (exécutée) : aucun plafond de messages par envoi ; la limite de l'heure fait attendre.
+  const F = await import(pathToFileURL(process.env.FC_FILE || path.join(RACINE, 'api', '_lib', 'favoris-file.js')).href + '?t=' + Date.now()).catch((e) => { dit(false, 'la file serveur se charge', e.message); return null; });
+  if (F) {
+    const cible = (i) => ({ itemId: String(100 + i), recipientId: String(900 + i), notificationId: 'n' + i, initiator: 'favori' });
+    let lance = null; try { lance = F.lancerFile(null, { owner: 'o', targets: Array.from({ length: 25 }, (_, i) => cible(i)), message: 'Salut', intervalleMinutes: 0, maintenant: T0 }); } catch (e) { lance = { erreur: e.message }; }
+    dit(lance && lance.data && lance.valeur.jobs.length === 25, 'la file serveur accepte 25 messages d’un coup (aucun « 10 au plus »)', lance && (lance.erreur || lance.valeur.jobs.length));
+    if (lance && lance.data) {
+      let d = lance.data; const r = F.reserverFile(d, { owner: 'o', maintenant: T0, jeton: 'j1' }); d = r.data;
+      d.enCours.autorise = true;
+      const t = F.terminerFile(d, { owner: 'o', jeton: 'j1', resultat: 'refuse', raison: 'quota_extension', ecrits: 0, maintenant: T0 + 1000 });
+      const j = t.data.groupes.o.jobs.find((x) => x.notificationId === 'n0');
+      dit(t.data.groupes.o.active === true && j.etat === 'attente' && t.data.groupes.o.prochain >= T0 + 1000 + F.QUOTA_ATTENTE_MS, 'limite de l’heure (rien d’écrit) ⇒ la file ATTEND une place, elle ne s’arrête pas', { active: t.data.groupes.o.active, etat: j.etat });
+      const t2 = F.terminerFile(F.reserverFile(lance.data, { owner: 'o', maintenant: T0, jeton: 'j2' }).data, { owner: 'o', jeton: 'j2', resultat: 'refuse', raison: 'quota_extension', ecrits: 1, maintenant: T0 + 1000 });
+      dit(t2.data.groupes.o.active === false, 'une écriture déjà partie ⇒ la file s’arrête comme avant (jamais de doublon)');
+    }
+  }
   const o = P.detailOffre(95, { mode: 'pct', valeur: 10, arrondi: false }, M.prixOffreFavori);
   dit(o.apres === 85.5 && o.remise === 9.5 && o.pct === 10, 'offre : 95 € −10 % ⇒ 85,50 €, −9,50 €', o);
   dit(P.detailOffre(null, { mode: 'pct', valeur: 10 }, M.prixOffreFavori).inconnu === true && P.detailOffre(40, { mode: 'prix', valeur: 45 }, M.prixOffreFavori).sansOffre === true && P.detailOffre(40, null, M.prixOffreFavori).sans === true, 'prix inconnu ⇒ « — » ; prix fixe ≥ prix ⇒ message seul ; sans offre');
   const mor = P.morceauxApercu('Salut {username}, {Bonjour|Salut} !', M.personnaliserMessageFavori);
   dit(mor.filter((x) => x.pseudo).length === 1 && !mor.some((x) => /[{}]/.test(x.texte || '')) && mor.some((x) => /Bonjour/.test(x.texte || '')), 'aperçu : {username} = pastille, variante = son premier choix', mor);
   dit(P.estimationSecondes({ n: 10, rythme: 'vintex' }) === 72 && P.estimationSecondes({ n: 3, rythme: 'fixe', intervalle: 6 }) === 720 && P.estimationSecondes({ n: 3, rythme: 'aleatoire', intervalle: 2, intervalleMax: 4 }) === 360 && P.estimationSecondes({ n: 3, rythme: 'fixe', intervalle: 'x' }) === null && P.estimationSecondes({ n: 1 }) === 0, 'durée : (n−1) attentes au rythme choisi ; illisible ⇒ null');
-  const R = P.recapEnvoi({ ids: C.ids, annonces: C.annonces, avecOffre: true, rythme: 'vintex', jauge: { n: 10, pourApp: 45 } });
+  const R = P.recapEnvoi({ ids: C.ids.slice(0, 10), annonces: C.annonces, avecOffre: true, rythme: 'vintex', jauge: { n: 10, pourApp: 45 } });
   dit(R.gestes === 30 && R.limite === 'dedans' && R.libres === 35, 'gestes : 3 par message avec l’offre, dans les 45/h', R);
-  dit(P.recapEnvoi({ ids: C.ids, avecOffre: false, jauge: { n: 20, pourApp: 45 } }).limite === 'dedans' && P.recapEnvoi({ ids: C.ids, avecOffre: true, jauge: { n: 20, pourApp: 45 } }).limite === 'depasse' && P.recapEnvoi({ ids: C.ids, jauge: null }).limite === 'passu', 'au-delà des gestes libres ⇒ dépasse ; jauge pas lue ⇒ pas su');
+  dit(P.recapEnvoi({ ids: C.ids.slice(0, 10), avecOffre: false, jauge: { n: 20, pourApp: 45 } }).limite === 'dedans' && P.recapEnvoi({ ids: C.ids.slice(0, 10), avecOffre: true, jauge: { n: 20, pourApp: 45 } }).limite === 'depasse' && P.recapEnvoi({ ids: C.ids.slice(0, 10), jauge: null }).limite === 'passu', 'au-delà des gestes libres ⇒ dépasse ; jauge pas lue ⇒ pas su');
   // La marge
   const pl = (c) => ({ etat: 'ok', plancher: c });
   dit(P.gardeMarge({ apres: 85.5, plancher: pl(9000) }).bloque === 'perte' && P.gardeMarge({ apres: 85.5, plancher: pl(9000) }).reste === -450, 'offre à perte ⇒ bloquée, reste −4,50 €');
@@ -112,7 +130,7 @@ function prouve() {
   dit(r0 > 0, `sur ${avant}, les contrôles sont rouges`, r0);
   const src = fs.readFileSync(MODULE, 'utf8');
   const MUT = [
-    ['plus de 10 par envoi', 'export const MAX_PAR_ENVOI = 10;', 'export const MAX_PAR_ENVOI = 50;'],
+    ['un plafond fixe de messages par envoi revient', 'for (const id of a.aEcrire) { ids.push(id);', 'for (const id of a.aEcrire) { if (ids.length >= 10) continue; ids.push(id);'],
     ['anciens proposés comme nouveaux', 'const nouveau = (p) => depuis == null ||', 'const nouveau = (p) => true ||'],
     ['offre à perte libre', "if (reste < 0) bloque = bloque || 'perte';", ''],
     ['prix mini ignoré', "let bloque = m != null && o < m ? 'mini' : null;", 'let bloque = null;'],
@@ -129,6 +147,16 @@ function prouve() {
     const f = path.join(path.dirname(MODULE), `.favorisParcours.mutant.${process.pid}.js`);
     fs.writeFileSync(f, src.replace(de, vers));
     try { dit(lancer({ FC_MODULE: f }) > 0, `mutation « ${nom} » ⇒ rouge`); } finally { fs.rmSync(f, { force: true }); }
+  }
+  const fsrc = path.join(RACINE, 'api', '_lib', 'favoris-file.js'), fs0 = fs.readFileSync(fsrc, 'utf8');
+  for (const [nom, de, vers] of [
+    ['la file serveur remet « 10 au plus »', "if(!Array.isArray(targets)||!targets.length||", "if(!Array.isArray(targets)||!targets.length||targets.length>10||"],
+    ['la limite de l’heure coupe la file', "const attendQuota=!j.auto&&", "const attendQuota=false&&"],
+  ]) {
+    if (!fs0.includes(de)) { dit(false, `mutation serveur « ${nom} » applicable`); continue; }
+    const f = path.join(path.dirname(fsrc), `.favoris-file.mutant.${process.pid}.js`);
+    fs.writeFileSync(f, fs0.replace(de, vers));
+    try { dit(lancer({ FC_FILE: f }) > 0, `mutation « ${nom} » ⇒ rouge`); } finally { fs.rmSync(f, { force: true }); }
   }
   fs.rmSync(dir, { recursive: true, force: true });
 }

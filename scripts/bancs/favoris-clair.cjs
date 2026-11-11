@@ -31,7 +31,7 @@
 //      acheteur su dite à part ; « Ce qui marche » par envoi ; l'offre groupée ;
 //   8. état vide : une phrase et le geste ; 44 px, aucun débordement, couleurs.
 //  FC_JEU = base · vide · absente. FC_THEME = clair · sombre. FC_MUTANT =
-//  max · nouveaux · marge · histo · suivi · envoi (§6.1 : chacune doit rougir).
+//  max (un plafond fixe par envoi revient) · nouveaux · marge · histo · suivi · envoi · outils (§6.1 : chacune doit rougir).
 //  `node scripts/bancs/favoris-clair.cjs` (esbuild). SHOTS=dossier des captures.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
@@ -61,6 +61,7 @@ const FAV = JEU === 'base' ? [
   ['n13', '', 9008, 50 * 60000], ['n14', 'ancien_x', 9010, 40 * J],
 ] : [];
 const PSEUDOS = FAV.map((f) => f[1]).filter(Boolean);
+const PSEUDOS_ICI = PSEUDOS;
 const TITRES = { 9001: 'Nike Air Max 90 blanche', 9002: 'Adidas Samba noire', 9003: 'New Balance 550 verte', 9004: 'Asics Gel-Lyte III', 9005: 'Jordan 1 Mid bleue', 9006: 'Puma Suede rouge', 9007: 'Sac Longchamp Le Pliage noir', 9008: 'Converse Chuck 70', 9009: 'Reebok Club C', 9010: 'Vans Old Skool' };
 const PRIX = { 9001: 65, 9002: 80, 9003: 95, 9005: 120, 9007: 45 };
 // La fiche par identité (vinted_annonce_numeros[item_id]) : 9003 achetée 90 € (offre à perte), 9001 mini 60 € (offre sous le mini).
@@ -87,11 +88,12 @@ const CHOISISSABLES = [...new Set(FAV.map((f) => f[2]))].filter((it) => aEcrire(
 const N_TOUS = CHOISISSABLES.reduce((n, it) => n + aEcrire(it, false), 0);
 
 const MUTATIONS = {
-  max: ['favorisParcours.js', 'export const MAX_PAR_ENVOI = 10;', 'export const MAX_PAR_ENVOI = 3;'],
+  max: ['favorisParcours.js', 'for (const id of a.aEcrire) { ids.push(id);', 'for (const id of a.aEcrire) { if (ids.length >= 3) continue; ids.push(id);'],   // un plafond fixe par envoi qui revient
   nouveaux: ['favorisParcours.js', 'const nouveau = (p) => depuis == null ||', 'const nouveau = (p) => true ||'],
   marge: ['FavorisEtapes.jsx', 'const peutEnvoyer = peutOuvrir && (!(p.bloquees || []).length || p.confirmeMarge);', 'const peutEnvoyer = peutOuvrir;'],
   histo: ['favorisParcours.js', 'x.personne === String(v.acheteur)', 'true'],
   suivi: ['AutomatisationFavoris.jsx', 'demarrerSuivi(j.vue);', ''],
+  outils: ['FavorisVinted.jsx', "          {/* (11 nov., lot favoris-clair) « Plus d'outils » : plus de liste par personne", "          {lignes.map(x=><p key={x.id}>{x.nom}</p>)}{/* "],
   envoi: ['AutomatisationFavoris.jsx', 'agirRef.current=agir;', "agirRef.current=agir;React.useEffect(()=>{if(selection.length&&!vue?.active)agir('lancer');},[selection.join(',')]);"],
 };
 
@@ -226,11 +228,19 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       dit(tous.length === attendus.length && tous.every(([it, n]) => n === aEcrire(Number(it), true)), `${T} « Inclure les anciens » : ${attendus.length} annonces, les anciens favoris ajoutés`, JSON.stringify(tous));
       await pg.click('[data-fc-anciens-bascule]');
       await pg.waitForTimeout(200);
+      // « Plus d'outils » : plus aucun pseudo (la liste par personne est retirée).
+      await pg.click('[data-favoris-ouvrir]');
+      await pg.waitForSelector('[data-favoris-feuille]', { state: 'attached', timeout: 5000 }).catch(() => {});
+      await pg.waitForTimeout(300);
+      const outils = await pg.evaluate(() => { const f = document.querySelector('.vrm-favoris-voile:not([hidden]) [data-favoris-feuille]'); return f ? { texte: f.innerText, cases: f.querySelectorAll('input[type=checkbox]').length } : null; });
+      dit(outils && !PSEUDOS_ICI.some((p) => outils.texte.includes(p)) && outils.cases === 0, `${T} « Plus d’outils » : aucun pseudo, aucune case par personne`, outils && outils.texte.slice(0, 200));
+      await pg.click('[data-favoris-feuille] .vrm-favoris-fermer').catch(() => {});
+      await pg.waitForTimeout(200);
       // 2. tout choisir ⇒ le compte ; aperçu de l'offre
       await pg.click('[data-fc-tout]');
       await pg.waitForTimeout(200);
       const ch = await pg.evaluate(() => Number(document.querySelector('[data-fc-choisis]')?.getAttribute('data-fc-choisis')));
-      dit(ch === Math.min(10, N_TOUS), `${T} « Tout choisir » : ${N_TOUS} messages`, ch);
+      dit(ch === N_TOUS, `${T} « Tout choisir » : ${N_TOUS} messages`, ch);
       const offre = await pg.evaluate(() => ({ v: document.querySelector('[data-fc-apercu-offre]')?.getAttribute('data-fc-apercu-offre'), l: document.querySelector('[data-fc-offre-ligne]')?.innerText || '' }));
       const ex = (qui.map((x) => Number(x.item)).find((it) => PRIX[it] != null) === Number(qui[0] && qui[0].item)) ? Number(qui[0].item) : null;   // l'aperçu montre la 1re annonce choisie
       if (ex) { const apres = Math.round(PRIX[ex] * 90) / 100; dit(Number(offre.v) === apres && offre.l.includes('−10 %'), `${T} QUOI : l’offre au centime (${PRIX[ex]} € → ${apres} €, −10 %)`, JSON.stringify(offre)); }
@@ -250,7 +260,7 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       await pg.waitForSelector('[data-fc-recap]', { timeout: 5000 }).catch(() => {});
       await pg.waitForTimeout(300);
       const rc = await pg.evaluate(() => { const l = document.querySelector('[data-fc-recap-ligne]'); return l ? { m: Number(l.getAttribute('data-fc-messages')), a: Number(l.getAttribute('data-fc-nannonces')), s: l.getAttribute('data-fc-secondes'), t: l.innerText, lim: document.querySelector('[data-fc-limite]')?.getAttribute('data-fc-limite'), g: Number(document.querySelector('[data-fc-limite]')?.getAttribute('data-fc-gestes')), garde: Number(document.querySelector('[data-fc-garde]')?.getAttribute('data-fc-garde') || 0), bloque: [...document.querySelectorAll('[data-fc-bloque]')].map((e) => [e.closest('[data-fc-recap-annonce]')?.getAttribute('data-fc-recap-annonce'), e.getAttribute('data-fc-bloque'), e.getAttribute('data-fc-marge')]), env: document.querySelector('[data-fc-envoyer]')?.disabled, garantie: /Aucune garantie/.test(document.querySelector('[data-fc-avertissement]')?.innerText || '') } : null; });
-      const nM = Math.min(10, N_TOUS);
+      const nM = N_TOUS;
       dit(rc && rc.m === nM && rc.a === CHOISISSABLES.length && Number(rc.s) === (nM - 1) * 8 && /environ/.test(rc.t), `${T} récap : ${nM} messages · ${CHOISISSABLES.length} annonces · environ ${(nM - 1) * 8} s`, JSON.stringify(rc));
       dit(rc && rc.g === nM * 3 && rc.lim === 'dedans', `${T} récap : ${nM * 3} gestes, dans la limite de 45/h (12 déjà pris)`, rc && rc.g + ' ' + rc.lim);
       const b9003 = rc && rc.bloque.find((x) => x[0] === '9003'), b9001 = rc && rc.bloque.find((x) => x[0] === '9001');
