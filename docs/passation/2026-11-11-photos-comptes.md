@@ -42,22 +42,28 @@ reprise par la session principale.
 N°), pas l'atelier automatique : celui-ci renverrait les MÊMES photos, et les modifier pour échapper à
 la détection est refusé (§3 « modifier les photos pour tromper »).
 
-### Reste (prochaines étapes exactes)
-1. **Banc d'écran** `scripts/bancs/photos-comptes.cjs` à écrire (modèle : `en-ligne-deux-fois.cjs`) :
-   servir `harvest_{A,B}_listings` + `photo_emprunte_{A,B}` (empreintes calculées par
-   `empreinteDepuisPixels` sur des pixels inventés) ; juger : carte `[data-journee-photos-comptes]`
-   (data-n), feuille `[data-photos-comptes]` (`data-pc-groupes`, `data-pc-pas-verifiees`), même compte
-   ⇒ aucune carte, lecture ratée ⇒ « pas lues », aucune écriture ; clic `[data-pc-republier]` ⇒
-   Republier à la main s'ouvre AUSSI depuis Ma journée (⚠️ pas vérifié : `repubMainOuvert` est-il rendu
-   sur l'instance `only='journee'` ?) ; 390 tactile / 1512, clair / sombre, captures REGARDÉES ;
-   rouge sur origin/main (git archive).
-2. Ligne « Quoi de neuf » (`src/nouveautes.js`, `audit-quoi-de-neuf`).
-3. Bancs voisins à relancer : `journee-perso` (nouvelle carte du catalogue), `en-ligne-deux-fois`,
-   `publier-ailleurs`, `annonces-coherence` (menu Outils), `vitesse` (nouvelle lecture `photo_emprunte_*`).
-4. Vrai `git merge origin/main`, ligne §9 de CLAUDE.md, réserver 5.358 dans COORDINATION (déjà notée
-   par l'agent principal).
-5. Non fait : Leboncoin/Vestiaire/eBay « pour info » côté extension (seul Vinted est calculé) ;
-   Studio photo / nouvel achat (essayé puis retiré : le texte « publier quand même » y trompait).
+### Reprise du 11 nov. (soir) — fait
+- **Banc d'écran** `scripts/bancs/photos-comptes.cjs` : photos INVENTÉES (le dessin du banc du seuil,
+  exportées en JPEG, servies comme vinted.net), empreintes par le vrai `photoEmpreinte.js`, 3 comptes ;
+  390 tactile / 1512 × clair / sombre ; carte ambre de Ma journée (data-n), feuille (groupes, P3 vue 1/2
+  pas groupées, même compte pas groupé, 8 vérifiées / 1 pas vérifiée DITE, miniatures chargées ENTIÈRES,
+  côte à côte, légende compte + N° VISIBLE, liens vinted.fr, geste ≥ 44 px sur la plus récente) ;
+  « Republier avec d'autres photos » depuis Ma journée ⇒ Republier à la main (oui, rendu sur cette
+  instance) ; rien écrit ; Annonces → Outils (n = 2) ; lecture ratée ⇒ « pas lues » ; compte lu il y a
+  30 h ⇒ nommé « pas relu » ; rien en double ⇒ aucune carte. `BANC_SEUL=390|1512`, `BANC_THEME=clair|sombre`.
+- **Défaut trouvé par les captures** : la classe `vrm-pc` était déjà celle de Photo carton
+  (`styles-photo-carton.css`) ⇒ miniatures coupées à 52 px, légendes invisibles. Classes renommées
+  `vrm-phc-*`. Le geste passe sur deux lignes (libellé, puis compte · N°).
+- Règle : un compte pas relu est nommé même sans annonce montrée (`photosEnDouble`).
+- Seuil re-mesuré dans le Chromium du banc : même photo max 11, autre photo min 19 (seuil 16) ;
+  mutations `seuil` et `sansrecadrage` rouges. (Le banc du seuil lançait un Chromium absent : corrigé.)
+- « Quoi de neuf » (`photos-comptes`), CLAUDE.md §8 (capacité) et §9 (ligne), merge origin/main.
+
+### Reste
+- Bancs voisins pas relancés (machine partagée) : `journee-perso`, `en-ligne-deux-fois`,
+  `publier-ailleurs`, `annonces-coherence`, `vitesse`.
+- L'encart « avant de publier » (Republier, Publier ailleurs) n'a pas de banc d'écran.
+- Leboncoin/Vestiaire/eBay « pour info » côté extension : non fait (seul Vinted est calculé).
 
 ### Pièges
 - `_fond-vm.cjs` : passer `src:` explicite (le `--src` de l'audit est un ARBRE, pas background.js).
