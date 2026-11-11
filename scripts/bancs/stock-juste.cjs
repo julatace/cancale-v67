@@ -18,10 +18,10 @@
 //  J  Ma journée (390 clair, 1512 sombre) : la carte « à trancher » en tête, ouverte EN PLACE
 //     (l'écran reste Ma journée) ; la question de N°60 : trois réponses ≥ 44 px ; plus de
 //     seconde carte « supprimé de Vinted ».
-//  A  « Non, enlève-la du stock » ⇒ quatre raisons ; « Donnée » ⇒ la carte sort, la pilule
+//  A  « Enlever du stock » (un toucher, la réponse principale) ⇒ la carte sort, la pilule
 //     « Annuler » ; écrit : décision `separe`/`donnee`, déclarée partie (id 7002), case de N°60
 //     libérée ; le N° (`vinted_annonce_numeros`) inchangé ; la pilule part en ≤ 6 s.
-//  P  LA PILULE (le bug) : « Oui, je la garde » → « Annuler » (clic) → la pilule part ; le geste
+//  P  LA PILULE (le bug) : « Non, je l’ai » → « Annuler » (clic) → la pilule part ; le geste
 //     SUIVANT (« Oui » encore) : sa pilule part aussi en ≤ 6 s ; rechargement ⇒ aucune pilule.
 //     « Plus tard » ⇒ la carte sort, et ne revient pas au rechargement.
 //  T  `?tab=trancher` (ancien lien) ⇒ Ma journée, la carte ouverte ; plus d'entrée « À trancher ».
@@ -189,26 +189,22 @@ const attendrePartie = async (pg, ms) => { const vu = []; for (let t = 0; t < ms
     const j = await pg.evaluate((sel) => ({ url: location.search, corps: !!document.querySelector('[data-at-journee-corps] [data-a-trancher]'),
       gestes: [...document.querySelectorAll(sel + ' button')].map((x) => ({ r: x.getAttribute('data-role'), h: Math.round(x.getBoundingClientRect().height), w: Math.round(x.getBoundingClientRect().width) })) }), CARTE);
     dit(j.corps, `J ${nom} : la carte s'ouvre EN PLACE dans Ma journée (mêmes cartes, aucun autre écran)`, JSON.stringify(j.url));
-    dit(j.gestes.map((g) => g.r).join() === 'oui,non,plus-tard' && j.gestes.every((g) => g.h >= 44), `J ${nom} : « Tu l'as encore ? » : trois réponses, ≥ 44 px`, JSON.stringify(j.gestes));
+    dit(j.gestes.map((g) => g.r).sort().join() === 'non,oui,plus-tard' && j.gestes.every((g) => g.h >= 44), `J ${nom} : « L'enlever du stock ? » : trois réponses, ≥ 44 px`, JSON.stringify(j.gestes));
     await pg.evaluate((sel) => document.querySelector(sel).scrollIntoView({ block: 'center' }), CARTE); await pg.waitForTimeout(300);
     await shot(pg, 'J-' + nom + '-question');
     // A
     const num0 = JSON.stringify(MAIN.vinted_annonce_numeros);
     await pg.click(CARTE + ' [data-a-trancher-non]');
-    const raisons = await pg.$$eval(CARTE + ' [data-a-trancher-raison]', (l) => l.map((x) => x.getAttribute('data-a-trancher-raison')));
-    dit(raisons.join() === 'donnee,vendue-ailleurs,perdue,rendue', `A ${nom} : « Non » ⇒ quatre raisons au choix rapide`, raisons.join());
-    await shot(pg, 'A-' + nom + '-raisons');
-    await pg.click(CARTE + ' [data-a-trancher-raison="donnee"]');
     await pg.waitForTimeout(300);
     const v1 = await pg.evaluate((sel) => ({ carte: !!document.querySelector(sel), dialogue: !!document.querySelector('.vrm-confirmation') }), CARTE);
     const p1 = await pilule(pg);
-    dit(!v1.carte && !v1.dialogue && p1.annuler, `A ${nom} : « Donnée » ⇒ la carte sort, aucune confirmation, pilule « Annuler »`, JSON.stringify({ ...v1, ...p1 }));
+    dit(!v1.carte && !v1.dialogue && p1.annuler, `A ${nom} : « Enlever du stock » (un toucher) ⇒ la carte sort, aucune confirmation, pilule « Annuler »`, JSON.stringify({ ...v1, ...p1 }));
     await shot(pg, 'A-' + nom + '-pilule');
     for (let i = 0; i < 40 && !(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']); i++) await pg.waitForTimeout(200);
     const dec = (MAIN.vrm_cycle_decisions || {})['7002'];
     const perdue = Object.entries(MAIN.vinted_pairs_lost || {}).find(([, v]) => v && String(v.id) === '7002');
-    dit(!!dec && dec.choix === 'separe' && dec.raison === 'donnee', `A ${nom} : écrit — séparée, raison « donnée »`, JSON.stringify(dec));
-    dit(!!perdue && perdue[1].raison === 'donnee', `A ${nom} : déclarée partie par IDENTITÉ (annonce 7002)`, JSON.stringify(perdue));
+    dit(!!dec && dec.choix === 'separe', `A ${nom} : écrit — sortie du stock (séparée)`, JSON.stringify(dec));
+    dit(!!perdue, `A ${nom} : déclarée partie par IDENTITÉ (annonce 7002)`, JSON.stringify(perdue));
     dit(MAIN.vrm_slots && !MAIN.vrm_slots['60'] && !!MAIN.vrm_slots['12'], `A ${nom} : sa case (N°60) libérée, l'autre (N°12) intacte`, JSON.stringify(MAIN.vrm_slots));
     dit(JSON.stringify(MAIN.vinted_annonce_numeros) === num0, `A ${nom} : aucun N° changé (jamais réattribué)`);
     const parti = await attendrePartie(pg, 7000);
@@ -239,7 +235,7 @@ const attendrePartie = async (pg, ms) => { const vu = []; for (let t = 0; t < ms
     dit(p2.annuler && t2 != null, `P ${nom} : le geste SUIVANT : sa pilule « Annuler » part aussi (≤ 7 s) — le bug du 11 nov.`, JSON.stringify({ p2, t2 }));
     await shot(pg, 'P-' + nom + '-apres');
     for (let i = 0; i < 30 && !(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']); i++) await pg.waitForTimeout(200);
-    dit((MAIN.vrm_cycle_decisions || {})['7002'] && MAIN.vrm_cycle_decisions['7002'].choix === 'chez-moi', `P ${nom} : « Oui, je la garde » ⇒ chez-moi`, JSON.stringify((MAIN.vrm_cycle_decisions || {})['7002']));
+    dit((MAIN.vrm_cycle_decisions || {})['7002'] && MAIN.vrm_cycle_decisions['7002'].choix === 'chez-moi', `P ${nom} : « Non, je l’ai » ⇒ chez-moi`, JSON.stringify((MAIN.vrm_cycle_decisions || {})['7002']));
     await pg.reload({ waitUntil: 'domcontentloaded' });
     await pg.waitForSelector('[data-job]', { timeout: 40000 }).catch(() => {});
     await pg.waitForTimeout(2500);
