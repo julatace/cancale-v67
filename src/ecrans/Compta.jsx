@@ -4072,6 +4072,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         if (!c) { if (++essais < 100) setTimeout(viser, 100); return; }
         // Rangée dans « Documents et réglages » (replié) : le repli s'ouvre (son `onToggle` suit).
         const d = c.closest('details'); if (d && !d.open && ++essais < 100) { d.open = true; setTimeout(viser, 60); return; }
+        // (11 nov., restes) La carte existe AVANT d'être affichée : « Déclarer » est encore `hidden` tant
+        // que `allerVue` n'a pas rendu — un focus sur un bouton invisible échoue sans rien dire, et la
+        // demande était effacée (banc annuler-commandes K5). On attend qu'elle ait une boîte à l'écran.
+        if (!c.getClientRects().length && ++essais < 100) { setTimeout(viser, 60); return; }
         DEMANDE_COMMANDE.export = 0;
         try { c.scrollIntoView({ block: 'center' }); } catch (_) {}
         const b = c.querySelector('[data-export-preparer]'); try { if (b) b.focus({ preventScroll: true }); } catch (_) {}
