@@ -2,6 +2,7 @@ import { PlateformesSetting } from '../App.jsx';
 import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 import { RappelsSetting } from '../App.jsx';
+import { CLE_VERIF_COUPEES, lireCoupees, rallumerAlerte, NOMS_ALERTES } from '../verifAnnonce.js';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
 import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
@@ -3442,6 +3443,28 @@ function JeVendsSetting() {
   );
 }
 
+// (11 nov., lot verif-publication) Les alertes « vérifier avant de publier » qu'il
+// a coupées (« Ne plus me le dire ») : chacune se rallume d'un clic. Rien de coupé ⇒
+// rien n'est montré (le réglage n'existe que s'il a servi).
+function VerifCoupeesSetting() {
+  const [brut, setBrut] = React.useState(() => load(CLE_VERIF_COUPEES, null));
+  React.useEffect(() => onCloudReady(() => setBrut(load(CLE_VERIF_COUPEES, null))), []);
+  const codes = [...lireCoupees(brut)];
+  if (!codes.length) return null;
+  const rallumer = (code) => { const r = rallumerAlerte(brut, code); save(CLE_VERIF_COUPEES, r); setBrut(r); toast(code ? 'Alerte rallumée.' : 'Toutes les alertes sont rallumées.'); };
+  return (
+    <div data-verif-coupees={codes.length} style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Alertes coupées avant de publier</div>
+      {codes.map((c) => (
+        <div key={c} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44 }}>
+          <span style={{ fontSize: 13, color: C.muted }}>{NOMS_ALERTES[c]}</span>
+          <button type="button" className="vrm-lien-action" data-verif-rallumer={c} onClick={() => rallumer(c)} style={{ minHeight: 44 }}>Rallumer</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function NumeroEcritSetting({ onAnnonces }) {
   const exemples = useExemplesVendeur();
   const lire = () => lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null));
@@ -3664,6 +3687,7 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
       <NumeroEcritSetting onAnnonces={onAnnonces}/>
+      <VerifCoupeesSetting/>
       <div style={{fontSize:13,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Le format des <b>prochains</b> numéros. Ceux déjà donnés ne changent pas.
       </div>

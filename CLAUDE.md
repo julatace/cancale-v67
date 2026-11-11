@@ -531,6 +531,7 @@ sans la fonction.
 | `avisnegatif` | `signalerAvisLus` | **5.352.0** (11 nov.) | après une lecture d'avis RÉUSSIE, `/api/push {action:'avis', uid}` (le serveur décide, une fois par avis ≤ seuil) ; `transaction_id` gardé s'il est en chiffres ; aucune requête Vinted de plus |
 | `importdepart` | `importerHistorique` | **5.344.0** (11 nov.) | « Ton historique Vinted · 400 sur 1 250 » : tout l'historique (ventes, achats) du compte de l'onglet, 20 lectures/h, reprise ; `import_vinted_{uid}` |
 | `moderation` | `guetterDressing` | **5.350.0** (11 nov.) | « Vinted a masqué / fait disparaître / limite » : deux lectures COMPLÈTES comparées, aucune requête de plus ; `moderation_vinted_{uid}` |
+| `verifdepot` | `alertesDepotVinted` | **5.353.0** (11 nov.) | sur le formulaire de dépôt vinted.fr : encart discret « N° absent / déjà en ligne / prix sous l'achat », base VRM seulement, jamais une garde |
 
 ---
 
