@@ -10,7 +10,7 @@ Remplace, pour l'état, `2026-11-10-passation-generale.md` et `2026-11-09-passat
 
 ## A. Ce que tu as aujourd'hui (en ligne sur vrm.center)
 
-Mis en ligne le 10 nov. (PR #1088 → #1121, toutes vérifiées avant mise en ligne) :
+Mis en ligne le 10 nov. (PR #1088 → #1122, toutes vérifiées avant mise en ligne) :
 
 | domaine | ce qui marche |
 |---|---|
@@ -21,7 +21,7 @@ Mis en ligne le 10 nov. (PR #1088 → #1121, toutes vérifiées avant mise en li
 | **Achats** | une visionneuse photo ; Achats plus beaux ; facture d'achat jointe ; achat saisi deux fois ; « Revendu combien ? » ; calculette d'achat ; Siri « Ajouter un achat » |
 | **Stock** | valeur du stock (au moins … sur N) ; emballages ; inventaire de fin d'année ; Atelier dans Organisation |
 | **Argent** | Compta + Statistiques réunies (Résumé · Statistiques · Déclarer · Factures) ; mois bouclé ; comparer deux mois ; d'où viennent mes achats ; vitesse d'envoi ; avis Vinted ; factures Pro (à envoyer, envoi auto ÉTEINT, avoir, registre + zip) ; factures Leboncoin/eBay ; facture bilingue ; alerte seuil de TVA ; livre de police |
-| **Partout** | Mon adresse VRM en un parcours 1·2·3·✓ (code Gmail affiché, plus de roue sans fin) ; raccourcis clavier (« ? » pour la liste) et lecteur d'écran ; recherche universelle (identité exacte en tête) ; À trancher en cartes ; corbeille 30 jours ; textes courts (3 séries) |
+| **Partout** | ouverture plus légère (2e ouverture : −60 % de données, copies gardées sur l'appareil et revalidées) ; Mon adresse VRM en un parcours 1·2·3·✓ (code Gmail affiché, plus de roue sans fin) ; raccourcis clavier (« ? » pour la liste) et lecteur d'écran ; recherche universelle (identité exacte en tête) ; À trancher en cartes ; corbeille 30 jours ; textes courts (3 séries) |
 | **Offres** | Solo 16,99 € = 1 compte vendeur par plateforme · **Pro 19,99 € = comptes vendeurs illimités** (ta décision de ce soir) ; CGV du 10 nov. |
 | **Extension** | 5.339.0 servie (jauge 50 actions/h, journal, mode vacances appris sur ton geste, infos sous tes annonces sur vinted.fr, calculette sur l'annonce d'un autre vendeur) |
 
@@ -96,8 +96,11 @@ communes à recopier dans chaque brief sont résumées en F.
 
 | lot | contenu | note |
 |---|---|---|
-| K | ouverture légère (cache par `data.rev`) | en dernier ; mesurer avant/après |
-| textes courts, 4e série | FavorisVinted.jsx (8, dont « Aucune garantie contre un blocage Vinted » : voir avec Julien), Operations.jsx (9), Communaute.jsx (7), écrans de connexion/installation | chercher chaque libellé dans `scripts/` avant de le changer |
+| suite de K | appliquer les copies revalidées aux autres lectures du démarrage : `harvest_%_txn_%` (~246 Ko), `harvest_*` (~244 Ko), `email_track_*` (~130 Ko), `vinted_item_details` (~108 Ko) ; un instantané pour Annonces | mesurer d'abord (`_mesure-demarrage`) ; voir `2026-11-10-ouverture-legere.md` |
+| textes courts, 5e série | ≈ 135 textes > 90 caractères restants : Réglages, eBay, Leboncoin, Accueil, `ConfigurerTransfert`, `RelierBoite`, `CarteRelais` ; « ⓘ Pourquoi ? » en 11 px dans `operations.css` | chercher chaque libellé dans `scripts/` avant de le changer |
+| extension 5.339 sur le vrai Vinted | repères de la page d'annonce (titre, prix, marque, vendeur) non mesurés sur le vrai site | si l'encart n'apparaît pas, mesurer la page réelle |
+| mode vacances : journal | inscrire le geste « vacances » dans le journal du lot G | petit |
+| VoiceOver | relecture à la main sur iPhone/Safari ; écrans Litiges, E-mails, Communauté, Organisation | |
 | logos exacts | Chronopost, Colissimo, InPost, Relais Colis, Shop2Shop, GLS, Colis Privé (aujourd'hui « mot-symbole ») | attendre les captures de Julien ; `DESSINS_TRANSPORTEURS` dans `src/transporteursVisuels.js` |
 | Vestiaire | facture Pro : l'extension doit ranger `sellerPrice` (prix payé) | nouvelle version d'extension |
 | avis datés | l'extension garde un historique daté par capture | nouvelle version d'extension |
