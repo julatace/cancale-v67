@@ -77,11 +77,18 @@ PDF compris) à chaque écriture : refusé (§4.4). À la place, `supabase/migra
   flottante, K versions en 503 ⇒ l'écran garde ce qu'il montre, aucune écriture de moisson.
   - après : **13 verts, 0 rouge** à 390 (vente 21 s, annonce 16 s, journée 18,5 s ; au calme
     1 lecture de versions / 28 s, 7 Ko ; après l'écriture 9 lectures, 193 Ko dont 182 Ko = les
-    commandes du seul compte touché) ; 1512 : voir §5 bis.
+    commandes du seul compte touché) ; **1512 sombre 13/0** (vente 18,6 s, annonce 19,7 s, journée
+    18,5 s) ; **390 sombre 13/0**.
   - `origin/main` (`git archive`, banc copié dedans) : **5 rouges** (Annonces jamais, Ma journée
     jamais, aucune pastille, aucune lecture de versions). La vente arrive en 21 s grâce à la sonde de
     60 s déjà là (Ventes seulement).
-  - mutation « abonnement coupé » (`vrm:neuf` plus écouté) : voir §5 bis.
+  - mutation « abonnement coupé » (`vrm:neuf` plus écouté par l'app) : **2 rouges** (Annonces
+    jamais, Ma journée jamais ; la vente arrive encore par la vieille sonde de 60 s).
+  - captures regardées : la pastille flotte en haut au centre à 1512 (entre la recherche et l'île),
+    et au-dessus de la barre du bas au téléphone (en haut, elle couvrait les boutons de la coque :
+    déplacée). Rien ne saute.
+- `audit-lectures-lourdes` : 1 rouge après la fusion de `origin/main`, dans `src/categoriesLecture.js`
+  (pas de ce lot).
 - `scripts/tests/temps-reel.test.mjs` 9/9 (familles, premier passage, lecture ratée, budget 10 s,
   fenêtre bornée, arrêt, canal : sujet privé + jeton, message d'un autre vendeur ignoré, refus ⇒ plus
   de tentative).
