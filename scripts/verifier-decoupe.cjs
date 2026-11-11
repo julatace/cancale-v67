@@ -100,6 +100,27 @@ function etapeStructure() {
     const attendu = x + (neufs.includes(nom) ? 1 : 0);
     if (y !== attendu) ecarts.push(`${nom} ${x}→${y}${neufs.includes(nom) ? ' (attendu ' + attendu + ')' : ''}`);
   }
+  // (11 nov., reprise) §4.11 « un composant jamais rendu ne lève rien » : chaque vue/racine d'un module
+  // src/coeur/ doit être déclarée paresseuse dans App.jsx ET rendue au moins une fois (sinon son texte
+  // existe, tous les comptes tombent juste, et l'écran a disparu).
+  const orphelins = [];
+  try {
+    const app = fs.readFileSync(path.join(APRES, 'src', 'App.jsx'), 'utf8');
+    for (const f of fs.readdirSync(path.join(APRES, 'src', 'coeur')).filter((x) => /\.jsx?$/.test(x))) {
+      const t = fs.readFileSync(path.join(APRES, 'src', 'coeur', f), 'utf8');
+      const noms = [...t.matchAll(/^export function (\w+)\(\{ v \}\)/gm)].map((m) => m[1]);
+      const ex = t.match(/\nexport \{ ([^}]*) \};\n*$/); if (ex) noms.push(...ex[1].split(',').map((x) => x.trim()).filter(Boolean));
+      for (const n of noms) {
+        const lazyDecl = new RegExp(`^const ${n} = aLaDemande\\(\\(\\) => import\\('\\./coeur/${f.replace('.', '\\.')}'\\)`, 'm').test(app);
+        const rendus = (app.match(new RegExp(`<${n}[\\s/>]`, 'g')) || []).length + [...fs.readdirSync(path.join(APRES, 'src', 'coeur'))].reduce((a, g) => a + ((fs.readFileSync(path.join(APRES, 'src', 'coeur', g), 'utf8').match(new RegExp(`<${n}[\\s/>]`, 'g')) || []).length), 0) + S.fichiersApp(APRES).filter((x) => /ecrans/.test(x)).reduce((a, g) => a + ((fs.readFileSync(g, 'utf8').match(new RegExp(`<${n}[\\s/>]`, 'g')) || []).length), 0);
+        if (!lazyDecl) orphelins.push(`${n} (coeur/${f}) : pas déclaré paresseux dans App.jsx`);
+        else if (!rendus) orphelins.push(`${n} (coeur/${f}) : jamais rendu`);
+      }
+    }
+  } catch (e) { if (e.code !== 'ENOENT') throw e; }
+  rapport.structure.orphelins = orphelins;
+  if (orphelins.length) KO(`écran(s) découpé(s) jamais rendu(s) : ${orphelins.join(' ; ')}`);
+  else OK('chaque vue/racine de src/coeur/ est déclarée paresseuse dans App.jsx et rendue');
   if (ecarts.length) KO(`composants rendus : écarts ${ecarts.slice(0, 20).join(', ')}`);
   else OK(`composants rendus : ${a.rendus.size} noms, mêmes nombres de rendus (+1 pour chacun des ${neufs.length} paresseux neufs : ${neufs.join(', ')})`);
 }
