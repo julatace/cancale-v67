@@ -21,7 +21,8 @@
 //  anciens écrans `retraits` / `cat_achats` — mène à Achats.
 // ════════════════════════════════════════════════════════════════════════════
 
-export const ONGLETS_COLIS = Object.freeze(['cat_bord', 'cat_expedition']);
+// (11 nov.) + `colis` : un lien écrit `?tab=colis` (le nom de l'ancien onglet) ne tombe jamais sur un écran vide.
+export const ONGLETS_COLIS = Object.freeze(['cat_bord', 'cat_expedition', 'colis']);
 export const ONGLETS_RETRAIT = Object.freeze(['retraits', 'cat_achats']);
 const SITES = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
 

@@ -146,13 +146,14 @@ async function signaux(pg) {
     await pg.evaluate(() => { window.__suivre = true; });
     // Premier passage sur chaque écran (calculé), puis retour sur chacun (gardé).
     const premier = {};
-    for (const t of ['journee', 'cat_bord', 'ventes', 'annonces', 'journee']) { premier[t] = await toucher(pg, t); await calme(lectures, 1500); }
+    // (11 nov., lot DJ3) Colis n'est plus dans la barre : Achats (« À retirer » en tête) est gardé à sa place.
+    for (const t of ['journee', 'achats', 'ventes', 'annonces', 'journee']) { premier[t] = await toucher(pg, t); await calme(lectures, 1500); }
     // Un repère sur chaque écran (seul l'écran montré est dans la page : on repasse sur chacun).
-    for (const t of ['cat_bord', 'ventes', 'annonces', 'journee']) { await toucher(pg, t); await marquer(pg, t, 'vu-' + t); await calme(lectures, 800); }
+    for (const t of ['achats', 'ventes', 'annonces', 'journee']) { await toucher(pg, t); await marquer(pg, t, 'vu-' + t); await calme(lectures, 800); }
     // Annonces n'est PAS gardée (sa grille rattachée d'un bloc s'affichait plus tard) : remontée à chaque visite.
     await toucher(pg, 'annonces'); await calme(lectures, 800);
     dit((await repere(pg, 'annonces')) !== 'vu-annonces', '1. annonces : remontée à chaque visite (pas gardée, comme avant)');
-    for (const t of ['cat_bord', 'ventes', 'journee']) {
+    for (const t of ['achats', 'ventes', 'journee']) {
       const l0 = lectures.length;
       await pg.evaluate(() => { window.__rendusCompta = []; window.__releve = true; window.__vrmGardeEcarts = []; });
       const r = await toucher(pg, t);

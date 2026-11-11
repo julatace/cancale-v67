@@ -263,6 +263,17 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
         });
         dit(errs.length === 0, 'U aucune erreur (Achats)', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
+      // L : un lien écrit avec le nom de l'ancien onglet (`?tab=colis`) ⇒ Ventes « À expédier » ; `&sub=retirer` ⇒ Achats.
+      for (const [lien, attendu] of [['?tab=colis', 'ventes'], ['?tab=colis&sub=retirer', 'achats']]) {
+        const { ctx, pg, errs } = await ouvrir(b, vp, sombre, lien);
+        await essaie('L ' + nom + ' ' + lien, async () => {
+          await attendre(pg, '[data-colis-section]');
+          const m = await mesure(pg);
+          dit(m.tache === attendu && m.section === attendu, `L \`${lien}\` ouvre ${attendu} (jamais un écran vide)`, `${m.tache} · ${m.section}`);
+        });
+        dit(errs.length === 0, 'U aucune erreur (' + lien + ')', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+      }
       // C : le lien d'un e-mail de retrait (src/boiteEmails.js) vise encore `cat_bord` : il mène à Achats.
       { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, '?tab=cat_bord&cible=retrait&suivi=90000001');
         await essaie('C ' + nom, async () => {
