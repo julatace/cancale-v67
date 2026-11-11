@@ -1427,7 +1427,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   const [search,setSearch]=useState('');
 
   // Normalise un numéro (string, trim)
-  const norm=(v)=>String(v||'').trim();
+  const norm=(v)=>cleNum(v);   // (11 nov., famille « N° par cleNum ») « 007 » au garage = « 7 » en ligne
 
   // Ajoute un numéro à l'unité
   const addOne=()=>{
@@ -1677,11 +1677,11 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const garageNums = useMemo(() => {
     const s = new Set();
     Object.values(garageGrid || {}).forEach(arr => {
-      if (Array.isArray(arr)) arr.forEach(v => { const t = (v||'').trim().toLowerCase(); if (t) s.add(t); });
+      if (Array.isArray(arr)) arr.forEach(v => { const t = cleNum(v); if (t) s.add(t); });
     });
     return s;
   }, [garageGrid]);
-  const inGarage = (numero) => !!numero && garageNums.has(String(numero).trim().toLowerCase());
+  const inGarage = (numero) => !!numero && garageNums.has(cleNum(numero));   // (11 nov.) par cleNum
 
   const accName = (accId) => (labels && labels[accId]) || accounts.find(a=>a.vinted_user_id===accId)?.login || `Compte #${accId}`;
 

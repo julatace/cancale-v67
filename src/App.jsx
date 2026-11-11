@@ -7681,11 +7681,11 @@ const nextUrssafDeadline = (freq, now = new Date()) => {
 // renvoie sa position lisible (colonne / place). null si pas rangée.
 const garageCellOf = (grid, num) => {
   if (grid == null || num == null || String(num).trim() === '') return null;
-  const target = String(num).trim().toLowerCase();
+  const target = cleNum(num);   // (11 nov., famille « N° par cleNum ») « 007 » rangé = « 7 » cherché
   for (const key in grid) {
     const arr = grid[key];
     if (!Array.isArray(arr)) continue;
-    const si = arr.findIndex(v => v != null && String(v).trim().toLowerCase() === target);
+    const si = arr.findIndex(v => v != null && cleNum(v) === target);
     if (si >= 0) {
       const ci = parseInt(String(key).split('_').pop(), 10);
       return { key, si, col: isNaN(ci) ? null : ci + 1, slot: si + 1 };
@@ -25012,7 +25012,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         if (v == null) return;
         const t = String(v).trim();
         if (!t) { sortirDeCase(itemId, cellKey, String(quoi.num)); return; }
-        if (t === String(quoi.num)) return;
+        if (cleNum(t) === cleNum(quoi.num)) return;   // (11 nov.) « 07 » = « 7 »
         const ou = dejaPoseOu(t);
         if (ou) { toast(`N°${t} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
         const idx = pile.indexOf(String(quoi.num)); if (idx < 0) return;
@@ -30365,12 +30365,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
   // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
   const garageSpotOf = (num) => {
-    const t = String(num||'').trim().toLowerCase(); if (!t) return null;
+    const t = cleNum(num); if (!t) return null;   // (11 nov.) par cleNum
     try {
       const plan = normalizePlan(load('vrm_room_plan', null));
       for (const rm of (plan.rooms||[])) for (const it of (rm.items||[])) {
         const label = (FURN_TYPES[it.type]||{}).label || 'rangement';
-        if (it.num!=null && String(it.num).trim().toLowerCase()===t) return { room: rm.name, kind: label };
+        if (it.num!=null && cleNum(it.num)===t) return { room: rm.name, kind: label };
         if (Array.isArray(it.nums) && it.nums.some(n=>String(n).trim().toLowerCase()===t)) return { room: rm.name, kind: label };
         for (const cell in (it.slots||{})) if ((it.slots[cell]||[]).some(n=>String(n).trim().toLowerCase()===t)) return { room: rm.name, kind: label };
       }
@@ -30410,7 +30410,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Entrée numérotée liée manuellement à ce bordereau (si l'utilisateur en a choisi une).
   const manualEntry = (b) => {
     const lk = bordLinks[bordKey(b)]; if (!lk || !lk.numero) return null;
-    for (const key in numeros) { if (numeros[key] && String(numeros[key].numero) === String(lk.numero)) return numeros[key]; }
+    for (const key in numeros) { if (numeros[key] && cleNum(lk.numero) && cleNum(numeros[key].numero) === cleNum(lk.numero)) return numeros[key]; }   // (11 nov.) par cleNum
     return { numero: lk.numero }; // au moins le N°, même si l'annonce n'existe plus
   };
   const isBordPrinted = (b) => !!bordsPrinted[bordKey(b)];
@@ -31180,7 +31180,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // SEUL rangement affiché depuis le 5 nov.) — l'ancienne grille ne bouge plus :
   // sans ça, une paire posée dans une case était dite « pas encore rangée ».
   const meublesNums = (() => { const sl = load('vrm_slots', {}) || {}; const s = new Set(); for (const k of Object.keys(sl)) if (ouDansMeubles(k, null, sl)) s.add(k); return s; })();
-  const inGarage = (n)=> !!n && (garageNums.has(String(n).trim().toLowerCase()) || meublesNums.has(cleNum(n)));
+  // (11 nov., famille « N° par cleNum ») « 007 » au garage = « 7 » sur la fiche.
+  const garageCles = useMemo(() => new Set([...garageNums].map(cleNum).filter(Boolean)), [garageNums]);
+  const inGarage = (n)=> !!n && (garageCles.has(cleNum(n)) || meublesNums.has(cleNum(n)));
   const openPicker = async (item) => {
     // ⚠️ LA MODALE S'OUVRE TOUT DE SUITE. Avant, elle attendait le chargement de
     // TOUS les achats de TOUS les comptes — 11 s mesurées, à chaque clic. On
@@ -32887,7 +32889,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!pk) continue;
       // Ambigu seulement si deux entrées ont un NUMÉRO DIFFÉRENT pour la même photo.
       // (Une paire renvoyée puis republiée réutilise son numéro → non ambigu.)
-      if (m[pk]) { if (String(numeros[m[pk]].numero) !== String(numeros[k].numero)) dup.add(pk); }
+      if (m[pk]) { if (cleNum(numeros[m[pk]].numero) !== cleNum(numeros[k].numero)) dup.add(pk); }
       else m[pk] = k;
     }
     dup.forEach(pk => delete m[pk]);
@@ -32902,7 +32904,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const k in numeros) {
       const d = photoDir((numeros[k] && numeros[k].photo) || null) || (numeros[k] && numeros[k].photoK ? String(numeros[k].photoK).split('/')[0] : null);
       if (!d) continue;
-      if (m[d]) { if (String(numeros[m[d]].numero) !== String(numeros[k].numero)) dup.add(d); }
+      if (m[d]) { if (cleNum(numeros[m[d]].numero) !== cleNum(numeros[k].numero)) dup.add(d); }
       else m[d] = k;
     }
     dup.forEach(d => delete m[d]);
@@ -34063,7 +34065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const vendus = new Set();
     for (const o of (sales.items || [])) {
       const e = saleOv[String(o.transaction_id)];
-      const n = String((e && e.numero) || '').trim().toLowerCase(); if (n) vendus.add(n);
+      const n = cleNum(e && e.numero); if (n) vendus.add(n);   // (11 nov.) par cleNum
       // ⚠️ `vendus.add('t:' + titre)` VIVAIT ICI, et RIEN ne le lisait — le test
       //    par titre avait été retiré (voir le commentaire plus bas), la ligne
       //    qui l'alimentait était restée. Même famille que le tiroir `Nav` : du
@@ -34085,7 +34087,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!presentAcc.has(String((e && e.accountId) || ''))) continue; // compte pas rafraîchi
       if (soldManual.has(String(k))) continue;                      // marquée vendue à la main
       if (emailSoldIds.has(String(k))) continue;                    // vendue d'après les emails
-      if (vendus.has(raw.toLowerCase())) continue;                  // numéro porté par une vente
+      if (vendus.has(cleNum(raw))) continue;                        // numéro porté par une vente
       // ⚠️ Le test « même TITRE qu'une vente » a été retiré : avec plusieurs paires
       //    au même libellé, une seule vente les masquait TOUTES de l'audit — donc
       //    une paire réellement perdue passait inaperçue. Le titre n'est pas une
@@ -35166,7 +35168,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    parce que je vais commencer à les mettre dans les boîtes. » Même si
       //    le numéro vient de l'attribution automatique, dès qu'une case du
       //    garage le porte, plus rien ne le change tout seul.
-      if ((porteursNum[String(cur.numero)] || []).some(x => x.type === 'garage')) continue;
+      if ((porteursNum[cleNum(cur.numero)] || []).some(x => x.type === 'garage')) continue;   // (11 nov.) la carte est rangée par cleNum
       const t = normTitle(it.title), sz = sizeOf(it.title, it.size);
       // ⚠️ LA PHOTO PASSE AVANT LE TITRE. Republier re-téléverse la MÊME image
       //    sous un nouveau nom, mais dans le même dossier (§5.34) — c'est donc
@@ -35174,7 +35176,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    paires au même libellé, le titre seul désignerait la mauvaise.
       const dirIt = photoDir(it.photo);
       const cands = orphans.filter(o => {
-        if (String(o.e.numero) === String(cur.numero)) return false;
+        if (cleNum(o.e.numero) === cleNum(cur.numero)) return false;   // (11 nov.) « 07 » = « 7 »
         const dirO = photoDir(o.e.photo);
         // Deux dossiers connus et différents = ce n'est pas la même paire, quel
         // que soit le titre. Deux dossiers connus et identiques = c'est elle.
@@ -35954,7 +35956,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const parIdentite = o.transaction_id != null && txnItem[String(o.transaction_id)] != null;
       if (reuse && !parIdentite && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;
       if (reuse) {
-        if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
+        if (!cur || cleNum(cur.numero) !== cleNum(reuse)) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
       } else if ((needsBordereau(o.status) || venteRecente(o)) && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled') {
         // ⚠️ LE CAS QUI MANQUAIT — « je me retrouve avec des paires qui n'ont pas
         // de numéro alors que c'est censé être automatique ».
@@ -49569,7 +49571,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucun article hors ligne{q?' pour cette recherche':' disponible'} (ceux en ligne ne sont pas proposés).</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
-                  style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:12,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                  style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&cleNum(already.numero)===cleNum(e.num)?C.accent:C.border}`,background:C.card,borderRadius:12,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:42,height:42,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                   </div>
@@ -49991,20 +49993,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
       {auditOpen && (()=>{
-        const onlineNums = new Set(); annBase.forEach(it=>{ const nn=numeros[it.id]?.numero; if(nn) onlineNums.add(String(nn)); });
-        const soldNums = new Set(); (sales.items||[]).forEach(o=>{ if(classifyOrderStatus(o.status)==='completed'){ const e=effEntry(o); if(e&&e.numero) soldNums.add(String(e.numero)); } });
-        const byNum = new Map(); Object.values(numeros).forEach(e=>{ if(e&&e.numero!=null) byNum.set(String(e.numero), e); });
+        const onlineNums = new Set(); annBase.forEach(it=>{ const nn=numeros[it.id]?.numero; if(nn) onlineNums.add(cleNum(nn)); });   // (11 nov.) par cleNum
+        const soldNums = new Set(); (sales.items||[]).forEach(o=>{ if(classifyOrderStatus(o.status)==='completed'){ const e=effEntry(o); if(e&&e.numero) soldNums.add(cleNum(e.numero)); } });
+        const byNum = new Map(); Object.values(numeros).forEach(e=>{ if(e&&e.numero!=null&&cleNum(e.numero)) byNum.set(cleNum(e.numero), e); });
         // Tous les numéros présents au garage (grille 2D + pièces 3D).
-        const garageAll = new Set(garageNums);
-        try { const plan=normalizePlan(load('vrm_room_plan',null)); for(const rm of (plan.rooms||[])) for(const it of (rm.items||[])){ if(it.num!=null){const t=String(it.num).trim().toLowerCase(); if(t)garageAll.add(t);} if(Array.isArray(it.nums)) it.nums.forEach(n=>{const t=String(n).trim().toLowerCase(); if(t)garageAll.add(t);}); for(const c in (it.slots||{})) (it.slots[c]||[]).forEach(n=>{const t=String(n).trim().toLowerCase(); if(t)garageAll.add(t);}); } } catch(_){}
-        const atG = (num) => garageAll.has(String(num).trim().toLowerCase());
+        const garageAll = new Set([...garageNums].map(cleNum).filter(Boolean));
+        try { const plan=normalizePlan(load('vrm_room_plan',null)); for(const rm of (plan.rooms||[])) for(const it of (rm.items||[])){ if(it.num!=null){const t=cleNum(it.num); if(t)garageAll.add(t);} if(Array.isArray(it.nums)) it.nums.forEach(n=>{const t=cleNum(n); if(t)garageAll.add(t);}); for(const c in (it.slots||{})) (it.slots[c]||[]).forEach(n=>{const t=String(n).trim().toLowerCase(); if(t)garageAll.add(t);}); } } catch(_){}
+        const atG = (num) => garageAll.has(cleNum(num));
         const ghosts=[], soldStored=[], notStored=[];
         for (const [num,e] of byNum) { const on=onlineNums.has(num), so=soldNums.has(num), g=atG(num);
           if(!on && !so && !g) ghosts.push({num,e});
           else if(so && g) soldStored.push({num,e});
           else if(on && !g) notStored.push({num,e});
         }
-        const unknownAtGarage = [...garageAll].filter(t=>t && ![...byNum.keys()].some(k=>k.toLowerCase()===t)).sort((a,b)=>(+a||0)-(+b||0));
+        const unknownAtGarage = [...garageAll].filter(t=>t && !byNum.has(t)).sort((a,b)=>(+a||0)-(+b||0));
         ghosts.sort((a,b)=>(+a.num||0)-(+b.num||0)); soldStored.sort((a,b)=>(+a.num||0)-(+b.num||0)); notStored.sort((a,b)=>(+a.num||0)-(+b.num||0));
         const Section = ({icon,color,title,desc,items,render}) => items.length===0 ? null : (
           <div style={{marginBottom:12}}>
@@ -50276,7 +50278,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (la nouvelle n'est donc jamais numérotée à neuf) ; l'ancienne fiche reste
         // (elle porte l'historique, sa suppression est notée : plus présente).
         const reporterNumero = (ancienId, nouvelId) => setNumeros(prev => {
-          const e = prev[ancienId], cible=prev[nouvelId]||{}; if (!e || !nouvelId || (cible.numero&&String(cible.numero)!==String(e.numero))) return prev;
+          const e = prev[ancienId], cible=prev[nouvelId]||{}; if (!e || !nouvelId || (cible.numero&&cleNum(cible.numero)!==cleNum(e.numero))) return prev;
           const u = { ...prev, [nouvelId]: { ...e, ...cible, numero:cible.numero||e.numero, recreeDe: String(ancienId), recreeAt: new Date().toISOString() } };
           save('vinted_annonce_numeros', u); return u;
         });
@@ -51257,7 +51259,7 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
     const a = (d && d.annonce) || {};
     const ecarte = (raison) => ecartes.push({ numero: d && d.numero, itemId: a.itemId, raison });
     const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
-    if (!a.itemId || !n || n !== (d && d.numero)) { ecarte('sku'); continue; }
+    if (!a.itemId || !n || cleNum(n) !== cleNum(d && d.numero)) { ecarte('sku'); continue; }
     const ids = parNum.get(n) || [];
     if (ids.length !== 1) { ecarte('numero-partage'); continue; }
     if (revenues.has(ids[0])) { ecarte('revenue-une-fois'); continue; }
@@ -53660,12 +53662,12 @@ function AppCoeur() {
   // après un litige). Ne touche à rien d'autre — le numéro reste dans
   // l'historique (vinted_used_numeros) et n'est jamais redonné à une autre paire.
   const freeGarageNum=(num)=>{
-    const target=String(num||'').trim().toLowerCase(); if(!target) return;
+    const target=cleNum(num); if(!target) return;   // (11 nov.) par cleNum
     setGarageGrid(prev=>{
       const next={...prev}; let touched=false;
       for(const key in next){
         const arr=next[key]; if(!Array.isArray(arr)) continue;
-        const idx=arr.findIndex(v=>v!=null&&String(v).trim().toLowerCase()===target);
+        const idx=arr.findIndex(v=>v!=null&&cleNum(v)===target);
         if(idx>=0){ const copy=[...arr]; copy[idx]=''; next[key]=copy; touched=true; }
       }
       if(touched) save('vinted_garage_grid',next);
@@ -56458,7 +56460,7 @@ function AppCoeur() {
         const numerosTx = memoSur('gs-ntx', [fichesToutes, numData && numData.txnItem, brutOv], () => numerosDesVentes(fichesToutes, numData && numData.txnItem, load('vinted_sale_overrides', {}) || {}));
         const factures = memoSur('gs-fac', [invoices, gsData && gsData.facturesPro], () => facturesPourRecherche(invoices, gsData && gsData.facturesPro));
         const lbcSet = (gsData && gsData.lbc) || new Set();
-        const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
+        const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&cleNum(numero)&&arr.some(v=>cleNum(v)===cleNum(numero))) return box; } return null; };
         // (9 nov.) Les ventes hors Vinted, chacune par SON n° de commande, et leur N° par
         // IDENTITÉ seulement (eBay : le SKU ; Leboncoin : le lien ou la référence ;
         // Vestiaire : le N° de la vente lue) — jamais par le titre.

@@ -6,6 +6,7 @@
 // d'import circulaire avec App.jsx. Rendu derrière <Suspense> côté App.
 import React, { useState, useEffect, useRef } from 'react';
 import { plateauxMeuble, hauteurPile } from './stockRegles.js';
+import { cleNum } from '../api/_lib/numerotation.js';   // (11 nov.) deux N° se comparent par cleNum
 
 // (28 oct., « les photos avec les numéros sur les boîtes ») : une image par adresse,
 // gardée pour la session (une reconstruction de la scène ne la redemande pas).
@@ -1454,7 +1455,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
           if (!g) return;
           let cible = null;
-          if (numVise != null) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && String(o.userData.num) === String(numVise) && o.isMesh) cible = o; });
+          if (numVise != null) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && cleNum(o.userData.num) === cleNum(numVise) && o.isMesh) cible = o; });
           if (!cible) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && !o.userData.ghost && o.isMesh) cible = o; });
           if (!cible) return;
           const yFin = cible.position.y;
@@ -1494,7 +1495,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
           if (!g) { fini && fini(); return; }
           let cible = null;
-          if (numVise != null) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && String(o.userData.num) === String(numVise) && o.isMesh) cible = o; });
+          if (numVise != null) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && cleNum(o.userData.num) === cleNum(numVise) && o.isMesh) cible = o; });
           if (!cible) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && !o.userData.ghost && o.isMesh) cible = o; });
           if (!cible) { fini && fini(); return; }
           const y0 = cible.position.y;
@@ -1540,7 +1541,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           // Où est à l'écran le carton qui porte CE numéro (dans ce meuble).
           boite: (itemId, num) => {
             const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
-            let m = null; g.traverse((o) => { if (!m && o.isMesh && o.userData && String(o.userData.num) === String(num)) m = o; });
+            let m = null; g.traverse((o) => { if (!m && o.isMesh && o.userData && cleNum(o.userData.num) === cleNum(num)) m = o; });
             if (!m) return null; m.updateWorldMatrix(true, false);
             const c = new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).project(camera), r = renderer.domElement.getBoundingClientRect();
             return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height, yMonde: new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).y };
