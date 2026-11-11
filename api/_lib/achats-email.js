@@ -59,16 +59,16 @@ function siteTransfere(texte) {
 // Famille d'un achat : confirmation · expedition · annulation · remboursement.
 const SUJETS = {
   confirmation: [
-    /\b(?:confirmation\s+de\s+(?:votre|ta)\s+(?:commande|achat)|(?:votre|ta)\s+(?:commande|achat)\s+(?:est|a\s+[ée]t[ée])\s+confirm[ée]e?|commande\s+confirm[ée]e|merci\s+pour\s+(?:votre|ton)\s+(?:achat|commande)|(?:votre|ton)\s+paiement\s+a\s+(?:bien\s+)?[ée]t[ée]\s+(?:accept[ée]|valid[ée]|pris\s+en\s+compte)|order\s+confirmed|you\s+bought)\b/i,
+    /\b(?:confirmation\s+de\s+(?:votre|ta)\s+(?:commande|achat)|(?:votre|ta)\s+(?:commande|achat)\s+(?:est|a\s+[ée]t[ée])\s+confirm[ée]e?|commande\s+confirm[ée]e|merci\s+pour\s+(?:votre|ton)\s+(?:achat|commande)|(?:votre|ton)\s+paiement\s+a\s+(?:bien\s+)?[ée]t[ée]\s+(?:accept[ée]|valid[ée]|pris\s+en\s+compte)|order\s+confirmed|you\s+bought)(?![a-zà-ÿ])/i,
   ],
   expedition: [
-    /\b(?:(?:votre|ton)\s+(?:commande|achat|colis|objet|article)\s+(?:a\s+[ée]t[ée]|est)\s+(?:exp[ée]di[ée]e?|envoy[ée]e?|en\s+route)|(?:votre|ton)\s+colis\s+est\s+en\s+chemin|your\s+(?:order|item)\s+(?:has\s+)?shipped)\b/i,
+    /\b(?:(?:votre|ton)\s+(?:commande|achat|colis|objet|article)\s+(?:a\s+[ée]t[ée]|est)\s+(?:exp[ée]di[ée]e?|envoy[ée]e?|en\s+route)|(?:votre|ton)\s+colis\s+est\s+en\s+chemin|your\s+(?:order|item)\s+(?:has\s+)?shipped)(?![a-zà-ÿ])/i,
   ],
   annulation: [
-    /\b(?:(?:votre|ta)\s+(?:commande|achat|transaction)\s+(?:a\s+[ée]t[ée]|est)\s+annul[ée]e?|annulation\s+de\s+(?:votre|ta)\s+(?:commande|achat)|order\s+(?:was\s+)?cancel+ed)\b/i,
+    /\b(?:(?:votre|ta)\s+(?:commande|achat|transaction)\s+(?:a\s+[ée]t[ée]|est)\s+annul[ée]e?|annulation\s+de\s+(?:votre|ta)\s+(?:commande|achat)|order\s+(?:was\s+)?cancel+ed)(?![a-zà-ÿ])/i,
   ],
   remboursement: [
-    /\b(?:(?:vous\s+avez|tu\s+as)\s+[ée]t[ée]\s+rembours[ée]|(?:votre|ton)\s+remboursement|remboursement\s+(?:de\s+(?:votre|ta)\s+commande|effectu[ée]|confirm[ée])|(?:votre|ta)\s+commande\s+a\s+[ée]t[ée]\s+rembours[ée]e|refund\s+(?:issued|confirmed))\b/i,
+    /\b(?:(?:vous\s+avez|tu\s+as)\s+[ée]t[ée]\s+rembours[ée]|(?:votre|ton)\s+remboursement|remboursement\s+(?:de\s+(?:votre|ta)\s+commande|effectu[ée]|confirm[ée])|(?:votre|ta)\s+commande\s+a\s+[ée]t[ée]\s+rembours[ée]e|refund\s+(?:issued|confirmed))(?![a-zà-ÿ])/i,
   ],
 };
 // Un e-mail de VENDEUR n'est jamais un achat (Vestiaire « Votre article vient
