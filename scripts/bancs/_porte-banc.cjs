@@ -29,7 +29,11 @@
 // ════════════════════════════════════════════════════════════════════════════
 const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
-  const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };
+  // (11 nov.) Le jeton a la FORME d'un jeton Supabase (trois parties, « sub » = l'uid) : l'ouverture
+  // hors ligne à froid (src/porteHorsLigne.js) exige que le jeton rangé dise le même uid que la session.
+  const UID_BANC = '__UID_BANC__';
+  const JETON_BANC = 'banc.' + btoa(JSON.stringify({ sub: UID_BANC, banc: 'direct' })).split('=').join('').split('+').join('-').split('/').join('_') + '.banc';
+  const SESS_BANC = { access_token: JETON_BANC, refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: UID_BANC, email: 'banc@vrm.test', totp: [] } };
   // La récupération autonome ne doit recevoir ni session ni stockage du banc.
   if (location.pathname === '/recuperation.html') return;
   const ls = window.localStorage; const poserSess = () => {

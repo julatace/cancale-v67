@@ -152,7 +152,9 @@ async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) 
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS().filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  // (11 nov.) La route d'abonnement servie à sa vraie forme (comme mode-depot.cjs) : sans l'état de
+  // l'abonnement rangé sur l'appareil, l'ouverture hors ligne à froid refuse (« abonnement-inconnu »).
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: /mode=abonnement/.test(r.request().url()) ? JSON.stringify({ ok: true, acces: true, statut: 'active', configure: true }) : '{"pret":true}' }));
   // (9 nov.) La vibration relevée (le banc n'a pas de moteur) : la forme de chaque appel.
   if (vib) await pg.addInitScript(() => { try { Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, value: function (p) { (window.__vib = window.__vib || []).push(p); return true; } }); } catch (_) {} });
   await pg.addInitScript(({ m, sombre, vide }) => {
