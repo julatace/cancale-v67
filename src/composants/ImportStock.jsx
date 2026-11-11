@@ -48,6 +48,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
   const [ecriture, setEcriture] = React.useState(false);
   const [etat, setEtat] = React.useState(() => outils.lireEtat());
   const [aAnnuler, setAAnnuler] = React.useState(null);
+  const [relire, setRelire] = React.useState(0);          // un refus à l'écriture ⇒ l'aperçu est relu
   const [annonces, setAnnonces] = React.useState(() => outils.annonces());
   const entree = React.useRef(null);
   const gen = React.useRef(0);
@@ -77,7 +78,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
     })().catch(() => { if (n === gen.current) setServis(null); });
     return () => { if (!fini) gen.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fichier, colonnes.join('|'), mode, avecSansRef, manque.length]);
+  }, [fichier, colonnes.join('|'), mode, avecSansRef, manque.length, relire]);
 
   const choisir = async (ev) => {
     const f = ev.target.files && ev.target.files[0];
@@ -109,7 +110,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
       if (r && r.ok) {
         outils.toast(`${pl(w.items.length, mode === 'ventes' ? 'vente importée' : 'paire importée', mode === 'ventes' ? 'ventes importées' : 'paires importées')}`);
         setFichier(null); setLignes(null); setEtat(outils.lireEtat());
-      } else setErreur((r && r.raison) || 'Rien n’a été écrit : réessaie.');
+      } else { setErreur((r && r.raison) || 'Rien n’a été écrit : réessaie.'); setRelire((x) => x + 1); }
     } finally { setEcriture(false); }
   };
   const annuler = async (imp) => {
@@ -227,7 +228,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
                   <span className="vrm-imps-meta">{[dateTexte(String(imp.at).slice(0, 10)), imp.nom].filter(Boolean).join(' · ')}</span>
                 </span>
                 {aAnnuler === imp.id
-                  ? <Bouton variante="danger" onClick={() => annuler(imp)} data-imps-annuler-confirmer={imp.id}>Retirer {imp.n}</Bouton>
+                  ? <Bouton variante="danger" onClick={() => annuler(imp)} data-imps-annuler-confirmer={imp.id}>Retirer {pl(imp.n, 'ligne', 'lignes')}</Bouton>
                   : <Bouton variante="discret" onClick={() => setAAnnuler(imp.id)} data-imps-annuler={imp.id}>Annuler</Bouton>}
               </li>
             ))}
