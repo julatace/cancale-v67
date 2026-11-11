@@ -1,4 +1,5 @@
 import { PlateformesSetting } from '../App.jsx';
+import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
@@ -126,7 +127,7 @@ const nomAppareilPris = (nom, verifies) => {
 // ⟦← App.jsx #18⟧
 
 const lireConnexionsOAuth = async()=>{
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
 };
 // (11 nov., lot DJ6) « Délier » Google/Discord : sur son clic, confirmé ; jamais la dernière façon de se connecter.
 const oauthDelier = async (provider, id, nbIdentites) => {
@@ -134,7 +135,7 @@ const oauthDelier = async (provider, id, nbIdentites) => {
  if(nbIdentites<2)return{ok:false,error:`${nom} est ta seule façon de te connecter : ajoute d’abord un mot de passe (Changer mon mot de passe).`};
  if(!id)return{ok:false,error:'Je n’ai pas pu lire cette liaison. Recharge la page.'};
  if(!(await askConfirm({title:`Délier ${nom} ?`,desc:`Tu ne pourras plus te connecter avec ${nom}. Ton compte VRM ne change pas.`,ok:'Délier',cancel:'Annuler'})))return{ok:false};
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});
   if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:/single.identity|last.identity|at least/i.test(String(j?.msg||j?.message||j?.error_code||''))?`${nom} est ta seule façon de te connecter.`:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
   try{relireFiche(AUTH.user?.id);}catch(_){}return{ok:true};
  }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
@@ -2461,7 +2462,7 @@ function DoubleVerification({ onEtat } = {}) {
 // « Se déconnecter partout », « Appareils connectés », « Ce que VRM a fait ».
 const appelSecurite = async (mode, init) => {
   try {
-    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(20000) });
+    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: signalDelai(20000) });
     const j = await r.json().catch(() => null);
     return { status: r.status, j };
   } catch (_) { return { status: 0, j: null }; }

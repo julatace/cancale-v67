@@ -27,7 +27,20 @@ export const idTicket = (id) => 'depense_ticket_' + String(id).replace(/[^\w-]/g
 const RE_MONTANT = /(\d{1,3}(?:[ .  ]\d{3})*|\d+)[,.](\d{2})(?!\d)\s*(?:€|eur)?/gi;
 // (11 nov., lot achat-photo) Une capture d'écran de commande écrit souvent « 45 € » sans centimes :
 // un ENTIER compte seulement collé à « € » ou « EUR » (jamais un entier nu : c'est une quantité).
-const RE_ENTIER_EURO = /(?<![\d,.])(\d{1,3}(?:[   ]\d{3})+|\d{1,6})\s*(?:€|eur\b)/gi;
+// (11 nov., webkit-fiable) SANS « lookbehind » : Safari < 16.4 refuse de LIRE un fichier qui en
+// contient un (tout le paquet tombe : « L'application n'a pas pu démarrer »). `apres(re, interdit)`
+// rend les mêmes correspondances que `(?<!interdit)re` en `matchAll` : chaque position est essayée
+// dans l'ordre (regex « collante »), et refusée si le caractère d'avant est interdit.
+const apres = (re, interdit) => (texte) => {
+  const t = String(texte), r = new RegExp(re.source, re.flags.replace('g', '') + 'y'), out = [];
+  for (let i = 0; i <= t.length;) {
+    if (i === 0 || !interdit.test(t[i - 1])) { r.lastIndex = i; const m = r.exec(t); if (m) { out.push(m); i += m[0].length || 1; continue; } }
+    i++;
+  }
+  return out;
+};
+const PAS_CHIFFRE_AVANT = /[\d,.]/, PAS_DIGIT_AVANT = /\d/;
+const RE_ENTIER_EURO = apres(/(\d{1,3}(?:[   ]\d{3})+|\d{1,6})\s*(?:€|eur\b)/i, PAS_CHIFFRE_AVANT);
 // « -5,00 » (une remise) n'est jamais un montant payé.
 const negatif = (l, i) => i > 0 && /[-−–]\s*$/.test(l.slice(Math.max(0, i - 2), i));
 const montantsDe = (ligne) => {
@@ -38,7 +51,7 @@ const montantsDe = (ligne) => {
     const c = parseInt(m[1].replace(/[ .  ]/g, ''), 10) * 100 + parseInt(m[2], 10);
     if (Number.isSafeInteger(c) && c > 0 && c < 10000000) out.push(c);
   }
-  if (!out.length) for (const m of l.matchAll(RE_ENTIER_EURO)) {
+  if (!out.length) for (const m of RE_ENTIER_EURO(l)) {
     if (negatif(l, m.index)) continue;
     const c = parseInt(m[1].replace(/[   ]/g, ''), 10) * 100;
     if (Number.isSafeInteger(c) && c > 0 && c < 10000000) out.push(c);
@@ -92,11 +105,11 @@ export function dateDuTicket(texte, aujourdhui = new Date()) {
   for (const l of lignesDe(texte)) {
     const t = sansAccent(l);
     if (PAS_ACHAT.test(t)) continue;
-    for (const m of t.matchAll(/(?<!\d)(\d{1,2})\s*[/.\-]\s*(\d{1,2})\s*[/.\-]\s*(\d{4}|\d{2})(?!\d)/g)) {
+    for (const m of apres(/(\d{1,2})\s*[/.\-]\s*(\d{1,2})\s*[/.\-]\s*(\d{4}|\d{2})(?!\d)/, PAS_DIGIT_AVANT)(t)) {
       const j = +m[1], mo = +m[2]; let a = +m[3]; if (m[3].length === 2) a += 2000;
       if (dateValide(j, mo, a)) vues.push(isoDe(j, mo, a));
     }
-    for (const m of t.matchAll(/(?<!\d)(\d{1,2})(?:er)?\s+([a-z]{3,9})\.?\s+(\d{4})(?!\d)/g)) {
+    for (const m of apres(/(\d{1,2})(?:er)?\s+([a-z]{3,9})\.?\s+(\d{4})(?!\d)/, PAS_DIGIT_AVANT)(t)) {
       const mo = MOIS[m[2]]; const j = +m[1], a = +m[3];
       if (mo && dateValide(j, mo, a)) vues.push(isoDe(j, mo, a));
     }
@@ -133,7 +146,7 @@ export function articlesDuTicket(texte) {
     const t = sansAccent(l);
     const m = /(?:nb|nbre|nombre)\s*(?:d['’ ]\s*)?articles?\s*(?:vendus?)?\s*[:=]?\s*(\d{1,3})(?![\d,.])/.exec(t)
       || /articles?\s*(?:vendus?)?\s*[:=]\s*(\d{1,3})(?![\d,.])/.exec(t)
-      || /(?<![\d,.])(\d{1,3})\s*articles?\b/.exec(t)
+      || apres(/(\d{1,3})\s*articles?\b/, PAS_CHIFFRE_AVANT)(t)[0]
       || /articles?\s+vendus?\s*(\d{1,3})(?![\d,.])/.exec(t);
     if (m) { const n = +m[1]; if (n >= 1 && n <= 200) return n; }
   }

@@ -19,6 +19,9 @@ const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('playwright')); }
+// (11 nov., webkit-fiable) `NAVIGATEUR=webkit` : le même banc sous le moteur de Safari (_navigateur.cjs).
+const { lancer, estWebkit } = require('./_navigateur.cjs');
+const PW_NAV = { chromium, webkit: (() => { try { return require(path.join(__dirname, '..', '..', 'node_modules', 'playwright')).webkit; } catch (_) { return require('playwright').webkit; } })() };
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = process.env.DIST || path.join(__dirname, '..', '..', 'dist');
@@ -164,7 +167,7 @@ const detail = async (pg, sousCle) => {
 
 (async () => {
   srv.listen(PORT);
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
+  const b = await lancer(PW_NAV, { executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch((e) => { if (estWebkit) throw e; return chromium.launch(); });
   try {
     for (const [vp, sombre, nom] of [[{ width: 390, height: 844 }, false, '390-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 1512, height: 982 }, false, '1512-clair']]) {
       if (VUES && !VUES.includes(nom)) continue;

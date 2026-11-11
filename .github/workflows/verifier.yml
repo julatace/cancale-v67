@@ -120,13 +120,19 @@ jobs:
         run: node scripts/lancer-bancs.cjs ${{ matrix.lot }}
 
   bancs-webkit:
-    # (6 nov., filet 6) Safari : trois bancs sous WebKit. NON BLOQUANT au début
+    # (6 nov., filet 6) Safari : des bancs sous WebKit. NON BLOQUANT au début
     # (continue-on-error) : on apprend d'abord ce que WebKit voit de différent ;
     # à rendre bloquant quand il est vert plusieurs fois de suite (la passation le dit).
+    # (11 nov., webkit-fiable) + les parcours critiques sur iPhone : connexion, Ma journée,
+    # Ventes, colis à retirer et leur suivi, impression des bordereaux. Le faux Supabase
+    # des bancs sert le CORS sous WebKit (_navigateur.cjs) ; nouveau-vendeur ne joue que
+    # 390 px (l'iPhone ; 1512 reste dans les bancs Chromium). Récit :
+    # docs/passation/2026-11-11-webkit-fiable.md. Pour le rendre BLOQUANT : retirer
+    # `continue-on-error: true` ci-dessous (après trois passages verts sans changement).
     name: Bancs sous WebKit (Safari, non bloquant)
     needs: construire
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -145,7 +151,9 @@ jobs:
         env:
           NAVIGATEUR: webkit
           BANCS_PORT_BASE: '10030'
-        run: node scripts/lancer-bancs.cjs nouveau-vendeur iphone-reprise colis-retirer-propre
+          BANCS_TIMEOUT_S: '1800'
+          LARGEURS: '390'
+        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur
 
   e2e-extension:
     # (11 nov.) L'APP ET LA VRAIE EXTENSION ENSEMBLE : un vrai Chromium (nouveau
