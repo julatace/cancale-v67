@@ -70,6 +70,13 @@ const numerosIntacts = (avant, apres) => {
 };
 const ouvrirSaisiePrix = async (pg, base) => {
   await pg.goto(base + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
+  // (11 nov.) Le chemin d'aujourd'hui : le prochain geste d'Annonces (« prix ») ouvre la saisie en série ;
+  // « Outils → Compléter les prix d'achat » n'existe plus.
+  const geste = pg.locator('[data-ann-prochain-geste="prix"] [data-ann-prochain-geste-bouton]');
+  if (await H.attendre(async () => (await geste.count()) > 0, 15000)) {
+    await geste.first().click().catch(() => {});
+    if (await H.attendre(async () => (await pg.locator('[data-fillbuy]').count()) > 0, 8000)) return true;
+  }
   await H.attendre(async () => (await pg.getByRole('button', { name: /Outils/ }).count()) > 0, 15000);
   await pg.getByRole('button', { name: /Outils/ }).first().click().catch(() => {});
   await H.attendre(async () => (await pg.getByText(/Compl[ée]ter les prix d'achat/).count()) > 0, 5000);

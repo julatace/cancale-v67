@@ -3652,7 +3652,9 @@ const poserLocalHL = (k, chemin, v) => {
 const rejouerGestesBientot = (ms = 1200) => { if (_rejeuT) clearTimeout(_rejeuT); _rejeuT = setTimeout(() => { _rejeuT = null; rejouerGestes(); }, ms); };
 const rejouerGestes = async () => {
   const owner = AUTH.user?.id;
-  if (!owner || !AUTH.session?.access_token || !CLOISONNE || horsLigneMaintenant()) return;
+  if (!owner || !AUTH.session?.access_token || !CLOISONNE) return;
+  // Encore hors ligne (ou la porte pas encore revérifiée au retour du réseau) : on repasse plus tard.
+  if (horsLigneMaintenant()) { if (_gestesHL.attente) rejouerGestesBientot(5000); return; }
   if (!isCloudReady()) { onCloudReady(() => rejouerGestesBientot(300)); return; }
   if (_pushEnVol) { rejouerGestesBientot(800); return; }
   const avant = await rafraichirGestesHL();
@@ -3691,6 +3693,8 @@ const trancherGesteHL = async (ids, choix) => {
 };
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => rejouerGestesBientot(1500));
+  // La porte « hors ligne à froid » se lève (vérifiée au retour du réseau) : les gestes partent.
+  try { suivreHorsLigne((v) => { if (!v) rejouerGestesBientot(800); signalerGestesHL(); }); } catch (_) {}
   window.addEventListener('offline', () => signalerGestesHL());
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && _gestesHL.attente) rejouerGestesBientot(500); });
 }

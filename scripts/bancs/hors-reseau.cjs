@@ -215,7 +215,9 @@ async function main() {
         await c.pg.waitForTimeout(1500);
         const n = await c.pg.evaluate(() => ({
           ligne: (() => { const x = document.querySelector('[data-hl-point="Tabac du Port Cancale"] [data-hl-retrait]'); return x ? x.getAttribute('data-hl-retire') : null; })(),
-          file: (() => { const e = document.querySelector('[data-file-envoi]'); return e ? Number(e.getAttribute('data-file-envoi')) : 0; })(),
+          // (11 nov.) Hors ligne, les gestes ont UNE pastille (« Hors ligne · N gestes en attente », src/gestesHorsLigne.js) :
+          // la mention de la file se tait alors (le même nombre une fois). L'une ou l'autre dit l'attente.
+          file: (() => { const e = document.querySelector('[data-file-envoi]'); if (e) return Number(e.getAttribute('data-file-envoi')); const g = document.querySelector('[data-gestes-attente]'); return g ? Number(g.getAttribute('data-gestes-attente')) : 0; })(),
           local: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_collected') || '[]'); } catch (_) { return null; } })(),
           enFile: (() => { try { return Object.keys((JSON.parse(localStorage.getItem('vrm_file_envoi') || '{}').cles) || {}); } catch (_) { return []; } })(),
         }));
