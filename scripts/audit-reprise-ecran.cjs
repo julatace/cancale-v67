@@ -35,7 +35,6 @@ const MUTATIONS = {
   'depart-fixe': ['app', "const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');", "const [tab,setTabBrut]=useState('journee');"],
   'pas-de-retour': ['app', '<FermeAuRetour fermer={()=>setOpen(false)}/>\n          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas', '<div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas'],
   'bord': ['app', 'if(t && (t.clientX<BORD_SYSTEME || t.clientX>(window.innerWidth||0)-BORD_SYSTEME)){ swipeStart.current=null; return; }', ''],
-  'double-nombre': ['app', 'const badgesBarre=badges?{...badges,ventes:undefined}:badges;', 'const badgesBarre=badges;'],
   'vendeur-garde': ['app', 'viderParcours(sessionStorage,garder); viderParcours(localStorage,garder);', 'viderParcours(sessionStorage,garder);'],
 };
 
@@ -123,7 +122,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const menu = (app.match(/function MenuEcrans[\s\S]*?\n\}/) || [''])[0];
     dit(/<FermeAuRetour fermer=\{\(\)=>setOpen\(false\)\}\/>\s*<div ref=\{panneau\} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas/.test(menu), '« Plus » se ferme au geste retour (FermeAuRetour), le retour ne quitte plus VRM');
     dit(/data-plus-ecran=\{courant\?cleEntree\(courant\):''\}/.test(menu), 'la 5ᵉ place dit l’écran de « Plus » où l’on est');
-    dit(/t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système');
+    // (11 nov.) Depuis la décision de Julien du 9 nov. (b6cde2bc) il n'y a plus de changement d'onglet au doigt :
+    // soit aucun balayage d'onglet n'est écouté (`swipeStart`, `slideTab(` au doigt), soit il laisse les bords.
+    const balayageOnglet = /swipeStart\.current=\{x:t\.clientX/.test(app) || /onTouchEnd=\{[^\n]*\n?[\s\S]{0,400}slideTab\(/.test(app);
+    dit(!balayageOnglet || /t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système (aucun balayage d’onglet au doigt depuis le 9 nov.)');
     // (11 nov., lot DJ3) Colis n'est plus dans la barre : le nombre « à poster » est porté par Ventes SEULE, « à retirer » par Achats seul.
     dit(/const badgesNav=\{ ventes: colisBadge, achats: retraitsBadge,/.test(app) && !/cat_bord: colisBadge/.test(app) && !/retraits: retraitsBadge/.test(app) && /<BadgeNav t=\{t\} badges=\{badgesBarre\} place="barre"\/>/.test(app), 'dans la barre, le nombre de colis est dit une fois (Ventes à poster, Achats à retirer) (§7)');
     dit(/viderParcours\(sessionStorage,garder\); viderParcours\(localStorage,garder\);/.test(app), 'à la connexion d’un autre vendeur, ses reprises seules restent');
