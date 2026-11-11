@@ -152,6 +152,8 @@ async function ouvrir(b, vp, sombre) {
 }
 
 const onglet = async (pg, v) => {
+  // (11 nov., revue colis) « À retirer » est la section de tête d'Achats (lot DJ3), plus un onglet de Colis.
+  if (v === 'retirer') { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(1200); return; }
   await pg.click(`[data-colis-onglet-choix="${v}"]`).catch(() => {});
   await pg.waitForFunction((x) => { const e = document.querySelector('[data-colis-onglet]'); return e && e.getAttribute('data-colis-onglet') === x; }, v, { timeout: 8000 }).catch(() => {});
   await pg.waitForTimeout(500);
