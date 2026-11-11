@@ -52,8 +52,20 @@ automatique** (ni signalement ni blocage) ; **jamais de faux positif sur SES mes
 - Banc `scripts/bancs/anti-arnaque.cjs` (données inventées) : liste Vinted (compteur 1,
   pastille sur la seule conversation de l'arnaqueur ; SA conversation avec WhatsApp + 06
   sans alerte), fil ouvert (codeSms en tête, horsPlateforme gardé, lien vers
-  vinted.fr/inbox, ambre), Tous (compteur 2, bannière Leboncoin paiementHors), aucune
-  commande ni écriture, 390/1512 clair et sombre.
+  vinted.fr/inbox, ambre), Tous (compteur 1 = Leboncoin, bannière paiementHors), aucune
+  commande ni écriture, 390/1512 clair et sombre. **Mutation du banc** : build où SES
+  messages Vinted comptent comme ceux de l'autre ⇒ C rouge (302, 1512 et 390).
+- Captures regardées (390 sombre, 1512 clair, fil Leboncoin 390) : bannière ambre lisible,
+  rien ne déborde. Le navigateur du banc est en anglais : les textes `en` s'affichent.
+- Audits verts : variables, tdz, coherence, identite, icones, textes-courts,
+  fonctions-api, secrets, quoi-de-neuf, traduction, fil-unique, anti-arnaque --prouve.
+
+## Limite connue
+Dans « Tous », une ligne Vinted porte l'aperçu de la BOÎTE (auteur pas su, `filUnique`
+`deMoi: null`) : elle n'est donc jamais comptée ni marquée là (la bannière s'affiche
+bien à l'ouverture du fil). La rendre comptable demanderait de passer à `convVinted`
+l'auteur prouvé du fil capté (`extraitConversation` … `de === 'eux'`) — pas fait.
 
 ## ÉTAT À LA REPRISE
-Voir la fin de ce fichier (mise à jour en fin de session).
+Livré et poussé sur `claude/anti-arnaque` (merge `origin/main` fait, à jour). Pas de PR
+(consigne du lot). Geste de Julien : aucun.
