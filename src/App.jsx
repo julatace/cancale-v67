@@ -36,6 +36,7 @@ import SynchronisationVinted from './SynchronisationVinted.jsx';
 import { prendrePlaceRelais } from './freinRelaisVinted.js';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
+import {trierRecents,sansDate as convsSansDate,sansDoublons as convsSansDoublons,heureListe} from './ordreConversations.js'; // (11 nov.) le plus récent en haut, partout
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
@@ -15228,7 +15229,7 @@ function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensib
       <span className="vrm-msg-body">
         <span className="vrm-msg-l1">
           <span className="vrm-msg-name" title={sensible ? undefined : (typeof nom === 'string' ? nom : undefined)}>{sensible ? <span className="vrm-sensible" data-stream-type="acheteur">{nom}</span> : nom}</span>
-          <time className="vrm-msg-time" dateTime={quand ? new Date(quand).toISOString() : undefined} title={quand ? new Date(quand).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : undefined} style={{color:couleurHeure||C.muted}}>{quand ? heureMessage(quand) : ''}</time>
+          <time className="vrm-msg-time" dateTime={quand ? new Date(quand).toISOString() : undefined} title={quand ? new Date(quand).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : undefined} style={{color:couleurHeure||C.muted}}>{quand ? heureListe(quand) : ''}</time>
         </span>
         {/* (5 nov., chantier G, revue 2.23) Le COMPTE passe sur la ligne de la paire : sur la ligne du
             pseudo il le coupait (« mathilde_sn… · bou… »). Le pseudo a toute la ligne, l'heure à droite. */}
@@ -15302,14 +15303,19 @@ const listeRapides = (q) => (q && q.length ? q.map(t=>({e:'',t})) : QUICK_REPLIE
 const REPONSE_DISPONIBLE = /disponible|\bdispo\b/i;
 const rapidesDuFil = (liste, partie) => (partie ? (liste || []).filter((q) => !REPONSE_DISPONIBLE.test(String(q && q.t || ''))) : liste);
 const reponsesRapidesPartagees = () => { let q = null; try { q = load('vinted_quick_replies', null); } catch (_) {} return listeRapides(Array.isArray(q) && q.length ? q.filter(t => typeof t === 'string' && t.trim()) : DEFAULT_QUICK_REPLIES); };
-function RapidesConv({ liste, onChoisir, desactive = false, style }) {
+// (11 nov., demande de Julien : « plus naturel et simple ») UNE seule entrée pour les réponses
+// rapides : cette rangée, qui défile au doigt, au texte lisible (coupé par la largeur, plus à
+// 24 signes) ; le crayon au bout ouvre leur réglage (`onModifier`). La barre « Réponses
+// rapides » posée sous la liste (le doublon) n'existe plus.
+function RapidesConv({ liste, onChoisir, desactive = false, style, onModifier = null }) {
   return (
-    <div className="vrm-chat-rapides" style={style}>
+    <div className="vrm-chat-rapides" data-rapides-rangee="" role="group" aria-label="Réponses rapides" style={style}>
       {liste.map((q,i)=>(
         <button key={i} type="button" className="vrm-chat-rapide" data-reponse-rapide={i} disabled={desactive} onClick={()=>onChoisir(q.t)} title={q.t}>
-          {q.t.length>24?q.t.slice(0,24)+'…':q.t}
+          {q.t.length>60?q.t.slice(0,60)+'…':q.t}
         </button>
       ))}
+      {onModifier && <button type="button" className="vrm-chat-rapide vrm-chat-rapides-modifier" data-rapides-modifier="" aria-label="Modifier mes réponses rapides" title="Modifier mes réponses rapides" onClick={onModifier}><Icon name="pencil" size={15}/></button>}
     </div>
   );
 }
@@ -15344,7 +15350,8 @@ function PiedSansEnvoi({ raison, lien, texteLien, attrs, children }) {
 // la raison du site. Lecture seule : aucun geste ici.
 function FicheConvVolet({ etat, fc, raison, site }) {
   const a = { className: 'vrm-msg-fiche', 'aria-label': 'Fiche de l’article', 'data-fiche-site': site || undefined };
-  if (etat === 'aucune') return <aside {...a} data-fiche-conv="aucune"><p className="vrm-msg-fiche-vide">La fiche de l’article s’affiche ici quand tu ouvres une conversation.</p></aside>;
+  // (11 nov., Julien : pas de grand vide) Sans conversation ouverte, pas de volet : la fiche arrive AVEC le fil.
+  if (etat === 'aucune') return null;
   if (etat === 'attente') return <aside {...a} data-fiche-conv="attente"/>;
   if (!fc) return (
     <aside {...a} data-fiche-conv="non-reliee">
@@ -30833,6 +30840,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Réponses rapides (modèles) copiables en 1 clic pour répondre vite sur Vinted.
   const [quickReplies, setQuickReplies] = useState(() => { const q = load('vinted_quick_replies', null); return Array.isArray(q) && q.length ? q : DEFAULT_QUICK_REPLIES; });
   const [showQR, setShowQR] = useState(false);
+  const [feuilleQR, setFeuilleQR] = useState(false);
   const saveQR = (arr) => { setQuickReplies(arr); save('vinted_quick_replies', arr); };
   // Ventes masquées de la compta (par n° de transaction). Réversible.
   const [hiddenSales, setHiddenSales] = useState(() => new Set(VENTES_MASQUEES_AUCUNE().map(String)));
@@ -32790,6 +32798,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [replyErr, setReplyErr] = useState(null);
   const verrouReponse=useRef(false),brouillonsReponse=useRef(null);
   if(!brouillonsReponse.current)brouillonsReponse.current=creerBrouillonsReponses(()=>AUTH.user?.id||'');
+  // (11 nov.) L'état de l'envoi d'une réponse, vu DANS le fil : envoi… → envoyé ✓ / pas envoyé, réessayer / pas confirmé.
+  const [envoiReponse,setEnvoiReponse]=useState(null);
   const [replyNotice,setReplyNotice]=useState(''),[reponsesIncertaines,setReponsesIncertaines]=useState({}),[capturesRepondues,setCapturesRepondues]=useState({});
   // Messagerie intégrée (3 octobre) : la liste, et les gestes d'offre du fil.
   const [convMax, setConvMax] = useVueSession('messages-limite',40);
@@ -36153,8 +36163,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(!courante())return;
     const ko = []; const failedUids = [];
     const mr = messagesRetires();  // messages retirés POUR DE BON : hors de la liste, de ses compteurs ET de « boîte pas lue »
-    for (const { acc, r } of results) { if (mr.has(String(acc.vinted_user_id))) continue; if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; ko.push(acc); failedUids.push(String(acc.vinted_user_id)); } }
-    out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
+    // (11 nov.) Mesuré : 30 conversations sur 3 200 captées DEUX fois dans la même boîte (5 à deux dates) :
+    // une seule ligne, la copie la plus fraîche (src/ordreConversations.js).
+    for (const { acc, r } of results) { if (mr.has(String(acc.vinted_user_id))) continue; if (r.ok) { anyOk=true; convsSansDoublons(r.items,c=>c&&c.id!=null?String(c.id):'',c=>c&&c.updated_at).forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; ko.push(acc); failedUids.push(String(acc.vinted_user_id)); } }
+    out.splice(0, out.length, ...trierRecents(out, c=>c.updated_at));
     const error = out.length===0 && anyErr && !anyOk;
     if (!anyErr) putCache('convs', out, { failedUids }, demandes);
     const echoues=new Set(failedUids),autorises=new Set(accounts.map(a=>String(a.vinted_user_id)));
@@ -37198,8 +37210,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     conversationOrigin.current=document.activeElement;
     const request=++conversationRequest.current,lecture=++lectureConversationRequest.current;
     const owner=AUTH.user?.id||'',brouillon=brouillonsReponse.current.lire(owner,conv._acc.vinted_user_id,conv.id);
-    setReplyText(brouillon);setReplyErr(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);if(!verrouOffre.current)setOffreBusy(false);
-    setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
+    setReplyText(brouillon);setReplyErr(null);setEnvoiReponse(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);if(!verrouOffre.current)setOffreBusy(false);
+    setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,extraitBoite:String(conv.description||'').trim(),loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
     if(owner!==(AUTH.user?.id||'')||lecture!==lectureConversationRequest.current)return;
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,refreshError:res.actualisationNonConfirmee?'Actualisation non confirmée. Le fil enregistré reste affiché ; réessaie ou ouvre-le sur Vinted.':null,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
@@ -37280,6 +37292,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(reponsesIncertaines[cle])return;
     if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le navigateur où l'extension est installée, ou réponds sur Vinted."); return; }
     verrouReponse.current=true;setReplyBusy(true);setReplyErr(null);setReplyNotice('');
+    setEnvoiReponse({request:oc.request,texte:text,etat:'envoi'});
     let retour;
     try{
       const r=await vmrExec({uid:oc.acc.vinted_user_id,method:'POST',endpoint:`/api/v2/conversations/${oc.convId}/replies`,body:{reply:{body:text,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}}});
@@ -37298,11 +37311,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     }
     if(retour.etat==='incertain')setReponsesIncertaines(v=>({...v,[cle]:true}));
+    setEnvoiReponse(e=>e&&e.request===oc.request&&e.texte===text?{...e,etat:retour.etat==='confirme'?'ok':retour.etat}:e);
     if(conversationRequest.current!==oc.request)return;
     if(retour.etat==='confirme'){
       // Une lecture commencée avant cet accusé ne doit pas effacer le message confirmé.
       lectureConversationRequest.current++;
-      setReplyText(v=>v.trim()===text?'':v);setReplyNotice(retour.texte);
+      // (11 nov.) « Envoyé ✓ » est dit sous la bulle (data-envoi="ok"), plus une seconde fois au-dessus du champ.
+      setReplyText(v=>v.trim()===text?'':v);setReplyNotice('');
       setOpenConv(o=>o?.request===oc.request?({...o,refreshing:false,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}]}):o);
     }else setReplyErr(retour.texte);
   };
@@ -41204,7 +41219,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </TeteFil>
             {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
             {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
-            {!openConv.loading&&!openConv.error&&(()=>{const suivi0=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);const suivi=suivi0&&suivi0.libelle==='Offre reçue'&&offrePartieDuFil(openConv)?{libelle:'Annonce plus en vente',detail:'Elle n’est plus dans ton dressing : cette offre ne peut plus être acceptée.'}:suivi0;return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
+            {!openConv.loading&&!openConv.error&&(()=>{const suivi0=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);const suivi=suivi0&&suivi0.libelle==='Offre reçue'&&offrePartieDuFil(openConv)?{libelle:'Annonce plus en vente',detail:'Elle n’est plus dans ton dressing : cette offre ne peut plus être acceptée.'}:suivi0;return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>Paiement pas encore confirmé.</small>}</div>:null;})()}
             {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accentTexte}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
             {/* (31 oct.) Hors du défilement : la carte reste en tête du fil (maquette téléphone). */}
               {/* (19 oct.) LA PAIRE DE CE FIL, en tête — par la transaction de la
@@ -41281,7 +41296,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
                       </>}/>
               )}</React.Fragment>; })}
-              {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
+              {/* (11 nov.) L'ENVOI SE VOIT DANS LE FIL : la bulle « Envoi… » pendant, « Envoyé ✓ » quand Vinted l'a
+                  accepté, « Pas envoyé · Réessayer » sur un refus (SON clic renvoie), « Pas confirmé » sinon (rien ne
+                  repart : la vérification sur Vinted est demandée au-dessus du champ). */}
+              {envoiReponse && envoiReponse.request===openConv.request && !openConv.loading && !openConv.error && (envoiReponse.etat==='ok'
+                ? <div className="vrm-envoi-etat" data-envoi="ok" role="status">Envoyé ✓</div>
+                : <BulleConv moi qui="Toi" texte={envoiReponse.texte} attrs={{'data-envoi-bulle':envoiReponse.etat,className:'vrm-bulle-l vrm-bulle-moi vrm-bulle-envoi'}}
+                    apres={<div className="vrm-envoi-etat" data-envoi={envoiReponse.etat} role={envoiReponse.etat==='envoi'?'status':'alert'}>
+                      {envoiReponse.etat==='envoi' ? 'Envoi…'
+                        : envoiReponse.etat==='refuse' ? <>Pas envoyé · <button type="button" className="vrm-envoi-reessayer" data-envoi-reessayer="" disabled={replyBusy||!replyText.trim()} onClick={sendReply}>Réessayer</button></>
+                        : 'Pas confirmé · vérifie sur Vinted'}
+                    </div>}/>)}
+              {/* (11 nov.) « Aucun message » seulement si la boîte n'en annonce aucun : un fil vide alors que la boîte
+                  montre un dernier message, c'est une lecture incomplète (§4.1), pas « rien ». */}
+              {!openConv.loading && !openConv.error && openConv.messages.length===0 && (openConv.extraitBoite
+                ? <div data-fil-pas-lu="" role="status" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Ce fil n’est pas encore lu en entier. <button type="button" className="vrm-pied-lien" data-pied-lien="relire-fil" onClick={actualiserConversation}>Relire</button></div>
+                : <div data-fil-vide="" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>)}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
             {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const offreBloquee=!!actionsOffresIncertaines[cleActionOffreVinted(openConv.owner,openConv.acc?.vinted_user_id,openConv.convId)]; const sansExt = !vmrExtPresent() && !msgRelais; const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
@@ -41365,7 +41395,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>);
                       })()}
                       {tx && (
-                        <details className="vrm-chat-negociation" open={!off||!!prixOffre||contreOffreOuverte}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
+                        <details className="vrm-chat-negociation" open={!!prixOffre||contreOffreOuverte}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
                           <span className="vrm-chat-offre-k" style={{color:C.muted}}>Ton prix</span>
                           <input ref={prixOffreRef} className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy||offreBloquee} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix&nbsp;€" aria-label="Prix de l'offre"
                             style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}/>
@@ -41391,7 +41421,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies).
                     (29 oct., revue) Pas sur une offre dont l'annonce est prouvée
                     partie : la première dit « l'article est toujours disponible ». */}
-                {!offrePartieDuFil(openConv) && <RapidesConv liste={rapidesDuFil(listeRapides(quickReplies), annonceDuFilPartie(openConv))} onChoisir={modifierReponse} desactive={ro} style={{opacity:ro?0.5:1}}/>}
+                {!offrePartieDuFil(openConv) && <RapidesConv liste={rapidesDuFil(listeRapides(quickReplies), annonceDuFilPartie(openConv))} onChoisir={modifierReponse} desactive={ro} style={{opacity:ro?0.5:1}} onModifier={()=>{setShowQR(true);setFeuilleQR(true);}}/>}
                 <ComposeConv valeur={replyText} onChange={modifierReponse} onEnvoyer={sendReply} desactive={ro} entreeEnvoie enCours={replyBusy}
                   placeholder={ro?'Lecture seule sur ce compte':'Écris ta réponse…'}
                   envoiBloque={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false}/>
@@ -46879,9 +46909,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           // Le compte de l'extension d'abord (là où VRM peut répondre), puis les
           // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
-          // (19 oct.) Dans chaque groupe, une offre en attente passe devant : elle
-          // expire, et y répondre décide d'une vente.
-          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter.startsWith('repondre')?reponseAttendue(c)&&(messageFilter==='repondre'||(messageFilter==='repondre-offres'?!!offreDeConv(c):!offreDeConv(c))):messageFilter==='offres'?!!offreDeConv(c):conversationNonLue(c))).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (Number(!!reponseAttendue(b))-Number(!!reponseAttendue(a))) || ((!!offreDeConv(b))-(!!offreDeConv(a))) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          // (11 nov., Julien : « tu ne fais pas du plus récent au plus vieux ») Plus rien
+          // ne passe devant à l'intérieur d'un groupe : ni « à répondre », ni une offre
+          // (« À répondre » et « Offres reçues » sont des FILTRES). Le plus récent en haut,
+          // par horodatage ; sans date lue, en bas (dit sous la liste).
+          const tri=trierRecents(liste.filter(c=>messageFilter==='all'||(messageFilter.startsWith('repondre')?reponseAttendue(c)&&(messageFilter==='repondre'||(messageFilter==='repondre-offres'?!!offreDeConv(c):!offreDeConv(c))):messageFilter==='offres'?!!offreDeConv(c):conversationNonLue(c))),c=>c.updated_at,prioMsg?(c=>uidC(c)===prioMsg?0:1):null);
+          const nSansDate=convsSansDate(tri,c=>c.updated_at);
           const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
           const nonLusRo = roListe.filter(c=>conversationNonLue(c)).length;
           const nomActif = prioMsg ? msgNomActif() : '';
@@ -47039,6 +47072,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                 })}
               </div>
+              {nSansDate>0 && <p className="vrm-msg-sans-date" data-conv-sans-date={nSansDate} style={{color:C.muted}}>{nSansDate} sans date lue : en bas de la liste.</p>}
               {/* (5 nov., chantier G, revue 2.23) UN style de lien en pied (`vrm-pied-lien`) ; le compte « 40/200 » reste lisible à côté. */}
               {tri.length>convMax && <button type="button" className="vrm-msg-more vrm-pied-lien" data-pied-lien="suite" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))}>Afficher les {Math.min(40,tri.length-convMax)} suivantes <span className="vrm-pied-lien-n">{convMax} sur {tri.length}</span></button>}
               {retireesIci.length>0 && (
@@ -47054,8 +47088,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        </div><div className="vrm-chat-column" data-conv-ouverte={openConv?.convId!=null?String(openConv.convId):undefined}>{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span></div>}</div>{rendreFicheConv()}</div>
-        {zoneMessages==='conversations'&&<details className="vrm-quick-settings"><summary>Réponses rapides</summary>
+        </div><div className="vrm-chat-column" data-conv-ouverte={openConv?.convId!=null?String(openConv.convId):undefined}>{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>La plus récente est en haut.</small></div>}</div>{rendreFicheConv()}</div>
+        {/* (11 nov.) Les réponses rapides se RÈGLENT dans une feuille, ouverte par le crayon au bout de la
+            rangée du fil (une seule entrée : la barre « Réponses rapides » sous la liste faisait doublon). */}
+        {feuilleQR&&<SheetShell onClose={()=>{setFeuilleQR(false);setShowQR(false);}} titre="Réponses rapides" data-feuille-rapides="">
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         {/* (5 nov., chantier G) Le titre est celui du repli (plus écrit deux fois) ; « Modifier » au style des liens de pied ;
             chaque pastille se prend au doigt (44 px) ; « + Ajouter » neutre (l'accent reste rare, §7). */}
@@ -47079,7 +47115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {showQR && <button type="button" className="vrm-qr-puce" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.border}`,borderRadius:999,background:'transparent',color:C.text,fontSize:13,fontWeight:600,padding:'0 14px',cursor:'pointer',fontFamily:'inherit'}}>+ {VERBES.ajouter}</button>}
           </div>
         </div>
-        </details>}
+        </SheetShell>}
       </>)}
       {/* (30 oct.) Les vérifications passent SOUS la liste, comme sur Ventes : avant, on ne voyait
           aucune annonce au premier écran. Rien n'est retiré, tout reste replié. */}

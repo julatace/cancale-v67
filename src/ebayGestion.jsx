@@ -10,6 +10,7 @@ import {offresAffichees} from './ebayOffresVue.js';
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {messageEbayNonLu} from '../api/_lib/ebay-messages-nonlus.js';
 import {estQuestion,questionsParAnnonce} from './questionsEbay.js';
+import {trierRecents} from './ordreConversations.js';
 import {useBrouillonCommande} from './brouillonsCommandesEbay.js';
 import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
@@ -115,7 +116,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
   }catch(e){if(selection.current===m.id)setMessage(e.message);}
   finally{setBusy(false);}
  }
- const affiches=(rows || []).filter(m=>`${m.sender} ${m.subject} ${m.titre} ${m.body} ${(m.responses || []).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
+ const affiches=trierRecents((rows || []).filter(m=>`${m.sender} ${m.subject} ${m.titre} ${m.body} ${(m.responses || []).join(' ')}`.toLowerCase().includes(search.toLowerCase())),m=>m&&m.date); // (11 nov.) le plus récent en haut, par horodatage
  const groupes=questionsParAnnonce(affiches);
  const groupeSel=selected && estQuestion(selected)?questionsParAnnonce(rows || []).find(g=>g.itemId===String(selected.itemId)) || null:null;
  const nVus=vue==='questions'?groupes.length:affiches.length;

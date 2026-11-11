@@ -4,6 +4,7 @@ import { STYLE_FLOU, lbcFloute } from '../flouCompte.js';
 import React, { useState, useEffect } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
+import { trierRecents } from '../ordreConversations.js';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 
 
@@ -157,7 +158,8 @@ function ConversationsLeboncoin() {
   const lignes = ids.map((id) => ({ id, nom: nomDe(id), type: typeDe(id), c: d.compteurs[id] || d.compteurs['lbc-account:' + id] || null }));
   const releves = lignes.filter((l) => l.c);
   const pasLus = lignes.filter((l) => !l.c);
-  const fils = Array.isArray(d.fils) ? d.fils.slice().sort((a, z) => String(z.da || '').localeCompare(String(a.da || ''))) : [];
+  // (11 nov.) Le plus récent en haut par HORODATAGE (avant : comparaison de textes) ; sans date, en bas.
+  const fils = Array.isArray(d.fils) ? trierRecents(d.fils, (f) => f && f.da) : [];
   if (!releves.length && !fils.length) {
     return (
       <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>

@@ -7,6 +7,7 @@ import { lienDe, vcReliable } from '../lienVestiaire.js';
 import React, { useState, useEffect } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
+import { trierRecents } from '../ordreConversations.js';
 import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut } from '../../api/_lib/vestiaire-regle.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis } from '../transporteursVisuels.js';
@@ -949,7 +950,8 @@ function MessagesVestiaire() {
       const it = (pid && d.items && d.items[pid]) || null;
       return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '',
         titreArticle: String(v.titre || (it && it.titre) || ''), photoArticle: urlPhotoVc(v.photo || (it && it.photo) || '') };
-    }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
+    }); // (11 nov.) le plus récent en haut, par horodatage (avant : les non-lus devant, puis un tri de textes)
+    liste.splice(0, liste.length, ...trierRecents(liste, (v) => v.date));
     const choisie = liste.find((v) => v.id === ouvert) || null;
     const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
     const offresEtat = offresVestiaire(d.offres);

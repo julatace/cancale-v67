@@ -1,0 +1,81 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   (11 nov.) MESSAGES, PLUS NATUREL ET SIMPLE — demande de Julien (captures
+   à 1512 px : « je veux que le visuel soit plus beau, plus naturel et simple
+   d'utilisation »). Chargée EN DERNIER (src/stylesApp.js) : elle n'a le dernier
+   mot que sur Messages (les quatre sites partagent LigneConv / le fil).
+   Rien de métier ici. L'accent reste rare (§7) : le point « non lu » et
+   Envoyer. Ambre : seulement « pas envoyé ». Récit : 2026-11-11-messages.md.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── La liste, comme une messagerie ─────────────────────────────────── */
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row { min-height: 72px !important; padding: 12px 10px !important; border-radius: 12px !important; border-bottom: 0 !important; margin: 0 0 2px; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row.is-current { box-shadow: none !important; padding-left: 10px !important; background: var(--vrm-card2, var(--vrm-surface)) !important; }
+@media (hover: hover) and (pointer: fine) {
+  html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row:not(.is-current):hover { background: color-mix(in srgb, var(--vrm-card2, var(--vrm-surface)) 60%, transparent) !important; }
+}
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-av { width: 48px !important; height: 48px !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-l1 { display: flex; align-items: baseline; gap: 8px; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-time { margin-left: auto; flex: none; font-family: inherit !important; font-variant-numeric: tabular-nums; font-size: 13px !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-inbox-row[data-nonlu="1"] .vrm-msg-name { font-weight: 700 !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-inbox-row[data-nonlu="1"] .vrm-msg-extrait { color: var(--vrm-ink) !important; font-weight: 500; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-extrait { font-size: 14px !important; line-height: 1.35; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire { font-size: 12px !important; opacity: .9; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-dot { width: 9px !important; height: 9px !important; min-width: 9px; border-radius: 50% !important; flex: none; }
+/* L'en-tête de groupe (compte de l'onglet / autres comptes) : une ligne discrète. */
+html body [data-messagerie] .vrm-msg-section { padding: 8px 10px 6px !important; font-size: 12px !important; letter-spacing: 0 !important; text-transform: none !important; font-weight: 600; }
+html body [data-messagerie] .vrm-msg-section-ro { padding: 14px 10px 8px !important; }
+html body [data-messagerie] .vrm-msg-section-p { font-size: 13px !important; }
+html body .vrm-msg-sans-date { margin: 8px 10px 0; font-size: 13px; }
+
+/* ── Ordinateur : pas de grand vide ─────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* Aucune conversation ouverte : deux colonnes, la liste prend plus de place, la fiche n'est pas là. */
+  :root body .vrm-message-workspace:not(#_):has(> .vrm-chat-column > .vrm-chat-empty) { grid-template-columns: minmax(400px, 1.15fr) minmax(0, 1fr) !important; }
+  html body .vrm-message-workspace .vrm-chat-empty { display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--vrm-muted); font-size: 15px; background: var(--vrm-bg) !important; }
+  html body .vrm-message-workspace .vrm-chat-empty svg { opacity: .45; }
+  html body .vrm-message-workspace .vrm-chat-empty small { font-size: 13px; opacity: .8; }
+  /* La fiche, plus compacte : photo moins haute, titre plus petit, blocs serrés. */
+  :root body .vrm-message-workspace:not(#_):has(> .vrm-msg-fiche) { grid-template-columns: minmax(340px, 400px) minmax(0, 1fr) minmax(210px, 240px) !important; }
+  html body .vrm-message-workspace > .vrm-msg-fiche { padding: 14px !important; gap: 6px !important; }
+  html body .vrm-msg-fiche-ph { aspect-ratio: auto !important; height: 150px; }
+  html body .vrm-msg-fiche-t { font-size: 15px !important; margin-top: 6px !important; }
+  html body .vrm-msg-fiche-bloc { padding: 8px 10px !important; }
+  html body .vrm-msg-fiche-bloc b { font-size: 14px !important; }
+}
+
+/* ── Le fil ─────────────────────────────────────────────────────────── */
+/* L'état de la négociation : une ligne, sans bandeau lourd. */
+html body .vrm-chat-panel .vrm-chat-negociation-etat { display: flex !important; align-items: baseline; gap: 6px; flex-wrap: wrap; padding: 6px 16px !important; border-bottom: 0 !important; }
+html body .vrm-chat-panel .vrm-chat-negociation-etat b { display: inline !important; }
+html body .vrm-chat-panel .vrm-chat-negociation-etat small { display: inline !important; color: var(--vrm-muted); font-size: 13px; }
+html body .vrm-chat-panel .vrm-chat-negociation-etat small::before { content: '· '; }
+
+/* Les bulles : arrondies comme une messagerie, la petite pointe côté auteur. */
+html body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { border-radius: 18px 18px 18px 6px !important; padding: 10px 14px !important; }
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { border-radius: 18px 18px 6px 18px !important; }
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi { align-self: flex-end; }
+/* L'envoi en cours / refusé : la bulle en attente, plus pâle. */
+html body .vrm-chat-panel .vrm-bulle-envoi > .vrm-bulle.vrm-bulle { opacity: .55; }
+html body .vrm-envoi-etat { align-self: flex-end; margin-top: 2px; font-size: 12px; color: var(--vrm-muted); text-align: right; }
+html body .vrm-envoi-etat[data-envoi="refuse"] { color: var(--vrm-warn); font-weight: 600; }
+html body .vrm-envoi-etat .vrm-envoi-reessayer { min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--vrm-ink); font: 600 13px/1 var(--vrm-police, inherit); text-decoration: underline; cursor: pointer; }
+html body .vrm-envoi-etat .vrm-envoi-reessayer:disabled { opacity: .5; cursor: default; }
+
+/* « Proposer un prix » replié derrière un bouton discret ; ouvert, le champ suit. */
+html body .vrm-chat-panel .vrm-chat-offre[data-offre="libre"] { background: transparent !important; padding: 0 !important; border: 0 !important; }
+html body .vrm-chat-panel .vrm-chat-negociation { border-top: 0 !important; margin-top: 4px !important; padding-top: 0 !important; }
+html body .vrm-chat-panel .vrm-chat-negociation > summary { display: inline-flex !important; width: auto; min-height: 36px !important; padding: 0 14px; border: 1px solid var(--vrm-line); border-radius: 999px; font-size: 14px !important; font-weight: 500 !important; color: var(--vrm-ink); list-style: none; cursor: pointer; }
+html body .vrm-chat-panel .vrm-chat-negociation > summary::-webkit-details-marker { display: none; }
+html body .vrm-chat-panel .vrm-chat-negociation > summary::after { content: none !important; }
+html body .vrm-chat-panel .vrm-chat-negociation[open] > summary { border-color: transparent; padding-left: 0; color: var(--vrm-muted); }
+@media (pointer: coarse), (hover: none) { html body .vrm-chat-panel .vrm-chat-negociation > summary { min-height: 44px !important; } }
+
+/* Les réponses rapides : UNE rangée qui défile au doigt, au texte lisible ; le crayon au bout. */
+html body .vrm-chat-panel .vrm-chat-rapides { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; gap: 8px !important; padding-bottom: 10px !important; margin: 0 -2px; }
+html body .vrm-chat-panel .vrm-chat-rapides::-webkit-scrollbar { display: none; }
+html body .vrm-chat-panel .vrm-chat-rapides > button { flex: none; max-width: 280px; overflow: hidden; text-overflow: ellipsis; scroll-snap-align: start; min-height: 38px !important; font-size: 14px !important; padding: 0 14px !important; }
+html body .vrm-chat-panel .vrm-chat-rapides > .vrm-chat-rapides-modifier { width: 38px; padding: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; color: var(--vrm-muted) !important; }
+@media (pointer: coarse), (hover: none) {
+  html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 44px !important; }
+  html body .vrm-chat-panel .vrm-chat-rapides > .vrm-chat-rapides-modifier { width: 44px; }
+}
