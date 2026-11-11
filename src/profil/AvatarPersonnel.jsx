@@ -45,7 +45,7 @@ export async function poserNomMasque(owner,headers,masque){
 export function AvatarCompte({owner,headers,lettre='V'}){
  const p=usePhoto(owner,headers),fiche=useFiche(owner),[rate,setRate]=useState('');
  const a=choisirAvatar({televersee:p?.image,fiche});const url=a.url&&a.url!==rate?a.url:'';
- return <span data-avatar-source={url?a.source:'initiale'} style={{display:'contents'}}>{url?<img alt="" src={url} referrerPolicy="no-referrer" onError={()=>setRate(a.url)} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'inherit'}}/>:lettre}</span>;
+ return <span data-avatar-source={url?a.source:'initiale'} style={{display:'contents'}}>{url?<img alt="" src={url} referrerPolicy="no-referrer" onError={()=>setRate(a.url)} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/>:lettre}</span>;
 }
 function lireFichier(file){
  return (async()=>{

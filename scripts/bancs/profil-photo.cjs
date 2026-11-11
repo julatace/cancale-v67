@@ -120,6 +120,7 @@ async function profil(b, largeur, sombre) {
       await toucher(pg, porteProfil(largeur), mobile); await pg.waitForTimeout(600);
       const menu = await pg.evaluate(() => { const m = document.querySelector('[data-menu-profil]'); return m ? [...m.querySelectorAll('[data-profil-menu]')].map((e) => e.getAttribute('data-profil-menu')) : null; });
       dit(!!menu && ['masquer', 'parametres', 'appareils', 'deconnexion'].every((x) => menu.includes(x)), `${tag} · R2 la photo ouvre le menu : Masquer mon nom, Paramètres, Appareils connectés, Se déconnecter`, JSON.stringify(menu));
+      dit(!!menu && menu[0] === 'parametres', `${tag} · R2 le geste le plus fréquent d'abord : « Paramètres » en tête du menu`, JSON.stringify(menu));
       const cibles = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-profil-menu]')].map((e) => Math.round(e.getBoundingClientRect().height)));
       dit(cibles.length && cibles.every((h) => h >= 44), `${tag} · R2 chaque ligne du menu fait au moins 44 px`, cibles.join(','));
       dit(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${tag} · aucun débordement horizontal`);
