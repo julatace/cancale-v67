@@ -51,6 +51,8 @@ const MUTATIONS = {
   'achat inconnu = 0': [['src/venteManuelle.js', '    if (trouves.some((x) => !x)) return null;                       // un N° du lot introuvable\n', '']],
   'nonComptees perdu': [['src/ecrans/Compta.jsx', ', nonComptees: v.nonComptees || null } : null;', ' } : null;']],
   'offre vendue ailleurs acceptée': [['src/offresGarde.js', "if (r === 'vendue-ailleurs') return { bloque: true,", "if (r === 'vendue-ailleurs') return { bloque: false,"]],
+  'garde publiée seulement': [['src/App.jsx', 'avisAcceptationManuelle(gardeMain,', "avisAcceptationManuelle(load('vinted_offres_garde', null),"]],
+  'vente connue masquée par un site pas relu': [['src/offresGarde.js', "const r = connue ? 'vendue-ailleurs' : gardeRefuse(garde, item, maintenant);", 'const r = gardeRefuse(garde, item, maintenant);']],
   'baisse flottante': [['src/baissePrix.js', "!/^\\d+(?:[.,]\\d{1,2})?$/.test(brut.replace(/\\s/g, ''))", 'Math.round(v * 100) !== v * 100']],
   'bénéfice rouge': [['src/ecrans/Compta.jsx', "style={{padding:'2px 10px',color:b==null?C.muted:C.text,", "style={{padding:'2px 10px',color:b==null?C.muted:(b>=0?C.text:C.danger),"]],
   'eBay pas su = 0': [['src/ecrans/Ebay.jsx', "const eur = (n) => n == null || !Number.isFinite(Number(n)) ? '—' : (Math.round", "const eur = (n) => (Math.round"]],
@@ -162,11 +164,15 @@ const MUTATIONS = {
     dit(a && a.bloque === true, 'H1 paire vendue ailleurs ⇒ « Accepter » ne part pas', JSON.stringify(a));
     const b = M.avisAcceptationManuelle && M.avisAcceptationManuelle({ ...garde, at: now - 72 * 3600e3 }, '8002', now);
     dit(b && b.pasSu === true && !b.bloque, 'H2 garde périmée ⇒ « pas su », dit dans la confirmation', JSON.stringify(b));
+    const d = M.avisAcceptationManuelle && M.avisAcceptationManuelle({ ...garde, complet: false, manques: ['commandes eBay non entièrement relues'] }, '8001', now);
+    dit(d && d.bloque === true, 'H1b vendue ailleurs (prouvé) même si eBay n\'est pas relu ⇒ bloquée', JSON.stringify(d));
     const c = M.avisAcceptationManuelle && M.avisAcceptationManuelle(garde, '8002', now);
     dit(c === null, 'H3 garde fraîche, paire pas vendue ailleurs ⇒ rien à dire');
     const i = APP.indexOf('const actionOffre = async'), g = i < 0 ? '' : APP.slice(i, i + 4000);
     const iA = g.indexOf('avisAcceptationManuelle('), iC = g.indexOf('askConfirm(');
     dit(iA > 0 && iA < iC && /if \(avis && avis\.bloque\)[^\n]*return;/.test(g), 'H4 Messages lit la garde AVANT la confirmation, et s\'arrête si vendue ailleurs');
+    const iG = g.indexOf('chargerRetraitsMulti()');
+    dit(iG > 0 && iG < iA && /avisAcceptationManuelle\(gardeMain,/.test(g), 'H5 la garde est RECALCULÉE au clic (la publiée n\'existe que moteur allumé)');
   });
 
   // ── I. Baisse en euros ────────────────────────────────────────────────────

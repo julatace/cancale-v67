@@ -36815,7 +36815,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!off) return;
       // (11 nov., revue robustesse) La MÊME garde anti double vente que le moteur
       // automatique (`gardeRefuse`) : vendue ailleurs ⇒ rien ne part ; pas su ⇒ dit.
-      const avis = quoi === 'accept' ? avisAcceptationManuelle(load('vinted_offres_garde', null), (paireDeConv(oc.acc.vinted_user_id, oc.convId, oc.conversation) || {}).item) : null;
+      // La garde publiée n'existe que moteur allumé (et peut dater de 48 h) : elle est
+      // RECALCULÉE ici, sur son clic (une lecture) ; ratée ⇒ garde incomplète ⇒ « pas su ».
+      let gardeMain = null;
+      if (quoi === 'accept') { try { const dataG = await chargerRetraitsMulti(); gardeMain = gardeOffres(dataG, articlesVendusAilleurs(dataG)); } catch (_) { gardeMain = gardeOffres(null, null); } }
+      if (conversationRequest.current !== oc.request) return;
+      const avis = quoi === 'accept' ? avisAcceptationManuelle(gardeMain, (paireDeConv(oc.acc.vinted_user_id, oc.convId, oc.conversation) || {}).item) : null;
       if (avis && avis.bloque) { setOffreMsg({ err: avis.texte }); return; }
       if (quoi === 'accept' && !(await askConfirm({ title: `Accepter ${fmtE(off.prix)} ?`, desc:`Le prix sera accepté pour ${oc.header?.login || 'cet acheteur'}. La vente dépend ensuite de son paiement.${avis && avis.pasSu ? ' ' + avis.texte : ''}`, ok: 'Accepter', cancel: 'Annuler' }))) return;
       endpoint = `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`;
