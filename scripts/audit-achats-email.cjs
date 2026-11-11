@@ -123,6 +123,26 @@ const texte = (lignes) => lignes.join('\n');
   dit(r.code === 503, 'E2 écriture « à vérifier » ratée ⇒ 503', String(r.code));
   F.panne(null);
 
+  // ── A : côté app (src/achatsAuto.js), sur les lignes que la route vient d'écrire ──
+  const { lignesAchatsEmail, fusionAchatsAuto, entreeDepuisEmail, SELECT_ACHATS_EMAIL } = await import('file://' + path.join(R, 'src', 'achatsAuto.js'));
+  dit(lignesAchatsEmail(null) === null, 'A1 lecture ratée ⇒ null (pas su), jamais []');
+  // La projection réelle : on la sert telle quelle depuis la fausse base.
+  const proj = (l) => { const o = { id: l.id }; for (const part of SELECT_ACHATS_EMAIL.split(',').slice(1)) { const [al, ch] = part.split(':'); const k = ch.replace(/^data->>?/, ''); let v = l.data[k]; if (ch.includes('->>') && v != null && typeof v === 'object') v = JSON.stringify(v); o[al] = v === undefined ? null : (ch.includes('->>') && v != null ? String(v) : v); } return o; };
+  const lu = lignesAchatsEmail(F.ids(/^achat_email_/).map(proj));
+  dit(lu && lu.achats.length === achats().length && lu.aVerifier.length === verifs().length, 'A2 achats et « à vérifier » séparés', lu && `${lu.achats.length}/${lu.aVerifier.length}`);
+  const aE = lu.achats.find((x) => x.site === 'ebay');
+  const e = entreeDepuisEmail(aE);
+  dit(e.price === '51,50' && e.prixSource === 'email' && e.ref === '12-34567-89012' && e.source === 'eBay', 'A3 « Ajouter » : prix lu proposé, marqué lu dans l\'e-mail, ref = n° de commande', JSON.stringify(e));
+  const manuel = { id: 'ob_1', title: '', price: '40,00', date: '', source: '', ref: '12 34567 89012' };
+  const f = fusionAchatsAuto([manuel], [aE])[0];
+  dit(f.manuel === manuel && f.etat === 'annule', 'A4 achat à la main de même n° (espaces) ⇒ relié ; annulé reste dit');
+  const aL = lu.achats.find((x) => x.site === 'vestiaire');
+  const f2 = fusionAchatsAuto([{ id: 'ob_2', title: '', price: '100,00', date: '', ref: '55512345' }], [aL])[0];
+  dit(f2.etat === 'relie' && f2.patch && f2.patch.title === 'Sac en toile beige' && f2.patch.price === undefined, 'A5 « Compléter » : les vides seulement, SON prix gagne', JSON.stringify(f2.patch));
+  const jumeaux = Array.from({ length: 50 }, (_, i) => ({ id: 'ob_t' + i, title: aL.titre, price: '144,00', date: aL.date, ref: '' }));
+  dit(fusionAchatsAuto(jumeaux, [aL])[0].etat === 'nouveau', 'A6 50 achats au même titre/prix/date sans n° ⇒ aucun relié (jamais par ressemblance)');
+  dit(fusionAchatsAuto([], [lu.achats.find((x) => x.site === 'leboncoin')])[0].etat === 'annule', 'A7 remboursé ⇒ hors dépenses, pas d\'« Ajouter »');
+
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
