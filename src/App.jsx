@@ -39053,9 +39053,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // de classement neuve) : `expeditions()` + `pret` + `isShipDone` pour les
   // ventes Vinted, `colisEbay`, `colisVestiaire`, `pickupUnion` pour les
   // retraits, `venteStage` pour les partis. `colonnesColis` les range.
-  const [siteColis, setSiteColis] = useState(() => (SITES_COLIS.includes(siteColisDemande) && siteColisDemande !== 'leboncoin') ? siteColisDemande : 'toutes');
+  // (11 nov., revue colis) En section d'Achats, « Leboncoin » est un filtre comme un autre (aucun colis
+  // Leboncoin à retirer ⇒ rien) ; ailleurs, la pastille Leboncoin ouvre son écran (`LeboncoinColis`).
+  const siteColisVoulu = () => (SITES_COLIS.includes(siteColisDemande) && (siteColisDemande !== 'leboncoin' || colisDans === 'achats')) ? siteColisDemande : 'toutes';
+  const [siteColis, setSiteColis] = useState(siteColisVoulu);
   // (11 nov., lot DJ3) En section de Ventes / d'Achats, le site suit le filtre de l'écran hôte (un seul filtre).
-  React.useEffect(() => { if (colisDans) setSiteColis((SITES_COLIS.includes(siteColisDemande) && siteColisDemande !== 'leboncoin') ? siteColisDemande : 'toutes'); }, [colisDans, siteColisDemande]);
+  React.useEffect(() => { if (colisDans) setSiteColis(siteColisVoulu()); }, [colisDans, siteColisDemande]);
   useEffect(() => { if (Array.isArray(profilPlateformes.plateformes) && siteColis !== 'toutes' && !profilPlateformes.plateformes.includes(siteColis)) setSiteColis('toutes'); }, [siteColis, profilPlateformes.plateformes?.join('|')]);
   // (2 nov., Julien : « des données Vinted dans eBay, inadmissible ») Le filtre de
   // site vaut pour TOUT Colis, pas seulement les colonnes : un bloc d'un site ne
@@ -54882,7 +54885,9 @@ function AppCoeur() {
       </section>);
     if(t==='achats') return (
       <section className="vrm-colis-section" data-colis-hote="achats" aria-label="À retirer">
-        <GardeEcran nom="achats:colis"><Comptabilite key="colis_achats" {...commun} only="bordereaux" colisDans="achats" sitesPresents={sitesPresents}
+        {/* (11 nov., revue colis) Le filtre de site d'Achats vaut pour « À retirer » (un seul filtre, comme Ventes) :
+            Achats · eBay ne montre plus les colis Vinted et leurs codes (banc achats-retirer-site). */}
+        <GardeEcran nom="achats:colis"><Comptabilite key="colis_achats" {...commun} only="bordereaux" colisDans="achats" siteColisDemande={site==='toutes'?null:site} sitesPresents={sitesPresents}
           ongletColis="retirer" onOngletColis={choisirOngletColis}/></GardeEcran>
         {/* Les OUTILS de retrait (à confirmer, à vérifier, suivis, e-mails reçus, argent à vérifier), sous la liste,
             une fois — les mêmes qu'hier sous Colis → À retirer (`retraitsOutils`). */}
