@@ -305,6 +305,7 @@ import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
+import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
 import { PhotoVide } from "./composants/PhotoVide.jsx";
 import { Numero } from "./composants/Numero.jsx";
 import { EtatPanne } from "./composants/EtatPanne.jsx";
@@ -30101,6 +30102,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [seuilFav, setSeuilFavEtat] = useState(() => { try { return seuilFavorisValide(localStorage.getItem('vrm_qd_seuil_fav')); } catch (_) { return 5; } });
   const setSeuilFav = (v) => { const x = seuilFavorisValide(v); setSeuilFavEtat(x); try { localStorage.setItem('vrm_qd_seuil_fav', String(x)); } catch (_) {} };
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
+  // (11 nov., limites-client) La grille se rend par paquets : 5 000 fiches d'un coup figeaient la page.
+  const [annMax, setAnnMax] = useState(PAQUET_LISTE);
+  const annPlus = React.useCallback(() => setAnnMax((m) => m + PAQUET_LISTE), []);
   // (27 oct., décision de Julien) Acceptation AUTOMATIQUE des offres ≥ au mini.
   // Éteinte par défaut, synchronisée (`vinted_offres_auto`, rattrapée au nuage).
   // L'extension LIT ce réglage ; l'app en est propriétaire (§11). Allumer demande
@@ -33724,6 +33728,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'ordre de `annShown` est gardé dans chaque compte (src/annoncesGrille.js) ; un compte prend la place de
   // sa première annonce (celui de l'onglet reste en tête). Affichage seulement : rien n'entre ni ne sort.
   const annGroupes = useMemo(() => groupesParCompte(annShown, (it) => String((it && it._acc && it._acc.vinted_user_id) || '')), [annShown]);
+  useEffect(() => { setAnnMax(PAQUET_LISTE); }, [annSort, annSearch, compteSel]);   // un autre tri, une recherche : on repart du haut
+  const annGroupesMontres = useMemo(() => groupesBornes(annGroupes, annMax), [annGroupes, annMax]);
   // Les annonces que l'alerte « même paire en ligne deux fois » nomme (lot AF, mêmes groupes, §11) : une marque sur leur vignette.
   const annEnDouble = useMemo(() => new Set(groupesDeuxFois.filter((g) => g.length > 1).flat()), [groupesDeuxFois]);
   // La grille de vignettes est montrée pour « Toutes » et ses tris (pas pour les vues à cocher ni les files).
@@ -44666,13 +44672,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             éléments, mêmes écritures, mêmes data-* (rien n'est retiré, seulement replié). Toucher la PHOTO ouvre la
             visionneuse unique (src/visionneuse.js). L'ordre et la règle « en ligne » ne changent pas (`annShown`). */}
         <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes" data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
-          {annGroupes.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
+          {annGroupesMontres.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
           <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.items.length} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
             <span className="vrm-ann-compte-nom">{nomG || 'Compte Vinted'}</span>
             <span className="vrm-ann-compte-n">{g.items.length} annonce{g.items.length>1?'s':''}</span>
           </div>,
-          ...g.items.map(it=>{
+          ...g.montres.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
             //    reconstruit avec 5 champs, la pastille « prête » valait
             //    « à capter » sur toutes les cartes, par construction.
@@ -44903,6 +44909,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })]; })}
         </div>
+        <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
           </>)}
         {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
