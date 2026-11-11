@@ -190,13 +190,13 @@ export function TourneePleinEcran({ arrets = [], C, onFermer, onArret, zIndex = 
         {epingles.length > 0
           ? <FondRelais points={epingles} selection={choisi} onChoisir={choisir} C={C} hauteur={300} onEtat={setEtatFond}/>
           : <p className="vrm-tr-note" data-tournee-sans-carte="">{retraits.length ? 'Aucun point de retrait n’a encore pu être placé sur la carte (la raison est sous chacun).' : 'Aucun point relais à placer sur la carte.'}</p>}
-        {epingles.length > 0 && !ko && <p className="vrm-tr-note vrm-tr-credit">Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Vinted, adresse.data.gouv.fr.</p>}
+        {epingles.length > 0 && !ko && <div className="vrm-tr-note vrm-tr-credit"><div>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap</div><div>Adresses : Vinted, adresse.data.gouv.fr</div></div>}
         {retraits.length > 0 && epingles.length > 0 && !ko && (
           <p className="vrm-tr-note" data-tournee-retraits-carte={retraits.length - nHors} data-tournee-retraits-hors={nHors}>
             {nHors === 0 ? `${retraits.length > 1 ? `Les ${retraits.length} points` : 'Le point'} de retrait ${retraits.length > 1 ? 'sont' : 'est'} sur la carte, chacun avec son nombre de colis.` : `${retraits.length - nHors} point${retraits.length - nHors > 1 ? 's' : ''} de retrait sur ${retraits.length} sur la carte · ${nHors} pas sur la carte (la raison est sous chacun).`}
           </p>
         )}
-        {nDepots > 0 && <p className="vrm-tr-note" data-tournee-depots-hors-carte={nDepots}>Les dépôts n’ont pas d’épingle : le point où tu déposes n’est écrit nulle part pour un colis.</p>}
+        {nDepots > 0 && <p className="vrm-tr-note" data-tournee-depots-hors-carte={nDepots}>Dépôts sans épingle : aucun colis ne dit où tu le déposes.</p>}
       </div>
       <div className="vrm-tr-plein-feuille">
         <div className="vrm-tr-plein-tete">
