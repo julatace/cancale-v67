@@ -123,7 +123,7 @@ async function verifier(racine, { muet = false } = {}) {
     ['src/nouveautes.js', '« autre » pour tous', "  if (n.pour === 'autre') return vend === 'autre' && !(cats && cats.length === 1 && cats[0] === 'sneakers');", "  if (n.pour === 'autre') return true;"],
     ['src/nouveautes.js', '« Vu » redate', "!vues[id]) vues[id] = at;", ') vues[id] = at;'],
     ['src/nouveautes.js', 'une vue revient', '.filter((n) => !vues[n.id]);', ';'],
-    ['src/nouveautes.js', 'un titre de 9 mots', "titre: 'Plus de « pointure » sur eBay'", "titre: 'Il n’y a plus de « pointure » sur eBay ici'"],
+    ['src/nouveautes.js', 'un titre de 9 mots', "titre: 'Plus de «\u00a0pointure\u00a0» sur eBay'", "titre: 'Il n’y a plus de «\u00a0pointure\u00a0» sur eBay ici'"],
     ['src/nouveautes.js', 'une phrase de 13 mots', "phrase: 'Elle n’est demandée que pour les sneakers.'", "phrase: 'Elle n’est plus du tout demandée que pour les sneakers, partout, toujours, voilà.'"],
     ['src/nouveautes.js', 'un écran qui n’existe pas', "tab: 'ebay_annonces', pour: 'autre'", "tab: 'ebay_nulle_part', pour: 'autre'"],
     ['src/nouveautes.js', 'un id en double', "{ id: 'profil-photo',", "{ id: 'tu-vends-quoi',"],
