@@ -205,6 +205,20 @@ const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(aw
   await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {});
   return true; };
 const PLUS = '.vrm-tabbar button[aria-label="Plus"]';
+// Ce que « Plus » porte (App.jsx, GROUPES_PLUS sans les groupes `ordi`) : lu dans la source, pas recopié.
+const PLUS_ATTENDUES = (() => {
+  try {
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8');
+    const i = src.indexOf('const GROUPES_PLUS=['); if (i < 0) return [];
+    const bloc = src.slice(i, src.indexOf('\n];', i));
+    const ids = [];
+    for (const g of bloc.split(/\n\s*\{\s*titre:/).slice(1)) {
+      if (/^[^\n]*\bordi\s*:\s*true/.test(g)) continue;
+      for (const l of g.split('\n')) { if (/^\s*\/\//.test(l)) continue; if (/\.\.\.ONGLET_MESSAGES/.test(l)) ids.push('messages'); const m = /\{\s*id:\s*'([a-z_]+)'/.exec(l); if (m) ids.push(m[1]); }
+    }
+    return [...new Set(ids)];
+  } catch (_) { return []; }
+})();
 
 // La barre, mesurée.
 const mesureBarre = (pg) => pg.evaluate(() => {
@@ -255,8 +269,9 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await capture(pg, `plus-${mode}-${sombre ? 'sombre' : 'clair'}`);
         dit(!!p && p.plusOuvert === 'true', `B3 ${qui} : « Plus » ouvert le dit (aria-expanded)`);
         dit(!!p && p.bas <= p.navHaut + 1, `B3 ${qui} : le panneau ne recouvre pas la barre`, JSON.stringify(p && { bas: p.bas, navHaut: p.navHaut }));
-        // (11 nov.) 7 entrées : « Argent » remplace Statistiques et Compta (lot AO, 10 nov.) ; Paramètres derrière le profil (lot DJ6).
-        dit(!!p && p.entrees.length >= 7 && p.entrees.every((e) => e.visible) && !p.defile, `B3 ${qui} : toutes les entrées visibles sans défiler`, JSON.stringify(p && { horsVue: p.entrees.filter((e) => !e.visible).map((e) => e.id), defile: p.defile }));
+        // (11 nov., webkit-fiable) Les entrées ATTENDUES sont lues dans App.jsx (GROUPES_PLUS) : la liste
+        // a changé trois fois le 10-11 nov. (Argent, Paramètres sous le profil, À trancher dans Ma journée).
+        dit(!!p && PLUS_ATTENDUES.length >= 4 && PLUS_ATTENDUES.every((id) => p.entrees.some((e) => e.id === id)) && p.entrees.every((e) => e.visible) && !p.defile, `B3 ${qui} : toutes les entrées visibles sans défiler`, JSON.stringify(p && { attendues: PLUS_ATTENDUES, ids: p.entrees.map((e) => e.id), horsVue: p.entrees.filter((e) => !e.visible).map((e) => e.id), defile: p.defile }));
         dit(!!p && p.entrees.every((e) => e.h >= 44 && e.touche && !e.coupe), `B3 ${qui} : entrées ≥ 44 px, touchables, libellés entiers`, JSON.stringify(p && p.entrees.filter((e) => !(e.h >= 44 && e.touche && !e.coupe))));
         // B4 · retour avec « Plus » ouvert
         await pg.goBack({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(800);
@@ -282,12 +297,12 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(m6.entrees.every((e) => !e.coupe), `B6 ${qui} : son libellé n'est pas coupé`, JSON.stringify(m6.entrees.filter((e) => e.coupe)));
         // Chaque écran de « Plus » : la 5ᵉ place le dit, libellé entier.
         const vus = [];
-        for (const id of ['messages', 'trancher', 'garage', 'achats', 'emails', 'communaute']) {   // Paramètres : derrière le profil (lot DJ6)   // (11 nov.) plus de `dashboard` à part (lot AO : dans Argent) ; chaque entrée de « Plus »
+        for (const id of PLUS_ATTENDUES) {
           await toucher(pg, PLUS); await toucher(pg, `.vrm-sheet [data-nav-entree="${id}"]`);
           const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
           vus.push({ id, ...x });
         }
-        dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : Messages, À trancher, Stock, Achats, E-mails, Communauté — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
+        dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : chaque écran de « Plus » (lu dans GROUPES_PLUS) — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
         // B7 · balayages
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
         // Le milieu de l'écran, HORS d'une commande : un geste qui part d'un bouton, d'un lien,
