@@ -143,6 +143,7 @@ async function maFacture(nav, W, theme) {
   const o = await ouvrir(nav, { W, sombre, base, tab: 'invoices', registre });
   const btn = o.pg.getByRole('button', { name: 'Ma facture' }).first();
   await btn.waitFor({ timeout: 20000 }).catch(() => {});
+  await o.pg.waitForTimeout(800);                                 // (11 nov.) l'écran finit de se poser avant le clic
   await btn.click();
   const champ = o.pg.locator('[data-fp-champ="siret"] input');
   await champ.waitFor({ timeout: 10000 });
@@ -176,15 +177,55 @@ async function maFacture(nav, W, theme) {
   await o.pg.locator('[data-fp-registre]').scrollIntoViewIfNeeded();
   await capture(o.pg, `cf-${W}-${theme}-F1b-verifie`);
   if (o.tel) { const p = await petites(o.pg, '[data-fp-registre] button'); dit(!p.length, `${T} cibles de 44 px`, p.join(' | ')); }
+  // (11 nov.) La ville du greffe, recopiée de SON Kbis ⇒ « RCS Rennes <SIREN> ».
+  await o.pg.fill('[data-ent-ville]', 'rennes');
+  const grp = SIREN.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+  const imm2 = await o.pg.locator('[data-fp-registre] [data-ent-ligne="imm"] b').innerText().catch(() => '');
+  dit(imm2 === `RCS Rennes ${grp}`, `${T} F1 la ville du greffe tapée ⇒ « RCS Rennes ${grp} »`, imm2);
+  await capture(o.pg, `cf-${W}-${theme}-F1c-ville-greffe`);
   await o.pg.click('[data-ent-oui]');
   dit(await attendre(o.pg, async () => (ligne(base, 'vrm_pro_facture') || {}).adresse === '12 RUE DE L’EXEMPLE'), `${T} F1 « Oui, c’est moi » écrit l’adresse (sans le code postal)`, JSON.stringify(ligne(base, 'vrm_pro_facture')));
   f = ligne(base, 'vrm_pro_facture') || {};
-  dit(f.nom === 'Mon Atelier' && f.ville === 'RENNES' && f.forme === 'SAS' && f.siret === SIRET && !f.rcs, `${T} F1 son nom (écart) est GARDÉ par défaut ; ville, forme écrites ; aucun RCS sans ville du greffe`, JSON.stringify(f));
+  dit(f.nom === 'Mon Atelier' && f.ville === 'RENNES' && f.forme === 'SAS' && f.siret === SIRET && f.rcs === `RCS Rennes ${grp}` && f.tva === TVA, `${T} F1 son nom (écart) GARDÉ par défaut ; ville, forme, RCS, TVA écrits`, JSON.stringify(f));
+  dit(!!(await o.pg.$('[data-fp-registre][data-ent-recherche="rempli"]')), `${T} F1 après « Oui » : « Rempli depuis le registre », tout reste modifiable`);
+  await capture(o.pg, `cf-${W}-${theme}-F1d-rempli`);
+  // F4 : choisir le statut ⇒ ses mentions, dans la même carte.
+  await o.pg.selectOption('[data-fp-champ="forme"] select', 'SASU');
+  const carteForme = await attendre(o.pg, async () => !!(await o.pg.$('[data-ent-forme="SASU"]')), 4000);
+  const tForme = carteForme ? await o.pg.locator('[data-ent-forme="SASU"]').innerText() : '';
+  const capitalARemplir = !!(await o.pg.$('[data-ent-forme="SASU"] [data-ent-mention="capital"][data-ent-ok="0"] [data-ent-remplir="capital"]'));
+  dit(carteForme && /Pour une SASU/.test(tForme) && capitalARemplir && !!(await o.pg.$('[data-ent-forme="SASU"] [data-ent-mention="rcs"][data-ent-ok="1"]')), `${T} F4 statut SASU ⇒ « Pour une SASU, ta facture porte : » capital à remplir, RCS en place`, tForme);
+  await o.pg.locator('[data-ent-forme]').scrollIntoViewIfNeeded().catch(() => {});
+  await capture(o.pg, `cf-${W}-${theme}-F4-statut`);
+  if (o.tel) { const p = await petites(o.pg, '[data-ent-forme] button'); dit(!p.length, `${T} F4 cibles de 44 px`, p.join(' | ')); }
+  await o.pg.click('[data-ent-remplir="capital"]');
+  const focusCapital = await o.pg.evaluate(() => !!(document.activeElement && document.activeElement.closest('[data-fp-champ="capital"]')));
+  dit(focusCapital, `${T} F4 « Remplir » met le doigt sur le champ « capital »`);
+  await o.pg.click('[data-ent-forme-ok]');
   const valNom = await o.pg.locator('[data-fp-champ="nom"] input').inputValue();
   dit(valNom === 'Mon Atelier', `${T} F1 le champ « nom » affiché est toujours le sien`, valNom);
   dit(!(await deborde(o.pg)), `${T} rien ne déborde`);
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
+
+  // F5 : le registre ne répond pas en 8 s ⇒ « Pas trouvé à temps », saisie à la main.
+  const base5 = { lignes: [MAIN({}), { id: 'vrm_pro_facture', owner: UID, data: { ...FICHE } }], comptes: [] };
+  const o5 = await ouvrir(nav, { W, sombre, base: base5, tab: 'invoices', registre: { tenir: new Promise(() => {}) } });
+  await o5.pg.getByRole('button', { name: 'Ma facture' }).first().click({ timeout: 20000 }).catch(() => {});
+  await o5.pg.locator('[data-fp-champ="siret"] input').fill(SIRET).catch(() => {});
+  await o5.pg.click('[data-ent-lancer]').catch(() => {});
+  const t0 = Date.now();
+  await attendre(o5.pg, async () => !!(await o5.pg.$('[data-fp-registre][data-ent-recherche="encours"]')), 3000);
+  await o5.pg.locator('[data-fp-registre]').scrollIntoViewIfNeeded().catch(() => {});
+  await capture(o5.pg, `cf-${W}-${theme}-F5a-squelette`);
+  const lent = await attendre(o5.pg, async () => !!(await o5.pg.$('[data-fp-registre][data-ent-recherche="lent"]')), 12000);
+  const dt = Date.now() - t0;
+  const t5 = lent ? await o5.pg.locator('[data-fp-registre]').innerText() : '';
+  dit(lent && dt >= 7000 && dt < 11000 && /Pas trouvé à temps/.test(t5) && /à la main/.test(t5) && !!(await o5.pg.$('[data-ent-reessayer]')), `${T} F5 registre muet ⇒ arrêt à 8 s : « Pas trouvé à temps. Remplis à la main » (+ Réessayer)`, `${dt} ms · ${t5}`);
+  await o5.pg.locator('[data-fp-registre]').scrollIntoViewIfNeeded().catch(() => {});
+  await capture(o5.pg, `cf-${W}-${theme}-F5b-lent`);
+  dit(!o5.journal.erreurs.length, `${T} F5 aucune erreur JS`, o5.journal.erreurs.join(' ¦ '));
+  await o5.ctx.close();
 
   // F3 : le registre en panne.
   const base3 = { lignes: [MAIN({}), { id: 'vrm_pro_facture', owner: UID, data: { ...FICHE } }], comptes: [] };
