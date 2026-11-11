@@ -81,7 +81,21 @@ Captures : `CAPTURE_DIR` du banc (hors dépôt).
 - Banc neuf `scripts/bancs/emails-densite.cjs` : **96 verts** sur ce code.
   Sur le code d'avant (`BANC_DIST=<dist d'origin/main>`) : **58 rouges**.
   Par mutation (ligne à 17 px, clavier coupé) : 3 rouges, comme attendu.
-- Bancs e-mails existants : voir le rapport de session (relancés après le changement).
+- Bancs e-mails existants, relancés après le changement :
+  - verts : `boite-mail` (120/0), `emails-html`, `reception-emails`, `journal-emails`,
+    `emails-action`, `attente-email`, `vente-email-fraiche`, `bordereau-des-email`,
+    `messages-emails-communaute`, et `scripts/tests/` `journal-email-reessai`,
+    `transfert-guide-interface`, `reception-synthese-interface`
+    (`VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium`).
+  - rouges DÉJÀ sur `main`, à l'identique (arbre d'avant par `git archive`) :
+    `boite-emails` 4 (« MR » attendu, le logo du transporteur est montré depuis v36),
+    `emails-mis-de-cote` 3, `emails-stats-clairs` 5, `comptes-sans-email` 12,
+    `scripts/tests/espace-emails-interface` (attend « Bordereau de ta vente »).
+- Contrôles de banc retouchés (et dits) : `boite-mail` et `boite-emails` exigeaient 44 px
+  aussi à la souris. Ils exigent maintenant 44 px au doigt et 26 px au pointeur fin
+  (même requête que la CSS) ; l'avatar 28 px à la souris, 32 au doigt. Sans ce
+  changement, 26 + 16 rouges : uniquement ces tailles, et une page préchargée trop tôt
+  (corrigé : 400 px d'avance sur ordinateur au lieu de 900).
 
 ## Pour la suite
 - Le titre d'écran et la phrase restent ceux de la coque ; seul leur corps change ici.
