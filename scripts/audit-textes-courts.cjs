@@ -37,6 +37,7 @@ const LISTE = [
   'src/ecrans/MessagesLeboncoin.jsx', 'src/ecrans/PhotoEditor.jsx', 'src/Bienvenue.jsx', 'src/BoiteEmails.jsx',
   'src/JournalEmails.jsx', 'src/ReceptionEmails.jsx', 'src/ebayGestion.jsx', 'src/Tournee.jsx',
   'src/JaugeActions.jsx', 'src/ModeEmballage.jsx', 'src/GuideIphone.jsx', 'src/ExpliqueMondialRelay.jsx',
+  'src/ParcoursArrivee.jsx', 'src/parcoursArrivee.js',
 ];
 // Gardés exprès (dits dans docs/passation/2026-11-10-textes-courts-4.md).
 const EXCEPTIONS = [

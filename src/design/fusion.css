@@ -128,10 +128,19 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 }
 @media (max-width: 360px) { .vrm-fu-grand { font-size: 34px; } .vrm-fu-case { padding: 9px 9px; } .vrm-fu-case b { font-size: 17px; } }
 /* (4 nov.) L'objectif du mois : une barre fine sous les cases, rien d'autre. */
-.vrm-fu-objectif { display: flex; flex-direction: column; gap: 6px; }
+.vrm-fu-objectif { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .vrm-fu-objectif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-objectif-ligne > b { font: 600 13px/1.3 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-fu-objectif-sur { color: var(--fu-sur-sombre-2); font-weight: 500; }
+.vrm-fu-objectif-bas { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; min-width: 0; }
+.vrm-fu-objectif-bas > .vrm-fu-objectif-reste { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.vrm-fu-objectif-rythme { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-fu-objectif-rythme.is-avance { color: #fff; }
+.vrm-fu-objectif-bilan { box-sizing: border-box; max-width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font: 500 13px/1.35 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; }
+.vrm-fu-objectif-vu { all: unset; box-sizing: border-box; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,.14); color: #fff; font: 600 13px/1 var(--vrm-police); cursor: pointer; }
+.vrm-fu-objectif-vu:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
+.vrm-carte-objectif-prop { display: flex; align-items: center; gap: 10px; margin: 0; font: 500 13px/1.35 var(--vrm-police); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-carte-objectif-prop.is-vide { display: block; }
 .vrm-fu-objectif-piste { height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
 .vrm-fu-objectif-piste > span { display: block; height: 100%; border-radius: 999px; background: var(--fu-bleu); transition: width .4s cubic-bezier(.23,1,.32,1); }
 @media (prefers-reduced-motion: reduce) { .vrm-fu-objectif-piste > span { transition: none; } }
@@ -1168,7 +1177,7 @@ html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-coli
 .vrm-carte-defaut { all: unset; box-sizing: border-box; align-self: center; min-height: 44px; padding: 0 14px; display: grid; place-items: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-encre, #1d1d1f); cursor: pointer; margin-top: 6px; }
 /* (4 nov.) « Objectif » dans la feuille */
 .vrm-carte-objectif { margin-top: 6px; border-radius: 14px; background: var(--fu-carte, #fff); overflow: hidden; flex-shrink: 0; }
-.vrm-carte-objectif-types { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--fu-fond, #f2f2f7); }
+.vrm-carte-objectif-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--fu-fond, #f2f2f7); }
 .vrm-carte-objectif-types > button { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 10px; border-radius: 12px; display: grid; place-items: center; text-align: center; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); cursor: pointer; }
 .vrm-carte-objectif-types > button[aria-pressed="true"] { background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .vrm-carte-objectif-types > button:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
@@ -1391,3 +1400,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-outils .vrm-tip-lien { margin-right: 0; font-size: 13px; }
 html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien { background: none !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; min-height: 44px; color: var(--fu-bleu, #0071E3) !important; font: 600 14px/1 var(--vrm-police) !important; }
 html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien:disabled { color: var(--fu-gris) !important; }
+/* (11 nov., lot objectifs-mois) Le bilan du mois passé hors de la carte sombre (Argent). */
+.vrm-objectif-bilan-clair .vrm-fu-objectif-bilan { color: inherit; margin-top: 0; border-top-color: var(--fu-filet, rgba(0,0,0,.08)); }
+.vrm-objectif-bilan-clair .vrm-fu-objectif-vu { background: var(--fu-fond, #f2f2f7); color: var(--fu-encre, #1d1d1f); }
+:root[data-theme="dark"] .vrm-objectif-bilan-clair .vrm-fu-objectif-vu { background: #3a3a3c; color: #fff; }

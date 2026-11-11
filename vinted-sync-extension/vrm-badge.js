@@ -118,6 +118,11 @@
   .refus summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
   .refus ul { margin: 0; padding-left: 16px; }
   .refus li { margin: 2px 0; word-break: break-word; }
+  /* 5.344 : l'historique de départ — une barre fine, neutre (l'accent reste rare, §7). */
+  .imp { margin-top: 6px; }
+  .imp-l { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+  .barre { height: 4px; margin-top: 4px; border-radius: 999px; background: var(--remplir); overflow: hidden; }
+  .barre > i { display: block; height: 100%; border-radius: 999px; background: var(--texte); opacity: .55; }
   .pied { margin-top: 8px; font-size: 12px; color: var(--doux); }
   .pied b { color: var(--texte); font-weight: 600; }
   .b { display: block; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 12px;
@@ -392,6 +397,32 @@
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
     else compteSite = '<div class="val gris">pas encore reconnu</div>';
 
+    // 5.344 : l'historique de départ (ventes puis achats) — lu / total, ou pages lues.
+    const nb = (x) => Number(x || 0).toLocaleString('fr-FR');
+    const heure = (ms) => { try { return new Date(Number(ms)).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+    const ligneImport = (im) => {
+      if (!im || !im.etat) return '';
+      const unType = (t, nom, attente) => {
+        if (!t) return '';
+        if (t.fini) return `<div class="imp" data-import-type="${nom}" data-import-lus="${Number(t.lus) || 0}"><div class="imp-l"><span>${nom === 'ventes' ? 'Ventes' : 'Achats'}</span><span>${nb(t.lus)} ✓</span></div></div>`;
+        const tot = Number(t.total) || 0;
+        const pc = tot > 0 ? Math.max(2, Math.min(100, Math.round((Number(t.lus) || 0) / tot * 100))) : 0;
+        const droite = tot > 0 ? `${nb(Math.min(t.lus, tot))} sur ${nb(tot)}` : (Number(t.pages) > 0 ? `${nb(t.pages)} page${t.pages > 1 ? 's' : ''} lue${t.pages > 1 ? 's' : ''} · encore…` : (attente ? 'ensuite' : 'bientôt'));
+        return `<div class="imp" data-import-type="${nom}" data-import-lus="${Number(t.lus) || 0}" data-import-total="${tot || ''}"><div class="imp-l"><span>${nom === 'ventes' ? 'Ventes' : 'Achats'}</span><span>${droite}</span></div>${tot > 0 ? `<div class="barre" role="progressbar" aria-valuemin="0" aria-valuemax="${tot}" aria-valuenow="${Math.min(Number(t.lus) || 0, tot)}"><i style="width:${pc}%"></i></div>` : ''}</div>`;
+      };
+      let tete;
+      if (im.etat === 'fini') tete = `<div class="val" data-import-etat="fini">Tout est récupéré<span class="coche" aria-label="vérifié">✓</span></div>`;
+      else if (im.etat === 'pause') tete = `<div class="val gris" data-import-etat="pause">${im.cause === 'vinted' ? 'En pause : Vinted freine.' : 'En pause pour ménager ton compte.'} Reprise à ${esc(heure(im.repriseA))}.</div>`;
+      else {
+        const m = Number(im.resteMin) || 0;
+        const duree = m >= 60 ? `environ ${Math.ceil(m / 60)} h` : `environ ${Math.max(5, m)} min`;
+        tete = `<div class="val gris" data-import-etat="${im.etat === 'encours' ? 'encours' : 'attente'}">${im.etat === 'encours' ? 'Lecture de ton historique' : 'Ton historique arrive'} · ${duree}, Vinted ouvert.</div>`;
+      }
+      const bouton = im.etat === 'encours' ? '' : '<button class="b sec" data-import-tout>Tout récupérer</button>';
+      return `<div class="ligne" data-import="${esc(im.etat)}"><div class="lib">Ton historique Vinted</div>${tete}${unType(im.ventes, 'ventes', false)}${unType(im.achats, 'achats', !(im.ventes && im.ventes.fini))}${bouton}</div>`;
+    };
+    const historique = e.plateforme === 'vinted' && e.capte && e.site && e.site.id && e.site.choix !== 'non' && v && v.connecte ? ligneImport(e.site.import) : '';
+
     // 5.335 (9 nov.) — Julien : « le "à confirmer" je ne comprends pas, ça doit
     // être beaucoup plus clair ». Sur Leboncoin : Compte · Annonces · Ventes, ce
     // que le fond a résumé (`resumeCarteLbc`), et UN geste.
@@ -482,6 +513,7 @@
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
       ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
+      ${historique}
       ${lbcLignes}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${aRetirerLbc}
@@ -503,6 +535,20 @@
     if (recharger) recharger.addEventListener('click', () => { try { location.reload(); } catch (_) {} });
     const capter = carte.querySelector('[data-capter]');
     if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
+    // 5.344 : « Tout récupérer » — l'historique du compte de l'onglet, depuis la page 1.
+    const impTout = carte.querySelector('[data-import-tout]');
+    if (impTout) impTout.addEventListener('click', () => {
+      impTout.disabled = true; impTout.textContent = 'C’est parti…';
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'importTout', uid: String((e.site && e.site.id) || '') }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.ok) { if (e.site) e.site.import = r.etat; rendre(); return; }
+          impTout.disabled = false; impTout.textContent = 'Tout récupérer';
+          const err = document.createElement('div'); err.className = 'err'; err.textContent = (r && r.raison) || 'L’extension n’a pas répondu. Réessaie.';
+          impTout.after(err);
+        });
+      } catch (_) { impTout.disabled = false; impTout.textContent = 'Tout récupérer'; }
+    });
   }
 
   // ══ CONFIRMER LE BON COMPTE VINTED (5.191, 19 octobre) ═══════════════════
