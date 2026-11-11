@@ -41,3 +41,6 @@
   .vrm-serie-actions > .vrm-b { flex: 1 1 auto; }
   .vrm-main:has(.vrm-serie-case[data-serie-actif="1"])::after { content: ''; display: block; height: 140px; }
 }
+/* Boîte e-mails : la case à gauche de la ligne (un <li> qui porte un bouton plein). */
+.vrm-boite-item > .vrm-serie-case { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); z-index: 3; }
+.vrm-boite-item:has(> .vrm-serie-case) > .vrm-boite-ligne { padding-left: 46px !important; }

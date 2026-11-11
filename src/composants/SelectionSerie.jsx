@@ -52,10 +52,14 @@ export function useSelectionSerie(ordre, { nom = '' } = {}) {
     try { navigator.vibrate && navigator.vibrate(12); } catch (_) {}
   }, []);
   // Les props d'une ligne : appui long au doigt ; sélection ouverte ⇒ le tap coche.
+  // Au repos (rien d'ouvert), les props d'une ligne ne changent pas : gardées par clé,
+  // une ligne mémoïsée (React.memo) ne se redessine pas pour rien.
+  const repos = useRef(new Map());
   const ligne = useCallback((cle) => {
     const k = String(cle);
+    if (!actif && !sel.length && repos.current.has(k)) return repos.current.get(k);
     const annulerAppui = () => { if (appui.current) { clearTimeout(appui.current.t); appui.current = null; } };
-    return {
+    const props = {
       'data-serie-ligne': k,
       'data-serie-coche': sel.includes(k) ? '1' : '0',
       onPointerDown: (e) => {
@@ -77,6 +81,8 @@ export function useSelectionSerie(ordre, { nom = '' } = {}) {
         e.preventDefault(); e.stopPropagation(); cocher(k, e);
       },
     };
+    if (!actif && !sel.length) repos.current.set(k, props);
+    return props;
   }, [sel, actif, commencer, cocher]);
   const choisies = useMemo(() => ordreS.filter((k) => sel.includes(k)), [ordreS, sel]);
   return { nom, actif, sel, choisies, n: choisies.length, total: ordreS.length, estCoche, cocher, tout, vider, commencer, ligne, ouvrir: () => setActif(true) };
