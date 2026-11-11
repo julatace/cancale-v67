@@ -19,7 +19,7 @@ const jourHeure = (iso) => { const t = Date.parse(iso || ''); return Number.isFi
 
 function LigneAlerte({ x, veille, revente, contexte, C, onRetirer, occupe }) {
   const m = margePossible(x, veille, { revente, contexte });
-  return <div className="vrm-buy-row vrm-ebay-res" data-alerte-ebay={x.itemId}>
+  return <div className="vrm-buy-row vrm-alerte-ebay" data-alerte-ebay={x.itemId}>
     <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
     <div className="vrm-buy-main" style={{ minWidth: 0 }}>
       <div className="vrm-buy-title" style={{ color: C.text }} title={x.titre}>{x.titre || x.itemId}</div>
@@ -29,17 +29,17 @@ function LigneAlerte({ x, veille, revente, contexte, C, onRetirer, occupe }) {
             : x.port === 0 ? <>{eurosCalc(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>{tr('alertesEbay.portCompris')}</span></>
             : <>{eurosCalc(x.total)} <span style={{ fontWeight: 400, color: C.muted }}>{tr('alertesEbay.dontPort', { prix: eurosCalc(x.prix), port: eurosCalc(x.port) })}</span></>}
         </span>
-        <span>· {x.recherche}</span>
-        {x.etat && <span>· {x.etat}</span>}
+        <span>{x.recherche}</span>
+        {x.etat && <span>{x.etat}</span>}
       </div>
       <div data-alerte-marge={m.etat === 'ok' ? m.benefice : m.etat} data-alerte-borne={m.etat === 'ok' ? m.borne : ''} style={{ fontSize: 13, color: C.muted, marginTop: 3, lineHeight: 1.4 }}>
         {m.etat === 'ok' ? <>{tr('alertesEbay.marge')} <strong style={{ color: C.text, fontWeight: 600 }}>{m.borne === 'au-plus' ? tr('alertesEbay.auPlus') + ' ' : m.borne === 'environ' ? tr('alertesEbay.environ') + ' ' : ''}{eurosCalc(m.benefice)}</strong> · {m.base.source === 'toi' ? tr('alertesEbay.baseToi', { prix: eurosCalc(m.base.montant), site: tr('alertesEbay.site.' + m.base.site) }) : tr('alertesEbay.baseMediane', { prix: eurosCalc(m.base.montant), n: m.base.n })}</>
           : <>{tr('alertesEbay.marge')} — {tr(m.etat === 'pas-su' ? 'alertesEbay.margePasSu' : 'alertesEbay.margeSansBase')}</>}
       </div>
     </div>
-    <div className="vrm-buy-act" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div className="vrm-alerte-act">
       <a href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="" style={{ display: 'flex', alignItems: 'center', minHeight: 44, padding: '0 10px', color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>{tr('alertesEbay.voir')}</a>
-      <button type="button" className="vrm-lien-action" disabled={occupe} onClick={() => onRetirer([x.itemId])} data-alerte-retirer="" style={{ minHeight: 44 }}>{tr('alertesEbay.retirer')}</button>
+      <button type="button" className="vrm-lien-action" disabled={occupe} onClick={() => onRetirer([x.itemId])} data-alerte-retirer="" style={{ minHeight: 44, border: 'none', background: 'transparent', padding: '0 10px', fontSize: 13 }}>{tr('alertesEbay.retirer')}</button>
     </div>
   </div>;
 }
@@ -98,7 +98,7 @@ export default function AlertesEbay({ headers, theme: C, revente = () => undefin
         {nouvelles.map((x) => <LigneAlerte key={x.itemId} x={x} veille={parId.get(x.veille) || null} revente={revente} contexte={contexte} C={C} onRetirer={retirer} occupe={occupe} />)}
       </div>
       <p style={{ fontSize: 12, color: C.muted, margin: 0, lineHeight: 1.5 }}>{tr('alertesEbay.margeExplique')}{' '}
-        <button type="button" className="vrm-lien-action" disabled={occupe} onClick={() => retirer(nouvelles.map((x) => x.itemId))} data-alertes-tout-retirer="">{tr('alertesEbay.toutRetirer')}</button></p>
+        <button type="button" className="vrm-lien-action" disabled={occupe} onClick={() => retirer(nouvelles.map((x) => x.itemId))} data-alertes-tout-retirer="" style={{ minHeight: 44, border: 'none', background: 'transparent', padding: '0 4px', fontSize: 12 }}>{tr('alertesEbay.toutRetirer')}</button></p>
     </>}
     {vue && enAlerte.length > 0 && <details className="vrm-repli" data-alertes-recherches="">
       <summary>{tr('alertesEbay.tesAlertes', { n: enAlerte.length })}</summary>

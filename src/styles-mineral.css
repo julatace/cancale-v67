@@ -836,6 +836,16 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-buy-row.vrm-ebay-res > .vrm-buy-act > a { padding-left:0 !important; }
 }
 
+/* (11 nov., lot alertes-ebay) Une annonce signalée par une alerte : photo, contenu, puis
+   « Voir sur eBay ↗ » et « Retirer » — sous le contenu sur téléphone. */
+.vrm-buy-row.vrm-alerte-ebay { grid-template-columns:64px minmax(0,1fr) auto; }
+.vrm-buy-row.vrm-alerte-ebay > .vrm-alerte-act { display:flex; align-items:center; gap:2px; }
+@media(max-width:767px){
+  .vrm-buy-row.vrm-alerte-ebay { grid-template-columns:60px minmax(0,1fr); }
+  .vrm-buy-row.vrm-alerte-ebay > .vrm-alerte-act { grid-column:2; }
+  .vrm-buy-row.vrm-alerte-ebay > .vrm-alerte-act > a { padding-left:0 !important; }
+}
+
 /* À retirer : un en-tête, des destinations, et le code mis en avant. */
 .vrm-achats .vrm-pickup-board { margin-bottom:8px !important; }
 .vrm-pickup-head { margin:0 2px 12px; }
