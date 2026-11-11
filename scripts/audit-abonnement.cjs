@@ -407,10 +407,12 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     const r = await estPris('aa.bb.A', '77');
     dit(r.code === 200 && r.corps.pris === false, 'un compte que personne n’a ⇒ libre', JSON.stringify(r.corps));
   });
-  await essaie('lecture ratée ⇒ pris:false (jamais de fausse alerte)', async () => {
+  // (11 nov., familles-serveur, M52) « pas su » n'est ni « pris » ni « libre » : 503,
+  // `pris` jamais true (pas de fausse alerte) ni false (pas de fausse assurance).
+  await essaie('lecture ratée ⇒ 503 pas su (ni alerte, ni « libre »)', async () => {
     reset(); vintedParId = { '42': [B] }; panneVintedPris = true;
     const r = await estPris('aa.bb.A', '42');
-    dit(r.code === 200 && r.corps.pris === false, 'la base ne répond pas ⇒ on n’invente pas d’alerte (la base bloque la capture de toute façon)', JSON.stringify(r.corps));
+    dit(r.code === 503 && r.corps.pris !== true && r.corps.pris !== false, 'la base ne répond pas ⇒ ni alerte inventée, ni « libre » (503, l’app se tait ; la base bloque la capture de toute façon)', JSON.stringify(r.corps));
   });
   await essaie('carte : prix relayé seulement s’il est celui des CGV', async () => {
     reset(); prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };

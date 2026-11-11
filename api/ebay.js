@@ -2226,7 +2226,7 @@ async function handleApp(req, res) {
     res.status(r.status).json(r.body);
   } catch (e) {
     // (11 nov., B120) une panne d'eBay (réseau, délai) n'est pas une panne de base ou de code.
-    const reseau = e && (e.name === 'TimeoutError' || e.name === 'AbortError' || e.name === 'TypeError' && /fetch/i.test(String(e.message)));
+    const reseau = e && (e.name === 'TimeoutError' || e.name === 'AbortError' || e.name === 'TypeError' && String(e.message).toLowerCase().includes('fetch'));
     if (!reseau) console.warn('ebay : erreur interne', e && e.name);
     res.status(reseau ? 502 : 500).json({ ok: false, error: reseau ? 'eBay injoignable' : 'Erreur de VRM — réessaie', detail: String((e && e.message) || '').slice(0, 200) });
   }

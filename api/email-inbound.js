@@ -24,6 +24,7 @@ import { ligneHtml, idHtml } from "./_lib/email-html.js";
 // ────────────────────────────────────────────────────────────────────────────
 
 import crypto from 'crypto';
+import { empreinte, ancienneEmpreinte, cleCompatible } from './_lib/empreinte.js';   // (11 nov.) clés de ligne 64 bits, anciennes relues
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { suiteProduction, SIGNAUX as SIGNAUX_PROD, SERIE_503, FENETRE_503_MS } from './_lib/alertes-production.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
@@ -353,10 +354,22 @@ export function cleFinalisation({ texte, messageId, sujet, corps }) {
   if (mid) return { cle: 'm' + crypto.createHash('sha256').update(mid).digest('hex').slice(0, 20), transaction: '', via: 'message-id' };
   return { cle: shortHash(String(sujet || '') + '|' + String(corps || '').slice(0, 400)), transaction: '', via: 'texte' };
 }
-function shortHash(s) {
-  let h = 0; const str = String(s || '');
-  for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
-  return Math.abs(h).toString(36);
+// (11 nov., H8) L'ancien hachage 31 bits : il ne fabrique plus AUCUNE clé de ligne
+// neuve (`empreinte`, _lib/empreinte.js) ; il sert à RELIRE les lignes déjà rangées
+// sous l'ancienne clé, et aux étiquettes de notification.
+const shortHash = ancienneEmpreinte;
+// La clé d'une ligne e-mail : l'ancienne si une ligne d'avant la porte déjà ET
+// désigne la même chose, sinon la nouvelle (64 bits, ou l'identité lue).
+// `undefined` = la lecture a échoué : rien n'est écrit (503, le collecteur rejoue).
+async function cleLigneEmail(prefixe, texteAncien, nouvelle, select, memeChose) {
+  return cleCompatible({ prefixe, ancienne: ancienneEmpreinte(texteAncien), nouvelle, memeChose, lire: async (id) => {
+    try {
+      const r = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=${select}&limit=1`), { headers: { ...sbCle(SUPABASE_KEY) } });
+      if (!r.ok) return undefined;
+      const j = await r.json();
+      return Array.isArray(j) ? (j[0] || null) : undefined;
+    } catch (_) { return undefined; }
+  } });
 }
 
 // ── Parsers (portés fidèlement de l'Apps Script) ────────────────────────────
@@ -796,7 +809,9 @@ async function garderInconnu(corpsBrut, mail, raison, famille) {
     // de quoi l'identifier, pas de quoi peser (§34).
     const plafond = famille ? 2000 : 200000;
     if (brut && brut.length > plafond) brut = brut.slice(0, plafond);
-    const cle = shortHash((mail && mail.subject ? mail.subject : '') + String(brut).slice(0, 400) + Date.now());
+    // (11 nov., M60) une clé STABLE : un rejeu du collecteur réécrit la même ligne
+    // (avant : `Date.now()` dans la clé ⇒ une ligne de 200 Ko de plus à chaque rejeu).
+    const cle = empreinte([String((mail && mail.messageId) || ''), (mail && mail.subject ? mail.subject : ''), String((mail && mail.from) || ''), String(brut).slice(0, 2000)].join('|'));
     await supabaseUpsert([{ id: `email_inconnu_${cle}`, data: {
       type: famille ? 'connu-sans-action' : 'inconnu', famille: famille || '', raison,
       forme: formeRecue(corpsBrut),
@@ -822,7 +837,9 @@ async function logEmail(entry) {
     if (owner) {
       const ok = await modifierLigneCas({ url: SUPABASE_URL, entetes: sbCle(SUPABASE_KEY), owner, id: 'email_journal',
         modifier: (cur) => ({ ...(cur || {}), entries: [ligne, ...((cur && Array.isArray(cur.entries)) ? cur.entries : [])].slice(0, 200) }) });
-      if (ok === null) marquerEcritureRatee();   // comme avant : un journal pas écrit ⇒ 503, le collecteur rejoue
+      // Le journal est une TRACE : son échec ne fait pas rejouer un e-mail déjà rangé
+      // (comme une lecture ratée du journal avant).
+      if (ok === null) console.warn('email-inbound : journal non écrit');
       return;
     }
     const lu = await supabaseLireRow('email_journal');
@@ -1729,7 +1746,10 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
       // 2e écrasait la 1re et la 1re adresse ne pouvait plus réclamer son e-mail.
       // Un rejeu du collecteur (mêmes adresses) réécrit toujours la même ligne.
       ? 'm' + crypto.createHash('sha256').update(mid + '|' + String(raison || '') + '|' + [...new Set((adresses || []).map((a) => String(a).toLowerCase()))].sort().join(',')).digest('hex').slice(0, 20)
-      : Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+      // (11 nov., familles-serveur) Sans Message-ID : une clé DÉTERMINISTE (expéditeur,
+      // sujet, date, début du texte, adresses, raison) — un rejeu ne crée plus de copie.
+      : 'e' + empreinte([String((mail && mail.from) || ''), String((mail && mail.subject) || ''), String((mail && mail.date) || ''),
+        String((mail && (mail.text || mail.html)) || '').slice(0, 2000), [...new Set((adresses || []).map((a) => String(a).toLowerCase()))].sort().join(','), String(raison || '')].join('|')));
     // Les pièces d'abord : si l'une ne s'écrit pas, la quarantaine ne s'écrit pas
     // non plus et la route répond 503 (le collecteur rejoue) — jamais un e-mail
     // « gardé » dont le PDF manque.
@@ -2808,7 +2828,12 @@ export async function traiterEmail(req, res) {
       // ne partage jamais sa ligne avec son jumeau sans). Le n° reste dans
       // `transaction` : c'est l'app qui regroupe les lignes d'un même n°
       // (`indexRecusParTransaction`, PDF d'abord).
-      const key = shortHash(subject + corpsTexte.slice(0, 300) + (transaction ? `|tx${transaction}` : '') + (pdfA ? '|pdf' : ''));
+      // (11 nov., H8) 64 bits ; une ligne d'avant (ancienne clé, même n° et même sujet) garde la sienne.
+      const texteCle = subject + corpsTexte.slice(0, 300) + (transaction ? `|tx${transaction}` : '') + (pdfA ? '|pdf' : '');
+      const idAchat = await cleLigneEmail('email_achat_', texteCle, empreinte(texteCle), 's:data->>subject,tx:data->>transaction',
+        (lu) => String(lu.s || '') === String(subject || '') && String(lu.tx || '') === String(transaction || ''));
+      if (idAchat === undefined) { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable' }); return; }
+      const key = idAchat.slice('email_achat_'.length);
       await supabaseUpsert([{ id: `email_achat_${key}`, data: {
         type: 'achat', subject, article, prix, transaction,
         account: acc.login || '', uid: acc.uid || '',
@@ -2840,7 +2865,16 @@ export async function traiterEmail(req, res) {
       //    montre, et il sert à recaler l'analyse.
       if (!data) { await garderInconnu(corpsBrut, mail, 'reconnu vente, analyse impossible', 'vente');
         await repondre(res, 200, { ok: false, type: 'vente', error: 'parse échec', garde: true }); return; }
-      const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
+      // (11 nov., H7/H8) La clé d'une vente : SA transaction quand elle est lue, sinon le
+      // Message-ID, sinon l'empreinte (64 bits) du texte. Avant : pseudo|prix|titre en
+      // 31 bits — deux paires identiques au même acheteur et au même prix = UNE vente.
+      // Une ligne d'avant (ancienne clé, même transaction) garde sa clé : pas de double.
+      const texteCleVente = `${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`;
+      const nouvelleVente = data.transaction ? `tx${data.transaction}` : mail.messageId ? 'm' + empreinte(String(mail.messageId)) : empreinte(texteCleVente);
+      const idVente = await cleLigneEmail('email_sale_', texteCleVente, nouvelleVente, 'tx:data->>transaction',
+        (lu) => String(lu.tx || '') === String(data.transaction || ''));
+      if (idVente === undefined) { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable' }); return; }
+      const key = idVente.slice('email_sale_'.length);
       { const jn = await numeroDEmail(data.numero, data.designation);
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', compteSource: acc.source || '', receivedAt: now } }]);
@@ -2907,7 +2941,12 @@ export async function traiterEmail(req, res) {
        || (textAll.match(/([\w.\-]{2,30})\s+(?:a|vient\s+de)\s+(?:te\s+)?(?:faire|fait|envoyer|envoyé)\s+une?\s+offre/i) || [])[1]
        || '';
       const article = (textAll.match(/offre\s+(?:de\s+[\d,.]+\s*€\s+)?pour\s+[«"“']?([^«»"”'\n]{3,60})/i) || [])[1] || '';
-      const key = shortHash(subject + corpsTexte.slice(0, 200));
+      // (11 nov., B107/H8) Message-ID dans la clé : deux offres de même texte et même
+      // montant (deux acheteurs) ne fusionnent plus ; une ligne d'avant garde sa clé.
+      const texteCleOffre = subject + corpsTexte.slice(0, 200);
+      const idOffre = await cleLigneEmail('email_offer_', texteCleOffre, mail.messageId ? 'm' + empreinte(String(mail.messageId)) : empreinte(texteCleOffre), 'q:data->>qui,m:data->>montant',
+        (lu) => String(lu.q || '') === String(qui || '') && String(lu.m || '') === String(montant || ''));
+      const key = idOffre ? idOffre.slice('email_offer_'.length) : (mail.messageId ? 'm' + empreinte(String(mail.messageId)) : empreinte(texteCleOffre));
       // ── COPILOTE D'OFFRES : conseil chiffré instantané ─────────────────────
       // On retrouve le prix d'achat de la paire → on dit s'il faut accepter et
       // combien il reste net, ou refuser (offre sous le coût).
@@ -2926,7 +2965,7 @@ export async function traiterEmail(req, res) {
         _cat: 'offre',
       }); } catch (_) {}
       // Archive l'offre + le conseil pour le panneau « Copilote d'offres » de l'app.
-      try { await supabaseUpsert([{ id: `email_offer_${key}`, data: {
+      if (idOffre !== undefined) try { await supabaseUpsert([{ id: `email_offer_${key}`, data: {
         type: 'offre', qui, article, montant, buy, net, ...(buy != null ? { buySur: 'titre' } : {}),
         // ⚠️ Quand l'extraction échoue, on garde un ÉCHANTILLON du texte (300
         // caractères) au lieu de deviner une nouvelle regex à l'aveugle — c'est

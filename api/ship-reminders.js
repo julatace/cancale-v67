@@ -89,7 +89,7 @@ import { purgerHtml } from './_lib/email-html.js';
 import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
-import { modifierLigneCas, reserverMemo } from './_lib/cas.js';   // (11 nov.) mémos par comparer-et-échanger
+import { reserverMemo } from './_lib/cas.js';   // (11 nov.) mémos par comparer-et-échanger
 import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
@@ -170,11 +170,10 @@ async function ownersActifs() {
 // Écrit un mémo de dédoublonnage POUR LE VENDEUR DU TOUR (clé (owner,id) quand on
 // est cloisonné, `id` seul sinon). Sans ça, deux vendeurs partageraient le même
 // `ship_reminder_dedup` et l'un ferait taire l'autre.
-// (11 nov., B128) Cloisonné : par comparer-et-échanger (_lib/cas.js) — deux
-// passages ne se réécrivent plus l'un sur l'autre sans le voir.
+// (11 nov.) Les mémos qui décident d'un ENVOI se RÉSERVENT par comparer-et-échanger
+// (`reserverDedup` ci-dessous) ; celui-ci reste l'écriture simple (lignes de travail).
 async function ecrireDedup(id, data) {
   const o = proprietaireCourant();
-  if (o) return (await modifierLigneCas({ url: SUPABASE_URL, entetes: HEADERS, owner: o, id, modifier: () => data })) === true;
   const row = o ? { owner: o, id, data } : withOwnerAll([{ id, data }])[0];
   const conflict = o ? 'owner,id' : conflictTarget('id');
   // Rend VRAI seulement si la base a confirmé : le bilan de la semaine ne part
