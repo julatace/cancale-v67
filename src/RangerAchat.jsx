@@ -111,13 +111,14 @@ function UnAchat({ entree, preparer, ranger, onSuivant, onPlusTard, onPasARanger
 
   const prixLu = prixAffiche(entree.prix);
   return (
+    <>
     <div className="vrm-ra-achat" data-ranger-tx={entree.tx || ''} data-ranger-n={lignes.length}>
       <div className="vrm-ra-tete">
-        <span className="vrm-ra-photo">{entree.photo && Photo ? <Photo src={entree.photo} alt="" /> : null}</span>
-        <span className="vrm-ra-tete-textes">
+        <div className="vrm-ra-photo">{entree.photo && Photo ? <Photo src={entree.photo} alt="" /> : null}</div>
+        <div className="vrm-ra-tete-textes">
           <span className="vrm-ra-titre-achat">{entree.titre || tr('ranger.sansTitre')}</span>
           <span className="vrm-ra-sous" data-ranger-prix-lu={prixLu ? String(entree.prix) : ''}>{[prixLu ? tr('ranger.achete', { prix: prixLu }) : tr('ranger.prixPasLu'), position].filter(Boolean).join(' · ')}</span>
-        </span>
+        </div>
       </div>
       {entree.lot ? (
         <div className="vrm-ra-lot" data-ranger-lot={n}>
@@ -175,14 +176,16 @@ function UnAchat({ entree, preparer, ranger, onSuivant, onPlusTard, onPasARanger
         </>
       ) : null}
       {erreur ? <p className="vrm-ra-refus" role="alert" data-ranger-erreur="">{erreur}</p> : null}
-      <div className="vrm-fs-pied vrm-ra-pied">
+    </div>
+    {/* Le pied d'actions collé en bas de la feuille (`.vrm-fs-pied`, enfant direct de la feuille). */}
+    <div className="vrm-fs-pied vrm-ra-pied">
         <Bouton variante="primaire" plein data-ranger-ok="" occupe={envoi} disabled={!pret} onClick={valider}>{lignes.length > 1 ? tr('ranger.rangeN', { n: lignes.length }) : tr('ranger.range')}</Bouton>
         <div className="vrm-ra-pied-second">
           <Bouton variante="secondaire" data-ranger-plus-tard="" onClick={onPlusTard}>{tr('ranger.plusTard')}</Bouton>
           {onPasARanger && entree.tx ? <Bouton variante="secondaire" data-ranger-pas="" onClick={() => onPasARanger(entree)}>{tr('ranger.pasARanger')}</Bouton> : null}
-        </div>
       </div>
     </div>
+    </>
   );
 }
 

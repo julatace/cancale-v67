@@ -77,7 +77,7 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
 async function passe(b, vp, sombre) {
   const T = `${vp.width}px${sombre ? ' sombre' : ''}`;
   const tactile = vp.width < 600;
-  const ctx = await b.newContext({ viewport: vp, ...(tactile ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(tactile ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript((sb) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(!!sb)); } catch (_) {} }, sombre);
@@ -159,13 +159,15 @@ async function passe(b, vp, sombre) {
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   const carte = await attendre(() => pg.evaluate(() => { const c = document.querySelector('[data-job="achats-a-ranger"]'); return c ? c.getAttribute('data-n') : null; }), 25000);
   dit(carte === '1', `${T} R5 · Ma journée : « 1 achat à ranger »`, carte);
+  await pg.locator('[data-job="achats-a-ranger"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(600);
   await capture(pg, `rangement-${vp.width}${sombre ? '-sombre' : ''}-3-journee`);
   if (carte) {
     await pg.locator('[data-job="achats-a-ranger"]').first().click();
     const n2 = await attendre(() => pg.evaluate(() => { const l = document.querySelector('[data-ranger-feuille] [data-ranger-ligne="0"]'); return l && l.getAttribute('data-ranger-num'); }), 15000);
     const suivant = String(Number(attendu) + 1);
     dit(n2 === suivant, `${T} R5 · la feuille propose N°${suivant} : le N°${attendu} annulé n’est jamais redonné`, n2);
-    await capture(pg, `rangement-${vp.width}${sombre ? '-sombre' : ''}-4-suivant`);
+    await pg.waitForTimeout(500); await capture(pg, `rangement-${vp.width}${sombre ? '-sombre' : ''}-4-suivant`);
+    await pg.locator('[data-ranger-plan]').first().scrollIntoViewIfNeeded().catch(() => {}); await capture(pg, `rangement-${vp.width}${sombre ? '-sombre' : ''}-5-plan`);
   }
   dit(!errs.length, `${T} aucune erreur de page`, errs[0]);
   await ctx.close();
