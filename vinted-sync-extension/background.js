@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.344.0';
+const CODE_VERSION = '5.366.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3018,6 +3018,8 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     return;
   }
   if (estErreurVinted(parsed)) { noterDiag(`ignore_erreur_vinted_${type || 'inconnu'}`); return; }
+  // (5.366) Sa page Vinted a rendu ses données : la vérification anti-robot est passée.
+  secuLectureNormale('vinted', String(uid)).catch(() => {});
   if(type==='conversation'&&scopeNotif?.user_id)await capterLectureFavori(uid,domain,id,parsed,sourceUrl,tabId,scopeNotif.user_id,sourceMethod,httpStatus);
   // Le corps a parsé : la clé de liste attendue est-elle toujours là ? (sentinelle
   // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
@@ -3288,6 +3290,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.from === 'vrm-cookies') {
     if (msg.action === 'veux') { sendResponse({ ok: true, veux: !CAP.cookies }); return true; }
     recevoirCookiesPage(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
+  // 5.366 : il est LÀ — un vrai geste (isTrusted) dans un onglet du site (content.js, vc.js).
+  // La plateforme vient de l'ADRESSE de l'onglet, jamais du message.
+  if (msg && msg.from === 'vrm-presence' && msg.action === 'la') {
+    let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+    const pf = /(^|\.)vinted\.[a-z.]+$/i.test(hote) ? 'vinted' : /(^|\.)vestiairecollective\.com$/i.test(hote) ? 'vestiaire' : /(^|\.)leboncoin\.fr$/i.test(hote) ? 'leboncoin' : '';
+    if (!pf) { sendResponse({ ok: false }); return true; }
+    secuPresence(pf, Date.now()).then((ok) => sendResponse({ ok: !!ok }), () => sendResponse({ ok: false }));
+    return true;
+  }
+  // 5.366 : « Tout arrêter » / « Relancer » depuis la carte du logo (tous les comptes, tous les sites).
+  if (msg && msg.from === 'vrm-badge' && msg.action === 'secuArret') {
+    secuPoserArret(msg.arret === true, 'carte').then(sendResponse, () => sendResponse({ accepte: false }));
     return true;
   }
   // 5.294 : un onglet Vinted redevient VISIBLE (content.js) — le rattrapage
@@ -3702,6 +3718,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // 5.296 : le compte est celui que l'ONGLET a lu sur `/users/me` (vide = pas su), jamais celui que dirait le message.
           // 5.299 : … et seulement si la PAGE dit le même (`compteVcCapture`) : un onglet où l'on vient de changer de compte n'étiquette rien.
           const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          if (compteOnglet) secuLectureNormale('vestiaire', compteOnglet).catch(() => {});   // (5.366) sa page Vestiaire lit normalement
           const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu });
           if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
           sendResponse({ ok: ok === true });
@@ -3715,6 +3732,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          if (compteOnglet) secuLectureNormale('vestiaire', compteOnglet).catch(() => {});   // (5.366) sa page Vestiaire lit normalement
           sendResponse({ ok: (await rangerVcTimeline(msg, compteOnglet)) === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -3762,6 +3780,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // 5.295 : le compte est celui que l'ONGLET a lu sur `/users/me`, jamais celui que dirait le message.
           // 5.299 : le compteur aussi porte le compte (chaque compte a SES non-lus).
           const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          if (compteOnglet) secuLectureNormale('vestiaire', compteOnglet).catch(() => {});   // (5.366) sa page Vestiaire lit normalement
           const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages, compte: compteOnglet } : Object.assign({}, msg, { compte: compteOnglet }));
           if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_messages'); await noterVcCapte('messages', ok === true, 0, { inconnu: true }); } else await noterVcCapte(msg.action === 'vcCompteur' ? 'nonlus' : 'messages', ok === true, msg.action === 'vcCompteur' ? Number(msg.messages) || 0 : (Array.isArray(msg.conversations) ? msg.conversations.length : 0));
           sendResponse({ ok: ok === true });
@@ -5289,14 +5308,16 @@ function raisonPauseVinted(p) {
 // Sérialisé : deux réponses 429 arrivées l'une derrière l'autre ne montent pas
 // de deux paliers (la seconde trouve la pause déjà posée).
 let _pauseChaine = Promise.resolve();
-function poserPauseVinted(statut, quoi) {
+// (5.366) `retryMs` : le Retry-After de Vinted — la pause dure AU MOINS ce délai (le palier
+// reste le plancher ; borné à 24 h par `secuRetryAfterMs`).
+function poserPauseVinted(statut, quoi, retryMs = 0) {
   _pauseChaine = _pauseChaine.then(async () => {
     const t = Date.now();
     const cur = await lirePauseVinted();
     if (Number(cur.jusqua || 0) > t) return;                  // déjà en pause : rien ne monte
     const recent = cur.jusqua && (t - Number(cur.jusqua)) < PAUSE_OUBLI_MS;
     const niveau = recent ? Math.min(Number(cur.niveau || 0) + 1, PAUSE_PALIERS_MIN.length) : 1;
-    const minutes = PAUSE_PALIERS_MIN[niveau - 1];
+    const minutes = Math.max(PAUSE_PALIERS_MIN[niveau - 1], Math.ceil((Number(retryMs) || 0) / 60000));
     const famille = String(quoi || 'api').replace(/[^a-z]/gi, '').slice(0, 20) || 'api';
     try { await chrome.storage.local.set({ [PAUSE_VINTED]: { jusqua: t + minutes * 60000, niveau, statut: Number(statut) || 0, depuis: t, quoi: famille } }); } catch (_) {}
     noterDiag(`vinted_frein_${Number(statut) || 0}`);
@@ -5315,7 +5336,7 @@ function requeteVinted(quoi, fn) {
     const p = await pauseVinted();
     if (p) { noterDiag('vinted_pause_refus'); return { status: 0, ok: false, json: null, text: '', pause: true, raison: raisonPauseVinted(p) }; }
     const r = await fn();
-    if (r && freinVinted(r.status)) await poserPauseVinted(r.status, quoi);
+    if (r && freinVinted(r.status)) await poserPauseVinted(r.status, quoi, secuRetryAfterMs(r.retryAfter, Date.now()));
     return r;
   };
   const suite = _fileRequetes.then(tour, tour);
@@ -5341,9 +5362,12 @@ async function vintedGet(acc, endpoint, options = {}) {
           ...(options.notifications?{'platform':'web','x-next-app':'marketplace-web'}:{}),
         },
       });
-      let json = null;
-      try { json = await res.json(); } catch (_) {}
-      return { status: res.status, ok: res.ok, json };
+      // (5.366) le texte d'abord : une page de vérification (HTML) se reconnaît (`secuObserver`).
+      const ent = secuEntetes(res);
+      let brut = ''; try { brut = await res.text(); } catch (_) {}
+      let json = null; try { json = brut ? JSON.parse(brut) : null; } catch (_) {}
+      await secuObserver('vinted', acc && acc.vinted_user_id, { status: res.status, json, texte: json == null ? brut.slice(0, 3000) : '', entetes: ent });
+      return { status: res.status, ok: res.ok, json, retryAfter: ent['retry-after'] || null };
     } catch (_) { return { status: 0, ok: false, json: null }; }
   });
 }
@@ -5429,9 +5453,11 @@ async function vintedSend(acc, method, endpoint, body, options = {}) {
         },
         body: payload,
       });
-      let json = null;
-      try { json = await res.json(); } catch (_) {}
-      return { status: res.status, ok: res.ok, json };
+      const ent = secuEntetes(res);
+      let brut = ''; try { brut = await res.text(); } catch (_) {}
+      let json = null; try { json = brut ? JSON.parse(brut) : null; } catch (_) {}
+      await secuObserver('vinted', acc && acc.vinted_user_id, { status: res.status, json, texte: json == null ? brut.slice(0, 3000) : '', entetes: ent });
+      return { status: res.status, ok: res.ok, json, retryAfter: ent['retry-after'] || null };
     } catch (_) { return { status: 0, ok: false, json: null }; }
   });
   let rep = await doCall();
@@ -9989,6 +10015,9 @@ async function autoAccepterOffres(uid) {
       if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs(), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
       if (pv[o.oid].at > Date.now()) continue;
       if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux gestes
+      // (5.366) Sécurité du compte : repos de nuit, « si tu es là », prudence, Tout arrêter,
+      // plafonds, pas de rafale. Refus ⇒ l'offre reste prévue (rien n'est noté « faite »).
+      if (await secuGeste('vinted', uid, 'offre', 'auto')) break;
       const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? reg.msgRefus : null });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
@@ -11194,7 +11223,7 @@ async function republierVinted(msg) {
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
   { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   const recuP = {};
-  const stop = await gardeStricte(uid, acc, { recu: recuP });
+  const stop = await gardeStricte(uid, acc, { recu: recuP, secu: { sorte: 'republication', mode: 'serie' } });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   // 1. SAUVEGARDE COFFRE vérifiée (filet : de quoi tout refaire si besoin).
   let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
@@ -11290,7 +11319,7 @@ async function baisserPrixVinted(msg) {
   { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu_baisse'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   // Le compte de l'onglet ET le plafond : UNE place réservée (le changement de prix).
   const recu = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu });
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu, secu: { sorte: 'baisse', mode: 'serie' } });
   if (stop) return { accepte: false, code: stop.code, actif: stop.actif, raison: stop.error };
   const rendre = async () => { if (recu.at) await rendreActions(uid, recu.at, 1); };
   // Filet : la sauvegarde coffre de l'annonce (la règle de `republierVinted`).
@@ -11492,7 +11521,7 @@ async function mettreVacancesVinted(msg) {
   if (!corps || !/^(PUT|POST|PATCH)$/.test(String(recette.methode || '')) || !RE_VACANCES_CHEMIN.test(String(recette.chemin).replace('{moi}', '1'))) return { accepte: false, code: 'recette-illisible', raison: 'ce que VRM a appris n’est pas exploitable : refais-le une fois à la main — rien n’est parti' };
   // Le compte de l'onglet ET le plafond : UNE place réservée.
   const recu = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu });
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu, secu: { sorte: 'vacances', mode: 'clic' } });
   if (stop) return { accepte: false, code: stop.code, actif: stop.actif, raison: stop.error };
   const rendre = async () => { if (recu.at) await rendreActions(uid, recu.at, 1); };
   return await avecVinted(async () => {
@@ -11650,15 +11679,23 @@ async function vintedPage(acc, method, endpoint, body, options = {}) {
           const t = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, delai || 60000) : null;
           const r = await fetch(chemin, { method: m, credentials: 'include', headers: h, body: b, ...(ctl ? { signal: ctl.signal } : {}) });
           if (t) clearTimeout(t);
-          let json = null; try { json = await r.json(); } catch (_) {}
-          return { status: r.status, ok: r.ok, json, origine };
+          // (5.366) Quelques en-têtes (contrôle anti-robot, Retry-After) et, si la réponse
+          // n'est pas du JSON, le début du texte : seulement pour reconnaître une page de
+          // vérification. Rien n'en est rangé.
+          const ent = {};
+          try { for (const k of ['content-type', 'x-datadome', 'x-dd-b', 'cf-mitigated', 'retry-after']) { const v = r.headers && r.headers.get(k); if (v) ent[k] = String(v).slice(0, 200); } } catch (_) {}
+          let brut = ''; try { brut = await r.text(); } catch (_) {}
+          let json = null; try { json = brut ? JSON.parse(brut) : null; } catch (_) {}
+          return { status: r.status, ok: r.ok, json, origine, entetes: ent, texte: json == null ? String(brut || '').slice(0, 3000) : '' };
         } catch (_) { return { status: 0, ok: false, json: null, origine }; }
       }, [String(method || 'POST').toUpperCase(), endpoint, body == null ? null : body, lastCsrfByDomain[domain] || '', Number(options.timeoutMs) || 60000]);
       const o = res && res[0] && res[0].result;
       if (!o || typeof o !== 'object') return { status: 0, ok: false, json: null };
       let hote = ''; try { hote = new URL(String(o.origine || '')).hostname; } catch (_) {}
       if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('page_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true, sansPage: 'onglet' }; }
-      return { status: o.status, ok: o.ok, json: o.json };
+      const ent = o.entetes && typeof o.entetes === 'object' ? o.entetes : {};
+      await secuObserver('vinted', acc && acc.vinted_user_id, { status: o.status, json: o.json, texte: o.texte, entetes: ent });
+      return { status: o.status, ok: o.ok, json: o.json, retryAfter: ent['retry-after'] || null };
     } catch (_) { return { status: 0, ok: false, json: null }; }
   });
 }
@@ -12415,7 +12452,7 @@ async function recreerVinted(msg) {
     let n0 = 0; try { const l = ((await chrome.storage.local.get('vrmActions')).vrmActions || {})[uid]; n0 = Array.isArray(l) ? l.filter((t) => Date.now() - Number(t) < 3600000).length : 0; } catch (_) {}
     if (n0 + nA0 > ACTIONS_MAX_HEURE - RESERVE_GESTES) {
       const recu0 = {};
-      const stopP = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA0, recu: recu0 });
+      const stopP = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA0, recu: recu0, secu: { sorte: 'republication', mode: 'serie' } });
       if (stopP) return { accepte: false, code: stopP.code, raison: stopP.error };
       if (recu0.at) await rendreActions(uid, Number(recu0.at), nA0);   // passé entre-temps : on rend, la vraie réservation est plus bas
     } }
@@ -12740,7 +12777,7 @@ async function finRepubBrouillon(acc, job) {
     let deja; try { deja = await sbGet(`app_data?id=eq.vinted_brouillon_${draftId}&select=etat:data->>etat`); } catch (_) { deja = null; }
     if (deja && deja[0] && deja[0].etat === 'publie') { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'fait', draftId }); return { accepte: true, etape: 'fait', draftId, nouvelId: draftId, raison: 'le brouillon était déjà en ligne — rien n’a été renvoyé.' }; }
     if (await lireVerrouRecreer('b' + draftId)) { await rendre1(); await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId }); return { accepte: true, etape: 'incertain', draftId, raison: "une autre mise en ligne de ce brouillon est partie sans réponse claire — VRM n'en renvoie pas une seconde. Regarde ton dressing." }; }
-    const stopC = await gardeStricte(uid, acc, { lecture: true });
+    const stopC = (await gardeStricte(uid, acc, { lecture: true })) || (await secuGeste('vinted', uid, 'mise_en_ligne', 'suite'));   // (5.366) « Tout arrêter » / vérification : le brouillon attend
     { const fr = await lireFreinRepub(uid); if (fr) { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'frein' }); noterDiag('frein_repub_tenu'); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a PAS été mis en ligne : ${phraseFreinRepub(fr)} « Brouillons → en ligne » le mettra en ligne ensuite, sans en créer un autre.` }; } }
     if (stopC) { await rendre1(); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stopC.error}) — « Brouillons → en ligne » le met en ligne, sans en créer un autre.` }; }
     const rlB = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
@@ -12964,7 +13001,10 @@ function entreeJournal(sorte, extra, t) {
 let _chaineJournal = Promise.resolve();
 function noterJournal(uid, sorte, extra) {
   const u = String(uid || '');
-  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(false);   // Vinted seulement (`vc:`/`lbc:` ne passent pas)
+  // (5.366) Vinted (n° du compte) et Vestiaire (`vc:{compte}` ⇒ ligne `journal_vc_{compte}_{nav}`,
+  // que les lecteurs Vinted n'entendent pas) ; `lbc:` ne passe pas.
+  const vcJ = /^vc:([\w-]{1,40})$/.exec(u);
+  if (!vcJ && !/^\d{1,20}$/.test(u)) return Promise.resolve(false);
   const e = entreeJournal(sorte, extra);
   if (!e) return Promise.resolve(false);
   const suite = _chaineJournal.then(async () => {
@@ -12976,7 +13016,7 @@ function noterJournal(uid, sorte, extra) {
       cur[u] = l.slice(-JOURNAL_MAX);
       await chrome.storage.local.set({ vrmJournal: cur });
       const moi = await idNavigateur();
-      if (moi) { try { await supabaseUpsert('app_data', [{ id: `${JOURNAL_LIGNE}${u}_${moi}`, data: { uid: u, nav: moi, v: CODE_VERSION, at: new Date().toISOString(), e: cur[u].map((y) => entreeJournal(y.s, y, y.t)).filter(Boolean) } }], 'id'); } catch (_) {} }
+      if (moi) { try { await supabaseUpsert('app_data', [{ id: vcJ ? `journal_vc_${vcJ[1]}_${moi}` : `${JOURNAL_LIGNE}${u}_${moi}`, data: { uid: u, nav: moi, v: CODE_VERSION, at: new Date().toISOString(), e: cur[u].map((y) => entreeJournal(y.s, y, y.t)).filter(Boolean) } }], 'id'); } catch (_) {} }
       return true;
     } catch (_) { return false; }
   });
@@ -13018,6 +13058,573 @@ function sorteExec(methode, endpoint) {
   if (methode === 'POST' && /^\/api\/v2\/transactions\/\d+\/offers$/.test(e)) return 'contre_offre';
   if (methode === 'POST' && /^\/api\/v2\/conversations\/\d+\/replies$/.test(e)) return 'reponse';
   return null;
+}
+// <securite-comptes-regle> — COPIE de src/securiteComptes.js (scripts/audit-securite-comptes.cjs --recopie). Ne pas modifier ici.
+const SECU_V = 1;
+const SECU_PLATEFORMES = ['vinted', 'vestiaire', 'leboncoin'];
+const SECU_NOMS = { vinted: 'Vinted', vestiaire: 'Vestiaire', leboncoin: 'Leboncoin' };
+const SECU_HOTES = { vinted: 'vinted.fr', vestiaire: 'vestiairecollective.com', leboncoin: 'leboncoin.fr' };
+const SECU_SORTES = ['offre', 'favori', 'republication', 'mise_en_ligne', 'baisse', 'reponse', 'vacances', 'bordereau', 'publication', 'autre'];
+const SECU_TYPES_REGLABLES = ['offre', 'favori', 'republication', 'baisse', 'reponse'];
+const SECU_MODES = ['auto', 'programme', 'serie', 'suite', 'visite', 'clic'];
+const SECU_SANS_LUI = ['auto', 'programme'];          // partent sans qu'il soit derrière l'écran
+const SECU_COMPTES = ['auto', 'programme', 'serie'];  // comptent dans le plafond du jour et par type
+const SECU_DEFAUT = {
+  repos: { actif: true, debut: 23 * 60, fin: 8 * 60 },  // 23 h → 8 h (heure de Paris)
+  varierMin: 9,          // chaque jour, début et fin bougent de ±9 min au plus
+  parJour: 0,            // 0 = pas de plafond par jour (son choix) ; sinon N gestes VRM par jour
+  parType: {},           // { offre: 10, … } par HEURE, à l'intérieur des 50/h ; 0/absent = rien de plus
+  espaceS: 40,           // au moins 40 s (plus un tirage) entre deux gestes AUTOMATIQUES d'un même compte
+  presence: { actif: true, min: 30 },   // « n'agir que si tu es là » : onglet utilisé il y a ≤ 30 min
+  calme: [],             // jours de la semaine (0 = dimanche … 6 = samedi) : rien d'automatique
+  calmeDates: [],        // journées calmes posées une fois ('AAAA-MM-JJ')
+  rodage: true,          // un compte récent démarre plus doucement
+};
+const SECU_CLIC_MS = 3000;            // deux clics du même compte : 3 s au moins (jamais une rafale)
+const SECU_CLIC_PRUDENCE_MS = 20000;  // en prudence : 20 s
+const SECU_SERIE_MS = 8000;           // une série qu'il a lancée : 8 à 14 s au moins entre deux gestes (son espacement à lui s'ajoute)
+const SECU_ATTENTE_MAX_MS = 25000;    // l'extension n'attend jamais plus (l'app attend sa réponse) : au-delà, « plus tard », dit
+const SECU_REVEIL_MIN = 40;           // les 40 min après le repos : un geste toutes les 4 à 7 min
+const SECU_PRUDENCE_MS = { 429: 3 * 3600000, 403: 6 * 3600000, restreint: 24 * 3600000, apresRobot: 6 * 3600000 };
+const SECU_RODAGE = { jeune: { heure: 10, jours: 7, ventes: 3 }, recent: { heure: 25, jours: 30, ventes: 10 } };
+
+function secuEntier(v, min, max, def) {
+  const n = Number(v);
+  if (v === null || v === undefined || v === '' || typeof v === 'boolean' || !Number.isFinite(n)) return def;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+function secuCle(plateforme, compte) {
+  const p = String(plateforme || ''), c = String(compte == null ? '' : compte);
+  return SECU_PLATEFORMES.includes(p) && /^[\w-]{1,40}$/.test(c) ? p + ':' + c : '';
+}
+// Un réglage lu (de n'importe où) rendu PROPRE : champ par champ, bornes tenues.
+function secuNet(r, base) {
+  const b = base || SECU_DEFAUT, x = r && typeof r === 'object' ? r : {};
+  const rp = x.repos && typeof x.repos === 'object' ? x.repos : {};
+  const pr = x.presence && typeof x.presence === 'object' ? x.presence : {};
+  const pt = {};
+  const srcType = x.parType && typeof x.parType === 'object' ? x.parType : {};
+  for (const s of SECU_TYPES_REGLABLES) {
+    const v = s in srcType ? secuEntier(srcType[s], 0, 50, 0) : secuEntier((b.parType || {})[s], 0, 50, 0);
+    if (v > 0) pt[s] = v;
+  }
+  const jours = Array.isArray(x.calme) ? x.calme : b.calme;
+  const dates = Array.isArray(x.calmeDates) ? x.calmeDates : b.calmeDates;
+  return {
+    repos: {
+      actif: typeof rp.actif === 'boolean' ? rp.actif : b.repos.actif,
+      debut: secuEntier(rp.debut, 0, 1439, b.repos.debut),
+      fin: secuEntier(rp.fin, 0, 1439, b.repos.fin),
+    },
+    varierMin: secuEntier(x.varierMin, 0, 30, b.varierMin),
+    parJour: secuEntier(x.parJour, 0, 1200, b.parJour),
+    parType: pt,
+    espaceS: secuEntier(x.espaceS, 20, 900, b.espaceS),
+    presence: { actif: typeof pr.actif === 'boolean' ? pr.actif : b.presence.actif, min: secuEntier(pr.min, 5, 720, b.presence.min) },
+    calme: [...new Set((jours || []).map((d) => secuEntier(d, -1, 7, -1)).filter((d) => d >= 0 && d <= 6))].sort(),
+    calmeDates: [...new Set((dates || []).filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort().slice(-14),
+    rodage: typeof x.rodage === 'boolean' ? x.rodage : b.rodage,
+  };
+}
+// Les réglages d'UN compte : le défaut, puis la plateforme, puis le compte.
+function secuReglages(tout, plateforme, compte) {
+  const t = tout && typeof tout === 'object' ? tout : {};
+  const pf = (t.plateformes && t.plateformes[plateforme]) || null;
+  const cle = secuCle(plateforme, compte);
+  const cp = (cle && t.comptes && t.comptes[cle]) || null;
+  return secuNet(cp, secuNet(pf, SECU_DEFAUT));
+}
+// L'heure de Paris : jour 'AAAA-MM-JJ', minute du jour, jour de la semaine.
+function secuParis(ms) {
+  const d = new Date(Number(ms));
+  try {
+    const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', weekday: 'short', hourCycle: 'h23' }).formatToParts(d);
+    const g = (k) => (p.find((x) => x.type === k) || {}).value;
+    const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(g('weekday'));
+    return { jour: `${g('year')}-${g('month')}-${g('day')}`, min: Number(g('hour')) * 60 + Number(g('minute')) + Number(g('second')) / 60, dow };
+  } catch (_) {
+    return { jour: d.toISOString().slice(0, 10), min: d.getUTCHours() * 60 + d.getUTCMinutes(), dow: d.getUTCDay() };
+  }
+}
+function secuHash(s) {
+  let h = 2166136261;
+  const t = String(s);
+  for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+// Le décalage du jour (en minutes, à la seconde près : jamais une heure ronde),
+// le même pour l'app et l'extension, différent chaque jour et pour chaque compte.
+function secuDecalage(jour, compte, cote, varierMin) {
+  const v = Math.max(0, Number(varierMin) || 0) * 60;
+  if (!v) return 0;
+  return ((secuHash(`${jour}|${compte}|${cote}`) % (2 * v + 1)) - v) / 60;
+}
+function secuJourSuivant(jour) {
+  const d = new Date(jour + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+// Le repos en cours (`{ jusqua }`), ou null ; `reveil` = la fin du repos est toute récente.
+function secuRepos(reg, ms, compte) {
+  const r = reg && reg.repos;
+  if (!r || !r.actif || r.debut === r.fin) return { repos: null, reveil: null };
+  const p = secuParis(ms), j = p.jour, demain = secuJourSuivant(j);
+  const deb = r.debut + secuDecalage(j, compte, 'debut', reg.varierMin);
+  const fin = r.fin + secuDecalage(j, compte, 'fin', reg.varierMin);
+  const finDemain = r.fin + secuDecalage(demain, compte, 'fin', reg.varierMin);
+  const a = (minutes) => Math.round(ms + (minutes - p.min) * 60000);
+  let repos = null;
+  if (r.debut > r.fin) {
+    if (p.min < fin) repos = { jusqua: a(fin) };
+    else if (p.min >= deb) repos = { jusqua: a(1440 + finDemain) };
+  } else if (p.min >= deb && p.min < fin) repos = { jusqua: a(fin) };
+  let reveil = null;
+  if (!repos && p.min >= fin && p.min < fin + SECU_REVEIL_MIN) reveil = { jusqua: a(fin + SECU_REVEIL_MIN) };
+  return { repos, reveil };
+}
+function secuCalme(reg, ms) {
+  const p = secuParis(ms);
+  if (!(reg && ((reg.calme || []).includes(p.dow) || (reg.calmeDates || []).includes(p.jour)))) return null;
+  return { jusqua: Math.round(ms + (1440 - p.min) * 60000), jour: p.jour };
+}
+// Un délai VARIABLE entre deux bornes : jamais une minute ronde (une valeur à
+// moins de 1,5 s d'une minute pleine reçoit 2,3 à 6,4 s de plus).
+function secuDelaiVariable(minMs, maxMs, rnd) {
+  const r = typeof rnd === 'function' ? rnd : Math.random;
+  const a = Math.max(0, Number(minMs) || 0), b = Math.max(a, Number(maxMs) || a);
+  let v = a + r() * (b - a);
+  const reste = v % 60000;
+  if (reste < 1500 || reste > 58500) v += 2300 + r() * 4100;
+  return Math.round(v);
+}
+// L'espacement voulu après le geste de `dernier` : la base, plus un tirage qui
+// dépend de ce geste (l'app et l'extension disent la même heure), à la seconde.
+function secuCible(baseMs, dernier) {
+  const h = secuHash('espace|' + dernier);
+  let v = baseMs + (h % Math.max(1, Math.round(baseMs * 0.8)));
+  const reste = v % 60000;
+  if (reste < 1500 || reste > 58500) v += 2300 + (h % 4100);
+  return v;
+}
+function secuRetryAfterMs(v, maintenant) {
+  if (v === null || v === undefined || v === '') return 0;
+  const s = String(v).trim();
+  let ms = 0;
+  if (/^\d{1,7}$/.test(s)) ms = Number(s) * 1000;
+  else { const t = Date.parse(s); if (Number.isFinite(t)) ms = t - (Number(maintenant) || Date.now()); }
+  return Math.max(0, Math.min(24 * 3600000, Math.round(ms) || 0));
+}
+// Une réponse est-elle un CONTRÔLE ANTI-ROBOT (captcha, page de vérification,
+// défi DataDome / Cloudflare) ou un signe de RESTRICTION ? 'robot' · 'restreint' · ''.
+// `entetes` : quelques en-têtes en minuscules (x-datadome, x-dd-b, cf-mitigated, content-type).
+function secuDefi(rep) {
+  const r = rep && typeof rep === 'object' ? rep : {};
+  const st = Number(r.status) || 0;
+  const e = r.entetes && typeof r.entetes === 'object' ? r.entetes : {};
+  if (e['x-datadome'] || e['x-dd-b'] || /challenge/i.test(String(e['cf-mitigated'] || ''))) return 'robot';
+  const html = /text\/html/i.test(String(e['content-type'] || ''));
+  if (st < 400 && !html && !r.defi) return '';
+  let txt = String(r.texte || '').slice(0, 6000);
+  try { if (r.json != null) txt += ' ' + JSON.stringify(r.json).slice(0, 6000); } catch (_) {}
+  if (r.defi === true || /captcha-delivery\.com|geo\.captcha|\bdatadome\b|\bcaptcha\b|cf-chl|challenge-platform|hcaptcha|recaptcha|turnstile|just a moment|verify you are (?:a )?human|v[ée]rifi(?:e|er) que vous [êe]tes (?:un )?humain/i.test(txt)) return 'robot';
+  if (st >= 400 && /automat|activit[ée] inhabituelle|unusual activity|suspicious|restreint|restricted|suspendu|suspended|banned|bloqu[ée]/i.test(txt)) return 'restreint';
+  return '';
+}
+// « Tout arrêter » : le DERNIER geste (arrêt ou relance), d'où qu'il vienne, fait foi.
+function secuArretEffectif(evts) {
+  let d = null;
+  for (const e of Array.isArray(evts) ? evts : []) {
+    if (!e || (e.s !== 'arret' && e.s !== 'relance')) continue;
+    const at = Number(e.at);
+    if (!Number.isFinite(at) || at <= 0) continue;
+    if (!d || at > d.at) d = { s: e.s, at };
+  }
+  return d && d.s === 'arret' ? { arrete: true, at: d.at } : { arrete: false, at: d ? d.at : null };
+}
+// Un compte récent (LU : ancienneté en jours, ventes faites) démarre doucement.
+// Rien de lu ⇒ null (« pas su » : pas de rodage inventé, et l'écran le dit).
+function secuRodage(profil, reg) {
+  if (reg && reg.rodage === false) return null;
+  const p = profil && typeof profil === 'object' ? profil : {};
+  const age = Number.isFinite(Number(p.ageJours)) && p.ageJours !== null && p.ageJours !== '' ? Number(p.ageJours) : null;
+  const ventes = Number.isFinite(Number(p.ventes)) && p.ventes !== null && p.ventes !== '' ? Number(p.ventes) : null;
+  if (age === null && ventes === null) return null;
+  const sous = (n) => (age !== null && age < n.jours) || (ventes !== null && ventes < n.ventes);
+  if (sous(SECU_RODAGE.jeune)) return { niveau: 'jeune', heure: SECU_RODAGE.jeune.heure, age, ventes };
+  if (sous(SECU_RODAGE.recent)) return { niveau: 'recent', heure: SECU_RODAGE.recent.heure, age, ventes };
+  return null;
+}
+// LA DÉCISION, pour UN geste d'UN compte. Rend { ok: true, attendreMs } ou
+// { ok: false, code, jusqua } — jamais une place de plus que l'extension n'en donne.
+//   etat : { robot, prudence: { jusqua }, dernier }   gestes : [{ t, s, m }] (24 h)
+//   presenceAt : son dernier geste dans l'onglet du site   arret : « Tout arrêter »
+function secuDecision(o) {
+  const x = o || {};
+  const now = Number(x.maintenant) || Date.now();
+  const mode = SECU_MODES.includes(x.mode) ? x.mode : 'clic';
+  const sorte = SECU_SORTES.includes(x.sorte) ? x.sorte : 'autre';
+  const reg = x.reg || SECU_DEFAUT;
+  const etat = x.etat && typeof x.etat === 'object' ? x.etat : {};
+  const non = (code, jusqua) => ({ ok: false, code, jusqua: Number.isFinite(jusqua) ? Math.round(jusqua) : null });
+  if (etat.robot) return non('robot', null);
+  if (x.arret && mode !== 'clic') return non('arret', null);
+  const prudence = etat.prudence && Number(etat.prudence.jusqua) > now ? etat.prudence : null;
+  const dernier = Number(etat.dernier) || 0;
+  if (mode === 'clic') {
+    const e = prudence ? SECU_CLIC_PRUDENCE_MS : SECU_CLIC_MS;
+    return { ok: true, attendreMs: dernier && now - dernier < e ? e - (now - dernier) : 0 };
+  }
+  if (mode === 'suite') return { ok: true, attendreMs: 0 };
+  if (prudence) return non('prudence', Number(prudence.jusqua));
+  let reveil = null;
+  if (SECU_SANS_LUI.includes(mode)) {
+    const rp = secuRepos(reg, now, x.compte);
+    if (rp.repos) return non('repos', rp.repos.jusqua);
+    reveil = rp.reveil;
+    const c = secuCalme(reg, now);
+    if (c) return non('calme', c.jusqua);
+  }
+  if (mode === 'auto' && reg.presence && reg.presence.actif) {
+    const p = Number(x.presenceAt) || 0;
+    if (!p || now - p > reg.presence.min * 60000) return non('absent', null);
+  }
+  const gestes = (Array.isArray(x.gestes) ? x.gestes : []).filter((g) => g && Number(g.t) > now - 25 * 3600000 && Number(g.t) <= now + 60000);
+  if (SECU_COMPTES.includes(mode)) {
+    const jour = secuParis(now).jour;
+    if (reg.parJour > 0) {
+      const n = gestes.filter((g) => SECU_COMPTES.includes(g.m) && secuParis(g.t).jour === jour).length;
+      if (n >= reg.parJour) { const p = secuParis(now); return non('jour', now + (1440 - p.min) * 60000); }
+    }
+    const heure = gestes.filter((g) => now - Number(g.t) < 3600000).sort((a, b) => a.t - b.t);
+    const max = reg.parType && reg.parType[sorte];
+    if (max > 0) {
+      const l = heure.filter((g) => g.s === sorte && SECU_COMPTES.includes(g.m));
+      if (l.length >= max) return non('type', Number(l[l.length - max].t) + 3600000);
+    }
+    const ro = secuRodage(x.profil, reg);
+    if (ro) {
+      const l = heure.filter((g) => SECU_COMPTES.includes(g.m));
+      if (l.length >= ro.heure) return non('rodage', Number(l[l.length - ro.heure].t) + 3600000);
+    }
+  }
+  if (dernier) {
+    const base = reveil && SECU_SANS_LUI.includes(mode) ? 4 * 60000 : SECU_SANS_LUI.includes(mode) ? reg.espaceS * 1000 : SECU_SERIE_MS;
+    const cible = reveil && SECU_SANS_LUI.includes(mode) ? Math.min(7 * 60000, secuCible(base, dernier)) : secuCible(base, dernier);
+    const reste = cible - (now - dernier);
+    if (reste > 0) {
+      if (reste > SECU_ATTENTE_MAX_MS) return non(reveil ? 'reveil' : 'espace', now + reste);
+      return { ok: true, attendreMs: Math.round(reste) };
+    }
+  }
+  return { ok: true, attendreMs: 0 };
+}
+// L'heure de Paris dite « 8 h 07 ».
+function secuHeure(ms) {
+  if (!Number.isFinite(Number(ms))) return '';
+  const m = secuParis(Number(ms)).min;
+  const h = Math.floor(m / 60), mm = Math.floor(m % 60);
+  return `${h} h ${String(mm).padStart(2, '0')}`;
+}
+// LA PHRASE d'un compte (Paramètres → Mes comptes, carte de l'extension) : une
+// seule, la plus importante. { niveau, cle, v } ; le texte vient de SECU_PHRASES
+// (le même que src/i18n/langues/fr.js, `securite.phrase.<cle>`).
+function secuPhrase(o) {
+  const x = o || {};
+  const now = Number(x.maintenant) || Date.now();
+  const site = SECU_NOMS[x.plateforme] || 'le site';
+  const etat = x.etat && typeof x.etat === 'object' ? x.etat : null;
+  const reg = x.reg || SECU_DEFAUT;
+  if (etat && etat.robot) return { niveau: 'robot', cle: 'robot', v: { site, hote: SECU_HOTES[x.plateforme] || '' } };
+  if (x.arret && x.arret.arrete) return { niveau: 'arret', cle: 'arret', v: { heure: secuHeure(x.arret.at) } };
+  if (x.pause && Number(x.pause.jusqua) > now) return { niveau: 'pause', cle: 'pause', v: { site, heure: secuHeure(x.pause.jusqua) } };
+  if (etat && etat.prudence && Number(etat.prudence.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(etat.prudence.jusqua) } };
+  if (x.frein && Number(x.frein.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(x.frein.jusqua) } };
+  const rp = secuRepos(reg, now, x.compte);
+  if (rp.repos) return { niveau: 'repos', cle: 'repos', v: { heure: secuHeure(rp.repos.jusqua) } };
+  if (secuCalme(reg, now)) return { niveau: 'calme', cle: 'calme', v: {} };
+  const ro = secuRodage(x.profil, reg);
+  if (ro) return { niveau: 'rodage', cle: 'rodage', v: { n: ro.heure } };
+  const n = Number.isFinite(Number(x.aujourdhui)) ? Number(x.aujourdhui) : null;
+  if (n === null) return { niveau: 'ok', cle: 'okPasSu', v: {} };
+  if (reg.parJour > 0) return { niveau: 'ok', cle: 'okPlafond', v: { n, max: reg.parJour } };
+  return { niveau: 'ok', cle: 'ok', v: { n } };
+}
+const SECU_PHRASES = {
+  robot: '{site} vérifie ton compte · fais la vérification toi-même sur {hote}',
+  arret: 'Tout est arrêté depuis {heure} · rien d’automatique ne part',
+  pause: '{site} demande de ralentir · reprise à {heure}',
+  prudence: 'Prudence jusqu’à {heure} · {site} a refusé un geste',
+  repos: 'Repos jusqu’à {heure} · rien d’automatique la nuit',
+  calme: 'Journée calme · rien d’automatique aujourd’hui',
+  rodage: 'Compte récent · VRM y va doucement ({n}/h au plus)',
+  ok: 'Calme · {n} gestes de VRM aujourd’hui',
+  okPlafond: 'Calme · {n}/{max} gestes de VRM aujourd’hui',
+  okPasSu: 'Calme',
+};
+// Ce qu'un refus dit à l'endroit du geste (l'extension, le journal de la carte).
+const SECU_REFUS = {
+  robot: '{site} vérifie ton compte : fais la vérification toi-même sur {hote}. Rien n’est parti, et rien ne repart avant une lecture normale.',
+  arret: 'Tout est arrêté (« Tout arrêter ») : rien d’automatique ne part. Relance depuis VRM ou la carte de l’extension.',
+  prudence: 'Prudence sur ce compte jusqu’à {heure} : {site} a refusé un geste. Rien n’est parti.',
+  repos: 'Repos sur ce compte jusqu’à {heure} : rien d’automatique ne part la nuit.',
+  calme: 'Journée calme sur ce compte : rien d’automatique aujourd’hui.',
+  absent: 'Tu n’as pas utilisé {site} depuis un moment : VRM n’agit seul que si tu es là. Rien n’est parti.',
+  jour: 'Plafond du jour atteint sur ce compte (ton réglage) : la suite demain.',
+  type: 'Plafond de ce type de geste atteint cette heure (ton réglage) : la suite à {heure}.',
+  rodage: 'Compte récent : VRM y va doucement. La suite à {heure}.',
+  espace: 'Pas de rafale : le prochain geste de ce compte à {heure}.',
+  reveil: 'Fin du repos : VRM reprend doucement. Le prochain geste à {heure}.',
+  reglages: 'Les réglages de sécurité n’ont pas pu être lus : rien d’automatique ne part.',
+};
+function secuTexte(table, cle, v) {
+  return String(table[cle] || '').replace(/\{(\w+)\}/g, (m, k) => (v && v[k] != null ? String(v[k]) : ''));
+}
+// </securite-comptes-regle>
+// ══════════════════════════════════════════════════════════════════════════════
+// SÉCURITÉ DES COMPTES (11 nov., 5.366 — lot securite-vinted, Vinted ET Vestiaire)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « améliore la sécurité des comptes Vinted pour faire comme Vintex, pour
+// ne pas se faire bannir » ; « on peut faire la même chose avec Vestiaire ».
+// UNE règle (le bloc <securite-comptes-regle>, recopié de src/securiteComptes.js),
+// appelée AVANT le plafond horaire par chaque geste qui écrit chez un site :
+//   secuGeste(plateforme, compte, sorte, mode) ⇒ null (le geste peut partir) ou le refus dit.
+//   secuObserver(plateforme, compte, réponse)  ⇒ contrôle anti-robot, refus, Retry-After.
+//   secuLectureNormale(plateforme, compte)     ⇒ une lecture normale lève l'arrêt « vérification ».
+// ⚠️ Cette couche n'AJOUTE que des freins : le plafond de 50/h/compte (sa décision du
+//    29 oct.), la réserve de 5, la pause 429/403, une requête à la fois, le compte de
+//    l'onglet restent au-dessus et inchangés. Aucun changement d'empreinte, d'appareil,
+//    d'adresse ni de photo (refusé, CLAUDE.md §3).
+// L'état vit dans `chrome.storage.local` (§4.9) ; ce navigateur en publie un résumé
+// dans SA ligne `securite_etat_{navigateur}` (jamais `main`, rien de personnel : des
+// heures, des nombres, les n° de compte). Les réglages sont SA clé `vrm_securite_comptes`
+// (lue dans `main`, jamais écrite ici).
+// Pour brancher un nouveau geste (Leboncoin, Vestiaire en série…) :
+//   const s = await secuGeste('vestiaire', compte, 'baisse', 'serie'); if (s) return s;
+//   … le geste …   await secuObserver('vestiaire', compte, { status, texte, entetes, defi });
+// (docs/passation/COORDINATION-AGENTS.md, « Sécurité des comptes — comment s'y brancher »)
+const SECU_ETAT = 'vrmSecu';
+const SECU_LIGNE = 'securite_etat_';
+const SECU_PUBLIE_MS = 2 * 60000;
+let _secuChaine = Promise.resolve();
+function secuSerie(fn) { const s = _secuChaine.then(fn, fn); _secuChaine = s.then(() => {}, () => {}); return s; }
+async function secuLire() {
+  try { const s = (await chrome.storage.local.get(SECU_ETAT))[SECU_ETAT]; return s && typeof s === 'object' ? s : {}; } catch (_) { return null; }
+}
+async function secuEcrire(s) { try { await chrome.storage.local.set({ [SECU_ETAT]: s }); return true; } catch (_) { return false; } }
+function secuCompteDe(s, cle) {
+  s.comptes = s.comptes && typeof s.comptes === 'object' ? s.comptes : {};
+  const c = s.comptes[cle] = s.comptes[cle] && typeof s.comptes[cle] === 'object' ? s.comptes[cle] : {};
+  c.gestes = Array.isArray(c.gestes) ? c.gestes : [];
+  c.jours = c.jours && typeof c.jours === 'object' ? c.jours : {};
+  return c;
+}
+// Ses réglages (`main.vrm_securite_comptes`) et les « Tout arrêter » des AUTRES navigateurs.
+// Base muette ⇒ le dernier lu (`frais: false`), ou null (« pas su »).
+async function secuReglagesLus() {
+  let m = null, rows = null;
+  try { m = await lireMain(['vrm_securite_comptes']); } catch (_) { m = null; }
+  try { rows = await sbGet(`app_data?id=like.${SECU_LIGNE}*&select=id,evts:data->evts`); } catch (_) { rows = null; }
+  const autres = [];
+  for (const r of Array.isArray(rows) ? rows : []) if (r && /^securite_etat_[0-9a-f]{16}$/.test(String(r.id || '')) && Array.isArray(r.evts)) autres.push(...r.evts);
+  if (m === null) {
+    try { const c = (await chrome.storage.local.get('vrmSecuReglages')).vrmSecuReglages; return c && c.tout ? { tout: c.tout, autres, frais: false } : null; } catch (_) { return null; }
+  }
+  const tout = m.vrm_securite_comptes && typeof m.vrm_securite_comptes === 'object' ? m.vrm_securite_comptes : {};
+  try { await chrome.storage.local.set({ vrmSecuReglages: { tout, at: Date.now() } }); } catch (_) {}
+  return { tout, autres, frais: true };
+}
+// L'ancienneté et les ventes LUES du compte (profil capté) : 6 h en mémoire de l'extension.
+async function secuProfil(pf, compte) {
+  if (pf !== 'vinted' || !/^\d{1,20}$/.test(String(compte))) return null;
+  try {
+    const mem = (await chrome.storage.local.get('vrmSecuProfils')).vrmSecuProfils || {};
+    const m = mem[compte];
+    if (m && Date.now() - Number(m.lu) < 6 * 3600000) return m.p;
+    const rows = await sbGet(`app_data?id=eq.harvest_${compte}_profile&select=v:data->payload->user->>given_item_count,c:data->payload->user->>created_at`);
+    if (!Array.isArray(rows)) return m ? m.p : null;
+    const r = rows[0] || {};
+    const v = r.v == null || r.v === '' ? null : Number(r.v);
+    const t = Date.parse(String(r.c || ''));
+    const p = { ventes: Number.isFinite(v) ? v : null, ageJours: Number.isFinite(t) && t < Date.now() ? Math.floor((Date.now() - t) / 864e5) : null };
+    mem[compte] = { lu: Date.now(), p };
+    await chrome.storage.local.set({ vrmSecuProfils: mem });
+    return p;
+  } catch (_) { return null; }
+}
+function secuMots(pf, d) { return { site: SECU_NOMS[pf] || 'le site', hote: SECU_HOTES[pf] || '', heure: d && d.jusqua ? secuHeure(d.jusqua) : '' }; }
+// Le refus d'un geste, une fois par compte et par raison toutes les 30 min dans le journal.
+async function secuDireRefus(cle, pf, d) {
+  try {
+    const dits = (await chrome.storage.local.get('vrmSecuDits')).vrmSecuDits || {};
+    const k = cle + '|' + d.code;
+    noterDiag('secu_' + d.code + '_' + pf);
+    if (dits[k] && Date.now() - dits[k] < 30 * 60000) return;
+    dits[k] = Date.now();
+    for (const x in dits) if (Date.now() - dits[x] > 864e5) delete dits[x];
+    await chrome.storage.local.set({ vrmSecuDits: dits });
+    logActivity('🛡 ' + secuTexte(SECU_REFUS, d.code, secuMots(pf, d)));
+  } catch (_) {}
+}
+// Le refus « vérification anti-robot » seul (sans lire les réglages, sans prendre de place) :
+// posé en tête des gardes, lectures comprises.
+async function secuRobotDit(pf, compte) {
+  const cle = secuCle(pf, compte); if (!cle) return null;
+  const s = await secuLire();
+  if (!s || !s.comptes || !s.comptes[cle] || !s.comptes[cle].robot) return null;
+  noterDiag('secu_robot_refus_' + pf);
+  return { ok: false, code: 'secu-robot', secu: 'robot', error: secuTexte(SECU_REFUS, 'robot', secuMots(pf)) };
+}
+function secuEntetes(res) {
+  const ent = {};
+  try { for (const k of ['content-type', 'x-datadome', 'x-dd-b', 'cf-mitigated', 'retry-after']) { const v = res && res.headers && res.headers.get(k); if (v) ent[k] = String(v).slice(0, 200); } } catch (_) {}
+  return ent;
+}
+async function secuGeste(pf, compte, sorte, mode, opts = {}) {
+  const cle = secuCle(pf, compte);
+  if (!cle) return null;                       // compte illisible : les gardes d'avant décident (elles refusent)
+  for (let tour = 0; tour < 3; tour++) {
+    const s = await secuLire();
+    if (s === null) return mode === 'clic' ? null : { ok: false, code: 'stockage', secu: 'stockage', error: RAISON_STOCKAGE };
+    let lu = null;
+    if (mode !== 'clic') {
+      lu = await secuReglagesLus();
+      if (lu === null && (mode === 'auto' || mode === 'programme')) { const d = { code: 'reglages' }; await secuDireRefus(cle, pf, d); return { ok: false, code: 'secu-reglages', secu: 'reglages', error: secuTexte(SECU_REFUS, 'reglages', {}) }; }
+    }
+    const tout = (lu && lu.tout) || {};
+    const reg = secuReglages(tout, pf, compte);
+    const arret = secuArretEffectif([...(Array.isArray(tout.evts) ? tout.evts : []), ...((lu && lu.autres) || []), ...(Array.isArray(s.evts) ? s.evts : [])]).arrete;
+    const c = (s.comptes && s.comptes[cle]) || {};
+    const profil = SECU_COMPTES.includes(mode) && reg.rodage ? await secuProfil(pf, compte) : null;
+    const d = secuDecision({ reg, etat: c, sorte, mode, maintenant: Date.now(), compte: String(compte), gestes: c.gestes, presenceAt: (s.presence || {})[pf], profil, arret });
+    if (!d.ok) {
+      await secuDireRefus(cle, pf, d);
+      await secuPublier(false);
+      return { ok: false, code: 'secu-' + d.code, secu: d.code, jusqua: d.jusqua, error: secuTexte(SECU_REFUS, d.code, secuMots(pf, d)) };
+    }
+    if (d.attendreMs > 0) {
+      if (opts.sansAttendre) { const dd = { code: 'espace', jusqua: Date.now() + d.attendreMs }; return { ok: false, code: 'secu-espace', secu: 'espace', jusqua: dd.jusqua, error: secuTexte(SECU_REFUS, 'espace', secuMots(pf, dd)) }; }
+      try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['secu:' + mode, d.attendreMs]); } catch (_) {}
+      await new Promise((ok) => setTimeout(ok, d.attendreMs));
+      continue;                                // relu après l'attente (« Tout arrêter » a pu tomber entre-temps)
+    }
+    // La place est prise : notée AVANT le geste (comme le plafond horaire), jamais après.
+    const ok = await secuSerie(async () => {
+      const s2 = await secuLire(); if (s2 === null) return false;
+      const c2 = secuCompteDe(s2, cle), t = Date.now(), jour = secuParis(t).jour;
+      c2.gestes = c2.gestes.filter((g) => g && t - Number(g.t) < 25 * 3600000).concat([{ t, s: SECU_SORTES.includes(sorte) ? sorte : 'autre', m: mode }]).slice(-600);
+      c2.dernier = t;
+      const j = c2.jours[jour] = c2.jours[jour] && typeof c2.jours[jour] === 'object' ? c2.jours[jour] : { n: 0, t: {} };
+      j.n = (Number(j.n) || 0) + 1; j.t = j.t && typeof j.t === 'object' ? j.t : {}; j.t[sorte] = (Number(j.t[sorte]) || 0) + 1;
+      for (const k of Object.keys(c2.jours).sort().slice(0, -8)) delete c2.jours[k];
+      return secuEcrire(s2);
+    });
+    if (!ok) return mode === 'clic' ? null : { ok: false, code: 'stockage', secu: 'stockage', error: RAISON_STOCKAGE };
+    secuPublier(false).catch(() => {});
+    return null;
+  }
+  return { ok: false, code: 'secu-espace', secu: 'espace', error: secuTexte(SECU_REFUS, 'espace', secuMots(pf, { jusqua: Date.now() + 60000 })) };
+}
+// Une réponse d'un site, regardée APRÈS le geste : contrôle anti-robot ⇒ ARRÊT de ce
+// compte (aucune nouvelle tentative) ; refus 403/429 ou restriction ⇒ PRUDENCE.
+// `rep` : { status, json, texte, entetes, defi, retryAfter }. Rend 'robot' · 'prudence' · ''.
+async function secuObserver(pf, compte, rep) {
+  const cle = secuCle(pf, compte);
+  if (!cle || !rep || typeof rep !== 'object') return '';
+  const defi = secuDefi(rep), st = Number(rep.status) || 0;
+  if (!defi && st !== 429 && st !== 403) return '';
+  const ra = secuRetryAfterMs(rep.retryAfter != null ? rep.retryAfter : (rep.entetes && rep.entetes['retry-after']), Date.now());
+  await secuSerie(async () => {
+    const s = await secuLire(); if (s === null) return;
+    const c = secuCompteDe(s, cle), t = Date.now();
+    if (defi === 'robot') {
+      if (!c.robot) {
+        c.robot = { depuis: t };
+        logActivity(`⛔ ${secuTexte(SECU_PHRASES, 'robot', secuMots(pf))} — tout s'arrête pour ce compte jusqu'à une lecture normale`);
+      }
+    } else {
+      const ms = defi === 'restreint' ? SECU_PRUDENCE_MS.restreint : Math.max(st === 429 ? SECU_PRUDENCE_MS[429] : SECU_PRUDENCE_MS[403], ra);
+      const jusqua = Math.max(Number(c.prudence && c.prudence.jusqua) || 0, t + ms);
+      if (!(c.prudence && Number(c.prudence.jusqua) > t)) logActivity(`🛡 ${SECU_NOMS[pf] || 'Le site'} a refusé un geste (${defi === 'restreint' ? 'restriction' : st}) : prudence sur ce compte jusqu'à ${secuHeure(jusqua)} — rien d'automatique ne part`);
+      c.prudence = { jusqua, raison: defi || String(st), depuis: t };
+    }
+    await secuEcrire(s);
+  });
+  noterDiag('secu_vu_' + (defi || st) + '_' + pf);
+  await secuPublier(true);
+  return defi === 'robot' ? 'robot' : 'prudence';
+}
+// Une lecture NORMALE réussie (la page du site a rendu ses données, à lui) : la
+// vérification est passée. L'arrêt tombe, une prudence de 6 h le remplace.
+async function secuLectureNormale(pf, compte) {
+  const cle = secuCle(pf, compte);
+  if (!cle) return false;
+  let leve = false;
+  await secuSerie(async () => {
+    const s = await secuLire(); if (s === null) return;
+    const c = s.comptes && s.comptes[cle];
+    if (!c || !c.robot) return;
+    const t = Date.now();
+    delete c.robot;
+    c.prudence = { jusqua: Math.max(Number(c.prudence && c.prudence.jusqua) || 0, t + SECU_PRUDENCE_MS.apresRobot), raison: 'apres-verification', depuis: t };
+    leve = await secuEcrire(s);
+  });
+  if (leve) { logActivity(`✅ ${SECU_NOMS[pf] || 'Le site'} répond normalement : VRM reprend doucement (prudence jusqu'à ${secuHeure(Date.now() + SECU_PRUDENCE_MS.apresRobot)})`); await secuPublier(true); }
+  return leve;
+}
+// Il est LÀ : un geste réel (isTrusted) dans un onglet du site, noté par le script de page.
+async function secuPresence(pf, at) {
+  if (!SECU_PLATEFORMES.includes(pf)) return false;
+  return secuSerie(async () => {
+    const s = await secuLire(); if (s === null) return false;
+    s.presence = s.presence && typeof s.presence === 'object' ? s.presence : {};
+    s.presence[pf] = Math.min(Date.now(), Number(at) || Date.now());
+    return secuEcrire(s);
+  });
+}
+// « Tout arrêter » / « Relancer » (carte de l'extension, ou l'app dans ce navigateur).
+async function secuPoserArret(arret, par) {
+  const ok = await secuSerie(async () => {
+    const s = await secuLire(); if (s === null) return false;
+    s.evts = [...(Array.isArray(s.evts) ? s.evts : []), { s: arret ? 'arret' : 'relance', at: Date.now(), par: par === 'app' ? 'app' : 'carte' }].slice(-10);
+    return secuEcrire(s);
+  });
+  if (!ok) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+  logActivity(arret ? '⏹ Tout arrêter : plus aucune action automatique, sur tous les comptes' : '▶️ Relancé : les actions automatiques peuvent reprendre');
+  await secuPublier(true);
+  return { accepte: true, etape: 'fait', arrete: !!arret };
+}
+async function secuPublier(force) {
+  try {
+    const s = await secuLire(); if (!s) return false;
+    if (!force && Date.now() - Number(s.publieAt || 0) < SECU_PUBLIE_MS) return false;
+    const moi = await idNavigateur(); if (!moi) return false;
+    const comptes = {};
+    for (const [cle, c] of Object.entries(s.comptes || {})) {
+      if (!/^(vinted|vestiaire|leboncoin):[\w-]{1,40}$/.test(cle) || !c) continue;
+      const jours = {};
+      for (const [j, v] of Object.entries(c.jours || {})) if (/^\d{4}-\d{2}-\d{2}$/.test(j)) jours[j] = { n: Number(v && v.n) || 0, t: Object.fromEntries(Object.entries((v && v.t) || {}).filter(([k]) => SECU_SORTES.includes(k)).map(([k, n]) => [k, Number(n) || 0])) };
+      comptes[cle] = { robot: c.robot ? { depuis: Number(c.robot.depuis) || 0 } : null, prudence: c.prudence ? { jusqua: Number(c.prudence.jusqua) || 0, raison: String(c.prudence.raison || '').slice(0, 30) } : null, dernier: Number(c.dernier) || null, jours };
+    }
+    const evts = (Array.isArray(s.evts) ? s.evts : []).map((e) => ({ s: e.s === 'arret' ? 'arret' : 'relance', at: Number(e.at) || 0, par: e.par === 'app' ? 'app' : 'carte' }));
+    await supabaseUpsert('app_data', [{ id: `${SECU_LIGNE}${moi}`, data: { nav: moi, v: CODE_VERSION, at: new Date().toISOString(), comptes, evts } }], 'id');
+    await secuSerie(async () => { const s2 = await secuLire(); if (s2) { s2.publieAt = Date.now(); await secuEcrire(s2); } });
+    return true;
+  } catch (_) { return false; }
+}
+// La phrase de la carte (même règle et même texte que Paramètres → Mes comptes).
+async function secuPourCarte(pf, compte) {
+  try {
+    const s = (await secuLire()) || {};
+    let tout = {};
+    try { const c = (await chrome.storage.local.get('vrmSecuReglages')).vrmSecuReglages; if (c && c.tout) tout = c.tout; } catch (_) {}
+    const arret = secuArretEffectif([...(Array.isArray(tout.evts) ? tout.evts : []), ...(Array.isArray(s.evts) ? s.evts : [])]);
+    let cle = secuCle(pf, compte);
+    if (!cle && pf === 'vestiaire') cle = Object.keys(s.comptes || {}).find((k) => /^vestiaire:/.test(k) && (s.comptes[k].robot || Number(s.comptes[k].prudence && s.comptes[k].prudence.jusqua) > Date.now())) || '';
+    const c = (cle && s.comptes && s.comptes[cle]) || {};
+    const jour = secuParis(Date.now()).jour;
+    const pause = pf === 'vinted' ? await pauseVinted() : null;
+    const ph = secuPhrase({ plateforme: pf, compte: cle ? cle.split(':')[1] : '', etat: c, reg: secuReglages(tout, pf, cle ? cle.split(':')[1] : ''), arret, pause, maintenant: Date.now(), aujourdhui: cle ? Number((c.jours && c.jours[jour] && c.jours[jour].n) || 0) : null });
+    return { niveau: ph.niveau, texte: secuTexte(SECU_PHRASES, ph.cle, ph.v), arrete: arret.arrete };
+  } catch (_) { return null; }
 }
 function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n)); }
 async function compterActionUn(uid, plafond, n = 1) {
@@ -13181,6 +13788,7 @@ async function reserveLectures(uid, classe = 'photos') {
 // l'argent et des colis ; 'photos' (le défaut) avant celle-ci ET celle de la
 // relecture.
 async function gardeLecture(uid, acc, classe = 'photos', plafondMax = LECTURES_MAX_HEURE) {
+  { const rb = await secuRobotDit('vinted', uid); if (rb) return rb; }   // (5.366) vérification anti-robot : aucune nouvelle tentative
   const p = await pauseVinted();
   if (p) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(p) };
   const actif = await compteConnecte(acc && acc.domain);
@@ -13250,6 +13858,9 @@ function execPermis(methode, endpoint) {
   return EXEC_PERMIS.find((p) => p.methode === methode && p.chemin.test(e)) || null;
 }
 async function gardeStricte(uid, acc, opts = {}) {
+  // (5.366) Vinted a demandé une vérification anti-robot sur CE compte : plus rien ne part,
+  // pas même une lecture, jusqu'à une lecture normale de sa page (`secuLectureNormale`).
+  { const rb = await secuRobotDit('vinted', uid); if (rb) return rb; }
   // Vinted a demandé de ralentir : même un clic attend (5.162). On le DIT.
   const pause = await pauseVinted();
   if (pause) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(pause) };
@@ -13263,6 +13874,11 @@ async function gardeStricte(uid, acc, opts = {}) {
              error: "ton navigateur est connecté à un autre compte Vinted — bascule sur celui-ci sur vinted.fr d'abord" };
   }
   if (opts.lecture) return null;            // lire n'engage rien : pas de plafond
+  // (5.366) La sécurité du compte AVANT le plafond horaire : repos, prudence, « Tout
+  // arrêter », plafonds du jour et par type, pas de rafale (src/securiteComptes.js).
+  // Le plafond de 50/h et la réserve de 5 ne bougent pas : ils restent juste en dessous.
+  const secuC = await secuGeste('vinted', uid, opts.secu ? opts.secu.sorte : 'autre', opts.secu ? opts.secu.mode : 'clic', { sansAttendre: !!(opts.secu && opts.secu.sansAttendre) });
+  if (secuC) return secuC;
   const reserve = Math.max(0, Number(opts.reserve) || 0);
   const nA = Math.max(1, Math.floor(Number(opts.actions) || 1));
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);
@@ -13389,7 +14005,7 @@ async function executerMessageFavori(uid,acc,body){
   // qui ne servent pas (arrêt avant l'écriture) sont RENDUES, les siennes (X8).
   const nA=offre?3:2;
   const recu={};
-  const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu});
+  const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,secu:{sorte:'favori',mode:body&&body.auto===true?'auto':'serie'}});
   if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux'].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
   const tRes=Number(recu.at)||0;
   // Chaque réponse de Vinted passe par `freinFavoriAuto` : 429/403, captcha ou
@@ -13877,7 +14493,9 @@ async function etatSite(url,tabId) {
   const aRetirer = aRetirerBrut ? { at: aRetirerBrut.at, liste: aRetirerProuveCarte(aRetirerBrut.liste, lectureLbc, Date.now()) } : null;
   const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now() }) : null;
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
+  // 5.366 : la sécurité du compte de l'onglet, en UNE phrase (la règle de Paramètres → Mes comptes).
+  const secu = plateforme === 'vinted' || plateforme === 'vestiaire' ? await secuPourCarte(plateforme, plateforme === 'vinted' && site ? site.id : null) : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, oauthFenetre: oauthFenetrePossible(), oauthRevenu, secu };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -14273,6 +14891,9 @@ async function executerCommande(msg) {
     const r = await demanderImportTout(uid);
     return r.ok ? { accepte: true, etape: 'file', etat: r.etat } : { accepte: false, code: r.code || 'refus', raison: r.raison };
   }
+  // 11 nov. (5.366) : « Tout arrêter » / « Relancer » depuis VRM — tout de suite dans CE navigateur
+  // (les autres le lisent dans sa clé `vrm_securite_comptes` avant chaque geste automatique).
+  if (msg && msg.cmd === 'secuArret') return await secuPoserArret(msg.arret === true, 'app');
   if (msg && msg.cmd === 'republierVinted') { const r = await republierVinted(msg); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted(msg); await journalCommande(msg, r); return r; }
@@ -14708,6 +15329,7 @@ async function relaisSuivreJobUn(jobId, job) {
 
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
 async function garde(uid, acc) {
+  { const rb = await secuRobotDit('vinted', uid); if (rb) return rb; }   // (5.366) vérification anti-robot en cours : rien
   const pause = await pauseVinted();
   if (pause) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(pause) };
   const actif = await compteConnecte(acc && acc.domain);
@@ -18250,8 +18872,9 @@ async function noterRecetteVc(brute) {
 async function pauseVc() {
   try { const p = (await chrome.storage.local.get(VC_PAUSE))[VC_PAUSE]; return p && Number(p.jusqua) > Date.now() ? p : null; } catch (_) { return null; }
 }
-async function poserPauseVc(statut) {
-  try { await chrome.storage.local.set({ [VC_PAUSE]: { jusqua: Date.now() + VC_PAUSE_MS, statut: Number(statut) || 0, depuis: Date.now() } }); } catch (_) {}
+// (5.366) `retryAfter` : le Retry-After de Vestiaire — la pause dure au moins ce délai (30 min plancher, 24 h au plus).
+async function poserPauseVc(statut, retryAfter = null) {
+  try { await chrome.storage.local.set({ [VC_PAUSE]: { jusqua: Date.now() + Math.max(VC_PAUSE_MS, secuRetryAfterMs(retryAfter, Date.now())), statut: Number(statut) || 0, depuis: Date.now() } }); } catch (_) {}
 }
 async function ongletVestiaire(compteFil) {
   let tabs = [];
@@ -18286,6 +18909,10 @@ async function repondreVestiaire(msg) {
     const compteFil = String((rows[0] && rows[0].compte) || '');
     const o = await ongletVestiaire(compteFil);
     if (!o.ok) return { accepte: false, code: o.code, raison: o.raison };
+    // (5.366) La sécurité du compte Vestiaire (la même règle que Vinted) AVANT le plafond de 50/h, inchangé.
+    { const rbVc = await secuRobotDit('vestiaire', o.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
+    const secuVc = await secuGeste('vestiaire', o.compte, 'reponse', 'clic');
+    if (secuVc) return { accepte: false, code: secuVc.code, raison: secuVc.error };
     const cpt = await compterAction('vc:' + o.compte, ACTIONS_MAX_HEURE);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
@@ -18308,9 +18935,12 @@ async function repondreVestiaire(msg) {
       return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde la conversation sur Vestiaire avant de renvoyer" };
     }
     noterDiag('vc_repondre_' + statut);
-    if (statut === 429 || statut === 403) { await poserPauseVc(statut); return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
+    // (5.366) Contrôle anti-robot (défi DataDome vu par la page) ⇒ ce compte s'arrête ; refus ⇒ prudence.
+    if (await secuObserver('vestiaire', o.compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') { await poserPauseVc(statut || 403, rep.ra); return { accepte: true, etape: 'refuse', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire')) }; }
+    if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
     if (statut >= 200 && statut < 300) {
       await rangerVcFil({ conv, messages: [{ id: rep.idMsg || '', t: texte, deMoi: true, at: new Date().toISOString() }] }, o.compte, true);
+      await noterJournal('vc:' + o.compte, 'reponse', {});   // (5.366) jamais le texte : une sorte, une heure
       return { accepte: true, etape: 'fait', statut };
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — le message n'est pas parti` };
@@ -18462,6 +19092,10 @@ async function repondreOffreVestiaire(msg) {
     if (!compteOffre) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette offre — recharge tes offres sur Vestiaire (connecté sur ton compte), puis réessaie" };
     const ot = await ongletVestiaire(compteOffre);
     if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
+    // (5.366) La sécurité du compte Vestiaire AVANT le plafond de 50/h, inchangé.
+    { const rbVc = await secuRobotDit('vestiaire', ot.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
+    const secuVo = await secuGeste('vestiaire', ot.compte, 'offre', 'clic');
+    if (secuVo) return { accepte: false, code: secuVo.code, raison: secuVo.error };
     const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
@@ -18485,10 +19119,12 @@ async function repondreOffreVestiaire(msg) {
       return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde l'offre sur Vestiaire avant de recommencer" };
     }
     noterDiag('vc_offre_' + statut);
-    if (statut === 429 || statut === 403) { await poserPauseVc(statut); return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
+    if (await secuObserver('vestiaire', ot.compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') { await poserPauseVc(statut || 403, rep.ra); return { accepte: true, etape: 'refuse', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire')) }; }
+    if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
     if (statut >= 200 && statut < 300) {
       // « Fait » seulement si Vestiaire RENVOIE l'offre avec TON geste en dernier.
       if (rep.confirme !== true) return { accepte: true, etape: 'incertain', statut, raison: "Vestiaire a répondu sans montrer ta réponse sur l'offre — regarde-la sur Vestiaire avant de recommencer" };
+      await noterJournal('vc:' + ot.compte, geste === 'accepter' ? 'offre_acceptee' : geste === 'refuser' ? 'offre_refusee' : 'contre_offre', {});   // (5.366) « Ce que VRM fait sur tes comptes »
       return { accepte: true, etape: 'fait', statut };
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — ta réponse n'est pas partie` };

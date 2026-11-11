@@ -7,6 +7,17 @@
 (function () {
   'use strict';
   if (window.__vrmVcRelais) return; window.__vrmVcRelais = true;
+  // 5.366 (sécurité des comptes) : « n'agir que si tu es là » — un VRAI geste (isTrusted)
+  // dans cet onglet est signalé au fond, au plus une fois par 30 s, sans rien d'autre.
+  try {
+    let vuPresence = 0;
+    const presence = (e) => {
+      if (!e || e.isTrusted !== true || document.visibilityState !== 'visible' || window.top !== window) return;
+      const t = Date.now(); if (t - vuPresence < 30000) return; vuPresence = t;
+      try { chrome.runtime.sendMessage({ from: 'vrm-presence', action: 'la' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+    };
+    for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(ev, presence, { capture: true, passive: true });
+  } catch (_) {}
   // 5.295 : les envois en attente de leur réponse (jeton → réponse au fond).
   const envoisEnAttente = new Map();
   const vivant = () => { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
@@ -110,7 +121,7 @@
       // 5.295 : la réponse de Vestiaire à un envoi demandé par le fond.
       if (d.kind === 'vcenvoiresultat' && typeof d.jeton === 'string') {
         const f = envoisEnAttente.get(d.jeton);
-        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), idMsg: /^[\w-]{1,40}$/.test(String(d.idMsg || '')) ? String(d.idMsg) : '', erreur: String(d.erreur || '').slice(0, 80) }); }
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), idMsg: /^[\w-]{1,40}$/.test(String(d.idMsg || '')) ? String(d.idMsg) : '', erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); }
         return;
       }
       // 5.319 : tes OFFRES Vestiaire (« négociations ») — l'article, les prix, les gestes ;
@@ -139,7 +150,7 @@
       }
       if (d.kind === 'vcoffreresultat' && typeof d.jeton === 'string') {
         const f = envoisEnAttente.get(d.jeton);
-        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, confirme: d.confirme === true ? true : d.confirme === false ? false : null, erreur: String(d.erreur || '').slice(0, 80) }); }
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, confirme: d.confirme === true ? true : d.confirme === false ? false : null, erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); }
         return;
       }
       // 5.239 : tes ACHATS Vestiaire — scalaires seulement, jamais le vendeur ni ton adresse.

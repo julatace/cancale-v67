@@ -146,7 +146,14 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     let r;
     try { r = await vinted(entree); } finally { j.enVol--; }
     r = r || { status: 404, body: {} };
-    return rep(r.status, r.body, typeof r.body === 'string' ? 'text/html' : 'application/json');
+    // (5.366) Un faux Vinted peut rendre des EN-TÊTES (`headers` : Retry-After, x-datadome…) ;
+    // sans eux, seul `content-type` répond (avant : tout en-tête rendait le type — un
+    // `x-datadome` aurait toujours été « présent »).
+    const ct = typeof r.body === 'string' ? 'text/html' : 'application/json';
+    const base = rep(r.status, r.body, ct);
+    const h = {}; for (const k of Object.keys(r.headers || {})) h[k.toLowerCase()] = String(r.headers[k]);
+    base.headers = { get: (k) => { const c = String(k).toLowerCase(); return h[c] !== undefined ? h[c] : (c === 'content-type' ? ct : null); } };
+    return base;
   };
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
