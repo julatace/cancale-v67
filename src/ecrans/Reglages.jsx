@@ -63,7 +63,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
-import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR} from '../../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
 import {fenetreGroupe,FENETRES as FENETRES_GROUPE} from '../../api/_lib/notif-groupe.js';
@@ -1402,7 +1402,14 @@ function PushPrefsSetting({ comptes, onMuets }) {
   };
   const bascule = (c) => ecrirePrefs({ ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } }, `« ${c.titre} »`);
   const calme = reglageCalme(prefs || {});
-  const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
+  // (11 nov.) La ligne `calme` lue est gardée entière (jours calmes, congés) : un réglage n'efface pas l'autre.
+  const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...((prefs && prefs.calme) || {}), ...calme, ...patch } });
+  const jc = reglageJours(prefs || {});
+  const congesBrut = (prefs && prefs.calme && prefs.calme.conges && typeof prefs.calme.conges === 'object') ? prefs.calme.conges : {};
+  const weekend = jc.jours.includes('sam') && jc.jours.includes('dim');
+  const basculerJour = (id) => poserCalme({ jours: jc.jours.includes(id) ? jc.jours.filter((x) => x !== id) : [...jc.jours, id] });
+  const poserConges = (patch) => { const g = { ...congesBrut, ...patch }; poserCalme({ conges: g.du || g.au ? g : null }); };
+  const aujourdhuiCalme = prefs ? jourCalme(prefs) : false;
   // (8 nov.) Allumé par défaut (api/_lib/notif-textes.js, `regrouper`) : seul un `false` posé l'éteint.
   const regroupe = !(prefs && prefs.regrouper === false);
   const fenetre = fenetreGroupe(prefs || {});
@@ -1463,6 +1470,28 @@ function PushPrefsSetting({ comptes, onMuets }) {
           <Interrupteur on={calme.sauf.includes('doublevente')} onClick={()=>poserCalme({ sauf: calme.sauf.includes('doublevente') ? calme.sauf.filter((x)=>x!=='doublevente') : [...calme.sauf, 'doublevente'] })} disabled={!prefs||busy} label="La double vente sonne pendant les heures calmes"/>
         </div>
       )}
+      {/* (11 nov., lot `notifs-groupees`) Les JOURS calmes (api/_lib/notif-textes.js, `jourCalme`) :
+          seul l'urgent sonne ; le reste part groupé au premier matin non calme. */}
+      <div className="vrm-np-ligne" data-np-weekend={weekend?'on':'off'}>
+        <span className="vrm-np-lib">Week-end calme<small>Samedi et dimanche : seul l’urgent sonne.</small></span>
+        <Interrupteur on={weekend} onClick={()=>poserCalme({ jours: weekend ? jc.jours.filter((x)=>x!=='sam'&&x!=='dim') : [...new Set([...jc.jours,'sam','dim'])] })} disabled={!prefs||busy} label={`Week-end calme : ${weekend?'activé':'désactivé'}`}/>
+      </div>
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-jours={jc.jours.join(',') || 'aucun'} data-np-jour-calme={aujourdhuiCalme?'oui':'non'}>
+        <span className="vrm-np-lib">Jours calmes<small>{aujourdhuiCalme ? 'Aujourd’hui est calme : le reste arrivera groupé.' : 'Seul l’urgent sonne. Le reste arrive groupé ensuite.'}</small></span>
+        <div className="vrm-np-jours" role="group" aria-label="Jours calmes">
+          {JOURS_SEMAINE.map((j)=>(
+            <button key={j.id} type="button" className="vrm-np-jour" aria-pressed={jc.jours.includes(j.id)} aria-label={j.nom} title={j.nom} data-np-jour={j.id} disabled={!prefs||busy} onClick={()=>basculerJour(j.id)}>{j.court}</button>
+          ))}
+        </div>
+      </div>
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-conges={jc.conges ? `${jc.conges.du}_${jc.conges.au}` : 'aucun'}>
+        <span className="vrm-np-lib">Congés<small>Du … au … inclus : seul l’urgent sonne.</small></span>
+        <div className="vrm-np-heures">
+          <label>Du <input type="date" value={congesBrut.du || ''} disabled={!prefs||busy} aria-label="Début des congés" data-np-conges-du="" onChange={(e)=>poserConges({ du: e.target.value || '' })}/></label>
+          <label>au <input type="date" value={congesBrut.au || ''} min={congesBrut.du || undefined} disabled={!prefs||busy} aria-label="Fin des congés" data-np-conges-au="" onChange={(e)=>poserConges({ au: e.target.value || '' })}/></label>
+          {(congesBrut.du || congesBrut.au) ? <Bouton variante="secondaire" data-np-conges-effacer="" disabled={!prefs||busy} onClick={()=>poserCalme({ conges: null })}>Effacer</Bouton> : null}
+        </div>
+      </div>
       {/* (11 nov., décision C8 — Julien : « tranche ») L'heure du résumé du soir : le défaut
           INCHANGÉ (19 h l'hiver, 20 h l'été), ou son heure, de 18 h à 22 h (heure de Paris).
           Rangée dans `push_prefs.soirHeure` ; le serveur la lit (api/_lib/notif-textes.js, `soirALHeure`). */}

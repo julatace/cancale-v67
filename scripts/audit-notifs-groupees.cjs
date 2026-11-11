@@ -18,6 +18,8 @@
 //   P  réglages : Non (chaque notification seule), 1 h
 //   (L'heure du résumé du soir : décision C8, son propre audit.)
 //   E  l'écran exact : Ventes / Achats, jamais `cat_bord`
+//   J  les JOURS calmes (week-end, jours cochés, congés) : seul l'urgent passe ;
+//      le reste part groupé au premier matin non calme (route `?moment=reveil` EXÉCUTÉE)
 // `--sur <dossier>` : juge un autre arbre (le code d'avant). Données inventées.
 'use strict';
 const path = require('path');
@@ -114,6 +116,9 @@ const plus = (iso, min) => new Date(Date.parse(iso) + min * 60e3).toISOString();
     let code = 0, corps = null;
     const res = { setHeader() {}, status(c) { code = c; return this; }, json(j) { corps = j; return this; }, end() { return this; } };
     P.oublierPrefsVues();
+    // Le curseur du passage est daté sur la VRAIE date : deux matins simulés le même jour réel
+    // le prendraient pour « déjà fait ». On l'efface (chaque appel = un autre matin).
+    for (const kk of [...base.keys()]) if (/\|cron_curseur_/.test(kk)) base.delete(kk);
     await route({ method: 'GET', query: { moment }, headers: { authorization: 'Bearer secret-de-banc' } }, res);
     return { code, corps: corps || {} };
   };
@@ -212,6 +217,50 @@ const plus = (iso, min) => new Date(Date.parse(iso) + min * 60e3).toISOString();
     const n1 = pushes.length;
     await aHeure(plus(t0, 62), () => appeler('groupe'));
     dit(n1 === 1 && pushes.length === 2 && pushes[1].title === 'Offre de 55 €', 'P2 « 1 h » : rien à +20 min, la seule en attente sonne telle quelle à +62 min', `${n1} puis ${pushes.length} · ${pushes[1] && pushes[1].title}`);
+  });
+
+  await essaie('J — jours calmes', async () => {
+    // Le prochain samedi (Paris) à partir d'aujourd'hui : décalage en jours.
+    const idJour = (iso) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', weekday: 'short' }).format(new Date(iso));
+    let dSam = 0; while (idJour(parisA(12, 0, dSam)) !== 'Sat') dSam++;
+    const sam = parisA(12, 0, dSam), dim = parisA(12, 0, dSam + 1), lun = parisA(12, 0, dSam + 2);
+    prepare({ calme: { jours: ['sam', 'dim'] } });
+    const r1 = await aHeure(sam, () => comme(() => P.sendPushToAll(OFFRE('31'))));
+    dit(pushes.length === 0 && r1 && r1.calme === true, 'J1 week-end calme, samedi midi : une offre ne sonne pas (rangée « heures calmes »)', JSON.stringify(r1));
+    await aHeure(plus(sam, 1), () => comme(() => P.sendPushToAll(DV)));
+    await aHeure(plus(sam, 2), () => comme(() => P.sendPushToAll(RELAIS(5, plus(sam, 6 * 60)))));
+    await aHeure(plus(sam, 3), () => comme(() => P.sendPushToAll({ cat: 'expedier', title: '2 colis à poster aujourd’hui', body: 'x', tag: 'ship-reminder', url: L.DESTINATIONS.colis({}), urgent: true })));
+    await aHeure(plus(sam, 4), () => comme(() => P.sendPushToAll({ cat: 'capture', title: 'Un compte n’arrive plus', body: 'x', tag: 'capture-a', url: L.DESTINATIONS.toutVaBien() })));
+    dit(pushes.length === 4, 'J2 l’urgent passe : double vente, retrait au dernier jour, colis dus aujourd’hui, panne', pushes.map((p) => p.title).join(' | '));
+    await aHeure(plus(sam, 5), () => comme(() => P.sendPushToAll(RELAIS(6, plus(sam, 3 * 24 * 60)))));
+    await aHeure(plus(dim, 0), () => comme(() => P.sendPushToAll(BORD('931'))));
+    dit(pushes.length === 4, 'J3 un retrait dans 3 jours et un bordereau dimanche : rien', String(pushes.length));
+    const rs = await aHeure(parisA(8, 30, dSam), () => appeler('reveil'));
+    dit(pushes.length === 4, 'J4 samedi matin, le réveil ne part pas (jour calme)', JSON.stringify(rs.corps.bilans || rs.corps).slice(0, 160));
+    const rl = await aHeure(parisA(8, 30, dSam + 2), () => appeler('reveil'));
+    const w = pushes[4] || {};
+    dit(rl.code === 200 && pushes.length === 5 && /^Pendant ta pause : 3 notifications$/.test(w.title || ''), 'J5 lundi matin : UNE notification groupée pour tout le week-end (3, samedi compris)', `${w.title} · ${w.body} · ${JSON.stringify(rl.corps.bilans || rl.corps).slice(0, 300)}`);
+    await aHeure(parisA(9, 0, dSam + 2), () => appeler('reveil'));
+    dit(pushes.length === 5, 'J6 rien n’est redit', String(pushes.length));
+    await aHeure(lun, () => comme(() => P.sendPushToAll(OFFRE('32'))));
+    dit(pushes.length === 6, 'J7 lundi midi : tout sonne de nouveau', String(pushes.length));
+    // Jours cochés, heures calmes éteintes ; congés.
+    prepare({ calme: { actif: false, jours: ['dim'] } });
+    await aHeure(dim, () => comme(() => P.sendPushToAll(OFFRE('33'))));
+    await aHeure(sam, () => comme(() => P.sendPushToAll(OFFRE('34'))));
+    dit(pushes.length === 1 && /banc 34/.test(pushes[0].body || ''), 'J8 seul le dimanche coché est calme, même heures calmes éteintes', pushes.map((p) => p.body).join(','));
+    const jour = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date(iso));
+    prepare({ calme: { conges: { du: jour(parisA(12, 0, 1)), au: jour(parisA(12, 0, 3)) } } });
+    await aHeure(parisA(12, 0, 2), () => comme(() => P.sendPushToAll(OFFRE('35'))));
+    await aHeure(parisA(12, 0, 4), () => comme(() => P.sendPushToAll(OFFRE('36'))));
+    dit(pushes.length === 1 && /banc 36/.test(pushes[0].body || ''), 'J9 congés du … au … : calme pendant, de nouveau après', pushes.map((p) => p.body).join(','));
+    // La fenêtre qui finit un jour calme : les entrées passent « heures calmes ».
+    prepare({ calme: { jours: ['sam'] } });
+    const v = parisA(23, 50, dSam - 1);
+    await aHeure(parisA(19, 0, dSam - 1), () => comme(() => P.sendPushToAll(BORD('941'))));
+    await aHeure(parisA(19, 5, dSam - 1), () => comme(() => P.sendPushToAll(BORD('942'))));
+    await aHeure(parisA(12, 0, dSam), () => appeler('groupe'));
+    dit(pushes.length === 1 && /bordereau:envoyee,bordereau:calme$/.test(etats()), 'J10 une fenêtre échue un jour calme ne sonne pas : elle attend le réveil', `${pushes.length} · ${etats()} ${v ? '' : ''}`);
   });
 
   await essaie('E — l’écran exact', async () => {

@@ -371,13 +371,15 @@ export async function sendPushToAll(payload) {
   //   `photo`    : `{ url, preuve: 'meme-email' }` — seule une photo prouvée part ;
   //   `maj`      : la mise à jour d'un objet déjà annoncé — remplace sans re-sonner.
   //   `cle`      : (11 nov.) l'identité de l'objet pour l'idempotence (sinon `tag` + titre).
+  //   `urgent`   : (11 nov.) l'émetteur sait que ça expire aujourd'hui (rappel du matin) :
+  //                passe pendant un JOUR calme et n'attend pas la fenêtre.
   // (11 nov., lot `notifs-groupees`) Puis, pour une notification de vendeur (une
   // famille) : JAMAIS DEUX FOIS la même chose (objet + jour, `cleDuJour`) et la
   // FENÊTRE de regroupement (api/_lib/notif-groupe.js) : un événement non urgent
   // qui arrive moins de N min après une sonnerie attend le résumé ; l'urgent
   // (échéance < 24 h, double vente) passe tout de suite. Décidé et rangé dans la
   // MÊME écriture du journal (deux e-mails simultanés ne sonnent pas tous deux).
-  const { cat: catBrute = null, _cat, echeance = null, discret = false, photo = null, maj = false, cle: cleBrute = '', image: _imageNue, ...brut } = payload || {};
+  const { cat: catBrute = null, _cat, echeance = null, discret = false, photo = null, maj = false, cle: cleBrute = '', urgent: urgentBrut = false, image: _imageNue, ...brut } = payload || {};
   const cat = catBrute || _cat || null;
   const notif = { ...brut, ...embellir({ title: brut.title, body: brut.body }, cat) };
   const genre = genreDe(brut.tag);
@@ -392,7 +394,8 @@ export async function sendPushToAll(payload) {
   // `VRM_NOTIF_FENETRE` : posée par les bancs seulement (scripts/_horloge-notif.cjs), jamais en production.
   const fenBanc = typeof process !== 'undefined' && process.env ? process.env.VRM_NOTIF_FENETRE : undefined;
   const fenetre = !duVendeur ? 0 : (fenBanc !== undefined && fenBanc !== '' && Number.isFinite(Number(fenBanc)) ? Math.min(Number(fenBanc), fenetreGroupe(prefs)) : fenetreGroupe(prefs));
-  const attendre = !!genre && !maj && !estUrgent({ cat, echeance }, t);
+  const urgent = urgentBrut === true || estUrgent({ cat, echeance }, t);
+  const attendre = !!genre && !maj && !urgent;
   const ranger = async (etat) => {
     if (!cat || !owner) return null;
     try {
@@ -405,7 +408,7 @@ export async function sendPushToAll(payload) {
     if (rangee && rangee.doublon) return { sent: 0, total: null, doublon: true };
     return { sent: 0, total: null, discret: true, ...(rangee ? { seq: rangee.seq } : {}) };
   }
-  if (cat && dansHeuresCalmes(prefs, cat, t, echeance)) {
+  if (cat && dansHeuresCalmes(prefs, cat, t, echeance, { urgent: urgentBrut === true })) {
     rangee = await ranger('calme');
     if (rangee && rangee.doublon) return { sent: 0, total: null, doublon: true };
     return { sent: 0, total: null, calme: true, ...(rangee ? { seq: rangee.seq } : {}) };

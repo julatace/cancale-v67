@@ -24,7 +24,7 @@ import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif } from './_lib/push.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
-import { reglageCalme, reglageSoir, soirALHeure } from './_lib/notif-textes.js';
+import { reglageCalme, reglageSoir, soirALHeure, reglageJours } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
@@ -940,7 +940,8 @@ async function traiterVendeurApresRelecture() {
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
-      await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
+      // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
+      await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
     return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, overdue, aVerifier, dueToday, dueTomorrow, total,
@@ -1211,18 +1212,20 @@ async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
 // dit ce qui est arrivé pendant (api/_lib/reveil-calme.js). Rien d'autre.
 // Le mémo du jour est écrit AVANT l'envoi (un envoi raté ne part pas deux fois) ;
 // mémo pas écrit ⇒ rien ne part.
-async function traiterVendeurReveil(maintenant = Date.now()) {
+async function traiterVendeurReveil(maintenant = instantNotif()) {   // (11 nov.) l’horloge des notifications (bancs : simulée ; production : maintenant)
   const prefs = await prefsDuVendeur();
   // (8 nov.) Heures calmes allumées par défaut : seul un `actif: false` posé les éteint.
   // Préférences pas sues ⇒ rien (« pas su » n'envoie pas un récapitulatif inventé).
   if (!prefs) return { reveil: 'pas-su' };
-  if (!reglageCalme(prefs).actif) return { reveil: 'calme-eteint' };
+  // (11 nov.) Des jours calmes posés suffisent (heures calmes éteintes ou non).
+  const rj = reglageJours(prefs);
+  if (!reglageCalme(prefs).actif && !rj.jours.length && !rj.conges) return { reveil: 'calme-eteint' };
   const memo = await getRow(ID_REVEIL);
   if (memo === undefined) return { reveil: 'pas-su' };
   const [journal, lu] = await Promise.all([lireJournal(), lireLu()]);
-  const r = resumeReveil({ prefs, journal, lu, dejaJour: memo && memo.jour, maintenant });
+  const r = resumeReveil({ prefs, journal, lu, dejaJour: memo && memo.jour, dejaSeq: memo && Number.isSafeInteger(memo.seq) ? memo.seq : null, dejaAt: memo && memo.at, maintenant });
   if (!r.envoyer) return { reveil: r.raison };
-  if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString() }))) return { reveil: 'memo-non-ecrit' };
+  if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString(), ...(Number.isSafeInteger(r.seq) ? { seq: r.seq } : {}) }))) return { reveil: 'memo-non-ecrit' };
   const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url, tag: 'vrm-reveil' });
   return { reveil: 'envoye', n: r.n, sent: envoi && envoi.sent };
 }
