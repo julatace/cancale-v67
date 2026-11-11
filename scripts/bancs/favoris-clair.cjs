@@ -93,7 +93,7 @@ const MUTATIONS = {
   marge: ['FavorisEtapes.jsx', 'const peutEnvoyer = peutOuvrir && (!(p.bloquees || []).length || p.confirmeMarge);', 'const peutEnvoyer = peutOuvrir;'],
   histo: ['favorisParcours.js', 'x.personne === String(v.acheteur)', 'true'],
   suivi: ['AutomatisationFavoris.jsx', 'demarrerSuivi(j.vue);', ''],
-  outils: ['FavorisVinted.jsx', "          {/* (11 nov., lot favoris-clair) « Plus d'outils » : plus de liste par personne", "          {lignes.map(x=><p key={x.id}>{x.nom}</p>)}{/* "],
+  outils: ['FavorisVinted.jsx', "          {/* (11 nov., lot favoris-clair) « Plus d'outils » : plus de liste par personne", "          {lignes.map(x=><p key={x.id}>{x.body}</p>)}{/* "],
   envoi: ['AutomatisationFavoris.jsx', 'agirRef.current=agir;', "agirRef.current=agir;React.useEffect(()=>{if(selection.length&&!vue?.active)agir('lancer');},[selection.join(',')]);"],
 };
 

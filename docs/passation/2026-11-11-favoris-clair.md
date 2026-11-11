@@ -19,8 +19,9 @@ article puis « Lancer » dans une feuille) est remplacé par UNE page en trois 
    dernier envoi confirmé (`dernierEnvoi`) ; les plus anciens sont comptés à part, « Inclure les anciens »
    les ajoute ; un favori sans date lisible n'est jamais « nouveau ». Jamais deux fois la même offre à la
    même personne pour la même annonce : c'est la file serveur qui le garantit (clé `annonce:personne`
-   prouvée), inchangée. Au plus **10 messages par envoi** (la file refuse au-delà) : « N attendront le
-   prochain ». En ambre : « N messages à vérifier sur Vinted » (→ Vérifier) et « VRM ne sait pas encore à
+   prouvée), inchangée. **Aucun nombre fixe de messages par envoi** (correction du coordinateur : le plafond
+   10/60 min est RETIRÉ, CLAUDE.md §3 ; la borne « 10 par envoi » de `lancerFile` / `resoudreCiblesFavoris`
+   le réintroduisait — retirée ; reste la capacité de la file, 500, et un corps de commande ≤ 100 Ko). En ambre : « N messages à vérifier sur Vinted » (→ Vérifier) et « VRM ne sait pas encore à
    qui écrire » (→ Ouvrir). Les annonces sans rien à écrire sont repliées (« N autres annonces »).
 2. **Quoi** — le message (champ direct, plus de feuille « Modifier »/« Enregistrer » : il est enregistré au
    lancement par `preparerReglages`, comme avant), « + Son pseudo » / « + Bonjour ou Salut » et UNE phrase
@@ -36,7 +37,12 @@ article puis « Lancer » dans une feuille) est remplacé par UNE page en trois 
 **Le pied** collé en bas : « 5 messages · 3 annonces · environ 32 s » + « Vérifier et envoyer ».
 **Le récapitulatif** (feuille) : la même ligne, « 15 gestes · dans la limite de 45 gestes par heure »
 (2 par message, 3 avec l'offre — X3 ; jauge `actions_compte_*` lue, sinon « pas lue, l'extension la tient
-quand même »), une ligne par annonce (N messages, offre à X €, **ce qui reste après remise et frais** avec
+quand même ») ; au-delà des gestes libres : « {n} gestes · {libres} libres cette heure : {m} messages
+attendront l'heure suivante, puis partiront seuls ». C'est VRAI côté serveur : un message refusé par le
+plafond de l'extension AVANT toute écriture (`quota_extension`, 0 écrite) ne coupe plus la file, il repasse
+« en attente » et la file réessaie 10 min plus tard (`QUOTA_ATTENTE_MS`), au plus 12 fois
+(`QUOTA_ATTENTES_MAX`) ; une écriture déjà partie arrête la file comme avant. Le plafond reste compté et
+refusé par l'extension seule., une ligne par annonce (N messages, offre à X €, **ce qui reste après remise et frais** avec
 SON prix d'achat relié par identité — `plancherVente`, la règle du bénéfice ; « — (prix d'achat pas saisi) »
 sinon), le rythme, « **Aucune garantie contre un blocage Vinted.** Garde vinted.fr ouvert… ».
 **Garde-fou de marge** : une offre **à perte** ou **sous le prix mini** (`fiche.min`) est BLOQUÉE —
@@ -91,14 +97,20 @@ d'`audit-traduction`. Le journal du suivi reste en français (trace copiable, r�
 
 ## Preuves
 
-- `node scripts/audit-favoris-clair.cjs` : **29 ✅** (règles exécutées) ; `--prouve` : rouge sur
-  origin/main (règle absente) + **11 mutations toutes rouges** (plus de 10 par envoi, anciens proposés,
+- `node scripts/audit-favoris-clair.cjs` : **32 ✅** (règles exécutées, la file serveur comprise : 25
+  messages acceptés d'un coup, limite de l'heure ⇒ attente) ; `--prouve` : rouge sur origin/main + **13
+  mutations toutes rouges** (un plafond fixe de messages par envoi revient — côté app ET côté serveur —,
+  la limite de l'heure coupe la file, anciens proposés,
   offre à perte libre, prix mini ignoré, achat sans la personne, achat d'avant le message, acheteur pas su
   compté, à vérifier compté réussi, groupée sans identité, gestes sans l'offre, durée inventée).
 - Banc `scripts/bancs/favoris-clair.cjs` (remplace `favoris-ecran.cjs`, qui jugeait l'écran retiré) : vrai
   `FavorisVinted` + vraie feuille `SuiviTravailHote`, fausse file serveur À ÉTAT, extension bouchonnée
   (« envoyé », puis « offre refusée » au 3e), 390 tactile / 1512, clair / sombre ; mutations `FC_MUTANT`.
-  **122 ✅** (base, clair + sombre, 390 + 1512 ; après correction du repère de couleur : le bleu
+  Après la correction « aucun plafond fixe » : **128 ✅ · 0 ❌** (base, clair + sombre, 390 + 1512 ; dont
+  « Plus d'outils » sans pseudo ni case), vide 12 ✅, absente 12 ✅ ; mutations rouges : `max` (un plafond
+  fixe de 3 par envoi revient) 12 ❌, `outils` (la liste par personne revient) 2 ❌, `nouveaux` et `envoi`
+  interrompus (rouges), `marge` 2 ❌, `histo` 4 ❌, `suivi` 8 ❌ ; build vert.
+  Avant cette correction : **122 ✅** (base, clair + sombre, 390 + 1512 ; après correction du repère de couleur : le bleu
   d'accent du mode sombre #409CFF était hors de la plage permise du banc), `FC_JEU=vide` 12 ✅,
   `absente` 12 ✅. Mutations toutes rouges : `max` 12 ❌, `nouveaux` interrompu (rouge), `marge` 2 ❌,
   `histo` 4 ❌, `suivi` 8 ❌, `envoi` (lancer sans clic) interrompu (rouge).
@@ -123,6 +135,7 @@ Restes / à regarder :
   choisi ne voit que celui-là.
 - L'offre groupée ne voit que les personnes DÉJÀ contactées (seule identité prouvée côté client) ; aucune
   recette d'offre lot ⇒ « à faire sur Vinted ».
-- « Plus d'outils » (…) ouvre encore l'ancienne feuille (récupérer toutes les pages, vérifier un favori,
-  diagnostic, « J'ai vérifié sur Vinted ») : elle montre des pseudos, comme avant ; à refaire plus tard.
+- « Plus d'outils » (…) : l'ancienne feuille ne garde que les outils (récupérer toutes les pages, vérifier
+  un favori, tester la connexion, diagnostic, « J'ai vérifié sur Vinted ») — la liste par personne
+  (pseudos, cases) et le compte rendu par personne sont RETIRÉS ; l'aperçu n'y met plus de pseudo.
 - Banc sur l'avant (`git archive origin/main`) : ROUGE (« banc interrompu » : la page en trois temps et la feuille commune n'existent pas sur main — rouge par absence ; la vraie preuve, ce sont les 6 mutations toutes rouges). Sombre relancé après la correction du repère : 62 ✅ · 0 ❌ (390 + 1512).
