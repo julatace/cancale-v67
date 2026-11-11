@@ -90,7 +90,8 @@ import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.j
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { reserverMemo } from './_lib/cas.js';   // (11 nov.) mémos par comparer-et-échanger
-import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+import { passerVendeurs, BUDGET_VENDEURS_MS, prendreBail, rendreBail } from './_lib/cron-lots.js';
+import { modifierNeutre } from './_lib/neutre-cas.js';   // (11 nov., H14) le bail du passage
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
 import { passageSondes } from './_lib/statut-sondes.js';
@@ -1473,6 +1474,18 @@ export default async function handler(req, res) {
     res.status(s && s.fait ? 200 : 503).json({ ok: !!(s && s.fait), moment: 'sondes', sondes: s });
     return;
   }
+  // (11 nov., H14) UN SEUL PASSAGE À LA FOIS par moment (api/_lib/cron-lots.js `prendreBail`) :
+  // un second appel simultané (cron Vercel + GitHub, rejeu) ne fait rien et le dit (200).
+  // Bail pas su (base muette) ⇒ le passage se fait comme avant, la réponse le dit.
+  const momentBail = moment === 'soir' && String((req.query && req.query.passage) || '') === 'heure' ? 'soir_heure' : (moment || 'matin');
+  const jetonBail = crypto.randomUUID();
+  const bail = await prendreBail({ moment: momentBail, jeton: jetonBail, modifier: modifierNeutre, maintenant: Date.now() });
+  if (bail.pris === false) { res.status(200).json({ ok: true, moment: momentBail, saute: 'passage-en-cours', jusqua: new Date(bail.jusqua).toISOString() }); return; }
+  try { await passageDuCron(req, res, moment, bail.pris === true ? 'pris' : 'pas-su'); }
+  finally { if (bail.pris === true) await rendreBail({ moment: momentBail, jeton: jetonBail, modifier: modifierNeutre, maintenant: Date.now() }); }
+}
+
+async function passageDuCron(req, res, moment, bailEtat) {
   // (9 nov., retraits frais) `?moment=colis` : le statut des colis ACTIFS chez le transporteur, et RIEN
   // d'autre (ni rappel, ni bilan, ni sonde) — GitHub toutes les 15 min (.github/workflows/colis-frais.yml).
   // Seuls les vendeurs qui ont une ligne due sont visités (api/_lib/colis-frequent.js) ; sélection pas
@@ -1632,7 +1645,7 @@ export default async function handler(req, res) {
       lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre, retirerCurseur: retirerNeutre,
     });
     const { bilans, echecs } = lot;
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(bailEtat === 'pas-su' ? { bail: 'pas-su' } : {}), ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
       bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {

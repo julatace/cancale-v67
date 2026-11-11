@@ -13,6 +13,27 @@ import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
 import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
 
+// (11 nov., M82 de la revue serveur) Jamais `select=data` sur une capture : les
+// lignes `harvest_{uid}_notifications`, `…_favoris_archive` et la trace
+// `…_wreq_api_v2_conversations` sont lues PROJETÉES sur les seuls champs que la
+// résolution des cibles et la file lisent (favoris-cibles.js, favoris-auto.js) :
+// la liste des notifications, l'identité de la capture, les traces natives.
+// Les réglages (`vrm_favoris_reglages_{uid}`, une petite ligne) restent lus entiers.
+export const SEL_FAVORIS='id,owner,type:data->type,uid:data->uid,domain:data->domain,notifs:data->payload->notifications,archiveVersion:data->archiveVersion,creations:data->creations,lecturesLiees:data->lecturesLiees,method:data->method,path:data->path,body:data->body,contexteFavori:data->contexteFavori';
+const CHAMPS_FAVORIS=['type','uid','domain','archiveVersion','creations','lecturesLiees','method','path','body','contexteFavori'];
+export function ligneFavorisProjetee(x){
+  const d={};for(const k of CHAMPS_FAVORIS)if(x[k]!=null)d[k]=x[k];
+  if(x.notifs!=null)d.payload={notifications:x.notifs};
+  return {id:x.id,owner:x.owner,data:Object.keys(d).length?d:null};
+}
+// `lire(chemin)` rend un tableau ou null (pas su) ; les réglages à part, entiers.
+async function lireLignesFavoris(lire,owner,lourdes,reglages){
+  const a=await lire(`app_data?owner=eq.${owner}&id=in.(${lourdes.join(',')})&select=${SEL_FAVORIS}`);
+  if(!Array.isArray(a))return null;
+  const b=reglages?await lire(`app_data?owner=eq.${owner}&id=eq.${reglages}&select=id,owner,data`):[];
+  if(!Array.isArray(b))return null;
+  return [...a.map(ligneFavorisProjetee),...b];
+}
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
 // UID, including the rolling quota shared across all devices and VRM owners.
 // This endpoint NEVER calls Vinted. Only the seller's extension dispatches.
@@ -20,8 +41,9 @@ import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,n
 // ouvertures natives des AUTRES comptes de ce vendeur (jamais d'un autre
 // vendeur : owner filtré, RLS). Lecture ratée ⇒ [] (rien n'est envoyé).
 async function parametresDesAutresComptes(req,{owner,uid}){
-  const rows=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&or=(id.like.harvest_*_favoris_archive,id.like.harvest_*_wreq_api_v2_conversations)&select=id,owner,data`);
-  if(!Array.isArray(rows))return [];
+  const lues=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&or=(id.like.harvest_*_favoris_archive,id.like.harvest_*_wreq_api_v2_conversations)&select=${SEL_FAVORIS}`);
+  if(!Array.isArray(lues))return [];
+  const rows=lues.map(ligneFavorisProjetee);
   const vus=new Map();
   for(const r of rows){
     const m=/^harvest_([1-9]\d{0,19})_favoris_archive$/.exec(String(r.id||''));if(!m||m[1]===uid||r.owner!==owner)continue;
@@ -87,7 +109,7 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
   };
   try{
     const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`,`harvest_${uid}_favoris_archive`];
-    const rows=await lecture(req,`app_data?owner=eq.${owner}&id=in.(${ids.join(',')})&select=id,owner,data`);
+    const rows=await lireLignesFavoris(c=>lecture(req,c),owner,[ids[0],ids[1],ids[3]],ids[2]);
     if(rows.some(x=>x.owner!==owner))return await stop('lecture');
     const lire=id=>rows.find(x=>x.id===id)?.data;
     const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)return await stop('reglages');
@@ -169,7 +191,7 @@ export async function routeFavoris(req,res){
       if(c.action==='lancer'){
         const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`];
         const archiveId=`harvest_${uid}_favoris_archive`;
-        const rows=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&id=in.(${[...ids,archiveId].join(',')})&select=id,owner,data`);
+        const rows=await lireLignesFavoris(c=>lireCommeVendeur(req,c),owner,[ids[0],ids[1],archiveId],ids[2]);
         if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner)||ids.slice(1).some(id=>rows.filter(x=>x.id===id).length!==1))throw new RefusFavoris('Capture ou réglages indisponibles. Actualise et enregistre tes réglages avant de lancer.');
         const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');

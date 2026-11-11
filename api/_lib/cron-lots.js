@@ -108,3 +108,39 @@ export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseu
     curseur: !peutEcrire ? 'pas-su' : derniereOk === true ? 'ecrit' : 'non-ecrit',
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// (11 nov., H14 de la revue serveur) UN SEUL PASSAGE À LA FOIS : LE BAIL
+// ═══════════════════════════════════════════════════════════════════════════
+// Deux appels simultanés du même moment (le cron Vercel ET le workflow GitHub,
+// ou un rejeu à la main) lisaient le même curseur et traitaient les mêmes
+// vendeurs : doubles notifications, doubles e-mails là où un mémo manquait.
+// Une LIGNE-VERROU `cron_bail_{moment}` (propriétaire NEUTRE) écrite par
+// comparer-et-échanger (`modifierNeutre`, sur `data.rev`) : le premier passage
+// la prend pour `BAIL_MS` ; un second qui la trouve tenue et pas échue ne fait
+// RIEN (il le dit). Un passage coupé net (durée maximale) ne la rend pas : elle
+// expire seule. Fini, il la rend (seulement si elle porte encore SON jeton).
+// « Pas su » (base muette) : le passage se fait comme avant (les mémos de chaque
+// rappel et le curseur du jour évitent les doublons), et la réponse le dit.
+// Aucune migration : une ligne d'app_data. Tenu par scripts/audit-serveur-migrations.cjs.
+export const BAIL_MS = DUREE_MAX_MS + 30000;
+export const idBail = (moment) => `cron_bail_${String(moment || 'matin').replace(/[^a-z0-9_]/gi, '_')}`;
+export function deciderBail(d, { jeton, maintenant, dureeMs = BAIL_MS }) {
+  const tenu = d && typeof d.jeton === 'string' && d.jeton !== '' && d.jeton !== jeton && Number(d.jusqua) > maintenant;
+  if (tenu) return { valeur: { pris: false, jusqua: Number(d.jusqua) } };
+  return { data: { jeton, depuis: maintenant, jusqua: maintenant + dureeMs }, valeur: { pris: true } };
+}
+export function deciderRendre(d, { jeton, maintenant }) {
+  if (!d || d.jeton !== jeton) return { valeur: false };   // échu et repris par un autre : on n'y touche pas
+  return { data: { jeton: null, jusqua: 0, rendu: maintenant }, valeur: true };
+}
+// `modifier(id, decider)` : `modifierNeutre` (rend { valeur } ou null = pas su).
+// Rend { pris:true } · { pris:false, jusqua } · { pris:null } (pas su).
+export async function prendreBail({ moment, jeton, modifier, maintenant = Date.now(), dureeMs = BAIL_MS }) {
+  let r = null;
+  try { r = await modifier(idBail(moment), (d) => deciderBail(d, { jeton, maintenant, dureeMs })); } catch (_) { r = null; }
+  return r && r.valeur ? r.valeur : { pris: null };
+}
+export async function rendreBail({ moment, jeton, modifier, maintenant = Date.now() }) {
+  try { const r = await modifier(idBail(moment), (d) => deciderRendre(d, { jeton, maintenant })); return !!(r && r.valeur); } catch (_) { return false; }
+}
