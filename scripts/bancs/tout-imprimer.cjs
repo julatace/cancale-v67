@@ -152,8 +152,8 @@ async function scenario(b, nom, vue, LIGNES) {
   const contigu = ap.every((x, i) => i === 0 || x.tr === ap[i - 1].tr || !ap.slice(0, i - 1).some((y) => y.tr === x.tr));
   dit(contigu, `${nom} : B chaque transporteur d'un seul tenant`, JSON.stringify(ap.map((x) => x.tr)));
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-apercu.png`) });
-  // Tout cocher et contrôler, puis imprimer.
-  for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check(); await pg.locator(`[data-lot-ligne="${x.cle}"] input`).nth(1).check(); }
+  // Tout cocher, puis imprimer. (11 nov.) Plus de case « Contrôlé » : la sélection seule.
+  for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check(); }
   await pg.click('button[data-lot-imprimer]');
   // C : le N° à vérifier DEMANDE.
   // (Si une case « Contrôlé » n'a pas pris, la question « Vérifier les articles » passe d'abord : on la franchit.)
