@@ -7,35 +7,34 @@
   'use strict';
   const TAG = 'CANCALE_VINTED';
 
+  // ⚠️⚠️ 5.356 (revue de robustesse, critique 4) — LE CANAL PRIVÉ. inject.js
+  // (monde MAIN, document_start, AVANT tout script de la page) crée un
+  // `MessageChannel` et nous remet son second port UNE fois. On ne croit que CE
+  // port, le premier reçu (même fenêtre, même origine) : un script de la page
+  // qui imite `{__tag:'CANCALE_VINTED', …}` sur `window` n'est plus relayé, et un
+  // second « canal » proposé ensuite est ignoré. Pas de canal = rien ne part.
+  // (La pause 429/403 n'est plus transmise à la page : la page ne moissonne plus.)
+  let canal = null;
+  const recus = [];
+  const surCanal = (fn) => { recus.push(fn); };
+  window.addEventListener('message', (event) => {
+    try {
+      if (canal || event.source !== window || event.origin !== location.origin) return;
+      const d = event.data;
+      if (!d || d.__tag !== 'CANCALE_VINTED_CANAL' || !event.ports || !event.ports[0]) return;
+      canal = event.ports[0];
+      canal.onmessage = (e) => { const m = e && e.data; if (!m || typeof m !== 'object') return; for (const f of recus) { try { f(m); } catch (_) {} } };
+    } catch (_) {}
+  }, false);
+  const versPage = (m) => { if (!canal) return false; try { canal.postMessage(m); return true; } catch (_) { return false; } };
+
   // Injecte inject.js dans le MAIN world (via un <script> pointant sur la
   // ressource web-accessible de l'extension), en secours du script MAIN posé
   // directement par le manifeste à document_start. Sa garde évite le doublon.
-  // ⚠️ 5.162 — LA PAUSE DEMANDÉE PAR VINTED (429/403) VAUT AUSSI POUR LA
-  // MOISSON FAITE DANS LA PAGE. Elle est rangée par le fond dans
-  // `chrome.storage.local` (`vrmPauseVinted`) ; `inject.js` (monde MAIN) n'y a
-  // pas accès : on lui transmet la fin de la pause — un nombre, rien d'autre —
-  // une fois qu'il est chargé, puis à chaque changement.
-  let injecte = false, pauseFin = null;
-  const direPause = () => {
-    if (!injecte || pauseFin == null) return;
-    try { window.postMessage({ __tag: 'CANCALE_VINTED_PAUSE', jusqua: pauseFin }, '*'); } catch (_) {}
-  };
-  try {
-    chrome.storage.local.get('vrmPauseVinted', (o) => {
-      try { pauseFin = Number(((o && o.vrmPauseVinted) || {}).jusqua) || 0; direPause(); } catch (_) {}
-    });
-    chrome.storage.onChanged.addListener((ch, zone) => {
-      try {
-        if (zone !== 'local' || !ch || !ch.vrmPauseVinted) return;
-        pauseFin = Number((ch.vrmPauseVinted.newValue || {}).jusqua) || 0; direPause();
-      } catch (_) {}
-    });
-  } catch (_) {}
-
   try {
     const s = document.createElement('script');
     s.src = chrome.runtime.getURL('inject.js');
-    s.onload = function () { this.remove(); injecte = true; direPause(); };
+    s.onload = function () { this.remove(); };
     (document.head || document.documentElement).appendChild(s);
   } catch (_) {}
 
@@ -50,11 +49,9 @@
   // transporte que ce qu'on a pensé à écrire.*
   // ⇒ On recopie TOUT ce que la page envoie, sauf son étiquette. `from` et
   //   `domain` restent posés par NOUS : la page ne doit pas pouvoir les dicter.
-  window.addEventListener('message', (event) => {
-    if (event.source !== window) return;
-    const d = event.data;
+  surCanal((d) => {
     if (!d || d.__tag !== TAG) return;
-    if(d.kind==='injectReady'){injecte=true;direPause();return;}
+    if (d.kind === 'injectReady') return;
     try {
       const m = {};
       for (const k of Object.keys(d)) {
@@ -65,7 +62,7 @@
       m.domain = location.host;
       chrome.runtime.sendMessage(m);
     } catch (_) { /* le service worker peut etre endormi, on ignore */ }
-  }, false);
+  });
 
   // ── NAVIGATEUR SANS API `cookies` / SANS MONDE MAIN (20 octobre, Orion) ──
   // (1) Les cookies de session : le fond demande s'il en a besoin (`veux`) —
@@ -122,17 +119,17 @@
   } catch (_) {}
 
   const enAttente = new Map();
-  window.addEventListener('message', (event) => {
-    if (event.source !== window || !event.data || event.data.__tag !== 'CANCALE_VINTED_REP') return;
-    const f = enAttente.get(String(event.data.id || ''));
-    if (f) { enAttente.delete(String(event.data.id)); f(event.data); }
-  }, false);
+  surCanal((d) => {
+    if (!d || d.__tag !== 'CANCALE_VINTED_REP') return;
+    const f = enAttente.get(String(d.id || ''));
+    if (f) { enAttente.delete(String(d.id)); f(d); }
+  });
   const demanderPage = (req) => new Promise((res) => {
     const id = String((req && req.id) || '');
     if (!id || !/(^|\.)vinted\.[a-z.]+$/i.test(location.hostname)) { res(null); return; }
     const t = setTimeout(() => { enAttente.delete(id); res(null); }, 20000);
     enAttente.set(id, (d) => { clearTimeout(t); res({ id, status: d.status, ok: d.ok, json: d.json, origine: d.origine }); });
-    try { window.postMessage({ __tag: 'CANCALE_VINTED_REQ', id, p: req.p, h: req.h }, location.origin); } catch (_) { enAttente.delete(id); clearTimeout(t); res(null); }
+    if (!versPage({ __tag: 'CANCALE_VINTED_REQ', id, p: req.p, h: req.h })) { enAttente.delete(id); clearTimeout(t); res(null); }
   });
   try {
     chrome.runtime.onMessage.addListener((m, sender, sendResponse) => {
@@ -146,8 +143,8 @@
 
   // Tab-addressed navigation only. Do not broadcast a click through storage.
   const attentesFavoris=new Map();
-  window.addEventListener('message',event=>{
-    const m=event.data;if(event.source!==window||m?.__tag!=='CANCALE_VINTED_FAVORI_REP')return;
+  surCanal(m=>{
+    if(m?.__tag!=='CANCALE_VINTED_FAVORI_REP')return;
     const f=attentesFavoris.get(m.id);if(f){attentesFavoris.delete(m.id);f(m);}
   });
   function natifFavoriSur(v){
@@ -171,7 +168,7 @@
       if(m.action.startsWith('cloche_')){if(!v||!['disponible','deja_ouverte','activee','absente','ambigue','indisponible','origine'].includes(v.etat))return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{etat:v.etat}});}
       else {if(!v||typeof v.trouve!=='boolean')return sendResponse(null);const nat=v.trouve&&v.natif?natifFavoriSur(v.natif):null;if(v.trouve&&v.natif&&!nat)return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{trouve:v.trouve,...(nat?{natif:nat}:{}),...(v.inspection?{inspection:inspectionFavoriSure(v.inspection)}:{})}});}
     });
-    try{window.postMessage({__tag:'CANCALE_VINTED_FAVORI_REQ',id:m.id,action:m.action,cible:m.cible},location.origin);}catch{clearTimeout(timer);attentesFavoris.delete(m.id);sendResponse(null);}
+    if(!versPage({__tag:'CANCALE_VINTED_FAVORI_REQ',id:m.id,action:m.action,cible:m.cible})){clearTimeout(timer);attentesFavoris.delete(m.id);sendResponse(null);}
     return true;
   }
   // La boîte aux lettres (navigateur sans `tabs.sendMessage`) : une demande

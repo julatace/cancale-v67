@@ -1312,6 +1312,16 @@ async function relancerLbcApresSession() {
 // Le dernier refus d'une écriture `vinted_accounts`, par compte : 'preuve' (029),
 // 'unicite' (023) ou ''. Lu (et effacé) par `captureDomain` juste après l'appel.
 const _refusComptes = new Map();
+// ⚠️ 5.356 (revue de robustesse, hautes 12-13) — UNE BASE MUETTE NE BLOQUE PLUS
+//    LES GESTES. `sbGet` et `supabaseUpsert` n'avaient aucun délai : un fetch
+//    Supabase pendu restait pendu jusqu'à la mort du worker, et comme les
+//    compteurs d'actions (`unCompteurALaFois`) lisent/écrivent la base, TOUS les
+//    gestes attendaient derrière. Un signal qui coupe la requête (corps compris) :
+//    une lecture coupée rend `null` (pas su), une écriture coupée rend false.
+const SB_DELAI_LECTURE_MS = 10000, SB_DELAI_ECRITURE_MS = 20000;
+function signalDelai(ms) {
+  try { const c = new AbortController(); const t = setTimeout(() => { try { c.abort(); } catch (_) {} }, ms); if (t && typeof t.unref === 'function') t.unref(); return c.signal; } catch (_) { return undefined; }
+}
 async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
@@ -1339,6 +1349,7 @@ async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${(s && s.access_token) || SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: corps,
+      signal: signalDelai(SB_DELAI_ECRITURE_MS),
     });
   };
   let statut = 'reseau', octets = 0;
@@ -2722,12 +2733,13 @@ function suivreFavoriAffiche(cible,activer=false){
  const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===article).length,exacts:exacts.length,visibles:liens.length,natifsMemeArticle:natifsArticle.length,natifs:candidats.length,natifsVisibles:candidatsVisibles.length};
  if(exacts.length){
   if(liens.length!==1)return {trouve:false,inspection};
-  if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
+  // 5.356 : aucun clic synthétique (§3, isTrusted:false) — le lien est MONTRÉ, c'est SON clic qui l'ouvre.
+  if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.style.outline='3px solid #F5A623';liens[0].a.style.outlineOffset='2px';}
   return {trouve:true,inspection};
  }
  // Exactly one visible candidate; two (even same href) is refused, as above.
  if(candidatsVisibles.length!==1)return {trouve:false,inspection};
- if(activer){candidatsVisibles[0].a.scrollIntoView({block:'center'});candidatsVisibles[0].a.click();}
+ if(activer){candidatsVisibles[0].a.scrollIntoView({block:'center'});candidatsVisibles[0].a.style.outline='3px solid #F5A623';candidatsVisibles[0].a.style.outlineOffset='2px';}
  return {trouve:true,inspection,natif:candidatsVisibles[0].n};
 }
 // Semantic native controls only. No guessed CSS class, router or API call.
@@ -2753,8 +2765,9 @@ function clocheFavorisNative(activer=false,origine){
  if(boutons.length!==1)return {etat:boutons.length?'ambigue':'absente'};
  const b=boutons[0];if(b.disabled||b.getAttribute('aria-disabled')==='true')return {etat:'indisponible'};
  const ouverte=b.getAttribute('aria-expanded')==='true';
- if(activer&&!ouverte)b.click();
- return {etat:ouverte?'deja_ouverte':activer?'activee':'disponible'};
+ // 5.356 : jamais de clic synthétique sur la cloche (§3) — elle est entourée, c'est SON clic qui l'ouvre.
+ if(activer&&!ouverte){b.scrollIntoView({block:'center'});b.style.outline='3px solid #F5A623';b.style.outlineOffset='2px';}
+ return {etat:ouverte?'deja_ouverte':'disponible'};
 }
 // Closed navigation protocol: no arbitrary code and no message/offer endpoint.
 async function naviguerFavoriDansPage(tabId,action,cible){
@@ -2912,7 +2925,7 @@ async function ouvrirFavoriNatif(uid,acc,body){
   let present=await naviguerFavoriDansPage(tab.id,'sonder',liens[0].url);
   if(present?.[0]?.result?.trouve!==true){
    const cl=await naviguerFavoriDansPage(tab.id,'cloche_ouvrir',liens[0].url);
-   if(!['activee','deja_ouverte'].includes(cl?.[0]?.result?.etat))return refus('La cloche Vinted ne peut pas être ouverte automatiquement dans cet onglet. Aucun message envoyé.','cloche_indisponible');
+   if(!['activee','deja_ouverte'].includes(cl?.[0]?.result?.etat))return refus('Clique sur la cloche Vinted (entourée dans l’onglet), puis réessaie. VRM ne clique jamais à ta place. Aucun message envoyé.','cloche_indisponible');
    for(let i=0;i<20;i++){
     if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))return refus('Le compte connecté a changé. Aucun message envoyé.');
     present=await naviguerFavoriDansPage(tab.id,'sonder',liens[0].url);
@@ -2940,7 +2953,8 @@ async function ouvrirFavoriNatif(uid,acc,body){
    return {ok:true,status:200,json:{ouvert:true,version:CODE_VERSION,preuve:'non_confirmee',raison:'destinataire_different'}};
   }
   if(natifClic)await confirmerNavigationNative(tab.id,uid,owner,acc.domain,liens[0].url,natifClic);
-  for(let i=0;i<40;i++){
+  // 5.356 : le lien est entouré dans l'onglet, c'est SON clic qui l'ouvre (aucun clic synthétique, §3) — 60 s pour le faire.
+  for(let i=0;i<240;i++){
     if((await loadSession())?.user_id!==owner)return refus('La session VRM a changé pendant l’ouverture.');
     const record=(await stockageFavorisOnglets().get(cleOngletFavori(tab.id)))?.[cleOngletFavori(tab.id)];
     if(!record||['confirmee','erreur'].includes(record.etat))return {ok:true,status:200,json:{ouvert:true,version:CODE_VERSION,preuve:record?.etat==='confirmee'?'confirmee':'non_confirmee',raison:record?.raison||''}};
@@ -3148,6 +3162,13 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     if (cles.length) { noterDiag('boost_vu'); echantillonRate('boost_forme', id, JSON.stringify(cles).slice(0, 600)); }
     return;
   }
+  // ⚠️ 5.356 (revue de robustesse, haute 10) — RANGÉ SOUS LE COMPTE DU DÉBUT, OU
+  //    JETÉ. L'uid est lu au DÉBUT (le cookie au moment où la réponse arrive) ;
+  //    les lectures de la base qui précèdent l'écriture prennent du temps : s'il a
+  //    basculé de compte entre-temps, ce qui est rangé ici irait sous le mauvais
+  //    compte au prochain passage. On relit le cookie juste avant d'écrire : un
+  //    autre compte ⇒ on jette (mieux vaut un blanc qu'un faux, §5).
+  { const encore = await activeAccountId(domain); if (!encore || String(encore) !== String(uid)) { noterDiag('moisson_compte_change'); return; } }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
   data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
@@ -4106,7 +4127,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     return;
   }
-  const domain = msg.domain || 'www.vinted.fr';
+  // ⚠️ 5.356 (revue de robustesse, critique 4) — un message « de la page » n'est
+  //    cru que s'il vient d'un onglet Vinted (cadre principal), et son domaine est
+  //    celui de l'ONGLET, jamais celui que le message dit. (content.js ne relaie
+  //    plus que ce qui arrive par le canal privé d'inject.js : voir content.js.)
+  let domain = msg.domain || 'www.vinted.fr';
+  {
+    const urlPage = (sender && (sender.url || (sender.tab && sender.tab.url))) || '';
+    if (urlPage) {
+      let h = ''; try { h = new URL(String(urlPage)).host; } catch (_) { h = ''; }
+      if (!h || !VINTED_HOTE.test(h.replace(/:\d+$/, '')) || (sender && sender.frameId > 0) || (sender && sender.id && chrome.runtime && chrome.runtime.id && sender.id !== chrome.runtime.id)) { noterDiag('page_message_refuse'); return; }
+      domain = h;
+    }
+  }
   if (msg.kind === 'csrf' && msg.csrf) {
     lastCsrfByDomain[domain] = msg.csrf;
     // On rattache le csrf au compte actif (mise a jour legere).
@@ -4531,7 +4564,11 @@ function prochainNumeroDe(main, resa, maintenant) {
   for (const e of Object.values((main && main.vinted_annonce_numeros) || {})) add(e && e.numero);
   for (const e of Object.values((main && main.vinted_sale_overrides) || {})) add(e && e.numero);
   const t = Number(maintenant) || Date.now();
-  for (const [n, v] of Object.entries((resa && resa.attente) || {})) { const at = Date.parse((v && v.at) || ''); if (!isNaN(at) && t - at < RESA_ATTENTE_MS) add(n); }
+  // ⚠️ 5.356 (revue, haute 6) : une réservation AFFICHÉE (peut-être déjà écrite
+  // sur un carton) ne redevient JAMAIS libre avec le temps — §5, un N° n'est
+  // jamais réattribué. Toutes les attentes comptent, quel que soit leur âge.
+  void t;
+  for (const n of Object.keys((resa && resa.attente) || {})) add(n);
   for (const v of Object.values((resa && resa.items) || {})) add(v && v.numero);
   let c = 1;
   for (const k of cles) {
@@ -4543,10 +4580,20 @@ function prochainNumeroDe(main, resa, maintenant) {
 // Le réglage de l'app (`vrm_numero_ecrit` : { actif, depuis }) : seul `actif === true`
 // l'allume ; absent ou illisible = éteint (comme avant).
 function numeroEcritAllume(main) { const o = main && main.vrm_numero_ecrit; return !!(o && typeof o === 'object' && o.actif === true); }
+// 5.356 : les attentes ne s'effacent plus au bout de 3 h (un N° montré reste
+// pris). Bornées aux RESA_ATTENTE_MAX plus récentes — et la plus HAUTE de chaque
+// série est toujours gardée : le suivant part après elle (`prochainNumeroDe`),
+// donc rien de ce qui a été montré ne peut être redonné.
+const RESA_ATTENTE_MAX = 200;
 function resaPropre(data, maintenant) {
-  const t = Number(maintenant) || Date.now();
+  void maintenant;
   const attente = {}, items = {};
-  for (const [n, v] of Object.entries((data && data.attente) || {})) { const at = Date.parse((v && v.at) || ''); if (!isNaN(at) && t - at < RESA_ATTENTE_MS) attente[n] = v; }
+  const toutes = Object.entries((data && data.attente) || {}).filter(([n, v]) => cleNum(n) && v && typeof v === 'object');
+  toutes.sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || '')));
+  for (const [n, v] of toutes.slice(0, RESA_ATTENTE_MAX)) attente[n] = v;
+  const haut = {};
+  for (const [n, v] of toutes) { const m = /^([A-Z]{0,3})(\d+)$/.exec(cleNum(n)); if (!m) continue; const h = haut[m[1]]; if (!h || Number(m[2]) > h.num) haut[m[1]] = { num: Number(m[2]), n, v }; }
+  for (const h of Object.values(haut)) attente[h.n] = h.v;
   const its = Object.entries((data && data.items) || {}).filter(([id, v]) => /^\d{4,15}$/.test(id) && v && v.numero);
   its.sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || '')));
   for (const [id, v] of its.slice(0, RESA_ITEMS_MAX)) items[id] = v;
@@ -4557,10 +4604,48 @@ async function lireResa() {
   if (rows === null) return null;
   return resaPropre(rows[0] && rows[0].data);
 }
-async function ecrireResa(r) {
-  const ok = await supabaseUpsert('app_data', [{ id: RESA_LIGNE, data: { attente: r.attente, items: r.items, capturedAt: new Date().toISOString(), ver: EXT_VERSION } }], 'id');
-  return ok !== false;
+// ⚠️⚠️ 5.356 (revue de robustesse, critique 3) — COMPARER-ET-ÉCHANGER SUR
+//    `data.rev` (la forme de `modifierCas`, api/_lib/suivi-vinted.js). Avant :
+//    lire `panel_num_reserves`, calculer le suivant, RÉÉCRIRE la ligne entière —
+//    deux Chrome (ou deux profils) lisaient la même ligne et donnaient le MÊME
+//    N° à deux paires, le seul risque irréversible (§5). Désormais l'écriture ne
+//    passe que si personne n'a écrit depuis notre lecture (`data->>rev`) ; sinon
+//    on relit et on recalcule. `modifier(d)` rend l'objet à écrire (sans `rev`)
+//    ou `undefined` (rien à écrire). Rend true · false (rien à écrire) · null
+//    (pas su : lecture ou écriture ratée, ou toujours devancé — rien d'affirmé).
+async function modifierLigneCas(id, modifier, essais = 6) {
+  if (!/^[a-z0-9_]+$/i.test(String(id || ''))) return null;
+  for (let n = 0; n < essais; n++) {
+    const s = await authToken();
+    if (!(s && s.user_id && s.access_token)) return null;
+    const rows = await sbGet(`app_data?id=eq.${id}&select=data`);
+    if (!Array.isArray(rows)) return null;
+    const present = !!rows[0];
+    const d = present ? (rows[0].data || {}) : null;
+    const nouveau = await modifier(d);
+    if (nouveau === undefined) return false;
+    const rev0 = (d && Number.isSafeInteger(d.rev) && d.rev >= 0) ? d.rev : null;
+    const data = Object.assign({}, nouveau, { rev: (rev0 || 0) + 1 });
+    const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${s.access_token}`, 'Content-Type': 'application/json' };
+    try {
+      let w;
+      if (!present) {
+        w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: Object.assign({}, h, { Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify([{ owner: s.user_id, id, data }]), signal: signalDelai(15000) });
+      } else {
+        const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
+        w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner=eq.${encodeURIComponent(s.user_id)}&${cond}&select=id`, { method: 'PATCH', headers: Object.assign({}, h, { Prefer: 'return=representation' }), body: JSON.stringify({ data }), signal: signalDelai(15000) });
+      }
+      if (!w || !w.ok) return null;
+      const out = await w.json().catch(() => null);
+      if (!Array.isArray(out)) return null;
+      if (out.length >= 1) return true;
+    } catch (_) { return null; }
+    noterDiag('cas_devance_' + id.replace(/[^a-z_]/gi, '').slice(0, 30));
+    await new Promise((ok) => setTimeout(ok, 25 * (n + 1) + Math.floor(Math.random() * 40)));
+  }
+  return null;
 }
+const corpsResa = (r) => ({ attente: r.attente, items: r.items, capturedAt: new Date().toISOString(), ver: EXT_VERSION });
 async function reserverNumeroPourOnglet(tabId, domain) {
   return unResaALaFois(async () => {
     if (tabId == null) return { ok: false, raison: 'onglet' };
@@ -4575,15 +4660,21 @@ async function reserverNumeroPourOnglet(tabId, domain) {
     const uid = await activeAccountId(domain);
     if (!uid) return { ok: false, raison: 'compte' };
     const main = await lireMain(['vinted_used_numeros', 'vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_num_prefixe', 'vrm_numero_ecrit']);
-    const r = await lireResa();
-    if (main === null || r === null) { noterDiag('resa_lecture_ratee'); return { ok: false, raison: 'lecture' }; }
+    if (main === null) { noterDiag('resa_lecture_ratee'); return { ok: false, raison: 'lecture' }; }
     // 5.324 (7 nov.) « Je numérote moi-même dans mes annonces » (src/numeroEcrit.js de
     // l'app) : il écrit SON numéro dans l'annonce, VRM n'en donne plus aucun — aucune
     // réservation, rien affiché à côté de « Publier ».
     if (numeroEcritAllume(main)) { noterDiag('resa_numero_ecrit'); return { ok: false, raison: 'ecrit' }; }
-    const numero = prochainNumeroDe(main, r);
-    r.attente[numero] = { at: new Date().toISOString(), uid: String(uid) };
-    if (!(await ecrireResa(r))) { noterDiag('resa_ecriture_ratee'); return { ok: false, raison: 'ecriture' }; }
+    // 5.356 : le N° est calculé SUR la ligne lue, et écrit seulement si personne
+    // n'a réservé entre-temps (comparer-et-échanger) — sinon relu et recalculé.
+    let numero = null;
+    const ecrit = await modifierLigneCas(RESA_LIGNE, (d) => {
+      const r = resaPropre(d);
+      numero = prochainNumeroDe(main, r);
+      r.attente[numero] = { at: new Date().toISOString(), uid: String(uid) };
+      return corpsResa(r);
+    });
+    if (ecrit !== true || !numero) { noterDiag(ecrit === null ? 'resa_ecriture_ratee' : 'resa_rien'); return { ok: false, raison: 'ecriture' }; }
     loc[tabId] = { numero, at: Date.now(), uid: String(uid) };
     try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
     noterDiag('resa_posee');
@@ -4616,13 +4707,16 @@ async function lierPublicationsEnAttente() {
   try { loc = (await chrome.storage.local.get(RESA_LOCAL))[RESA_LOCAL] || {}; } catch (_) { return; }
   const aLier = Object.entries(loc).filter(([, v]) => v && v.item);
   if (!aLier.length) return;
-  const r = await lireResa();
-  if (r === null) { noterDiag('publication_lecture_ratee'); return; }   // pas su : on n'écrase rien
-  for (const [, v] of aLier) {
-    if (!r.items[v.item]) r.items[v.item] = { numero: v.numero, at: new Date().toISOString(), uid: v.uid };
-    delete r.attente[v.numero];
-  }
-  if (!(await ecrireResa(r))) { noterDiag('publication_ecriture_ratee'); return; }
+  // 5.356 : comparer-et-échanger (une autre réservation écrite entre-temps n'est jamais effacée).
+  const ecrit = await modifierLigneCas(RESA_LIGNE, (d) => {
+    const r = resaPropre(d);
+    for (const [, v] of aLier) {
+      if (!r.items[v.item]) r.items[v.item] = { numero: v.numero, at: new Date().toISOString(), uid: v.uid };
+      delete r.attente[v.numero];
+    }
+    return corpsResa(r);
+  });
+  if (ecrit !== true) { noterDiag('publication_ecriture_ratee'); return; }   // pas su : on n'écrase rien
   for (const [tab] of aLier) delete loc[tab];
   try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
   noterDiag('publication_liee');
@@ -9934,8 +10028,49 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   }
   return { ok: !!r.ok, status: r.status, code: r.code, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
+// ⚠️⚠️ 5.356 (revue de robustesse, critique 2) — UN SEUL PASSAGE DU MOTEUR À
+//    LA FOIS. `offresTick` (chaque minute) et `visiteVinted` l'appelaient sans
+//    verrou : chaque passage prenait un instantané de `vrmOffresFaites`, dormait
+//    15-45 s entre deux gestes, et deux passages traitaient la MÊME offre (double
+//    refus + double message) puis s'écrasaient le mémo — « chaque offre une
+//    fois » tombait. Le verrou vit dans `chrome.storage.local` avec une
+//    expiration (§4.9 : un worker tué ne le garde pas plus de 10 min) ; la chaîne
+//    `_chaineVerrousStock` rend « lire puis poser » indivisible dans CE worker
+//    (il n'y en a qu'un par extension). Et le mémo est RELU juste avant chaque
+//    geste.
+const OFFRES_VERROU = 'vrmOffresVerrou';
+const OFFRES_VERROU_MS = 10 * 60000;
+let _chaineVerrousStock = Promise.resolve();
+function surVerrouStock(fn) { const p = _chaineVerrousStock.then(fn, fn); _chaineVerrousStock = p.then(() => {}, () => {}); return p; }
+function prendreVerrouStock(cle, ms) {
+  return surVerrouStock(async () => {
+    const t = Date.now();
+    let v = null;
+    try { v = (await chrome.storage.local.get(cle))[cle] || null; } catch (_) { return null; }
+    if (v && Number(v.jusqua) > t) return null;
+    const id = t.toString(36) + Math.random().toString(36).slice(2, 10);
+    try { await chrome.storage.local.set({ [cle]: { id, jusqua: t + ms } }); } catch (_) { return null; }
+    return id;
+  });
+}
+function prolongerVerrouStock(cle, id, ms) {
+  return surVerrouStock(async () => {
+    try { const v = (await chrome.storage.local.get(cle))[cle]; if (v && v.id === id) await chrome.storage.local.set({ [cle]: { id, jusqua: Date.now() + ms } }); } catch (_) {}
+  });
+}
+function lacherVerrouStock(cle, id) {
+  return surVerrouStock(async () => {
+    try { const v = (await chrome.storage.local.get(cle))[cle]; if (v && v.id === id) await chrome.storage.local.remove(cle); } catch (_) {}
+  });
+}
 // Le moteur. Appelé à CHAQUE visite sur Vinted, APRÈS la moisson (offres fraîches).
 async function autoAccepterOffres(uid) {
+  const verrou = await prendreVerrouStock(OFFRES_VERROU, OFFRES_VERROU_MS);
+  if (!verrou) { noterDiag('offre_auto_deja_en_cours'); return 0; }
+  try { return await autoAccepterOffresUnPassage(uid, verrou); }
+  finally { await lacherVerrouStock(OFFRES_VERROU, verrou); }
+}
+async function autoAccepterOffresUnPassage(uid, verrou) {
   try {
     const reg = await offreAutoReglages();
     if (!reg || !reg.actif) return 0;                  // éteint (ou « pas su »)
@@ -9989,6 +10124,11 @@ async function autoAccepterOffres(uid) {
       if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs(), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
       if (pv[o.oid].at > Date.now()) continue;
       if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux gestes
+      await prolongerVerrouStock(OFFRES_VERROU, verrou, OFFRES_VERROU_MS);
+      // 5.356 : le mémo RELU juste avant le geste (jamais l'instantané du début).
+      const stFrais = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
+      if (stFrais[o.oid]) { st[o.oid] = stFrais[o.oid]; continue; }
+      for (const k in stFrais) if (!st[k]) st[k] = stFrais[k];
       const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? reg.msgRefus : null });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
@@ -11608,13 +11748,34 @@ async function photoReglee(blob, r) {
 // Même file (`requeteVinted` : une à la fois, pause, frein) ; une réponse qui ne
 // vient pas de Vinted (l'onglet a navigué) vaut « rien envoyé ».
 // ══════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ 5.356 (revue de robustesse, critique 1 et haute 5) — L'ONGLET DU DOMAINE
+//    DU COMPTE, ET LE COMPTE REVÉRIFIÉ AU DÉPART. Avant : le PREMIER onglet
+//    *.vinted.fr OU *.vinted.com, alors que `gardeStricte` ne lit le cookie que
+//    de `acc.domain` — un compte .fr et un seul onglet .com connecté à un AUTRE
+//    compte (cookies séparés) ⇒ la réponse, l'offre, la republication partaient
+//    au nom du compte .com. Et le compte était vérifié AVANT la file
+//    (`requeteVinted` peut attendre une moisson de 30 s+) : basculé pendant
+//    l'attente ⇒ le geste partait au nom du nouveau compte. Désormais : seul un
+//    onglet dont l'hôte est celui du compte, et le cookie de CE domaine relu ICI,
+//    dans le tour de la file, juste avant `executeScript`. Sinon rien ne part.
+const hoteSansWww = (h) => String(h || '').toLowerCase().replace(/^www\./, '');
+function ongletDuDomaine(t, domaine) {
+  if (!ongletEstVinted(t) || t.status !== 'complete') return false;
+  try { return hoteSansWww(new URL(String(t.url || '')).hostname) === hoteSansWww(domaine); } catch (_) { return false; }
+}
 async function pageVintedPour(acc) {
   if (!CAP.scripting || CAP_MAIN_REFUSE) return { refus: 'navigateur' };
-  const tab = await ongletVinted(null);
+  const domaine = (acc && acc.domain) || 'www.vinted.fr';
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] }); } catch (_) { tabs = []; }
+  const tab = (tabs || []).find((t) => ongletDuDomaine(t, domaine));
   if (!tab || tab.id == null) return { refus: 'onglet' };
+  const actif = await compteConnecte(domaine);
+  if (!actif || !acc || acc.vinted_user_id == null || String(actif) !== String(acc.vinted_user_id)) { noterDiag('page_compte_change'); return { refus: 'compte' }; }
   return { tabId: tab.id };
 }
 const RAISON_ONGLET_VINTED = "ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l'onglet ouvert pendant l'opération — VRM republie depuis la page Vinted, comme le site lui-même. Rien n'a été touché.";
+const RAISON_COMPTE_PAGE = "l'onglet vinted.fr n'est pas (ou plus) connecté sur ce compte — bascule sur ce compte dans l'onglet, puis réessaie. Rien n'est parti.";
 const RAISON_NAVIGATEUR_PAGE = "ce navigateur ne laisse pas VRM agir depuis la page Vinted — republie depuis Chrome sur l'ordinateur. Rien n'a été touché.";
 // `corps` : un objet (JSON) ou { photo: { b64, type, nom, temp } } (multipart).
 async function vintedPage(acc, method, endpoint, body, options = {}) {
@@ -11676,7 +11837,7 @@ async function vintedPagePhoto(acc, blob, nom, temp) {
 // Une republication refusée faute d'onglet : la phrase dite à l'app.
 function raisonSansPage(r) {
   if (!r || !r.sansPage) return '';
-  return r.sansPage === 'navigateur' ? RAISON_NAVIGATEUR_PAGE : RAISON_ONGLET_VINTED;
+  return r.sansPage === 'navigateur' ? RAISON_NAVIGATEUR_PAGE : r.sansPage === 'compte' ? RAISON_COMPTE_PAGE : RAISON_ONGLET_VINTED;
 }
 // (29 oct.) Quelques paires par jour et par compte, au début (sa décision avec
 // le modèle de Vintex). Fenêtre glissante de 24 h dans `chrome.storage.local`.
@@ -13324,6 +13485,7 @@ async function executerPourApp(msg, sender) {
     // c'est un geste humain, un à la fois. Un onglet qui a quitté Vinted : rien ne part.
     const rp = await vintedPage(acc, methode, msg.endpoint, msg.body, { timeoutMs: 12000 });
     if (rp && rp.horsVinted) return { status: 0, ok: false, json: { message: "l'onglet Vinted a changé de page — rien n'est parti, réessaie" } };
+    if (rp && rp.sansPage === 'compte') return { status: 0, ok: false, json: { message: RAISON_COMPTE_PAGE } };
     if (rp && rp.sansPage && !rp.pause) return vintedSend(acc, methode, msg.endpoint, msg.body);
     return rp;
   });
@@ -16540,7 +16702,7 @@ async function sbGet(query) {
     const session=await authToken();
     if(!session?.user_id||!session.access_token)return null;
     const filtre=`${query.includes('?')?'&':'?'}owner=eq.${encodeURIComponent(session.user_id)}`;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, { headers: {apikey:SUPABASE_KEY,Authorization:`Bearer ${session.access_token}`} });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, { headers: {apikey:SUPABASE_KEY,Authorization:`Bearer ${session.access_token}`}, signal: signalDelai(SB_DELAI_LECTURE_MS) });
     if (!res.ok) return null;
     const rows=await res.json();
     return (await loadSession())?.user_id===session.user_id?rows:null;
@@ -16618,7 +16780,7 @@ async function sbGetLbc(query) {
       const session = await authToken();
       if (!session?.user_id || !session.access_token) return null;
       const filtre = `${query.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(session.user_id)}`;
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, signal: signalDelai(SB_DELAI_LECTURE_MS) });
       if (res.ok) {
         const rows = await res.json();
         if (!Array.isArray(rows)) return null;
@@ -16643,6 +16805,7 @@ async function sbGetTout(query) {
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, {
         headers: { apikey:SUPABASE_KEY,Authorization:`Bearer ${session.access_token}`, Range: `${de}-${de + SB_PAGE - 1}`, 'Range-Unit': 'items' },
+        signal: signalDelai(SB_DELAI_LECTURE_MS),
       });
       if (!res.ok) return null;
       page = await res.json();

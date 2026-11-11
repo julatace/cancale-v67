@@ -26117,7 +26117,7 @@ const reattribueAEcrire = (f) => !!(f && f.reattribue && !f.reattribue.ecrit && 
 // <reserves-num-regle> — LA MÊME RÈGLE QUE L'EXTENSION (background.js), §11.
 // 20 octobre, Julien : « quand on publie sur Vinted je veux que le numéro soit
 // écrit à côté du bouton Publier ». L'extension RÉSERVE ce numéro au moment où
-// la page de dépôt s'ouvre (`panel_num_reserves.attente`, 3 h), puis le LIE à
+// la page de dépôt s'ouvre (`panel_num_reserves.attente`, sans expiration depuis 5.356), puis le LIE à
 // l'annonce que Vinted crée (`items[itemId]`, par l'identifiant rendu par
 // `POST /api/v2/item_upload/items` — une identité, §5). L'app : (1) ne donne
 // jamais un numéro réservé à une autre paire, (2) donne à l'annonce publiée le
@@ -26128,8 +26128,9 @@ function numerosReserves(data, maintenant) {
   if (!data || typeof data !== 'object') return out;
   const t = Number(maintenant) || Date.now();
   for (const [n, v] of Object.entries((data.attente && typeof data.attente === 'object') ? data.attente : {})) {
-    const at = Date.parse((v && v.at) || '');
-    if (!isNaN(at) && t - at < RESA_ATTENTE_MS) { const c = cleNum(n); if (c) out.cles.add(c); }
+    // 5.356 : une réservation MONTRÉE (peut-être écrite sur un carton) ne redevient jamais libre avec le temps (§5).
+    void v; void t; void RESA_ATTENTE_MS;
+    { const c = cleNum(n); if (c) out.cles.add(c); }
   }
   for (const [id, v] of Object.entries((data.items && typeof data.items === 'object') ? data.items : {})) {
     const c = cleNum(v && v.numero); if (!c || !/^\d{4,15}$/.test(id)) continue;

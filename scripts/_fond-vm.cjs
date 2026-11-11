@@ -196,12 +196,34 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       if (/^https:\/\/vrm\.center\/api\//.test(u0)) return appelVrm(u0, opts);
       if (HOTES_TRANSP.test(u0)) return appelTransporteur(u0, opts);
       if (!/\/rest\/v1\//.test(u0)) { j.ailleurs.push({ url: u0, methode: String(opts.method || 'GET').toUpperCase() }); return rep(404, {}); }
+      const prefer = String((opts.headers && (opts.headers.Prefer || opts.headers.prefer)) || '');
       if ((opts.method || 'GET') === 'POST') {
         let rows = []; try { rows = JSON.parse(opts.body || '[]'); } catch (_) {}
         if (rows.some((r) => r && ecritureKO(String(r.id)))) return rep(503, '{}');
+        // 5.356 : `resolution=ignore-duplicates,return=representation` (création
+        // d'une ligne par comparer-et-échanger) — une ligne déjà là n'est PAS
+        // touchée et la réponse est vide, comme PostgREST.
+        if (/ignore-duplicates/.test(prefer)) {
+          const pris = rows.filter((r) => r && r.id != null && lignes[r.id] === undefined);
+          j.posts.push(pris.map((r) => r.id));
+          for (const r of pris) lignes[r.id] = copie(r.data);
+          return /return=representation/.test(prefer) ? rep(201, pris.map((r) => ({ id: r.id }))) : rep(201, '');
+        }
         j.posts.push(rows.map((r) => r.id));
         for (const r of rows) if (r && r.id != null) lignes[r.id] = copie(r.data);
         return rep(201, '');
+      }
+      // 5.356 : PATCH conditionnel (`id=eq.X&data->>rev=eq.N`), comme PostgREST :
+      // seules les lignes qui passent le filtre sont réécrites, la réponse les nomme.
+      if ((opts.method || 'GET') === 'PATCH') {
+        const u = decodeURIComponent(metaVersData(u0));
+        const eq = /[?&]id=eq\.([^&]+)/.exec(u);
+        if (eq && ecritureKO(String(eq[1]))) return rep(503, '{}');
+        if (!eq || lignes[eq[1]] === undefined || !filtreOk({ id: eq[1], data: lignes[eq[1]] }, u)) return /return=representation/.test(prefer) ? rep(200, []) : rep(204, '');
+        let corps = {}; try { corps = JSON.parse(opts.body || '{}'); } catch (_) {}
+        if (corps && corps.data !== undefined) lignes[eq[1]] = copie(corps.data);
+        (j.patchs = j.patchs || []).push(eq[1]);
+        return /return=representation/.test(prefer) ? rep(200, [{ id: eq[1] }]) : rep(204, '');
       }
       if ((opts.method || 'GET') !== 'GET') return rep(204, '');
       const u = decodeURIComponent(metaVersData(u0));
