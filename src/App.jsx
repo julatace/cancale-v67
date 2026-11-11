@@ -49072,11 +49072,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
                 <div style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.45,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px'}}>
                   <div style={{color:C.text,fontWeight:600,marginBottom:ent.length?4:0}}>
-                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} au format 10×15 cm (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
+                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} au format ${papierThermique(reglageImpressionChoisi()).nom} (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
                     {(bordResult.etiquettes||0)>iso ? ` · ${bordResult.etiquettes} pages : un envoi international porte aussi l'étiquette du transporteur partenaire, colle-les toutes` : ''}
                     {ent.length>0 ? ` · ${ent.length} page${ent.length>1?'s':''} entière${ent.length>1?'s':''}` : ''}
                   </div>
                   {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 : découpe à la main.</div>}
+                  {/* (11 nov., lot thermique) Ce qui a été mesuré sur les étiquettes posées : dit, jamais caché. */}
+                  {(bordResult.codesFins||0)>0 && <div data-bord-codes-fins={bordResult.codesFins} style={{color:C.warn,fontWeight:600,marginTop:4}}>{bordResult.codesFins===1?'1 étiquette a':`${bordResult.codesFins} étiquettes ont`} un code-barres trop fin sur ce papier ({String(Math.round((bordResult.moduleMin||0)*100)/100).replace('.',',')} mm, il faut {String(MODULE_MIN_MM).replace('.',',')} mm) : il risque de ne pas se lire. Choisis un papier plus grand dans Paramètres → Impression des bordereaux.</div>}
+                  {(bordResult.codesPerdus||0)>0 && <div data-bord-codes-perdus={bordResult.codesPerdus} style={{color:C.warn,fontWeight:600,marginTop:4}}>Vérifie les codes-barres de {bordResult.codesPerdus===1?'1 étiquette':`${bordResult.codesPerdus} étiquettes`} sur l’aperçu avant d’imprimer : je ne les ai pas tous retrouvés.</div>}
+                  {(bordResult.fichesPrep||0)>0 && <div data-bord-fiches-prep={bordResult.fichesPrep} style={{marginTop:4}}>Pas de place sûre pour le N° sur {bordResult.fichesPrep===1?'1 étiquette':`${bordResult.fichesPrep} étiquettes`} : la fiche de préparation suit, à mettre DANS le colis.</div>}
+                  {(bordResult.sansTampon||0)>0 && <div data-bord-sans-tampon={bordResult.sansTampon} style={{color:C.warn,marginTop:4}}>{bordResult.sansTampon===1?'1 étiquette part':`${bordResult.sansTampon} étiquettes partent`} sans N° (aucune place sûre, fiche de préparation coupée) : écris-le à la main.</div>}
                 </div>
               ); })()}
             <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
