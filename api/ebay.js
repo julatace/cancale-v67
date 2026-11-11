@@ -1,5 +1,6 @@
 import './_lib/sans-bruit.js';
 import {creerLectureCommandesEbay} from './_lib/ebay-commandes-pages.js';
+import {creerHistoriqueEbay} from './_lib/ebay-historique.js';
 import {fusionCommandesEbay} from './_lib/ebay-synchronisation.js';
 import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 import {relireCommandesCompte} from './_lib/ebay-relecture.js';
@@ -2033,6 +2034,8 @@ async function handleModifierAnnonceGestion(b,ctx){
 
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
 const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireResumeCommandes,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
+// (11 nov., lot import-historique-sites) Tout l'historique des ventes eBay, fenêtre par fenêtre (api/_lib/ebay-historique.js).
+const importerHistoriqueEbay=creerHistoriqueEbay({lire:lireDonnee,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
 // (17 octobre) Après la vente : retours, annulations, promotion, achats.
 // Une annulation ACCEPTÉE marque la commande rangée « CANCELED » (comparer-et-
@@ -2251,6 +2254,7 @@ async function handleApp(req, res) {
       sync: (ctx) => handleSync(ctx),
       relire: (ctx) => handleRelire(ctx),
       commandessuite:(ctx)=>chargerCommandesSuivantes(ctx),
+      historique:(ctx)=>importerHistoriqueEbay(ctx,b),
       revise: (ctx) => handleRevise(b, ctx),
       pubinfo: (ctx) => handlePubInfo(b, ctx),
       parametres: (ctx) => handleParametres(b, ctx),

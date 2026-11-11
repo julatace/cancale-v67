@@ -1558,3 +1558,16 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne de CLAUDE.md §9 déplacée telle quelle (11 nov., lot visuels-reseaux)
 
 - **11 nov. · Visuels réseaux (lot `visuels-reseaux`)** : Annonces → « … » → « Visuel réseaux », ou Sélectionner → Actions → « Nouveautés de la semaine » : carré 1080 et story 1080 × 1920 dessinés DANS le navigateur (canvas, sans IA ni serveur), 3 modèles, 5 couleurs, nom de SA boutique (vide par défaut, `vrm_visuels_reglages`) ; photos par le chemin de l'app (`lirePhotoVisuel` : route photo, copie de l'extension, extension — jamais le `<img>` du CDN) ; pas lisible ⇒ dit, jamais une image vide ; jamais N° ni prix d'achat ; Partager (fichiers) ou Télécharger, rien publié. `docs/passation/2026-11-11-visuels-reseaux.md`. Geste : aucun.
+## Déplacé de CLAUDE.md §9 (11 nov., lots suivi-travail et import-historique-sites)
+
+## Déplacé de CLAUDE.md §9 (11 nov., lot import-historique-sites)
+
+- **11 nov. · Traduction (fr, en, es, it, de)** : `src/i18n/` (`tr()`, pluriels Intl, formats, chargement à la demande), Paramètres → Langue (`vrm_langue`, SYNC_KEYS) ; migrés : coque, menu du profil, Paramètres (liste), connexion, écrans d'erreur, accueil public ; le reste écran par écran (méthode, ordre) : `docs/passation/2026-11-11-traduction.md`. Geste : aucun.
+
+- **11 nov. · Notifications groupées (lot `notifs-groupees`)** : la 1re sonne, les suivantes (événements par objet) attendent 15 min (réglable : Non · 15 · 30 · 60) puis UN résumé « 2 colis à poster · 1 colis à retirer » (`api/_lib/notif-groupe.js`, passage `?moment=groupe` toutes les 15 min) ; urgent (< 24 h, double vente) tout de suite ; jamais deux fois (objet + jour) ; heures calmes respectées ; **jours calmes** (week-end, jours cochés, congés : seul l'urgent passe, le reste groupé au premier matin non calme) ; colis ⇒ Ventes / Achats, plus jamais `cat_bord` (à intégrer avec DJ3). `docs/passation/2026-11-11-notifs-groupees.md`. Geste : aucun.
+
+- **11 nov. · CI verte (ci-vert)** : rouges de « Vérifier avant fusion » repris sur e2 (bancs de navigation et argent-mois à la règle actuelle, rouges de doublon par `--vrm-doublon`, `_source-app` sans double import, Chrome en dur, icônes, coque) ; installations de navigateur réessayées ; Parcours critiques : garde réseau après le checkout. `docs/passation/2026-11-11-ci-vert.md`. Geste : aucun.
+
+- **11 nov. · Tout au vert (vert-11nov)** : les bancs s'ouvrent en **fr-FR** par défaut (l'app suit la langue du navigateur ; un runner en-US affichait « Today · Listings » : `_garde-reseau.cjs` pose la langue quand le banc n'en pose pas) ; audits portés à `tr()` (`scripts/_tr-fr.cjs` : un libellé se juge dans fr.js par sa clé), à DJ4 (`?tab=trancher` ⇒ Ma journée), journee-perso, impression sans confirmation ; Argent lit `vrm_pro_facture` une fois (`lireReglageMontage`) ; budgets hors de `scripts/bancs/`. Reste `audit-colis-envoi` B (zone Colis, `claude/revue-colis`). `docs/passation/2026-11-11-vert-11nov.md`. Geste : aucun.
+
+- **11 nov. · Vraie base, étape 1** : migration **038** (pas appliquée) : tables typées (annonces, ventes, achats, colis, emails, numeros append-only, comptes sans jeton…), clé = identité, RLS, remplies À CÔTÉ d'`app_data` par déclencheur ; l'app ne les lit pas encore. `audit-tables-typees-sql.cjs`, `2026-11-11-base-tables.md`. Geste : §6 du récit.
