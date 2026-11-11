@@ -1493,7 +1493,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
       : `${BP.n === 0 ? 'aucune vente finalisée · ' : ''}après prix d’achat, frais${BP.depenses === 'jamais' ? '' : ', dépenses'}${BP.sansCotis ? '' : ' et URSSAF'}${BP.depenses === 'jamais' ? ' · avant tes dépenses' : ''}`;
     return tuile('benefice', NOM_BENEFICE, CB.valeur == null ? '—' : fmt(CB.valeur), sous,
       { 'data-sv-etat': BP ? 'lu' : etatBP, 'data-sv-n': BP ? BP.n : undefined, 'data-sv-ncout': BP ? BP.nCout : undefined, 'data-sv-brut': BP && BP.nCout > 0 ? cents(BP.brut) : '', ...CB.attrs },
-      `Bénéfice : tes ventes finalisées moins le prix d’achat des ${motsVendeur().noms}, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.');
+      `Bénéfice : tes ventes finalisées moins le prix d’achat des ${motsVendeur().noms}, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.`);
   })();
   const tDelai = !releve
     ? tuile('delai', 'Temps pour vendre', '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
