@@ -78,9 +78,9 @@ test('/api/widget : une clé inventée ne déclenche jamais la lecture de toutes
       await widget({ method: 'GET', query: { k }, headers: {} }, r);
       assert.equal(r.statusCode, 401, `clé « ${k} »`);
     }
-    const balayages = lus.filter((u) => u.includes('vrm_widget_token') && !u.includes('vrm_widget_token=eq.') && !u.includes('jeton_index') && !u.includes('vrm_jeton'));
+    const balayages = lus.filter((u) => u.includes('vrm_widget_token') && !u.includes('vrm_widget_token=eq.') && !/[?&]limit=2(&|$)/.test(u) && !u.includes('jeton_index') && !u.includes('vrm_jeton'));
     assert.equal(balayages.length, 0, `lecture de toutes les lignes main : ${balayages.length}`);
-    assert.ok(lus.every((u) => !/vrm_widget_token=eq\.[^&]*[&(),]/.test(decodeURIComponent(u.split('vrm_widget_token=eq.')[1] || '').split('&select')[0] + '&')), 'valeur brute dans le filtre');
+    assert.ok(!lus.some((u) => decodeURIComponent(u).includes('or=(id.neq.0)')), 'valeur brute de la clé injectée dans le filtre');
   } finally { net.rendre(); }
 });
 

@@ -115,7 +115,7 @@ function memeToken(a, b) {
 // Transition : un vendeur unique qui n'a pas encore de clé (avant d'avoir rouvert
 // l'app) est servi, sinon son widget tomberait avant qu'il récupère l'adresse.
 // Rend `null` APRÈS avoir répondu lui-même (503/401) quand il faut s'arrêter.
-export const CLE_WIDGET = /^[A-Za-z0-9_-]{16,64}$/;
+export const CLE_WIDGET = /^[A-Za-z0-9_-]{4,64}$/;
 async function ownerDuToken(req, res) {
   const cl = await cloisonnee();
   if (cl === null) {
@@ -126,8 +126,21 @@ async function ownerDuToken(req, res) {
   const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
   // (11 nov., revue de sécurité) Une clé absente ou mal formée ne déclenche plus
   // la lecture PAR PAGES de toutes les lignes `main` (travail coûteux offert à
-  // un anonyme). L'app fabrique des clés de 28 signes [A-Za-z0-9].
-  if (!CLE_WIDGET.test(given)) { res.status(401).json({ error: 'cle invalide' }); return null; }
+  // un anonyme). L'app fabrique des clés de 28 signes [A-Za-z0-9] ; jamais un
+  // signe qui changerait le filtre (&, virgule, parenthèse…).
+  if (given && !CLE_WIDGET.test(given)) { res.status(401).json({ error: 'cle invalide' }); return null; }
+  // Transition d'avant (une seule boutique, pas encore de clé) : servie SANS clé,
+  // mais en lisant DEUX lignes au plus — jamais toutes.
+  if (!given) {
+    let deux = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
+      const j = r.ok || r.status === 206 ? await r.json() : null; deux = Array.isArray(j) ? j.slice(0, 2) : null;
+    } catch (_) { deux = null; }
+    if (deux === null) { res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." }); return null; }
+    if (deux.length === 1 && !deux[0].vrm_widget_token) return deux[0].owner || '';
+    res.status(401).json({ error: 'cle invalide' }); return null;
+  }
   // (7 nov., audit « 1 000 vendeurs ») L'INDEX DES JETONS (api/_lib/jeton-index.js) :
   //    une ligne lue par sa clé exacte au lieu de TOUTES les lignes `main`.
   //    L'index ne fait jamais foi seul : le jeton est re-comparé (durée
@@ -158,7 +171,8 @@ async function ownerDuToken(req, res) {
     res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
     return null;
   }
-  const parCle = lignes.length === 1 && lignes[0].owner && memeToken(given, lignes[0].vrm_widget_token) ? lignes[0] : null;
+  const bons = lignes.filter((x) => x && x.owner && memeToken(given, x.vrm_widget_token));
+  const parCle = bons.length === 1 ? bons[0] : null;
   if (parCle) {
     // Transition : la prochaine fois, l'index (une écriture ratée ne coûte
     // qu'une nouvelle recherche au passage suivant, jamais la réponse).
