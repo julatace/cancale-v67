@@ -280,6 +280,10 @@ const CAP=process.env.BANC_CAPTURE||'';
         if(CAP) fs.writeFileSync(path.join(CAP,`registre-achats-${nomT}.pdf`),pdfA.octets);
         const LA=(await lirePdf(pdfA.octets)).map(l=>l.join(' ')).join('\n').replace(/[  ]/g,' ');
         dit(/Registre des achats/.test(LA)&&/vendeuse_71001/.test(LA)&&/Photo du ticket/.test(LA)&&/À compléter/.test(LA),'PDF des achats : pseudo, ticket, à compléter');
+        const cibles=await pg.evaluate(()=>[...document.querySelectorAll('[data-registres-vue] button, [data-registres-vue] select, [data-registres-vue] input')].filter(e=>e.offsetParent&&!e.classList.contains('vrm-seg-btn')).map(e=>Math.round(e.getBoundingClientRect().height)));
+        dit(cibles.length&&cibles.every(h=>h>=44),'cibles au doigt ≥ 44 px',cibles.join(','));
+        const deb=await pg.evaluate(()=>{ const s=document.querySelector('[data-registres-vue]'); return s?s.scrollWidth-s.clientWidth:0; });
+        dit(deb<=1,'aucun débordement horizontal dans la feuille',`${deb}px`);
         // (11 nov.) « Payé en » dans la fiche de l'achat hors plateforme : lu, changé par SON toucher, rangé avec l'achat.
         await pg.keyboard.press('Escape').catch(()=>{}); await pg.waitForTimeout(400);
         await aller(pg,'achats','[data-achats-hors]',1500);
@@ -297,10 +301,6 @@ const CAP=process.env.BANC_CAPTURE||'';
         await pg.waitForFunction(()=>{ try{ const l=JSON.parse(localStorage.getItem('vinted_offvinted_buys')||'[]'); const b=l.find(x=>x&&x.id==='hb1'); return b&&b.paiement==='carte'; }catch(_){ return false; } },null,{timeout:10000}).catch(()=>{});
         const rangé=await pg.evaluate(()=>{ try{ const l=JSON.parse(localStorage.getItem('vinted_offvinted_buys')||'[]'); const b=l.find(x=>x&&x.id==='hb1'); return b?b.paiement:null; }catch(_){ return null; } });
         dit(rangé==='carte','« Carte » rangé avec l’achat (vinted_offvinted_buys, synchronisé)',rangé);
-        const cibles=await pg.evaluate(()=>[...document.querySelectorAll('[data-registres-vue] button, [data-registres-vue] select, [data-registres-vue] input')].filter(e=>e.offsetParent&&!e.classList.contains('vrm-seg-btn')).map(e=>Math.round(e.getBoundingClientRect().height)));
-        dit(cibles.length&&cibles.every(h=>h>=44),'cibles au doigt ≥ 44 px',cibles.join(','));
-        const deb=await pg.evaluate(()=>{ const s=document.querySelector('[data-registres-vue]'); return s?s.scrollWidth-s.clientWidth:0; });
-        dit(deb<=1,'aucun débordement horizontal dans la feuille',`${deb}px`);
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       }catch(e){ dit(false,T.nom,String(e.message||e).slice(0,200)); }
