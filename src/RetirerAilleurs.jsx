@@ -38,7 +38,7 @@ export function RetirerAilleursBloc({ plan, resultats = null, enVol = false, onR
         <article key={art.numero} className="vrm-ra-article" data-ra-numero={art.numero} data-ra-vendu={art.venduSur.join(' ')}>
           <div className="vrm-ra-photo">{art.photo && PhotoVinted ? <PhotoVinted src={art.photo} alt="" loading="lazy"/> : <PhotoVide remplir/>}</div>
           <div className="vrm-ra-corps">
-            <strong className="vrm-ra-phrase" data-ra-phrase="">{phraseArticle(art)}</strong>
+            <strong className="vrm-ra-phrase" data-ra-phrase="">{fait ? `N°${art.numero} vendu sur ${art.venduSur.join(', ') || '—'}` : phraseArticle(art)}</strong>
             {art.titre ? <small className="vrm-ra-titre">{art.titre}</small> : null}
             <ul className="vrm-ra-sites">
               {art.sites.map((s) => {
