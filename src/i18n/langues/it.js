@@ -467,8 +467,6 @@ export default {
   "rp.carte.rienParti": "Non è stato inviato nulla a Vinted.",
   "rp.carte.reprogrammer": "Riprogramma",
   "rp.carte.compris": "Capito",
-  "rp.depart.journal": "Partenza programmata delle {heure}: le impostazioni della tua programmazione",
-  "rp.depart.absentes": {"one": "{n} annuncio non è più online: non inviato", "other": "{n} annunci non sono più online: non inviati"},
   "rp.modif.titre": "Stai modificando la programmazione di {quand}",
   "rh.titre": "Ripubblicazioni",
   "rh.fois": {"one": "ripubblicata {n} volta", "other": "ripubblicata {n} volte"},

@@ -467,8 +467,6 @@ export default {
   "rp.carte.rienParti": "Nichts wurde an Vinted gesendet.",
   "rp.carte.reprogrammer": "Neu planen",
   "rp.carte.compris": "Verstanden",
-  "rp.depart.journal": "Geplanter Start um {heure}: die Einstellungen deiner Planung",
-  "rp.depart.absentes": {"one": "{n} Anzeige ist nicht mehr online: nicht gesendet", "other": "{n} Anzeigen sind nicht mehr online: nicht gesendet"},
   "rp.modif.titre": "Du änderst die Planung für {quand}",
   "rh.titre": "Neueinstellungen",
   "rh.fois": {"one": "{n}-mal neu eingestellt", "other": "{n}-mal neu eingestellt"},

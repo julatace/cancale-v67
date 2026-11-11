@@ -467,8 +467,6 @@ export default {
   "rp.carte.rienParti": "Nothing was sent to Vinted.",
   "rp.carte.reprogrammer": "Reschedule",
   "rp.carte.compris": "Got it",
-  "rp.depart.journal": "Scheduled start at {heure}: your schedule’s settings",
-  "rp.depart.absentes": {"one": "{n} listing is no longer live: not sent", "other": "{n} listings are no longer live: not sent"},
   "rp.modif.titre": "You’re editing the schedule for {quand}",
   "rh.titre": "Relistings",
   "rh.fois": {"one": "relisted {n} time", "other": "relisted {n} times"},

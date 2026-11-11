@@ -1503,8 +1503,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       } });
     // (11 nov.) Un départ programmé le dit en tête du journal, et nomme les paires qui ne sont plus en ligne.
     if (programme && programmeMode === 'depart' && suiviRef.current) {
-      suiviRef.current.noter(tr('rp.depart.journal', { heure: heureLoc(programme.at) }));
-      if (absentesProg.current.length) suiviRef.current.noter(tr('rp.depart.absentes', { n: absentesProg.current.length }), null, 'pause');
+      // Le journal reste en français (trace copiable, règle du lot suivi-travail).
+      const hh = new Date(programme.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      suiviRef.current.noter(`Départ programmé de ${hh} : les réglages de ta programmation`);
+      const nAbs = absentesProg.current.length;
+      if (nAbs) suiviRef.current.noter(`${nAbs} annonce${nAbs > 1 ? 's' : ''} programmée${nAbs > 1 ? 's' : ''} plus en ligne : pas envoyée${nAbs > 1 ? 's' : ''}`, null, 'pause');
     }
     return true;
   };

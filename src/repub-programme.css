@@ -1,7 +1,7 @@
 /* ── REPUBLIER PROGRAMMÉ ET HISTORIQUE (11 nov., src/RepubProgramme.jsx, src/HistoriqueRepub.jsx) ──
    DA Apple : neutre ; l'accent seulement sur le bouton principal ; l'AMBRE pour « pas partie »
    (un geste à faire) ; jamais de rouge (§7). Cibles 44 px. */
-.vrm-rp { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-card, #fff); min-width: 0; }
+.vrm-rp { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-surface, #fff); min-width: 0; }
 .vrm-rp-titre { margin: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1d1d1f); }
 .vrm-rp-champ { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--vrm-muted, #6e6e73); }
 .vrm-rp-champ input { min-height: 44px; font-size: 16px; padding: 8px 10px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 10px; background: var(--vrm-bg, #fff); color: var(--vrm-ink, #1d1d1f); font-family: inherit; max-width: 100%; box-sizing: border-box; }
@@ -17,7 +17,7 @@
 .vrm-rp-principal:disabled, .vrm-rp-ouvrir:disabled { opacity: .45; cursor: default; }
 .vrm-rp-second, .vrm-rp-ouvrir { border: 1px solid var(--vrm-line, #e5e5ea); background: transparent; color: var(--vrm-ink, #1d1d1f); }
 .vrm-rp-cartes { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
-.vrm-rp-carte { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-card, #fff); min-width: 0; }
+.vrm-rp-carte { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-surface, #fff); min-width: 0; }
 .vrm-rp-carte-ambre { border-color: var(--vrm-warn, #b25000); }
 .vrm-rp-carte-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 220px; }
 .vrm-rp-carte-txt b { font-size: 14px; color: var(--vrm-ink, #1d1d1f); }

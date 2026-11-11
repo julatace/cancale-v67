@@ -467,8 +467,6 @@ export default {
   "rp.carte.rienParti": "No se envió nada a Vinted.",
   "rp.carte.reprogrammer": "Volver a programar",
   "rp.carte.compris": "Entendido",
-  "rp.depart.journal": "Salida programada de las {heure}: los ajustes de tu programación",
-  "rp.depart.absentes": {"one": "{n} anuncio ya no está en línea: no enviado", "other": "{n} anuncios ya no están en línea: no enviados"},
   "rp.modif.titre": "Estás modificando la programación de {quand}",
   "rh.titre": "Republicaciones",
   "rh.fois": {"one": "republicada {n} vez", "other": "republicada {n} veces"},

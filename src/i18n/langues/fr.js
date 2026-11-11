@@ -472,8 +472,6 @@ export default {
   "rp.carte.rienParti": "Rien n’a été envoyé à Vinted.",
   "rp.carte.reprogrammer": "Reprogrammer",
   "rp.carte.compris": "Compris",
-  "rp.depart.journal": "Départ programmé de {heure} : les réglages de ta programmation",
-  "rp.depart.absentes": {"one": "{n} annonce n’est plus en ligne : pas envoyée", "other": "{n} annonces ne sont plus en ligne : pas envoyées"},
   "rp.modif.titre": "Tu modifies la programmation de {quand}",
   "rh.titre": "Republications",
   "rh.fois": {"one": "republiée {n} fois", "other": "republiée {n} fois"},
