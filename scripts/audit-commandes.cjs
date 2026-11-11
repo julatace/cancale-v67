@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),parser=require('@babel/par
 const root=path.resolve(__dirname,'..'),items=[];
 const content=n=>n.type==='JSXText'?n.value.trim():n.type==='JSXExpressionContainer'?(n.expression.type==='JSXEmptyExpression'?'':'[calculé]'):n.type==='JSXElement'?(n.children||[]).map(content).join(' '):'';
 // (8 nov., démarrage léger) + les écrans découpés d'App.jsx (src/ecrans/)
-const _ecrans=(()=>{try{return fs.readdirSync(path.join(root,'src','ecrans')).filter(f=>f.endsWith('.jsx')).sort().map(f=>'ecrans/'+f);}catch(_){return [];}})();
+const _ecrans=['ecrans','coeur'].flatMap(d=>{try{return fs.readdirSync(path.join(root,'src',d)).filter(f=>f.endsWith('.jsx')).sort().map(f=>d+'/'+f);}catch(_){return [];}});   // (11 nov.) + src/coeur/ (découpe 2)
 for(const file of fs.readdirSync(path.join(root,'src')).filter(f=>f.endsWith('.jsx')).concat(_ecrans)){
  const src=fs.readFileSync(path.join(root,'src',file),'utf8');
  function walk(n,scope='module'){

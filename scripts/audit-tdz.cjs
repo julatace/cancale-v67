@@ -53,7 +53,8 @@ const estImmediate = (fn) => {
 
 const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f)).map((f) => 'src/' + f);
 // (8 nov., démarrage léger) et les écrans découpés d'App.jsx (src/ecrans/), chargés à la demande
-try { for (const f of fs.readdirSync(path.join(R, 'src', 'ecrans')).filter((f) => /\.jsx?$/.test(f)).sort()) fichiers.push('src/ecrans/' + f); } catch (_) {}
+// (11 nov., découpe 2) et les modules de scripts/decouper-app-2.cjs (src/coeur/)
+for (const d of ['ecrans', 'coeur']) try { for (const f of fs.readdirSync(path.join(R, 'src', d)).filter((f) => /\.jsx?$/.test(f)).sort()) fichiers.push('src/' + d + '/' + f); } catch (_) {}
 const defauts = [];
 let fonctions = 0;
 for (const f of fichiers) {

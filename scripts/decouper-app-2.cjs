@@ -177,7 +177,8 @@ function lectureVue(A, fnPath, E) {
       if (dedans(cv.node)) { refus.push(`écrit la variable ${nom} du composant (ligne ${cv.node.loc.start.line})`); continue; }
       // Permis : une réaffectation faite AVANT la branche, dans le rendu lui-même — directement, ou dans
       // une fonction appelée sur-le-champ ((() => { x = … })()) : la valeur passée est la valeur finale.
-      const fDecl = b.scope.getFunctionParent();
+      const sDecl = b.scope.getFunctionParent();   // (une Scope : son nœud est `.block`)
+      const fDecl = sDecl ? { node: sDecl.block } : null;
       let f = cv.getFunctionParent(), parIIFE = true;
       while (f && fDecl && f.node !== fDecl.node) {
         const par = f.parentPath;
@@ -386,8 +387,8 @@ function decouper(src, mod, appFile) {
     R.deplaces.push({ noms: nomsDe[i].join('+'), taille: body[i].end - body[i].start });
   }
   const exportsNoms = mod.sorte === 'pur' ? [...new Set([...racines, ...exporteVers])] : racines;
-  const exportsMod = exportsNoms.length ? `\nexport { ${exportsNoms.join(', ')} };\n` : '\n';
-  const texteModule = tete + enveloppes + teteImp + '\n' + corps + exportsMod;
+  const exportsMod = exportsNoms.length ? `\nexport { ${exportsNoms.join(', ')} };\n` : '';   // (rien après la dernière suite : sourceApp la recolle telle quelle)
+  const texteModule = tete + enveloppes + teteImp + corps + exportsMod;   // (chaque suite commence par sa balise « \n// ⟦← … ⟧ » : rien entre deux)
   R.tailleModule = Buffer.byteLength(texteModule);
   R.racines = racines;
 
@@ -405,14 +406,23 @@ function decouper(src, mod, appFile) {
     }
     return res;
   };
+  const retires = new Set(idxRetires);
   for (const i of idxRetires) {
-    let rep = debutSuite(i) ? `\n// ⟦→ ${modRel} #${suiteDe.get(i)}⟧` : '';
+    const rep = debutSuite(i) ? `\n// ⟦→ ${modRel} #${suiteDe.get(i)}⟧` : '';
+    edits.push([debutMorceau(i), body[i].end, rep]);
     if (Mimp.has(i)) {
       const abs = path.resolve(path.dirname(appFile), body[i].source.value);
       const css = [...new Set(cssDe(fs.existsSync(abs) ? abs : abs + '.js'))];
-      for (const c of css) { let r = path.relative(path.dirname(appFile), c).split(path.sep).join('/'); if (!r.startsWith('.')) r = './' + r; rep += `\nimport '${r}'; // (8 nov.) style de ${body[i].source.value}, gardé à sa place (son écran est chargé à la demande)`; }
+      let lignesCss = '';
+      for (const c of css) { let r = path.relative(path.dirname(appFile), c).split(path.sep).join('/'); if (!r.startsWith('.')) r = './' + r; lignesCss += `\nimport '${r}'; // (8 nov.) style de ${body[i].source.value}, gardé à sa place (son écran est chargé à la demande)`; }
+      if (!lignesCss) continue;
+      // après la fin de SA ligne (un commentaire de fin de ligne reste avec son import dans le texte recollé),
+      // sauf si la suite continue (le commentaire part alors avec elle, et les styles viennent après la suite)
+      const eol = src.indexOf('\n', body[i].end);
+      const finLigneSeule = eol > 0 && /^[ \t]*(\/\/[^\n]*)?$/.test(src.slice(body[i].end, eol)) && (i + 1 >= n || body[i + 1].start > eol);
+      if (!retires.has(i + 1) && finLigneSeule) edits.push([eol, eol, lignesCss]);
+      else edits[edits.length - 1][2] += lignesCss;
     }
-    edits.push([debutMorceau(i), body[i].end, rep]);
   }
   for (const v of vues) edits.push([v.E.start, v.E.end, `/*⟦→ ${modRel} #${v.cle}⟧*/<${v.nom} v={{ ${v.captures.join(', ')} }}/>/*⟦→/⟧*/`]);
   if (mod.sorte === 'pur') {

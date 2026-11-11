@@ -47,18 +47,76 @@
           "condition": "curSub==='messages' && !filTous",
           "nom": "VueMessages",
           "laPlusGrande": true
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "!openConv.loading && !openConv.error && openConv.convId",
+          "nom": "VueConversation"
         }
       ],
       "precharger": true
     },
     {
-      "fichier": "coeur/Rapport.jsx",
+      "fichier": "coeur/VueColis.jsx",
       "sorte": "ecran",
+      "precharger": true,
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "ongletColisVu==='envoyer'",
+          "nom": "VueColisEnvoyer",
+          "laPlusGrande": true
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "curSub==='bordereaux' && ongletColisVu==='envoyes'",
+          "nom": "VueColisEnvoyes"
+        }
+      ]
+    },
+    {
+      "fichier": "coeur/VueColisHaut.jsx",
+      "sorte": "ecran",
+      "precharger": true,
+      "_note": "après VueColis : la branche « envoyer » qui reste est celle du haut",
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "ongletColisVu==='envoyer'",
+          "nom": "VueColisEnvoyerHaut",
+          "laPlusGrande": true
+        }
+      ]
+    },
+    {
+      "fichier": "coeur/FeuillesCompta.jsx",
+      "sorte": "ecran",
+      "feuille": true,
       "vues": [
         {
           "composant": "Comptabilite",
           "condition": "showReport",
-          "nom": "VueRapport"
+          "nom": "FeuilleRapport"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "showAnnual",
+          "nom": "FeuilleAnnuel"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "fillBuyOpen",
+          "nom": "FeuilleSaisieAchats"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "showWrapped",
+          "nom": "FeuilleBilan"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "repubAction",
+          "nom": "FeuilleRepublier"
         }
       ]
     },

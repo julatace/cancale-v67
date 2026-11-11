@@ -124,6 +124,9 @@ function sourceApp(racine) {
       const t = m[k]; delete m[k]; change = true; return cheminsVusDeSrc(t);
     });
   }
+  // (11 nov.) Une racine paresseuse peut avoir voyagé DANS un morceau (déplacé ensuite vers un autre module) :
+  // la même règle qu'en tête, sur le texte recollé.
+  out = out.replace(/^const \w+ = aLaDemande\(\(\) => import\('\.\/ecrans\/[^\n]*\n/gm, '');
   // Ce qui n'a pas retrouvé sa place (balise effacée, écran écrit à la main) : à la fin, ses imports recollés.
   const deja = importesDe(out);
   const restes = [];
