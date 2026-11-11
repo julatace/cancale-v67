@@ -98,8 +98,9 @@ Julien, 11 nov. : un NOUVEAU vendeur démarre en 10 minutes, avec « un vrai acc
   « C'est prêt »), **rechargement à CHAQUE étape (reprise exacte)**, **autre appareil** (stockage
   vide) repris à la même étape ; B « Plus tard » / ✕ ; C installé : rien, dressing illisible jamais
   coché. **188 verts, 0 rouge sur les 4 combinaisons.** Mutation de l'app (extension « pas
-  connectée » = faite, build à part) ⇒ **5 rouges** ; code d'avant (`git archive origin/main` + build,
-  banc copié dedans) : voir le rapport de fin.
+  connectée » = faite, build à part) ⇒ **5 rouges** ; code d'avant (`git archive origin/main` 1ca9c09 + build,
+  banc copié dedans) : **11 rouges puis arrêt** (aucun parcours). Après fusion de `origin/main`
+  (23f71d6, lot DJ2 « Tu vends quoi ? » seule gardé) : **188 verts, 0 rouge** à nouveau.
 - Bancs suivis, verts à 390 clair : `premieres-minutes.cjs` (réécrit pour six étapes : la question du
   numéro est dans la configuration, « Vérifier » par Paramètres), `mode-exemple.cjs`,
   `configuration-depart.cjs` (C2 « Reprendre » porté par la carte du parcours).
