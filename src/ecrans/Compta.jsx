@@ -1431,7 +1431,8 @@ const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length 
 // ⟦← App.jsx #25⟧
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
-const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// (11 nov.) LA lecture d'un montant saisi (`lireMontantSaisi`) : « 1.234,56 » ou « 12.5.3 » sont refusés, jamais lus 1,23 € / 12,5 €.
+const parseMontant = (s) => { const n = lireMontantSaisi(s); return n != null && n > 0 ? n : null; };
 // ⟦← App.jsx #26⟧
 // (3 nov.) Les LIGNES des charges d'un mois — les mêmes que `comptaChargesMois`
 // somme (fixes, dépenses et packs du mois, échéances d'abonnement) : le récap du

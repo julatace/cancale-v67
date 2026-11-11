@@ -44,8 +44,9 @@ export const VC_VENTE_ETAPES = [
   ['annulee', /cancel|annul|refund|rembours|return|retour|litige|dispute/i, 'Annulée ou retournée'],
   ['versee', /payout|paid.?out|vers[ée]|virement|transferred|credited|cr[ée]dit/i, 'Argent versé'],
   ['terminee', /complet|finali|termin|closed|done|clotur/i, 'Terminée'],
-  ['livree', /deliver|livr|received|re[cç]u/i, 'Livrée à l’acheteur'],
-  ['controle', /authenti|control|inspect|verif|expertis|check|quality/i, 'Contrôle par Vestiaire'],
+  // (11 nov.) « Paiement reçu » (payée par l'acheteur) n'est PAS « livrée » ; « checkout » n'est pas un contrôle.
+  ['livree', /deliver|livr[ée]|(?<!paiement |payment |paid )\b(?:received|re[cç]u)\b(?!.*paiement)/i, 'Livrée à l’acheteur'],
+  ['controle', /authenti|control|inspect|verif|expertis|quality|\bcheck(?!out)/i, 'Contrôle par Vestiaire'],
   ['en-route', /ship|sent|transit|exp[ée]di|envoy|on.?the.?way|in.?delivery|dispatch/i, 'Envoyée'],
 ];
 // L'étape nommée par le mot, ou '' (aucun mot, ou un mot qu'aucune étape ne nomme).
@@ -96,7 +97,8 @@ export const numVcAnnonce = (id, it, liens, auto) => cleNum((id != null && objet
 // net vendeur…). « price », « amount », « total » seuls ne le disent pas.
 // (2 nov.) `vousGagnez` : « Vous gagnez » de l'email de vente Vestiaire
 // (api/_lib/vestiaire-email.js) — la même valeur que `sellerEarning`, mesurée.
-export const CLE_RECU_VC = /payout|earning|vous.?gagnez|net.?(amount|price|seller|vendeur)|seller.?(amount|net|payout|revenue|earning|price)|amount.?to.?(seller|receive|pay)|you.?(get|receive|earn)|to.?receive|versement|vers[ée]|gain/i;
+// (11 nov.) ni `sellerPrice` (le PRIX DE VENTE, avant commission — §8 vcprixvente) ni `sellerAmount` : ils ne disent pas « versé ».
+export const CLE_RECU_VC = /payout|earning|vous.?gagnez|net.?(amount|price|seller|vendeur)|seller.?(net|payout|revenue|earning)|amount.?to.?(seller|receive|pay)|you.?(get|receive|earn)|to.?receive|versement|vers[ée]|gain/i;
 export function montantRecuVc(v) {
   const m = v && objet(v.montant);
   if (!m || typeof m.valeur !== 'number' || !isFinite(m.valeur) || m.valeur < 0) return { eur: null, raison: 'montant pas lu' };

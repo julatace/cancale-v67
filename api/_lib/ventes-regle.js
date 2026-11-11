@@ -57,6 +57,8 @@ export const montantCommande = (o) => {
 export const montantCommandeLu = (o) => {
   const p = o && o.price;
   if (p == null) return null;
+  // (11 nov., famille « pas su ≠ 0 ») une commande dans une autre devise n'est pas sue EN EUROS : écartée, jamais convertie.
+  if (typeof p === 'object' && p.currency_code && String(p.currency_code).toUpperCase() !== 'EUR') return null;
   const v = (typeof p === 'object') ? (p.amount ?? p.value) : p;
   if (v == null || String(v).trim() === '') return null;
   const n = Number(String(v).replace(',', '.'));

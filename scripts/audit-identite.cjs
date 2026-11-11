@@ -239,7 +239,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 //        sinon taper « 20 » posait d'abord le N°2 sur la paire (et brûlait ce
 //        numéro au passage).
 {
-  /\(porteursNum\[String\(cur\.numero\)\] \|\| \[\]\)\.some\(x => x\.type === 'garage'\)/.test(SRC)
+  /\(porteursNum\[cleNum\(cur\.numero\)\] \|\| \[\]\)\.some\(x => x\.type === 'garage'\)/.test(SRC)   // (11 nov.) la carte est rangée par cleNum
     ? ok('la reprise auto ne touche jamais une paire rangée au garage')
     : nok('la reprise auto ne touche jamais une paire rangée au garage',
           'une paire déjà dans sa boîte peut encore changer de numéro toute seule');

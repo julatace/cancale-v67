@@ -39518,7 +39518,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Export CSV du rapport (ventes + registre d'achats).
   const exportReportCsv = () => {
-    const R=report; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+    // (11 nov.) un montant s'écrit « 12,50 » (Excel français lit « 12.50 » comme du texte ou une date) — la règle de `nbT`.
+    const R=report; const e=(v)=>{ let s=String(v==null?'':v); if(typeof v==='string'&&/^-?\d+\.\d{2}$/.test(s)) s=s.replace('.',','); return `"${s.replace(/"/g,'""')}"`; };
     const L=[];
     L.push([`Rapport ${R.monthLabel}`]);
     L.push([`Régime`, libelleRegime(R.regime)]);
@@ -39725,7 +39726,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try { const buf=lu.octets; const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ toast('Impossible d\'ouvrir ce reçu.'); }
   };
   const exportAnnualCsv = () => {
-    const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+    // (11 nov.) un montant s'écrit « 12,50 » (Excel français lit « 12.50 » comme du texte ou une date) — la règle de `nbT`.
+    const R=annual; const e=(v)=>{ let s=String(v==null?'':v); if(typeof v==='string'&&/^-?\d+\.\d{2}$/.test(s)) s=s.replace('.',','); return `"${s.replace(/"/g,'""')}"`; };
     const L=[];
     L.push([`Bilan annuel ${R.year}`]);
     L.push([`Régime`, libelleRegime(R.regime)]);
