@@ -1314,4 +1314,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **10 nov. · Import tableur, partage de photo, aide par écran (lot J)** : Achats → « Nouvel achat » → « Importer un tableur » (CSV/.xlsx lus dans le navigateur sans dépendance, aperçu ligne à ligne, doublons par RÉFÉRENCE seulement, prix du fichier, N° par `numeroExterne`, coût posé seulement sur une fiche sans prix, rien écrit sans « Importer N achats ») ; VRM cible de partage (`share_target`, `public/sw.js` ⇒ « Nouvel achat » avec la photo ; pas sur iPhone/Safari) ; le « ? » ouvre 3–5 gestes (`scripts/aide-contenu.cjs` ⇒ `src/aideEtapes.js`). `docs/passation/2026-11-10-import-partage-aide.md`. Geste : aucun.
 
+## Déplacé de CLAUDE.md §9 (11 nov., extension 5.340)
+
+- **10 nov. · Échéances dans l'agenda + alerte « nouvel appareil » (lot H)** : Paramètres → Notifications → « Ajouter à mon agenda » = lien webcal secret (`vrm_agenda` + index, régénérable/coupable, `/agenda/<jeton>.ics` → `?mode=agenda`) : URSSAF (micro, non déclarée), dépôts LUS (`vrm_agenda_envoi` publié par Ma journée), retraits LUS ; rien de personnel (`api/_lib/agenda-ics.js`) ; à chaque ouverture `?mode=appareils {verifier}` relit ses sessions (024), signature jamais vue ⇒ push « Nouvel appareil : Chrome sur Mac. Ce n'est pas toi ? » ⇒ Appareils connectés, CETTE session en ambre (`api/_lib/appareil-nouveau.js`). `docs/passation/2026-11-10-ics-appareil.md`. Geste : aucun.
+
+## Déplacé de CLAUDE.md §9 (11 nov., lot DJ8)
+
 - **10 nov. · Republier à la main, conseillé (lot AP, demande 17)** : Annonces → Republier : carte « À la main : conseillé, le moins risqué », « À la main · N » principal, « Par VRM · N » second ; kit de plusieurs annonces (N° et description TELLE QU'ELLE PARTIRA à copier, une à une ou « Tout copier », photos réglées vers la galerie par le menu de partage, « Pas à pas », « Ouvrir Vinted » note le suivi : le N° suit par SON clic) ; une photo seule s'enregistre aussi (`src/republierKit.js`, `usePhotosReglees`) ; rien n'est envoyé à Vinted. `docs/passation/2026-11-10-republier-main.md`. Geste : aucun.
