@@ -55,8 +55,8 @@ tout arrive par e-mail). Aucune écriture en base.
   `--prouve` : voir ci-dessous.
 - Banc `scripts/bancs/retours-litiges.cjs` (390 tactile clair/sombre, 1512 clair) : voir ci-dessous.
 - Touchés et verts : audit-litiges-ecran, litiges, retours-stock, lbc-suppression, variables, tdz,
-  coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf ; traduction : seul C2
-  rouge, DÉJÀ rouge avant ce lot (clés de navigation, pas ce lot).
+  coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction (C2 était
+  rouge avant la fusion de `origin/claude/revue-colis`, vert après).
 
 ### Reste
 - Leboncoin / Vestiaire / eBay : aucun bordereau de retour d'ACHAT jamais vu ⇒ rien (Vinted seul).
