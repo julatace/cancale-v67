@@ -125,4 +125,4 @@ Restes / à regarder :
   recette d'offre lot ⇒ « à faire sur Vinted ».
 - « Plus d'outils » (…) ouvre encore l'ancienne feuille (récupérer toutes les pages, vérifier un favori,
   diagnostic, « J'ai vérifié sur Vinted ») : elle montre des pseudos, comme avant ; à refaire plus tard.
-- Banc rouge sur l'avant : lancé sur `git archive origin/main` (voir ci-dessous, ligne ajoutée si fini).
+- Banc sur l'avant (`git archive origin/main`) : ROUGE (« banc interrompu » : la page en trois temps et la feuille commune n'existent pas sur main — rouge par absence ; la vraie preuve, ce sont les 6 mutations toutes rouges). Sombre relancé après la correction du repère : 62 ✅ · 0 ❌ (390 + 1512).
