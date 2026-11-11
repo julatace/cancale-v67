@@ -113,6 +113,7 @@ async function passe(nav, { W, theme, sc }) {
       await pg.waitForTimeout(300);
       const b = await barre(pg);
       dit(b && b.n === '3', 'A', `${T} case puis Maj-clic : la PLAGE (3 lignes)`, JSON.stringify(b));
+      await pg.waitForFunction(() => document.querySelectorAll('[data-serie-coche="1"]').length >= 3, null, { timeout: 3000 }).catch(() => {});
       const coches = await pg.evaluate(() => [...document.querySelectorAll('[data-serie-coche="1"]')].map((x) => x.getAttribute('data-serie-ligne')).join(','));
       dit(coches === '7400001,7400002,7400003', 'A', `${T} les 3 lignes cochées sont celles de la plage`, coches);
     }

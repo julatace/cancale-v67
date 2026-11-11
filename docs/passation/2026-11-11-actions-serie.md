@@ -100,6 +100,12 @@ pour la prochaine action Vinted en série : jamais plus que le plafond restant, 
   verts, sauf `photos-vinted` et `relier-compte`, **rouges à l'identique sur origin/main**
   (sortie comparée : seul un numéro de ligne bouge).
 
+- **Après la fusion de `origin/main`** : build vert, audit 30/30 (21/21 mutations), les 8 audits
+  demandés verts (`coherence` demande l'historique complet de `main` : `git fetch --unshallow
+  origin main`), banc 70/0. Un passage complet avait donné 2 rouges (« les 3 lignes cochées »,
+  1512 px) : lecture du DOM 300 ms après le Maj-clic, sous charge ; jamais reproduit isolé (2 × vert).
+  Le banc attend maintenant l'état (≤ 3 s, règle de preuve n° 5) au lieu d'un délai fixe.
+
 ## Pas fait / à savoir
 
 - Stock et E-mails n'ont pas de scène de banc (Stock demande des meubles et des cases, la boîte
