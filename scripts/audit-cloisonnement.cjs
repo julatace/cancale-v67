@@ -108,13 +108,14 @@ if (!process.argv[2] || process.argv[2] === '--prouve') {
     return { out, rouge: /❌/.test(out) };
   };
   if (!prouve) {
+    const tot = { appels: 0, profonds: 0 };
     for (const f of Object.keys(ROUTES)) {
       const { out } = lancer(f);
       process.stdout.write(out);
-      ok += (out.match(/^✅/gm) || []).length;
-      ko += (out.match(/^❌/gm) || []).length;
+      const m = /= (\d+) appels \((\d+) ont touché la base\) · (\d+) contrôles verts · (\d+) rouges/.exec(out);
+      if (m) { tot.appels += +m[1]; tot.profonds += +m[2]; ok += +m[3]; ko += +m[4]; } else ko++;
     }
-    console.log(`\n${ok} ✅ · ${ko} ❌`);
+    console.log(`\n${tot.appels} appels de B (${tot.profonds} ont touché la base) · ${ok} ✅ · ${ko} ❌`);
     process.exit(ko ? 1 : 0);
   }
   // --prouve : chaque trou injecté (dans une COPIE de l'arbre) doit rougir.
@@ -127,7 +128,8 @@ if (!process.argv[2] || process.argv[2] === '--prouve') {
     try { fs.symlinkSync(path.join(RACINE, 'node_modules'), path.join(dossier, 'node_modules')); } catch (_) {}
     const cible = path.join(dossier, mu.fichier);
     const avant = fs.readFileSync(cible, 'utf8');
-    const apres = avant.replace(mu.de, mu.vers);
+    let apres = avant.replace(mu.de, mu.vers);
+    for (const [de, vers] of (mu.puis || [])) apres = apres.replace(de, vers);
     if (apres === avant) { console.log(`❌ mutation « ${mu.nom} » : motif introuvable (${mu.fichier})`); ko++; continue; }
     fs.writeFileSync(cible, apres);
     const { out, rouge } = lancer(mu.route, { CLOISON_RACINE: dossier });
@@ -157,10 +159,13 @@ delete process.env.AI_API_KEY; delete process.env.ANTHROPIC_API_KEY;
 process.env.VRM_CLE_CHIFFREMENT = process.env.VRM_CLE_CHIFFREMENT || 'b'.repeat(64);
 process.env.RELANCES_SECRET = 'relances-banc-cloison';
 
-const CANARI = { [O]: 'CANARI-O', [A]: 'CANARI-A', [B]: 'MOI-B' };
+// N : le propriétaire NEUTRE (quarantaine des e-mails, files partagées) — à personne.
+const N = '00000000-0000-0000-0000-000000000000';
+const CANARI = { [O]: 'CANARI-O', [A]: 'CANARI-A', [B]: 'MOI-B', [N]: 'CANARI-N' };
 const VINTED = { [O]: '7000001', [A]: '7000002', [B]: '7000003' };
+const CLE_EBAY = { [O]: 'c3c3c3c3c3c3c3c3', [A]: 'a1a1a1a1a1a1a1a1', [B]: 'b2b2b2b2b2b2b2b2' };
 const ADRESSE = { [O]: 'canari-o@exemple.test', [A]: 'canari-a@exemple.test', [B]: 'moi-b@exemple.test' };
-const FUITE = /canari-[ao]|jeton-canari|tok-canari/i;
+const FUITE = /canari-[aon]|jeton-canari|tok-canari|\b7000002\b|\b7000001\b|a1a1a1a1a1a1a1a1|c3c3c3c3c3c3c3c3/i;
 
 // La donnée d'une ligne : toutes les formes que les routes savent lire, et un
 // canari dans chaque champ texte.
@@ -175,6 +180,8 @@ const donnee = (owner, id) => {
     payload: { items: [item], transaction: tx, transactions: [tx], orders: [tx], canari: t, username: t, login: t },
     capturedAt: new Date().toISOString(), nItems: 1, n: 1, owner_note: t, pdfB64: Buffer.from(`%PDF ${t}`).toString('base64'),
     vinted_inventory: [{ title: t, num: '7', itemId: item.id }], vinted_accounts: [{ id: VINTED[owner], username: t }],
+    comptes: [{ cle: CLE_EBAY[owner], pseudo: `${t}-ebay`, principal: false, ajouteLe: 1, site: 'FR' }], refresh_token_ebay: `tok-${t}-ebay`,
+    proprietaires: owner === N ? [A, O] : [owner], groupes: owner === N ? { [A]: { canari: 'CANARI-A' }, [O]: { canari: 'CANARI-O' } } : { [owner]: { canari: t } },
     rev: 1, cle: `cle-${t}`, token: `tok-${t}`, access_token: `tok-${t}`, refresh_token: `tok-${t}-r`, siret: t, iban: t,
   };
 };
@@ -218,7 +225,8 @@ const idsDemandes = (u) => {
   for (const k of ['or', 'and']) { const v = u.searchParams.get(k); if (v) { const re = /id\.(eq|like|in)\.(\([^)]*\)|[^,)]+)/g; let m; while ((m = re.exec(v))) lire(`${m[1]}.${m[2]}`); } }
   return [...out].filter((x) => x && x.length < 200);
 };
-const fabriquer = (ids) => { for (const id of ids) for (const ow of [O, A, B]) if (!tables.app_data.some((r) => r.owner === ow && r.id === id)) tables.app_data.push({ owner: ow, id, data: donnee(ow, id), updated_at: new Date().toISOString(), meta: {} }); };
+// (le neutre n'a jamais de `main` : il n'est le vendeur de personne)
+const fabriquer = (ids) => { for (const id of ids) for (const ow of (id === 'main' ? [O, A, B] : [O, A, B, N])) if (!tables.app_data.some((r) => r.owner === ow && r.id === id)) tables.app_data.push({ owner: ow, id, data: donnee(ow, id), updated_at: new Date().toISOString(), meta: {} }); };
 
 const qui = (headers = {}) => {
   const h = {}; for (const [k, v] of Object.entries(headers || {})) h[k.toLowerCase()] = v;
@@ -279,6 +287,10 @@ const fauxFetch = async (url, opts = {}) => {
   const enTetes = {}; for (const [k, v] of Object.entries(opts.headers || {})) enTetes[k.toLowerCase()] = v;
   if (m === 'GET' || m === 'HEAD') {
     note('lecture', { table, role: ident.role });
+    if (ident.role === 'service') {
+      const ow = String(u.searchParams.get('owner') || '');
+      for (const [qui2, nom2] of [[A, 'A'], [O, 'O']]) if (ow.includes(qui2)) note('lecture-autrui', { table, cible: nom2, id: u.searchParams.get('id') || '' });
+    }
     if (ident.role === 'anon' && table !== 'vrm_reglages') return rep([]);
     const { body, range } = servir(visibles(tables[table]), u.toString(), enTetes, table);
     if (/application\/vnd\.pgrst\.object/.test(String(enTetes.accept || ''))) return body.length === 1 ? rep(body[0]) : rep({ message: 'pas une ligne' }, 406);
@@ -292,6 +304,7 @@ const fauxFetch = async (url, opts = {}) => {
     for (const l0 of lignes) {
       const l = { ...l0 };
       if (ident.role === 'vendeur') { if (l.owner == null) l.owner = ident.uid; if (l.owner !== ident.uid) return rep({ code: '42501', message: 'new row violates row-level security policy' }, 403); }
+      if (table === 'vinted_accounts' && String(l.vinted_user_id) === VINTED[A] && l.owner !== A) note('appropriation', { table, id: `vinted_user_id=${l.vinted_user_id}`, m });
       if (l.owner === A || l.owner === O) note('ecriture', { table, owner: l.owner, id: l.id, m, existait: tables[table].some((r) => r.owner === l.owner && r.id === l.id && l.id != null) });
       const i = tables[table].findIndex((r) => r.owner === l.owner && r.id === l.id && l.id != null);
       if (i >= 0) tables[table][i] = { ...tables[table][i], ...l }; else tables[table].push({ id: l.id ?? ++seq, ...l });
@@ -343,12 +356,19 @@ const corpsDe = (qui) => ({
   cle: 'pr_banc_cloison_123456', ville: 'Rennes', groupe: 'groupe-banc', plan: 'pro', siret: '12345678900011', tx: '80000003',
   transaction: '80000003', numero: 'FA-2026-0001', items: [{ id: 90000003 }], lot: [], adresse: ADRESSE[qui], email: ADRESSE[qui],
   ticket: 'ticket-banc', confirmation: 'SUPPRIMER', motDePasse: 'x', annee: 2026, mois: '2026-11', d: Buffer.from(qui).toString('base64url'),
+  // vinted-proxy / vinted-connect : SON compte Vinted (un jeton Vinted FABRIQUÉ : Vinted le refusera).
+  uid: VINTED[qui], endpoint: '/api/v2/users/current', refreshToken: `tok-vinted-${qui === A ? 'a' : 'b'}`,
+  accessToken: jwtVinted(VINTED[qui]), source: 'app',
 });
-const usurpation = { owner: A, uid: A, user_id: A, userId: A, vendeur: A, proprio: A, membre: A, compte: VINTED[A], account: VINTED[A], vinted_user_id: VINTED[A], accountId: VINTED[A], adresse: ADRESSE[A], email: ADRESSE[A], id: 'main', ids: 'main,vrm_email_owners', texte: 'email_log_canari', lire: 'email_log_canari', tx: '80000002', item: '90000002', session: A.replace(/.$/, 'f'), d: Buffer.from(A).toString('base64url'), k: '', key: '' };
+// Un jeton Vinted d'apparence valide (non expiré) portant l'`account_id` voulu.
+function jwtVinted(id) { const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'); return `${b({ alg: 'RS256' })}.${b({ account_id: Number(id), sub: id, exp: Math.floor(Date.now() / 1000) + 3600 })}.faux`; }
+const usurpation = { owner: A, uid: A, user_id: A, userId: A, vendeur: A, proprio: A, membre: A, compte: VINTED[A], account: VINTED[A], vinted_user_id: VINTED[A], accountId: VINTED[A], adresse: ADRESSE[A], email: ADRESSE[A], id: 'main', ids: 'main,vrm_email_owners', texte: 'email_reception_' + 'a'.repeat(16), lire: 'email_reception_' + 'a'.repeat(16), tx: '80000002', item: '90000002', session: A.replace(/.$/, 'f'), d: Buffer.from(A).toString('base64url'), k: '', key: '' };
 const VARIANTES = [
   { nom: 'base', h: () => ({ authorization: `Bearer ${jwt(B)}` }), q: {}, c: corpsDe(B) },
   { nom: 'usurpe', h: () => ({ authorization: `Bearer ${jwt(B)}`, 'x-vrm-equipe': A, 'x-vrm-owner': A, 'x-vrm-key': '' }), q: usurpation, c: { ...corpsDe(A), ...usurpation } },
   { nom: 'in', h: () => ({ authorization: `Bearer ${jwt(B)}` }), q: { owner: `in.(${A},${B})`, id: 'in.(main,vrm_email_owners)', ids: `in.(${A})`, uid: `eq.${A}`, select: 'owner,data' }, c: { ...corpsDe(B), owner: `in.(${A},${B})`, id: 'in.(main,vrm_email_owners)', ids: [`in.(${A})`] } },
+  // eBay : la clé d'un compte eBay de A (16 hexa), et la clé du widget de B (sa clé à lui).
+  { nom: 'cles', h: () => ({ authorization: `Bearer ${jwt(B)}` }), q: { k: `jeton-${CANARI[B]}` }, c: { ...corpsDe(B), compte: CLE_EBAY[A], cle: CLE_EBAY[A], uid: VINTED[A] } },
   { nom: 'forge', h: () => ({ authorization: `Bearer ${jwt(A, 'forge')}` }), q: {}, c: corpsDe(A) },
   { nom: 'anonyme', h: () => ({}), q: {}, c: corpsDe(A) },
 ];
@@ -407,8 +427,14 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; if (!c || DETAIL) console.log
         const sortie = res.morceaux.join('') + ' ' + JSON.stringify(res.entetes);
         const fuite = FUITE.exec(sortie);
         const ev = appelEnCours.evenements;
-        const surA = ev.filter((e) => (e.genre === 'ecriture' && e.owner === A) || e.genre === 'rpc-autrui' || e.genre === 'admin-ecrit' || (e.genre === 'admin-lit' && e.cible === A));
+        const surA = ev.filter((e) => (e.genre === 'ecriture' && e.owner === A) || e.genre === 'appropriation' || e.genre === 'rpc-autrui' || e.genre === 'admin-ecrit' || (e.genre === 'admin-lit' && e.cible === A));
         const surO = ev.filter((e) => e.genre === 'ecriture' && e.owner === O);
+        // Une lecture à la clé de service PORTÉE sur A (filtre owner=A) pendant
+        // la requête de B : la route travaille DANS le compte de A — même si
+        // rien ne sort, c'est la porte d'un trou. Chez O : seulement ce qui
+        // sert à le PRÉVENIR (ses abonnements de notification).
+        const portee = ev.filter((e) => e.genre === 'lecture-autrui' && (e.cible === 'A' || !/^eq\.push_(subs|prefs|journal)$|^like\.signalement_\*$/.test(e.id)));
+        dit(!portee.length, `${nomAppel} : la route ne lit rien DANS le compte d'un autre`, portee.map((e) => `${e.table} owner=${e.cible} ${e.id}`).join(' ; '));
         const partage = PARTAGE.has(`${FICHIER}:${mode}`);
         if (DETAIL) console.log(`· ${nomAppel} → HTTP ${res.code}${erreur ? ' (levée : ' + erreur.message + ')' : ''} · ${ev.length} évts · ${res.morceaux.join('').slice(0, 160)}`);
         if (fuite) resume.fuites++;
