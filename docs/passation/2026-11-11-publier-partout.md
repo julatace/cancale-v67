@@ -85,8 +85,8 @@ L'annonce Vinted est la source ; VRM la reporte sur Leboncoin, Vestiaire et eBay
   porter) : à faire dans un lot extension avec une version réservée dans COORDINATION-AGENTS.md.
 - **VRM figé pendant l'envoi** : la feuille ne se ferme plus (×, voile, Échap, **retour du navigateur** — la garde
   `FermeAuRetour` est remontée après un retour), `beforeunload` posé ; une barre fine « N sur M ».
-  **SuiviTravail** (branche `claude/suivi-travail`) : **pas fusionné** — à 18 h il était WIP (CSS absente ⇒ son
-  build casse). Branchement propre : `src/suiviBranchement.js` (`import.meta.glob('./suiviTravail.js')` : rien tant
+  **SuiviTravail** : d'abord pas fusionné (WIP à 18 h), puis **FUSIONNÉ** (tête f1bb866, audit 48/48, banc, feuille
+  montée seule dans `AppCoeur`). Branchement : `src/suiviBranchement.js` (`import.meta.glob('./suiviTravail.js')` : rien tant
   que le fichier n'existe pas, s'allume tout seul à la fusion) + `src/publierPartoutSuivi.js` (pur : envoi ⇒ debut +
   étape, attente ⇒ étape « depot », publié ⇒ ok, à finir ⇒ main, refus ⇒ refus, pas envoyé ⇒ saute ; Pause /
   Arrêter lus ENTRE deux envois par `executerPartout({ doitSArreter })` ; « Reprendre » relance ce qui est « pas
@@ -99,3 +99,32 @@ L'annonce Vinted est la source ; VRM la reporte sur Leboncoin, Vestiaire et eBay
   ignorée, valeur hors liste, Vestiaire publié quand même, arrêt ignoré, catégorie inventée, « à finir » compté fait,
   `publier` de l'app, synchro oubliée). Banc : scénario H ajouté (défaut Vestiaire ⇒ à finir ; livraison « non » par
   annonce ⇒ bloquant ; tous les champs Leboncoin présents).
+
+## Fusions (11 nov., soir)
+- `claude/suivi-travail` fusionné (conflits = ajouts des deux côtés dans les 5 dictionnaires et `nouveautes.js`, gardés
+  tous les deux). Publier partout : `suivi.demarrer` (articles = une case annonce × site), `continuer()` lu ENTRE deux
+  envois (la pause attend Reprendre / Arrêter ; rien n'est relancé deux fois).
+- `claude/ebay-complet` fusionné (conflit `Ebay.jsx` : la fin de `publier` garde le suivi ET `erreurEbay(j)` ; l'export
+  garde `preparerBrouillonPartout`, `GuidesEbay`, `EbayRemises`). Publier partout NOMME les réglages eBay par défaut
+  (`resume(defautsDepuis(vrm_ebay_publication_defaut))`) ; le brouillon les reprend à sa mise en ligne (écran eBay) ;
+  catégorie et caractéristiques restent demandées là (`questions`), jamais ici.
+
+## « Un prix modifié dans VRM change partout » (validé par Julien, même branche)
+- `src/prixPartout.js` (la feuille « Changer le prix » du 3 nov., fiche d'un N°) : le prix tapé est celui de Vinted ;
+  chaque site reçoit SON ajustement (`prixParSite`, le réglage `vrm_partout_prix` de Publier partout ; Vestiaire = le
+  prix tapé) ; ≤ 0 € ⇒ ce site ne part pas, dit.
+- eBay : route `revise` existante (confirmée, prix vu), puis **relu** : la route relit déjà l'annonce (`regle.lecture.prix`) ;
+  relu = demandé ⇒ « Fait ✓ relu » ; relu autre ⇒ « Pas sûr » + le prix vu ; pas relu ⇒ « Fait » sans « relu ».
+- Vinted : **VRM PROPOSE** — état « Proposé », bouton « Baisser sur Vinted » qui ouvre la feuille « Baisser le prix »
+  existante (montée aussi dans `AppCoeur`, `baisseInitiale` = l'écart en €) ; c'est SON clic là-bas qui envoie
+  (`baisserPrixVinted`, extension 5.336, relu). Une hausse ne se propose pas (« à faire sur le site »). L'envoi direct
+  `republierVinted` d'avant n'est plus utilisé ici (décision de Julien).
+  ⚠️ La baisse lancée depuis la coque ne note pas `vinted_prix_historique` (c'est l'état de l'écran Annonces : l'écrire
+  d'ici pourrait être écrasé) — le prix relu arrive à la prochaine lecture du dressing.
+- Leboncoin, Vestiaire : aucune voie de changement de prix ⇒ « À faire sur le site » avec « À mettre : 45 € » et le lien.
+- Preuves : `audit-annonces-outils` 48/48 (P8, P10, P12 remis à la décision ; P15-P17 neufs) ; `audit-publier-partout`
+  section J (5) + 4 mutations (ajustement oublié, Vinted envoyé, relu ignoré, réglage pas passé par l'app).
+
+## ÉTAT FINAL
+- Build et bancs : voir la ligne « Bancs » ci-dessous (machine très chargée : la file des créneaux lourds a tué un
+  premier build après 30 min sans créneau).
