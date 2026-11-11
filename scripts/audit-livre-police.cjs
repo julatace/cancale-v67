@@ -51,6 +51,9 @@ const MUTS = {
   projection: () => muter('carte', 'select=id,tx:data->payload->transaction->>id,side:data->payload->transaction->>user_side,vendeur:data->payload->transaction->seller->>login', 'select=id,data'),
   montee: () => muter('compta', '<LivrePoliceCarte lireAchats={lireAchatsRegistre} registreDe={registreAchatsDe} panelOff={panelOff} />', ''),
   garde: () => muter('carte', '  if (!livrePolicePropose(profil)) return null;\n', ''),
+  // (11 nov., C7) Un champ pour saisir l'identité ; la phrase retirée.
+  'saisie-identite': () => muter('carte', '<div data-livre-identite-export=""', '<input aria-label="Identité du vendeur"/><div data-livre-identite-export=""'),
+  'phrase-tue': () => muter('carte', 'L’identité des vendeurs se remplit sur l’export, pas dans VRM.', ''),
 };
 if (MUT === 'lecture-ko') {
   // la mutation remplace `lu` par `lu2` dans la suite
@@ -201,6 +204,14 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/if \(!livrePolicePropose\(profil\)\) return null;/.test(carte), 'P9 · la carte ne s’affiche qu’à un statut pro');
   dit(/user_side/.test(carte) && /seller->>login/.test(carte) && !/select=data\b(?!->)/.test(carte) && !/select=id,data/.test(carte), 'P9 · pseudos lus en projection (jamais select=data)');
   dit(!/conform/i.test(carte), 'P9 · l’écran ne dit jamais « conforme »');
+  // (11 nov., décision C7) L'identité des vendeurs (données de tiers) ne se saisit JAMAIS dans VRM :
+  // aucun champ de saisie dans la carte (seul le choix de période), rien d'identité écrit en base,
+  // et l'écran le dit en UNE phrase (data-livre-identite-export).
+  const champs = (carte.match(/<(input|textarea)\b/g) || []).length;
+  dit(champs === 0, 'P10 · (C7) aucun champ pour saisir l’identité d’un vendeur dans VRM', `${champs} champ(s)`);
+  dit(!/identite\s*:/.test((/export async function inscrireEnBase[\s\S]*?\n}\n/.exec(sansCommentaires(MOD)) || [''])[0]), 'P10 · (C7) rien d’identité n’est écrit dans la ligne du livre');
+  const phrase = (/data-livre-identite-export=""[^>]*>([^<]+)</.exec(carte) || [])[1] || '';
+  dit(/export/.test(phrase) && /pas dans VRM/.test(phrase) && phrase.trim().split(/\s+/).length <= 12, 'P10 · (C7) l’écran le dit en une phrase courte', phrase);
   dit(/legifrance\.gouv\.fr\/codes\/article_lc\/LEGIARTI000025213232/.test(MOD) && /F39552/.test(MOD) && /R321-3/.test(MOD), 'P9 · sources officielles citées dans le module');
 
   console.log(ko ? `\n❌ livre de police : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ livre de police : ${ok} verts, 0 rouge`);

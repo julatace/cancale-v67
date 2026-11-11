@@ -36,6 +36,14 @@ function Evolution({ e }) {
   );
 }
 
+// (11 nov., extension 5.340) L'historique daté par lecture : « Depuis le 12 oct. : +34 avis ·
+// moyenne 4,8 → 4,9 ». Neutre (jamais rouge ni vert). Moins de deux jours lus ⇒ « pas encore su ».
+function Historique({ h }) {
+  if (!h) return <p className="vrm-av-histo" data-av-histo="pas-su">Évolution sur 90 jours : pas encore su.</p>;
+  const morceaux = [h.nouveaux != null ? `+${nFr(h.nouveaux)} avis` : null, h.moyAvant != null && h.moyApres != null ? `moyenne ${noteFr(h.moyAvant)} → ${noteFr(h.moyApres)}` : null].filter(Boolean);
+  return <p className="vrm-av-histo" data-av-histo="lu" data-av-histo-nouveaux={h.nouveaux == null ? '' : h.nouveaux} data-av-histo-depuis={h.depuis} data-av-histo-points={h.points}>Depuis le {jour(h.depuis)} : {morceaux.length ? morceaux.join(' · ') : '—'}</p>;
+}
+
 export default function AvisLus({ comptes = [] }) {
   const avec = comptes.filter((c) => c && c.liste);
   if (!avec.length) {
@@ -57,6 +65,7 @@ export default function AvisLus({ comptes = [] }) {
               <span data-av-couverture="">{L.lus ? `moyenne des ${L.lus} derniers lus${L.total != null && L.total > L.lus ? ` · ${nFr(L.total)} en tout` : ''}` : 'aucun avis lisible'}</span>
               <Evolution e={L.evolution}/>
             </div>
+            <Historique h={L.historique}/>
             {L.dernieres.length ? (
               <ol className="vrm-av-liste">
                 {L.dernieres.map((x) => (

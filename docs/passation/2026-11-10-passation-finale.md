@@ -10,7 +10,7 @@ Remplace, pour l'état, `2026-11-10-passation-generale.md` et `2026-11-09-passat
 
 ## A. Ce que tu as aujourd'hui (en ligne sur vrm.center)
 
-Mis en ligne le 10 nov. (PR #1088 → #1122, toutes vérifiées avant mise en ligne) :
+Mis en ligne le 10 nov. (PR #1088 → #1125, toutes vérifiées avant mise en ligne) :
 
 | domaine | ce qui marche |
 |---|---|
@@ -23,7 +23,7 @@ Mis en ligne le 10 nov. (PR #1088 → #1122, toutes vérifiées avant mise en li
 | **Argent** | Compta + Statistiques réunies (Résumé · Statistiques · Déclarer · Factures) ; mois bouclé ; comparer deux mois ; d'où viennent mes achats ; vitesse d'envoi ; avis Vinted ; factures Pro (à envoyer, envoi auto ÉTEINT, avoir, registre + zip) ; factures Leboncoin/eBay ; facture bilingue ; alerte seuil de TVA ; livre de police |
 | **Partout** | ouverture plus légère (2e ouverture : −60 % de données, copies gardées sur l'appareil et revalidées) ; Mon adresse VRM en un parcours 1·2·3·✓ (code Gmail affiché, plus de roue sans fin) ; raccourcis clavier (« ? » pour la liste) et lecteur d'écran ; recherche universelle (identité exacte en tête) ; À trancher en cartes ; corbeille 30 jours ; textes courts (3 séries) |
 | **Offres** | Solo 16,99 € = 1 compte vendeur par plateforme · **Pro 19,99 € = comptes vendeurs illimités** (ta décision de ce soir) ; CGV du 10 nov. |
-| **Extension** | 5.339.0 servie (jauge 50 actions/h, journal, mode vacances appris sur ton geste, infos sous tes annonces sur vinted.fr, calculette sur l'annonce d'un autre vendeur) |
+| **Extension** | 5.340.0 servie (mode vacances au journal, prix de vente Vestiaire pour la facture, avis datés ; jauge 50 actions/h, journal, mode vacances appris sur ton geste, infos sous tes annonces sur vinted.fr, calculette sur l'annonce d'un autre vendeur) |
 
 **Fait par toi ce soir** : `CRON_SECRET` (GitHub + Vercel, vérifié : relecture des colis OK) ·
 migrations **028, 030, 024, 025, 026, 027** posées (vérifiées en base) · domaine **recu-vrm.com**
@@ -40,7 +40,7 @@ Le pas à pas détaillé de chaque geste : `docs/passation/2026-11-10-guide-gest
    → ton adresse doit finir par `@recu-vrm.com` → « Envoyer l'e-mail d'essai » → « Reçu ✓ ».
    Si ça ne passe pas : sur Vercel, mettre `EMAIL_INBOUND_SECRET` = la même valeur que ton script Gmail
    (Apps Script → Paramètres du projet → Propriétés), puis Redeploy.
-2. **Installer l'extension 5.339.0** dans chaque Chrome (remplacer le dossier, puis ⟳) et Orion.
+2. **Installer l'extension 5.340.0** dans chaque Chrome (remplacer le dossier, puis ⟳) et Orion.
    Puis, une seule fois sur vinted.fr : mettre un compte en vacances à la main, puis le rouvrir à
    la main (VRM apprend les deux gestes ; Paramètres → Mes comptes → Mode vacances le dira).
 3. **Après l'extension** : migrations **029** puis **023** (Supabase → SQL Editor, copier le fichier
@@ -80,6 +80,14 @@ Mis en ligne après la rédaction (10 nov., 22 h–23 h) : annonces à compléte
 
 ## D. Pour la prochaine session Claude : ce qui reste à finir
 
+### D0. Demandes de Julien du 11 nov. (en cours)
+
+Voir `docs/passation/2026-11-11-demandes-julien.md`. En ligne : DJ5 Achats et DJ7 ventes sans date
+(#1125). En cours (branches `claude/…`) : DJ1 `facture-siret`, DJ2 `vendeur-generaliste`, DJ3
+`colis-a-leur-place`, DJ4 `stock-juste`, DJ6 `profil-photo`, DJ8 `offres-sures`, extension 5.341
+`extension-5341` (dates de versement plus vite), bancs `rouges-a`, `rouges-b`, `audits-rouges`.
+Si la session tombe : reprendre chaque branche (son récit `docs/passation/2026-11-11-<lot>.md`).
+
 ### D1. Chantiers commencés, travail POUSSÉ mais PAS vérifié (reprendre la branche)
 
 | lot | branche | état | reste |
@@ -97,9 +105,8 @@ communes à recopier dans chaque brief sont résumées en F.
 | lot | contenu | note |
 |---|---|---|
 | suite de K | appliquer les copies revalidées aux autres lectures du démarrage : `harvest_%_txn_%` (~246 Ko), `harvest_*` (~244 Ko), `email_track_*` (~130 Ko), `vinted_item_details` (~108 Ko) ; un instantané pour Annonces | mesurer d'abord (`_mesure-demarrage`) ; voir `2026-11-10-ouverture-legere.md` |
-| textes courts, 5e série | ≈ 135 textes > 90 caractères restants : Réglages, eBay, Leboncoin, Accueil, `ConfigurerTransfert`, `RelierBoite`, `CarteRelais` ; « ⓘ Pourquoi ? » en 11 px dans `operations.css` | chercher chaque libellé dans `scripts/` avant de le changer |
+| textes courts, 6e série | 42 textes (dont CGU/rétractation/essai/DAC7 exprès) ; voir `2026-11-11-textes-courts-5.md`. Avant : ≈ 135 textes > 90 caractères restants : Réglages, eBay, Leboncoin, Accueil, `ConfigurerTransfert`, `RelierBoite`, `CarteRelais` ; « ⓘ Pourquoi ? » en 11 px dans `operations.css` | chercher chaque libellé dans `scripts/` avant de le changer |
 | extension 5.339 sur le vrai Vinted | repères de la page d'annonce (titre, prix, marque, vendeur) non mesurés sur le vrai site | si l'encart n'apparaît pas, mesurer la page réelle |
-| mode vacances : journal | inscrire le geste « vacances » dans le journal du lot G | petit |
 | VoiceOver | relecture à la main sur iPhone/Safari ; écrans Litiges, E-mails, Communauté, Organisation | |
 | logos exacts | Chronopost, Colissimo, InPost, Relais Colis, Shop2Shop, GLS, Colis Privé (aujourd'hui « mot-symbole ») | attendre les captures de Julien ; `DESSINS_TRANSPORTEURS` dans `src/transporteursVisuels.js` |
 | Vestiaire | facture Pro : l'extension doit ranger `sellerPrice` (prix payé) | nouvelle version d'extension |

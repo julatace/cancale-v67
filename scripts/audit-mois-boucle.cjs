@@ -46,6 +46,10 @@ const MUTATIONS = {
   'pas-meme-point': ['comparer', "const cote = (ym, b, enCours) => (enCours ? { de: b.de, a: maintenant, complet: false } : couper(ym, b));", "const cote = (ym, b, enCours) => (enCours ? { de: b.de, a: maintenant, complet: false } : { ...b, complet: true });"],
   // Comparer : achats Vinted pas lus ⇒ un nombre présenté complet.
   'achats-complets': ['comparer', 'const partiel = manque.length > 0;\n  return partiel && !(n > 0)', 'const partiel = false;\n  return partiel && !(n > 0)'],
+  // (11 nov., C5) Les paires redeviennent des achats (un lot compte 1).
+  'paires-achats': ['comparer', 'else p += n; }', 'else p += 1; }'],
+  // (11 nov., C5) Un lot sans nombre présenté complet.
+  'lot-sans-nombre-tu': ['comparer', "...(sansNombre ? [`${sansNombre} lot${sansNombre > 1 ? 's' : ''} sans nombre`] : [])", ''],
   // Comparer : le reçu daté à la VENTE (le branchement de Statistiques lit le vendu).
   'recu-a-la-vente': ['stats', 'recuDe: (b) => recuAvecADater(recuPublieEntre(ligneUrssaf, b, maintenant), ligneUrssaf),', 'recuDe: (b) => ({ valeur: vendu ? bilanLignes(vendu.lignes, b.de, b.a - 1).eur : null }),'],
   // Mois bouclé n'est plus monté dans Déclarer.
@@ -206,21 +210,35 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
     const RGc = { bilanLignes: ctx.bilanLignes };
     const C1 = CM.comparerDeuxMois({ ymA: '2026-09', ymB: '2026-10', maintenant: MAINT, vendu, recuDe, beneficeDe: () => null, achatsDe: achatsDe(achatsV), R: RGc });
     const Lc = (C, k) => C.lignes.find((x) => x.cle === k);
-    dit(C1 && C1.lignes.map((x) => x.cle).join(',') === 'vendu,recu,benefice,ventes,achats', 'cinq lignes : vendu, reçu, bénéfice, ventes, achats', C1 && C1.lignes.map((x) => x.cle).join(','));
+    dit(C1 && C1.lignes.map((x) => x.cle).join(',') === 'vendu,recu,benefice,ventes,paires', 'cinq lignes : vendu, reçu, bénéfice, ventes, paires achetées (11 nov., C5)', C1 && C1.lignes.map((x) => x.cle).join(','));
     dit(C1.memePoint === false && proche(Lc(C1, 'vendu').a.valeur, 140) && proche(Lc(C1, 'vendu').b.valeur, 0), 'septembre et octobre entiers : vendu 140 € face à 0 € (date de la VENTE)');
     dit(proche(Lc(C1, 'recu').a.valeur, 40) && proche(Lc(C1, 'recu').b.valeur, 100), 'reçu 40 € face à 100 € : la vente du 28 sept. est REÇUE en octobre (jour du versement)', `${Lc(C1, 'recu').a.valeur} / ${Lc(C1, 'recu').b.valeur}`);
-    dit(Lc(C1, 'achats').a.valeur === 1 && Lc(C1, 'achats').b.valeur === 0, 'achats : 1 en septembre (l’annulé n’y est pas), 0 en octobre — le registre des achats', JSON.stringify(Lc(C1, 'achats').a));
+    dit(Lc(C1, 'paires').a.valeur === 1 && Lc(C1, 'paires').a.achats === 1 && Lc(C1, 'paires').b.valeur === 0, 'paires : 1 en septembre (l’annulé n’y est pas), 0 en octobre — le registre des achats', JSON.stringify(Lc(C1, 'paires').a));
+    console.log('── (11 nov., C5) Les PAIRES, pas les achats : un lot compte ses paires, le nombre d’achats à côté');
+    const achatsL = [{ transaction_id: 7011, date: new Date(T(2026, 8, 4)).toISOString(), status: 'Commande finalisée', title: 'Lot 3 paires Nike', price: { amount: '60', currency_code: 'EUR' } },
+      { transaction_id: 7012, date: new Date(T(2026, 8, 5)).toISOString(), status: 'Commande finalisée', title: 'Air Max 90', price: { amount: '40', currency_code: 'EUR' } },
+      { transaction_id: 7013, date: new Date(T(2026, 8, 6)).toISOString(), status: 'Commande finalisée', title: 'Dunk Low', price: { amount: '40', currency_code: 'EUR' } },
+      { transaction_id: 7014, date: new Date(T(2026, 9, 6)).toISOString(), status: 'Commande finalisée', title: 'Samba', price: { amount: '40', currency_code: 'EUR' } }];
+    const grosL = { personnes: { f1: { nom: 'Grossiste' } }, achats: { g1: { fournisseur: 'f1', total: 30000, paires: 5, date: '2026-09-10' } }, hors: {} };
+    const achatsDeL = ({ ym }) => REG.registreDesAchats({ achats: achatsL, hors: [], fiches: {}, periode: ym, gros: grosL });
+    const SRCL = await charger(fs.readFileSync(path.join(R, 'src', 'achatsSourcing.js'), 'utf8'), 'sourcing');
+    const nombreDe = (declares, nArticlesTx = {}) => (l) => { const a = { title: l.titre, transaction_id: l.reference }; return SRCL.estLot(a, { nArticlesTx, declares }) ? SRCL.nombreLot(a, { nArticlesTx, declares }) : 1; };
+    const C6 = CM.comparerDeuxMois({ ymA: '2026-09', ymB: '2026-10', maintenant: MAINT, vendu, recuDe, beneficeDe: () => null, achatsDe: achatsDeL, nombreDe: nombreDe({}, { 7012: 2 }), R: RGc });
+    dit(Lc(C6, 'paires').a.valeur === 11 && Lc(C6, 'paires').a.achats === 4 && !Lc(C6, 'paires').a.partiel, 'septembre : lot « Lot 3 » = 3, items_count 2 = 2, une paire = 1, en gros 5 ⇒ 11 paires pour 4 achats', JSON.stringify(Lc(C6, 'paires').a));
+    dit(Lc(C6, 'paires').b.valeur === 1 && Lc(C6, 'paires').sens === 'hausse' && Lc(C6, 'paires').ecart === 10, 'octobre : 1 paire ; l’écart compte des paires (+10)', JSON.stringify(Lc(C6, 'paires')));
+    const C7 = CM.comparerDeuxMois({ ymA: '2026-09', ymB: '2026-10', maintenant: MAINT, vendu, recuDe, beneficeDe: () => null, achatsDe: achatsDeL, nombreDe: nombreDe({ 7013: true }), R: RGc });
+    dit(Lc(C7, 'paires').a.partiel && Lc(C7, 'paires').a.valeur === 10 && Lc(C7, 'paires').a.manque.includes('1 lot sans nombre') && Lc(C7, 'paires').sens == null, 'un lot déclaré SANS nombre ⇒ « au moins » (compté 1), nommé, aucune flèche', JSON.stringify(Lc(C7, 'paires').a));
     dit(Lc(C1, 'vendu').sens === 'hausse' && proche(Lc(C1, 'vendu').ecart, 140) && Lc(C1, 'recu').sens === 'baisse' && Lc(C1, 'benefice').sens == null, 'écart du 1er mois face au 2d (+140 € vendu, −60 € reçu), flèche neutre ; aucune sur un « — »');
     console.log('── Un mois en cours choisi EN FACE : il coupe l’autre au même point');
     const C2 = CM.comparerDeuxMois({ ymA: '2025-11', ymB: '2026-11', maintenant: MAINT, vendu, recuDe, beneficeDe: () => null, achatsDe: achatsDe(achatsV), R: RGc });
     dit(C2.memePoint === true && Lc(C2, 'ventes').a.valeur === 1 && Lc(C2, 'ventes').b.valeur === 3, 'nov. 2025 coupé au 10 à 15 h : 1 vente (pas celle du 20) ; nov. 2026 : 3', `${Lc(C2, 'ventes').a.valeur} / ${Lc(C2, 'ventes').b.valeur}`);
-    dit(Lc(C2, 'achats').b.valeur === 2 && Lc(C2, 'achats').a.valeur === 0, 'achats de novembre 2026 au même point : 2');
+    dit(Lc(C2, 'paires').b.valeur === 2 && Lc(C2, 'paires').a.valeur === 0, 'paires de novembre 2026 au même point : 2');
     console.log('── Trois états, aucune flèche fausse');
     const C3 = CM.comparerDeuxMois({ ymA: '2026-09', ymB: '2025-11', maintenant: MAINT, vendu: { ...vendu, manque: ['eBay'] }, recuDe, beneficeDe: () => null, achatsDe: achatsDe(null), R: RGc });
     dit(Lc(C3, 'vendu').a.partiel && Lc(C3, 'vendu').b.partiel && Lc(C3, 'vendu').a.valeur > 0 && Lc(C3, 'vendu').sens == null && Lc(C3, 'vendu').ecart == null, 'eBay pas lu ⇒ « au moins » des deux côtés, aucune flèche');
-    dit(Lc(C3, 'achats').a.raison === 'partiel' && Lc(C3, 'achats').a.valeur == null && Lc(C3, 'achats').b.valeur == null && Lc(C3, 'achats').sens == null, 'achats Vinted pas lus ⇒ jamais « au moins 0 », « — », aucune flèche', JSON.stringify(Lc(C3, 'achats').a));
+    dit(Lc(C3, 'paires').a.raison === 'partiel' && Lc(C3, 'paires').a.valeur == null && Lc(C3, 'paires').b.valeur == null && Lc(C3, 'paires').sens == null, 'achats Vinted pas lus ⇒ jamais « au moins 0 », « — », aucune flèche', JSON.stringify(Lc(C3, 'paires').a));
     const C4 = CM.comparerDeuxMois({ ymA: '2026-09', ymB: '2026-10', maintenant: MAINT, vendu, recuDe, beneficeDe: () => null, achatsDe: () => undefined, R: RGc });
-    dit(Lc(C4, 'achats').a.valeur == null && Lc(C4, 'achats').a.raison === 'encours', 'achats en lecture ⇒ en cours (« — »), jamais 0');
+    dit(Lc(C4, 'paires').a.valeur == null && Lc(C4, 'paires').a.raison === 'encours', 'achats en lecture ⇒ en cours (« — »), jamais 0');
     dit(CM.comparerDeuxMois({ ymA: '2026-12', ymB: '2026-10', maintenant: MAINT, vendu, R: RGc }) === null, 'un mois à venir ne se compare pas');
     const C5 = CM.comparerMois({ ymA: '2026-11', mode: 'an', maintenant: MAINT, vendu, recuDe, beneficeDe: () => null, R: RGc });
     dit(C5 && C5.ymB === '2025-11' && C5.mode === 'an', '`comparerMois` (mois d’avant / il y a un an) reste le même chemin');

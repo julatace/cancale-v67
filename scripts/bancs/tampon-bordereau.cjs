@@ -75,6 +75,11 @@ if (MUT === 'marges0') tampon = muter(tampon, 'mx: 14, my: 10', 'mx: 0, my: 0', 
 if (MUT === 'bandeThermique') tampon = muter(tampon, 'if (!thermique && tientA4(', 'if (tientA4(', MUT);
 if (MUT === 'sansRotation') tampon = muter(tampon, 'rotate: PL.degrees(r) });', 'rotate: PL.degrees(0) });', MUT);
 if (MUT === 'seuilStrict') tampon = muter(tampon, 'encre: 200, cellule: 3,', 'encre: 248, cellule: 1,', MUT);
+// (11 nov.) LA MENTION « Créé par VRM » : posée à l'aveugle (rien n'est de l'encre,
+// aucune zone gardée) ou sans masquer l'étiquette à découper ⇒ rouge.
+if (MUT === 'mentionAveugle') tampon = muter(tampon, '{ depuisBas: true, bloques }', '{ depuisBas: true, bloques: [], encre: 0 }', MUT);
+if (MUT === 'mentionDansEtiquette') tampon = muter(tampon, 'interdits.push(elargir({ x: Math.min(a.x, c.x)', 'void (({ x: Math.min(a.x, c.x)', MUT);
+if (MUT === 'mentionCollee') tampon = muter(tampon, 'if (tampon) interdits.push(elargir(tampon, MENTION.ecart));', '', MUT);
 // (3 nov., soir) LE TAMPON LIBRE : la place choisie à la main, la forme, la
 // mémoire par forme (`choisirTampon`). Absent du code d'avant ⇒ rouge, pas un plantage.
 const opt = (re) => { const x = re.exec(APP); return x ? x[0] : ''; };
@@ -119,6 +124,15 @@ async function fabriquer(pngScan) {
   { const { d, p } = await nouveau([595.28, 841.89]); const img = await d.embedPng(pngScan); p.drawImage(img, { x: 0, y: 0, width: 595.28, height: 841.89 }); out.scan = await d.save(); }
   { const { d, p, f, fb } = await nouveau([595.28, 841.89]); p.drawRectangle({ x: 0, y: 0, width: 595.28, height: 841.89, color: PL.rgb(0.88, 0.88, 0.88) }); etiquette(p, f, fb, 150, 40, 283, 380, true); out['gris-clair'] = await d.save(); }
   { const { d, p, f, fb } = await nouveau([595.28, 841.89]); etiquette(p, f, fb, 10, 440, 575, 395, false); remplir(p, f, 4, 4, 591, 838, 9); out['a4-pleine'] = await d.save(); }
+  // (11 nov.) Comme Chronopost Shop2Shop : l'étiquette occupe toute la moitié
+  // basse (cadre), un 2ᵉ code-barres tout en bas, du blanc au milieu ; la
+  // notice en haut à gauche. La mention ne doit aller NI dans l'étiquette NI
+  // sur un code : seulement dans le haut de la feuille, loin du N°.
+  { const { d, p, f, fb } = await nouveau([595.28, 841.89]);
+    p.drawRectangle({ x: 20, y: 20, width: 555, height: 380, borderColor: NOIR, borderWidth: 1 }); etiquette(p, f, fb, 20, 20, 555, 380, false); codeBarres(p, 30, 30, 535, 40);
+    texte(p, f, ['AIDE-MÉMOIRE (à conserver)', '1. Découpez l\'étiquette', '2. Fixez-la sur le colis', '3. Déposez-le en relais'], 30, 800, 9, false);
+    p.drawLine({ start: { x: 10, y: 420 }, end: { x: 585, y: 420 }, thickness: 0.6, color: NOIR, dashArray: [4, 3] });
+    out['a4-moitie'] = await d.save(); }
   return out;
 }
 // L'issue attendue pour chaque forme (null : toute issue, mais un tampon).
@@ -131,7 +145,13 @@ const ATTENDU = {
   scan: { normale: 'blanc', thermique: null },
   'gris-clair': { normale: 'blanc', thermique: null },
   'a4-pleine': { normale: 'fiche', thermique: 'fiche' },
+  'a4-moitie': { normale: 'blanc', thermique: null },
 };
+// (11 nov.) La mention « Créé par VRM » : attendue (true), interdite (false) ou
+// libre (null : seulement si une place sûre existe). L'étiquette à découper,
+// en points sur la page AFFICHÉE, pour vérifier que la mention n'y est pas.
+const MENTION_ATTENDUE = { 'a4-quart': true, 'a4-moitie': true, 'pleine-10x15': false, 'tournee-90-pleine': false, 'a4-pleine': false };
+const ETIQUETTE_AFFICHEE = { 'a4-quart': { x: 20, y: 841.89 - 820, w: 283, h: 380 }, 'a4-moitie': { x: 20, y: 841.89 - 400, w: 555, h: 380 }, 'gris-clair': { x: 150, y: 841.89 - 420, w: 283, h: 380 } };
 
 // ── Le serveur (pdf.js, pdf-lib) et la page ─────────────────────────────────
 const srv = http.createServer((q, r) => {
@@ -161,7 +181,7 @@ window.__analyser = async (aB64, bB64, captures) => {
     const pages = [], png = [];
     for (let i = 1; i <= A.numPages; i++) {
       const pg = await A.getPage(i), v = pg.getViewport({ scale: 1 });
-      const items = (await pg.getTextContent()).items.map(it => { const mm = pdfjsLib.Util.transform(v.transform, it.transform); return { s: it.str, droit: mm[0] > 0 && Math.abs(mm[1]) < 0.01 * mm[0] && Math.abs(mm[2]) < 0.01 * mm[0] && mm[3] < 0 }; });
+      const items = (await pg.getTextContent()).items.map(it => { const mm = pdfjsLib.Util.transform(v.transform, it.transform); return { s: it.str, x: mm[4], y: mm[5], l: it.width, t: Math.hypot(mm[2], mm[3]), droit: mm[0] > 0 && Math.abs(mm[1]) < 0.01 * mm[0] && Math.abs(mm[2]) < 0.01 * mm[0] && mm[3] < 0 }; });
       pages.push({ w: v.width, h: v.height, texte: items.map(x => x.s).join(' '), items });
       if (captures) { const r = await __rendre(A, i, 1.2); png.push(r.c.toDataURL('image/png')); }
     }
@@ -197,7 +217,7 @@ window.__libreImprimer = async (b64, thermique, numero, titre, o) => {
   const d = await pdfjsLib.getDocument({ data: o2.slice(), isEvalSupported: false }).promise;
   try {
     const pg = await d.getPage(1), v = pg.getViewport({ scale: 1 });
-    const items = (await pg.getTextContent()).items.map(it => { const m = pdfjsLib.Util.transform(v.transform, it.transform); return { s: it.str, x: m[4], y: m[5], t: Math.hypot(m[2], m[3]), droit: m[0] > 0 && Math.abs(m[1]) < 0.01 * m[0] && Math.abs(m[2]) < 0.01 * m[0] && m[3] < 0 }; });
+    const items = (await pg.getTextContent()).items.map(it => { const m = pdfjsLib.Util.transform(v.transform, it.transform); return { s: it.str, x: m[4], y: m[5], l: it.width, t: Math.hypot(m[2], m[3]), droit: m[0] > 0 && Math.abs(m[1]) < 0.01 * m[0] && Math.abs(m[2]) < 0.01 * m[0] && m[3] < 0 }; });
     // La largeur du cartouche de la variante, pour l'échelle attendue.
     const dd = await PL.PDFDocument.create(), c = __libre.cartoucheLibre(await dd.embedFont(PL.StandardFonts.HelveticaBold), await dd.embedFont(PL.StandardFonts.Helvetica), numero, titre, (o.choix && o.choix.v) || 0);
     return { b64: btoa(s), r0, pages: d.numPages, W: v.width, H: v.height, items, cw: c.w, ch: c.h, intact };
@@ -295,6 +315,17 @@ async function libre(pg, pdfs) {
   const m6 = await imprimer('a4-quart', false, { apercu: true });
   dit(m6.erreur && m6.erreur.annule && m6.intact, 'Annuler : rien ne s\'imprime, le PDF rangé est intact', JSON.stringify(m6.erreur));
   await pg.evaluate(() => { __libre.placeur(null); });
+  // L7 (11 nov.) — tampon posé à la main en bas à droite : la mention « Créé par
+  // VRM » va AILLEURS (≥ 20 mm du cartouche), jamais dessus ni collée à lui.
+  {
+    const CH7 = { vx: 0.62, vy: 0.86, vw: 0.3, v: 0 };
+    const r7 = await imprimer('a4-quart', false, { choix: CH7 });
+    const men = r7.items.filter((x) => /Créé par VRM/.test(x.s)), k = attenduN(r7, CH7).k;
+    const cad = { x: CH7.vx * r7.W, y: CH7.vy * r7.H, w: r7.cw * k, h: r7.ch * k };
+    dit(r7.r0 && r7.r0.tampons[0] === 'libre' && men.length === 1, 'tampon libre : la mention est posée dans une autre zone libre', `${men.length} mention(s)`);
+    const loin = men.every((m) => { const dx = Math.max(0, cad.x - (m.x + m.l), m.x - (cad.x + cad.w)), dy = Math.max(0, cad.y - m.y, (m.y - m.t) - (cad.y + cad.h)); return Math.hypot(dx, dy) >= 20 * 72 / 25.4; });
+    dit(men.length === 1 && loin, 'tampon libre : la mention n\'est PAS à côté du cartouche (≥ 20 mm)', men.map((m) => `(${m.x.toFixed(0)}, ${m.y.toFixed(0)}) · cartouche (${cad.x.toFixed(0)}, ${cad.y.toFixed(0)}, ${cad.w.toFixed(0)}×${cad.h.toFixed(0)})`).join(' '));
+  }
   // L6 — la puce « recouvre le code-barres » : le code-barres et le QR sont vus, l'adresse non.
   const z = await pg.evaluate(([x]) => __libreCodes(x), [b64('a4-quart')]);
   const rec = (b) => z.some((q) => b.x < q.x + q.w && b.x + b.w > q.x && b.y < q.y + q.h && b.y + b.h > q.y);
@@ -335,6 +366,27 @@ async function juger(pg, nom, b64, thermique, attendu) {
     const f = z.pages[1];
     dit(f && proche(f.w, 283.46, 1) && proche(f.h, 425.2, 1) && /B125/.test(f.texte), `${t} : fiche — 100×150 juste après l'étiquette, avec le N°`);
   } else dit(false, `${t} : une issue connue`, issue);
+  // (11 nov.) LA MENTION « Créé par VRM » : toute petite, loin du N°, jamais
+  // sur l'étiquette à découper ni sur une page-étiquette (100×150), seulement
+  // en zone libre. Les zones gardées (code, QR, adresse, suivi) : contrôle 3.
+  {
+    const men = z.pages.flatMap((p, i) => p.items.filter((x) => /Créé par VRM/.test(x.s)).map((x) => ({ ...x, page: i, pw: p.w, ph: p.h })));
+    const att = thermique ? (issue === 'blanc' ? null : false) : MENTION_ATTENDUE[nom];
+    if (att === true) dit(men.length === 1, `${t} : la mention « Créé par VRM » est posée (place sûre)`, `${men.length} mention(s)`);
+    if (att === false) dit(men.length === 0, `${t} : pas de place sûre ⇒ aucune mention`, `${men.length} mention(s)`);
+    dit(men.length <= 1 && men.every((m) => m.page === 0 && issue === 'blanc'), `${t} : la mention n'existe qu'en zone libre, page 1, une fois`, men.map((m) => `p${m.page + 1}`).join(' ') || 'aucune');
+    dit(men.every((m) => !(Math.abs(m.pw - 283.46) < 2 && Math.abs(m.ph - 425.2) < 2)), `${t} : jamais de mention sur une page-étiquette 100×150`);
+    for (const m of men) {
+      dit(m.t >= 6 && m.t <= 7 && m.droit, `${t} : mention en tout petit (6–7 pt), à l'endroit`, `${m.t.toFixed(2)} pt`);
+      const boite = { x: m.x, y: m.y - m.t, w: m.l, h: m.t * 1.25 };
+      const nn = items.filter((x) => /B125|Nike Air Max 1/.test(x.s) && z.pages[0].items.includes(x));
+      const loin = nn.every((x) => { const dx = Math.max(0, x.x - (boite.x + boite.w), boite.x - (x.x + x.l)), dy = Math.max(0, (x.y - x.t) - (boite.y + boite.h), boite.y - x.y); return Math.hypot(dx, dy) >= 20 * 72 / 25.4; });
+      dit(nn.length > 0 && loin, `${t} : mention PAS à côté du N°/titre (≥ 20 mm)`, `mention à (${m.x.toFixed(0)}, ${m.y.toFixed(0)})`);
+      const e = !thermique && ETIQUETTE_AFFICHEE[nom];
+      if (e) dit(!(boite.x < e.x + e.w + 3 && boite.x + boite.w > e.x - 3 && boite.y < e.y + e.h + 3 && boite.y + boite.h > e.y - 3), `${t} : mention hors de l'étiquette à découper`, `mention (${boite.x.toFixed(0)}, ${boite.y.toFixed(0)}) · étiquette (${e.x}, ${e.y.toFixed(0)}, ${e.w}×${e.h})`);
+      dit(boite.x >= 14 && boite.y >= 14 && boite.x + boite.w <= m.pw - 14 && boite.y + boite.h <= m.ph - 14, `${t} : mention hors de la marge non imprimable (≥ 5 mm du bord)`);
+    }
+  }
   if (thermique) {
     const tailles = z.pages.map((p) => `${p.w.toFixed(1)}×${p.h.toFixed(1)}`), avant = z.pagesB.map((p) => `${p.w.toFixed(1)}×${p.h.toFixed(1)}`);
     dit(tailles.slice(0, avant.length).join() === avant.join() && tailles.slice(avant.length).every((x) => x === '283.5×425.2'), `${t} : thermique — aucune page ne change de taille`, tailles.join(' '));

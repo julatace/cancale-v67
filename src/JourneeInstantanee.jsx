@@ -53,7 +53,7 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
     // Le cadre de l'écran vrai (la racine de `Comptabilite` : 16 px en haut), puis sa mise en page.
     <div ref={ref} style={{ padding: '16px 14px 40px' }} data-journee-instantane="" data-ji-t={String(M.t)} data-ji-age={String(Math.floor(M.age / 60000))} aria-busy="true">
     <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee vrm-ji">
-      {ScreenHead ? <ScreenHead icon="sun" title="Ma journée"/> : null}
+      {ScreenHead ? <ScreenHead icon="soleilLevant" title="Ma journée"/> : null}
       <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" aria-label="Ta journée — derniers chiffres connus" style={largeurOk && M.hauteur ? { minHeight: M.hauteur } : undefined}>
         <div className="vrm-day-hello vrm-fu-bonjour">{hello}{M.prenom ? ' ' + M.prenom : ''}</div>
         <h1 className="vrm-fu-titre-tete">Ma journée</h1>

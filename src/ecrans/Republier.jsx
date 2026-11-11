@@ -509,7 +509,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, border: `1px solid ${reel ? C.warn : C.border}`, borderRadius: 12, padding: 10, background: reel ? `${C.warn}0c` : 'transparent' }}>
               <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', cursor: 'pointer' }}>
                 <input type="checkbox" data-file-reel checked={reel} onChange={ev => { setReel(ev.target.checked); if (!ev.target.checked) setReelOk(false); }} style={{ marginTop: 2, accentColor: C.warn, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: C.text }}><b>Publier pour de vrai sur Vinted</b> : baisser le prix de chaque annonce. <span style={{ color: C.muted }}>Même N°, rien supprimé ; une annonce douteuse est sautée.</span></span>
+                <span style={{ fontSize: 13, color: C.text }}><b>Pour de vrai sur Vinted</b> : baisse chaque prix. <span style={{ color: C.muted }}>Même N°, rien supprimé, douteuse sautée.</span></span>
               </label>
               {majExt && <div data-file-reel-maj style={{ fontSize: 12, color: C.warn, paddingLeft: 27 }}>Mets l'extension à jour ({EXT_ATTENDUE}), connectée au bon compte : sinon rien ne part.</div>}
               {reel && <>
@@ -1204,7 +1204,7 @@ function usePhotosReglees(photos, reglage, numero) {
 // chaque paire numérotée : la vue Republier demande ensuite de désigner la nouvelle annonce
 // (SON clic : le N° suit la paire, jamais deviné). Rien ne part chez Vinted d'ici.
 // Une fiche pas lue est DITE (« pas lue »), jamais copiée vide.
-function CarteKit({ x, regs, copie, copies, copier }) {
+function CarteKit({ x, regs, copie, copies, copier, domaine, ouverte, onOuvrir }) {
   const { p, ann, photos, lue } = x;
   const nPh = photos.length;
   const { ph, pretes, enregistrer, libelle } = usePhotosReglees(photos, regs.photo, p.numero);
@@ -1223,12 +1223,21 @@ function CarteKit({ x, regs, copie, copies, copier }) {
           <div className="vrm-kit-desc" data-kit-desc="">{lue === undefined ? <span className="vrm-rm-muet">Lecture…</span> : descOk ? (ann.description || <span className="vrm-rm-muet">Pas de description.</span>) : <span className="vrm-rm-ambre">Description pas lue : copie-la depuis Vinted.</span>}</div>
         </div>
       </div>
-      <div className="vrm-kit-gestes">
-        {num ? bouton(kN, num, num, 'copy', { 'data-kit-copier-num': p.id, 'aria-label': `Copier le ${num}` }) : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-num="">Sans N°</span>}
-        {descOk ? bouton(kD, 'Description', ann.description, 'copy', { 'data-kit-copier-desc': p.id, 'aria-label': 'Copier la description' }) : null}
-        {nPh > 0 ? <Bouton variante={pretes && !ph.enregistre ? 'primaire' : 'secondaire'} icone={ph && ph.enregistre ? 'check' : 'image'} data-kit-photos={p.id} data-kit-photos-n={nPh} data-kit-photos-fait={ph && ph.enregistre ? ph.enregistre : undefined} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libelle}</Bouton>
-          : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-photo="">Photos pas lues</span>}
-      </div>
+      {/* (11 nov., lot DJ8 — « que tout soit parfait ») LES GESTES DANS L'ORDRE où il les fait :
+          1 les photos dans sa galerie, 2 Vinted ouvert sur « Vendre », 3 le N° et la description à
+          coller. « Vinted » note le suivi de CETTE paire (par son identité) : la vue Republier lui
+          demandera ensuite de désigner la nouvelle annonce (SON clic, le N° la suit). */}
+      <ol className="vrm-kit-gestes vrm-kit-etapes">
+        <li data-kit-etape="photos">{nPh > 0 ? <Bouton variante={pretes && !ph.enregistre ? 'primaire' : 'secondaire'} icone={ph && ph.enregistre ? 'check' : 'image'} data-kit-photos={p.id} data-kit-photos-n={nPh} data-kit-photos-fait={ph && ph.enregistre ? ph.enregistre : undefined} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libelle}</Bouton>
+          : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-photo="">Photos pas lues</span>}</li>
+        {/* (11 nov., « gagner du temps ») « Vinted ↗ » COPIE AUSSI la description : un geste de moins
+            par paire (il colle en arrivant sur « Vendre »). « Description » reste pour la recopier. */}
+        <li data-kit-etape="vinted"><Bouton variante={ouverte ? 'discret' : 'secondaire'} icone={ouverte ? 'check' : 'link'} data-kit-ouvrir-paire={p.id} data-kit-ouvrir-copie={descOk ? '1' : '0'} href={`https://${domaine}/items/new`} target="_blank" rel="noopener noreferrer" onClick={() => { if (descOk) copier(kD, ann.description); onOuvrir(); }}>{ouverte ? (descOk ? 'Description copiée' : 'Vinted ouvert') : 'Vinted ↗'}</Bouton></li>
+        <li data-kit-etape="coller" className="vrm-kit-coller">
+          {num ? bouton(kN, num, num, 'copy', { 'data-kit-copier-num': p.id, 'aria-label': `Copier le ${num}` }) : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-num="">Sans N°</span>}
+          {descOk ? bouton(kD, 'Description', ann.description, 'copy', { 'data-kit-copier-desc': p.id, 'aria-label': 'Copier la description' }) : null}
+        </li>
+      </ol>
       {ph && !ph.encours && ph.rate ? <div className="vrm-rm-ambre vrm-kit-rate">{ph.rate} photo{ph.rate > 1 ? 's' : ''} pas lue{ph.rate > 1 ? 's' : ''} : réessaie.</div> : null}
     </li>
   );
@@ -1261,6 +1270,7 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
   const [lettres] = useState(() => { const o = {}; for (const p of liste) o[cle(p)] = tirerLettre(); return o; });
   const [copie, setCopie] = useState('');
   const [copies, setCopies] = useState(() => new Set());
+  const [ouvertes, setOuvertes] = useState(() => new Set());   // (11 nov., lot DJ8) Vinted ouvert pour CETTE paire
   const copier = async (k, t) => {
     try { await navigator.clipboard.writeText(String(t || '')); setCopie(k); setCopies((s) => new Set(s).add(k)); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1600); }
     catch (_) { toast('Copie impossible ici : sélectionne le texte et copie-le.'); }
@@ -1283,13 +1293,13 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
       {/* Le conseil, en tête : une phrase, trois gestes. */}
       <div className="vrm-kit-conseil" data-kit-conseil="">
         <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
-        <div><b>Le plus sûr : tu publies toi-même.</b><span>Photos, N° et description sont prêts.</span></div>
+        <div><b>Le plus sûr : tu publies toi-même.</b><span>Photos, puis « Vinted ↗ » : description déjà copiée.</span></div>
       </div>
       <div className="vrm-kit-barre">
         <span className="vrm-rm-muet" data-kit-couverture={`${cv.lues}/${cv.n}`}>{cv.enCours ? 'Lecture des fiches…' : cv.lues === cv.n ? `${n} description${n > 1 ? 's' : ''} prête${n > 1 ? 's' : ''}` : `Descriptions lues : ${cv.lues} sur ${cv.n}`}</span>
         {n > 1 ? <Bouton variante={copies.has('tout') ? 'discret' : 'secondaire'} icone={copie === 'tout' ? 'check' : 'copy'} data-kit-tout-copier={n} onClick={() => copier('tout', texteKit(kit))}>{copie === 'tout' ? 'Copié' : 'Tout copier'}</Bouton> : null}
       </div>
-      <ul className="vrm-kit-liste">{items.map((x) => <CarteKit key={x.k} x={x} regs={regs} copie={copie} copies={copies} copier={copier}/>)}</ul>
+      <ul className="vrm-kit-liste">{items.map((x) => <CarteKit key={x.k} x={x} regs={regs} copie={copie} copies={copies} copier={copier} domaine={x.p.domain || domaine} ouverte={ouvertes.has(x.k)} onOuvrir={() => { setOuvertes((o) => new Set(o).add(x.k)); if (onOuvrirVinted) onOuvrirVinted([x.p]); }}/>)}</ul>
       <p className="vrm-rm-muet" data-kit-relier="">Publiée ? Désigne la nouvelle dans Republier : le N° la suit.</p>
       <div className="vrm-rm-pied">
         <Bouton variante="secondaire" data-kit-pas-a-pas={n} onClick={onUneParUne}>Pas à pas</Bouton>

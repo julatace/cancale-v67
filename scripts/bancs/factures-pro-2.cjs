@@ -219,8 +219,29 @@ const confirmer = async (pg, nom) => { const b = pg.getByRole('button', { name: 
         if (tel) dit(!m.petites.length, '6. registre : cibles de 44 px', m.petites.join(' | '));
         if (SHOTS) { await r.scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fq-registre-${nf}.png`) }); }
       });
+      // (11 nov., décision C4) Au téléphone : le geste principal + « … » ; les quatre autres dans une
+      // feuille en portail (44 px). Sur ordinateur : les cinq boutons sur la ligne du titre.
+      await essaie('Menu des factures (C4)', async () => {
+        const vis = (sel) => pg.evaluate((sel) => [...document.querySelectorAll(sel)].some((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }), sel);
+        if (tel) {
+          dit(!(await vis('[data-fac-actions="large"]')) && await vis('[data-fac-actions="tel"] [data-fac-principal]') && await vis('[data-fac-plus]'), 'C4. téléphone : « + Nouvelle facture » et « … » seuls sur la ligne du titre');
+          const h = await pg.evaluate(() => [...document.querySelectorAll('[data-fac-actions="tel"] > button')].map((b) => Math.round(b.getBoundingClientRect().height)));
+          dit(h.length === 2 && h.every((x) => x >= 44), 'C4. téléphone : deux cibles de 44 px', h.join(','));
+          await pg.locator('[data-fac-plus]').click();
+          const f = pg.locator('[data-fac-menu]'); await f.waitFor({ timeout: 4000 });
+          const g = await f.evaluate((d) => ({ gestes: [...d.querySelectorAll('[data-fac-menu-geste]')].map((b) => b.getAttribute('data-fac-menu-geste') + ':' + Math.round(b.getBoundingClientRect().height)), portail: d.closest('#root') === null }));
+          dit(g.gestes.map((x) => x.split(':')[0]).join(',') === 'relire,excel,fiche,reglages' && g.gestes.every((x) => Number(x.split(':')[1]) >= 44) && g.portail, 'C4. « … » : Relire, Excel, Ma facture, Réglages — 44 px, feuille en portail', JSON.stringify(g));
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fq-menu-${nf}.png`) });
+          await f.locator('[data-fac-menu-geste="fiche"]').click();
+          await pg.waitForFunction(() => !document.querySelector('[data-fac-menu]'), null, { timeout: 4000 });
+          dit(true, 'C4. un geste ferme la feuille et agit');
+        } else {
+          dit(await vis('[data-fac-actions="large"]') && !(await vis('[data-fac-actions="tel"]')), 'C4. ordinateur : les cinq boutons restent sur la ligne du titre, pas de « … »');
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fq-tete-${nf}.png`) });
+        }
+      });
       await essaie('Envoi automatique', async () => {
-        await pg.getByRole('button', { name: 'Ma facture' }).first().click();
+        if (!tel) await pg.getByRole('button', { name: 'Ma facture' }).first().click();
         const a = pg.locator('[data-fp-auto]');
         await a.waitFor({ timeout: 8000 });
         dit(await a.getAttribute('data-fp-auto') === 'off' && !(await a.locator('[data-fp-auto-case]').isChecked()), '7. l’envoi automatique est ÉTEINT par défaut');

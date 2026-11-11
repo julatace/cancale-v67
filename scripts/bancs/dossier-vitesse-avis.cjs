@@ -68,7 +68,7 @@ const rowsDe = ({ sombre, avis = true }) => [
   { id: 'email_bord_9401', data: { uid: '111', type: 'bordereau', suivi: '3SBXAA000401', transaction: '9401', receivedAt: ilYaH(110), filename: 'b9401.pdf', modele: T, transporteur: 'mondialrelay', pdfB64: PDF_B64 } },
   { id: 'colis_photo_v_9401', data: { b64: PHOTO_CARTON, at: ilYaH(100), site: 'vinted', tx: '9401', num: '21' } },
   { id: 'harvest_111_profile', data: { uid: '111', capturedAt: ilYaH(2), payload: { user: { login: 'compte_a', feedback_reputation: 0.96, feedback_count: 120, positive_feedback_count: 117, neutral_feedback_count: 2, negative_feedback_count: 1 } } } },
-  ...(avis ? [{ id: 'harvest_111_feedbacks', data: { type: 'feedbacks', uid: '111', domain: 'www.vinted.fr', capturedAt: ilYaH(3), nItems: 20, payload: { user_feedbacks: AVIS, pagination: { total_entries: 120, total_pages: 6 } } } }] : []),
+  ...(avis ? [{ id: 'harvest_111_feedbacks', data: { type: 'feedbacks', uid: '111', domain: 'www.vinted.fr', capturedAt: ilYaH(3), nItems: 20, payload: { user_feedbacks: AVIS, pagination: { total_entries: 120, total_pages: 6 }, historique: [{ at: ilYaH(24 * 30), total: 86, n: 20, c: [0, 0, 2, 4, 14] }, { at: ilYaH(3), total: 120, n: 20, c: [0, 0, 5, 5, 10] }] } } }] : []),
   // Un ENVOI d'avis (la forme `wreq` mesurée) : jamais pris pour une lecture.
   { id: 'harvest_111_wreq_api_v2_user_feedbacks', data: { uid: '111', url: '/api/v2/user_feedbacks', method: 'POST', capturedAt: ilYaH(50) } },
 ];
@@ -225,7 +225,7 @@ const telecharger = async (pg, clic) => {
             return {
               etat: corps && corps.getAttribute('data-ve-etat'), n: corps && corps.getAttribute('data-ve-n'), med: corps && corps.getAttribute('data-ve-mediane'), sans: corps && corps.getAttribute('data-ve-sans-date'),
               ligne: ligne ? ligne.innerText.replace(/\s+/g, ' ') : '',
-              av: av ? { lus: av.getAttribute('data-av-lus'), moy: av.getAttribute('data-av-moyenne'), total: av.getAttribute('data-av-total'), txt: av.innerText.replace(/\s+/g, ' '), avis: [...av.querySelectorAll('[data-av-avis]')].map((x) => [x.getAttribute('data-av-avis'), x.getAttribute('data-av-date')]), evol: (av.querySelector('[data-av-evolution]') || { getAttribute: () => null }).getAttribute('data-av-evolution') } : null,
+              av: av ? { lus: av.getAttribute('data-av-lus'), moy: av.getAttribute('data-av-moyenne'), total: av.getAttribute('data-av-total'), txt: av.innerText.replace(/\s+/g, ' '), avis: [...av.querySelectorAll('[data-av-avis]')].map((x) => [x.getAttribute('data-av-avis'), x.getAttribute('data-av-date')]), evol: (av.querySelector('[data-av-evolution]') || { getAttribute: () => null }).getAttribute('data-av-evolution'), histo: (av.querySelector('[data-av-histo]') || { getAttribute: () => null }).getAttribute('data-av-histo'), histoN: (av.querySelector('[data-av-histo]') || { getAttribute: () => null }).getAttribute('data-av-histo-nouveaux') } : null,
               liste: (document.querySelector('[data-sv-notes-liste]') || { getAttribute: () => null }).getAttribute('data-sv-notes-liste'),
             };
           });
@@ -234,6 +234,8 @@ const telecharger = async (pg, clic) => {
           dit(Number(s.sans) >= 1, 'BM la finalisée sans preuve datée n’est pas comptée à 0 : elle est « sans date »', s.sans);
           dit(s.av && s.av.lus === '20' && s.av.total === '120' && s.av.moy === '4.3', 'BN 20 avis lus (forme sans date), moyenne 4,3, « 120 en tout »', JSON.stringify(s.av));
           dit(s.av && s.av.avis.length === 5 && s.av.avis[0][0] === '9000000020' && s.av.avis.every((x) => x[1] === ''), 'BN les 5 derniers, le plus récent d’abord, AUCUNE date inventée', JSON.stringify(s.av && s.av.avis));
+          // (11 nov., extension 5.340) l'historique daté par lecture : +34 avis en 30 jours, moyenne 4,6 → 4,3.
+          dit(s.av && s.av.histo === 'lu' && s.av.histoN === '34' && /\+34 avis · moyenne 4,6 → 4,3/.test(s.av.txt), 'BN historique daté : « +34 avis · moyenne 4,6 → 4,3 »', s.av && s.av.txt);
           dit(s.av && s.av.evol === 'hausse' && /10 derniers 5 · avant 3,5/.test(s.av.txt), 'BN évolution : 10 derniers 5 · avant 3,5', s.av && s.av.txt);
           dit(s.av && !/jeanne|compte_b/i.test(s.av.txt) && /Parfait, envoi rapide/.test(s.av.txt) && /…/.test(s.av.txt), 'BN texte court, jamais un pseudo', s.av && s.av.txt);
           dit(selectData.length === 0, 'BN avis lus en projection (jamais `select=data`)', selectData.join(' '));

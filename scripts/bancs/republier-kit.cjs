@@ -152,6 +152,8 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           await clic(pg, '[data-selection-annonce="9102"] input'); await clic(pg, '[data-selection-annonce="9103"] input');
           const barre = await attendre(pg, () => { const m = document.querySelector('[data-republier-main-lancer]'); const v = document.querySelector('[data-republier-lancer]'); return m && v ? { m: m.getAttribute('data-republier-main-lancer'), mP: m.classList.contains('vrm-b-primaire'), v: v.getAttribute('data-republier-lancer'), vP: v.classList.contains('vrm-b-primaire') } : null; });
           dit(barre && barre.m === '2' && barre.mP && barre.v === '2' && !barre.vP, `C ${T} deux paires cochées : « À la main · 2 » principal, « Par VRM · 2 » en second`, JSON.stringify(barre));
+          const vider = await pg.evaluate(() => document.querySelectorAll('[data-selection-vue="republier"] [data-selection-vider]').length);
+          dit(vider === 0, `C ${T} un seul compte : un seul « Tout décocher » (celui du compte)`, String(vider));
           await pg.waitForTimeout(600); await pg.screenshot({ path: nomF('1-vue') });
           // ── K : le kit ──
           await clic(pg, '[data-republier-main-lancer]');
@@ -181,6 +183,20 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           const p1 = await petitsDans(pg, '[data-kit-main]');
           dit(!p1.length, `F ${T} cibles ≥ 44 px (kit)`, p1.join(' | '));
           await pg.waitForTimeout(400); await pg.screenshot({ path: nomF('2-kit') });
+          // ── (11 nov., lot DJ8) E : les gestes de chaque carte dans l'ORDRE où il les fait ──
+          const ordre = await pg.evaluate(() => [...document.querySelectorAll('[data-kit-paire="9102"] [data-kit-etape]')].map((x) => x.getAttribute('data-kit-etape')).join(','));
+          dit(ordre === 'photos,vinted,coller', `E ${T} chaque carte : 1 photos · 2 Vinted · 3 coller N° et description`, ordre);
+          // « Vinted ↗ » d'UNE carte note le suivi de CETTE paire seulement.
+          const [pop1] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-kit-ouvrir-paire="9103"]')]);
+          if (pop1) await pop1.close().catch(() => {});
+          const un = await attendre(pg, () => { try { const v = JSON.parse(localStorage.getItem('vrm_repub_main') || '{}'); return Object.keys(v).length ? Object.keys(v).sort().join(',') : null; } catch (_) { return null; } });
+          dit(un === '9103', `E ${T} « Vinted ↗ » d’une carte : le suivi de CETTE paire seulement (par son identifiant)`, un);
+          // (11 nov., « gagner du temps ») le même clic a COPIÉ la description de CETTE paire.
+          const descAttendue = await pg.evaluate(() => { const d = document.querySelector('[data-kit-paire="9103"] [data-kit-desc]'); return d ? d.innerText.trim() : null; });
+          const pp = await pressePapier(pg);
+          const copieOk = await pg.getAttribute('[data-kit-ouvrir-paire="9103"]', 'data-kit-ouvrir-copie');
+          const lue9103 = await pg.getAttribute('[data-kit-paire="9103"]', 'data-kit-lue');
+          dit(lue9103 === '1' && copieOk === '1' && pp != null && descAttendue && pp.trim() === descAttendue, `E ${T} « Vinted ↗ » copie aussi la description de cette paire (un geste de moins)`, { copieOk, pp: pp && pp.slice(0, 60), descAttendue: descAttendue && descAttendue.slice(0, 60) });
           // ── N : « Ouvrir Vinted » note le suivi ──
           const [pop] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-kit-ouvrir-vinted]')]);
           if (pop) await pop.close().catch(() => {});
@@ -208,6 +224,9 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           const rep = await attendre(pg, () => document.querySelectorAll('[data-suivi-main-reprendre]').length || null);
           dit(rep === 2, `N ${T} la vue demande de désigner les deux nouvelles annonces (« Reprendre ») : le N° suit par son clic`, String(rep));
           await pg.screenshot({ path: nomF('4-suivis') });
+          // (11 nov., lot DJ8) En arrivant, « À la main » se voit d'abord : le conseil AVANT les suivis.
+          const avantSuivis = await pg.evaluate(() => { const c = document.querySelector('[data-republier-conseil="main"]'), s = document.querySelector('[data-suivi-main]'); return !!(c && s && (c.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING)); });
+          dit(avantSuivis, `C ${T} le conseil « À la main » passe avant les suivis à reprendre`);
           dit((await pg.evaluate(() => window.__envois.length)) === 0, `F ${T} rien n’est parti chez Vinted (c’est lui qui publie)`);
           const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
           dit(deb <= 1, `F ${T} aucun débordement horizontal`, deb);

@@ -180,7 +180,7 @@ export function csvInventaire(inv, { date, ecarts = null } = {}) {
   L.push(['N°', 'Titre', 'Compte', 'Prix d’achat (€)', 'Vérification'].map(cellule).join(';'));
   for (const l of inv.lignes) L.push([l.numero || '', l.titre, l.compte, prixCsv(l.achat), verifTexte(l, ec)].map(cellule).join(';'));
   if (ec && ec.horsListe.length) {
-    L.push(''); L.push(cellule('Trouvées dans les cartons, pas dans la liste'));
+    L.push(''); L.push(cellule('Trouvées dans les rangements, pas dans la liste'));
     for (const k of ec.horsListe) L.push([k, '', '', '', 'hors liste'].map(cellule).join(';'));
   }
   return '﻿' + L.join('\r\n') + '\r\n';
@@ -214,7 +214,7 @@ export async function pdfInventaire(inv, { date, ecarts = null, PDFLib = null } 
   txt(e.lue, M, y, { t: 9.5, c: GRIS }); y -= 30;
   txt('Valeur du stock (prix d’achat saisis)', M, y, { t: 12 }); txt(e.valeur, W - M, y, { font: fb, t: 14, droite: true }); y -= 15;
   txt([e.sur, e.sans].filter(Boolean).join(' · ') + (e.partiel ? ' · une lecture des annonces manque' : ''), M, y, { t: 9, c: GRIS }); y -= 22;
-  txt('Vérification des cartons', M, y, { t: 12 }); txt(e.verif, W - M, y, { t: 9.5, droite: true }); y -= 28;
+  txt('Vérification des rangements', M, y, { t: 12 }); txt(e.verif, W - M, y, { t: 9.5, droite: true }); y -= 28;
   tete();
   for (const l of inv.lignes) {
     if (y < M + 30) nouvelle();
@@ -227,7 +227,7 @@ export async function pdfInventaire(inv, { date, ecarts = null, PDFLib = null } 
   }
   if (ec && ec.horsListe.length) {
     y -= 10; if (y < M + 40) nouvelle();
-    txt('Trouvées dans les cartons, pas dans la liste', M, y, { font: fb, t: 11 }); y -= 16;
+    txt('Trouvées dans les rangements, pas dans la liste', M, y, { font: fb, t: 11 }); y -= 16;
     txt(ec.horsListe.join(', '), M, y, { t: 9.5, w: W - 2 * M }); y -= 16;
   }
   const pages = doc.getPages();

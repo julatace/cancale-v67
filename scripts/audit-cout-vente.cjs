@@ -127,7 +127,7 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   const ST = sansCommentaires(lire('ecrans/Stats.jsx')), SK = sansCommentaires(lire('ecrans/Stock.jsx'));
   dit(/useValeurStock\(/.test(ST) && /useValeurStock\(/.test(SK) && !/valeurStock\(|buyPrice/.test(ST.slice(ST.indexOf('label="Valeur du stock"') - 400, ST.indexOf('label="Valeur du stock"') + 600)), 'E8 Statistiques et Stock LISENT la valeur publiée, ne la recalculent pas');
   dit(/value=\{valeurStk && valeurStk\.centimes != null \?/.test(ST) && /onClick=\{valeurStk && valeurStk\.nSans \? versSaisiePrix : null\}/.test(ST), 'E9 Statistiques : « — » si pas su ; « N sans prix » ouvre la saisie en série');
-  dit(/<ValeurStockCarte v=\{valeurStk\} onSaisir=\{saisirPrixStock\}\/>/.test(SK) && /DEMANDE_SAISIE_PRIX\.on = true/.test(SK), 'E10 Stock : le widget, sa porte vers la saisie en série');
+  dit(/<ValeurStockCarte v=\{valeurStk\} onSaisir=\{saisirPrixStock\}( mots=\{motsStock\})?\/>/.test(SK) && /DEMANDE_SAISIE_PRIX\.on = true/.test(SK), 'E10 Stock : le widget, sa porte vers la saisie en série');
   dit(!/stockValue/.test(A) && !/stockValue/.test(ST), 'E11 l’ancien total sans couverture (`stockValue`) a disparu (une règle par notion)');
   dit(/'Autres frais','Emballage','Frais confirmés'/.test(A), 'E12 l’export CSV porte la colonne Emballage (une par champ de frais)');
 

@@ -44,9 +44,9 @@ function fichiersApp(racine) {
 function recoller(texte, dejaImportes) {
   return texte.replace(/^import ([^;'"]*?) from (["'])([^"'\n]+)\2;/gm, (ligne, specs, q, chemin) => {
     if (/(^|\/)App\.jsx$/.test(chemin)) return '';
-    // (11 nov.) un écran qui importe un AUTRE écran (`./MessagesLeboncoin.jsx`) : cet écran est
-    // recollé lui aussi, son nom est déjà déclaré dans le texte (Babel : « already been declared »).
-    if (/^\.\/[^/]+\.jsx$/.test(chemin)) return '';
+    // (11 nov.) L'import d'un AUTRE écran (`./MessagesLeboncoin.jsx` vu de src/ecrans/) : cet
+    // écran est recollé lui aussi, ses noms sont déjà déclarés dans le texte.
+    if (/^\.\/[^/]+\.jsx?$/.test(chemin)) return '';
     const vu = (n) => dejaImportes.has(n);
     const garde = [];
     let reste = specs.trim();
@@ -124,7 +124,8 @@ function sourceApp(racine) {
 // et ordre intacts ; une ligne vidée disparaît).
 function sansDoublonsImport(texte) {
   const vus = new Set();
-  // (11 nov.) une ligne d'import peut finir par un commentaire (`…js';   // (lot H)`) : elle compte aussi.
+  // (11 nov.) Une ligne suivie d'un commentaire (`; // (10 nov., lot H)`) compte aussi : sans
+  // cela DEMANDE_APPAREIL (App.jsx ET Réglages) était déclaré deux fois (Babel).
   return texte.replace(/^import\s+([^'";]*?)\s+from\s+(["'])([^"'\n]+)\2;[ \t]*(?:\/\/[^\n]*)?$/gm, (ligne, specs, q, chemin) => {
     // Un import d'App.jsx par un morceau recollé DANS App.jsx : ses noms y sont déclarés.
     if (/(^|\/)App\.jsx$/.test(chemin)) return '';
