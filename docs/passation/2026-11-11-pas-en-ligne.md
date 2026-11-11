@@ -77,8 +77,21 @@ Un site que VRM n'a jamais lu n'est pas nommé : VRM ne connaît pas ce compte (
   annonce au même titre sans N° ⇒ 36 à confirmer. Vert sous UTC, Paris, Los Angeles, Kiritimati.
 - Audits verts : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
   quoi-de-neuf, traduction (44), stock-annonces (53), journee-perso.
-- Banc `scripts/bancs/pas-en-ligne.cjs` (390 tactile / 1512, clair / sombre) : voir « État ».
+- Banc `scripts/bancs/pas-en-ligne.cjs` (390 tactile / 1512, clair / sombre, en français) : **72 verts** —
+  A carte « 36 articles achetés pas en ligne » ; B 36 lignes N°150 … N°114, jamais N°117, prix, âge,
+  case ; C seuil 30 j ⇒ 21 ; D « Ouvrir l'achat » ouvre l'achat N°150 en modification ; E compte vieux de
+  3 j ⇒ aucune carte, Achats « 36 à confirmer », « compte_beta pas relu depuis 3 j » ; F annonces pas
+  lues ⇒ rien ; G ni erreur ni défilement horizontal. Premier passage : D et E rouges — le geste menait
+  à `cat_achats` (= Colis → À retirer) : corrigé en `achats`. Sur `main` le banc est rouge (aucune carte).
+- Captures regardées (390 clair : feuille ; 1512 sombre : à confirmer ; 390 sombre : Ma journée) ;
+  à 390 px « depuis 50 jours » était coupé ⇒ lignes secondaires sur deux lignes.
+- `npm run build` vert.
 
 ## État à la reprise
 
-(mis à jour en fin de session, ci-dessous)
+- Tout est livré et poussé ; `git merge origin/main` fait (rien de neuf au moment de la fin).
+- Reste : brancher « Créer sur Vinted » en série quand `claude/annonce-vinted` sera sur main ; une
+  fiche « prête à l'arrivée d'un achat » (N° posé sur un achat Vinted avant la mise en ligne) rendrait
+  les achats Vinted prouvables sans relier toutes les annonces — pas fait (hors demande).
+- Geste de Julien : relier ses annonces à leurs achats (Annonces → « Sans achat relié ») ; tant que
+  ce n'est pas fait, ses achats Vinted restent « à confirmer » (c'est voulu : mieux vaut un blanc qu'un faux).
