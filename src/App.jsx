@@ -13,6 +13,8 @@ import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
 import {stockageParcours,lireReprise,garderReprise} from './repriseEcran.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
+import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from './composants/SelectionSerie.jsx';
+import { trierSerie, resumeSerie, csvDe } from './selectionSerie.js';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
@@ -35447,6 +35449,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     });
   };
+  // (11 nov., lot actions-serie) Masquer EN SÉRIE : la même écriture que `masquerAchat`
+  // (une entrée de `vinted_purchases_hidden` par achat), en UN geste ⇒ UN « Annuler » qui
+  // remet tous les achats à leur place. Rien chez Vinted.
+  const masquerAchats = (liste) => {
+    const deja = achatsMasques();
+    const L = (liste || []).filter(o => o && o.transaction_id != null && !deja.has(String(o.transaction_id)));
+    if (!L.length) return 0;
+    const txs = L.map(o => String(o.transaction_id));
+    let avant = null, avantCache = null;
+    gesteVrm(L.length > 1 ? `${L.length} achats masqués` : 'Achat masqué', txs.map(tx => ({ k: ACHATS_MASQUES, type: 'ensemble', id: tx, apres: true, avant: false })), {}, (sens) => {
+      const n = achatsMasques(); for (const tx of txs) { if (sens === 'apres') n.add(tx); else n.delete(tx); }
+      _achatsMasques = [...n];
+      const enleve = new Set(txs);
+      setBuys(prev => {
+        if (!prev || !prev.items) return prev;
+        if (sens === 'apres') { avant = prev.items; return { ...prev, items: prev.items.filter(x => !enleve.has(String(x.transaction_id))) }; }
+        return avant ? { ...prev, items: avant.filter(x => enleve.has(String(x.transaction_id)) || prev.items.some(y => String(y.transaction_id) === String(x.transaction_id))) } : prev;
+      });
+      const c = _acctCache['purchased'];
+      if (c) {
+        if (sens === 'apres') { avantCache = c.items || []; c.items = avantCache.filter(x => !enleve.has(String(x.transaction_id))); }
+        else if (avantCache) { const l = c.items || []; c.items = avantCache.filter(x => enleve.has(String(x.transaction_id)) || l.some(y => String(y.transaction_id) === String(x.transaction_id))); }
+        _persistAcctCache();
+      }
+    });
+    return L.length;
+  };
+  // (11 nov., lot actions-serie) « J'ai retiré » EN SÉRIE : l'écriture de `markPickupDone`
+  // (`vinted_pickup_done[tx]`), en UN geste. Seul un colis AU POINT RELAIS se retire.
+  const markPickupDoneSerie = (liste) => {
+    const L = (liste || []).filter(o => o && o.transaction_id != null);
+    if (!L.length) return 0;
+    const t = new Date().toISOString();
+    gesteVrm(L.length > 1 ? `${L.length} colis retirés` : 'Colis retiré', L.map(o => ({ k: 'vinted_pickup_done', type: 'cle', id: String(o.transaction_id), apres: t, avant: pickupDone[String(o.transaction_id)] })), { vinted_pickup_done: setPickupDone });
+    return L.length;
+  };
   const achatsAffiches = useMemo(() => {
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
@@ -35490,6 +35528,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   };
   useEffect(() => { setAchatsMax(60); }, [aFilter, ordSearchDiff, periode]);
+  // (11 nov., lot actions-serie) Sélectionner plusieurs achats, agir une fois (src/selectionSerie.js).
+  const ordreAchatsSerie = useMemo(() => achatsAffiches.map(x => String(x.o.transaction_id)), [achatsAffiches]);
+  const serieAchats = useSelectionSerie(ordreAchatsSerie, { nom: 'achats' });
+  // Les actions : la même écriture que le geste unitaire, ligne par ligne, et un résumé honnête.
+  const actionsSerieAchats = () => {
+    const parTx = new Map(achatsAffiches.map(x => [String(x.o.transaction_id), x]));
+    const lignes = (cles) => cles.map(k => parTx.get(k)).filter(Boolean);
+    return [
+      { k: 'retire', libelle: 'Retiré', icone: 'check', variante: 'primaire', faire: (cles) => {
+        const { ok, pasFaits } = trierSerie(lignes(cles), ({ o, st }) => {
+          if (st.step === 0) return 'annulé';
+          if (st.retour) return 'en retour';
+          if (pickupDone[String(o.transaction_id)] || st.step >= 4) return 'déjà retiré';
+          return st.step === 3 ? true : 'pas au point relais';
+        });
+        markPickupDoneSerie(ok.map(x => x.o));
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'retiré', plusieurs: 'retirés' });
+      } },
+      { k: 'relier', libelle: 'Relier', icone: 'link', faire: (cles) => {
+        const L = lignes(cles);
+        if (typeof relierAchatsSerie === 'function') return relierAchatsSerie(L.map(x => x.o));
+        return { texte: 'Pas fait : relier un achat se fait depuis l’annonce' };
+      } },
+      { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
+        const L = lignes(cles);
+        const csv = csvDe(['Date', 'Compte', 'Article', 'N°', 'Prix payé (€)', 'État', 'N° de transaction'],
+          L.map(({ o, st }) => [o.date && Number.isFinite(new Date(o.date).getTime()) ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._acc ? accNameOf(o._acc) : '', o.title || '', buyNumByTxn[String(o.transaction_id)] ?? '', montantCommande(o).toFixed(2).replace('.', ','), st.label || '', String(o.transaction_id)]));
+        telechargerFichier(csv, `achats-${dateLocaleISO()}.csv`, 'text/csv;charset=utf-8');
+        return resumeSerie({ faits: L, pasFaits: [] }, { un: 'achat exporté', plusieurs: 'achats exportés' });
+      } },
+      { k: 'masquer', libelle: 'Masquer', icone: 'eyeOff', faire: (cles) => {
+        const deja = achatsMasques();
+        const { ok, pasFaits } = trierSerie(lignes(cles), ({ o }) => deja.has(String(o.transaction_id)) ? 'déjà masqué' : true);
+        masquerAchats(ok.map(x => x.o));
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'masqué', plusieurs: 'masqués' });
+      } },
+    ];
+  };
 
 
   // ⚠️⚠️ L'ORDRE DES TESTS EST LA RÈGLE (4 octobre). Avant, « transit » passait
@@ -43796,6 +43872,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>
         {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>Tous sur <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
+        {tranche.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieAchats}/></div>}
+        <BarreSerie serie={serieAchats} actions={actionsSerieAchats()}/>
         <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
           {tranche.map(({o,tk,st},i)=>{
             const cancelled = st.step===0;
@@ -43805,8 +43883,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
             <React.Fragment key={o.transaction_id}>
             {i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
-            <div className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+            <div {...serieAchats.ligne(String(o.transaction_id))} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
+                <CaseSerie serie={serieAchats} cle={String(o.transaction_id)} etiquette={o.title} surPhoto/>
                 {orderPhoto(o)&&!achatPhKo.has(orderPhoto(o))?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>{ const u=orderPhoto(o); setAchatPhKo(s=>{ if(s.has(u)) return s; const n=new Set(s); n.add(u); return n; }); }}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
               </div>
               <div className="vrm-buy-main">
