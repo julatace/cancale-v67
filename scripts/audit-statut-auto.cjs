@@ -179,7 +179,7 @@ const VENDEUR = '3f2b8c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f';
   vrai(a0.res.code === 200 && base().etat === 'pas_su' && base().raison === 'sans-reponse', 'S3 pas de réponse de la base ⇒ « pas su » (sans-reponse), jamais « ok »', base());
   await appel();
   vrai(base().etat === 'pas_su' && !base().incident && (base().echecs || 0) === 0 && notifs.length === 0, 'S3 deux « pas su » de suite ⇒ aucun incident, aucune notification', base());
-  vrai(a0.j.every((x) => !/select=data(&|$)/.test(x.u) || /id=eq\.statut_sondes/.test(x.u)), 'S3 aucune lecture `select=data` hors de la petite ligne d’état', a0.j.map((x) => x.u).filter((u) => /select=data(&|$)/.test(u)));
+  vrai(a0.j.every((x) => !/select=data(&|$)/.test(x.u) || /id=eq\.(statut_sondes|alertes_production)/.test(x.u)), 'S3 aucune lecture `select=data` hors des petites lignes d’état (sondes, journal des alertes du propriétaire)', a0.j.map((x) => x.u).filter((u) => /select=data(&|$)/.test(u)));
   const autres = etat().composants || {};
   vrai(autres.connexion && autres.connexion.etat === 'ok' && autres.emails && autres.emails.etat === 'pas_su' && autres.emails.raison === 'dependance' && autres.extension.raison === 'dependance' && autres.envoi.etat === 'pas_su' && autres.envoi.raison === 'non-configure',
     'S3 base muette ⇒ e-mails et extension « pas su » (dépendance) ; envoi pas configuré ⇒ « pas su », pas « ok »', Object.fromEntries(Object.entries(autres).map(([k, v]) => [k, v.etat + '/' + v.raison])));
