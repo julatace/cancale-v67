@@ -74,3 +74,8 @@ html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; widt
 }
 /* Les zones de Favoris & offres (Favoris · Offres auto). */
 .vrm-fav-zones { margin: 0 0 12px; }
+/* Dans la couche de la direction artistique : un `!important` posé en couche y gagne contre
+   celui d'un fichier hors couche — le champ du seuil reste UN champ (pas un champ dans un champ). */
+@layer vrm-premium {
+  :root:root body .vrm-app-shell .vrm-oa .vrm-oa-seuil-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 40px !important; }
+}
