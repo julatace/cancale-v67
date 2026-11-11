@@ -57,7 +57,7 @@ ceux de Vinted, à partir des e-mails de confirmation de chaque plateforme.
   pris pour un reçu Vinted). **Mutations** rougies : garde des deux n°, garde du transfert, remplacement d'une
   valeur connue, deux valeurs d'un libellé, total qui ne colle pas, autre devise, `!famille`.
 - Les 58 audits qui exécutent `email-inbound` : tous verts. Audits du socle : verts. Build vert.
-- Banc `scripts/bancs/achats-email.cjs` (390 tactile, 1512) : voir plus bas.
+- Banc `scripts/bancs/achats-email.cjs` (390 tactile, 1512) : **20 OK**, captures regardées (titre sur deux lignes au téléphone, aucun débordement, cibles ≥ 44 px). Le motif « à vérifier » vient du serveur en français (pas encore `tr()`).
 
 ### Ce qui reste
 - **Les formes sont SUPPOSÉES.** Aucun vrai e-mail d'achat Leboncoin / eBay / Vestiaire n'a été vu.
