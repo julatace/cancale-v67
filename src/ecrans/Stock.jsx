@@ -641,6 +641,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
             calcule (prix d'achat, temps achat → vente, réception → mise en ligne,
             mise en ligne → vente, republications) — `etatArticle`. */}
         <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-voir-etat={cleDeFiche(f)} onClick={() => { const n = String(f.numero); fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>Voir l’état</button>
+        {/* (11 nov., lot partage-fiche) Une paire EN LIGNE se partage à un client hors Vinted :
+            l'annonce est retrouvée par SON identifiant (`f.id`), jamais par le titre. */}
+        {!sold && f.actuelle ? <button className="vrm-b vrm-b-secondaire" type="button" data-stock-partager={cleDeFiche(f)} onClick={() => { const d = { num: String(f.numero), itemId: /^\d+$/.test(String(f.id || '')) ? String(f.id) : null, compte: (f.comptes || [])[0] || null, titre: f.title || '', photo: typeof f.photo === 'string' ? f.photo : '' }; fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:partager', { detail: d })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>Partager</button> : null}
         <div style={{ display: 'flex', gap: 9 }}>
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}

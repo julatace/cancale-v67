@@ -601,7 +601,9 @@ import { cleFacture } from "./factureAchat.js";
 import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille de vignettes, par compte — même couche, après la DA6
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
-import { enregistrerGaleries } from "./visionneuse.js";
+import { enregistrerGaleries, galerieDe } from "./visionneuse.js";
+import PartageFiche from "./composants/PartageFiche.jsx";   // (11 nov., lot partage-fiche)
+import { ficheDepuisAnnonce, decisionsSynchro } from "./partageFiche.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
@@ -32870,6 +32872,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!meme) save('vrm_stock_vendus', { nums: liste, at: Date.now() });
     } catch (_) {}
   }, [annoncesVendues, numeros, sales.items]);
+  // (11 nov., lot partage-fiche) LES FICHES PARTAGÉES suivent la PREUVE (§5) : une annonce prouvée
+  // vendue (`annoncesVendues`, ce propriétaire) ⇒ la page dit « Vendu » ; toujours EN LIGNE (lecture
+  // complète) ⇒ « vérifiée », au prix relu. Jamais vendue par absence ; ventes ou annonces pas lues ⇒ rien.
+  useEffect(() => {
+    if (!sales.items || !Array.isArray(listings.items) || listings.error || listings.incomplet || !AUTH.user?.id) return;
+    const nums = new Set(); annoncesVendues.forEach((id) => { const n = cleNum((numeros[id] || {}).numero); if (n) nums.add(n); });
+    const enLigne = new Map(listings.items.map((it) => [String(it.id), { price: it.price, currency: it.currency }]));
+    synchroniserPartages({ vendusIds: annoncesVendues, vendusNums: nums, enLigne });
+  }, [annoncesVendues, numeros, sales.items, listings.items, listings.error, listings.incomplet]);
   // (6 nov.) PUBLIÉ pour l'inventaire du Stock (src/inventaire.js) : les N° portés
   // par deux paires présentes (`conflitsNum`, §11 — un seul propriétaire, ici), le
   // seul rouge de l'inventaire. Clé LOCALE, recalculable. Ventes ou annonces pas
@@ -44449,6 +44460,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </button>
                       );
                     })}
+                    {/* (11 nov., lot partage-fiche) Un lien propre pour un client hors Vinted (src/composants/PartageFiche.jsx). */}
+                    <button type="button" className="vrm-fiche-geste" data-fiche-partager={String(it.id)} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:partager',{detail:{ item: it, num: num ? String(num) : null }})); } catch (_) {} }} style={geste}>Partager</button>
                     <button type="button" className="vrm-fiche-geste" data-fiche-relier-achat="" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
                     <button type="button" className="vrm-fiche-geste" data-fiche-passeport="" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
@@ -49991,6 +50004,28 @@ const applyZoom = (z) => {
 };
 // ⟦→ ecrans/Reglages.jsx #38⟧
 const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {});
+// (11 nov., lot partage-fiche) La synchro des fiches partagées (src/partageFiche.js `decisionsSynchro`) :
+// SES liens lus (projetés côté serveur), puis UN envoi des seuls changements prouvés. Une fois par
+// 10 minutes au plus (sauf une vente nouvelle) ; aucun lien ⇒ un seul appel léger, puis plus rien.
+const _synchroPartage = { at: 0, cleVendus: '', vide: false };
+async function synchroniserPartages({ vendusIds, vendusNums, enLigne }) {
+  const cleV = [...(vendusIds || [])].sort().join(',');
+  const maintenant = Date.now();
+  if (_synchroPartage.vide && maintenant - _synchroPartage.at < 3600000) return;
+  if (maintenant - _synchroPartage.at < 600000 && cleV === _synchroPartage.cleVendus) return;
+  _synchroPartage.at = maintenant; _synchroPartage.cleVendus = cleV;
+  try {
+    const r = await fetch('/api/compte?mode=partage', { headers: enTeteSession(), cache: 'no-store' });
+    const j = r.ok ? await r.json().catch(() => null) : null;
+    if (!j || !Array.isArray(j.partages)) return;
+    _synchroPartage.vide = !j.partages.length;
+    const maj = decisionsSynchro(j.partages, { vendusIds, vendusNums, enLigne, cleNum }, maintenant);
+    if (!maj.length) return;
+    await fetch('/api/compte?mode=partage', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'etat', maj }) });
+  } catch (_) {}
+}
+// Un lien créé à l'instant : la synchro suivante le relit (il n'est plus « aucun lien »).
+try { window.addEventListener('vrm:partage-cree', () => { _synchroPartage.vide = false; _synchroPartage.at = 0; }); } catch (_) {}
 // ── LA FACTURE PRO (2 nov.) : les outils de l'app que src/FacturePro.jsx emprunte.
 const ecrireReglage = async (id, data) => {
   try {
@@ -52009,10 +52044,25 @@ function AppCoeur() {
   // (5 nov.) « PUBLIER AILLEURS » : { num (null = choisir l'article), site (mis en avant) }.
   const [pubAil,setPubAil]=useState(null);
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const n=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null; const st=['leboncoin','vestiaire','ebay'].includes(d.site)?d.site:null; setPubAil({num:n,site:st});};window.addEventListener('vrm:publier-ailleurs',ouvrir);return()=>window.removeEventListener('vrm:publier-ailleurs',ouvrir);},[]);
-  const besoinNumData=gsOpen||!!ficheNum||!!prixNum||!!(pubAil&&pubAil.num);
+  // (11 nov., lot partage-fiche) « PARTAGER » une fiche : { item? (annonce Vinted de l'app), num?, itemId?, compte?, titre?, photo? }.
+  // Depuis Annonces (`item` complet) ou le Stock (l'annonce retrouvée par SON identifiant, jamais par le titre).
+  const [partage,setPartage]=useState(null);
+  const [partageItem,setPartageItem]=useState(undefined);
+  useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const num=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null;
+    const itemId=d.item&&d.item.id!=null?String(d.item.id):(/^\d{1,15}$/.test(String(d.itemId||''))?String(d.itemId):null);
+    const compte=d.item&&d.item._acc?String(d.item._acc.vinted_user_id||''):(/^\d{1,15}$/.test(String(d.compte||''))?String(d.compte):null);
+    if(!itemId&&!num) return; setPartageItem(d.item||undefined); setPartage({num,itemId,compte,titre:String(d.titre||'').slice(0,200),photo:typeof d.photo==='string'?d.photo:''});};
+    window.addEventListener('vrm:partager',ouvrir);return()=>window.removeEventListener('vrm:partager',ouvrir);},[]);
+  useEffect(()=>{ if(!partage||partageItem!==undefined) return undefined; let vivant=true;
+    (async()=>{ const acc=(vintedAccounts||[]).find(a=>String(a.vinted_user_id)===String(partage.compte||''));
+      if(!acc||!partage.itemId){ if(vivant) setPartageItem(null); return; }
+      let it=null; try{ const r=await fetchVintedListings(acc); it=r&&Array.isArray(r.items)?r.items.find(x=>String(x.id)===String(partage.itemId))||null:null; if(it&&!it._acc) it={...it,_acc:acc}; }catch(_){ it=null; }
+      if(vivant) setPartageItem(it); })();
+    return()=>{ vivant=false; }; /* eslint-disable-next-line */ },[partage,partageItem]);
+  const besoinNumData=gsOpen||!!ficheNum||!!prixNum||!!(pubAil&&pubAil.num)||!!(partage&&partage.num);
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
   const [ficheExtra,setFicheExtra]=useState(null);
-  const numOutil=ficheNum||prixNum||(pubAil&&pubAil.num)||null;
+  const numOutil=ficheNum||prixNum||(pubAil&&pubAil.num)||(partage&&partage.num)||null;
   useEffect(()=>{ if(!numOutil||!numData){ setFicheExtra(null); return undefined; } let vivant=true; setFicheExtra(null);
     (async()=>{ const { rn }=rechercheParNumero(numOutil, numData, vintedAccounts); const x=await lireExtraFiche(rn); if(vivant) setFicheExtra({ ...x, num: numOutil }); })();
     return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData]);
@@ -54873,6 +54923,22 @@ function AppCoeur() {
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
         }}/></GardeEcran>}
         <GardeEcran nom="lienvc" feuille><HoteLienVc comptes={vintedAccounts}/></GardeEcran>
+        {partage && <GardeEcran nom="partage" feuille resetKey={(partage.itemId||'')+':'+(partage.num||'')} onFermer={()=>{setPartage(null);setPartageItem(undefined);}}><Differe rendre={()=>{
+          // (11 nov., lot partage-fiche) La fiche publique d'une annonce : l'annonce Vinted (par identité),
+          // ses autres sites EN LIGNE par le N° (`sitesPrixDe`, la règle de « Prix partout »), jamais le titre.
+          const it = partageItem || null;
+          const ex = partage.num && ficheExtra && ficheExtra.num === partage.num ? ficheExtra : null;
+          const { rn } = partage.num ? rechercheParNumero(partage.num, numData, vintedAccounts) : { rn: null };
+          const sites = partage.num && ex && numData ? sitesPrixDe(partage.num, rn, ex).sites : [];
+          const acc = it && it._acc ? it._acc : (vintedAccounts || []).find(a => String(a.vinted_user_id) === String(partage.compte || ''));
+          const galerie = it ? galerieDe(typeof it.photo === 'string' ? it.photo : (it.photo && it.photo.url) || '').photos : (partage.photo ? [partage.photo] : []);
+          const fiche = it ? ficheDepuisAnnonce(it, { photos: galerie, liens: sites }) : (partage.titre || partage.photo ? { titre: partage.titre, photos: galerie, liens: sites.map(x => ({ site: x.site, url: x.lien })) } : null);
+          const enCours = partageItem === undefined || (!!partage.num && (!numData || !ex));
+          return <PartageFiche key={(partage.itemId||'')+':'+(partage.num||'')+':'+(it?'1':'0')} Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente} toast={toast} enTete={enTeteSession}
+            source={fiche ? { fiche: { ...fiche, liens: [] }, liens: (fiche.liens || []).map(l => ({ site: l.site, url: l.url })), pseudo: acc && acc.login ? String(acc.login) : '', chercheLiens: enCours,
+              ident: { itemId: partage.itemId || undefined, compte: partage.compte || undefined, num: partage.num || undefined } } : null}
+            onFermer={()=>{setPartage(null);setPartageItem(undefined);}}/>;
+        }}/></GardeEcran>}
         {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><Differe rendre={()=>{
           // (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), un clic.
           const { rn } = rechercheParNumero(prixNum, numData, vintedAccounts);

@@ -1,0 +1,26 @@
+/* ── « Partager » une fiche (11 nov., lot partage-fiche) — Vitrine/Apple : neutre,
+   l'accent n'est que sur le bouton principal ; cibles 44 px ; la feuille est un
+   portail sur <body> (pas de `.vrm-app-shell` au-dessus : sélecteurs `.vrm-partage`). ── */
+.vrm-partage { display: flex; flex-direction: column; gap: 14px; font-family: var(--vrm-police); color: var(--fu-encre, inherit); }
+.vrm-partage .vrm-partage-apercu { margin: 0; display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 18px; background: var(--fu-case, rgba(118,118,128,.12)); }
+.vrm-partage .vrm-partage-apercu img, .vrm-partage .vrm-partage-sansphoto { flex: none; width: 84px; height: 104px; object-fit: cover; border-radius: 12px; background: var(--fu-piste, #e5e5ea); }
+.vrm-partage figcaption { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vrm-partage .vrm-partage-titre { font: 600 16px/1.3 var(--vrm-police); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vrm-partage .vrm-partage-details { font: 500 13px/1.35 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
+.vrm-partage .vrm-partage-prix { font: 700 20px/1.2 var(--vrm-police); letter-spacing: -.02em; margin-top: 2px; }
+.vrm-partage .vrm-partage-note { margin: 0 2px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
+.vrm-partage .vrm-partage-groupe { display: flex; flex-direction: column; gap: 6px; }
+.vrm-partage .vrm-partage-lib { margin: 0 2px; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
+.vrm-partage .vrm-partage-case { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); font: 500 15px/1.3 var(--vrm-police); cursor: pointer; }
+.vrm-partage .vrm-partage-case input { width: 20px; height: 20px; margin: 0; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-partage .vrm-partage-url { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); color: inherit; font: 500 14px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; }
+.vrm-partage .vrm-partage-gestes { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 16px; }
+html body .vrm-partage .vrm-lien-action { min-height: 44px; padding: 0 6px; border: 0; background: none; font: 600 15px/1 var(--vrm-police); color: var(--fu-bleu, #0071e3); cursor: pointer; }
+html body .vrm-partage .vrm-lien-action.vrm-partage-arreter { color: var(--fu-ambre-txt, #b25000); }
+html body .vrm-partage .vrm-lien-action:disabled { opacity: .45; cursor: default; }
+.vrm-partage .vrm-partage-autres summary { min-height: 44px; display: flex; align-items: center; font: 600 15px/1.3 var(--vrm-police); cursor: pointer; }
+.vrm-partage .vrm-partage-autres ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vrm-partage .vrm-partage-autres li { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); }
+.vrm-partage .vrm-partage-autre-titre { font: 600 15px/1.3 var(--vrm-police); overflow-wrap: anywhere; }
+.vrm-partage .vrm-partage-autres .vrm-partage-gestes { justify-content: flex-start; }
+.vrm-partage .vrm-fs-pied { margin-top: 2px; }
