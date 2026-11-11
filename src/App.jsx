@@ -20548,7 +20548,7 @@ function KpiVentes({ tuiles, note, plateforme, compte = null }) {
     // « Payé » ; le détail (« · 4 ventes ») ne va plus dans la case, où il était tronqué (il reste en infobulle).
     const libCourt = String(t.lib || '').replace(/^CA\s+/, '');
     locaux[ID[t.cle] || t.cle] = { nom: t.lib, court: libCourt.charAt(0).toUpperCase() + libCourt.slice(1), type: t.brut != null ? 'eur' : 'n',
-      valeur: t.val == null ? null : (num != null ? num : t.val), affiche: t.val == null ? undefined : t.val, quand: 'Depuis le début', titre: t.sub ? `${t.lib} · ${t.sub}` : t.lib, attrs: kv(t) };
+      valeur: t.val == null ? null : (num != null ? num : t.val), affiche: t.val == null ? undefined : t.val, ...(t.partiel ? { partiel: true, manque: t.manque || [] } : {}), quand: 'Depuis le début', titre: t.sub ? `${t.lib} · ${t.sub}` : t.lib, attrs: kv(t) };
   }
   return (
     <div className="vrm-kpi-ventes vrm-fu-ecran vrm-fu-ventes-site" data-ventes-kpi={plateforme}>
@@ -56354,7 +56354,7 @@ function AppCoeur() {
               return <KpiVentes plateforme="leboncoin" tuiles={[
                 { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : texteSomme(ar.attenteS, fmt) },
                 { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
-                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : texteSomme(ar.recuS, fmt), brut: (vide && !lu) ? null : ar.recu },
+                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : texteSomme(ar.recuS, fmt), brut: (vide && !lu) ? null : ar.recu, partiel: !!(ar.recuS && ar.recuS.partiel), manque: ar.recuS && ar.recuS.partiel ? [`${ar.recuS.manque} prix inconnu${ar.recuS.manque > 1 ? 's' : ''}`] : [] },
               ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
