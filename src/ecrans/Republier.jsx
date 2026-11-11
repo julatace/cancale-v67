@@ -6,8 +6,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
-import JaugeActions from '../JaugeActions.jsx';
-import { EncartPhotosAutresComptes } from '../PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)   // (10 nov., lot G) la jauge des 50 actions/h du compte
+import JaugeActions from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h du compte
+import { EncartPhotosAutresComptes } from '../PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';

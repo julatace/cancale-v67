@@ -157,7 +157,7 @@ window.__mesure = async (nPaires, nVues) => {
 </script>`;
 
 (async () => {
-  const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? undefined : undefined });
+  const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     const page = await nav.newPage();
     await page.route('**/*', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: PAGE }));
