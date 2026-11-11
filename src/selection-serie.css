@@ -46,6 +46,9 @@
 .vrm-boite-item > .vrm-serie-case { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); z-index: 3; }
 .vrm-boite-item:has(> .vrm-serie-case) > .vrm-boite-ligne { padding-left: 46px !important; }
 
-/* (11 nov., lot accessibilité) Le contour de focus de la case : celui de Chrome donnait 2,97:1 en
-   sombre ; le bleu-texte du thème (≥ 4,5:1 en clair comme en sombre). */
-.vrm-serie-case input:focus-visible { outline: 2px solid var(--vrm-accent-texte, #0066CC); outline-offset: 2px; }
+/* (11 nov., lot accessibilité) Le contour de focus de la case : 2,97:1 en sombre (#0071E3 sur la
+   pastille de la vignette) ; le bleu-texte du thème (≥ 4,5:1 en clair comme en sombre).
+   ⚠️ La règle qui gagnait est `styles-bureau.css` (≥ 1024 px) `.vrm-app-shell .vrm-main
+   :is(…input…):focus-visible` (0,3,1, `--vrm-accent`, qui reste #0071E3 en sombre) : la seconde
+   forme ci-dessous (0,4,1) la passe ; la première garde les cases hors de `.vrm-main`. */
+.vrm-serie-case input:focus-visible, .vrm-app-shell .vrm-main .vrm-serie-case input:focus-visible { outline: 2px solid var(--vrm-accent-texte, #0066CC); outline-offset: 2px; }
