@@ -77,7 +77,7 @@ export function AvisBasDetail({ liste, onVu, onAller, Bouton }) {
             : <p className="vrm-avb-texte is-muet" data-avis-texte-absent="">Lis l’avis sur Vinted.</p>}
           {!a.vente ? <p className="vrm-avb-pourquoi" data-avis-sans-vente="">Vinted ne dit pas quelle vente il note : pour écrire à l’acheteur, ouvre la conversation sur Vinted.</p> : null}
           <div className="vrm-avb-gestes">
-            {a.vente ? <Bouton variante="primaire" data-avis-voir-vente={a.tx} onClick={() => onAller(a.vente.slice(1))}>Voir la vente et écrire</Bouton> : null}
+            {a.vente ? <Bouton variante="primaire" data-avis-voir-vente={a.tx || ""} onClick={() => onAller(a.vente.slice(1))}>Voir la vente et écrire</Bouton> : null}
             {a.vinted ? <Bouton variante={a.vente ? 'secondaire' : 'primaire'} href={a.vinted} target="_blank" rel="noreferrer" data-avis-vinted={a.vinted}>Répondre sur Vinted ↗</Bouton> : null}
             <Bouton variante="discret" occupe={occupe === a.cle} data-avis-vu={a.cle} onClick={() => vu([a.cle])}>C’est vu</Bouton>
           </div>
