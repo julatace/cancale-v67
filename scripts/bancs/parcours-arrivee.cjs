@@ -218,6 +218,7 @@ async function parcoursComplet(nav, W, theme) {
   dit(avance, `${T} A2 puis l'étape suivante (e-mails), toute seule`, JSON.stringify(await plein(o.pg)));
   await etapeReprise(o, base, 'emails', T, 'A2');
   // A3 — e-mails.
+  await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etat !== 'encours'; }, 8000);
   p = await plein(o.pg);
   dit(p && p.geste === 'emails' && p.primaires === 1 && (!o.tel || p.hGeste >= 43.5), `${T} A3 UN geste principal : « Relier mes e-mails »`, JSON.stringify(p));
   await capture(o.pg, `pa-${W}-${theme}-3-emails`);
@@ -241,6 +242,7 @@ async function parcoursComplet(nav, W, theme) {
     await o2.ctx.close();
   }
   // A4 — Vinted.
+  await attendre(o.pg, async () => { const q = await plein(o.pg); return q && q.etat !== 'encours'; }, 8000);
   p = await plein(o.pg);
   dit(p && p.geste === 'vinted' && /vinted\.fr/.test(p.gesteHref) && p.primaires === 1, `${T} A4 UN geste : « Ouvrir vinted.fr »`, JSON.stringify(p));
   await capture(o.pg, `pa-${W}-${theme}-6-vinted`);
