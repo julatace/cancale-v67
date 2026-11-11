@@ -2634,7 +2634,9 @@ function Dac7Plateformes({ ligne, annee }) {
         const droite = p.etat !== 'lu' ? '—'
           : p.verdict === 'atteint' ? <b style={{ color: C.text }}>atteint</b>
           : p.verdict === 'atteintSi' ? <>atteint si {p.nAd} à dater</>
-          : p.verdict === 'sous' ? <>encore {p.reste.n} vente{p.reste.n > 1 ? 's' : ''} ou {eur(p.reste.centimes)}</>
+          // (11 nov., restes) Aucune vente sur cette plateforme : le reste EST le seuil, déjà écrit dans
+          // l'en-tête — le redire sur chaque ligne l'écrivait trois fois (§7). La jauge vide le dit.
+          : p.verdict === 'sous' ? (p.n === 0 && p.centimes === 0 ? null : <>encore {p.reste.n} vente{p.reste.n > 1 ? 's' : ''} ou {eur(p.reste.centimes)}</>)
           : <>au moins</>;
         return (
           <div key={p.plateforme} data-dac7-plateforme={p.plateforme} data-etat={p.etat} data-n={p.n == null ? '' : p.n} data-cts={p.centimes == null ? '' : p.centimes} data-verdict={p.verdict || ''} data-a-dater={p.nAd || ''} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
@@ -2643,7 +2645,7 @@ function Dac7Plateformes({ ligne, annee }) {
               <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{p.etat !== 'lu' ? '—' : <>{p.partiel ? 'au moins ' : ''}{p.n} vente{p.n > 1 ? 's' : ''} · {eur(p.centimes)}</>}</span>
             </div>
             {p.etat === 'lu' ? <div style={{ marginTop: 6 }}><JaugeBarre attr={{ 'data-dac7-jauge': p.plateforme }} pct={pct} etat="ok" /></div> : null}
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{droite}</div>
+            {droite == null ? null : <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{droite}</div>}
           </div>
         );
       })}
@@ -3031,6 +3033,10 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const prevIci = (prev.etat === 'lu' || prev.etat === 'passu') && urssafDue && prev.label === urssafDue.label ? prev : null;
   const urssafPeriodCA = prevIci ? prevIci.ca : montantEcheance.ca;
   const echeancePartiel = (prevIci ? prevIci.partiel : montantEcheance.partiel) ? 1 : 0;
+  // (11 nov., restes) MOIS EN COURS = LA PÉRIODE DE LA CARTE DU HAUT (rythme mensuel) : son montant
+  // est déjà écrit en tête de Déclarer (`PrevisionUrssafCarte`, même règle, « au moins » compris).
+  // Ici, plus de second « 7,44 € » : la phrase dit d'où il vient (§7 : un nombre, une fois).
+  const montantEnHaut = prev.etat === 'lu' && prev.enCours && Array.isArray(prev.mois) && prev.mois.length === 1 && prev.mois[0] === ymCour && urssafEstime != null;
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
   const sLib = {fontSize:13,color:C.muted,fontWeight:500};
@@ -3134,14 +3140,9 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       <span style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{suivante.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                       <span data-echeance-suivante-jours={suivante.daysLeft} style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>dans {suivante.daysLeft} j</span>
                     </div>
-                    {prev.etat === 'lu' && prev.label === suivante.label ? (
-                      <div data-prevision-urssaf="lu" data-prevision-label={prev.label} data-prevision-ca={String(prev.ca)} data-prevision-apayer={String(prev.apayer)} data-prevision-partiel={prev.partiel ? '1' : ''} data-prevision-adater={prev.aDater || ''}
-                        style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap',marginTop:6}}>
-                        <span>À payer ≈</span>
-                        <span style={{color:C.text,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{prev.partiel ? 'au moins ' : ''}<Mt v={prev.apayer}/>{prev.aDater > 0 ? <span style={{color:C.muted,fontWeight:400}}> · {prev.aDater} à dater</span> : null}</span>
-                      </div>
-                    ) : null}
-                    <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours : ce qu'il faut mettre de côté est juste en dessous</> : <>, la période en cours</>) : null}.</div>
+                    {/* (11 nov., restes) Plus de « À payer ≈ » ici : le montant de cette période est
+                        celui de la carte « URSSAF » en tête de Déclarer (même `previsionUrssaf`) — §7, une fois. */}
+                    <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours</> : <>, la période en cours</>) : null}.</div>
                   </>) : null}
                   <div style={{marginTop:suivante?6:0}}><span style={{textTransform:'capitalize'}}>{urssafDue.label}</span> : déclaration notée ✓</div>
                 </div>
@@ -3181,8 +3182,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
           })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
         <div data-compta-mois="" style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
-          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours · à payer ({String(tauxUrssaf()).replace('.',',')}&nbsp;%)</div>
-          <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
+          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours{montantEnHaut ? null : <> · à payer ({String(tauxUrssaf()).replace('.',',')}&nbsp;%)</>}</div>
+          <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} data-montant-en-haut={montantEnHaut ? '1' : undefined} hidden={montantEnHaut} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
           {/* (2 nov.) La phrase vient de la MÊME ligne publiée que le chiffre :
               le CA reçu du mois (`moisCourantCA`) et son nombre de ventes. « Net
               après paiement » et la tuile « Ventes finalisées » sont retirés :
@@ -3190,7 +3191,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           <p className="vrm-compta-phrase" data-compta-phrase="urssaf-mois">
             {moisCourantCA==null
               ? <>— pas encore calculé</>
-              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté : {String(tauxUrssaf()).replace('.',',')}&nbsp;% de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
+              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté{montantEnHaut ? ' (le montant en haut)' : ''} : {String(tauxUrssaf()).replace('.',',')}&nbsp;% de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:'inherit',fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
                 {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
                 .
                 {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
