@@ -107,7 +107,9 @@ async function brancher(ctx, etat) {
     if (etat.hors) return route.abort('internetdisconnected');
     return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) });
   });
-  await ctx.route(/\/api\//, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  // (11 nov.) L'état de l'abonnement est servi : la porte « hors ligne à froid » (9 nov.) ne laisse
+  // rouvrir sans réseau qu'un appareil qui CONNAÎT l'abonnement (`vrm_abo_dernier_{uid}`) ; `{}` la fermait.
+  await ctx.route(/\/api\//, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', body: /mode=abonnement/.test(route.request().url()) ? JSON.stringify({ ok: true, acces: true, statut: 'active', configure: true }) : '{}' }));
   await ctx.route(/qr\.exemple\.test/, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
   await ctx.route(/^https?:\/\/p\.vintedgo\.com\//, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
   await ctx.route(/vinted\.net|fonts\.(googleapis|gstatic)\.com|jsdelivr|cdnjs/, (route) => route.abort());

@@ -111,7 +111,7 @@ async function brancher(ctx, base, app) {
     return json(route, r.body, { 'content-range': r.range });
   });
   await ctx.route(/supabase\.co\/auth\/v1\//, (route) => (app.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(/\/user/.test(route.request().url()) ? SESSION.user : { access_token: JETON, refresh_token: 'r', expires_in: 86400, user: SESSION.user }) })));
-  await ctx.route(/\/api\//, (route) => (app.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', body: /mode=confidentialite/.test(route.request().url()) ? JSON.stringify({ ok: true, uid: UID }) : '{"ok":true}' })));
+  await ctx.route(/\/api\//, (route) => (app.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', body: /mode=confidentialite/.test(route.request().url()) ? JSON.stringify({ ok: true, uid: UID }) : /mode=abonnement/.test(route.request().url()) ? JSON.stringify({ ok: true, acces: true, statut: 'active', configure: true }) : '{"ok":true}' })));
   await ctx.route(/vinted\.net|fonts\.(googleapis|gstatic)\.com|jsdelivr|cdnjs/, (route) => route.abort().catch(() => {}));
 }
 async function appareil(nav, base, vp, nom) {
