@@ -235,16 +235,37 @@
           "nom": "VueReglagesCoque"
         }
       ]
+    },
+    {
+      "fichier": "coeur/EcransPlateformes.jsx",
+      "sorte": "ecran",
+      "precharger": true,
+      "_note": "écrans de la coque ouverts sur un onglet (jamais Ma journée)",
+      "racines": [
+        "VentesToutes",
+        "AchatsLeboncoin",
+        "VentesLeboncoin",
+        "AchatsVestiaire",
+        "AdressesSansCompte"
+      ]
+    },
+    {
+      "fichier": "coeur/FeuillesCoque.jsx",
+      "sorte": "ecran",
+      "feuille": true,
+      "precharger": true,
+      "_note": "feuilles ouvertes sur un geste ; VisionneusePdf n’y est PAS (toujours montée : elle écoute)",
+      "racines": [
+        "ActionsSelectionFeuille",
+        "PlaceurTamponFeuille",
+        "HotePublierAilleurs"
+      ]
     }
   ],
-  "_differes": "Composants importés par App.jsx et rendus seulement en JSX, ouverts sur un geste (jamais au premier écran) : leur fichier sort du premier chargement. attente : rien (défaut) | feuille | squelette.",
+  "_differes": "Composants importés par App.jsx et rendus seulement en JSX, ouverts sur un geste (jamais au premier écran) : leur fichier sort du premier chargement. attente : rien (défaut) | feuille | squelette. ⚠️ Jamais un composant TOUJOURS monté (hôte qui écoute : Visionneuse, PiloteFavorisAuto) : il se chargerait quand même au démarrage, et son écoute commencerait plus tard.",
   "differes": [
     {
       "nom": "ImportStockReglage"
-    },
-    {
-      "nom": "Visionneuse",
-      "attente": "feuille"
     },
     {
       "nom": "ModeRelais",
@@ -265,9 +286,6 @@
     },
     {
       "nom": "ChoixEmballageColis"
-    },
-    {
-      "nom": "PiloteFavorisAuto"
     }
   ]
 }
