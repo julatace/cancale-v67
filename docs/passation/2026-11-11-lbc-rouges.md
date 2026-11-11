@@ -35,8 +35,10 @@ même banc rouge sans `id=in.`.
 
 ## Résultat
 
-Voir le tableau final de la fin de lot (`lot-bancs.sh` sur cet arbre) dans le
-rapport. Audits : lbc-plus 56/0, lbc-plus-vue-pause, variables, tdz, coherence,
+`lot-bancs.sh` sur cet arbre (build du 11 nov.) : lbc-pause 58/0, lbc-publier-app
+44/0, lbc-relier 19/0, lbc-flou-compte 25/0, lbc-messages 19/0, lbc-comme-vinted
+67/0 ; les quatre autres restent verts (lbc-supprimer 70, lbc-repondre 41, dater-lbc
+15, lbc-bordereau 7) ; banc lbc-plus 54/0. Audits : lbc-plus 56/0, lbc-plus-vue-pause, variables, tdz, coherence,
 identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction :
 tous verts. Build vert.
 
