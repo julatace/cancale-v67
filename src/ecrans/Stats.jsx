@@ -1632,7 +1632,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
   const tuile = (k, lib, val, sous, attrs, titre) => (
     <div className="vrm-sv-tuile" data-sv-tuile={k} title={titre || undefined} {...(attrs || {})}>
       <div className="vrm-sv-tuile-lib">{lib}</div>
-      <GrandChiffre className="vrm-display vrm-sv-tuile-val" plancher={16} data-vide={val === '—' ? '1' : undefined}>{val}</GrandChiffre>
+      <GrandChiffre className="vrm-display vrm-sv-tuile-val" plancher={16} data-vide={val === '—' ? '1' : undefined}>{typeof val === 'string' ? val.replace(/ (€|%)/g, '\u00a0$1') : val}</GrandChiffre>
       <div className="vrm-sv-tuile-sous">{sous}</div>
     </div>
   );

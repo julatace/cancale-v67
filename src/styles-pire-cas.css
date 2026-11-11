@@ -18,6 +18,9 @@
 }
 /* Replié (CarteMois.jsx, `ajusterChiffre`) : « au moins » sur sa propre ligne, au-dessus du montant entier. */
 :root:root body [data-chiffre-replie] .vrm-fu-borne { display: block !important; white-space: nowrap !important; vertical-align: baseline !important; line-height: 1.2 !important; }
+/* Statistiques : la valeur d'une tuile sur UNE ligne, pour que l'ajustement la mesure (`GrandChiffre`,
+   plancher 16 px) — avant, une coupure « n'importe où » laissait « € » seul sur sa ligne, à 26 px. */
+:root:root body .vrm-sv-tuile-val { white-space: nowrap !important; overflow-wrap: normal !important; }
 } /* fin @layer vrm-premium */
 
 /* E-mails : un nom de compte de 60 caractères sans espace était coupé net par le bord de la ligne.
