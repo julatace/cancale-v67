@@ -55,7 +55,7 @@ const MOMENTS = [
     alt: 'L’écran Ma journée de VRM : le montant vendu aujourd’hui, la semaine, et la liste « À faire » — 1 colis à envoyer, 2 colis à retirer, 2 messages. Données d’exemple.',
     titre: 'Chaque matin, le prochain geste.',
     texte: 'Ma journée met en haut ce qui presse : le colis à envoyer avant sa date limite, les achats arrivés au relais, les messages qui attendent. Un bouton par geste.',
-    points: ['Tous tes comptes Vinted, Leboncoin et eBay dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
+    points: ['Tous tes comptes Vinted, Leboncoin, eBay et Vestiaire dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
   },
   {
     id: 'colis', capture: 'retirer',
@@ -372,7 +372,7 @@ export default function Accueil({ onEntrer }) {
         <section className="av-hero" data-section="hero">
           <div className="av-in">
             <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">Vinted, Leboncoin, eBay : VRM te dit chaque matin quoi faire, sans erreur de paire.</p>
+            <p className="av-sous">Vinted, Leboncoin, eBay, Vestiaire : VRM te dit chaque matin quoi faire, sans erreur de paire.</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
@@ -510,7 +510,7 @@ export default function Accueil({ onEntrer }) {
         <div className="av-in">
           <div>
             <span className="marque">VRM</span>
-            <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
+            <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin, eBay ou Vestiaire Collective.</span>
           </div>
           <nav aria-label="Informations">
             <a href="/aide">Aide</a>

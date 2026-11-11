@@ -7,13 +7,14 @@ import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBr
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
-import { etapeMotVc, vcVenteAnnulee, montantRecuVc } from '../../api/_lib/vestiaire-regle.js';
+import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc } from '../../api/_lib/vestiaire-regle.js';
+import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
 import { recuPublieEntre, valeurObjectif } from '../design/carteChiffres.js';
 import { lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from '../objectifMois.js';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, Bouton, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
+import { AUTH, Bouton, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, avecDatesLbc, montantRecuEbay, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -292,7 +293,7 @@ function RepliStats({ id, titre, phrase, children }) {
     </details>
   );
 }
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null}) {
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
   const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
@@ -486,18 +487,27 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   //    338 € », sur la même page. Il somme maintenant le CA finalisé par jour de
   //    vente publié par la coque (`caFinaliseParJour`, la population de
   //    « Finalisé sur Vinted », §11). Pas encore lu ⇒ `{passu}` : « — », jamais 0.
+  // (11 nov., parité) + Leboncoin, eBay, Vestiaire : la population de « Finalisé par
+  //    plateforme » (`caAutresParJour`), au jour de vente, comptes écartés hors. Une
+  //    plateforme pas lue est NOMMÉE (« au moins ») ; encore en lecture ⇒ on attend.
+  const autresJour=useMemo(()=>{
+    if(lbcLu===undefined || ebayCommandes===undefined || ventesVc===undefined) return undefined;
+    try {
+      return caAutresParJour({ lbc: lbcLu===null ? null : avecDatesLbc((lbcVentes&&lbcVentes.ventes)||[], lireDatesLbc()), ebay: ebayCommandes, vestiaire: ventesVc, excluAutre: excluAutreDash,
+        R: { lbcAnnulee, lbcFinalisee, commandeEbayEngagee, montantRecuEbay, etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc } });
+    } catch(_) { return null; }
+  },[lbcLu,lbcVentes,ebayCommandes,ventesVc,excluAutreDash]);
   const caRange=useMemo(()=>{
     if(!caDu && !caAu) return null;
     const parJour = liveStats && liveStats.caFinaliseParJour;
     if(!parJour || typeof parJour!=='object') return { passu:true, enCours: !liveStats || !liveStats.venduPasSu };
-    let ca=0, count=0;
-    for(const [k,v] of Object.entries(parJour)){
-      if(caDu && k<caDu) continue;
-      if(caAu && k>caAu) continue;
-      ca+=Number(v&&v.ca)||0; count+=Number(v&&v.n)||0;
-    }
-    return {ca:Math.round(ca*100)/100,count};
-  },[liveStats,caDu,caAu]);
+    const v=sommePlage(parJour,caDu,caAu);
+    // Les autres plateformes : encore en lecture ⇒ « en cours » (jamais un total Vinted seul présenté complet).
+    if(autresJour===undefined) return { passu:true, enCours:true };
+    if(autresJour===null) return { ...v, ca:Math.round(v.ca*100)/100, pasLues:['Leboncoin','eBay','Vestiaire'], horsTotal:{} };
+    const a=sommePlage(autresJour.parJour,caDu,caAu);
+    return {ca:Math.round((v.ca+a.ca)*100)/100,count:v.count+a.count,pasLues:autresJour.pasLues,horsTotal:autresJour.horsTotal};
+  },[liveStats,caDu,caAu,autresJour]);
 
   // ── GRAPHIQUES « épuré / haut de gamme » (Julien, 28 sept.) : une seule teinte
   //    d'accent, variée par OPACITÉ fixée par plateforme (jamais par rang, §7 +
@@ -982,11 +992,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); setCaLabel(v&&v.label?String(v.label):''); }}/>
         {caRange ? (
           <div style={{marginTop:14}}>
-            <div className="vrm-display" data-ca-plage={caRange.passu?'':String(Math.round(caRange.ca*100))} style={{fontSize:28,fontWeight:800,color:C.text}}>{caRange.passu?'—':fmt(caRange.ca)}</div>
+            <div className="vrm-display" data-ca-plage={caRange.passu?'':String(Math.round(caRange.ca*100))} data-ca-plage-au-moins={(caRange.pasLues||[]).length?'1':'0'} style={{fontSize:28,fontWeight:800,color:C.text}}>{caRange.passu?'—':((caRange.pasLues||[]).length?'au moins ':'')+fmt(caRange.ca)}</div>
             <div data-ca-plage-phrase style={{fontSize:13,color:C.muted,marginTop:2}}>
               {caRange.passu
-                ? (caRange.enCours ? `Lecture de tes ventes Vinted… (${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)})` : `Tes ventes Vinted n'ont pas pu être lues — le total ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} ne se calcule pas pour l'instant.`)
-                : `${caRange.count} vente${caRange.count>1?'s':''} finalisée${caRange.count>1?'s':''} ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} · Vinted, tous comptes`}
+                ? (caRange.enCours ? `Lecture de tes ventes… (${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)})` : `Tes ventes Vinted n'ont pas pu être lues — le total ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} ne se calcule pas pour l'instant.`)
+                : `${caRange.count} vente${caRange.count>1?'s':''} finalisée${caRange.count>1?'s':''} ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} · toutes plateformes${(caRange.pasLues||[]).length?` — au moins : ${caRange.pasLues.join(', ')} pas lu${caRange.pasLues.length>1?'s':''}`:''}${Object.keys(caRange.horsTotal||{}).length?` · hors total (sans date ou montant pas sûr) : ${Object.entries(caRange.horsTotal).map(([p,n])=>`${n} ${p}`).join(', ')}`:''}`}
             </div>
           </div>
         ) : null /* (30 oct.) Rien de choisi : le bouton dit « Choisir une période » (il disait
