@@ -101,7 +101,7 @@ let requetesApi = [];
 let PUBLIE = null;
 let TVM = null;   // la publication de la Comptabilité (`vrm_tva_marge`), servie telle quelle
 const ouvrir = async (b, vp, sombre, { tab = 'cat_ventes', stream = false } = {}) => {
-  const ctx = await b.newContext({ acceptDownloads: true, viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light' });
+  const ctx = await b.newContext({ locale: 'fr-FR', acceptDownloads: true, viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   pg.on('console', (m) => { if (m.type() === 'error' && /FacturePro|facture/i.test(m.text())) errs.push(m.text()); });
@@ -200,7 +200,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         CFG = cfg; TVM = tvm; PUBLIE = null;
         const o = await ouvrir(b, vp, sombre, { tab: 'invoices' });
         await essaie(`${k}`, async () => {
-          await o.pg.getByRole('button', { name: 'Ma facture' }).first().waitFor({ timeout: 20000 });
+          await o.pg.locator('[data-fac-principal]').first().waitFor({ state: 'attached', timeout: 30000 });
           await o.pg.waitForTimeout(1800);
           const s = o.pg.locator('[data-tva-marge]');
           if (k === 'franchise') { dit(await s.count() === 0, '3. franchise : aucune carte de TVA sur marge (rien ne change)'); return; }

@@ -368,6 +368,7 @@ export default {
   "tvaMarge.periode": "Zeitraum",
   "tvaMarge.mois": "Monat",
   "tvaMarge.trimestre": "Quartal",
+  "tvaMarge.trimestreDe": "Q{n} {annee}",
   "tvaMarge.precedente": "Vorheriger Zeitraum",
   "tvaMarge.suivante": "Nächster Zeitraum",
   "tvaMarge.tvaDue": "Fällige MwSt.",

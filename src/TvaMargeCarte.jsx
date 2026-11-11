@@ -14,9 +14,9 @@ import './facture-tva.css';
 import { AUTH, telechargerFichier } from './App.jsx';
 import { useFicheFacturation } from './FacturePro.jsx';
 import { SegmenteBase } from './composants/Bouton.jsx';
-import { tr, heure } from './i18n/index.js';
+import { tr, heure, date } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
-import { lireTvaMarge, declarationMarge, aDaterMarge, periodesMarge, moisParis, trimestreDe, libellePeriode, csvDeclarationMarge,
+import { lireTvaMarge, declarationMarge, aDaterMarge, periodesMarge, moisParis, trimestreDe, csvDeclarationMarge,
   eurosC, jourParisTs, SOURCES_TVA_MARGE, CLE_TVA_MARGE, EVT_TVA_MARGE } from './tvaMarge.js';
 
 function usePublication(owner) {
@@ -40,6 +40,13 @@ function decaler(periode, pas) {
   if (!m) return periode;
   let a = Number(m[1]), mo = Number(m[2]) + pas; while (mo < 1) { mo += 12; a -= 1; } while (mo > 12) { mo -= 12; a += 1; }
   return `${a}-${String(mo).padStart(2, '0')}`;
+}
+// Le nom de la période dans la langue choisie (« octobre 2026 », « October 2026 », « T4 2026 »).
+function nomPeriode(periode) {
+  const q = /^(\d{4})-T([1-4])$/.exec(periode);
+  if (q) return tr('tvaMarge.trimestreDe', { n: q[2], annee: q[1] });
+  const m = /^(\d{4})-(\d{2})$/.exec(periode);
+  return m ? date(new Date(Number(m[1]), Number(m[2]) - 1, 15), { month: 'long', year: 'numeric' }) : '';
 }
 const SOURCES_PARTIEL = { vinted: 'tvaMarge.source.vinted', versements: 'tvaMarge.source.versements', leboncoin: null, ebay: null, vestiaire: null, 'achats-autres': 'tvaMarge.source.achats' };
 const NOMS = { leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
@@ -91,7 +98,7 @@ export default function TvaMargeCarte({ deps }) {
       </div>
       <div className="vrm-tvm-periode">
         <button type="button" className="vrm-icon-control vrm-tvm-fleche" aria-label={tr('tvaMarge.precedente')} data-tva-marge-prec="" onClick={() => setChoisie(decaler(periode, -1))}>‹</button>
-        <span className="vrm-tvm-libelle">{libellePeriode(periode)}</span>
+        <span className="vrm-tvm-libelle">{nomPeriode(periode)}</span>
         <button type="button" className="vrm-icon-control vrm-tvm-fleche" aria-label={tr('tvaMarge.suivante')} data-tva-marge-suiv="" disabled={periode >= enCours} onClick={() => setChoisie(decaler(periode, 1))}>›</button>
       </div>
       {!pub ? <p className="vrm-tvm-muet" data-tva-marge-passu="">{tr('tvaMarge.pasPublie')}</p> : !d.n ? <p className="vrm-tvm-muet">{tr('tvaMarge.aucune')}</p> : (

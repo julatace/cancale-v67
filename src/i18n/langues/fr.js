@@ -373,6 +373,7 @@ export default {
   "tvaMarge.periode": "Période",
   "tvaMarge.mois": "Mois",
   "tvaMarge.trimestre": "Trimestre",
+  "tvaMarge.trimestreDe": "T{n} {annee}",
   "tvaMarge.precedente": "Période précédente",
   "tvaMarge.suivante": "Période suivante",
   "tvaMarge.tvaDue": "TVA due",
