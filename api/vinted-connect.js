@@ -175,7 +175,30 @@ async function upsertAccount(row, owner) {
     },
     body: JSON.stringify(lignes.map((l) => ({ ...l, owner }))),
   });
-  return res.ok;
+  if (res.ok) return 'ok';
+  // (11 nov., M50) 409 + 23505 : l'unicité globale de la 023 vient de voir un
+  // AUTRE propriétaire (deux liaisons au même instant) — rien n'est écrasé.
+  const t = res.status === 409 ? await res.text().catch(() => '') : '';
+  return /23505/.test(t) ? 'deja_relie' : 'echec';
+}
+
+// (11 nov., M50 de la revue serveur, migration 042) « Déjà relié ailleurs ? »
+// puis l'écriture SOUS UN MÊME VERROU, dans la base (`vrm_vinted_relier`) :
+// deux vendeurs qui relient le même compte Vinted au même instant passaient tous
+// les deux (contrôle puis upsert, pas atomiques). Rend 'ok' · 'deja_relie' ·
+// 'echec' · `null` = fonction absente (042 pas passée) ⇒ le chemin d'avant.
+async function relierAtomique(row, owner) {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/vrm_vinted_relier`, {
+      method: 'POST',
+      headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_owner: owner, p_ligne: row }),
+    });
+    if (r.status === 404) return null;
+    if (!r.ok) return 'echec';
+    const v = await r.json().catch(() => null);
+    return v === 'ok' || v === 'deja_relie' ? v : 'echec';
+  } catch { return 'echec'; }
 }
 
 export default async function handler(req, res) {
@@ -287,9 +310,14 @@ export default async function handler(req, res) {
     if (login) row.login = login;
     if (anonId) row.anon_id = anonId;
     if (csrfToken) row.csrf_token = csrfToken;
-    const ok = await upsertAccount(row, u.id);
-    // 409 ici = la 023 (unicité globale) vient de voir un autre propriétaire.
-    if (!ok) { res.status(502).json({ ok: false, raison: 'ecriture', error: 'Compte vérifié mais enregistrement Supabase impossible.' }); return; }
+    let ecrit = await relierAtomique(row, u.id);
+    if (ecrit === null) ecrit = await upsertAccount(row, u.id);
+    if (ecrit === 'deja_relie') {
+      await noterLitige(u.id, vintedUserId, depuisExtension ? 'extension' : 'app');
+      res.status(409).json({ ok: false, raison: 'deja_relie', error: MESSAGE_DEJA_RELIE });
+      return;
+    }
+    if (ecrit !== 'ok') { res.status(502).json({ ok: false, raison: 'ecriture', error: 'Compte vérifié mais enregistrement Supabase impossible.' }); return; }
 
     const account = { vinted_user_id: vintedUserId, login, photo: profile?.photo?.url || null, domain: host };
     // L'extension a déjà ses jetons : on ne les renvoie pas.
