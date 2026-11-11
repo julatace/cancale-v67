@@ -409,4 +409,5 @@ export default {
   "ranger.carte.court": { one: "{n} achat à ranger", other: "{n} achats à ranger" },
   "ranger.geste1": "N°{num} rangé",
   "ranger.gesteN": "{n} articles rangés · N°{num} à N°{fin}",
+  "ranger.stock.arrivee": "Rangé à l’arrivée — pas encore en ligne",
 };

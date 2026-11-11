@@ -404,4 +404,5 @@ export default {
   "ranger.carte.court": { one: "{n} purchase to put away", other: "{n} purchases to put away" },
   "ranger.geste1": "No. {num} put away",
   "ranger.gesteN": "{n} items put away · No. {num} to No. {fin}",
+  "ranger.stock.arrivee": "Put away on arrival — not listed yet",
 };

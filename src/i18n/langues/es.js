@@ -404,4 +404,5 @@ export default {
   "ranger.carte.court": { one: "{n} compra por guardar", other: "{n} compras por guardar" },
   "ranger.geste1": "N.º {num} guardado",
   "ranger.gesteN": "{n} artículos guardados · N.º {num} a N.º {fin}",
+  "ranger.stock.arrivee": "Guardado al llegar — aún no publicado",
 };

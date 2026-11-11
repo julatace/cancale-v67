@@ -404,4 +404,5 @@ export default {
   "ranger.carte.court": { one: "{n} acquisto da riporre", other: "{n} acquisti da riporre" },
   "ranger.geste1": "N° {num} riposto",
   "ranger.gesteN": "{n} articoli riposti · N° {num}–{fin}",
+  "ranger.stock.arrivee": "Riposto all’arrivo — non ancora online",
 };

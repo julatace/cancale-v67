@@ -404,4 +404,5 @@ export default {
   "ranger.carte.court": { one: "{n} Kauf einzuräumen", other: "{n} Käufe einzuräumen" },
   "ranger.geste1": "Nr. {num} eingeräumt",
   "ranger.gesteN": "{n} Artikel eingeräumt · Nr. {num} bis {fin}",
+  "ranger.stock.arrivee": "Beim Eintreffen eingeräumt — noch nicht online",
 };
