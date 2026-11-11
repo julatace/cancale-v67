@@ -24,3 +24,6 @@ html body .vrm-partage .vrm-lien-action:disabled { opacity: .45; cursor: default
 .vrm-partage .vrm-partage-autre-titre { font: 600 15px/1.3 var(--vrm-police); overflow-wrap: anywhere; }
 .vrm-partage .vrm-partage-autres .vrm-partage-gestes { justify-content: flex-start; }
 .vrm-partage .vrm-fs-pied { margin-top: 2px; }
+/* Clair : des cartes blanches sur la feuille grise (listes groupées d'iOS) ; sombre : la case. */
+:root:not([data-theme="dark"]) .vrm-partage .vrm-partage-apercu, :root:not([data-theme="dark"]) .vrm-partage .vrm-partage-case,
+:root:not([data-theme="dark"]) .vrm-partage .vrm-partage-url, :root:not([data-theme="dark"]) .vrm-partage .vrm-partage-autres li { background: var(--fu-carte, #fff); }

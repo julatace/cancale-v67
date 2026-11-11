@@ -11,6 +11,8 @@ import { nettoyerFiche, NOM_SITE, DUREES_JOURS, DUREE_DEFAUT, dateCourte, prixTe
 import './partage-fiche.css';
 
 const ROUTE = '/api/compte?mode=partage';
+// « 18 nov. » finit déjà par un point : jamais « 18 nov.. ».
+const finPhrase = (t) => (/[.!?]$/.test(t) ? t : t + '.');
 const memeArticle = (p, ident) => !!(p && p.ident && ident && ((ident.itemId && p.ident.itemId === ident.itemId) || (!ident.itemId && ident.num && p.ident.num === ident.num)));
 
 // Le partage du téléphone, sinon le presse-papiers. Rend 'partage' | 'copie' | 'annule' | 'refuse'.
@@ -135,7 +137,7 @@ export default function PartageFiche({ source, onFermer, Feuille, Bouton, Segmen
           <div className="vrm-partage-groupe" data-partage-actuel={actuel.ligne}>
             <span className="vrm-partage-lib">{actuel.vendu ? 'Lien actif · la page dit « Vendu »' : 'Lien actif'}</span>
             <input className="vrm-partage-url" readOnly value={actuel.url} onFocus={(e) => { try { e.target.select(); } catch (_) {} }} aria-label="Le lien" data-partage-url=""/>
-            <span className="vrm-partage-note" data-partage-expire="">Valable jusqu’au {dateCourte(Date.parse(actuel.expire), false)}.</span>
+            <span className="vrm-partage-note" data-partage-expire="">{finPhrase(`Valable jusqu’au ${dateCourte(Date.parse(actuel.expire), false)}`)}</span>
             <Bouton variante="primaire" plein icone="link" onClick={() => partager(actuel)} data-partage-ouvrir="">Partager le lien</Bouton>
             <div className="vrm-partage-gestes">
               <button type="button" className="vrm-lien-action" onClick={() => copier(actuel)} data-partage-copier="">Copier</button>
