@@ -96,7 +96,7 @@ jobs:
           - part: 2
             lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis accessibilite
           - part: 3
-            lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois chiffres-coherents retraits-suivi
+            lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois chiffres-coherents retraits-suivi accessibilite-clavier
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
