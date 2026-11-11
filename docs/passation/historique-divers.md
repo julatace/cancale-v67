@@ -1313,3 +1313,43 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé de CLAUDE.md §9 (11 nov., lot K)
 
 - **10 nov. · Import tableur, partage de photo, aide par écran (lot J)** : Achats → « Nouvel achat » → « Importer un tableur » (CSV/.xlsx lus dans le navigateur sans dépendance, aperçu ligne à ligne, doublons par RÉFÉRENCE seulement, prix du fichier, N° par `numeroExterne`, coût posé seulement sur une fiche sans prix, rien écrit sans « Importer N achats ») ; VRM cible de partage (`share_target`, `public/sw.js` ⇒ « Nouvel achat » avec la photo ; pas sur iPhone/Safari) ; le « ? » ouvre 3–5 gestes (`scripts/aide-contenu.cjs` ⇒ `src/aideEtapes.js`). `docs/passation/2026-11-10-import-partage-aide.md`. Geste : aucun.
+
+## Déplacé de CLAUDE.md §9 (11 nov., extension 5.340)
+
+- **10 nov. · Échéances dans l'agenda + alerte « nouvel appareil » (lot H)** : Paramètres → Notifications → « Ajouter à mon agenda » = lien webcal secret (`vrm_agenda` + index, régénérable/coupable, `/agenda/<jeton>.ics` → `?mode=agenda`) : URSSAF (micro, non déclarée), dépôts LUS (`vrm_agenda_envoi` publié par Ma journée), retraits LUS ; rien de personnel (`api/_lib/agenda-ics.js`) ; à chaque ouverture `?mode=appareils {verifier}` relit ses sessions (024), signature jamais vue ⇒ push « Nouvel appareil : Chrome sur Mac. Ce n'est pas toi ? » ⇒ Appareils connectés, CETTE session en ambre (`api/_lib/appareil-nouveau.js`). `docs/passation/2026-11-10-ics-appareil.md`. Geste : aucun.
+
+## Déplacé de CLAUDE.md §9 (11 nov., textes courts 5)
+- **10 nov. · Republier à la main, conseillé (lot AP, demande 17)** : Annonces → Republier : carte « À la main : conseillé, le moins risqué », « À la main · N » principal, « Par VRM · N » second ; kit de plusieurs annonces (N° et description TELLE QU'ELLE PARTIRA à copier, une à une ou « Tout copier », photos réglées vers la galerie par le menu de partage, « Pas à pas », « Ouvrir Vinted » note le suivi : le N° suit par SON clic) ; une photo seule s'enregistre aussi (`src/republierKit.js`, `usePhotosReglees`) ; rien n'est envoyé à Vinted. `docs/passation/2026-11-10-republier-main.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Jauge du plafond + journal de l'extension (lot G, ext. 5.337)** : jauge « 12/50 cette heure · repart à 21 h 40 » (somme de tous les Chrome, « — » si rien publié, ambre à 45) dans Baisser le prix, Republier, Favoris, Offres auto et en tête de Paramètres → « Ce que VRM a fait » (`src/jaugeActions.js`) ; l'extension note offres, réponses, baisses, modifications dans `journal_vrm_*`, lues par `lireJournal` (preuve, sans doublon avec le téléphone). `docs/passation/2026-11-10-jauge-journal.md`. Geste : installer la 5.337.0.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Textes courts, 4e série** : Favoris (« Aucune garantie contre un blocage Vinted » et le rythme restent À L'ÉCRAN, le reste sous « Pourquoi ? »), Organisation, Communauté, Accompagnement, fil eBay, inventaire, studio, configuration, connexion et installation de l'extension : une phrase + `src/composants/PourquoiReplie.jsx` ; audit `textes-courts` (relevé statique), banc `popups-propre` + favoris/organisation/communauté. `docs/passation/2026-11-10-textes-courts-4.md`. Geste : aucun.
+
+## Déplacé de CLAUDE.md §9 (11 nov., lot DJ8)
+
+- **11 nov. · Infos sur vinted.fr (lot AA, ext. 5.339)** : sous SES annonces « N°124 · acheté 60 € · en ligne depuis 23 j » (identifiant d'annonce, compte de l'onglet, pas su ⇒ rien) ; sur l'annonce d'un autre vendeur, encart « VRM » replié : calculette (règle de l'app) + « peut-être N paires proches » (lot F) ; lecture seule, aucune requête Vinted. `docs/passation/2026-11-10-extension-infos.md`. Geste : installer 5.339.0.
+
+- **10 nov. · Mode vacances tous comptes (lot O, ext. 5.338)** : Paramètres → Mes comptes → « Mode vacances » : état LU par compte (`is_on_holiday` du profil, mesuré ; « — » pas su), « Tout mettre en vacances » / « Tout rouvrir » = UN compte par clic, celui de l'onglet ; le geste de Vinted jamais vu ⇒ appris sur SON geste (`noteVacances` → `vinted_vacances_recette`, `/users/{current|son n°}` seulement), relu après ; Leboncoin/eBay/Vestiaire « À faire sur le site ». `docs/passation/2026-11-10-mode-vacances.md`. Geste : installer 5.338.0, puis poser et retirer une fois le mode vacances à la main sur vinted.fr.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ1)
+## Déplacé de CLAUDE.md §9 (11 nov., extension 5.341)
+- **10 nov. · Clavier + lecteur d'écran (lot P)** : ordinateur : « g » + lettre (j a v c m h s r t e p) ⇒ l'écran, « n » ⇒ Nouvel achat VIDE, « ? » ⇒ la liste (feuille, focus gardé), aussi Paramètres → « Raccourcis clavier » ; jamais dans un champ, ni sous une feuille, ni ⌘/Ctrl/Alt ; seulement naviguer/ouvrir (`src/raccourcisClavier.js`, `vrm:aller`). VoiceOver : bouton icône seule nommé à la racine (`BoutonBase`/`Segmente`/`Btn`), widgets lus « libellé : valeur » (« pas su » pour —), « Détails et gestes » dit sa paire. `docs/passation/2026-11-10-clavier-voiceover.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. (soir) · « Ton adresse VRM » en UN parcours** : en tête d'E-mails → Relier ma boîte (Paramètres → Mon adresse VRM : la même pièce en feuille) — barre 1·2·3·✓ avec reprise, adresse en grand, compte en puces, messagerie détectée par le domaine (une tuile, 3 pas, bouton vers la bonne page), relais Apple = liste des boîtes reliées, code Gmail affiché seul + « Confirmer dans Gmail » (son clic), essai « Reçu ✓ » ; plus de roue infinie ; adresses sans compte en une ligne (`src/AdresseReception.jsx`). `docs/passation/2026-11-10-adresse-vrm-simple.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ2)
+- **10 nov. · Mode vacances tous comptes (lot O, ext. 5.338)** : Paramètres → Mes comptes → « Mode vacances » : état LU par compte (`is_on_holiday` du profil, mesuré ; « — » pas su), « Tout mettre en vacances » / « Tout rouvrir » = UN compte par clic, celui de l'onglet ; le geste de Vinted jamais vu ⇒ appris sur SON geste (`noteVacances` → `vinted_vacances_recette`, `/users/{current|son n°}` seulement), relu après ; Leboncoin/eBay/Vestiaire « À faire sur le site ». `docs/passation/2026-11-10-mode-vacances.md`. Geste : installer 5.338.0, puis poser et retirer une fois le mode vacances à la main sur vinted.fr.
+
+- **11 nov. · Ouverture plus légère (lot K)** : ventes/achats, dressings, boîtes de réception gardés sur l'appareil (IndexedDB, par compte VRM, effacés à la déconnexion), revalidés par leur VERSION scalaire (`data.rev`, capture, écriture) : rien changé ⇒ rien téléchargé (2e ouverture 2,5 Mo → 0,9 Mo), changé ⇒ cette ligne seule ; versions ratées ⇒ lecture d'avant ou « pas su », jamais la copie, « Vu à hh:mm · pas relu » (`src/copieLignes.js`). `docs/passation/2026-11-10-ouverture-legere.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ6)
+
+- **11 nov. · Textes courts, 5e série** : Réglages, eBay, Leboncoin, Accueil (FAQ question/réponse), réception des e-mails, carte des relais, Stock, Vestiaire, Compta… : une phrase, le détail sous « Pourquoi ? » ; « Tu ne paies jamais le port » et l'attribution de la carte restent à l'écran ; 133 → 42 textes longs ; audit `textes-courts` étendu à 24 fichiers. `docs/passation/2026-11-11-textes-courts-5.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot tampon-vrm)
+
+- **11 nov. · Extension 5.340 (finitions)** : mode vacances au journal (accepté et relu seulement) ; prix de vente Vestiaire (`sellerPrice`) ⇒ facture Pro Vestiaire, sinon refus d'avant ; avis : historique daté par lecture (« +N avis », 90 j, nombres seuls) ; audits : imports recollés dédoublonnés. `docs/passation/2026-11-11-extension-5340.md`. Geste : installer 5.340.0.
+## Déplacé de CLAUDE.md §9 (11 nov., lot decisions-11nov)
+
+- **11 nov. · Achats (lot DJ5)** : à côté de chaque proposition d'achat (Sans achat relié, coût d'une vente, numérotage, saisie en série) « Choisir un autre achat » : recherche dans SES achats, libres d'abord, « Déjà relié à N°… » + « Déplacer ici », « Délier » ; SON clic relie par le n° de la ligne (`src/relierAutreAchat.js`) ; « Reçu » d'un achat relié OUVRE (feuille du reçu e-mail, sinon visionneuse PDF) ; « Nouvel achat » refait (photo d'abord, prix en grand, derniers lieux, N° proposé réservé au pool) ; icônes `vitrine` / `soleilLevant`. `docs/passation/2026-11-11-achats-relier.md`. Geste : aucun.

@@ -112,7 +112,7 @@ async function main() {
         const ec = await pg.evaluate(() => ({ etat: [...document.querySelectorAll('[data-etat-compte]')].map((e) => e.getAttribute('data-etat-compte')).join(','), test: /Tester la connexion/.test(document.body.innerText) }));
         dit(ec.etat === 'actif' && !ec.test, `${T} la carte du compte dit « Actif », sans « Tester la connexion »`, JSON.stringify(ec));
         // La recherche.
-        await pg.locator('[aria-label="Rechercher une paire"]').first().click();
+        await pg.locator('[aria-label^="Rechercher "][aria-label$=" paire"], [aria-label="Rechercher un article"]').first().click();
         const champ = pg.locator('[data-recherche-champ]');
         await champ.fill('nike'); await pg.waitForTimeout(900);
         const nike = await pg.evaluate(() => document.body.innerText);

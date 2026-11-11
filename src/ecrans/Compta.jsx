@@ -21,14 +21,14 @@ import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichi
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
 import { lireFactures } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
-import { useProfilFiscal } from '../App.jsx';
+import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
@@ -843,6 +843,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // `vrm_pro_facture` — seul l'endroit change (§11 : un seul propriétaire).
   const [showPro,setShowPro]=useState(false);
   const [fetching,setFetching]=useState(false);
+  const [menuFac,setMenuFac]=useState(false);   // (11 nov., C4) la feuille « … » des factures au téléphone
+  const relireFacturesClic=async()=>{ setFetching(true); try{ const r=await import('../FacturePro.jsx').then((m)=>m.relireFactures(DEPS_FACTURE)).catch(()=>null); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } };
   const PER_PAGE=50;
 
   // ⚠️⚠️ CHEMIN GOOGLE SHEETS RETIRÉ (9 septembre) — IL ÉTAIT MORT, MESURÉ.
@@ -983,20 +985,35 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
         <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:"Factures"} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
-          right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          right={<>
+          {/* (11 nov., décision C4 — Julien : « tranche ») Au téléphone, les cinq boutons tassaient la
+              ligne du titre : le geste principal reste visible, les quatre autres passent dans « … »
+              (une feuille en portail, des lignes de 44 px). Sur ordinateur, rien ne change. */}
+          <div className="vrm-fac-actions" data-fac-actions="large" style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
               pouvait QUE échouer. Il relit maintenant les reçus arrivés par
               email — la source qui remplit vraiment cet écran. */}
-          <Btn small outline color={C.muted} disabled={fetching}
-            onClick={async()=>{ setFetching(true); try{ const r=await import('../FacturePro.jsx').then((m)=>m.relireFactures(DEPS_FACTURE)).catch(()=>null); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } }}
-            style={{display:'inline-flex',alignItems:'center',gap:5}}>
+          <Btn small outline color={C.muted} disabled={fetching} onClick={relireFacturesClic} style={{display:'inline-flex',alignItems:'center',gap:5}}>
             <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les factures'}
           </Btn>
           <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Ma facture</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages des factures</Btn>
-        </div>}/>
+          </div>
+          <div className="vrm-fac-actions-tel" data-fac-actions="tel">
+            <Btn small primaire onClick={()=>setShowForm(true)} data-fac-principal="">+ Nouvelle facture</Btn>
+            <button type="button" className="vrm-icon-control vrm-fac-plus" data-fac-plus="" aria-haspopup="dialog" aria-expanded={menuFac} aria-label="Autres actions des factures" onClick={()=>setMenuFac(true)}><Icon name="more" size={20}/></button>
+          </div>
+        </>}/>
+        {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre="Factures" data-fac-menu="">
+          <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(()=>setMenuFac(false), 0); }}>
+            <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?'Chargement…':'Relire les factures'}</button>
+            <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>Exporter Excel</button>
+            <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>Ma facture</button>
+            <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>Réglages des factures</button>
+          </div>
+        </SheetShell>}
         {/* (10 nov., Argent) Les segments SOUS la ligne du titre, pas dedans : cinq actions y
             tassaient la piste (« Statistiqu… », vu en capture à 1512 px). */}
         {argentNav}
@@ -1162,7 +1179,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
             }} placeholder="ex: 1280"/>
           </Field>
           <Field label="Désignation *">
-            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder="ex: Adidas Spezial bleu marine taille 365"/>
+            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder={vendActuel()==='sneakers' ? 'ex: Adidas Spezial bleu marine taille 365' : exemplesActuels().achat}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
             <Field label="Prix de vente&nbsp;€ *">
@@ -1940,10 +1957,10 @@ function ExportComptableCarte(props) {
   return (
     <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <span data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</span>
-          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</span>
-        </span>
+        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</div>
+          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</div>
+        </div>
         {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
       </div>
       {ouvert && <ExportComptableCorps {...props} />}
@@ -2276,7 +2293,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
             {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
             {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret client de TON compte Super PDP. Envois facturés par Super PDP, pas par VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret de TON compte Super PDP. Il facture ses envois, pas VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
             <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
@@ -3433,6 +3450,50 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     </section>
   );
 }
+// (11 nov., lot DJ7) « 1 756 ventes sans date de versement » ⇒ ce qui est daté, ce qui
+// manque, POURQUOI (src/versementRaisons.js, publié par Ventes avec la ligne), et LE geste.
+// Rien n'est daté ici : une vente reste dans aucun mois tant que sa date n'est pas lue (§5).
+const nbAd = (n) => Number(n || 0).toLocaleString('fr-FR');
+const plAd = (n, s = 's') => (Number(n) > 1 ? s : '');
+function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
+  const d = ad.datees && Number.isFinite(Number(ad.datees.n)) ? ad.datees : null;
+  const lignes = [];
+  for (const r of ad.raisons) {
+    if (!r || !(r.n > 0)) continue;
+    if (r.cle === 'vinted-detail') {
+      const comptes = Array.isArray(r.comptes) && r.comptes.length ? r.comptes : [{ uid: '', nom: '', n: r.n }];
+      for (const c of comptes) lignes.push(
+        <li key={'d' + c.uid} data-adater-raison="vinted-detail" data-adater-compte={c.uid || ''} data-n={c.n}>
+          <span><b>{nbAd(c.n)}</b> {c.nom ? <>sur <b>{c.nom}</b></> : 'sur Vinted'} : vente{plAd(c.n)} pas encore relue{plAd(c.n)}.</span>
+          <Bouton variante="discret" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-adater-geste="vinted">Ouvrir Vinted ↗</Bouton>
+        </li>);
+    } else if (r.cle === 'leboncoin') lignes.push(
+      <li key="lbc" data-adater-raison="leboncoin" data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> Leboncoin : date à recopier.</span>
+        <Bouton variante="discret" data-urssaf-dater="" data-adater-geste="main" onClick={onDater}>Dater à la main</Bouton>
+      </li>);
+    else if (r.cle === 'vestiaire') lignes.push(
+      <li key="vc" data-adater-raison="vestiaire" data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> Vestiaire : versement pas encore lu.</span>
+        <Bouton variante="discret" href="https://fr.vestiairecollective.com/" target="_blank" rel="noopener noreferrer" data-adater-geste="vestiaire">Ouvrir Vestiaire ↗</Bouton>
+      </li>);
+    else lignes.push(
+      <li key={r.cle} data-adater-raison={r.cle} data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> {r.cle === 'vinted-attente' ? 'Vinted : pas encore finalisée' + plAd(r.n) + ', relue' + plAd(r.n) + ' seule' + plAd(r.n) + '.' : r.cle === 'vinted-passu' ? 'Vinted : pas su (lecture ratée).' : 'eBay : commande sans date.'}</span>
+      </li>);
+  }
+  return (
+    <div className="vrm-adater" data-adater-raisons="">
+      <span>
+        {d ? <><b data-adater-datees={d.n}>{nbAd(d.n)} datée{plAd(d.n)} ✓</b>{d.releve > 0 ? <span data-adater-releve={d.releve}> dont {nbAd(d.releve)} par ton porte-monnaie</span> : null} · </> : null}
+        <b data-adater-sans={n}>{nbAd(n)} vente{plAd(n)} sans date</b> : pas dans ce montant.
+        {periodeAd ? <> Elles ont été <span data-urssaf-adater-periode="">{periodeAd}</span> ; une vente versée en {label} y manquerait.</> : null}
+      </span>
+      <ul className="vrm-adater-liste">{lignes}</ul>
+      <Pourquoi ecrit>La date qui compte est celle où Vinted crédite ton porte-monnaie (« Commande finalisée »). Payer ensuite avec ton solde ne la change pas. VRM la lit dans le détail de chaque vente, quelques-unes à chaque visite sur Vinted. Elle n’est jamais devinée : sans elle, la vente n’est dans aucun mois.</Pourquoi>
+    </div>
+  );
+}
 function PrevisionUrssafCarte({ onNav }) {
   const { P, ligne, regLu, regPret } = usePrevisionUrssaf();
   const [copie, setCopie] = React.useState('');
@@ -3503,6 +3564,7 @@ function PrevisionUrssafCarte({ onNav }) {
       {(P.ca == null || P.partiel || P.aDater > 0) ? (
         <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
           {P.ca == null ? <><span>Pas encore calculé : ouvre l’écran Ventes une fois.</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>Ouvrir Ventes</Bouton> : null}</>
+            : P.aDater > 0 && ligne && ligne.aDater && Array.isArray(ligne.aDater.raisons) && ligne.aDater.raisons.length ? <ADaterRaisons ad={ligne.aDater} n={P.aDater} periodeAd={periodeAd} label={P.label} onDater={() => vers('compta-ca')}/>
             : P.aDater > 0 ? <><span>{P.aDater} vente{P.aDater > 1 ? 's' : ''} sans date de versement : pas dans ce montant.{periodeAd ? <> Elles ont été <span data-urssaf-adater-periode="">{periodeAd}</span> ; une vente versée en {P.label} y manquerait : vérifie-les avant de déclarer.</> : null}</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? 'Les dater' : 'La dater'}</Bouton></>
             : <>Il manque des ventes pas encore lues : ce montant est un minimum.</>}
         </div>

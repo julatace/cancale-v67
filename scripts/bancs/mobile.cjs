@@ -114,7 +114,7 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
     check(await p.evaluate(()=>document.querySelector('.vrm-mobile-nav').getBoundingClientRect().bottom<=844.5),largeur+' grand affichage: navigation toujours dans l’écran');
     await p.getByRole('button',{name:'Normal',exact:true}).tap();
     await p.evaluate(()=>localStorage.setItem('vrm_zoom','0.65'));
-    await p.getByRole('button',{name:'Rechercher une paire'}).tap();const recherche=p.getByPlaceholder(/N°|numéro|titre|marque/i).first();
+    await p.getByRole('button',{name:/^Rechercher (une paire|un article)$/}).tap();const recherche=p.getByPlaceholder(/N°|numéro|titre|marque/i).first();
     await recherche.fill('New Balance');check(!(await p.locator('.vrm-mobile-nav').isVisible()),largeur+' clavier: navigation masquée');
     await p.keyboard.press('Escape');await p.evaluate(()=>document.activeElement.blur());
     await p.waitForTimeout(120);
@@ -127,7 +127,7 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
     await ctx.close();
   }
   const ctx=await b.newContext({viewport:{width:1512,height:950}});const p=await ctx.newPage();await brancher(p);await p.addInitScript(()=>localStorage.setItem('vrm_zoom','1'));await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
-  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'ordinateur: paramètres toujours accessibles (bas du rail)');await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});{const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg>=64&&lg<=88,'ordinateur: photo de vente pleine, vente ouverte ('+lg+' px)');};
+  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.locator('.vrm-sidebar [data-nav-compte]').isVisible(),'ordinateur: paramètres toujours accessibles (la carte du profil, bas du rail)');await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});{const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg>=64&&lg<=88,'ordinateur: photo de vente pleine, vente ouverte ('+lg+' px)');};
   // (17 oct.) Le rail n'a plus de groupes repliés : Gestion est toujours visible, Factures vit dans Comptabilité.
   const rail=p.locator('.vrm-atelier-rail');
   check(await rail.getByRole('button',{name:'Argent',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');

@@ -22,6 +22,7 @@ import { sbCle } from './cle.js';
 import { lireLigne, prendreNumero } from './facture-pro.js';
 import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis } from '../../src/facturePro/regle.js';
 import { PLATEFORMES, refValide, idFactureAutre, cleNumeroAutre, venteAutre, manquantsAcheteurSaisi, venteFacture } from '../../src/facturePro/sources.js';
+import { compteFacturable, compteDeVente } from '../../src/facturePro/comptes.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const sbKey = () => process.env.SUPABASE_SERVICE_KEY || '';
@@ -64,7 +65,9 @@ export async function lireVenteAutre(owner, plateforme, ref) {
     const rows = await lireListe(`id=like.ebay_orders*&data->orders=cs.${encodeURIComponent(JSON.stringify([{ orderId: String(ref) }]))}&select=id,orders:data->orders`, owner);
     if (rows === undefined) return undefined;
     const trouvees = [];
-    for (const r of rows) for (const o of Array.isArray(r && r.orders) ? r.orders : []) if (o && String(o.orderId) === String(ref)) trouvees.push(o);
+    // (11 nov.) Chaque commande garde le compte VRM de SA ligne (`_compte`, comme l'app) :
+    // « compte professionnel » se décide par compte (src/facturePro/comptes.js).
+    for (const r of rows) for (const o of Array.isArray(r && r.orders) ? r.orders : []) if (o && String(o.orderId) === String(ref)) trouvees.push({ ...o, _compte: /^ebay_orders_./.test(String(r.id || '')) ? String(r.id).slice('ebay_orders_'.length) : 'principal' });
     if (trouvees.length > 1) return 'double';
     return trouvees[0] || null;
   }
@@ -73,7 +76,8 @@ export async function lireVenteAutre(owner, plateforme, ref) {
     if (rows === undefined) return undefined;
     const ventes = rows[0] && rows[0].ventes;
     const v = ventes && typeof ventes === 'object' && !Array.isArray(ventes) ? ventes[ref] : null;
-    return v && typeof v === 'object' ? v : null;
+    // (11 nov.) L'identité est la CLÉ relue ici (posée en `id`), jamais un champ du navigateur.
+    return v && typeof v === 'object' ? { ...v, id: String(ref) } : null;
   }
   return null;
 }
@@ -100,7 +104,9 @@ async function emettre(owner, corps, res) {
   if (!brut) return repondre(res, 409, { erreur: 'absente', message: `Cette vente n'est pas (encore) lue dans tes ventes ${PLATEFORMES[plateforme].l}.` });
   const v = venteAutre(plateforme, brut);
   if (!v.ok) return repondre(res, 409, { erreur: 'refus', code: v.code, raison: v.raison, message: `Pas de facture : ${v.raison}.` });
-  const ma = manquantsAcheteurSaisi(corps.acheteur);
+  // (11 nov., lot DJ1) Seulement un compte qu'IL a dit professionnel (src/facturePro/comptes.js).
+  if (compteFacturable(cfg || {}, plateforme, compteDeVente(plateforme, brut)) !== true) return repondre(res, 409, { erreur: 'compte', message: 'Pas de facture : ce compte n’est pas marqué professionnel (Ma facture → Sur quels comptes ?).' });
+  const ma =manquantsAcheteurSaisi(corps.acheteur);
   const mv = manquantsVendeur(cfg || {});
   const vente = venteFacture(v, corps.acheteur, corps.designation);
   const mvt = manquantsVente(vente);

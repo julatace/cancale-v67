@@ -177,3 +177,15 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 .vrm-fp-registre-pied b { font-size: 17px; color: var(--vrm-ink); }
 .vrm-fp-registre-pied .vrm-b { margin-top: 8px; }
 .vrm-fp-auto { display: grid; gap: 4px; padding-top: 8px; border-top: 1px solid var(--vrm-line); }
+
+/* ── 11 nov., lot DJ1 : bon de retour à côté de la facture, comptes professionnels ── */
+.vrm-fp-ligne { flex-wrap: wrap; }
+.vrm-fp-vente > [data-fp-bon-retour] { margin-top: 8px; }
+.vrm-fp-comptes { display: grid; gap: 0; border-radius: 12px; overflow: hidden; background: var(--w-carte-2, var(--vrm-bg, #F2F2F7)); }
+.vrm-fp-compte { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 44px; padding: 8px 12px; cursor: pointer; }
+.vrm-fp-compte + .vrm-fp-compte { border-top: .5px solid var(--w-filet, var(--vrm-line, rgba(60,60,67,.18))); }
+.vrm-fp-compte input { width: 22px; height: 22px; margin: 0; accent-color: var(--w-accent, var(--vrm-accent, #0071E3)); }
+.vrm-fp-compte span { display: grid; gap: 1px; min-width: 0; }
+.vrm-fp-compte b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.vrm-fp-compte small { font-size: 12px; color: var(--vrm-muted); }
+.vrm-fa-question { display: grid; gap: 8px; }

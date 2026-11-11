@@ -198,7 +198,7 @@ async function brancher(p){
       check(await rail.getByRole('region',{name:'Gérer',exact:true}).isVisible(),'gestion (« Gérer ») visible en permanence dans le rail');
       check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Argent',exact:true}).isVisible(),'stock et comptabilité (factures comprises) toujours accessibles');
       check(await rail.getByRole('button',{name:'Stock',exact:true}).getAttribute('title')==='Stock','nom de l’accès au survol');
-      check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
+      check(await rail.locator('[data-nav-compte]').isVisible(),'paramètres accessibles depuis le rail (la carte du profil, 11 nov.)');
     }
     if(width===1512){
       // ⚠️ Jugé sur un ÉTAT observé (la mise en page après le redimensionnement), borné à 5 s — une mesure

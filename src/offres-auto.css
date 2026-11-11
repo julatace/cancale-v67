@@ -1,0 +1,81 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   Messages → Favoris & offres → « Offres auto » (11 nov., lot DJ8) — src/OffresAuto.jsx
+   Style DA6 (styles-widgets-ios.css) : groupes arrondis, rangées, libellés 13/600 gris.
+   Accent RARE (l'interrupteur allumé, « Acceptée ») ; ambre = un geste à regarder.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-oa { display: flex; flex-direction: column; gap: 10px; min-width: 0; color: var(--w-encre, var(--vrm-ink)); }
+.vrm-oa-tete, .vrm-oa-groupe {
+  background: var(--w-carte, var(--vrm-surface)); border-radius: var(--w-r, 16px); box-shadow: var(--w-ombre, none);
+  padding: 6px 14px; box-sizing: border-box; min-width: 0;
+}
+.vrm-oa-tete { padding: 8px 10px 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.vrm-oa-ligne { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+.vrm-oa-icone { flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--w-remplir, var(--vrm-card2)); color: var(--w-gris, var(--vrm-muted)); }
+.vrm-oa-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-oa-texte b { font-size: 16px; font-weight: 700; }
+.vrm-oa-texte span { font-size: 13px; color: var(--w-gris, var(--vrm-muted)); overflow-wrap: anywhere; }
+.vrm-oa-alerte { margin: 0; font-size: 13px; line-height: 1.4; color: var(--w-encre, var(--vrm-ink)); padding: 8px 10px; border-radius: 12px;
+  background: color-mix(in srgb, var(--vrm-warn, #B25E09) 12%, transparent); border-left: 3px solid var(--vrm-warn, #B25E09); }
+.vrm-oa-arret { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vrm-oa-muet { font-size: 12.5px; color: var(--w-gris, var(--vrm-muted)); line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
+.vrm-oa-titre { margin: 8px 4px 0; font-size: 13px; font-weight: 600; color: var(--w-gris, var(--vrm-muted)); text-transform: none; letter-spacing: 0; }
+.vrm-oa-vide { margin: 10px 0; font-size: 14px; color: var(--w-gris, var(--vrm-muted)); line-height: 1.4; }
+.vrm-oa-pied { margin: 4px 0 6px; font-size: 12.5px; color: var(--w-gris, var(--vrm-muted)); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.vrm-oa-offre, .vrm-oa-histo {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom nom" "chiffres compte" "puce puce"; gap: 4px 10px; align-items: center;
+  padding: 10px 0; border-bottom: .5px solid var(--w-filet, var(--vrm-line)); min-width: 0;
+}
+.vrm-oa-histo { grid-template-areas: "puce chiffres" "nom nom"; grid-template-columns: auto minmax(0, 1fr); }
+.vrm-oa-histo .vrm-oa-chiffres { justify-self: end; }
+.vrm-oa-offre .vrm-oa-nom, .vrm-oa-histo .vrm-oa-nom { grid-area: nom; }
+.vrm-oa-offre .vrm-oa-puce, .vrm-oa-histo .vrm-oa-puce { grid-area: puce; justify-self: start; }
+.vrm-oa-histo .vrm-oa-puce { justify-self: start; }
+.vrm-oa-chiffres { grid-area: chiffres; font-size: 13px; color: var(--w-gris, var(--vrm-muted)); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+.vrm-oa-chiffres b { color: var(--w-encre, var(--vrm-ink)); font-weight: 700; }
+.vrm-oa-compte { grid-area: compte; justify-self: end; font-size: 12px; color: var(--w-gris, var(--vrm-muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
+.vrm-oa-nom { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; font-weight: 600; }
+.vrm-oa-titre-paire { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-oa-puce { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  background: var(--w-remplir, var(--vrm-card2)); color: var(--w-encre, var(--vrm-ink)); max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.vrm-oa-puce-accepter { color: var(--w-accent, var(--vrm-accent)); background: color-mix(in srgb, var(--w-accent, #0071E3) 12%, transparent); }
+.vrm-oa-puce-garde { color: var(--vrm-warn, #B25E09); background: color-mix(in srgb, var(--vrm-warn, #B25E09) 12%, transparent); }
+.vrm-oa-illisible { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; font-size: 13px; padding: 8px 10px; border-radius: 12px;
+  background: color-mix(in srgb, var(--vrm-warn, #B25E09) 12%, transparent); border-left: 3px solid var(--vrm-warn, #B25E09); }
+.vrm-oa-outils { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.vrm-oa-outils > * { min-width: 0; }
+.vrm-oa-cherche { flex: 1 1 140px; min-height: 44px; border-radius: 12px; border: 0; padding: 0 12px; font: inherit; font-size: 16px;
+  background: var(--w-remplir, var(--vrm-card2)); color: var(--w-encre, var(--vrm-ink)); box-sizing: border-box; }
+.vrm-oa-paire { display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-areas: "case nom" "seuils seuils"; gap: 4px 6px; align-items: center;
+  padding: 8px 0; border-bottom: .5px solid var(--w-filet, var(--vrm-line)); min-width: 0; }
+.vrm-oa-case { grid-area: case; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.vrm-oa-case input { width: 20px; height: 20px; margin: 0; accent-color: var(--w-accent, var(--vrm-accent)); }
+.vrm-oa-paire-nom { grid-area: nom; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-oa-seuils { grid-area: seuils; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-left: 50px; min-width: 0; }
+.vrm-oa-seuil { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-oa-seuil-mot { font-size: 12px; font-weight: 600; color: var(--w-gris, var(--vrm-muted)); }
+.vrm-oa-seuil-champ { display: flex; align-items: center; gap: 4px; min-height: 44px; border-radius: 12px; padding: 0 10px; background: var(--w-remplir, var(--vrm-card2)); box-sizing: border-box; }
+html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; width: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--w-encre, var(--vrm-ink)); outline: none; min-height: 44px !important; height: 44px; padding: 0 !important; margin: 0; }
+.vrm-oa-seuil-champ span { color: var(--w-gris, var(--vrm-muted)); font-size: 14px; }
+.vrm-oa-seuil-champ:focus-within { box-shadow: 0 0 0 2px var(--w-accent, var(--vrm-accent)); }
+.vrm-oa-paire[data-oa-incoherent] .vrm-oa-paire-nom .vrm-oa-muet { color: var(--vrm-warn, #B25E09); }
+.vrm-oa-plus { width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--w-accent, var(--vrm-accent)); font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; }
+.vrm-oa-serie { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 72px); z-index: 5; display: flex; gap: 8px; justify-content: flex-end; padding: 8px;
+  background: var(--w-carte, var(--vrm-surface)); border-radius: 999px; box-shadow: 0 6px 24px -6px rgba(0,0,0,.25); }
+.vrm-oa-refus { width: 100%; box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px 12px; margin: 6px 0; font: inherit; font-size: 16px; line-height: 1.4; resize: vertical;
+  background: var(--w-remplir, var(--vrm-card2)); color: var(--w-encre, var(--vrm-ink)); min-height: 64px; }
+@media (min-width: 700px) {
+  .vrm-oa-offre { grid-template-areas: "nom puce" "chiffres compte"; }
+  .vrm-oa-offre .vrm-oa-puce { justify-self: end; }
+}
+@media (min-width: 900px) {
+  .vrm-oa-paire { grid-template-columns: 44px minmax(0, 1fr) 300px; grid-template-areas: "case nom seuils"; }
+  .vrm-oa-seuils { padding-left: 0; }
+  .vrm-oa-serie { bottom: 16px; }
+}
+/* Les zones de Favoris & offres (Favoris · Offres auto). */
+.vrm-fav-zones { margin: 0 0 12px; }
+/* Dans la couche de la direction artistique : un `!important` posé en couche y gagne contre
+   celui d'un fichier hors couche — le champ du seuil reste UN champ (pas un champ dans un champ). */
+@layer vrm-premium {
+  :root:root body .vrm-app-shell .vrm-oa .vrm-oa-seuil-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 44px !important; height: 44px; }
+}
