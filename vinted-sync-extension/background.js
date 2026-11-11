@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.356.0';
+const CODE_VERSION = '5.357.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2593,6 +2593,159 @@ function verifFormeObjet(type, parsed, id) {
   } catch (_) { /* une sentinelle ne casse jamais la capture */ }
 }
 
+// ══ 5.357 (11 nov., validé par Julien) — LA FORME DES RÉPONSES DE VINTED ══════
+// « Alerte si Vinted change sa façon de répondre. » Les sentinelles ci-dessus
+// NOTENT une dérive, puis la capture est rangée quand même : un prix devenu un
+// nombre (au lieu de `{amount}`), un `status_title` devenu un objet… était rangé
+// tel quel par-dessus une bonne lecture, et l'app lisait `0 €` ou « pas une
+// vente » sans rien dire. Désormais, pour chaque réponse rangée, une empreinte de
+// FORME (noms de champs et types, jamais une valeur) est comparée à la forme
+// connue, sur les seuls champs dont dépend une règle :
+//   · forme inattendue (type changé, ou champ OBLIGATOIRE disparu de toute la
+//     liste) ⇒ RIEN n'est écrit (la bonne lecture d'avant reste : `listePlusRiche`
+//     ne voit même pas passer la douteuse), la forme vue est rangée dans
+//     `harvest_{uid}_forme_inconnue` (sans valeur personnelle) et l'app le dit
+//     (« Vinted a changé sa page des ventes : VRM ne la lit plus, on corrige ») ;
+//   · un champ FACULTATIF simplement absent ne déclenche jamais rien ;
+//   · un seul article d'une autre forme parmi des bons ne déclenche rien (Vinted
+//     varie d'un article à l'autre) : il faut qu'AUCUN ne porte la forme connue ;
+//   · la forme revenue (ou lue par une version corrigée) efface l'alerte.
+// Règle : [champ, genre, obligatoire]. Genres : `id` (nombre ou texte court),
+// `texte`, `nombre` (ou chiffres en texte), `booleen`, `prix` (objet avec
+// `amount`), `liste`.
+const GENRES_FORME = {
+  id: (v) => (typeof v === 'number' && isFinite(v)) || (typeof v === 'string' && /^[\w-]{1,64}$/.test(v)),
+  texte: (v) => typeof v === 'string',
+  nombre: (v) => (typeof v === 'number' && isFinite(v)) || (typeof v === 'string' && /^-?\d+(?:\.\d+)?$/.test(v)),
+  booleen: (v) => typeof v === 'boolean',
+  prix: (v) => !!(v && typeof v === 'object' && !Array.isArray(v) && (typeof v.amount === 'string' || typeof v.amount === 'number')),
+  liste: (v) => Array.isArray(v),
+};
+const CHAMPS_COMMANDE = [['transaction_id', 'id', 1], ['title', 'texte', 0], ['price', 'prix', 0], ['transaction_user_status', 'texte', 0], ['item_id', 'id', 0]];
+const REGLES_FORME_VINTED = {
+  listings:         { page: 'annonces', liste: 'items', champs: [['id', 'id', 1], ['price', 'prix', 1], ['title', 'texte', 0], ['is_hidden', 'booleen', 0]] },
+  orders_sold:      { page: 'ventes', liste: 'my_orders', champs: CHAMPS_COMMANDE },
+  orders_purchased: { page: 'achats', liste: 'my_orders', champs: CHAMPS_COMMANDE },
+  inbox:            { page: 'messagerie', liste: 'conversations', champs: [['id', 'id', 1]] },
+  transaction:      { page: 'ventes', objet: (p) => p.transaction, champs: [['status', 'nombre', 1], ['status_title', 'texte', 0], ['item_id', 'id', 0]] },
+  conversation:     { page: 'messagerie', objet: (p) => (p.conversation || p), champs: [['messages', 'liste', 1]] },
+  profile:          { page: 'profil', objet: (p) => p.user, champs: [['id', 'id', 1], ['is_account_banned', 'booleen', 0], ['login', 'texte', 0]] },
+  // Le porte-monnaie : jugé seulement sur SA forme (`main` ET `escrow`) — le motif
+  // « billing » attrape aussi des réponses de tarification, qui ne sont pas jugées.
+  billing:          { page: 'porte-monnaie', objet: (p) => p, quand: (o) => 'main' in o && 'escrow' in o, champs: [['main', 'prix', 1], ['escrow', 'prix', 1]] },
+};
+const genreVu = (v) => (v === null ? 'null' : Array.isArray(v) ? 'liste' : typeof v === 'object' ? 'objet' : typeof v);
+// L'empreinte d'un objet : `chemin:type`, jamais une valeur. Un nom de clé fait
+// de chiffres (une clé qui serait un identifiant) devient « # ».
+function empreinteForme(v, max = 40) {
+  const out = [];
+  const nom = (k) => String(k).replace(/\d{3,}/g, '#').slice(0, 40);
+  const walk = (x, pre, prof) => {
+    if (out.length >= max) return;
+    if (x && typeof x === 'object' && !Array.isArray(x) && prof < 3) { const ks = Object.keys(x); if (!ks.length) out.push(`${pre || '(racine)'}:objet`); for (const k of ks.slice(0, 30)) walk(x[k], pre ? `${pre}.${nom(k)}` : nom(k), prof + 1); }
+    else if (Array.isArray(x) && x.length && prof < 3) walk(x[0], `${pre}[]`, prof + 1);
+    else out.push(`${pre || '(racine)'}:${genreVu(x)}`);
+  };
+  try { walk(v, '', 0); } catch (_) {}
+  return [...new Set(out)].slice(0, max);
+}
+// `null` = forme connue (ou rien à juger) · objet = la forme douteuse, SANS valeur.
+function formeDouteuse(type, p) {
+  try {
+    const r = REGLES_FORME_VINTED[type];
+    if (!r || !p || typeof p !== 'object') return null;
+    const sortie = (champ, attendu, vu, echantillon) => ({ type: String(type), page: r.page, champ, attendu, vu, forme: empreinteForme(echantillon) });
+    if (r.liste) {
+      if (Array.isArray(p)) return p.length ? sortie(r.liste, 'liste', 'racine-liste', p[0]) : null;
+      const l = p[r.liste];
+      if (l === undefined || l === null) {
+        // La clé de liste a disparu ; une AUTRE clé porte une liste non vide ⇒ renommée.
+        const autre = Object.keys(p).find((k) => Array.isArray(p[k]) && p[k].length > 0);
+        return autre ? sortie(r.liste, 'liste', 'absent', p) : null;   // aucune liste ailleurs : vide légitime
+      }
+      if (!Array.isArray(l)) return sortie(r.liste, 'liste', genreVu(l), p);
+      const items = l.filter((it) => it && typeof it === 'object' && !Array.isArray(it));
+      if (!items.length) return null;                                   // liste vide : rien à juger
+      for (const [c, g, oblig] of r.champs) {
+        const presents = items.filter((it) => it[c] !== undefined && it[c] !== null);
+        if (!presents.length) { if (oblig) return sortie(c, g, 'absent', items[0]); continue; }
+        if (!presents.some((it) => GENRES_FORME[g](it[c]))) return sortie(c, g, genreVu(presents[0][c]), presents[0]);
+      }
+      return null;
+    }
+    const o = r.objet(p);
+    if (!o || typeof o !== 'object' || Array.isArray(o) || Object.keys(o).length < 3) return null;   // objet maigre : pas jugé
+    if (r.quand && !r.quand(o)) return null;
+    for (const [c, g, oblig] of r.champs) {
+      const v = o[c];
+      if (v === undefined || v === null) { if (oblig) return sortie(c, g, 'absent', o); continue; }
+      if (!GENRES_FORME[g](v)) return sortie(c, g, genreVu(v), o);
+    }
+    return null;
+  } catch (_) { return null; }   // une sentinelle ne casse jamais la capture
+}
+// Ce que l'extension retient en local (§4.9) : quelle page est signalée, quand
+// elle a été écrite en base — au plus une écriture par page et par 30 min.
+const FORMES_VUES = 'vrmFormesVues';           // { [uid]: { [type]: { at, sig } } }
+const FORME_REECRIRE_MS = 30 * 60000;
+const LIGNE_FORME = (uid) => `harvest_${uid}_forme_inconnue`;
+let _chaineFormes = Promise.resolve();
+function surFormes(fn) { const p = _chaineFormes.then(fn, fn); _chaineFormes = p.then(() => {}, () => {}); return p; }
+// La ligne de l'app : { type:'forme_inconnue', uid, at, formes: { [type]: { page, champ, attendu, vu, forme[], vuLe, depuis, n } } }.
+// Lire-fusionner-réécrire : une lecture ratée n'écrit RIEN (§5).
+async function majLigneForme(uid, fn) {
+  const rows = await sbGet(`app_data?id=eq.${LIGNE_FORME(uid)}&select=f:data->formes`);
+  if (!Array.isArray(rows)) { noterDiag('forme_ligne_pas_lue'); return false; }
+  const formes = (rows[0] && rows[0].f && typeof rows[0].f === 'object' && !Array.isArray(rows[0].f)) ? rows[0].f : {};
+  if (fn(formes) === false) return true;
+  return (await supabaseUpsert('app_data', [{ id: LIGNE_FORME(uid), data: { type: 'forme_inconnue', uid: String(uid), at: new Date().toISOString(), formes } }], 'id')) !== false;
+}
+function signalerForme(uid, d) {
+  return surFormes(async () => {
+    try {
+      noterDiag(`forme_bloquee_${d.type}`);
+      const sig = `${d.champ}|${d.attendu}|${d.vu}`;
+      const st = (await chrome.storage.local.get(FORMES_VUES))[FORMES_VUES] || {};
+      const u = st[String(uid)] || {};
+      const deja = u[d.type];
+      if (deja && deja.sig === sig && Date.now() - Number(deja.at || 0) < FORME_REECRIRE_MS) return;
+      const maintenant = new Date().toISOString();
+      const ok = await majLigneForme(uid, (formes) => {
+        const avant = formes[d.type];
+        formes[d.type] = { page: d.page, champ: d.champ, attendu: d.attendu, vu: d.vu, forme: d.forme, vuLe: maintenant, depuis: (avant && avant.depuis) || maintenant, n: Math.min(1e6, Number((avant && avant.n) || 0) + 1) };
+      });
+      if (!ok) return;
+      u[d.type] = { at: Date.now(), sig }; st[String(uid)] = u;
+      await chrome.storage.local.set({ [FORMES_VUES]: st });
+    } catch (_) {}
+  });
+}
+// La forme connue est revenue : l'alerte de CETTE page s'efface (seulement si
+// elle avait été signalée par ce Chrome — zéro lecture de base sinon).
+function formeRevenue(uid, type) {
+  return surFormes(async () => {
+    try {
+      const st = (await chrome.storage.local.get(FORMES_VUES))[FORMES_VUES] || {};
+      const u = st[String(uid)];
+      if (!u || !u[type]) return;
+      const ok = await majLigneForme(uid, (formes) => { if (!formes[type]) return false; delete formes[type]; });
+      if (!ok) return;
+      delete u[type]; st[String(uid)] = u;
+      await chrome.storage.local.set({ [FORMES_VUES]: st });
+      noterDiag(`forme_revenue_${type}`);
+    } catch (_) {}
+  });
+}
+// Le point de passage des deux voies (passive `storeHarvest`, active
+// `storeHarvestRow`) : `true` ⇒ la réponse est douteuse, RIEN n'est écrit.
+async function formeBloque(uid, type, brut) {
+  if (!REGLES_FORME_VINTED[type]) return false;
+  const d = formeDouteuse(type, brut);
+  if (!d) { await formeRevenue(uid, type); return false; }
+  await signalerForme(uid, d);
+  return true;
+}
+
 // ⚠️⚠️ 19 octobre (5.193) — UN REFUS DE VINTED N'EST PAS UNE CAPTURE. Mesuré chez
 //    Julien : `forme_inconnue_champ_conversation` ×246 avec
 //    `cles=[code,message,message_code]` — le corps d'une réponse d'ERREUR de
@@ -3032,6 +3185,8 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     return;
   }
   if (estErreurVinted(parsed)) { noterDiag(`ignore_erreur_vinted_${type || 'inconnu'}`); return; }
+  // 5.357 : une forme inattendue sur un champ dont dépend une règle ⇒ rien n'est rangé (dit à l'app).
+  if (await formeBloque(uid, type, parsed)) return;
   if(type==='conversation'&&scopeNotif?.user_id)await capterLectureFavori(uid,domain,id,parsed,sourceUrl,tabId,scopeNotif.user_id,sourceMethod,httpStatus);
   // Le corps a parsé : la clé de liste attendue est-elle toujours là ? (sentinelle
   // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
@@ -3586,7 +3741,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (async () => {
         try {
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
-          if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
+          // 5.357 (revue, haute 18) : seulement une annonce À LUI (son dressing ou ses fiches) — l'annonce
+          // d'un autre vendeur qu'il regarde n'entre plus dans `vinted_item_details`.
+          if (msg.action === 'saveDetail' && msg.id && msg.detail) { if (await detailEstASoi(sender, msg.id)) await saveItemDetail(msg.id, msg.detail); else noterDiag('detail_pas_a_soi'); sendResponse({ ok: true }); return; }
           if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
           if (msg.action === 'numeros') {
             const uidOnglet = await numerosPermisDansPage(sender);
@@ -5407,13 +5564,86 @@ function poserPauseVinted(statut, quoi) {
 // LA FILE : une requête Vinted à la fois, quelle que soit la source. `fn` ne
 // fait QUE la requête (jamais une autre primitive : elle attendrait sa propre
 // place dans la file). Pendant une pause, rien ne part.
+// ══ 5.357 (11 nov., validé par Julien) — LE MODE PRUDENCE, 24 H APRÈS UN REFUS ══
+// La pause ci-dessus arrête TOUT quelques minutes, puis tout repart au même
+// rythme. Après un refus de Vinted sur un compte (429, 403, captcha, « trop de
+// demandes »), CE compte passe 24 h en prudence :
+//   · plafond d'actions abaissé à `PRUDENCE_ACTIONS_HEURE` (20) — le plafond
+//     NORMAL reste `ACTIONS_MAX_HEURE` (50, sa décision du 29 oct., §3) : la
+//     prudence ne le touche JAMAIS, elle ne joue que pendant ses 24 h ;
+//   · délais entre deux gestes doublés (republication, favoris, offres auto) ;
+//   · lectures de FOND suspendues (`gardeLecture`), sauf les codes de retrait ;
+//     ce qu'il fait sur SON clic reste permis (dans le plafond abaissé) ;
+//   · rangée dans `chrome.storage.local` (§4.9 : survit au worker), publiée dans
+//     la ligne de la jauge (`actions_compte_…`, champ `prudence`) : l'app dit
+//     « Prudence jusqu'à 18 h 40 », les autres Chrome du compte l'appliquent ;
+//   · levée toute seule à l'échéance (rien à effacer : l'heure passée suffit).
+// Un nouveau refus pendant la prudence la reprolonge de 24 h.
+const PRUDENCE = 'vrmPrudence';                 // { [uid]: { depuis, jusqua, statut, quoi } }
+const PRUDENCE_MS = 24 * 3600000;
+const PRUDENCE_ACTIONS_HEURE = 20;
+const PRUDENCE_FACTEUR_DELAI = 2;
+// Un refus de Vinted : 429/403, ou une réponse d'ERREUR qui parle de captcha /
+// de trop de demandes (une page 200 qui cite « datadome » n'en est pas une).
+function refusDeVinted(r) {
+  if (!r || typeof r !== 'object' || r.pause) return false;
+  const st = Number(r.status) || 0;
+  if (freinVinted(st)) return true;
+  if (r.ok || st < 400) return false;
+  let t = '';
+  try { t = typeof r.text === 'string' && r.text ? r.text.slice(0, 4000) : (r.json == null ? '' : JSON.stringify(r.json).slice(0, 4000)); } catch (_) {}
+  return /captcha|datadome|too many requests|trop de (?:demandes|requ[eê]tes)/i.test(t);
+}
+async function uidDeQui(qui) {
+  if (qui == null) return compteConnecte('www.vinted.fr');
+  if (typeof qui === 'string' || typeof qui === 'number') return String(qui);
+  if (qui.vinted_user_id != null) return String(qui.vinted_user_id);
+  if (qui.uid != null) return String(qui.uid);
+  return compteConnecte(qui.domain || 'www.vinted.fr');
+}
+async function lirePrudences() {
+  try { const m = (await chrome.storage.local.get(PRUDENCE))[PRUDENCE]; return m && typeof m === 'object' ? m : {}; } catch (_) { return {}; }
+}
+// La prudence EN COURS de ce compte dans CE Chrome, ou `null` (échue = levée).
+async function prudenceDe(uid) {
+  if (!uid || /^vc:/.test(String(uid))) return null;
+  const p = (await lirePrudences())[String(uid)];
+  return p && Number(p.jusqua) > Date.now() ? p : null;
+}
+async function facteurPrudence(uid) { try { return (await prudenceDe(uid)) ? PRUDENCE_FACTEUR_DELAI : 1; } catch (_) { return 1; } }
+let _chainePrudence = Promise.resolve();
+function poserPrudence(qui, statut, quoi) {
+  _chainePrudence = _chainePrudence.then(async () => {
+    const uid = await uidDeQui(qui);
+    if (!uid || !/^\d{1,20}$/.test(String(uid))) { noterDiag('prudence_compte_pas_su'); return; }
+    const t = Date.now();
+    const m = await lirePrudences();
+    for (const k of Object.keys(m)) if (!(Number(m[k] && m[k].jusqua) > t)) delete m[k];   // les échues partent
+    const avant = m[String(uid)];
+    m[String(uid)] = { depuis: avant ? Number(avant.depuis) || t : t, jusqua: t + PRUDENCE_MS, statut: Number(statut) || 0, quoi: String(quoi || 'api').replace(/[^a-z]/gi, '').slice(0, 20) || 'api' };
+    try { await chrome.storage.local.set({ [PRUDENCE]: m }); } catch (_) { return; }
+    noterDiag(avant ? 'prudence_prolongee' : 'prudence_posee');
+    if (!avant) logActivity(`🐢 Vinted a refusé (${Number(statut) || 0}) : ce compte passe 24 h en prudence (${PRUDENCE_ACTIONS_HEURE} actions/heure, lectures de fond suspendues)`);
+    // La jauge de l'app le dit tout de suite (hors de la file Vinted : rien n'attend).
+    Promise.resolve().then(() => publierJaugeMaintenant(String(uid))).catch(() => {});
+  }).catch(() => {});
+  return _chainePrudence;
+}
+function phrasePrudence(p) {
+  const h = new Date(Number(p.jusqua)).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  return `Vinted a freiné ce compte : VRM ralentit (${PRUDENCE_ACTIONS_HEURE} actions/heure) jusqu'à ${h}. Réessaie plus tard.`;
+}
+
 let _fileRequetes = Promise.resolve();
-function requeteVinted(quoi, fn) {
+// 5.357 : `qui` — le compte de la requête (`acc`, un uid, ou `{ domain }` : le
+// compte du cookie de ce domaine) ; un refus de Vinted le met en PRUDENCE 24 h.
+function requeteVinted(quoi, fn, qui) {
   const tour = async () => {
     const p = await pauseVinted();
     if (p) { noterDiag('vinted_pause_refus'); return { status: 0, ok: false, json: null, text: '', pause: true, raison: raisonPauseVinted(p) }; }
     const r = await fn();
     if (r && freinVinted(r.status)) await poserPauseVinted(r.status, quoi);
+    if (r && refusDeVinted(r)) await poserPrudence(qui, Number(r.status) || 0, quoi);
     return r;
   };
   const suite = _fileRequetes.then(tour, tour);
@@ -5443,7 +5673,7 @@ async function vintedGet(acc, endpoint, options = {}) {
       try { json = await res.json(); } catch (_) {}
       return { status: res.status, ok: res.ok, json };
     } catch (_) { return { status: 0, ok: false, json: null }; }
-  });
+  }, acc);
 }
 
 // Renouvelle le token d'un compte — MAIS uniquement s'il est celui actuellement
@@ -5479,7 +5709,7 @@ async function refreshIfActive(acc) {
       });
       return { status: res.status, ok: res.ok };
     } catch (_) { return { status: 0, ok: false }; }
-  });
+  }, acc);
   if (!rf || !rf.ok) return null;
   await wait(400);
   // Vinted a pose les nouveaux cookies (Set-Cookie applique par le navigateur) :
@@ -5531,7 +5761,7 @@ async function vintedSend(acc, method, endpoint, body, options = {}) {
       try { json = await res.json(); } catch (_) {}
       return { status: res.status, ok: res.ok, json };
     } catch (_) { return { status: 0, ok: false, json: null }; }
-  });
+  }, acc);
   let rep = await doCall();
   if (rep.status === 401 && !options.sansRejeu) { const r = await refreshIfActive(acc); if (r) rep = await doCall(); }
   return rep;
@@ -6256,7 +6486,7 @@ async function vintedGetHtml(acc, endpoint) {
       return { status: res.status, ok: res.ok, text };
     } catch (_) { return { status: 0, ok: false, text: '' }; }
     finally { if (minuterie) clearTimeout(minuterie); }
-  });
+  }, acc);
 }
 // Extrait { photos, description } de la PAGE d'une annonce. Priorité au bloc
 // `__NEXT_DATA__` (rendu serveur) où vit l'objet de l'annonce avec TOUTES ses
@@ -6908,7 +7138,7 @@ async function lecteurPublic(domain) {
         if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('enligne_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true }; }
         return o;
       } catch (_) { return { status: 0, ok: false, json: null }; }
-    });
+    }, { domain });
   };
 }
 // Le dressing public d'UN profil, page par page. `avantPage()` rend un refus
@@ -8391,6 +8621,8 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // (l'allègement ci-dessous ne laisse qu'une photo par annonce).
   const brut = payload;
   if (estErreurVinted(brut)) { noterDiag(`ignore_erreur_vinted_${type || 'inconnu'}`); return 'erreur-vinted'; }
+  // 5.357 : même porte que la voie passive — une forme inattendue n'écrit rien.
+  if (await formeBloque(uid, type, brut)) return 'forme-inconnue';
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
   verifFormeObjet(type, brut, '');
@@ -8601,7 +8833,7 @@ async function vintedGetCookie(domain, endpoint) {
       let json = null; try { json = await res.json(); } catch (_) {}
       return { status: res.status, ok: res.ok, json };
     } catch (_) { return { status: 0, ok: false, json: null }; }
-  });
+  }, { domain });
 }
 async function fetchAllOrdersCookie(domain, type, maxPages = 8) {
   let all = []; let pagination = null;
@@ -8722,7 +8954,7 @@ async function pageActiveFetch() {
     // Le statut que la file regarde : le frein reçu dans la page, sinon « lu ».
     return { status: (o && o.frein) || (o ? 200 : 0), ok: !!o, out: o || null };
    } catch (_) { return { status: 0, ok: false, out: null }; }
-  });
+  }, { domain });
   const out = rep && rep.out;
   if (!out) return false;
   // On range sous l'uid du COMPTE ACTIF (decode du cookie de session).
@@ -10084,6 +10316,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
     if (await garde(uid, acc)) return 0;               // compte de l'onglet, plafond, pause
     // (5.342) Vinted a freiné CE compte (refus, « restreint ») : aucun geste automatique.
     if (await lireFreinRepub(uid)) { noterDiag('offre_auto_frein'); return 0; }
+    const fPrud = await facteurPrudence(uid);           // 5.357 : délais doublés en prudence
     const offres = await offresEnAttente(uid);
     if (!offres.length) return 0;
     const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
@@ -10125,9 +10358,9 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         }
       }
       // Délai aléatoire depuis la PREMIÈRE fois où VRM voit l'offre.
-      if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs(), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
+      if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs() * (await facteurPrudence(uid)), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
       if (pv[o.oid].at > Date.now()) continue;
-      if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux gestes
+      if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs() * fPrud));   // étalement aléatoire entre deux gestes
       await prolongerVerrouStock(OFFRES_VERROU, verrou, OFFRES_VERROU_MS);
       // 5.356 : le mémo RELU juste avant le geste (jamais l'instantané du début).
       const stFrais = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
@@ -10161,7 +10394,25 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
   } catch (_) { return 0; }
 }
 
-async function visiteVinted() {
+// ⚠️ 5.357 (revue de robustesse, haute 14) — UNE VISITE À LA FOIS. Chaque page
+//    Vinted qui finit de charger relançait une visite ; `vrmDerniereVisite` était
+//    lu puis écrit après plusieurs `await` : deux visites concurrentes traitaient
+//    offres auto, preuves, codes et bordereaux en double. Un verrou de module
+//    (le worker qui meurt n'a plus de visite en vol : rien à garder, §4.9) ; une
+//    page chargée PENDANT la visite en demande UNE de plus, après (elle est
+//    peut-être sur un autre compte) — jamais en parallèle.
+let _visiteEnCours = null, _visiteRedemandee = false;
+function visiteVinted() {
+  if (_visiteEnCours) { _visiteRedemandee = true; noterDiag('visite_deja_en_cours'); return _visiteEnCours; }
+  _visiteEnCours = (async () => {
+    try {
+      let tours = 0;
+      do { _visiteRedemandee = false; await visiteVintedUnPassage(); } while (_visiteRedemandee && ++tours < 3);
+    } finally { _visiteEnCours = null; }
+  })();
+  return _visiteEnCours;
+}
+async function visiteVintedUnPassage() {
   // 22 oct. : une visite, c'est lui sur Vinted — les photos de fond attendent
   // qu'il ait fini (`PHOTOS_CALME_MS` après la fin de la visite, `finally`).
   await noterActiviteVinted();
@@ -10223,6 +10474,17 @@ async function visiteVinted() {
     // Revue 5.165 : NOTRE base refuse tout depuis peu — ni moisson, ni lecteurs
     // (ils liraient Vinted pour rien) ; la garde n'est pas consommée.
     if (await reculBase()) { noterDiag('visite_base_en_recul'); return; }
+    // 5.357 : compte en PRUDENCE (Vinted l'a freiné il y a moins de 24 h) ⇒ pas de
+    //    moisson de fond ; seuls les codes de retrait sont lus (et les offres auto,
+    //    sous le plafond abaissé). La capture de ce que SA page charge continue.
+    if (await prudenceDe(uid)) {
+      noterDiag('visite_prudence');
+      await autoAccepterOffres(uid);
+      await capterRetraits(uid);
+      await envoyerNotifsRetrait();
+      await purgeBordereaux(); await purgeBordereauxAnnules();
+      return;
+    }
     const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
     if (Date.now() - Number(st[uid] || 0) < VISITE_DELAI_MS) return;
     const marqueVisite = Date.now();
@@ -10390,6 +10652,29 @@ function unItemDetailsALaFois(fn) {
   return p;
 }
 function saveItemDetail(id, detail) { return unItemDetailsALaFois(() => saveItemDetailMaintenant(id, detail)); }
+// ⚠️ 5.357 (revue de robustesse, haute 18) — `vinted_item_details` BORNÉE. Toute
+//    annonce OUVERTE (celles des autres vendeurs aussi) y entrait : la ligne
+//    grossissait sans fin (description + 20 photos chacune) et se relit entière.
+//    · la page lue en passant n'est rangée que si l'annonce est À LUI : dans le
+//      dressing du compte de l'onglet ou dans ses fiches VRM (une identité, §5) ;
+//      pas su (base muette) ⇒ rien n'est rangé (la page se relira) ;
+//    · au-delà de `ITEM_DETAILS_MAX` fiches, aucune NOUVELLE n'entre (dit en
+//      diagnostic) — rien n'est jamais retiré (ses textes servent à republier).
+const ITEM_DETAILS_MAX = 4000;
+async function detailEstASoi(sender, id) {
+  try {
+    const k = String(id == null ? '' : id);
+    if (!/^\d{4,15}$/.test(k)) return false;
+    let hote = 'www.vinted.fr';
+    try { const u = new URL(sender && sender.tab && sender.tab.url ? sender.tab.url : ''); if (!/^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname)) return false; hote = u.host; } catch (_) { return false; }
+    const uid = await activeAccountId(hote);
+    if (!uid) return false;
+    const d = await donneesInfosPage(String(uid));
+    if (!d) return false;
+    return !!(d.parId[k] || Object.prototype.hasOwnProperty.call(d.fiches || {}, k));
+  } catch (_) { return false; }
+}
+const placePourFiche = (cur, id) => Object.prototype.hasOwnProperty.call(cur, String(id)) || Object.keys(cur).length < ITEM_DETAILS_MAX;
 async function saveItemDetailMaintenant(id, detail) {
   const rows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
   // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
@@ -10398,6 +10683,7 @@ async function saveItemDetailMaintenant(id, detail) {
   if (rows === null) return;
   const cur = (rows[0] && rows[0].data) || {};
   const key = String(id);
+  if (!placePourFiche(cur, key)) { noterDiag('fiches_pleines'); return; }   // 5.357 : bornée
   const prev = cur[key] || {};
   const desc = String(detail.description || '').trim();
   const photos = Array.isArray(detail.photos) ? detail.photos.filter(Boolean).slice(0, 20) : [];
@@ -10493,7 +10779,7 @@ function fusionFiche(prev0, e) {
 function appliquerFiches(cur, file) {
   const ok = file.filter((e) => e && /^\d{1,15}$/.test(String(e.id || '')) && e.f && (e.src === 'page' || e.src === 'modif'));
   ok.sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0));
-  for (const e of ok) cur[String(e.id)] = fusionFiche(cur[String(e.id)], e);
+  for (const e of ok) { if (!placePourFiche(cur, e.id)) { noterDiag('fiches_pleines'); continue; } cur[String(e.id)] = fusionFiche(cur[String(e.id)], e); }   // 5.357 : bornée
   return ok;
 }
 // `force` : ranger maintenant. Sinon seulement s'il y a une fiche qu'il a
@@ -11825,7 +12111,7 @@ async function vintedPage(acc, method, endpoint, body, options = {}) {
       if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('page_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true, sansPage: 'onglet' }; }
       return { status: o.status, ok: o.ok, json: o.json };
     } catch (_) { return { status: 0, ok: false, json: null }; }
-  });
+  }, acc);
 }
 // Une photo téléversée depuis la page : les octets passent en base64 (la page
 // rebâtit le même FormData que le site : photo[type], photo[file], photo[temp_uuid]).
@@ -11966,9 +12252,10 @@ const PAUSES_REPUB = { lecture: [1500, 4000], photo: [2000, 4500], brouillon: [8
 // durée, pour qu'elle affiche le compte à rebours. Une seule à la fois (file Vinted).
 let _repubSuivi = '';
 function suiviRepub(id) { _repubSuivi = String(id || ''); }
-function pauseRepub(quoi) {
+async function pauseRepub(quoi, uid) {
   const p = PAUSES_REPUB[quoi] || [3000, 9000];
-  const ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
+  // 5.357 : compte en prudence (refus de Vinted < 24 h) ⇒ la pause est doublée.
+  const ms = Math.round(p[0] + Math.random() * (p[1] - p[0])) * (await facteurPrudence(uid));
   try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push([quoi, ms]); } catch (_) {}
   if (_repubSuivi) { try { Promise.resolve(notifierApp({ type: 'maj', quoi: 'repub', id: _repubSuivi, pause: quoi, ms, jusqua: Date.now() + ms })).catch(() => {}); } catch (_) {} }
   return new Promise((ok) => setTimeout(ok, ms));
@@ -12311,7 +12598,7 @@ async function refaireBrouillon(msg) {
     const brouillon = { ...d, id: null, temp_uuid: temp, assigned_photos: assigned }; delete brouillon.push_up;
     const corpsB = { draft: brouillon, feedback_id: null, parcel: null, upload_session_id: temp };
     etapeRepub(id, 'brouillon');
-    await pauseRepub('brouillon');
+    await pauseRepub('brouillon', uid);
     await poserVerrouRecreer('r' + id);
     // Un seul envoi (comme le site) : un refus arrête, jamais de nouvel essai en rafale.
     const rb = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corpsB, { timeoutMs: 60000 });
@@ -12352,7 +12639,7 @@ async function refaireBrouillon(msg) {
     // Mise en ligne DANS la même place de la file Vinted (publierBrouillon prend
     // sa propre place : l'appeler d'ici attendrait cette place pour toujours).
     etapeRepub(id, 'attente');
-    await pauseRepub('enLigne');
+    await pauseRepub('enLigne', uid);
     etapeRepub(id, 'en-ligne');
     const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
     if (stopC) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'a pas été mis en ligne (${stopC.error}) — « Refaire » le remet en ligne, sans en créer un autre.` }; }
@@ -12427,7 +12714,7 @@ function photosRefusees(rc) {
 async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
   const ids = [];
   for (let i = 0; i < urls.length; i++) {
-    if (i > 0) await pauseRepub('photo');
+    if (i > 0) await pauseRepub('photo', acc && acc.vinted_user_id);
     if (typeof suivi === 'function') { try { suivi(i, urls.length); } catch (_) {} }
     let blob = null;
     const essais = [urls[i], (second || [])[i]].filter((u, k, t) => u && t.indexOf(u) === k);
@@ -12693,7 +12980,7 @@ async function recreerVinted(msg) {
     // pas de réponse) : VRM ne sait pas si elle existe encore — il ne crée rien à l'aveugle.
     if (rl && !rl.ok) { noterDiag(`recreer_lecture_ko_${Number(rl.status) || 0}`); return { accepte: true, etape: 'echec', raison: `Vinted n'a pas répondu en lisant cette annonce (${Number(rl.status) || 'pas de réponse'}) — VRM ne sait pas si elle existe encore, rien n'a été créé ni supprimé. Réessaie dans quelques minutes.` }; }
     // 2. Les photos, une par une, depuis la page.
-    await pauseRepub('lecture');
+    await pauseRepub('lecture', uid);
     const temp = uuidRecreer();
     const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }));
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
@@ -12713,7 +13000,7 @@ async function recreerVinted(msg) {
     }
     // 3. Le brouillon. UN envoi : refus ⇒ on s'arrête, l'annonce est toujours en ligne.
     etapeRepub(id, 'brouillon');
-    await pauseRepub('brouillon');
+    await pauseRepub('brouillon', uid);
     const rbV = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corpsBV, { timeoutMs: 60000 });
     if (rbV && rbV.sansPage) { await majVersBrouillon(uid, id, { etat: 'fait', cause: 'sans-page' }); return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rbV) }; }
     if (rbV && rbV.pause) { await majVersBrouillon(uid, id, { etat: 'fait', cause: 'pause' }); return { accepte: false, code: 'vinted-pause', raison: `${rbV.raison || 'Vinted demande de ralentir'} — rien n'a été créé ni supprimé, ton annonce est toujours en ligne.` }; }
@@ -12745,7 +13032,7 @@ async function recreerVinted(msg) {
     await majVersBrouillon(uid, id, { etat: 'brouillon-range', draftId, supprime: false });
     // 4. L'ancienne annonce SUPPRIMÉE, juste après (comme Vintex).
     etapeRepub(id, 'suppression');
-    await pauseRepub('suppression');
+    await pauseRepub('suppression', uid);
     const rdV = await vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
     // (29 oct., revue) Suppression PAS PARTIE (pas d'onglet, pause) : l'issue est certaine,
     // l'ancienne est toujours en ligne — jamais « peut-être », jamais de verrou de 30 min.
@@ -12798,7 +13085,7 @@ async function recreerVinted(msg) {
       // Planification impossible (stockage illisible) : on attend ici, comme avant.
     }
     etapeRepub(id, 'attente');
-    await pauseRepub('enLigne');
+    await pauseRepub('enLigne', uid);
     return await finRepubBrouillon(acc, job);
   } finally { if (!confie && nA - envoyes > 0) await rendreActions(uid, tRes, nA - envoyes); } });
 }
@@ -12896,10 +13183,20 @@ function miseEnLigneTick() {
 }
 async function finRepubBrouillon(acc, job) {
   const { id, uid, draftId, titre, prix, urls, lettreFin, sauve, description } = job;
-  const corpsCV = JSON.parse(job.corpsCV);
     // Sa place est réservée depuis le départ de la paire : ici on ne revérifie que le
     // compte connecté et la pause de Vinted, jamais le plafond (l'ancienne est partie).
     const rendre1 = async () => { if (job.tRes) await rendreActions(String(uid), job.tRes, 1); };
+    // ⚠️ 5.357 (revue de robustesse, haute 22) : un job sans corps lisible (abîmé,
+    //    écrit par une version d'avant) levait AVANT de rendre l'action et le verrou
+    //    ⇒ verrou posé, action perdue, « incertain » alors que RIEN n'était parti.
+    let corpsCV = null;
+    try { corpsCV = JSON.parse(job.corpsCV); } catch (_) { corpsCV = null; }
+    if (!corpsCV || typeof corpsCV !== 'object' || !corpsCV.draft) {
+      noterDiag('republier_fin_corps_illisible');
+      await rendre1(); await leverVerrouRecreer(id);
+      await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'corps-illisible' });
+      return { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais VRM n'a pas pu relire ce qu'il devait envoyer : rien n'est parti. « Brouillons → en ligne » le met en ligne, sans en créer un autre." };
+    }
     // (29 oct., revue) Le brouillon a-t-il été mis en ligne entre-temps (« Brouillons → en
     // ligne », ou une mise en ligne restée sans réponse) ? Alors rien ne repart.
     let deja; try { deja = await sbGet(`app_data?id=eq.vinted_brouillon_${draftId}&select=etat:data->>etat`); } catch (_) { deja = null; }
@@ -13052,9 +13349,15 @@ async function idNavigateur() {
 }
 async function actionsAutresNavigateurs(uid) {
   const moi = await idNavigateur();
-  let rows; try { rows = await sbGet(`app_data?id=like.${ACTIONS_PARTAGEES}${uid}_*&select=id,ts:data->ts`); } catch (_) { rows = null; }
+  let rows; try { rows = await sbGet(`app_data?id=like.${ACTIONS_PARTAGEES}${uid}_*&select=id,ts:data->ts,pr:data->>prudence`); } catch (_) { rows = null; }
   if (!Array.isArray(rows)) return null;
   const t = Date.now(); let n = 0; const toutes = [];
+  // 5.357 : la prudence posée par un AUTRE Chrome de ce compte s'applique ici aussi.
+  let prudence = 0;
+  for (const r of rows) {
+    if (!r || !new RegExp(`^${ACTIONS_PARTAGEES}${uid}_[0-9a-f]{16}$`).test(String(r.id || ''))) continue;
+    const p = Number(r.pr); if (Number.isFinite(p) && p > t && p <= t + PRUDENCE_MS + 60000 && p > prudence) prudence = p;
+  }
   for (const r of rows) {
     // (2 nov., revue) Dans LIKE, « _ » vaut n'importe quel caractère : « …_123_* »
     // ramenait aussi le compte 1234. Seules les lignes EXACTEMENT de ce compte comptent.
@@ -13062,7 +13365,7 @@ async function actionsAutresNavigateurs(uid) {
     if (String(r.id) === `${ACTIONS_PARTAGEES}${uid}_${moi}`) continue;
     for (const x of (Array.isArray(r.ts) ? r.ts : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) { n++; toutes.push(v); } }
   }
-  return { n, toutes };
+  return { n, toutes, prudence };
 }
 async function publierActions(uid, list) {
   const moi = await idNavigateur(); if (!moi) return;
@@ -13070,7 +13373,22 @@ async function publierActions(uid, list) {
   // (10 nov., 5.337, lot G) La ligne porte aussi le plafond et la réserve : l'app en
   // tire la jauge « 12/50 cette heure » (src/jaugeActions.js) sans deviner les chiffres.
   // Rien de personnel : le n° du compte, l'empreinte du navigateur, des heures.
-  try { await supabaseUpsert('app_data', [{ id: `${ACTIONS_PARTAGEES}${uid}_${moi}`, data: { uid: String(uid), nav: moi, ts: (list || []).filter((x) => t - x < 3600000), at: new Date(t).toISOString(), max: ACTIONS_MAX_HEURE, reserve: RESERVE_GESTES, v: CODE_VERSION } }], 'id'); } catch (_) {}
+  // 5.357 : la prudence de ce compte dans CE Chrome (heure de fin, ou rien) et son plafond.
+  let pr = null; try { pr = await prudenceDe(uid); } catch (_) {}
+  try { await supabaseUpsert('app_data', [{ id: `${ACTIONS_PARTAGEES}${uid}_${moi}`, data: { uid: String(uid), nav: moi, ts: (list || []).filter((x) => t - x < 3600000), at: new Date(t).toISOString(), max: ACTIONS_MAX_HEURE, reserve: RESERVE_GESTES, ...(pr ? { prudence: Number(pr.jusqua), maxPrudence: PRUDENCE_ACTIONS_HEURE } : {}), v: CODE_VERSION } }], 'id'); } catch (_) {}
+}
+// 5.357 : la jauge publiée TOUT DE SUITE (une prudence vient d'être posée) — hors
+// du délai de 10 min de la visite, dans la file des compteurs.
+function publierJaugeMaintenant(uid) {
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return Promise.resolve(false);
+  return unCompteurALaFois(async () => {
+    try {
+      const t = Date.now();
+      const l = (((await chrome.storage.local.get('vrmActions')).vrmActions || {})[uid] || []).filter((x) => t - x < 3600000);
+      await publierActions(String(uid), l);
+      return true;
+    } catch (_) { return false; }
+  });
 }
 // ── LA JAUGE, MÊME SANS ACTION (10 nov., 5.337, lot G) ──────────────────────────
 // La ligne `actions_compte_` ne s'écrivait qu'à une action : un compte sans action
@@ -13199,8 +13517,15 @@ async function compterActionUn(uid, plafond, n = 1) {
     // (5.312) Les actions des AUTRES Chrome sur ce compte comptent aussi.
     const autres = /^vc:/.test(String(uid)) ? { n: 0, toutes: [] } : await actionsAutresNavigateurs(uid);
     if (autres === null) noterDiag('actions_partagees_pas_lues');
+    // 5.357 : en PRUDENCE (refus de Vinted il y a moins de 24 h, ce Chrome ou un
+    //    autre du compte), le plafond descend à `PRUDENCE_ACTIONS_HEURE`. Le
+    //    plafond normal (`ACTIONS_MAX_HEURE`, 50) n'est jamais modifié.
+    const prLocale = await prudenceDe(uid);
+    const prJusqua = Math.max(prLocale ? Number(prLocale.jusqua) : 0, (autres && Number(autres.prudence)) || 0);
+    const enPrudence = prJusqua > t;
+    const maxP = enPrudence ? Math.min(max, PRUDENCE_ACTIONS_HEURE) : max;
     const tous = list.concat(autres ? autres.toutes : []).sort((a, b) => a - b);
-    if (tous.length + k > max) return { ok: false, n: tous.length, resteMs: Math.max(0, tous[Math.max(0, tous.length + k - 1 - max)] + 3600000 - t) };
+    if (tous.length + k > maxP) return { ok: false, n: tous.length, resteMs: Math.max(0, tous[Math.max(0, tous.length + k - 1 - maxP)] + 3600000 - t), ...(enPrudence ? { prudence: prJusqua } : {}) };
     for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
     if (!/^vc:/.test(String(uid))) await publierActions(uid, list);
@@ -13353,6 +13678,12 @@ async function gardeLecture(uid, acc, classe = 'photos', plafondMax = LECTURES_M
     return { ok: false, code: 'autre-compte',
              error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted" };
   }
+  // 5.357 : compte en PRUDENCE (refus de Vinted < 24 h) ⇒ plus aucune lecture de
+  //    FOND, sauf les codes de retrait ('colis'). Ce qu'il demande sur SON clic reste.
+  if (classe !== 'colis' && classe !== 'clic') {
+    const pr = await prudenceDe(uid);
+    if (pr) { noterDiag(`lecture_prudence_${String(classe).replace(/[^a-z]/g, '').slice(0, 12)}`); return { ok: false, code: 'prudence', error: 'Vinted a freiné ce compte : les lectures de fond reprennent dans 24 h (codes de retrait toujours lus).' }; }
+  }
   const prioritaire = classe === 'argent' || classe === 'colis' || classe === 'clic';
   // 'suivi' (le suivi Vinted des achats) : sous la réserve de l'argent et des
   // colis, comme la relecture — jamais à leur place.
@@ -13436,6 +13767,7 @@ async function gardeStricte(uid, acc, opts = {}) {
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) {
     const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
+    if (c.prudence) return { ok: false, code: 'prudence', prudence: c.prudence, error: phrasePrudence({ jusqua: c.prudence }) };   // 5.357
     if (reserve && c.n < ACTIONS_MAX_HEURE) {
       return { ok: false, code: 'plafond-bordereaux',
                error: `${nA > 1 ? `une republication prend ${nA} actions (brouillon, suppression, mise en ligne) et il en reste ${Math.max(0, ACTIONS_MAX_HEURE - reserve - c.n)} sur ` : ''}${ACTIONS_MAX_HEURE - reserve} actions sur ce compte dans l'heure — les ${reserve} dernières sont gardées pour répondre à tes acheteurs. La suite dans ${min} min.` };
@@ -13583,7 +13915,7 @@ async function executerMessageFavori(uid,acc,body){
     const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
     if(!r.ok)return rep('refuse',r.status,'autorisation_expiree');const j=await r.json();if(!j.ok||!j.autorise||String(j.uid)!==String(uid))return rep('refuse');
   }catch{return rep('refuse');} // no reply has been sent yet
-  await pauseFavori('transaction');
+  await pauseFavori('transaction', uid);
   etape('verification');
   // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant).
   let c=cc,lu={status:creation.status,json:creation.json}; // (29 oct., revue) la pagination de la réponse de création est vérifiée aussi
@@ -13624,7 +13956,7 @@ async function executerMessageFavori(uid,acc,body){
   if(offre){
     const prix=id(tx)?prixOffreFavori(prixAnnonce,offre):null;
     if(!prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
-    await pauseFavori('offre');
+    await pauseFavori('offre', uid);
     if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
     etape('offre');
     const o=await vintedPage(acc,'POST',`/api/v2/transactions/${tx}/offers`,{offer:{currency:devise,price:prix}},{timeoutMs:12000});
@@ -13639,7 +13971,7 @@ async function executerMessageFavori(uid,acc,body){
   // {a|b} = une variante tirée au hasard pour ce message.
   const texteFinal=personnaliserMessageFavori(body.message,String(c?.opposite_user?.login||'')).slice(0,2000);
   if(!texteFinal.trim())return rep('refuse',400);
-  await pauseFavori('reponse');
+  await pauseFavori('reponse', uid);
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
   const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:texteFinal,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
@@ -13669,9 +14001,9 @@ function freinFavoriAuto(r) {
 // Mesuré sur Vintex (29 oct., 9 favoris) : création → transaction 3,2–6,0 s ;
 // transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.
 const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550] };
-function pauseFavori(quoi) {
+async function pauseFavori(quoi, uid) {
   const p = PAUSES_FAVORI[quoi] || [400, 800];
-  const ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
+  const ms = Math.round(p[0] + Math.random() * (p[1] - p[0])) * (await facteurPrudence(uid));   // 5.357 : doublée en prudence
   try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['favori:' + quoi, ms]); } catch (_) {}
   return new Promise((ok) => setTimeout(ok, ms));
 }
@@ -14900,6 +15232,7 @@ async function garde(uid, acc) {
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) {
+    if (c.prudence) return { ok: false, code: 'trop-d-actions', prudence: c.prudence, error: phrasePrudence({ jusqua: c.prudence }) };   // 5.357 : le plafond de la prudence
     return { ok: false, code: 'trop-d-actions',
              error: `${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions automatiques sur ce compte dans l'heure — les ${RESERVE_GESTES} dernières sont gardées pour tes gestes. Réessaie plus tard.` };
   }
