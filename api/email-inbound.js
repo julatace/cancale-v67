@@ -64,6 +64,7 @@ import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle,
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
+import { estBordereauRetour, lireBordereauRetour, estRemboursementAchat, lireRemboursementAchat } from './_lib/retour-email.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU, ID_ESSAI, codeEssaiDe } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -2276,6 +2277,43 @@ export async function traiterEmail(req, res) {
   const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();
 
   try {
+    // 000) (11 nov., lot retours-litiges) LE BORDEREAU DE RETOUR D'UN ACHAT — par le SUJET
+    // d'abord (api/_lib/retour-email.js). Avant : « aucune règle ne le reconnaît », gardé
+    // TRONQUÉ ⇒ le PDF était perdu. Rangé par SON n° de transaction (`email_bordretour_{tx}`),
+    // le PDF tel quel (l'app le tamponne « RETOUR · N°… » à l'impression, par identité) ;
+    // sans n° ou sans PDF ⇒ gardé entier « à vérifier », jamais jeté ; écriture ratée ⇒ 503.
+    if (estBordereauRetour(subject)) {
+      const lu = lireBordereauRetour({ subject, text: corpsTexte, attachments: mail.attachments });
+      if (!lu.ok) {
+        await garderInconnu(corpsBrut, mail, 'bordereau de retour : ' + lu.raison, '');
+        await repondre(res, 200, { ok: false, type: 'bordereau-retour', garde: true, raison: lu.raison });
+        return;
+      }
+      const ok = await supabaseUpsert([{ id: `email_bordretour_${lu.transaction}`, data: {
+        type: 'bordereau-retour', sens: 'achat', transaction: lu.transaction, suivi: lu.suivi,
+        dateLimite: lu.dateLimite, dateLimiteJour: lu.dateLimiteJour, dateLimiteIso: lu.dateLimiteIso, article: lu.article,
+        account: acc.login || '', uid: acc.uid || '', pdfB64: lu.pdf.contentB64, filename: lu.pdf.filename || `Bon-Retour-Vinted-${lu.transaction}.pdf`,
+        receivedAt: now } }]);
+      if (ok) try { await pushOnce({ title: '↩️ Bordereau de retour reçu', body: `${lu.article ? court(lu.article, 50) + ' · ' : ''}${lu.dateLimite ? 'à déposer avant le ' + lu.dateLimite.split(' ')[0] : 'imprime-le depuis Achats'}`,
+        tag: `bordretour-${lu.transaction}`, url: DESTINATIONS.achat({ tx: lu.transaction }) }, 'colis'); } catch (_) {}
+      await logEmail({ type: 'bordereau-retour', subject, from: mail.from, transaction: lu.transaction });
+      await repondre(res, 200, { ok: true, type: 'bordereau-retour', transaction: lu.transaction, suivi: lu.suivi, dateLimite: lu.dateLimiteIso || null, pdf: true });
+      return;
+    }
+    // 000b) « La commande "…" a été remboursée ! » — un de SES achats : la PREUVE du
+    // remboursement par SON n° de transaction (`email_rembachat_{tx}` : montant, date estimée ;
+    // JAMAIS le moyen de paiement ni ses chiffres). Illisible ⇒ la famille d'avant (gardé).
+    if (estRemboursementAchat(subject, corpsTexte)) {
+      const lu = lireRemboursementAchat({ subject, text: corpsTexte });
+      if (lu.ok) {
+        await supabaseUpsert([{ id: `email_rembachat_${lu.transaction}`, data: {
+          type: 'remboursement-achat', sens: 'achat', transaction: lu.transaction, montant: lu.montant, estime: lu.estime,
+          article: lu.article, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+        await logEmail({ type: 'remboursement-achat', subject, from: mail.from, transaction: lu.transaction });
+        await repondre(res, 200, { ok: true, type: 'remboursement-achat', transaction: lu.transaction, montant: lu.montant });
+        return;
+      }
+    }
     // 00) VESTIAIRE COLLECTIVE (2 nov.) — AVANT les colis et les ventes Vinted :
     // « Votre article vient d'être vendu » contient « vendu » (la branche vente
     // Vinted le prenait et le gardait tronqué, « analyse impossible ») et parle

@@ -121,6 +121,8 @@ export function litigesDesVentes({ res, preuves = null, retourDe = null, sites =
       // L'étape du retour (src/retoursStock.js), seulement quand elle AJOUTE quelque chose (« Retour initié » redirait « Retour »).
       etape: etape && etape.etape && etape.etape !== 'initie' ? LIBELLE_ETAPE[etape.etape] || '' : '',
       geste: l.geste, depuis: l.recuLe || null,
+      // (11 nov., lot retours-litiges) D'où vient la preuve (transaction, e-mail, les deux, eBay) : la feuille « Pas à pas » la nomme.
+      source: str(l.source || ''),
       preuves: (typeof preuves === 'function' ? preuves(l) : null) || preuvesVente({}),
     };
     (l.ancien ? anciennes : cartes).push(c);

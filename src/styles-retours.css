@@ -1,0 +1,60 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   RETOURS ET LITIGES — L'ASSISTANT (11 nov., lot retours-litiges)
+   src/RetoursLitiges.jsx — même direction que « Litiges en cours » (widgets
+   blancs, #1C1C1E la nuit). Couleur RARE (§7) : ambre = la date de dépôt à moins
+   de 48 h ; jamais de rouge. Cibles au doigt 44 px.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --ret-carte: var(--w-carte, #FFFFFF);
+  --ret-tuile: var(--w-remplir, rgba(118,118,128,.12));
+  --ret-encre: var(--w-encre, #1D1D1F);
+  --ret-gris: var(--w-gris, #6E6E73);
+  --ret-ombre: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10));
+  --ret-ambre: #A35200;
+}
+:root[data-theme="dark"] { --ret-carte: var(--w-carte, #1C1C1E); --ret-encre: var(--w-encre, #F5F5F7); --ret-gris: var(--w-gris, #98989D); --ret-ambre: #FFB340; }
+
+@layer vrm-premium {
+:root:root body .vrm-ret { display: flex; flex-direction: column; gap: 12px; margin: 4px 0 18px; min-width: 0; }
+:root:root body .vrm-ret-h2 { margin: 0 2px; font: 750 20px/1.2 var(--vrm-police, -apple-system, system-ui, sans-serif); letter-spacing: -.02em; color: var(--ret-encre); }
+:root:root body .vrm-ret-h2 > span { color: var(--ret-gris); font-weight: 600; margin-left: 4px; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-ret-grille { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 768px) { :root:root body .vrm-ret-grille { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; } }
+:root:root body .vrm-ret-carte { display: flex; flex-direction: column; gap: 12px; padding: 14px; min-width: 0; background: var(--ret-carte); color: var(--ret-encre); border-radius: 22px; box-shadow: var(--ret-ombre); }
+:root:root body .vrm-ret-haut { display: flex; align-items: center; gap: 14px; min-width: 0; }
+:root:root body .vrm-ret-photo { flex: 0 0 64px; width: 64px; height: 64px; object-fit: cover; border-radius: 16px; background: var(--ret-tuile); }
+:root:root body .vrm-ret-tuile { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 16px; background: var(--ret-tuile); display: flex; align-items: center; justify-content: center; color: var(--ret-gris); }
+:root:root body .vrm-ret-tuile svg { width: 26px; height: 26px; }
+:root:root body .vrm-ret-textes, :root:root body .vrm-ret-tip-corps { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+:root:root body .vrm-ret-num { font: 800 19px/1.1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ret-encre); }
+:root:root body .vrm-ret-titre { font: 500 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); overflow-wrap: anywhere; }
+:root:root body .vrm-ret-limite { font: 600 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
+:root:root body .vrm-ret-limite.is-presse { color: var(--ret-ambre); }
+:root:root body .vrm-ret-lignes { display: flex; flex-direction: column; gap: 4px; }
+:root:root body .vrm-ret-ligne { font: 500 14px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-ret-ligne.is-ok { color: var(--ret-encre); font-weight: 650; }
+:root:root body .vrm-ret-gestes, :root:root body .vrm-pap-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+:root:root body .vrm-ret-imprimer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+:root:root body .vrm-ret-imprimer .vrm-b { min-height: 44px; }
+:root:root body a.vrm-ret-lien { min-height: 44px; display: flex; align-items: center; color: var(--ret-encre); font: 600 15px/1.2 var(--vrm-police, system-ui, sans-serif); text-decoration: none; }
+:root:root body .vrm-ret-note { margin: 0 2px; color: var(--ret-gris); font: 500 14px/1.4 var(--vrm-police, system-ui, sans-serif); }
+:root:root body .vrm-ret-note.is-ok { color: var(--ret-encre); font-weight: 650; }
+:root:root body .vrm-ret-anciens > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font: 600 15px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
+/* « Tout imprimer » → Retours : une ligne par bordereau de retour. */
+:root:root body .vrm-ret-tip-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; min-width: 0; border-top: 1px solid var(--ret-tuile); }
+:root:root body .vrm-ret-tip-ligne:first-of-type { border-top: 0; }
+/* La feuille « Pas à pas ». */
+:root:root body .vrm-pap .vrm-pap-preuve { margin: 0 0 14px; font: 650 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); }
+:root:root body .vrm-pap .vrm-pap-bloc { margin: 0 0 18px; padding: 12px 14px; border-radius: 18px; background: var(--ret-tuile); }
+:root:root body .vrm-pap .vrm-pap-bloc > h3 { margin: 0 0 8px; font: 700 13px/1.2 var(--vrm-police, system-ui, sans-serif); text-transform: uppercase; letter-spacing: .04em; color: var(--ret-gris); }
+:root:root body .vrm-pap .vrm-pap-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 32px; font: 600 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); flex-wrap: wrap; }
+:root:root body .vrm-pap .vrm-pap-ligne small { font: 500 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
+:root:root body .vrm-pap .vrm-pap-etapes { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 6px; font: 500 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
+:root:root body .vrm-pap .vrm-pap-etapes > li.is-la { color: var(--ret-encre); font-weight: 700; }
+:root:root body .vrm-pap .vrm-pap-etapes > li.is-fait { text-decoration: line-through; text-decoration-thickness: 1px; }
+:root:root body .vrm-pap .vrm-pap-gestes { margin-top: 10px; }
+:root:root body .vrm-pap .vrm-pap-gestes .vrm-b { min-height: 44px; }
+:root:root body .vrm-pap .vrm-ret-note { margin-top: 8px; }
+:root:root body button.vrm-pap-ouvrir { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ret-tuile); color: var(--ret-encre); font: 650 15px/1.1 var(--vrm-police, system-ui, sans-serif); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:root:root body button.vrm-pap-ouvrir:focus-visible { outline: 3px solid var(--w-accent, #0071E3); outline-offset: 2px; }
+}
