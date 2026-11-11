@@ -48,9 +48,9 @@ if (process.argv.includes('--prouve')) {
   let rouges = 0;
   for (const [nom, f, avant, apres] of MUTATIONS) {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-alertes-mut-'));
-    spawnSync('sh', ['-c', `cd "${DEP}" && git ls-files -z | xargs -0 -I{} sh -c 'mkdir -p "${d}/$(dirname "{}")" && cp "{}" "${d}/{}"' 2>/dev/null; ln -s "${DEP}/node_modules" "${d}/node_modules"`]);
-    // les fichiers modifiés non commités : on recopie l'arbre de travail
-    for (const g of ['api', 'src', 'scripts']) spawnSync('cp', ['-r', path.join(DEP, g), d]);
+    // Une copie de l'arbre de travail (ce que l'audit lit), node_modules en lien.
+    for (const g of ['api', 'src', 'scripts', '.github', 'package.json']) spawnSync('cp', ['-r', path.join(DEP, g), d]);
+    fs.symlinkSync(path.join(DEP, 'node_modules'), path.join(d, 'node_modules'));
     const p = path.join(d, f); const s = fs.readFileSync(p, 'utf8');
     if (!s.includes(avant)) { console.log('⚠️ mutation introuvable : ' + nom); rouges--; continue; }
     fs.writeFileSync(p, s.replace(avant, apres));
@@ -129,6 +129,7 @@ global.fetch = async (u0, o = {}) => {
     if (!owner && !/vrm_operations_v1/.test(idq)) lignes = lignes.filter(() => true);
     return rep(200, lignes.map((r) => projeter(r, q.get('select'))));
   }
+  if (mode.ecritureEtat === 'ko' && m !== 'GET' && /ebay_tokens_alertes/.test(decodeURIComponent(url.search) + String(o.body || ''))) return rep(500, { message: 'boom' });
   if (m === 'POST') {
     let lignes = []; try { lignes = [].concat(JSON.parse(o.body || '[]')); } catch (_) {}
     const fusion = /merge-duplicates/.test(String((h.Prefer || h.prefer || '')));
@@ -263,8 +264,13 @@ const ops = (veilles) => ({ version: 1, revision: 3, missions: [], reservations:
     journal.length = 0;
     const r4 = await passer(T0 + 2 * H + 2 * 60e3);
     dit(r4.corps.nouvelles === 0 && notifs(J) === avant, 'P11 la même annonce n’est JAMAIS signalée deux fois', String(r4.corps.nouvelles));
-    // Heures calmes : 3 h à Paris — rangée dans la cloche, rien ne sonne.
+    // L'état ne s'écrit pas : rien n'est signalé (la prochaine lecture la retrouvera).
     EBAY_ITEMS = [item(1), item(2), item(3), item(4)];
+    mode = { ecritureEtat: 'ko' };
+    const r45 = await passer(T0 + 3 * H + 3 * 60e3);
+    mode = {};
+    dit(r45.corps.nouvelles === 0 && notifs(J) === avant, 'P11b état pas écrit ⇒ aucune notification (signalée seulement une fois RANGÉE)', JSON.stringify(r45.corps).slice(0, 140));
+    // Heures calmes : 3 h à Paris — rangée dans la cloche, rien ne sonne.
     process.env.VRM_NOTIF_HORLOGE = '2026-11-12T02:30:00.000Z';
     const r5 = await passer(T0 + 4 * H);
     delete process.env.VRM_NOTIF_HORLOGE;
