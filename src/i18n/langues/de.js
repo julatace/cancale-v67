@@ -424,7 +424,7 @@ export default {
   "sante.ps.profil": "Profil noch nicht gelesen: öffne Vinted mit diesem Konto.",
   "sante.ps.aucunAvis": "Noch keine Bewertungen.",
   "sante.ps.liste": "Bewertungen noch nicht gelesen: öffne dein Vinted-Profil.",
-  "sante.ps.envois": "Sendungen noch nicht gelesen: öffne einmal Verkäufe.",
+  "sante.ps.envois": "Sendungen noch nicht gelesen: öffne einmal Mein Tag.",
   "sante.ps.sansDate": {one: "{n} Paket ohne belegtes Abgabedatum.", other: "{n} Pakete ohne belegtes Abgabedatum."},
   "sante.ps.aucunColis": "Keine Pakete in 30 Tagen.",
   "sante.ps.sansLimite": {one: "{n} Paket ohne gelesene Frist.", other: "{n} Pakete ohne gelesene Frist."},

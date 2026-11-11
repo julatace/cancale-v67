@@ -424,7 +424,7 @@ export default {
   "sante.ps.profil": "Profilo non ancora letto: apri Vinted su questo account.",
   "sante.ps.aucunAvis": "Ancora nessuna recensione.",
   "sante.ps.liste": "Recensioni non ancora lette: apri il tuo profilo Vinted.",
-  "sante.ps.envois": "Spedizioni non ancora lette: apri Vendite una volta.",
+  "sante.ps.envois": "Spedizioni non ancora lette: apri La mia giornata una volta.",
   "sante.ps.sansDate": {one: "{n} pacco senza data di deposito provata.", other: "{n} pacchi senza data di deposito provata."},
   "sante.ps.aucunColis": "Nessun pacco in 30 giorni.",
   "sante.ps.sansLimite": {one: "{n} pacco senza scadenza letta.", other: "{n} pacchi senza scadenza letta."},

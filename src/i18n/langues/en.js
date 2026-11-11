@@ -424,7 +424,7 @@ export default {
   "sante.ps.profil": "Profile not read yet: open Vinted on this account.",
   "sante.ps.aucunAvis": "No reviews yet.",
   "sante.ps.liste": "Reviews not read yet: open your Vinted profile.",
-  "sante.ps.envois": "Shipments not read yet: open Sales once.",
+  "sante.ps.envois": "Shipments not read yet: open My day once.",
   "sante.ps.sansDate": {one: "{n} parcel without a proven drop-off date.", other: "{n} parcels without a proven drop-off date."},
   "sante.ps.aucunColis": "No parcels in 30 days.",
   "sante.ps.sansLimite": {one: "{n} parcel without a read deadline.", other: "{n} parcels without a read deadline."},

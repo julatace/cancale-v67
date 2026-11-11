@@ -429,7 +429,7 @@ export default {
   "sante.ps.profil": "Profil pas encore lu : ouvre Vinted sur ce compte.",
   "sante.ps.aucunAvis": "Aucun avis pour l’instant.",
   "sante.ps.liste": "Avis pas encore lus : ouvre ton profil Vinted.",
-  "sante.ps.envois": "Envois pas encore relus : ouvre Ventes une fois.",
+  "sante.ps.envois": "Envois pas encore relus : ouvre Ma journée une fois.",
   "sante.ps.sansDate": {one: "{n} colis sans date de dépôt prouvée.", other: "{n} colis sans date de dépôt prouvée."},
   "sante.ps.aucunColis": "Aucun colis sur 30 j.",
   "sante.ps.sansLimite": {one: "{n} colis sans date limite lue.", other: "{n} colis sans date limite lue."},

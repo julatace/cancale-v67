@@ -424,7 +424,7 @@ export default {
   "sante.ps.profil": "Perfil aún no leído: abre Vinted en esta cuenta.",
   "sante.ps.aucunAvis": "Aún no hay valoraciones.",
   "sante.ps.liste": "Valoraciones aún no leídas: abre tu perfil de Vinted.",
-  "sante.ps.envois": "Envíos aún no leídos: abre Ventas una vez.",
+  "sante.ps.envois": "Envíos aún no leídos: abre Mi día una vez.",
   "sante.ps.sansDate": {one: "{n} paquete sin fecha de depósito probada.", other: "{n} paquetes sin fecha de depósito probada."},
   "sante.ps.aucunColis": "Ningún paquete en 30 días.",
   "sante.ps.sansLimite": {one: "{n} paquete sin fecha límite leída.", other: "{n} paquetes sin fecha límite leída."},
