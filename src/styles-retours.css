@@ -41,7 +41,7 @@
 :root:root body .vrm-ret-note.is-ok { color: var(--ret-encre); font-weight: 650; }
 :root:root body .vrm-ret-anciens > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font: 600 15px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
 /* « Tout imprimer » → Retours : une ligne par bordereau de retour. */
-:root:root body .vrm-ret-tip-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; min-width: 0; border-top: 1px solid var(--ret-tuile); }
+:root:root body .vrm-ret-tip-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; min-width: 0; border-top: 1px solid var(--ret-tuile); }
 :root:root body .vrm-ret-tip-ligne:first-of-type { border-top: 0; }
 /* La feuille « Pas à pas ». */
 :root:root body .vrm-pap .vrm-pap-preuve { margin: 0 0 14px; font: 650 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); }

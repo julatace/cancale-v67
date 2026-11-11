@@ -167,7 +167,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit((await deborde(pg)) <= 1, `${nom} : Achats, rien ne déborde`);
       });
       if (!sombre) await essaie('Tout imprimer → Retours', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
+        // (une navigation précédente peut encore se terminer : un ERR_ABORTED se rejoue une fois)
+        await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' }).catch(async () => { await pg.waitForTimeout(800); await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' }); });
         await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 25000 }).catch(() => {});
         await pg.waitForTimeout(1200);
         const bt = await pg.$('button[data-lot-ouvrir="1"]');
@@ -175,6 +176,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('[data-lot-section="retours"]', { timeout: 12000 }).catch(() => {});
         const l = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-section="retours"] [data-lot-retour]')].map((x) => x.getAttribute('data-lot-retour')));
         dit(!!bt && l.join(',') === '9501', `${nom} : « Tout imprimer » porte une section « Retours » (9501 ; la remboursée n’y est plus)`, JSON.stringify({ bouton: !!bt, l }));
+        await pg.locator('[data-lot-section="retours"]').scrollIntoViewIfNeeded().catch(() => {});
+        await pg.waitForTimeout(700);
         await pg.screenshot({ path: path.join(SHOTS, `retours-tout-imprimer-${vp.width}.png`), fullPage: false }).catch(() => {});
         dit((await deborde(pg)) <= 1, `${nom} : « Tout imprimer », rien ne déborde`);
       });
