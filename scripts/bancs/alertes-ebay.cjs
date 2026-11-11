@@ -152,6 +152,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const dehors = await pg.$$eval('[data-alerte-ebay]', (l) => l.filter((r) => { const b = r.getBoundingClientRect(); return [...r.querySelectorAll('[data-voir-ebay],[data-alerte-retirer]')].some((x) => { const c = x.getBoundingClientRect(); return c.right > b.right + 1 || c.left < b.left - 1; }); }).length);
         const info = await pg.$eval('[data-alerte-ebay]', (r) => { const a = r.querySelector('.vrm-alerte-act'); const cs = getComputedStyle(r); return { g: cs.gridTemplateColumns, w: Math.round(r.getBoundingClientRect().width), act: a && Math.round(a.getBoundingClientRect().right), row: Math.round(r.getBoundingClientRect().right), parent: r.parentElement.className }; });
         dit(dehors === 0, '« Voir sur eBay » et « Retirer » dans la ligne', dehors + ' ligne(s) dehors · ' + JSON.stringify(info));
+        // Chaque geste tient sur UNE ligne de texte (« Reti / rer » coupé en deux à 1512 px avant).
+        const coupes = await pg.$$eval('[data-alerte-ebay] [data-voir-ebay], [data-alerte-ebay] [data-alerte-retirer]', (l) => l.filter((x) => { const rg = document.createRange(); rg.selectNodeContents(x); const tops = new Set([...rg.getClientRects()].map((c) => Math.round(c.top))); return tops.size > 1; }).map((x) => x.textContent));
+        dit(coupes.length === 0, 'chaque geste sur une seule ligne de texte', JSON.stringify(coupes));
         if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'alertes-ebay-' + vp.width + '.png'), fullPage: false, clip: await pg.$eval('[data-alertes-ebay]', (e) => { e.scrollIntoView(); const r = e.getBoundingClientRect(); return { x: 0, y: Math.max(0, r.top - 8), width: document.documentElement.clientWidth, height: Math.min(r.height + 16, 1400) }; }) });
       });
       await essaie('retirer', async () => {

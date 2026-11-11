@@ -35,10 +35,10 @@ function LigneAlerte({ x, veille, revente, contexte, C, onRetirer, occupe }) {
         {m.etat === 'ok' ? <>{tr('alertesEbay.marge')} <strong style={{ color: C.text, fontWeight: 600 }}>{m.borne === 'au-plus' ? tr('alertesEbay.auPlus') + ' ' : m.borne === 'environ' ? tr('alertesEbay.environ') + ' ' : ''}{eurosCalc(m.benefice)}</strong> · {m.base.source === 'toi' ? tr('alertesEbay.baseToi', { prix: eurosCalc(m.base.montant), site: tr('alertesEbay.site.' + m.base.site) }) : tr('alertesEbay.baseMediane', { prix: eurosCalc(m.base.montant), n: m.base.n })}</>
           : <>{tr('alertesEbay.marge')} — {tr(m.etat === 'pas-su' ? 'alertesEbay.margePasSu' : 'alertesEbay.margeSansBase')}</>}
       </div>
-    </div>
-    <div className="vrm-alerte-act">
+      <div className="vrm-alerte-act" style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: -10, flexWrap: 'wrap' }}>
       <a href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="" style={{ display: 'flex', alignItems: 'center', minHeight: 44, padding: '0 10px', color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>{tr('alertesEbay.voir')}</a>
-      <button type="button" className="vrm-lien-action" disabled={occupe} onClick={() => onRetirer([x.itemId])} data-alerte-retirer="" style={{ minHeight: 44, border: 'none', background: 'transparent', padding: '0 10px', fontSize: 13 }}>{tr('alertesEbay.retirer')}</button>
+      <button type="button" className="vrm-lien-action" disabled={occupe} onClick={() => onRetirer([x.itemId])} data-alerte-retirer="" style={{ minHeight: 44, border: 'none', background: 'transparent', padding: '0 10px', fontSize: 13, whiteSpace: 'nowrap' }}>{tr('alertesEbay.retirer')}</button>
+      </div>
     </div>
   </div>;
 }
