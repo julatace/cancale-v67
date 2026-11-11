@@ -10,8 +10,9 @@ import { L } from '../libelles.js';
 import { etapeMotVc, vcVenteAnnulee, montantRecuVc } from '../../api/_lib/vestiaire-regle.js';
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
-import { recuPublieEntre, valeurObjectif } from '../design/carteChiffres.js';
-import { lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from '../objectifMois.js';
+import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/carteChiffres.js';
+import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
+import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
 import { AUTH, Bouton, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
 
@@ -2069,6 +2070,11 @@ function AnalysesStatistiques({panelOff}) {
 // Le bloc « Objectif du mois » de Statistiques (4 nov.) : le MÊME réglage
 // (`useObjectifMois`) et la MÊME valeur que la barre de la carte sombre
 // (`valeurObjectif` sur les sources de la carte) — aucune seconde somme.
+// (11 nov., lot objectifs-mois) LE DÉTAIL, dans Argent : où il en est, ce qui
+// reste et le rythme, ses 3 derniers mois (même règle, `valeurObjectifMois`,
+// contre l'objectif qu'il avait alors), le bilan du mois passé, et le réglage
+// (Vendu · Bénéfice · Ventes, « Viser … » = sa moyenne sur 3 mois).
+const NOMS_MOIS_OBJ = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 function ObjectifDuMois({ liveStats }) {
   const [obj, poser, brut] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
@@ -2078,36 +2084,71 @@ function ObjectifDuMois({ liveStats }) {
   const [saisie, setSaisie] = React.useState('');
   const prog = obj ? progressionObjectif(obj, valeurObjectif(obj, sources, REGLES_CARTE)) : null;
   const lu = lireSaisieObjectif(type, saisie);
-  const eur = prog && prog.type === 'ca';
+  const eur = prog && estEuros(prog.type);
   const montre = (v) => (eur ? fmt(v) : `${v} vente${v > 1 ? 's' : ''}`);
+  const montreCourt = (v) => (eur ? fmt(v) : String(v));
+  const ry = prog ? rythmeObjectif(prog) : null;
+  const bilan = obj || brut ? bilanObjectif(brut, sources, REGLES_CARTE) : null;
+  const poserValeur = (v) => { const n = objectifAEnregistrer(brut, { type, valeur: v }); if (n) { poser(n); setEdit(false); } };
+  const eurT = estEuros(type);
+  // Ses 3 derniers mois, contre l'objectif EN VIGUEUR chaque mois (aucun ⇒ la valeur seule).
+  const passes = obj ? moisPleinsAvant(Date.now(), 3).map((b) => {
+    const x = valeurObjectifMois(obj.type, sources, REGLES_CARTE, b);
+    const o = objectifDuMoisYm(brut, b.ym);
+    const visait = o && o.type === obj.type ? o.valeur : null;
+    return { ...b, x, visait, atteint: visait != null && x && x.valeur != null && x.valeur >= visait };
+  }) : [];
+  const tete = prog ? `${eur ? fmt(prog.objectif) : `${prog.objectif} ventes`} ${(TYPES_OBJECTIF[prog.type] || TYPES_OBJECTIF.ca).ceMois}` : '';
   return (
     <div data-objectif-bloc={obj ? obj.type : ''}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: prog && !edit ? 8 : 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Objectif du mois</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{prog && !edit ? tete : 'Objectif du mois'}</div>
         <Bouton variante={edit ? 'discret' : 'secondaire'} className="vrm-b-petit" data-objectif-modifier="" onClick={() => { setType(obj ? obj.type : 'ca'); setSaisie(obj ? String(obj.valeur).replace('.', ',') : ''); setEdit((e) => !e); }}>{edit ? 'Annuler' : (obj ? 'Modifier' : 'Fixer')}</Bouton>
       </div>
       {edit ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-          <Segmente label="Type d’objectif" value={type} onChange={setType} options={[{ v: 'ca', l: 'CA vendu', data: { 'data-objectif-type': 'ca' } }, { v: 'ventes', l: 'Nombre de ventes', data: { 'data-objectif-type': 'ventes' } }]}/>
+          <Segmente label="Type d’objectif" value={type} onChange={setType} options={Object.entries(TYPES_OBJECTIF).map(([v, d]) => ({ v, l: d.nom, data: { 'data-objectif-type': v } }))}/>
+          <PropositionObjectif type={type} sources={sources} regles={REGLES_CARTE} onViser={poserValeur}/>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input aria-label={type === 'ca' ? 'Objectif en euros' : 'Objectif en nombre de ventes'} type="text" inputMode={type === 'ca' ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={type === 'ca' ? '2 000' : '40'} data-objectif-saisie=""
+            <input aria-label={eurT ? 'Objectif en euros' : 'Objectif en nombre de ventes'} type="text" inputMode={eurT ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={eurT ? '2 000' : '40'} data-objectif-saisie=""
               style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '11px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}/>
-            <span style={{ fontSize: 13, color: C.muted }}>{type === 'ca' ? '€' : 'ventes'}</span>
-            <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { const n = objectifAEnregistrer(brut, { type, valeur: lu }); if (n) { poser(n); setEdit(false); } }}>OK</Bouton>
+            <span style={{ fontSize: 13, color: C.muted }}>{eurT ? '€' : 'ventes'}</span>
+            <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { if (lu != null) poserValeur(lu); }}>OK</Bouton>
           </div>
+          {type === 'benefice' ? <div style={{ fontSize: 12, color: C.muted }}>Seules les ventes au prix d’achat connu comptent.</div> : null}
           {obj ? <Bouton variante="discret" data-objectif-retirer="" onClick={() => { poser(objectifAEnregistrer(brut, null)); setEdit(false); }} style={{ alignSelf: 'flex-start' }}>Retirer</Bouton> : null}
         </div>
       ) : prog ? (
-        <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined}>
+        <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined} data-objectif-rythme={ry ? ry.etat : undefined}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? `Au moins · ${prog.manque.join(', ')} pas lu` : undefined}>{prog.valeur == null ? '—' : montre(prog.valeur)}</span>
-            <span style={{ fontSize: 13, color: C.muted }}>/ {montre(prog.objectif)}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>{prog.partiel ? 'Au moins' : 'Tu en es à'}</span>
+            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? (prog.couverture ? `Prix d’achat connu pour ${prog.couverture} ventes` : `${prog.manque.join(', ')} pas lu`) : undefined}>{prog.valeur == null ? '—' : montreCourt(prog.valeur)}</span>
           </div>
-          <div role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 6, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
+          <div role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 4, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
             {prog.pct ? <div style={{ width: `${prog.pct}%`, height: '100%', background: C.accent, borderRadius: 999, transition: 'width .3s ease' }}/> : null}
           </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '2px 12px', marginTop: 8, fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
+            <span data-objectif-detail-reste="">{phraseResteObjectif(prog, montreCourt)}</span>
+            {ry ? <span data-objectif-detail-rythme={ry.etat} style={{ color: ry.etat === 'avance' ? C.text : C.muted }}>{phraseRythme(ry, prog.type, montreCourt)}</span> : null}
+          </div>
+          {prog.couverture ? <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }} data-objectif-couverture={prog.couverture}>Prix d’achat connu pour {prog.couverture} ventes.</div> : null}
+          {passes.length ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }} data-objectif-passes="">
+              {passes.map((m) => {
+                const v = m.x && m.x.valeur != null && m.x.couvert ? m.x.valeur : null;
+                return (
+                  <div key={m.ym} data-objectif-passe={m.ym} data-objectif-passe-valeur={v == null ? '' : (eur ? String(Math.round(v * 100)) : String(v))} data-objectif-passe-atteint={m.atteint ? '1' : undefined} style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: C.muted }}>{NOMS_MOIS_OBJ[Number(m.ym.slice(5)) - 1]}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{v == null ? '—' : <>{m.x.partiel ? <span style={{ fontSize: 11, fontWeight: 500, color: C.muted }}>≥ </span> : null}{montreCourt(v)}</>}{m.atteint ? ' ✓' : ''}</div>
+                    <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v == null ? (m.x && !m.x.couvert ? 'avant l’historique' : 'pas su') : m.visait != null ? `visé ${montreCourt(m.visait)}` : 'sans objectif'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}
+      {bilan && !edit ? <div className="vrm-objectif-bilan-clair" style={{ marginTop: 12, fontSize: 13, color: C.text }}><BilanObjectif bilan={bilan} fmt={fmt} onVu={() => { const n = objectifAEnregistrer(brut, { bilanVu: bilan.ym }); if (n) poser(n); }}/></div> : null}
     </div>
   );
 }

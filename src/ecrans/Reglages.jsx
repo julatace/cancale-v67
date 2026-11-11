@@ -1792,7 +1792,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const profilV = useProfilVendeur();
   // (9 nov.) L'objectif du mois, dit à droite de sa ligne (Réglages → Affichage).
   const [objectifR] = useObjectifMois();
-  const valObjectif = objectifR ? (objectifR.type === 'ca' ? `${objectifR.valeur.toLocaleString('fr-FR')} €` : `${objectifR.valeur} ventes`) : 'Aucun';
+  const valObjectif = objectifR ? (objectifR.type !== 'ventes' ? `${objectifR.valeur.toLocaleString('fr-FR')} €${objectifR.type === 'benefice' ? ' de bénéfice' : ''}` : `${objectifR.valeur} ventes`) : 'Aucun';
   const GROUPES_REGLAGES = [
     // (1er nov.) Le groupe portait « Comptes Vinted » mais rangeait aussi eBay, les
     // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
@@ -3316,24 +3316,27 @@ function AffichageSetting() {
 // « Retirer ». Rien n'est écrit tant qu'il n'a pas touché « Enregistrer » ; une saisie illisible
 // (« 2k ») n'enregistre rien (`lireSaisieObjectif`). Le même réglage que « Modifier » de la carte.
 function ObjectifMoisSetting() {
-  const [obj, poser] = useObjectifMois();
-  const [saisie, setSaisie] = React.useState(() => (obj && obj.type === 'ca' ? String(obj.valeur).replace('.', ',') : ''));
-  const lu = lireSaisieObjectif('ca', saisie);
-  const actuel = obj ? (obj.type === 'ca' ? `${obj.valeur.toLocaleString('fr-FR')} € de vendu par mois` : `${obj.valeur} ventes par mois`) : 'Aucun objectif';
-  const enregistrer = () => { if (lu == null) return; const n = objectifAEnregistrer(obj, { type: 'ca', valeur: lu }); if (n) { poser(n); toast('Objectif du mois enregistré.'); } };
+  // (11 nov.) Le type rangé est gardé (vendu, bénéfice ou ventes) ; l'histoire aussi (`brut`).
+  const [obj, poser, brut] = useObjectifMois();
+  const type = obj ? obj.type : 'ca';
+  const eur = type !== 'ventes';
+  const [saisie, setSaisie] = React.useState(() => (obj ? String(obj.valeur).replace('.', ',') : ''));
+  const lu = lireSaisieObjectif(type, saisie);
+  const actuel = obj ? (type === 'ventes' ? `${obj.valeur} ventes par mois` : `${obj.valeur.toLocaleString('fr-FR')} € ${type === 'benefice' ? 'de bénéfice' : 'de vendu'} par mois`) : 'Aucun objectif';
+  const enregistrer = () => { if (lu == null) return; const n = objectifAEnregistrer(brut, { type, valeur: lu }); if (n) { poser(n); toast('Objectif du mois enregistré.'); } };
   return (
     <div data-reglage-objectif-mois={obj ? obj.type : ''}>
       <div className="vrm-setting-applique" role="status" style={{ color: C.text }} data-objectif-actuel="">{actuel}</div>
-      <label style={{ display: 'block', fontSize: 13, color: C.muted, margin: '12px 0 6px' }} htmlFor="vrm-objectif-mois-saisie">Vendu à viser ce mois-ci, en euros</label>
+      <label style={{ display: 'block', fontSize: 13, color: C.muted, margin: '12px 0 6px' }} htmlFor="vrm-objectif-mois-saisie">{type === 'ventes' ? 'Ventes à viser ce mois-ci' : type === 'benefice' ? 'Bénéfice à viser ce mois-ci, en euros' : 'Vendu à viser ce mois-ci, en euros'}</label>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input id="vrm-objectif-mois-saisie" type="text" inputMode="decimal" placeholder="2 000" value={saisie} data-reglage-objectif-saisie=""
+        <input id="vrm-objectif-mois-saisie" type="text" inputMode={eur ? 'decimal' : 'numeric'} placeholder={eur ? '2 000' : '40'} value={saisie} data-reglage-objectif-saisie=""
           onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enregistrer(); }}
           style={{ flex: '1 1 auto', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, font: 'inherit', fontSize: 16, fontVariantNumeric: 'tabular-nums' }}/>
-        <span aria-hidden="true" style={{ color: C.muted }}>€</span>
+        <span aria-hidden="true" style={{ color: C.muted }}>{eur ? '€' : 'ventes'}</span>
         <Bouton variante="principal" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="">Enregistrer</Bouton>
       </div>
-      {obj ? <div style={{ marginTop: 10 }}><Bouton variante="discret" onClick={() => { poser(objectifAEnregistrer(obj, null)); setSaisie(''); toast('Objectif du mois retiré.'); }} data-reglage-objectif-retirer="">Retirer l’objectif</Bouton></div> : null}
-      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Compté sur « Vendu · mois » de Ma journée.</div>
+      {obj ? <div style={{ marginTop: 10 }}><Bouton variante="discret" onClick={() => { poser(objectifAEnregistrer(brut, null)); setSaisie(''); toast('Objectif du mois retiré.'); }} data-reglage-objectif-retirer="">Retirer l’objectif</Bouton></div> : null}
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Vendu, bénéfice ou ventes : choisis-le dans la carte de Ma journée.</div>
     </div>
   );
 }
