@@ -39176,7 +39176,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
     setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:cochesParDefaut(L),echecs:[] });
   };
-  const batchBordereaux = async (cles, placer = false) => {
+  // (11 nov., lot DJ3) `parcours` : lancé depuis « Tout imprimer » (trois temps) — pas de question « contrôlé » (l'aperçu
+  // A4 de la feuille la remplace) ; un lot tout réussi n'est marqué imprimé qu'à « Oui, imprimé » (étape 3).
+  const batchBordereaux = async (cles, placer = false, parcours = false) => {
     if (batchBusy) return;
     // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
     // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
@@ -39211,7 +39213,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     setBatchBusy(true);
     const controle=controlePreparation(aImprimer.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),new Set(aImprimer.map(l=>l.cle)),lot?.verifications||{});
-    if(controle.reste && !await askConfirm({title:'Vérifier les articles avant impression',desc:`${controle.verifies} sur ${controle.selection} article(s) contrôlé(s). Vérifie la photo, le numéro et le bon compte avant de préparer les PDF. Cette action ne marque aucun colis expédié.`,ok:'Préparer quand même les PDF',cancel:'Revenir aux articles'})){setBatchBusy(false);libererOngletPdf();return;}
+    if(!parcours && controle.reste && !await askConfirm({title:'Vérifier les articles avant impression',desc:`${controle.verifies} sur ${controle.selection} article(s) contrôlé(s). Vérifie la photo, le numéro et le bon compte avant de préparer les PDF. Cette action ne marque aucun colis expédié.`,ok:'Préparer quand même les PDF',cancel:'Revenir aux articles'})){setBatchBusy(false);libererOngletPdf();return;}
     const echecs = [], faits = [];let documentPrepare=false;
     if(choisis)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,erreur:''}:x);
     setBatchBusy(true);setProgressionLot({etape:'lecture',fait:0,total:aImprimer.length});
@@ -39274,10 +39276,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const clesReussies = (r.reussis || []).map(i => items[i].cle);
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
-      if (reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+      const differe = parcours && !echecs.length && choisis;
+      if (differe && (AUTH.user?.id||null)===proprietaire) setLot(x => x ? { ...x, fait: { n: imprimes, vinted: reussiesVinted, vestiaire: (r.reussis || []).filter(i => items[i].site === 'vestiaire').map(i => items[i].ligne.v.id) } } : x);
+      if (!differe && reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       noterImprimeSansNum((r.reussis || []).filter(i => items[i].site === 'vinted' && !String(items[i].numero || '').trim()).map(i => items[i].ligne && items[i].ligne.e && items[i].ligne.e.txn));
-      (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
-      if (choisis && (AUTH.user?.id||null)===proprietaire) setLot(x => (AUTH.user?.id||null)!==proprietaire?x:x?(echecs.length ? { ...x, coches: new Set(echecs), echecs } : null):x);
+      if (!differe) (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
+      if (!differe && choisis && (AUTH.user?.id||null)===proprietaire) setLot(x => (AUTH.user?.id||null)!==proprietaire?x:x?(echecs.length ? { ...x, coches: new Set(echecs), echecs } : null):x);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?texteSansBordereau(sansLignes):'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
     } catch(err){ libererOngletPdf();if(!documentPrepare&&!estTamponAnnule(err)&&choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,coches:new Set(aImprimer.map(l=>l.cle)),echecs:aImprimer.map(l=>l.cle),erreur:'La préparation s’est interrompue. Ta sélection est conservée ; tu peux réessayer.'}:x); if (!estTamponAnnule(err)) toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
@@ -45551,7 +45555,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {colisDans === 'achats' ? null : <>
                   <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
                     title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
-                    onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : 'Tout imprimer'}</Bouton>
+                    onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : nLot > 0 ? `Tout imprimer (${nLot})` : 'Tout imprimer'}</Bouton>
                   {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
                       et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
@@ -45871,70 +45875,104 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* (31 oct.) « Tout imprimer » est monté dans l'en-tête : « Imprimer les N prêts » (même action, même compte). */}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
                 {lot && (()=>{
+                  // ── (11 nov., lot DJ3 — Julien : « Tout imprimer… ça fait encore un peu trop débutant ») LE PARCOURS
+                  // EN TROIS TEMPS, une feuille : 1 · Ce qui part (cochés par défaut ; « à vérifier » à part, décochés ;
+                  // un colis déposé n'y est jamais : `lignesLot` sort la preuve de départ) — 2 · Aperçu A4 (le tampon
+                  // N° + titre, comme sur le papier) et « Imprimer » — 3 · « C'est imprimé ? » ⇒ prêts à déposer,
+                  // « Je dépose » à un geste, annulable. Gestes (N colis, tous bons) : avant 3 (Tout imprimer,
+                  // Imprimer, « Préparer quand même ») + 2 pour trouver « Je dépose » ; après 3 (Tout imprimer,
+                  // Imprimer, « Oui ») et « Je dépose » dans la même feuille.
                   const L = lot.lignes || lignesLotTous();
                   const nb=L.filter(l=>lot.coches.has(l.cle)).length;
-                  const controle=controlePreparation(L.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),lot.coches,lot.verifications||{});
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
-                  const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
+                  const aVerif = (l) => l.cochable !== false && (l.ancienne || l.imprime || l.depotAVerifier || l.pdf === false);
+                  const partent = L.filter((l) => l.cochable !== false && !aVerif(l));
+                  const verifier = L.filter(aVerif);
+                  const ebayL = L.filter((l) => l.cochable === false);
+                  const limite = (l) => { const lim = l.e && l.e.lim; const j = lim && lim.daysLeft; if (j == null || !Number.isFinite(j)) return null;
+                    return j < 0 ? { t: 'en retard', urgent: true } : j === 0 ? { t: lim.heure ? `avant ${lim.heure}` : 'aujourd’hui', urgent: true } : j === 1 ? { t: 'demain', urgent: false } : { t: `dans ${j} j`, urgent: false }; };
+                  const raison = (l) => l.depotAVerifier ? 'déposé ? à vérifier' : l.imprime ? 'déjà imprimé' : l.ancienne ? `vendue il y a ${Math.floor(l.age)} j` : l.pdf === false ? 'sans bordereau' : '';
+                  const logo = (l) => { const c = cleTransporteur(l.trNom); return c ? <LogoTransporteur cle={c} taille={22}/> : <LogoInconnu taille={22}/>; };
+                  const ligne = (l) => {
+                    const coche = lot.coches.has(l.cle), num = l.num || '', lim = limite(l), r = raison(l);
+                    return (
+                      <label key={l.cle} className="vrm-tip-ligne" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} data-lot-pdf={l.pdf===false?'0':'1'} data-lot-cochable={l.cochable===false?'0':'1'} data-lot-verifier={aVerif(l)?'1':'0'}>
+                        <input type="checkbox" className="vrm-tip-case" aria-label={`Imprimer ${l.titre||'ce bordereau'}`} disabled={batchBusy||l.cochable===false} checked={coche&&l.cochable!==false} onChange={()=>{ if(l.cochable!==false) basculer(l.cle); }}/>
+                        <PhotoVente src={l.photo||null} size={44} portrait/>
+                        <span className="vrm-tip-corps">
+                          <span className="vrm-titre-entier vrm-tip-titre" data-titre-entier="lot">{l.titre}</span>
+                          <span className="vrm-tip-sous">{num ? <b className="vrm-tip-num">N°{num}</b> : <b className="vrm-tip-num is-sans" title="Numéro VRM non confirmé : vérifie l’article avec sa photo">sans N°</b>}
+                            {lim ? <span className={lim.urgent?'vrm-tip-lim is-urgent':'vrm-tip-lim'}>{lim.t}</span> : null}
+                            {r ? <span className="vrm-tip-raison" data-lot-raison="">{r}</span> : null}
+                            {l.imprime && <span hidden data-lot-imprime="1"/>}{l.ancienne && <span hidden data-lot-ancienne="1"/>}{l.depotAVerifier && <span hidden data-lot-depot-verifier="1"/>}{l.pdf===false && l.cochable!==false && <span hidden data-lot-sans-bordereau="1"/>}
+                            {lot.echecs.includes(l.cle) && <span className="vrm-tip-raison">PDF pas lu</span>}</span>
+                        </span>
+                        <span className="vrm-tip-logo" aria-label={libelleTransp(l.trNom)} title={libelleTransp(l.trNom)}>{logo(l)}</span>
+                      </label>);
+                  };
+                  const choisis = L.filter((l) => lot.coches.has(l.cle) && l.cochable !== false);
+                  const fait = lot.fait || null;
+                  // 3 · « C'est imprimé ? » — les colis passent « prêts à déposer » (la date d'impression), annulable.
+                  const confirmerImprime = () => {
+                    const at = new Date().toISOString(), ops = [];
+                    for (const k of (fait && fait.vinted) || []) ops.push({ k: 'vinted_bords_printed', type: 'cle', id: k, apres: at, avant: bordsPrinted[k] });
+                    if (ops.length) gesteVrm(`${ops.length} prêt${ops.length>1?'s':''} à déposer`, ops, { vinted_bords_printed: setBordsPrinted });
+                    for (const id of (fait && fait.vestiaire) || []) { try { marquerVc('vrm_vc_imprimes', id, true); } catch (_) {} }
+                    setLot((x) => x ? { ...x, fait: { ...x.fait, confirme: true } } : x);
+                  };
                   return (
-                    /* (5 nov., chantier D) « Tout imprimer » ouvre la feuille unique (`SheetShell` : poignée,
-                       titre, croix de 44 px, retour du navigateur) au lieu d'un calque fait main. */
-                    <SheetShell onClose={()=>setLot(null)} maxWidth={560} z={9000} className="vrm-lot" data-noswipe="1" data-lot={L.length} aria-label="Bordereaux à imprimer"
-                      titre={lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}>
-                        <>{lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont repris.</p>}</><div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
-                        {lot.erreur&&<p className="vrm-preparation-note" role="alert" data-lot-erreur="">{lot.erreur}</p>}
-                        <RecapSelection lignes={L} coches={lot.coches}/>
-                        <p className="vrm-preparation-note">Compare le N° et la photo avec l’article. « Contrôlé » ≠ expédié.</p>
-                        {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
-                        <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 0',fontSize:12,color:C.muted,alignItems:'center'}} className="vrm-lot-outils">
-                          <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
-                          <span>Décocher ne supprime aucun bordereau.</span>
-                        </div>
-                        <div className="vrm-lot-liste" style={{padding:'4px 0'}}>
-                          {L.map((l, il) => {
-                            const o = l.e ? l.e.o : null, coche = lot.coches.has(l.cle);
-                            const num = l.num || '';
-                            const photo = l.photo || null;
-                            let emplacement='Emplacement non vérifié';
-                            if(num){try{const plan=load('vrm_room_plan',null),place=plan?ouEstNumero(normalizePlan(plan),num):null;if(place)emplacement=[place.roomName,place.itemName,place.nom].filter(Boolean).join(' · ');}catch(_){}}
-                            const verifie=lot.verifications?.[l.cle]===sigLigneLot(l);
-                            // (3 nov.) Un en-tête par transporteur, dans l'ordre du PDF (celui des groupes de l'écran).
-                            const ouvreT = il === 0 || L[il-1].trNom !== l.trNom;
-                            return (
-                              <React.Fragment key={l.cle}>
-                              {ouvreT ? <div className="vrm-fu-groupe-transp" data-lot-groupe={l.trNom} style={{marginTop:il?10:4}}><span className="vrm-fu-groupe-tuile" aria-hidden="true">{(() => { const c = cleTransporteur(l.trNom); return c ? <LogoTransporteur cle={c} taille={22}/> : <LogoInconnu taille={22}/>; })()}</span><h3 data-lot-groupe-libelle="">{libelleTransp(l.trNom)}</h3><span>{L.filter(x=>x.trNom===l.trNom).length}</span></div> : null}
-                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} data-lot-pdf={l.pdf===false?'0':'1'} data-lot-cochable={l.cochable===false?'0':'1'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:l.cochable===false?'default':'pointer',opacity:l.cochable===false?0.55:1}}>
-                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={l.cochable===false?`${l.titre||'Commande'} : eBay`:`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy||l.cochable===false} checked={coche&&l.cochable!==false} onChange={()=>{ if(l.cochable!==false) basculer(l.cle); }} style={{width:18,height:18,flexShrink:0}}/></label>
-                                <PhotoVente src={photo} size={32} portrait/>
-                                <span style={{flex:1,minWidth:0}}>
-                                  <span className="vrm-titre-entier" data-titre-entier="lot" style={{display:'block',fontSize:13,fontWeight:600}}>{num?`N°${num} · `:''}{l.titre}</span>
-                                  <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>
-                                    {l.sous}{l.site === 'vinted' ? ` · vendue le ${fmtD(o)}` : ''}
-                                    {l.pdf === false && l.cochable !== false ? <b data-lot-sans-bordereau="1" style={{color:C.warn,fontWeight:600}}> · Sans bordereau</b> : null}
-                                    {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
-                                    {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
-                                    {l.depotAVerifier && <b data-lot-depot-verifier="1" style={{color:C.warn,fontWeight:600}}> · déposé ? à vérifier</b>}
-                                    {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
-                                    <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
-                                  </span>
-                                </span>
-                                {l.cochable === false ? <span className="vrm-preparation-controle" data-lot-ebay="1" style={{fontSize:12,color:C.muted,fontWeight:600}}>eBay</span> : <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>}
-                              </div>
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                        {/* (5 nov., chantier D) Le pied reste visible en bas de la feuille (collé), deux gestes de
-                            la même forme (`Bouton`) ; « Fermer » est la croix de la feuille (plus de second bouton). */}
-                        <div className="vrm-lot-pied">
-                          {/* (4 nov.) « Placer le tampon » : la feuille de chaque type de bordereau du lot s'ouvre, même déjà gardé. */}
-                          <Bouton variante="secondaire" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}>Placer le tampon</Bouton>
-                          <Bouton variante="primaire" icone="printer" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}>
-                            {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
+                    <SheetShell onClose={()=>setLot(null)} maxWidth={620} z={9000} className="vrm-lot vrm-tip" data-noswipe="1" data-lot={L.length} data-lot-etape={fait ? (fait.confirme ? 'depot' : 'imprime') : 'choix'} aria-label="Tout imprimer"
+                      titre={fait ? (fait.confirme ? 'Prêts à déposer' : 'C’est imprimé ?') : lot.echecs.length ? `${lot.echecs.length} pas imprimé${lot.echecs.length>1?'s':''}` : 'Tout imprimer'}>
+                      {!fait && <div className="vrm-tip-temps" key="choix">
+                        <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
+                        {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
+                        {batchBusy&&progressionLot&&<div className="vrm-tip-progression" role="status">{progressionLot.etape==='lecture'?`PDF ${progressionLot.fait}/${progressionLot.total}`:'Préparation…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
+                        <section className="vrm-tip-groupe" data-lot-section="partent">
+                          <h3>Ce qui part <span>{partent.length}</span></h3>
+                          {partent.length ? partent.map(ligne) : <p className="vrm-tip-vide">Rien de neuf à imprimer.</p>}
+                        </section>
+                        {verifier.length > 0 && <section className="vrm-tip-groupe is-verifier" data-lot-section="verifier">
+                          <h3>À vérifier <span>{verifier.length}</span></h3>
+                          {verifier.map(ligne)}
+                        </section>}
+                        {ebayL.length > 0 && <section className="vrm-tip-groupe is-ebay" data-lot-section="ebay">
+                          <h3>Étiquette dans eBay <span>{ebayL.length}</span></h3>
+                          {ebayL.map((l) => <div key={l.cle} className="vrm-tip-ligne is-off" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-cochable="0"><span data-lot-ebay="1" className="vrm-tip-case-off"/><PhotoVente src={l.photo||null} size={44} portrait/><span className="vrm-tip-corps"><span className="vrm-titre-entier vrm-tip-titre">{l.titre}</span></span></div>)}
+                        </section>}
+                        {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
+                        {choisis.length > 0 && <section className="vrm-tip-groupe" data-lot-section="apercu" aria-label="Aperçu">
+                          <h3>Aperçu <span>{choisis.length} page{choisis.length>1?'s':''} A4</span></h3>
+                          <div className="vrm-tip-pages">
+                            {choisis.slice(0, 8).map((l) => <figure key={l.cle} className="vrm-tip-a4" data-lot-apercu={l.cle}>
+                              <span className="vrm-tip-a4-etiquette">{logo(l)}<i/><i/><i/></span>
+                              <figcaption className="vrm-tip-a4-tampon"><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b><span>{l.titre}</span></figcaption>
+                            </figure>)}
+                            {choisis.length > 8 ? <span className="vrm-tip-plus">+{choisis.length - 8}</span> : null}
+                          </div>
+                        </section>}
+                        <div className="vrm-lot-pied vrm-tip-pied">
+                          <button type="button" className="vrm-tip-lien" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}>Placer le tampon</button>
+                          <Bouton variante="primaire" icone="printer" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), false, true)}>
+                            {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer (${nb})`}
                           </Bouton>
                         </div>
+                      </div>}
+                      {fait && !fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="imprime" data-lot-question="">
+                        <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-la">Imprimer</li><li>Déposer</li></ol>
+                        <p className="vrm-tip-grand"><b>{fait.n}</b> bordereau{fait.n>1?'x':''} dans le PDF.</p>
+                        <div className="vrm-tip-pied">
+                          <Bouton variante="secondaire" data-lot-pas-imprime="" onClick={()=>setLot((x)=>x?{...x,fait:null}:x)}>Pas encore</Bouton>
+                          <Bouton variante="primaire" icone="check" data-lot-imprime-oui="" onClick={confirmerImprime}>Oui, imprimé</Bouton>
+                        </div>
+                      </div>}
+                      {fait && fait.confirme && <div className="vrm-tip-temps vrm-tip-fin" key="depot" data-lot-depot="">
+                        <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-fait">Choisir</li><li className="is-fait">Imprimer</li><li className="is-la">Déposer</li></ol>
+                        <p className="vrm-tip-grand"><b>{fait.n}</b> prêt{fait.n>1?'s':''} à déposer.</p>
+                        <div className="vrm-tip-pied">
+                          <Bouton variante="secondaire" onClick={()=>setLot(null)}>Plus tard</Bouton>
+                          <Bouton variante="primaire" icone="truck" data-lot-je-depose="" onClick={()=>{ setLot(null); setDepotOuvert(true); }}>Je dépose</Bouton>
+                        </div>
+                      </div>}
                     </SheetShell>
                   );
                 })()}
