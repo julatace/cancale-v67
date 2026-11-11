@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { baisseTapee, eurosBaisse as eur } from './baissePrix.js';
 import { lignesBaisseVc, issueBaisseVc, etatRecettePrixVc } from './baissePrixVestiaire.js';
 import { tr } from './i18n/index.js';
+import { suivi } from './suiviTravail.js';   // VRM figé, détail et barre pendant la série (lot suivi-travail)
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
 import './styles-vestiaire-plus.css';
@@ -48,18 +49,37 @@ export default function BaissePrixVestiaire({ annonces = [], compteOnglet, recet
     if (!file.length || !pret) return;
     arret.current = false;
     setPhase('envoi'); setEtats({}); setProgres({ i: 0, n: file.length });
+    // (11 nov.) La feuille commune « VRM travaille » (src/suiviTravail.js) : VRM figé, étapes, barre, journal.
+    const t = suivi.demarrer({ sorte: 'baisse-prix-vestiaire', titre: tr('vcBaisse.suivi.titre', { baisse: baisse.mode === 'pct' ? `−${baisse.valeur} %` : `−${baisse.valeur} €` }),
+      etapes: [['envoi', tr('vcBaisse.suivi.envoi')], ['relu', tr('vcBaisse.suivi.relu')]], uid: '',
+      articles: file.map((l) => ({ id: l.id, num: l.num || '', titre: l.titre || '' })) });
     const poser = (id, e) => setEtats((x) => ({ ...x, [id]: e }));
+    let stop = '';
     for (let i = 0; i < file.length; i++) {
       const l = file[i];
-      if (arret.current) { for (const m of file.slice(i)) poser(m.id, { etat: 'pas-envoye' }); break; }
+      if (t && !(await t.continuer())) arret.current = true;
+      if (arret.current) { for (const m of file.slice(i)) { poser(m.id, { etat: 'pas-envoye' }); if (t) t.fin(m.id, { etat: 'saute', raison: tr('vcBaisse.suivi.arrete') }); } break; }
       setProgres({ i: i + 1, n: file.length });
       poser(l.id, { etat: 'envoi' });
+      if (t) t.etape(l.id, 'envoi', `${eur(l.avant / 100)} → ${eur(l.apres / 100)}`);
       let r = null; try { r = await onBaisser(l); } catch (_) { r = null; }
       const iss = issueBaisseVc(r);
       poser(l.id, iss);
-      if (iss.arret) { for (const m of file.slice(i + 1)) poser(m.id, { etat: 'pas-envoye', raison: iss.raison }); break; }
-      if (i < file.length - 1) { const fin = Date.now() + pauseEntre(); while (Date.now() < fin && !arret.current) await new Promise((ok) => setTimeout(ok, Math.min(250, Math.max(0, fin - Date.now())))); }
+      if (t) {
+        if (iss.etat === 'fait' || iss.etat === 'ecart') t.etape(l.id, 'relu', iss.prixVu != null ? eur(iss.prixVu) : '');
+        t.fin(l.id, iss.etat === 'fait' ? { etat: 'ok' }
+          : iss.etat === 'ecart' || iss.etat === 'incertain' ? { etat: 'main', raison: iss.raison || tr('vcBaisse.etat.incertain'), geste: tr('vcBaisse.suivi.regarder'), lien: 'https://fr.vestiairecollective.com/' }
+          : { etat: 'refus', raison: iss.raison || tr('vcBaisse.etat.refus'), geste: iss.code === 'pas-appris' ? tr('vcBaisse.apprendre.titre') : '' });
+      }
+      if (iss.arret) { stop = iss.raison || 'refus'; for (const m of file.slice(i + 1)) { poser(m.id, { etat: 'pas-envoye', raison: iss.raison }); if (t) t.fin(m.id, { etat: 'saute', raison: iss.raison }); } break; }
+      if (i < file.length - 1) {
+        const ms = pauseEntre(); const fin = Date.now() + ms;
+        if (t && ms >= 1000) t.pause({ ms, raison: tr('vcBaisse.suivi.pause') });
+        while (Date.now() < fin && !arret.current && !(t && t.doitSArreter())) await new Promise((ok) => setTimeout(ok, Math.min(250, Math.max(0, fin - Date.now()))));
+        if (t) t.finPause();
+      }
     }
+    if (t) t.terminer(arret.current ? tr('vcBaisse.suivi.arrete') : stop, stop ? 'arrete' : undefined);
     setPhase('fini');
   };
   const n = (k) => Object.values(etats).filter((e) => e && e.etat === k).length;

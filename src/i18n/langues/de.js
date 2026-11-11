@@ -527,4 +527,11 @@ export default {
   "suivi.garde": "Die Details bleiben in Einstellungen → Was VRM getan hat.",
   "suivi.passes.titre": "Auf diesem Gerät verfolgte Aufgaben",
   "suivi.reprise.sansEcran": "Öffne den Bildschirm der Aufgabe erneut, um fortzusetzen.",
+  // ── vestiaire-plus (11 nov.) : parcours, photos, baisse de prix, offres dans Ma journée
+  "vcBaisse.suivi.titre": "Preis auf Vestiaire senken ({baisse})",
+  "vcBaisse.suivi.envoi": "Neuer Preis an Vestiaire gesendet",
+  "vcBaisse.suivi.relu": "Preis auf Vestiaire neu gelesen",
+  "vcBaisse.suivi.arrete": "von dir gestoppt",
+  "vcBaisse.suivi.regarder": "Sieh dir die Anzeige auf Vestiaire an",
+  "vcBaisse.suivi.pause": "Pause zwischen zwei Anzeigen",
 };

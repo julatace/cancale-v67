@@ -527,4 +527,11 @@ export default {
   "suivi.garde": "The details stay in Settings → What VRM did.",
   "suivi.passes.titre": "Tasks tracked on this device",
   "suivi.reprise.sansEcran": "Reopen the task’s screen to resume.",
+  // ── vestiaire-plus (11 nov.) : parcours, photos, baisse de prix, offres dans Ma journée
+  "vcBaisse.suivi.titre": "Lower the price on Vestiaire ({baisse})",
+  "vcBaisse.suivi.envoi": "Sending the new price to Vestiaire",
+  "vcBaisse.suivi.relu": "Price re-read on Vestiaire",
+  "vcBaisse.suivi.arrete": "stopped by you",
+  "vcBaisse.suivi.regarder": "Check the listing on Vestiaire",
+  "vcBaisse.suivi.pause": "Pause between two listings",
 };

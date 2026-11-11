@@ -532,4 +532,11 @@ export default {
   "suivi.garde": "Le détail reste dans Paramètres → Ce que VRM a fait.",
   "suivi.passes.titre": "Travaux suivis sur cet appareil",
   "suivi.reprise.sansEcran": "Rouvre l’écran du travail pour reprendre.",
+  // ── vestiaire-plus (11 nov.) : parcours, photos, baisse de prix, offres dans Ma journée
+  "vcBaisse.suivi.titre": "Baisser le prix sur Vestiaire ({baisse})",
+  "vcBaisse.suivi.envoi": "Envoi du nouveau prix à Vestiaire",
+  "vcBaisse.suivi.relu": "Prix relu sur Vestiaire",
+  "vcBaisse.suivi.arrete": "arrêté par toi",
+  "vcBaisse.suivi.regarder": "Regarde l'annonce sur Vestiaire",
+  "vcBaisse.suivi.pause": "Pause entre deux annonces",
 };
