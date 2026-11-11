@@ -263,7 +263,7 @@ export function texteNotifModeration(evts, { nomCompte = () => '' } = {}) {
   if (n('masquee')) morceaux.push(`${n('masquee')} annonce${n('masquee') > 1 ? 's' : ''} masquée${n('masquee') > 1 ? 's' : ''}`);
   if (n('disparue')) morceaux.push(`${n('disparue')} annonce${n('disparue') > 1 ? 's' : ''} disparue${n('disparue') > 1 ? 's' : ''}`);
   const grave = n('banni') || n('restreint');
-  const title = `Vinted${sur} : ${morceaux.join(' · ')}`;
+  const title = `Vinted${sur} : ${morceaux.join(', ')}`;
   const body = grave
     ? 'Pause conseillée : VRM a arrêté ses actions automatiques sur ce compte. Vérifie tes messages Vinted.'
     : (n('masquee') ? 'Ouvre l’annonce sur Vinted : la raison est écrite dessus.' : 'Peut-être retirée par Vinted. Vérifie tes messages Vinted.');

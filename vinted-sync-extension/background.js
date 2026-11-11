@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.342.0';
+const CODE_VERSION = '5.350.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5338,10 +5338,11 @@ function guetterDressing(uid, items, at) {
   if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
   return unModerationALaFois(async () => {
     try {
-      const t = Number(at) || Date.now();
       const etats = etatsDressingModeration(items);
       const memo = (await chrome.storage.local.get(MODERATION_VU))[MODERATION_VU] || {};
       const avant = memo[u] && memo[u].etats ? memo[u] : null;
+      // Les lectures passent une à une (la chaîne) : celle-ci est APRÈS la précédente, même à la même milliseconde.
+      const t = Math.max(Number(at) || Date.now(), avant && Number.isFinite(Number(avant.at)) ? Number(avant.at) + 1 : 0);
       const vacances = await vacancesVues(u);
       let r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: {}, vacances });
       // Les suppressions ne se lisent QUE s'il y a une disparue à juger (égress).
