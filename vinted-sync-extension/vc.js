@@ -53,6 +53,9 @@
           id: String((x && x.id) || '').slice(0, 40), productId: String((x && x.productId) || '').slice(0, 40), ref: String((x && x.ref) || '').slice(0, 12),
           etat: String((x && x.etat) || '').slice(0, 40), date: String((x && x.date) || '').slice(0, 30),
           montant: x && x.montant && isFinite(Number(x.montant.valeur)) ? { valeur: Number(x.montant.valeur), devise: String(x.montant.devise || '').slice(0, 3), cle: String(x.montant.cle || '').slice(0, 60) } : null,
+          // 5.364 (11 nov.) — le PRIX DE VENTE (`sellerPrice`, 5.340) n'était pas relayé : le fond ne le
+          // recevait jamais, la facture Pro Vestiaire non plus. Relayé tel quel ; le fond le rebâtit (`prixVenteVc`).
+          ...(x && x.prixVente && isFinite(Number(x.prixVente.valeur)) ? { prixVente: { valeur: Number(x.prixVente.valeur), devise: String(x.prixVente.devise || '').slice(0, 3), cle: String(x.prixVente.cle || '').slice(0, 20) } } : {}),
           limite: String((x && x.limite) || '').slice(0, 30), etiquette: x && (x.etiquette === true || x.etiquette === false) ? x.etiquette : null,
           suivi: String((x && x.suivi) || '').slice(0, 40), transporteur: String((x && x.transporteur) || '').slice(0, 30),
           // 5.316 : le titre affiché (marque + nom) et la photo de Vestiaire.

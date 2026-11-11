@@ -106,6 +106,7 @@ Contre-offre si appris, sinon « Répondre sur Vestiaire ↗ »).
 | Ma journée « N messages Vestiaire non lus » ouvrait **Annonces** Vestiaire | `tab: 'plat_vestiaire'` ⇒ `redirigerOnglet` prend la section par défaut du site (`annonces`) | la ligne (et les offres) ouvrent `?tab=messages&site=vestiaire` | banc `vestiaire-plus` A (rouge sur l'avant : `data-tache-vestiaire="annonces"`) |
 | Cloche : « N **paires** vendues …, encore en ligne sur Vestiaire » | texte d'avant le 2 nov. (« ce n'est pas toujours une paire ») | « N articles vendus … » | lecture du code |
 | Offres Vestiaire en français seulement | écran pas migré | `OffresVestiaire.jsx` passe par `tr()` (16 clés, 5 langues), ajouté à MIGRES | `audit-traduction` |
+| Le prix de vente Vestiaire (`sellerPrice`, 5.340) n'arrivait JAMAIS dans `vc_ventes` ⇒ facture Pro Vestiaire refusée | `vc.js` (le relais) ne recopiait pas `prixVente` (lu par vc-inject, rangé par le fond, perdu entre les deux) | `vc.js` relaie `prixVente` ; le fond le rebâtit (`prixVenteVc`) | `audit-vc-prix` P10 (VRAI vc-inject → vc.js → background) : rouge sur le vc.js d'avant, vert après ; mutation `relaisPrixVente` rouge |
 | (voir la suite ci-dessous, bancs Vestiaire) | | | |
 
 Audits Vestiaire relancés, tous verts : `audit-numeros-vestiaire` 26, `audit-vc-conversations` 36,

@@ -56,6 +56,7 @@ if (process.argv.includes('--prouve')) {
     ['fondPause', 'src', "    const pause = await pauseVc();\n    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };\n    let e;", '    let e;'],
     ['fondFaitSansRelu', 'src', "      if (vu === apres) return { accepte: true, etape: 'fait'", "      if (true) return { accepte: true, etape: 'fait'"],
     ['fondCompte', 'src', "    if (!compte) return { accepte: false, code: 'session',", "    if (false) return { accepte: false, code: 'session',"],
+    ['relaisPrixVente', 'relais', "          ...(x && x.prixVente && isFinite(Number(x.prixVente.valeur)) ? { prixVente:", "          ...(false ? { prixVente:"],
     ['appRecette', 'regle', "  return recette.appris === true ? { etat: 'pret', raison: '' }", "  return recette ? { etat: 'pret', raison: '' }"],
     ['appCompte', 'regle', "    else if (String(compteOnglet) !== compte) bloque = 'autre-compte';", ''],
     ['appFaitSansPrix', 'regle', "  if (r.etape === 'fait' && vu != null) return { etat: 'fait', prixVu: vu, arret: false };", "  if (r.etape === 'fait') return { etat: 'fait', prixVu: vu, arret: false };"],
@@ -277,6 +278,17 @@ async function p3p8() {
   dit(etat && etat.vcPrix === true, 'P4 · l’état de l’extension dit `vcPrix: true`', JSON.stringify(etat && Object.keys(etat)));
 }
 
+// P10 — le PRIX DE VENTE (`sellerPrice`, 5.340) traverse page → vc.js → fond jusqu'à `vc_ventes`
+// (défaut trouvé le 11 nov. : vc.js ne le relayait pas, la facture Pro Vestiaire ne l'avait jamais).
+async function p10() {
+  const S = systeme();
+  await S.ch.appel('GET', `${API}/users/me${Q}`, { data: { id: MOI, type: 'user' } }); await attendre(30);
+  await S.ch.appel('GET', `${API}/users/me/awaiting-shipping-items${Q}`, { data: [{ id: '72987282', productId: '72987282', brandName: 'Nike', productName: 'Dunk Low', sellerEarning: '203,23 €', sellerPrice: '250,00 €', shipByDate: '2026-11-20T23:59:59+01:00' }], meta: { count: 1 } });
+  await attendre(120);
+  const v = S.fond.lignes.vc_ventes && S.fond.lignes.vc_ventes.ventes && Object.values(S.fond.lignes.vc_ventes.ventes)[0];
+  dit(!!v && v.prixVente && v.prixVente.valeur === 250 && v.prixVente.cle === 'sellerPrice' && v.montant && v.montant.cle === 'sellerEarning', 'P10 · le prix de vente (`sellerPrice` 250 €) arrive dans `vc_ventes` par le VRAI relais vc.js (le versé reste à part)', JSON.stringify(v && { prixVente: v.prixVente, montant: v.montant }));
+}
+
 async function p9() {
   const APP = fs.readFileSync(F.app, 'utf8');
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
@@ -291,7 +303,7 @@ async function p9() {
 }
 
 (async () => {
-  for (const [nom, f] of [['P1-P2', p1p2], ['P3-P8', p3p8], ['P9', p9]]) {
+  for (const [nom, f] of [['P1-P2', p1p2], ['P3-P8', p3p8], ['P9', p9], ['P10', p10]]) {
     try { await f(); } catch (e) { dit(false, `${nom} : l’audit a tourné jusqu’au bout`, String((e && e.stack) || e).slice(0, 500)); }
   }
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ baisse de prix Vestiaire : tout est vert');
