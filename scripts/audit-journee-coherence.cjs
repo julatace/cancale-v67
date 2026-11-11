@@ -48,7 +48,7 @@ async function passe(mut) {
   }
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-e1-'));
   fs.writeFileSync(path.join(tmp, 'package.json'), '{"type":"module"}');
-  for (const f of ['src/journeeArgent.js', 'src/design/carteChiffres.js', 'src/argentAVenir.js', 'src/formatsDate.js']) { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), src[f] ?? lire(f)); }
+  for (const f of ['src/journeeArgent.js', 'src/design/carteChiffres.js', 'src/argentAVenir.js', 'src/formatsDate.js', 'src/profilVendeur.js']) { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), src[f] ?? lire(f)); }
   let JA = {}, CC = {};
   try { JA = await import(pathToFileURL(path.join(tmp, 'src/journeeArgent.js')).href); } catch (e) { dit(false, 'A1 src/journeeArgent.js se charge', e.message); }
   try { CC = await import(pathToFileURL(path.join(tmp, 'src/design/carteChiffres.js')).href); } catch (e) { dit(false, 'A2 carteChiffres.js se charge', e.message); }

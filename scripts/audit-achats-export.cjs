@@ -99,6 +99,7 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX);
     fs.writeFileSync(path.join(dir, 'registres.js'), REG);
+    fs.writeFileSync(path.join(dir, 'profilVendeur.js'), lire('src/profilVendeur.js'));   // (11 nov., 5.355) importé par registres.js (« paire » / « article »)
     fs.writeFileSync(path.join(dir, 'exportComptable.js'), EXP);
     fs.writeFileSync(path.join(dir, 'factureAchat.js'), lire('src/factureAchat.js'));   // (11 nov.) importé par exportComptable.js (mentionFacture)
     fs.writeFileSync(path.join(dir, 'vestiaire-regle.js'), VC.replace(/from '\.\/([^']+)\.js'/g, (x, n) => `from '${path.join(R0, 'api', '_lib', n + '.js').replace(/\\/g, '/')}'`));
