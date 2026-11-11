@@ -1,5 +1,5 @@
 import { gabaritMail } from '../../api/_lib/mail-gabarit.js';
-import { traductionContenu, MESSAGE_DEFAUT_EN } from './anglais.js';
+import { traductionContenu, MESSAGE_DEFAUT_EN, bi } from './anglais.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  LA FACTURE PRO — la règle (2 novembre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -172,6 +172,25 @@ export function jourParis(t) {
 }
 export const anneeParis = (t) => Number(jourParis(t).slice(-4)) || new Date(t).getFullYear();
 
+// (11 nov., lot ventes-lot) UNE VENTE EN LOT : une facture, UNE LIGNE PAR ARTICLE. `vente.lignes`
+// = [{ designation, centimes }] (src/venteLot.js `lignesFactureLot`, parts réparties au centime).
+// Elles ne valent que si leur somme est EXACTEMENT le prix de la vente ; sinon la ligne unique
+// d'avant (jamais un total qui diffère du prix encaissé). Le HT de chaque ligne suit la règle du
+// régime ; la dernière ligne prend l'écart d'arrondi pour que la somme soit le HT de la facture.
+export function lignesDeVente(vente, mt, c, signe = 1) {
+  const L = Array.isArray(vente && vente.lignes) ? vente.lignes : null;
+  const unique = [{ designation: txt(vente.designation), quantite: 1, unite: signe * mt.ht, total: signe * mt.ht }];
+  if (!L || L.length < 2 || !L.every((l) => l && txt(l.designation) && Number.isInteger(l.centimes) && l.centimes > 0)) return unique;
+  if (L.reduce((s, l) => s + l.centimes, 0) !== vente.centimes) return unique;
+  let reste = mt.ht;
+  return L.map((l, i) => {
+    const m = montants(l.centimes, c.tva_regime, c.tva_taux);
+    const ht = i === L.length - 1 ? reste : (m ? m.ht : l.centimes);
+    reste -= ht;
+    return { designation: txt(l.designation).slice(0, 400), quantite: 1, unite: signe * ht, total: signe * ht };
+  });
+}
+
 // ── L'INSTANTANÉ D'UNE FACTURE ──────────────────────────────────────────────
 // Tout ce que le PDF dessine, et rien d'autre : il se refait à l'identique des
 // années plus tard. Lève une erreur (avec la liste) si quelque chose manque —
@@ -219,7 +238,7 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
       adresse: lignes(vente.acheteur.adresse),
       email: emailValide(vente.acheteur.email) ? txt(vente.acheteur.email) : '',
     },
-    lignes: [{ designation: txt(vente.designation), quantite: 1, unite: signe * mt.ht, total: signe * mt.ht }],
+    lignes: lignesDeVente(vente, mt, c, signe),
     regime: c.tva_regime,
     taux: mt.taux,
     totaux: { ht: signe * mt.ht, tva: mt.tva == null ? null : signe * mt.tva, ttc: signe * mt.ttc },
@@ -363,6 +382,17 @@ export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) 
 // Le texte du vendeur (`messageEmail`) et une version HTML qui dit la même chose
 // (tout est échappé : aucune valeur n'écrit du HTML), sans pied (11 nov.). Jamais de lien de désinscription : c'est un e-mail
 // transactionnel (la facture d'un achat), pas une lettre d'information.
+// La dernière ligne du PDF (./pdf.js) : son libellé et son montant, tels quels.
+// Un total illisible ⇒ rien (jamais un « 0,00 € » qui voudrait dire « pas su »).
+export function totalDocument(contenu) {
+  const T = contenu && contenu.totaux;
+  if (!T || !Number.isInteger(T.ttc)) return null;
+  const avoir = contenu.type === 'avoir';
+  const lib = contenu.regime === 'normal' ? (avoir ? 'Total TTC à rembourser' : 'Total TTC')
+    : contenu.regime === 'franchise' ? (avoir ? 'Montant à rembourser' : 'Net à payer')
+      : (avoir ? 'Montant à rembourser' : 'Total à payer');
+  return [bi(lib, !!contenu.anglais), euros(T.ttc)];   // la traduction du PDF (./anglais.js)
+}
 export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
   const { sujet, corps } = messageEmail(cfg, contenu);
   const nom = contenu.vendeur.nom;
@@ -376,11 +406,22 @@ export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
   // le NOM du vendeur en tête (c'est SA facture, pas un e-mail de VRM), son texte
   // échappé, la pièce jointe dite, aucun bouton, aucun pied (`marque` : pas de mentions de VRM).
   const doc = contenu.type === 'avoir' ? (contenu.anglais ? 'Avoir / Credit note' : 'Avoir') : (contenu.anglais ? 'Facture / Invoice' : 'Facture');
+  // (11 nov., lot emails-envoyes) Sous son message, l'essentiel du document d'un coup
+  // d'œil : son numéro et le montant — le MÊME chiffre et le même libellé que la
+  // dernière ligne du PDF (`totalDocument`), jamais recalculé ici — puis le nom du
+  // PDF joint. Aucun bouton (le document EST la pièce jointe), rien de VRM.
+  // Le texte brut reste exactement SON message (l'aperçu « Message » de l'app).
+  const total = totalDocument(contenu);
+  const en = (fr, an) => (contenu.anglais ? `${fr} / ${an}` : fr);   // deux mots que le PDF n'a pas
   const { html } = gabaritMail({
     titre: `${doc} ${contenu.numero}`,
     preentete: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
     paras: corps.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean),
-    apres: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
+    chiffres: [
+      [en('Numéro', 'Number'), String(contenu.numero)],
+      ...(total ? [total] : []),
+    ],
+    apres: `${en('Pièce jointe', 'Attachment')} : ${nomFichier(contenu)}`,
     pied: null,
     marque: { nom },
   });

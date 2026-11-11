@@ -2386,3 +2386,12 @@ par commande (base = dû au vendeur, port exclu) ; Vestiaire : la vente rangée 
 `scripts/bancs/argent-mois.cjs` (données inventées, 390 tactile et 1512, clair et sombre) :
 100 verts. Captures regardées (carte « À venir », journal, Comparer, Frais). **52 rouges** sur le
 build d'origin/main (8d01ecc9).
+
+## Ligne déplacée de CLAUDE.md §9 (11 nov., tel quel)
+
+- **11 nov. · Ventes sans date de versement (lot DJ7)** : mesuré, 1 751 sur UN compte, détail de transaction jamais relu ; relevé : 0 vente datable. « Déclarer » : « N datées ✓ · M sans date », une raison par ligne + geste (« Ouvrir Vinted » par compte, Leboncoin à la main) ; jamais devinée (`src/versementRaisons.js`). `docs/passation/2026-11-11-dates-versement.md`. Geste : ouvrir vinted.fr sur ce compte.
+
+
+## Ligne déplacée de CLAUDE.md §9 (11 nov., taille)
+
+- **11 nov. · Clôturer l'année** : Argent → Déclarer (déc.–mai), 8 étapes CONSTATÉES (règles existantes) + portes ; « J'ai fini » = son clic (`vrm_cloture_annee`) ; Ma journée déc./janv. une fois. Sites officiels injoignables ici : cases/seuils non revérifiés. `2026-11-11-cloture-annee.md`.

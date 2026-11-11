@@ -82,7 +82,10 @@ const CONFIGS = [
   { id: '1024x700', w: 1024, h: 700, dsf: 1.25, souris: true },
   { id: '1000x700', w: 1000, h: 700, dsf: 1.25, souris: true },
   { id: '960x900', w: 960, h: 900, dsf: 1, souris: true },
-  { id: '768-tactile', w: 768, h: 1024, dsf: 2, souris: false },
+  // (11 nov., chantier iPad) 768×1024 au doigt est un iPad : coque ORDINATEUR (src/coque.js,
+  // banc ipad.cjs). Le doigt garde la coque téléphone sous 744 px ou couché (≤ 599 px de haut).
+  { id: '768-tactile', w: 768, h: 1024, dsf: 2, souris: false, tablette: true },
+  { id: '932x430-tactile', w: 932, h: 430, dsf: 3, souris: false },
   { id: '390-tactile', w: 390, h: 844, dsf: 3, souris: false },
 ];
 const ECRANS = ['journee', 'cat_msg', 'compta', 'cat_bord'];
@@ -189,6 +192,7 @@ const MESURE = () => {
       dit(!r.mort, `${nom} : l'écran s'affiche`);
       dit(r.docSw <= r.vw + 1 && r.mainSw <= r.mainCw + 1, `${nom} : aucun débordement horizontal`, `page ${r.docSw}/${r.vw}, main ${r.mainSw}/${r.mainCw}`);
       if (cf.souris) dit(r.sidebar && !r.tabbar, `${nom} : coque ordinateur à la souris (rail, pas de barre du bas)`, `rail ${r.sidebar} · barre du bas ${r.tabbar}`);
+      else if (cf.tablette) dit(r.sidebar && !r.tabbar, `${nom} : tablette au doigt : coque ordinateur (rail, pas de barre du bas)`, `rail ${r.sidebar} · barre du bas ${r.tabbar}`);
       else dit(!r.sidebar && r.tabbar, `${nom} : coque téléphone au doigt`, `rail ${r.sidebar} · barre du bas ${r.tabbar}`);
       if (t === 'journee' && cf.souris) dit(r.trous.length === 0, `${nom} : « À faire » ne laisse aucune case vide`, `vide de ${r.trous.join(', ')} px`);
       if (r.sidebar) {

@@ -142,7 +142,7 @@
    lisible à droite. Banc scripts/bancs/iphone-reprise.cjs (O2). */
 /* (3 nov.) Sauf la messagerie en trois volets (liste · fil · fiche, la maquette choisie) :
    à 760 px le fil n'avait plus que ~100 px de large. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   :root:root body .vrm-app-shell .vrm-main:is([data-ecran="dashboard"], [data-ecran="settings"], [data-ecran="achats"], [data-ecran="messages"], [data-ecran="compta"], [data-ecran="communaute"]):not(:has(.vrm-message-workspace)) > :not(.vrm-barre-haut):not(style):not(script):not([role="dialog"]):not([role="alertdialog"]) {
     max-width: var(--vrm-largeur-contenu, 760px) !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important;
   }
