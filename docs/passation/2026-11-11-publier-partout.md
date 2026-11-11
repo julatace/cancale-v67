@@ -125,6 +125,15 @@ L'annonce Vinted est la source ; VRM la reporte sur Leboncoin, Vestiaire et eBay
 - Preuves : `audit-annonces-outils` 48/48 (P8, P10, P12 remis à la décision ; P15-P17 neufs) ; `audit-publier-partout`
   section J (5) + 4 mutations (ajustement oublié, Vinted envoyé, relu ignoré, réglage pas passé par l'app).
 
-## ÉTAT FINAL
-- Build et bancs : voir la ligne « Bancs » ci-dessous (machine très chargée : la file des créneaux lourds a tué un
-  premier build après 30 min sans créneau).
+## ÉTAT FINAL (11 nov., ~19 h 30)
+- `npm run build` vert. Banc `scripts/bancs/publier-partout.cjs` **110/110 verts** (390 tactile et 1512, clair et
+  sombre ; A–H : feuille, gardes sans extension — au téléphone « depuis ton ordinateur » —, déjà en ligne par N°, prix
+  par site gardé, série, brouillon eBay sans port ni publication, paramètres par défaut et par annonce, VRM figé sous
+  le suivi commun puis « Fermer »). Banc `annonces-outils` vert (« Changer le prix »). Captures regardées.
+  Corrigé en passant : choisir « ± euros » faisait disparaître le champ (un écart nul se range « prix Vinted ») — le
+  mode choisi est tenu par la feuille jusqu'à la saisie.
+- Audits verts : publier-partout 75/75 (26/26 mutations), annonces-outils 48/48, suivi-travail 48/48, ebay-route 530,
+  annonces-actions, retirer-ailleurs, traduction, quoi-de-neuf, variables, tdz, coherence, identite, icones,
+  textes-courts, fonctions-api, secrets.
+- Reste : une extension qui porterait les paramètres Leboncoin/Vestiaire (porte → 'fiche') ; le prix réglé sur
+  Vestiaire ; un changement de prix Leboncoin/Vestiaire depuis VRM (aucune voie : « à faire sur le site »).
