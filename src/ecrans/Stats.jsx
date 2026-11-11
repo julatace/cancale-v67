@@ -2116,7 +2116,7 @@ function ObjectifDuMois({ liveStats }) {
             <span style={{ fontSize: 13, color: C.muted }}>{eurT ? '€' : 'ventes'}</span>
             <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { if (lu != null) poserValeur(lu); }}>OK</Bouton>
           </div>
-          {type === 'benefice' ? <div style={{ fontSize: 12, color: C.muted }}>Seules les ventes au prix d’achat connu comptent.</div> : null}
+          {type === 'benefice' ? <div style={{ fontSize: 13, color: C.muted }}>Seules les ventes au prix d’achat connu comptent.</div> : null}
           {obj ? <Bouton variante="discret" data-objectif-retirer="" onClick={() => { poser(objectifAEnregistrer(brut, null)); setEdit(false); }} style={{ alignSelf: 'flex-start' }}>Retirer</Bouton> : null}
         </div>
       ) : prog ? (
@@ -2132,14 +2132,14 @@ function ObjectifDuMois({ liveStats }) {
             <span data-objectif-detail-reste="">{phraseResteObjectif(prog, montreCourt)}</span>
             {ry ? <span data-objectif-detail-rythme={ry.etat} style={{ color: ry.etat === 'avance' ? C.text : C.muted }}>{phraseRythme(ry, prog.type, montreCourt)}</span> : null}
           </div>
-          {prog.couverture ? <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }} data-objectif-couverture={prog.couverture}>Prix d’achat connu pour {prog.couverture} ventes.</div> : null}
+          {prog.couverture ? <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }} data-objectif-couverture={prog.couverture}>Prix d’achat connu pour {prog.couverture} ventes.</div> : null}
           {passes.length ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }} data-objectif-passes="">
               {passes.map((m) => {
                 const v = m.x && m.x.valeur != null && m.x.couvert ? m.x.valeur : null;
                 return (
                   <div key={m.ym} data-objectif-passe={m.ym} data-objectif-passe-valeur={v == null ? '' : (eur ? String(Math.round(v * 100)) : String(v))} data-objectif-passe-atteint={m.atteint ? '1' : undefined} style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: C.muted }}>{NOMS_MOIS_OBJ[Number(m.ym.slice(5)) - 1]}</div>
+                    <div style={{ fontSize: 13, color: C.muted }}>{NOMS_MOIS_OBJ[Number(m.ym.slice(5)) - 1]}</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{v == null ? '—' : <>{m.x.partiel ? <span style={{ fontSize: 11, fontWeight: 500, color: C.muted }}>≥ </span> : null}{montreCourt(v)}</>}{m.atteint ? ' ✓' : ''}</div>
                     <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v == null ? (m.x && !m.x.couvert ? 'avant l’historique' : 'pas su') : m.visait != null ? `visé ${montreCourt(m.visait)}` : 'sans objectif'}</div>
                   </div>
