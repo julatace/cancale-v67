@@ -651,8 +651,8 @@ import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille
 import "./styles-profil.css";   // (11 nov., lot DJ6) la photo du profil et son menu
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
-import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import "./styles-pire-cas.css";   // (11 nov.) pire cas : chiffres et titres extrêmes tenus dans leur place
+import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
