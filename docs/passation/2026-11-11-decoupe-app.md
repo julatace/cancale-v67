@@ -57,7 +57,28 @@ les audits (vues `#v…`, compagnons `#h…`).
   dans les composants rendus (le texte d'origine est prouvé égal par l'étape texte).
 
 ## Prouvé (répétition sur origin/main f04d4a5) — voir « Mesures » ci-dessous
-RESULTATS_ICI
+Plan rejoué tel quel (`node scripts/decouper-app-2.cjs --appliquer`, 100 s) : **App.jsx 4 535 → 3 496 Ko**,
+13 modules `src/coeur/` (35 vues/racines paresseuses, 103 compagnons), 9 imports différés ; seul refus :
+`FeuilleSaisieAchats` (écrit `fillBuyN0.current` au rendu).
+- **texte recollé IDENTIQUE** à l'avant (83 467 lignes) ; `tab===` 59→59, `curSub===` 90→90, écrans montés
+  43→43, 680 composants rendus aux mêmes nombres (+1 par paresseux neuf), chaque vue/racine déclarée ET rendue ;
+  imports : aucun cassé neuf ; audit-variables, audit-tdz, audit-commandes, audit-parite-plateformes,
+  audit-decoupe-outil verts.
+- **Poids (vite build des deux arbres)** : morceau App 3 852 Ko / 1 290 Ko gz → 2 614 Ko / 882 Ko gz
+  (**−31,6 % gz**) ; **JS du premier chargement 4 085 Ko / 1 367 Ko gz → 2 847 Ko / 960 Ko gz (−29,8 % gz,
+  −30,3 % brut)** ; CSS inchangée (204 Ko gz) ; tout le JS construit 2 893 → 2 941 Ko gz (rien perdu).
+  Dont pdf-lib sorti (~10 %), le reste par la découpe.
+- **Tests** : 92 lancés dans les deux arbres, aucun rouge neuf (3 déjà rouges sur main : journee-instantanee,
+  lbc-persistance, retraits-confirmes).
+- **Audits** : 496 lancés (2 à la fois) ; 24 déjà rouges sur main (inchangés) ; **13 rouges neufs, tous parce
+  qu'ils lisaient `src/App.jsx` BRUT** (a-trancher, achats-relier, actions-serie, corbeille, factures-autres,
+  import-partage-aide, ligne-glissable, note-achat-double, ordre-recent, plans-solo-pro, profil-oauth,
+  relais-change, restauration) : branchés sur l'app recollée (`scripts/brancher-audits.cjs`, gardé hors des
+  modes `--prouve`/`MUT` qui écrivent le fichier lu) ⇒ **verts avant ET après la coupe** ; achats-relier
+  extrait sa fonction avant d'ôter les commentaires (sur le texte entier, un `/*` d'ailleurs l'avalait).
+  ⚠️ Au GO, un audit ajouté d'ici là peut faire de même : le vérificateur le DIT (« vert sur l'app recollée »)
+  et donne la commande.
+BANCS_ICI
 
 ## La coupe finale « GO » — commandes exactes
 ```
