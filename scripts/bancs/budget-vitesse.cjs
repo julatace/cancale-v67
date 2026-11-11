@@ -45,6 +45,10 @@ const RELEVER = process.env.BUDGET_RELEVER === '1';
 const DETAIL = !!process.env.BUDGET_DETAIL;
 const MUTATION = process.env.BUDGET_MUTATION || '';
 const MESURES = ['lectures', 'octets', 'doublons', 'entieres', 'js'];
+// La fenêtre observée, par ouverture : au moins 25 s (le rafraîchissement d'environ
+// 15 s après l'ouverture est toujours dedans), rien de ce qui part après 50 s (les
+// relectures à la minute jamais dedans). Le calme seul (vitesse.cjs) était bimodal.
+const FENETRE = { auMoins: Number(process.env.BUDGET_AU_MOINS) || 25000, auPlus: 50000 };
 const OUVERTURES = { neuf: 'appareil neuf', deuxieme: '2ᵉ ouverture' };
 
 // Les écrans principaux (navigation du 11 nov. : `NAV_GROUPES` de src/App.jsx). Le
@@ -109,7 +113,7 @@ function plafond(quoi, vals, marge) {
       if (seuls && !seuls.includes(tab)) continue;
       const series = { neuf: [], deuxieme: [] };
       for (let p = 0; p < passages; p++) {
-        const r = await V.ouvrir(b, { width: 390, height: 844 }, tab, attendre, null, { memoire: false, deuxieme: true, ...(MUTATION === 'doublon' ? { initScript: mutationDoublon } : {}) });
+        const r = await V.ouvrir(b, { width: 390, height: 844 }, tab, attendre, null, { memoire: false, deuxieme: true, fenetre: FENETRE, ...(MUTATION === 'doublon' ? { initScript: mutationDoublon } : {}) });
         for (const [cle, rr] of [['neuf', r], ['deuxieme', r.deuxieme]]) {
           const tombe = !rr || rr.lu.tombe || rr.errs.length || rr.utile == null;
           dit(!tombe, `${nom} (${OUVERTURES[cle]}) : l'écran s'affiche, sans erreur`, rr ? (rr.errs.join(' | ') || (rr.lu.tombe ? 'écran tombé' : rr.utile == null ? 'jamais affiché (30 s)' : '')).slice(0, 200) : 'pas mesuré');

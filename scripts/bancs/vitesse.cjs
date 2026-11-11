@@ -137,7 +137,12 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   servis = [];
   const req = [];
   let fige = false;   // après la mesure d'ouverture : les lectures du signal ne comptent pas dans le bilan
-  const noter = (e) => { if (!fige) req.push(e); };
+  // (11 nov., budget-vitesse) `fenetre` : {auMoins, auPlus} en ms depuis le chargement.
+  // Le calme seul (3 s sans lecture) coupe tantôt avant, tantôt après le rafraîchissement
+  // qui part ~15 s après l'ouverture (mesuré : Annonces 95 OU 111 lectures) ; le budget
+  // observe donc au moins `auMoins`, et ne compte rien de ce qui part après `auPlus`
+  // (avant les relectures à la minute).
+  const noter = (e) => { if (!fige && !(opts.fenetre && e.debut > opts.fenetre.auPlus)) req.push(e); };
   let t0 = Date.now();
   // L'histoire du héros de Ma journée : à quel moment il apparaît, avec quelle
   // valeur (un héros qui apparaît tôt avec un FAUX chiffre ne compte pas).
@@ -183,12 +188,16 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   try { await pg.waitForFunction(attendre, null, { timeout: RESEAU ? 120000 : 30000, polling: 50 }); utile = Date.now() - t0; } catch (_) {}
   // (6 nov., vitesse 2) La coque dessinée (le morceau `App` téléchargé, compilé, rendu) : mesurée dans la page.
   const coque = await pg.evaluate(() => window.__vrmCoque || null).catch(() => null);
-  // Le calme : plus aucune requête GET pendant 3 s.
-  for (let i = 0; i < 120; i++) {
-    await pg.waitForTimeout(500);
-    const dern = req.length ? Math.max(...req.map((x) => x.fin)) : 0;
-    if (Date.now() - t0 - dern > 3000) break;
+  // Le calme : plus aucune requête GET pendant 3 s (et, avec `fenetre`, au moins `auMoins`).
+  async function calme() {
+    for (let i = 0; i < 120; i++) {
+      await pg.waitForTimeout(500);
+      const dern = req.length ? Math.max(...req.map((x) => x.fin)) : 0;
+      if (Date.now() - t0 - dern > 3000 && !(opts.fenetre && Date.now() - t0 < opts.fenetre.auMoins)) break;
+      if (opts.fenetre && Date.now() - t0 > opts.fenetre.auPlus) break;
+    }
   }
+  await calme();
   // ⚠️ Sauf la phrase des photos (`data-photos-bloquees`) : le banc coupe les
   // images, et elle apparaît au bout d'un délai — elle dit le temps écoulé.
   const lu = await pg.evaluate(() => { let t = document.body.innerText; for (const x of document.querySelectorAll('[data-photos-bloquees]')) t = t.replace(x.innerText, ''); return { tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: t, rendus: window.__vrmRendus ? window.__vrmRendus.rendus : null }; });
@@ -260,7 +269,8 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     for (let i = 0; i < 120; i++) {
       await pg.waitForTimeout(500);
       const dern = req.length ? Math.max(...req.map((x) => x.fin)) : 0;
-      if (Date.now() - t0 - dern > 3000) break;
+      if (Date.now() - t0 - dern > 3000 && !(opts.fenetre && Date.now() - t0 < opts.fenetre.auMoins)) break;
+      if (opts.fenetre && Date.now() - t0 > opts.fenetre.auPlus) break;
     }
     const lu2 = await pg.evaluate(() => ({ tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: document.body.innerText })).catch(() => ({ tombe: true, texte: '' }));
     deuxieme = { req: req.slice(), utile: utile2, errs: errs2, lu: lu2, fichiers: servis.slice(), heros: [] };
