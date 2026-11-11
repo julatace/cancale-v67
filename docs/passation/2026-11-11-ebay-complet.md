@@ -118,5 +118,39 @@ retours) sont des replis, pas des promesses. Qu'un compte en politiques de vente
   `Feuille, C, mode, valeurs, onChange, onClose, compte, typeCompte, devise, onProgrammer, onUsine`.
 - Sponsorisée : après `publish` réussi, `apresPublication(r)` ⇒ `{action:'promouvoir', confirme:true, listingId, taux}`.
 
+
+## Ajouts validés par Julien (même lot)
+1. **« Faire une offre à ceux qui suivent l'annonce »** : DÉJÀ là (constaté dans le code, 17 oct.) —
+   `offreinfo` / `offre` (Sell Negotiation API `find_eligible_items` + `send_offer_to_interested_buyers`),
+   carte d'annonce eBay : remise 5–50 %, confirmation qui dit le nombre d'observateurs et le prix
+   proposé, revérifié chez eBay au moment d'envoyer, 48 h. Rien changé.
+2. **Remises eBay** (`api/_lib/ebay-remises.js`, actions `remises`, `poserremise`, `retirerremise`,
+   journalisées comme les gestes commerciaux) : remise sur une période (`item_price_markdown`,
+   5–80 %, 1–30 j) ou par quantité (`VOLUME_DISCOUNT`, 1 à 3 paliers croissants) sur SES annonces
+   (relues ; illisibles ⇒ 503), `confirme` exigé, **`applyFreeShipping:false` toujours (§2.8)** ;
+   retirer relit la remise : en cours ⇒ pause, programmée ⇒ supprimée, un code promo n'est jamais
+   touché. Écran : eBay → Promotion → « Remises eBay » (`EbayRemises`), la date de fin dite partout,
+   prix après remise par annonce, confirmation. ⚠️ Chemins Marketing v1 de la doc, non mesurés.
+3. **Messages eBay dans Messages · Tous** : `convEbay` (src/filUnique.js : ItemID et acheteur eBay
+   sont des identités préfixées `ebay:`), lus EN DIRECT (action `messages`, page 1, chaque compte) ;
+   le fil eBay (`FilEbay`) montre la question et les réponses ; « Envoyer » sur SON clic confirmé
+   (`repondre`, la route relit la question chez eBay) seulement pour une question d'acheteur ;
+   eBay illisible ⇒ « eBay : pas pu lire », jamais une liste vide.
+
+## Revue eBay (« eBay doit être irréprochable ») — défaut · cause · correction · preuve
+| défaut | cause | correction | preuve |
+|---|---|---|---|
+| Le retour de connexion eBay (`/?ebay=connecte…`) n'était jamais dit : écran d'accueil, puis l'adresse perdue au premier changement d'écran | seule `EbayConnexion` lisait `?ebay=`, et elle n'est montée que dans Paramètres → Comptes eBay | la coque garde le retour (`DEMANDE_RETOUR_EBAY`), ouvre Comptes eBay et nettoie l'adresse ; `RetourConnexionEbay` dit le compte constaté ou l'erreur + geste | banc `ebay-complet` B (adresse SANS onglet, celle d'eBay) |
+| Comptes eBay → Argent : « total des ventes » comptait le PORT payé par l'acheteur (§2.8) | `pricingSummary.total` au lieu de la règle `montantRecuEbay` | « reçu (après frais eBay) », « au moins · N sur M » si un montant manque, « — » si aucun | banc L (106,50 payé ⇒ 100,00 reçu) |
+| Ventes eBay : chaque ligne disait ce que l'acheteur a payé (port compris), pas ce que tu reçois — la somme des lignes ≠ « CA payé » | idem | la ligne dit `montantRecuEbay`, « — » si inconnu | banc L |
+| « à envoyer » en bleu d'accent, « en attente de paiement » en ambre (le geste est à l'acheteur) | couleurs inversées vs §7 | à envoyer = ambre ; attente = neutre | lecture du rendu (captures L) |
+| TVA et obligation des retours d'un pro jamais jugées par la route | `resoudreCompte` ne portait pas le `type` du registre | `type` porté (principal et autres comptes) | banc route P6 ; mutation « type-oublie » rouge |
+| Une enchère aurait pu partir avec une règle d'offre (BestOffer interdit sur enchère) | aucune garde | refus app (`itemDeBrouillon`) et route (`optionsPublication`) | banc route P1 |
+| Une valeur hors liste fermée d'eBay (« Bleu ciel ») pouvait devenir « Noir » en silence au pré-remplissage | — (nouveau code) | `preRemplir` : une seule valeur hors liste ⇒ rien rempli, la question porte « Vinted dit » | banc route A ; mutation « app-hors-liste » rouge |
+| Interrupteurs de la feuille à 32 px de haut | dessin = cible | cible 44 px, dessin 32 | banc I (390 px) |
+| `audit-benefice` rouge : « MeilleuresSources déclaré deux fois » | présent À L'IDENTIQUE sur origin/main (f04d4a580) | hors lot, laissé | relancé depuis l'arbre d'avant : même rouge |
+
 ## ÉTAT À LA REPRISE
 (voir la ligne du bas, mise à jour à chaque étape)
+- Tête poussée à chaque étape (`claude/ebay-complet`). Banc route 55/55 (16/16 mutations, 29 rouges sur l'avant) ; banc de rendu `ebay-complet` 70/70 avant l'ajout L (argent) — relance en cours sur la file lourde (machine saturée), comparée à l'arbre d'avant (`/home/user/wt/ebay-avant`, build de f04d4a580).
+- Bancs eBay voisins : la fenêtre « 1re publication » interceptait leurs publications ⇒ ils posent `vrm_ebay_guide_vu` (le banc ebay-complet prouve la fenêtre). Résultats comparés avant/après : voir le compte rendu final.
