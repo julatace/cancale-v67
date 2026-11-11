@@ -103,6 +103,8 @@ export function livreDesRecettes({ decl, periode, numDe = () => '', compteDe = (
     frais: Number.isFinite(l.frais) ? l.frais : null,
     reglement: `Versement ${l.plateforme}`, reference: referenceDe(l.id), num: String(numDe(String(l.id)) || ''),
     compte: String(compteDe(String(l.id)) || ''), titre: String(l.titre || ''), raison: raison || '',
+    // (11 nov., lot livre-registre) Le mois que la règle donne (`l.ym`) et le compte Vinted (uid) : par identité.
+    ym: String(l.ym || ''), uid: l.o && l.o._acc && l.o._acc.vinted_user_id != null ? String(l.o._acc.vinted_user_id) : '',
     // (9 nov.) Ce que la date de la ligne EST, selon la règle de `ventesDeclarables` :
     // le versement (Vinted, Vestiaire) ; la vente (Leboncoin) ; la commande (eBay).
     // La date de vente d'une ligne Vinted est celle de SA commande (`dateVente`).
@@ -192,7 +194,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     }
     const ts = Date.parse(o.date || '');
     const l = { id, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Vinted', fournisseur: 'Vinted', montant, source, raison, saisi,
-      reglement: 'Paiement Vinted', reference: tx, num: nums.join(' + '), compte: String(o.compte || ''), titre: String(o.title || '') };
+      reglement: 'Paiement Vinted', reference: tx, num: nums.join(' + '), compte: String(o.compte || ''), titre: String(o.title || ''), uid: String(o._uid || '') };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) lignes.push(l);
   }
