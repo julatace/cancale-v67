@@ -52,18 +52,24 @@ export const LIBELLES_TYPE = {
   // (11 nov., extension 5.340) relu chez Vinted après son clic
   vacances_pose: 'Mode vacances · posé',
   vacances_retire: 'Mode vacances · retiré',
+  // (11 nov., 5.350) constatés chez Vinted, jamais un geste de VRM
+  moderation_masquee: 'Annonce masquée par Vinted',
+  moderation_disparue: 'Annonce disparue · peut-être retirée par Vinted',
+  moderation_banni: 'Compte fermé par Vinted',
+  moderation_restreint: 'Compte limité par Vinted',
 };
 export const LIBELLES_RESULTAT = { ok: 'Fait', refuse: 'Refusé', pause: 'En pause', verifier: 'À vérifier', en_cours: 'En cours' };
 // Les filtres de type (puces) : regroupés comme Julien les nomme.
 export const FILTRES_TYPE = [
-  ['tous', 'Tout'], ['offres', 'Offres et messages'], ['favoris', 'Favoris'], ['republication', 'Republications'], ['prix', 'Prix'], ['ebay', 'eBay'], ['bordereau', 'Bordereaux'], ['leboncoin', 'Leboncoin'],
+  ['tous', 'Tout'], ['offres', 'Offres et messages'], ['favoris', 'Favoris'], ['republication', 'Republications'], ['prix', 'Prix'], ['ebay', 'eBay'], ['bordereau', 'Bordereaux'], ['leboncoin', 'Leboncoin'], ['moderation', 'Vinted'],
 ];
 const familleType = (t) => (t === 'favori' || t === 'favori_offre' ? 'favoris'
   : t === 'ebay_retrait' || t === 'ebay_action' ? 'ebay'
   : t === 'bordereau_demande' ? 'bordereau'
   : t === 'offre_acceptee' || t === 'offre_refusee' || t === 'offre_faite' || t === 'message_envoye' ? 'offres'
   : t === 'baisse_prix' || t === 'annonce_modifiee' ? 'prix'
-  : t === 'lbc_publication' ? 'leboncoin' : t);
+  : t === 'lbc_publication' ? 'leboncoin'
+  : /^moderation_/.test(String(t || '')) ? 'moderation' : t);
 
 export function filtrerJournal(evts, { compte = '*', type = 'tous' } = {}) {
   return (Array.isArray(evts) ? evts : []).filter((e) => e
