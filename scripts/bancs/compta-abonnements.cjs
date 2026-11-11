@@ -199,7 +199,9 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
         const rA = await lire(pg);
         dit(rA.nAbo === 0 && /corbeille/i.test(pil) && (await pg.locator('[data-pilule-annuler]').count()) > 0, 'supprimer un abonnement : la ligne part, la pilule dit « Mis à la corbeille » et offre « Annuler »', pil.replace(/\s+/g, ' '));
         await pg.click('[data-pilule-annuler]');
-        await pg.waitForTimeout(1500);
+        // (11 nov., restes) §6.5 : on attend l'ISSUE de l'annulation (la pilule « Annulé », ou plus de
+        // pilule), jamais un délai fixe — mesuré : « Annulation… » à 1,5 s, « Annulé » à ~2 s, sous charge.
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-pilule]'); const t = e && e.getAttribute('data-pilule-etat'); return !t || t === 'annule' || t === 'echec-annulation'; }, null, { timeout: 10000 }).catch(() => {});
         const stA = await stocke(); const rB = await lire(pg);
         dit(rB.nAbo === 1 && stA && JSON.stringify(stA.abo) === JSON.stringify(avant.abo) && !Object.keys(stA.corb).length, '« Annuler » remet la ligne exacte (écran et `vrm_compta`), corbeille vide', `${rB.nAbo} · ${stA && stA.abo.length}`);
         await pg.click('[data-abo] [data-compta-supprimer]');

@@ -1,0 +1,139 @@
+# 11 nov. 2026 — Chacun compose sa Ma journée (lot journee-perso)
+
+Branche `claude/journee-perso` (depuis `origin/main` fc3883d, `main` refusionnée ensuite), poussée à
+chaque commit, **pas de PR ni de merge dans `main`** (consigne du coordinateur).
+
+## Ce qui est demandé
+
+« Modifier » en bas de Ma journée (et Paramètres → Ma journée) : la liste des cartes avec un
+interrupteur et une poignée pour réordonner (au doigt et au clavier) ; « Revenir au réglage
+d'origine ». Réglage synchronisé par compte. Intouchable : une carte qui porte un geste DÛ urgent
+s'affiche toujours, même masquée (en tête, « affichée car urgent ») ; une carte masquée garde son
+compteur publié ; Simple/Complet reste le réglage de départ, la personnalisation s'ajoute par-dessus ;
+une carte livrée plus tard apparaît par défaut à sa place. Principe de Julien : « plus beau, simple,
+surtout PRATIQUE ».
+
+## Ce qui est livré
+
+### La règle — `src/journeePerso.js` (pure, exécutée par l'audit)
+- **Le catalogue** `CARTES_JOURNEE`, dans l'ordre d'origine (celui de Ma journée v2), en trois zones :
+  - **En haut** (la tête sombre) : la phrase du jour · la prochaine chose à faire · les 7 derniers
+    jours (frise) · les chiffres du mois ;
+  - **À faire** : vendus ailleurs · en ligne deux fois · colis à envoyer · colis à retirer ·
+    messages · prix à baisser · e-mails à relier · vendus encore rangés · supprimés de Vinted ·
+    les autres rappels (litiges, achats à relier, inventaire… : `jobsAFaire`) · déclaration URSSAF ;
+  - **En bas** : notifications coupées · Démarrer avec VRM.
+- **Le réglage** `vrm_journee_perso` (dans `SYNC_KEYS`) : `{ v: 1, ordre: [id…], choix: { [id]: bool }, at }`.
+  `choix` ne garde que ce qu'il a touché : une carte jamais touchée suit **Simple / Complet**
+  (`visibiliteCarte` part de `caseJourneeMontree` — en Simple, « Prix à baisser » se tait toujours
+  par défaut, et il peut la rallumer). « Revenir au réglage d'origine » écrit un réglage vide.
+- **Une carte livrée plus tard** (absente de `ordre`) : `ordreJournee` la pose juste après sa voisine
+  d'origine (ou en tête) — elle apparaît par défaut, à sa place. Pour qu'un futur lot ajoute une
+  carte : une entrée dans `CARTES_JOURNEE` + son bloc dans `blocsAF` (ou la tête / le bas) ;
+  `audit-journee-perso` S4 refuse un bloc sans entrée et une entrée sans bloc.
+- **L'urgence** `urgencesJournee` (aucun recalcul : les champs des cases déjà publiés) : « à envoyer »
+  quand un colis est en retard (`alerte`) ou à sa date limite (`presses`) ; « à retirer » au dernier
+  jour (`alerte`) ; ou une alerte urgente du même geste (`colis-en-retard`, `colis-limite`,
+  `retrait-dernier-jour`). Seules ces deux cartes peuvent « forcer ».
+
+### Les intouchables
+- **Les alertes urgentes** (`j.urgent` : deux articles sous un N°, double vente, colis en retard,
+  dernier jour de retrait, colis eBay à ne pas poster…) ne sont PAS dans la liste : toujours en
+  premier, jamais cachables ni déplaçables (ce qui était déjà la règle des widgets du 21 oct.).
+- **La panne de la base** (`LignePanne`, `BaseInjoignable`) n'est pas une carte : intouchée.
+- **Cachée mais urgente** : « Colis à envoyer » / « Colis à retirer » reviennent d'eux-mêmes, juste
+  après les alertes (donc en tête de « À faire », ou dans la tête si c'est la première), avec
+  « Affichée car urgent » (ambre : un geste à faire, jamais le rouge) — `data-jp-force`.
+- **Le compteur d'une carte cachée reste publié** : une case cachée sort de `cases`, donc tombe dans
+  le MÊME bloc caché `data-tuile` que les cases à zéro (audit-vendeurs-différents B2, inchangé) ; les
+  autres cartes cachées laissent `<span data-jp-cachee data-n>` ; la frise et les chiffres du mois
+  cachés restent RENDUS dans un `<div hidden>` (leurs `data-*` et publications ne changent pas).
+  Défaut trouvé au banc et corrigé : quand TOUT ce qui reste à faire est caché, la branche « Rien à
+  faire dans tes cartes affichées » ne portait pas le bloc caché — elle le porte (`compteursCaches`).
+- **« N gestes »** ne compte que ce qui est à l'écran (`nGestesTout − cartes cachées`) ; en bas,
+  « N cartes cachées » à côté de « Modifier ma journée ».
+
+### Les écrans
+- **Ma journée** : la tête, « À faire » et le bas suivent SON ordre. « La prochaine chose à faire »
+  cachée ⇒ rien ne monte en tête (la première carte reste dans la liste). En bas : **« Modifier ma
+  journée »** (secondaire, 44 px) ouvre une feuille (`SheetShell`, `data-feuille-journee-perso`).
+  Le « Modifier » de la carte des chiffres (choisir les chiffres) est inchangé : deux gestes, deux
+  noms.
+- **Paramètres → Affichage → Ma journée** (`data-reglage-journee-perso`) : le MÊME éditeur
+  (`JourneePersoSetting`, exporté par App.jsx).
+- **L'éditeur** (`src/JourneePerso.jsx`, `src/styles-journee-perso.css`) : trois listes groupées
+  façon Réglages iOS ; par ligne une poignée (six points, 44 px), le nom, une phrase grise, un
+  interrupteur (`.vrm-switch`, le même que Paramètres). Une carte cachée a son nom en gris.
+  - **Au doigt / à la souris** : la poignée capte le pointeur (`setPointerCapture`,
+    `touch-action: none` : la page ne défile pas pendant le geste) ; la ligne prend la place que
+    désigne le doigt (le milieu de chaque autre ligne fait la frontière), avec une ombre pendant le
+    geste. Mouvement réduit : aucune transition.
+  - **Au clavier** : poignée focalisée, flèches haut/bas, Début/Fin ; le focus reste sur la poignée ;
+    « Les chiffres du mois : 3ᵉ sur 4 » est annoncé (`aria-live`).
+  - Chaque geste s'enregistre tout de suite ; toutes les instances (Ma journée, sa feuille,
+    Paramètres) suivent sans attendre (`_ecoutesPerso`), le nuage reçoit la ligne `main` comme tout
+    réglage de `SYNC_KEYS`.
+
+### Ce qui a bougé sans qu'il le demande
+- **« Notifications coupées »** passe SOUS « À faire » (zone « En bas », avec le guide) : avant, il
+  était juste au-dessus. Raison : une seule règle de zones (haut · à faire · bas) ; ce rappel n'est
+  pas un geste dû. Il peut le remonter en tête de « En bas » ; s'il le veut au-dessus de « À faire »,
+  c'est une ligne à changer (`zone`).
+- **La barre d'import** (lot import-depart, fusionné pendant la session) n'est pas une carte : elle
+  n'existe que pendant l'import ; elle reste après le guide, toujours affichée.
+
+## Fichiers
+- `src/journeePerso.js` (neuf) · `src/JourneePerso.jsx` (neuf) · `src/styles-journee-perso.css` (neuf).
+- `src/App.jsx` : `SYNC_KEYS` (+ `CLE_JOURNEE_PERSO`), `useJourneePerso` / `JourneePersoSetting`
+  (après `useProfilVendeur`), Ma journée (`visJ`, `urgJ`, `blocsAF`, `compteursCaches`, la tête par
+  `ordreJournee('tete')`, le bas, la feuille).
+- `src/ecrans/Reglages.jsx` : l'entrée « Ma journée » du groupe Affichage.
+- `scripts/audit-journee-perso.cjs` (neuf) ; mis à la nouvelle forme sans s'affaiblir :
+  `audit-journee-coherence` A4 (le total s'appelle `nGestesTout`, les cartes vivent dans `blocsAF` ;
+  la règle « chaque carte rendue est comptée » est la même), `audit-vendeurs-differents` B1 (le mode
+  est lu aussi par `visibiliteCarte` / `nCartesCachees`, qui partent de `caseJourneeMontree`).
+- `scripts/bancs/journee-perso.cjs` (neuf).
+
+### Une carte fixe : les chiffres du mois
+Vu sur les captures : sur Ma journée, les cases du mois sont TOUJOURS posées sous la carte sombre (la
+grille des widgets, `styles-widgets-ios.css`, `grid-row: 31`). Les déplacer dans la tête ne changeait rien
+à l'écran : « Les chiffres du mois » est donc `fixe` (un interrupteur, pas de poignée) ; les trois autres
+cartes du haut se rangent entre elles (`ordreMobile`).
+
+## Preuves
+- `npm run build` vert.
+- Audits verts : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
+  vendeurs-differents (14/14 mutations), journee-coherence (30), boutons ; **journee-perso** (nouveau) :
+  vert, **20/20 mutations rouges**, et **15 rouges sur `origin/main`** (arbre extrait par `git archive`).
+  `audit-violet` : 3 rouges (logos FedEx / Relais Colis), les mêmes sur `origin/main`.
+- **Banc `journee-perso`** (390 tactile et 1512, clair et sombre, + Paramètres) : **99 verts, 0 rouge**.
+  Sur la construction de `origin/main` (ed0529c) : 0 vert, 9 rouges. Mutation de données
+  (`JP_MUTATION=1`, le colis n'est plus en retard) : 8 rouges (U), comme attendu.
+  Deux faux rouges du banc corrigés en route (pas de l'app) : le doigt posé hors de la vue touchait
+  `<html>` ; la base du banc est « non cloisonnée », l'app n'y écrit jamais `main` ⇒ la synchro se juge
+  sur la file d'envoi (`vrm_file_envoi`), le sens nuage → appareil par U. Deux vrais défauts trouvés et
+  corrigés : compteurs cachés absents quand tout ce qui reste est caché ; `touch-action: manipulation`
+  global (hors couche) qui volait le glisser au doigt (posé en ligne sur la poignée).
+- Bancs voisins sur cette construction : `journee-v2` 4 rouges (P « la pile ouvre Ventes ») et
+  `vendeurs-differents` 6 rouges (A5/A6 navigation) — **les mêmes, en même nombre, sur `origin/main`**.
+- Captures regardées (scratchpad du banc, `/tmp/banc-journee-perso/`) : l'éditeur clair/sombre 390/1512,
+  Ma journée modifiée (« Rien à faire dans tes cartes affichées · 1 geste dans les cartes cachées »,
+  « 1 carte cachée »), « Affichée car urgent » en ambre en tête de « Ensuite », juste après l'alerte.
+- Aucune écriture en base réelle ; aucune PR, aucun merge dans `main`.
+
+## Fusion de `claude/integration-11nov-e` (demande de la session principale)
+- Vrai `git merge`, les deux côtés gardés. Ce que leur côté a changé dans Ma journée, et comment c'est
+  rangé dans la règle :
+  - **« À trancher »** (lot DJ4 : carte en tête de « À faire », ouverte en place) ⇒ carte **fixe** du
+    catalogue (`trancher`, interrupteur sans poignée, toujours en tête), cachable (`visJ('trancher')`),
+    comptée dans `nGestesTout` et décomptée cachée.
+  - **« Supprimés de Vinted »** n'est plus rendue (absorbée par « À trancher », `cyclesJ = []`) ⇒ sortie
+    du catalogue (une poignée qui ne fait rien n'est pas pratique).
+  - **« Quoi de neuf »** : une ligne PASSAGÈRE après une mise en ligne ⇒ pas une carte réglable,
+    toujours à sa place (comme la barre d'import) ; « Notifications coupées » reste « En bas ».
+  - La carte sombre de stats-plus (jusqu'à 6 chiffres) est la même carte `chiffres` (fixe).
+- CLAUDE.md : celui de leur côté + la ligne de ce lot ; « Clôturer l'année » (la plus ancienne de §9)
+  déplacée telle quelle dans `historique-divers.md` (58 942 octets).
+- Preuves après fusion : build vert ; audits demandés verts ; `audit-journee-perso` 21/21 mutations ;
+  banc `journee-perso` 99 verts, 0 rouge. Banc `vendeurs-differents` : 10 rouges (A5, A6, A7) —
+  **les mêmes 10 sur `integration-11nov-e` seule** (construite à part) : pas de ce lot.

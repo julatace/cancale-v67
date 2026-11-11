@@ -32,7 +32,7 @@ import { prochainNumeroFacture, noterNumeroPris } from '../factureNumero.js';   
 import { achatVenteManuelle, beneficeVenteManuelle, totauxVentesManuelles } from '../venteManuelle.js';   // (11 nov.) achat inconnu = pas su, jamais 0
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
-import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
+import { gesteCorbeille, lireVentesImportees } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 // (11 nov., lot rapport-mois) « Rapport du mois » : le PDF (src/rapportMois.js), les lectures de catégories partagées.
 import { AUTH, lireExtrasRepartition } from '../App.jsx';
@@ -1562,8 +1562,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vestiaire = ventesVc || [];
-    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre });
-    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
+    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre, importees: lireVentesImportees() });
+    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees: lireVentesImportees() });
     let finSansDate = 0;
     const finalise = [];
     for (const l of [...decl.lignes, ...decl.aDater]) {
@@ -1805,10 +1805,10 @@ const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS
 // écartés (`compteEcarte`, `excluAutre`). Pure : `scripts/audit-registres.cjs`
 // l'EXÉCUTE. Les ventes Vinted ne passent que si les dates de versement sont
 // lues (sinon une vente serait datée à tort).
-const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u) }) => {
+const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u), importees = [] }) => {
   const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
   const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
+  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees });
   // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
   // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
   const ncER = phraseNonComptees((decl.ecartees || []).filter((x) => x && x.manque));
@@ -1833,7 +1833,7 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const rates = [...(lbcCoqueLu === null ? ['Leboncoin'] : []), ...(ebayCommandes === null ? ['eBay'] : []), ...(ventesVcER === null ? ['Vestiaire'] : [])];
-    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe });
+    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe, importees: lireVentesImportees() });
     return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined || ventesVcER === undefined };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre]);
@@ -2656,7 +2656,9 @@ function Dac7Plateformes({ ligne, annee }) {
         const droite = p.etat !== 'lu' ? '—'
           : p.verdict === 'atteint' ? <b style={{ color: C.text }}>atteint</b>
           : p.verdict === 'atteintSi' ? <>atteint si {p.nAd} à dater</>
-          : p.verdict === 'sous' ? <>encore {p.reste.n} vente{p.reste.n > 1 ? 's' : ''} ou {eur(p.reste.centimes)}</>
+          // (11 nov., restes) Aucune vente sur cette plateforme : le reste EST le seuil, déjà écrit dans
+          // l'en-tête — le redire sur chaque ligne l'écrivait trois fois (§7). La jauge vide le dit.
+          : p.verdict === 'sous' ? (p.n === 0 && p.centimes === 0 ? null : <>encore {p.reste.n} vente{p.reste.n > 1 ? 's' : ''} ou {eur(p.reste.centimes)}</>)
           : <>au moins</>;
         return (
           <div key={p.plateforme} data-dac7-plateforme={p.plateforme} data-etat={p.etat} data-n={p.n == null ? '' : p.n} data-cts={p.centimes == null ? '' : p.centimes} data-verdict={p.verdict || ''} data-a-dater={p.nAd || ''} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
@@ -2665,7 +2667,7 @@ function Dac7Plateformes({ ligne, annee }) {
               <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{p.etat !== 'lu' ? '—' : <>{p.partiel ? 'au moins ' : ''}{p.n} vente{p.n > 1 ? 's' : ''} · {eur(p.centimes)}</>}</span>
             </div>
             {p.etat === 'lu' ? <div style={{ marginTop: 6 }}><JaugeBarre attr={{ 'data-dac7-jauge': p.plateforme }} pct={pct} etat="ok" /></div> : null}
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{droite}</div>
+            {droite == null ? null : <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{droite}</div>}
           </div>
         );
       })}
@@ -3054,6 +3056,10 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const prevIci = (prev.etat === 'lu' || prev.etat === 'passu') && urssafDue && prev.label === urssafDue.label ? prev : null;
   const urssafPeriodCA = prevIci ? prevIci.ca : montantEcheance.ca;
   const echeancePartiel = (prevIci ? prevIci.partiel : montantEcheance.partiel) ? 1 : 0;
+  // (11 nov., restes) MOIS EN COURS = LA PÉRIODE DE LA CARTE DU HAUT (rythme mensuel) : son montant
+  // est déjà écrit en tête de Déclarer (`PrevisionUrssafCarte`, même règle, « au moins » compris).
+  // Ici, plus de second « 7,44 € » : la phrase dit d'où il vient (§7 : un nombre, une fois).
+  const montantEnHaut = prev.etat === 'lu' && prev.enCours && Array.isArray(prev.mois) && prev.mois.length === 1 && prev.mois[0] === ymCour && urssafEstime != null;
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
   const sLib = {fontSize:13,color:C.muted,fontWeight:500};
@@ -3157,14 +3163,9 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       <span style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{suivante.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                       <span data-echeance-suivante-jours={suivante.daysLeft} style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>dans {suivante.daysLeft} j</span>
                     </div>
-                    {prev.etat === 'lu' && prev.label === suivante.label ? (
-                      <div data-prevision-urssaf="lu" data-prevision-label={prev.label} data-prevision-ca={String(prev.ca)} data-prevision-apayer={String(prev.apayer)} data-prevision-partiel={prev.partiel ? '1' : ''} data-prevision-adater={prev.aDater || ''}
-                        style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap',marginTop:6}}>
-                        <span>À payer ≈</span>
-                        <span style={{color:C.text,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{prev.partiel ? 'au moins ' : ''}<Mt v={prev.apayer}/>{prev.aDater > 0 ? <span style={{color:C.muted,fontWeight:400}}> · {prev.aDater} à dater</span> : null}</span>
-                      </div>
-                    ) : null}
-                    <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours : ce qu'il faut mettre de côté est juste en dessous</> : <>, la période en cours</>) : null}.</div>
+                    {/* (11 nov., restes) Plus de « À payer ≈ » ici : le montant de cette période est
+                        celui de la carte « URSSAF » en tête de Déclarer (même `previsionUrssaf`) — §7, une fois. */}
+                    <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours</> : <>, la période en cours</>) : null}.</div>
                   </>) : null}
                   <div style={{marginTop:suivante?6:0}}><span style={{textTransform:'capitalize'}}>{urssafDue.label}</span> : déclaration notée ✓</div>
                 </div>
@@ -3204,8 +3205,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
           })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
         <div data-compta-mois="" style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
-          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours · à payer ({String(tauxUrssaf()).replace('.',',')}&nbsp;%)</div>
-          <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
+          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours{montantEnHaut ? null : <> · à payer ({String(tauxUrssaf()).replace('.',',')}&nbsp;%)</>}</div>
+          <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} data-montant-en-haut={montantEnHaut ? '1' : undefined} hidden={montantEnHaut} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
           {/* (2 nov.) La phrase vient de la MÊME ligne publiée que le chiffre :
               le CA reçu du mois (`moisCourantCA`) et son nombre de ventes. « Net
               après paiement » et la tuile « Ventes finalisées » sont retirés :
@@ -3213,7 +3214,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           <p className="vrm-compta-phrase" data-compta-phrase="urssaf-mois">
             {moisCourantCA==null
               ? <>— pas encore calculé</>
-              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté : {String(tauxUrssaf()).replace('.',',')}&nbsp;% de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
+              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté{montantEnHaut ? ' (le montant en haut)' : ''} : {String(tauxUrssaf()).replace('.',',')}&nbsp;% de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:'inherit',fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
                 {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
                 .
                 {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
@@ -3529,6 +3530,11 @@ function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
       <li key="lbc" data-adater-raison="leboncoin" data-n={r.n}>
         <span><b>{nbAd(r.n)}</b> Leboncoin : date à recopier.</span>
         <Bouton variante="discret" data-urssaf-dater="" data-adater-geste="main" onClick={onDater}>Dater à la main</Bouton>
+      </li>);
+    else if (r.cle === 'importee') lignes.push(
+      <li key="imp" data-adater-raison="importee" data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> importée{plAd(r.n)} sans date de versement : ajoute-la dans ton fichier, puis réimporte.</span>
+        <Bouton variante="discret" data-adater-geste="importer" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} }}>Importer</Bouton>
       </li>);
     else if (r.cle === 'vestiaire') lignes.push(
       <li key="vc" data-adater-raison="vestiaire" data-n={r.n}>
@@ -4220,6 +4226,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         if (!c) { if (++essais < 100) setTimeout(viser, 100); return; }
         // Rangée dans « Documents et réglages » (replié) : le repli s'ouvre (son `onToggle` suit).
         const d = c.closest('details'); if (d && !d.open && ++essais < 100) { d.open = true; setTimeout(viser, 60); return; }
+        // (11 nov., restes) La carte existe AVANT d'être affichée : « Déclarer » est encore `hidden` tant
+        // que `allerVue` n'a pas rendu — un focus sur un bouton invisible échoue sans rien dire, et la
+        // demande était effacée (banc annuler-commandes K5). On attend qu'elle ait une boîte à l'écran.
+        if (!c.getClientRects().length && ++essais < 100) { setTimeout(viser, 60); return; }
         DEMANDE_COMMANDE.export = 0;
         try { c.scrollIntoView({ block: 'center' }); } catch (_) {}
         const b = c.querySelector('[data-export-preparer]'); try { if (b) b.focus({ preventScroll: true }); } catch (_) {}
