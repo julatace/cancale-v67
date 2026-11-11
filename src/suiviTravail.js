@@ -92,8 +92,8 @@ export function noter(s, { id, texte, ton = 'info' } = {}, now = Date.now()) {
 
 export function debutArticle(s, id, now = Date.now()) {
   const a = s && articleDe(s, id);
-  if (!a || FINIS.has(a.etat)) return s;
-  const s2 = avecArticle(s, id, (x) => ({ ...x, etat: 'encours', debutAt: x.debutAt || now }));
+  if (!a || FINIS.has(a.etat) || a.etat === 'encours') return s;
+  const s2 = avecArticle(s, id, (x) => ({ ...x, etat: 'encours', debutAt: x.debutAt || now, vuAt: now }));
   return noter({ ...s2, pause: null }, { id, texte: 'commencée' }, now);
 }
 
@@ -103,11 +103,13 @@ export function etapeArticle(s, id, cle, now = Date.now(), detail = '') {
   const a = s && articleDe(s, id);
   if (!a || FINIS.has(a.etat) || !cle) return s;
   const k = String(cle);
+  const d = nettoyer(detail, 80);
   const s1 = a.etat === 'encours' ? s : debutArticle(s, id, now);
-  if (a.etape === k && !detail) return s1;
+  // La même étape, le même détail : rien de neuf à noter (l'écran repasse souvent).
+  if (a.etape === k && (a.detail || '') === d) return s1;
   const lib = (s.etapes.find((e) => e[0] === k) || [k, k])[1];
-  const s2 = avecArticle(s1, id, (x) => ({ ...x, etape: k }));
-  return noter(s2, { id, texte: `${lib}${detail ? ` (${detail})` : ''}` }, now);
+  const s2 = avecArticle(s1, id, (x) => ({ ...x, etape: k, detail: d, vuAt: now }));
+  return noter(s2, { id, texte: `${lib}${d ? ` (${d})` : ''}` }, now);
 }
 
 // La fin d'une annonce : ok (réussie) · main (à finir à la main, avec le lien) ·
@@ -128,8 +130,10 @@ export function finArticle(s, id, { etat = 'ok', raison = '', lien = '', geste =
 export function poserPause(s, { ms, jusqua, raison = 'Pause de sécurité' } = {}, now = Date.now()) {
   if (!s) return s;
   const fin = Number.isFinite(jusqua) ? jusqua : now + Math.max(0, Number(ms) || 0);
-  if (!(fin > now)) return { ...s, pause: null };
+  if (!(fin > now)) return s.pause ? { ...s, pause: null } : s;
   const r = nettoyer(raison, 120);
+  // La même pause redite par l'écran (à la seconde près) : une seule ligne au journal.
+  if (s.pause && Math.abs(s.pause.jusqua - fin) < 1500 && s.pause.raison === r) return s;
   return noter({ ...s, pause: { jusqua: fin, raison: r } }, { texte: `${r} · ${duree((fin - now) / 1000)}`, ton: 'pause' }, now);
 }
 export const leverPause = (s) => (s && s.pause ? { ...s, pause: null } : s);
@@ -162,7 +166,10 @@ export function progression(s, now = Date.now()) {
   const total = s.articles.length;
   const finis = s.articles.filter((a) => FINIS.has(a.etat));
   const nOk = finis.filter((a) => a.etat === 'ok').length;
-  const enCours = s.articles.find((a) => a.etat === 'encours') || null;
+  // Plusieurs annonces peuvent être « en cours » (une mise en ligne programmée attend pendant
+  // que la suivante commence) : la feuille montre celle que VRM a touchée en dernier.
+  const enCours = s.articles.filter((a) => a.etat === 'encours').sort((x, y) => (Number(y.vuAt) || 0) - (Number(x.vuAt) || 0))[0] || null;
+  const nEnCours = s.articles.filter((a) => a.etat === 'encours').length;
   const iEtape = enCours && s.etapes.length ? s.etapes.findIndex((e) => e[0] === enCours.etape) : -1;
   const partEnCours = enCours && s.etapes.length ? Math.max(0, iEtape + 0.5) / s.etapes.length : (enCours ? 0.1 : 0);
   const part = total ? Math.min(1, (finis.length + Math.min(0.95, partEnCours)) / total) : 0;
@@ -175,7 +182,7 @@ export function progression(s, now = Date.now()) {
   return {
     total, nFinis: finis.length, nOk, nMain: finis.filter((a) => a.etat === 'main').length, nRefus: finis.filter((a) => a.etat === 'refus' || a.etat === 'saute').length,
     part, enCours, rang: enCours ? s.articles.indexOf(enCours) + 1 : Math.min(total, finis.length + 1),
-    iEtape, nEtapes: s.etapes.length, ecoule, restant, pause, restants,
+    iEtape, nEtapes: s.etapes.length, ecoule, restant, pause, restants, nEnCours,
   };
 }
 
@@ -279,8 +286,22 @@ export const suivi = {
   _poser: (s) => { courant = s; annoncer(); },
 };
 
+// Le statut d'une fin de boucle : la demande d'abord (pause / arrêt), puis ce que l'écran
+// impose (`pause`), sinon : il reste des annonces pas commencées ⇒ « arrêté », sinon « terminé ».
+export function statutDeFin(s, force) {
+  if (!s) return 'fini';
+  if (force === 'arrete') return 'arrete';   // l'écran s'est arrêté sur un refus qui vaut pour la suite
+  // Plus rien à faire (toutes finies, réussies ou non) : c'est fini, quelle que soit la demande —
+  // une pause sans rien derrière laisserait un « Reprendre » qui n'a personne à reprendre.
+  if (!s.articles.some((a) => a.etat === 'attente' || a.etat === 'encours')) return 'fini';
+  if (s.demande === 'arret') return 'arrete';
+  if (s.demande === 'pause' || force === 'pause') return 'pause';
+  return 'arrete';
+}
+
 function pilote(idT) {
   const ok = () => courant && courant.id === idT;
+  const ok_ = ok;
   const maj = (f) => { if (!ok()) return; courant = f(courant); annoncer(); };
   return {
     id: idT,
@@ -295,9 +316,57 @@ function pilote(idT) {
     // L'écran lit la demande entre deux étapes (jamais au milieu d'une annonce).
     doitSArreter: () => !ok() || doitSArreter(courant),
     demande: () => (ok() ? courant.demande : 'arret'),
-    // Fin de la boucle : la demande décide du statut (pause reprenable, arrêt, fini).
-    terminer: (raison) => maj((s) => terminer(s, s.demande === 'pause' ? 'pause' : s.demande === 'arret' ? 'arrete' : (s.articles.some((a) => a.etat === 'attente') ? 'arrete' : 'fini'), Date.now(), raison)),
+    // Fin de la boucle : la demande décide du statut (pause reprenable, arrêt, fini) ;
+    // `statut` force 'pause' quand c'est l'écran qui s'arrête de lui-même (Vinted demande d'attendre).
+    terminer: (raison, statut) => maj((s) => (s.statut === 'cours' || s.statut === 'pause' ? terminer(s, statutDeFin(s, statut), Date.now(), raison) : s)),
+    // Pour une boucle d'écran (une annonce après l'autre) : à appeler ENTRE deux annonces.
+    // Rend true pour continuer, false pour s'arrêter. Sur « Mettre en pause », le travail passe
+    // « en pause » et la promesse attend « Reprendre » (true) ou « Arrêter » (false).
+    continuer: () => new Promise((ok) => {
+      if (!ok_()) { ok(false); return; }
+      const s0 = courant;
+      if (s0.demande === 'arret' || s0.statut !== 'cours' && s0.statut !== 'pause') { ok(false); return; }
+      if (s0.demande !== 'pause' && s0.statut === 'cours') { ok(true); return; }
+      if (s0.statut === 'cours') { courant = terminer(s0, 'pause', Date.now()); annoncer(); }
+      const fin = suivi.abonner((s) => {
+        if (!s || s.id !== idT) { fin(); ok(false); return; }
+        if (s.statut === 'cours') { fin(); ok(true); } else if (s.statut !== 'pause') { fin(); ok(false); }
+      });
+    }),
     // Reprise demandée sur la feuille : l'écran l'écoute (onReprendre).
     enPause: () => ok() && courant.statut === 'pause',
   };
+}
+
+// ── Suivre UNE commande de l'extension (dépôt Leboncoin, Vestiaire…) ─────────
+// L'extension range l'avancée d'une commande sous `jobId` (« lbc:… », « vc:… ») dans
+// ses jobs relus (`__vmrJobs` dans l'app) : `etape` (depot · fait · abandonne) et, pour
+// Leboncoin, `progres.etape` (ouverture · remplissage · photos · publication…). La
+// feuille suit CE QU'ELLE DIT, rien d'autre : « fait » seulement si elle l'a dit APRÈS
+// le départ (`depuis`) ; un geste attendu dans l'onglet, un abandon ou le délai dépassé
+// ⇒ « à finir à la main » avec le geste — jamais « réussie » par défaut.
+// Rend { fin: 'fait' | 'abandonne' | 'geste' | 'delai' | 'arret', job }.
+export const ETAPES_GESTE = /^(champ-manquant|publication-refusee)$/;
+export function lireAvanceeJob(j, depuis = 0) {
+  if (!j || typeof j !== 'object') return { fin: null, etape: '' };
+  const at = Number(j.at) || 0;
+  if (j.etape === 'fait' && at >= depuis) return { fin: 'fait', etape: 'fait' };
+  if (j.etape === 'abandonne' && at >= depuis) return { fin: 'abandonne', etape: 'abandonne', raison: j.raison || '' };
+  const pe = j.progres && j.progres.etape ? String(j.progres.etape) : '';
+  if (pe && ETAPES_GESTE.test(pe)) return { fin: 'geste', etape: pe };
+  return { fin: null, etape: pe || String(j.etape || '') };
+}
+export async function suivreJob(t, id, { jobId, lireJobs, depuis = Date.now(), delaiMs = 15 * 60000, pasMs = 1000, attendre = (ms) => new Promise((ok) => setTimeout(ok, ms)), maintenant = () => Date.now() } = {}) {
+  let derniere = null;
+  while (maintenant() - depuis < delaiMs) {
+    const jobs = typeof lireJobs === 'function' ? lireJobs() : null;
+    const j = jobs && jobId ? jobs[jobId] : null;
+    const a = lireAvanceeJob(j, depuis);
+    if (t && a.etape && a.etape !== 'fait' && a.etape !== 'abandonne') t.etape(id, a.etape);
+    if (a.fin) return { fin: a.fin, job: j, raison: a.raison || '' };
+    if (t && t.etat() && t.etat().demande === 'arret') return { fin: 'arret', job: j };
+    derniere = j;
+    await attendre(pasMs);
+  }
+  return { fin: 'delai', job: derniere };
 }

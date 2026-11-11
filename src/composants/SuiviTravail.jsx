@@ -23,7 +23,8 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { suivi, progression, recap, texteJournal, heureJournal, duree, lireTravaux, repriseDepuisExtension } from '../suiviTravail.js';
 import JaugeActions from '../JaugeActions.jsx';
-import { tr } from '../i18n/index.js';
+import { tr, date } from '../i18n/index.js';
+import { useLangue } from '../i18n/react.js';
 import './suivi-travail.css';
 
 export const Z_SUIVI = 15000;
@@ -63,8 +64,6 @@ function useTic(actif) {
   React.useEffect(() => { if (!actif) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [actif]);
   return now;
 }
-
-const MOT_ETAT = { ok: 'suivi.etat.ok', main: 'suivi.etat.main', refus: 'suivi.etat.refus', saute: 'suivi.etat.saute', encours: 'suivi.etat.encours', attente: 'suivi.etat.attente' };
 
 function Journal({ s }) {
   const ref = React.useRef(null);
@@ -119,6 +118,7 @@ function Recap({ s, jobs }) {
 
 // La feuille elle-même, pour un travail donné (exportée pour les bancs).
 export function SuiviTravailFeuille({ s, jobs = null }) {
+  useLangue();
   const [noeud, setNoeud] = React.useState(null);
   const [confArret, setConfArret] = React.useState(false);
   const tourne = s.statut === 'cours';
@@ -195,6 +195,7 @@ export function SuiviTravailFeuille({ s, jobs = null }) {
             <div className="vrm-st-boutons">
               <button type="button" className="vrm-st-b is-premier" data-suivi-reprendre="" disabled={!suivi.pilote()} onClick={() => suivi.reprendre()}>{tr('suivi.reprendre')}</button>
               <button type="button" className="vrm-st-b is-second" data-suivi-arreter="" onClick={() => setConfArret(true)}>{tr('suivi.arreter')}</button>
+              {!suivi.pilote() ? <small className="vrm-st-note" data-suivi-sans-ecran="">{tr('suivi.reprise.sansEcran')}</small> : null}
             </div>
           ) : (
             <div className="vrm-st-boutons">
@@ -232,7 +233,7 @@ export function TravauxPasses() {
           <details key={s.id} className="vrm-repli vrm-st-passe" data-suivi-passe={s.sorte}>
             <summary>
               <b>{s.titre}</b>
-              <small>{new Date(s.debut).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · {[tr('suivi.nReussies', { n: r.reussies.length }), r.aLaMain.length ? tr('suivi.nMain', { n: r.aLaMain.length }) : '', r.refusees.length ? tr('suivi.nRefus', { n: r.refusees.length }) : ''].filter(Boolean).join(' · ')}</small>
+              <small>{date(s.debut, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · {[tr('suivi.nReussies', { n: r.reussies.length }), r.aLaMain.length ? tr('suivi.nMain', { n: r.aLaMain.length }) : '', r.refusees.length ? tr('suivi.nRefus', { n: r.refusees.length }) : ''].filter(Boolean).join(' · ')}</small>
             </summary>
             <ol className="vrm-st-lignes is-passe">
               {s.journal.map((l, i) => <li key={i} data-ton={l.ton}><time>{heureJournal(l.at)}</time>{l.qui ? <b>{l.qui}</b> : null}<span>{l.texte}</span></li>)}
