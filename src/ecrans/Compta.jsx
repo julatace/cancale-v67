@@ -1940,10 +1940,10 @@ function ExportComptableCarte(props) {
   return (
     <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <span data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</span>
-          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</span>
-        </span>
+        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</div>
+          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</div>
+        </div>
         {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
       </div>
       {ouvert && <ExportComptableCorps {...props} />}
@@ -2276,7 +2276,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
             {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
             {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret client de TON compte Super PDP. Envois facturés par Super PDP, pas par VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret de TON compte Super PDP. Il facture ses envois, pas VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
             <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
@@ -3433,6 +3433,50 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     </section>
   );
 }
+// (11 nov., lot DJ7) « 1 756 ventes sans date de versement » ⇒ ce qui est daté, ce qui
+// manque, POURQUOI (src/versementRaisons.js, publié par Ventes avec la ligne), et LE geste.
+// Rien n'est daté ici : une vente reste dans aucun mois tant que sa date n'est pas lue (§5).
+const nbAd = (n) => Number(n || 0).toLocaleString('fr-FR');
+const plAd = (n, s = 's') => (Number(n) > 1 ? s : '');
+function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
+  const d = ad.datees && Number.isFinite(Number(ad.datees.n)) ? ad.datees : null;
+  const lignes = [];
+  for (const r of ad.raisons) {
+    if (!r || !(r.n > 0)) continue;
+    if (r.cle === 'vinted-detail') {
+      const comptes = Array.isArray(r.comptes) && r.comptes.length ? r.comptes : [{ uid: '', nom: '', n: r.n }];
+      for (const c of comptes) lignes.push(
+        <li key={'d' + c.uid} data-adater-raison="vinted-detail" data-adater-compte={c.uid || ''} data-n={c.n}>
+          <span><b>{nbAd(c.n)}</b> {c.nom ? <>sur <b>{c.nom}</b></> : 'sur Vinted'} : vente{plAd(c.n)} pas encore relue{plAd(c.n)}.</span>
+          <Bouton variante="discret" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-adater-geste="vinted">Ouvrir Vinted ↗</Bouton>
+        </li>);
+    } else if (r.cle === 'leboncoin') lignes.push(
+      <li key="lbc" data-adater-raison="leboncoin" data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> Leboncoin : date à recopier.</span>
+        <Bouton variante="discret" data-urssaf-dater="" data-adater-geste="main" onClick={onDater}>Dater à la main</Bouton>
+      </li>);
+    else if (r.cle === 'vestiaire') lignes.push(
+      <li key="vc" data-adater-raison="vestiaire" data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> Vestiaire : versement pas encore lu.</span>
+        <Bouton variante="discret" href="https://fr.vestiairecollective.com/" target="_blank" rel="noopener noreferrer" data-adater-geste="vestiaire">Ouvrir Vestiaire ↗</Bouton>
+      </li>);
+    else lignes.push(
+      <li key={r.cle} data-adater-raison={r.cle} data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> {r.cle === 'vinted-attente' ? 'Vinted : pas encore finalisée' + plAd(r.n) + ', relue' + plAd(r.n) + ' seule' + plAd(r.n) + '.' : r.cle === 'vinted-passu' ? 'Vinted : pas su (lecture ratée).' : 'eBay : commande sans date.'}</span>
+      </li>);
+  }
+  return (
+    <div className="vrm-adater" data-adater-raisons="">
+      <span>
+        {d ? <><b data-adater-datees={d.n}>{nbAd(d.n)} datée{plAd(d.n)} ✓</b>{d.releve > 0 ? <span data-adater-releve={d.releve}> dont {nbAd(d.releve)} par ton porte-monnaie</span> : null} · </> : null}
+        <b data-adater-sans={n}>{nbAd(n)} vente{plAd(n)} sans date</b> : pas dans ce montant.
+        {periodeAd ? <> Elles ont été <span data-urssaf-adater-periode="">{periodeAd}</span> ; une vente versée en {label} y manquerait.</> : null}
+      </span>
+      <ul className="vrm-adater-liste">{lignes}</ul>
+      <Pourquoi ecrit>La date qui compte est celle où Vinted crédite ton porte-monnaie (« Commande finalisée »). Payer ensuite avec ton solde ne la change pas. VRM la lit dans le détail de chaque vente, quelques-unes à chaque visite sur Vinted. Elle n’est jamais devinée : sans elle, la vente n’est dans aucun mois.</Pourquoi>
+    </div>
+  );
+}
 function PrevisionUrssafCarte({ onNav }) {
   const { P, ligne, regLu, regPret } = usePrevisionUrssaf();
   const [copie, setCopie] = React.useState('');
@@ -3503,6 +3547,7 @@ function PrevisionUrssafCarte({ onNav }) {
       {(P.ca == null || P.partiel || P.aDater > 0) ? (
         <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
           {P.ca == null ? <><span>Pas encore calculé : ouvre l’écran Ventes une fois.</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>Ouvrir Ventes</Bouton> : null}</>
+            : P.aDater > 0 && ligne && ligne.aDater && Array.isArray(ligne.aDater.raisons) && ligne.aDater.raisons.length ? <ADaterRaisons ad={ligne.aDater} n={P.aDater} periodeAd={periodeAd} label={P.label} onDater={() => vers('compta-ca')}/>
             : P.aDater > 0 ? <><span>{P.aDater} vente{P.aDater > 1 ? 's' : ''} sans date de versement : pas dans ce montant.{periodeAd ? <> Elles ont été <span data-urssaf-adater-periode="">{periodeAd}</span> ; une vente versée en {P.label} y manquerait : vérifie-les avant de déclarer.</> : null}</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? 'Les dater' : 'La dater'}</Bouton></>
             : <>Il manque des ventes pas encore lues : ce montant est un minimum.</>}
         </div>

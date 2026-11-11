@@ -178,3 +178,9 @@ html body .vrm-app-shell .vrm-main .vrm-fu-mois6-vide .vrm-lien-action { font-si
    presque le bord, une règle générale ramenait le retrait à 3 px). */
 html body .vrm-app-shell .vrm-main .vrm-surface:has(> [data-statut-carte]) { padding: 18px !important; }
 @media (max-width: 599px) { html body .vrm-app-shell .vrm-main .vrm-surface:has(> [data-statut-carte]) { padding: 16px !important; } }
+/* (11 nov., lot DJ7) Les ventes sans date de versement : la raison et le geste, une ligne chacune. */
+.vrm-main .vrm-urssaf-manque .vrm-adater { flex: 1 1 100%; min-width: 0; }
+.vrm-main .vrm-adater b { color: var(--vrm-text); font-variant-numeric: tabular-nums; }
+.vrm-main .vrm-adater-liste { list-style: none; margin: 8px 0 4px; padding: 0; }
+.vrm-main .vrm-adater-liste > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 4px 0; border-top: 1px solid var(--vrm-line); }
+.vrm-main .vrm-adater-liste > li > span { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }

@@ -579,6 +579,27 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
 
   // ── 10. LE VRAI background.js : « Non » COUPE LA CAPTURE DE CE COMPTE ────
   console.log('\n── Le vrai background.js : ce qu’un « Non » coupe');
+  // 5.341 : les dates de versement encore à lire sur CE compte.
+  await essaie('dates de versement', async () => {
+    for (const [scheme, mobile] of [['light', { largeur: 390 }], ['dark', { largeur: 390 }], ['dark', null], ['light', null]]) {
+      const e = ETATS.connecte; e.site.choix = 'oui'; e.site.dates = { reste: 1751, jours: 7 };
+      const { ctx, pg } = await rendre(nav, e, { scheme, mobile });
+      if (mobile) { await pg.tap('#vrm-badge'); await pg.waitForTimeout(400); } else await survoler(pg);
+      const d = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-dates-versement]'); return x ? { n: x.getAttribute('data-dates-versement'), t: x.innerText } : null; });
+      dit(!!d && d.n === '1751' && /1\s?751 restantes · environ 7 jours/.test(d.t), `${scheme} ${mobile ? 390 : 1512} : « 1 751 restantes · environ 7 jours »`, JSON.stringify(d));
+      await pg.screenshot({ path: path.join(SORTIE, `badge-dates-${mobile ? 390 : 1512}-${scheme}.png`) });
+      await ctx.close();
+    }
+    for (const dates of [null, { reste: 0, jours: 0 }]) {
+      const e = ETATS.connecte; e.site.choix = 'oui'; e.site.dates = dates;
+      const { ctx, pg } = await rendre(nav, e);
+      await survoler(pg);
+      const n = await pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelectorAll('[data-dates-versement]').length);
+      dit(n === 0, `dates ${dates ? 'toutes lues' : 'pas sues'} : la carte n’en dit rien`, String(n));
+      await ctx.close();
+    }
+  });
+
   await essaie('fond', async () => {
     const { faireFond } = require(path.join(__dirname, '..', '_fond-vm.cjs'));
     const SRC_FOND = process.env.BANC_FOND_SRC || path.join(EXT, 'background.js');
