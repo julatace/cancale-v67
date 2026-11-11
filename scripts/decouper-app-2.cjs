@@ -189,6 +189,127 @@ function lectureVue(A, fnPath, E) {
     }
   }
   for (const nom of progRefs) for (const cv of A.bindings[nom].constantViolations) if (dedans(cv.node)) refus.push(`réaffecte ${nom} (tête d'App.jsx, ligne ${cv.node.loc.start.line})`);
+  // (11 nov., reprise) LE MOMENT où les valeurs sont lues. Avant : le code de la branche tourne
+  // DANS le rendu du composant, à sa place. Après : `v={{…}}` est évalué à cette même place, mais
+  // le code de la branche tourne au rendu de la vue — APRÈS la fin du rendu du composant. Trois
+  // écarts possibles, tous refusés :
+  //  1. une valeur passée DÉCLARÉE après la branche (let/const : zone morte — écran blanc ; var :
+  //     undefined) alors qu'avant, une fonction de la branche la lisait plus tard ;
+  //  2. un objet passé MODIFIÉ (x.a = …, x.push(…), ref.current = …) par le rendu du composant
+  //     APRÈS la branche : avant, la branche lisait l'ancien état, après le nouveau ;
+  //  3. la branche elle-même modifie, AU RENDU (pas dans un geste), un objet du composant, appelle
+  //     un `setX` du composant, ou appelle sur-le-champ une fonction du composant qui écrit l'une
+  //     de ses variables : avant, la suite du rendu voyait l'écriture ; après, non.
+  // (Ce qui tourne PLUS TARD des deux côtés — un geste `onClick`, une fonction passée à un enfant —
+  // ne change pas de moment : c'est toujours après le rendu du composant.)
+  const fnS = fnPath.node.start, fnE = fnPath.node.end;
+  const dansComposant = (b) => b && b.identifier.start >= fnS && b.identifier.end <= fnE;
+  const MUTANTS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin', 'set', 'add', 'delete', 'clear']);
+  const racineDe = (n) => { while (n && (n.type === 'MemberExpression' || n.type === 'OptionalMemberExpression')) n = n.object; return n && n.type === 'Identifier' ? n : null; };
+  // un nœud qui MODIFIE un objet : la racine modifiée (Identifier) ou null
+  const mutation = (p) => {
+    const nd = p.node;
+    if ((nd.type === 'AssignmentExpression') && nd.left.type === 'MemberExpression') return racineDe(nd.left);
+    if (nd.type === 'UpdateExpression' && nd.argument.type === 'MemberExpression') return racineDe(nd.argument);
+    if (nd.type === 'UnaryExpression' && nd.operator === 'delete' && nd.argument.type === 'MemberExpression') return racineDe(nd.argument);
+    if ((nd.type === 'CallExpression' || nd.type === 'OptionalCallExpression')) {
+      const c = nd.callee;
+      if ((c.type === 'MemberExpression' || c.type === 'OptionalMemberExpression') && !c.computed && MUTANTS.has(c.property.name)) return racineDe(c.object);
+      if (c.type === 'MemberExpression' && !c.computed && c.object.type === 'Identifier' && c.object.name === 'Object' && /^(assign|defineProperty|defineProperties|setPrototypeOf)$/.test(c.property.name) && nd.arguments[0]) return racineDe(nd.arguments[0]);
+    }
+    return null;
+  };
+  // Une fonction PARESSEUSE : passée en attribut JSX (geste, rendu d'enfant) ou en enfant JSX,
+  // éventuellement dans un objet/tableau de cet attribut ; ou passée à un hook d'effet.
+  const fonctionParesseuse = (F) => {
+    let q = F.parentPath;
+    while (q && /^(ObjectProperty|ObjectExpression|ArrayExpression|ConditionalExpression|LogicalExpression|SequenceExpression|ParenthesizedExpression)$/.test(q.node.type)) q = q.parentPath;
+    if (!q) return false;
+    if (q.isJSXExpressionContainer()) return true;
+    if (q.isCallExpression() && q.node.callee.type === 'Identifier' && /^use(Layout|Insertion)?Effect$|^useCallback$/.test(q.node.callee.name)) return true;
+    return false;
+  };
+  // le nœud p tourne-t-il AU RENDU (sur-le-champ) ? (jusqu'à `borne` : la branche ou le composant)
+  const auRendu = (p, borne) => {
+    for (let F = p.getFunctionParent(); F && F.node !== borne.node && F.node.start >= borne.node.start; F = F.parentPath.getFunctionParent()) {
+      if (fonctionParesseuse(F)) return false;
+      // une fonction rangée dans une variable ne tourne que si on l'appelle : comptée « au rendu »
+      // seulement si on l'appelle sur-le-champ (IIFE) — sinon c'est l'appel qui sera jugé.
+      const par = F.parentPath;
+      const iife = par && par.isCallExpression() && par.node.callee === F.node;
+      const argument = par && par.isCallExpression() && par.node.arguments.includes(F.node);   // .map(cb), .forEach(cb)…
+      if (!iife && !argument) return false;
+    }
+    return true;
+  };
+  // une fonction du composant qui écrit ses variables (ou appelle un setX) quand on l'appelle
+  const ecrivainMemo = new Map();
+  const estSetter = (b) => b && b.path.isVariableDeclarator() && b.path.node.id.type === 'ArrayPattern' && b.path.node.init && b.path.node.init.type === 'CallExpression'
+    && /^use[A-Z]/.test(b.path.node.init.callee.type === 'Identifier' ? b.path.node.init.callee.name : (b.path.node.init.callee.property || {}).name || '') && b.path.node.id.elements.findIndex((x) => x && x.type === 'Identifier' && x.name === b.identifier.name) > 0;
+  const ecrivain = (b, prof = 0) => {
+    if (!b || !dansComposant(b) || prof > 4) return null;
+    if (ecrivainMemo.has(b)) return ecrivainMemo.get(b);
+    ecrivainMemo.set(b, null);
+    let F = null;
+    if (b.path.isFunctionDeclaration()) F = b.path;
+    else if (b.path.isVariableDeclarator() && b.path.node.init && /Function/.test(b.path.node.init.type)) F = b.path.get('init');
+    if (!F) return null;
+    let res = null;
+    const fs0 = F.node.start, fe0 = F.node.end;
+    const dansF = (n) => n.start >= fs0 && n.end <= fe0;
+    // une variable que SEULE cette fonction lit et écrit (son mémo, « let _memo » vidé à la microtâche)
+    // est son état privé : l'écrire ne se voit ailleurs que par ce qu'elle rend.
+    const privee = (bb) => bb.referencePaths.every((r) => dansF(r.node)) && bb.constantViolations.every((c) => dansF(c.node));
+    const dehorsF = (bb) => bb && dansComposant(bb) && !dansF(bb.identifier) && !privee(bb);
+    F.traverse({
+      'AssignmentExpression|UpdateExpression'(q) {
+        if (res || !auRendu(q, F)) return;
+        const cible = q.node.type === 'AssignmentExpression' ? q.node.left : q.node.argument;
+        const r = cible.type === 'Identifier' ? cible : racineDe(cible);
+        if (r && dehorsF(q.scope.getBinding(r.name))) res = `${b.identifier.name} écrit ${r.name} (ligne ${q.node.loc.start.line})`;
+      },
+      'CallExpression|UnaryExpression'(q) {
+        if (res || !auRendu(q, F)) return;
+        const r = mutation(q);
+        if (r && dehorsF(q.scope.getBinding(r.name))) { res = `${b.identifier.name} modifie ${r.name} (ligne ${q.node.loc.start.line})`; return; }
+        if (q.node.type === 'CallExpression' && q.node.callee.type === 'Identifier') {
+          const bb = q.scope.getBinding(q.node.callee.name);
+          if (bb && dansComposant(bb) && !dansF(bb.identifier) && estSetter(bb)) res = `${b.identifier.name} appelle ${q.node.callee.name} (ligne ${q.node.loc.start.line})`;
+          else if (bb && dansComposant(bb) && !dansF(bb.identifier)) { const r2 = ecrivain(bb, prof + 1); if (r2) res = `${b.identifier.name} → ${r2}`; }
+        }
+      },
+    });
+    ecrivainMemo.set(b, res);
+    return res;
+  };
+  for (const [nom, b] of captures) {
+    // 1. déclarée après la branche
+    if (b.kind === 'let' || b.kind === 'const' || b.kind === 'var') {
+      const decl = b.path.node;
+      if (!(decl.end <= s)) refus.push(`lit ${nom}, déclarée ligne ${decl.loc.start.line} — pas encore posée à l'endroit de la branche (la valeur passée n'existerait pas)`);
+    }
+  }
+  // 2. objet passé modifié par le rendu du composant APRÈS la branche
+  fnPath.traverse({
+    'AssignmentExpression|UpdateExpression|CallExpression|OptionalCallExpression|UnaryExpression'(p) {
+      if (p.node.start < e) return;
+      const r = mutation(p); if (!r || !captures.has(r.name) || p.scope.getBinding(r.name) !== captures.get(r.name)) return;
+      if (auRendu(p, fnPath)) refus.push(`l'objet ${r.name} qu'elle lit est modifié par le rendu APRÈS elle (ligne ${p.node.loc.start.line}) : elle ne lirait plus le même état`);
+    },
+  });
+  // 3. la branche écrit, au rendu, ce que la suite du composant lit
+  E.traverse({
+    'CallExpression|OptionalCallExpression|AssignmentExpression|UpdateExpression|UnaryExpression'(p) {
+      if (!auRendu(p, E)) return;
+      const r = mutation(p);
+      if (r && captures.has(r.name) && p.scope.getBinding(r.name) === captures.get(r.name)) { refus.push(`modifie au rendu l'objet ${r.name} du composant (ligne ${p.node.loc.start.line})`); return; }
+      if (p.node.type === 'CallExpression' && p.node.callee.type === 'Identifier' && captures.has(p.node.callee.name)) {
+        const b = captures.get(p.node.callee.name);
+        if (estSetter(b)) refus.push(`appelle ${p.node.callee.name} au rendu (ligne ${p.node.loc.start.line}) : un enfant ne met pas à jour son parent pendant son rendu`);
+        else { const w = ecrivain(b); if (w) refus.push(`appelle au rendu ${p.node.callee.name}, qui écrit le composant (${w})`); }
+      }
+    },
+  });
   return { captures: [...captures.keys()].sort(), refus: [...new Set(refus)] };
 }
 
@@ -515,4 +636,4 @@ function main() {
   console.log('écrit : App.jsx +', [...ecrits.keys()].map((f) => path.relative(RACINE, f)).join(', '));
 }
 if (require.main === module) main();
-module.exports = { analyser, decouper, sansEffet, instructionSansEffet };
+module.exports = { analyser, decouper, sansEffet, instructionSansEffet, trouverVue, lectureVue, lectureVueExport: (A, f, E) => lectureVue(A, f, E) };
