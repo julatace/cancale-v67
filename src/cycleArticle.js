@@ -162,17 +162,18 @@ export const chezLui = (etat) => CHEZ_LUI.includes(etat);
 // Rend { cartes: [{ id, numero, title, photo, accountId, preuve }], total, pasSu }.
 export function cartesSupprimees(fiches, x, max = CARTES_MAX) {
   const o = x || {};
-  const cartes = []; let pasSu = 0;
+  const cartes = []; let pasSu = 0, plusTard = 0;
   for (const id of Object.keys(fiches || {})) {
     const f = fiches[id] || {};
     const r = etatCycle(id, { ...o, fiche: f });
     if (r.etat === 'pas-su') { pasSu++; continue; }
     if (r.etat !== 'a-demander') continue;
+    if (repousseeJusqua(o.plusTard, id, o.maintenant) > 0) { plusTard++; continue; }
     cartes.push({ id: String(id), numero: String(f.numero).trim(), title: String(f.title || ''), photo: f.photo || null, accountId: String(f.accountId || ''), preuve: r.preuve });
   }
   const n = (s) => { const m = /(\d+)/.exec(s); return m ? Number(m[1]) : 1e9; };
   cartes.sort((a, b) => n(a.numero) - n(b.numero) || a.numero.localeCompare(b.numero) || a.id.localeCompare(b.id));
-  return { cartes: cartes.slice(0, Math.max(0, max)), total: cartes.length, pasSu };
+  return { cartes: cartes.slice(0, Math.max(0, max)), total: cartes.length, pasSu, plusTard };
 }
 
 // Le registre « vue en ligne » : pour chaque fiche NUMÉROTÉE en ligne dans une
@@ -225,4 +226,71 @@ export function montantSaisi(t) {
   if (!/^\d+(?:\.\d{1,2})?$/.test(s)) return null;
   const n = Number(s);
   return n > 0 && n < 100000 ? Math.round(n * 100) / 100 : null;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  « TU L'AS ENCORE ? » — LA RÉPONSE EN UN GESTE (11 nov., lot DJ4)
+// ════════════════════════════════════════════════════════════════════════════
+// Julien : « Quand l'app me demande si mon article est toujours chez moi après que je
+// l'ai supprimé, je veux qu'elle me demande si je veux l'enlever du stock ». UNE question,
+// trois réponses, chacune un geste ANNULABLE 5 s (la pilule du lot B, src/gesteAnnulable.js),
+// sans fenêtre de confirmation :
+//   · « Oui, je la garde »     ⇒ `vrm_cycle_decisions[id] = chez-moi` : reste au stock, N°
+//                                 gardé, proposée à republier (propositionsSites : 'chez-moi') ;
+//   · « Non, enlève-la »       ⇒ une RAISON au choix rapide (donnée, vendue ailleurs, perdue,
+//                                 rendue) : `vrm_cycle_decisions[id] = separe + raison`, la
+//                                 déclaration `vinted_pairs_lost` (par IDENTITÉ : l'id
+//                                 d'annonce), et sa case du Stock libérée (`vrm_slots`). Le N°
+//                                 n'est JAMAIS redonné (§5 : il reste pris, rien ne le libère) ;
+//                                 « vendue ailleurs » n'invente ni vente ni montant (§2.3).
+//   · « Plus tard »            ⇒ la question se tait `PLUS_TARD_MS` (sur cet appareil).
+// Une vendue PROUVÉE ou une republication (même N°, même photo, table de recréation —
+// `repriseNumero`) n'arrive jamais ici : `etatCycle` ne la rend pas « à demander ».
+// Module PUR : rend les opérations (`{ k, type: 'cle', id, apres, avant }`) que la coque
+// passe à `gesteVrm` ; « Annuler » remet chaque sous-valeur d'avant, exacte.
+export const PLUS_TARD = 'vrm_cycle_plus_tard';
+export const PLUS_TARD_MS = 20 * 60 * 60 * 1000;
+export const RAISONS_SORTIE = Object.freeze([
+  ['donnee', 'Donnée'], ['vendue-ailleurs', 'Vendue ailleurs'], ['perdue', 'Perdue'], ['rendue', 'Rendue'],
+]);
+export const REPONSES_CHEZ_TOI = Object.freeze({ garde: 'Oui, je la garde', enleve: 'Non, enlève-la du stock', plusTard: 'Plus tard' });
+// Le temps restant (ms) pendant lequel la question est repoussée ; 0 = pas repoussée.
+export function repousseeJusqua(plusTard, id, maintenant) {
+  const t = Date.parse((plusTard && typeof plusTard === 'object' && plusTard[String(id)]) || '');
+  if (!Number.isFinite(t)) return 0;
+  const reste = t + PLUS_TARD_MS - (Number.isFinite(maintenant) ? maintenant : Date.now());
+  return reste > 0 ? reste : 0;
+}
+//   carte     { id, numero, title }
+//   reponse   'garde' | 'enleve' | 'plus-tard'
+//   raison    une clé de RAISONS_SORTIE (seulement pour 'enleve' ; sans elle, rien)
+//   decisions, perdues, slots, plusTard : les valeurs COURANTES (pour « avant »)
+//   cleDeclaration(numero, id) : la clé de `vinted_pairs_lost` (App : `cleDeclarationPartie`)
+// Rend { ops, texte } ou null (réponse incomplète : rien n'est écrit).
+export function opsChezToi({ carte, reponse, raison = null, decisions = {}, perdues = {}, slots = {}, plusTard = {}, cleDeclaration = null, cle = cleDefaut, maintenant = Date.now() } = {}) {
+  if (!carte || carte.id == null || String(carte.id) === '') return null;
+  const id = String(carte.id), numero = String(carte.numero == null ? '' : carte.numero).trim();
+  const at = new Date(maintenant).toISOString();
+  const D = decisions || {}, P = perdues || {}, S = slots || {}, T = plusTard || {};
+  if (reponse === 'garde') {
+    return { texte: `N°${numero || '?'} : gardée au stock`,
+      ops: [{ k: 'vrm_cycle_decisions', type: 'cle', id, apres: { choix: CHOIX.CHEZ_MOI, numero, at }, avant: D[id] }] };
+  }
+  if (reponse === 'plus-tard') {
+    return { texte: `N°${numero || '?'} : je te redemande demain`,
+      ops: [{ k: PLUS_TARD, type: 'cle', id, apres: at, avant: T[id] }] };
+  }
+  if (reponse !== 'enleve') return null;
+  const R = RAISONS_SORTIE.find((x) => x[0] === raison);
+  if (!R) return null;
+  const ops = [{ k: 'vrm_cycle_decisions', type: 'cle', id, apres: { choix: CHOIX.SEPARE, raison: R[0], numero, at }, avant: D[id] }];
+  // La déclaration « partie », par IDENTITÉ : jamais une clé portée par une AUTRE annonce.
+  let k0 = typeof cleDeclaration === 'function' ? String(cleDeclaration(numero, id) || '') : '';
+  if (!k0) k0 = numero ? `${numero}@${id}` : '';
+  if (k0 && P[k0] && P[k0].id != null && String(P[k0].id) !== id) k0 = `${numero}@${id}`;
+  if (k0) ops.push({ k: 'vinted_pairs_lost', type: 'cle', id: k0, apres: { ...(P[k0] || {}), id, at, title: String(carte.title || ''), from: 'cycle', raison: R[0] }, avant: P[k0] });
+  // Sa case du Stock (par son N°) : libérée. Le N° lui-même ne bouge pas.
+  const kn = numero ? cle(numero) : '';
+  if (kn && S[kn]) ops.push({ k: 'vrm_slots', type: 'cle', id: kn, apres: undefined, avant: S[kn] });
+  return { texte: `N°${numero || '?'} sortie du stock · ${R[1].toLowerCase()}`, ops };
 }

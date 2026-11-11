@@ -15,6 +15,7 @@
 import React from 'react';
 import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import { cartesATrancher } from './aTrancher.js';
+import { RAISONS_SORTIE } from './cycleArticle.js';
 import './styles-a-trancher.css';
 
 const Chevron = () => (
@@ -41,6 +42,28 @@ function Vignette({ carte, ton, Photo }) {
   return tuile(<b>{carte.n}</b>, { 'data-a-trancher-nombre': carte.n });
 }
 
+// (11 nov., lot DJ4) « Tu l'as encore ? » : trois réponses sur place ; « Non » montre les
+// raisons (un toucher = le geste, annulable 5 s). Aucune fenêtre, aucune confirmation.
+export function QuestionChezToi({ carte, onTrancher }) {
+  const [raisons, setRaisons] = React.useState(false);
+  const b = carte.binaire;
+  if (raisons) return (
+    <div className="vrm-at-gestes is-raisons" data-a-trancher-raisons={carte.id} role="group" aria-label="Pourquoi elle part ?">
+      {RAISONS_SORTIE.map(([k, lib]) => (
+        <button key={k} type="button" className="vrm-at-b" data-role="raison" data-a-trancher-raison={k} onClick={() => onTrancher(carte, 'non', k)}>{lib}</button>
+      ))}
+      <button type="button" className="vrm-at-b" data-role="retour" data-a-trancher-retour="" aria-label="Revenir à la question" onClick={() => setRaisons(false)}>Retour</button>
+    </div>
+  );
+  return (
+    <div className="vrm-at-gestes is-trois">
+      <button type="button" className="vrm-at-b" data-role="oui" data-a-trancher-oui={carte.id} onClick={() => onTrancher(carte, 'oui')}>{b.oui}</button>
+      <button type="button" className="vrm-at-b" data-role="non" data-a-trancher-non={carte.id} onClick={() => setRaisons(true)}>{b.non}</button>
+      <button type="button" className="vrm-at-b" data-role="plus-tard" data-a-trancher-plus-tard={carte.id} onClick={() => onTrancher(carte, 'plus-tard')}>{b.plusTard}</button>
+    </div>
+  );
+}
+
 function Carte({ carte, ton, Photo, onAller, onTrancher, ligne }) {
   const ouvrir = () => onAller && onAller({ ...ligne, geste: carte.geste });
   return (
@@ -53,7 +76,8 @@ function Carte({ carte, ton, Photo, onAller, onTrancher, ligne }) {
           {carte.noms && carte.noms.length ? <span className="vrm-at-noms">{carte.noms.map((n) => <span key={n} className="vrm-at-nom">{n}</span>)}</span> : null}
         </div>
       </div>
-      {carte.binaire && carte.id && onTrancher ? (
+      {carte.binaire && carte.binaire.raisons && carte.id && onTrancher ? <QuestionChezToi carte={carte} onTrancher={onTrancher}/>
+      : carte.binaire && carte.id && onTrancher ? (
         <div className="vrm-at-gestes is-deux">
           <button type="button" className="vrm-at-b" data-role="oui" data-a-trancher-oui={carte.id} onClick={() => onTrancher(carte, 'oui')}>{carte.binaire.oui}</button>
           <button type="button" className="vrm-at-b" data-role="non" data-a-trancher-non={carte.id} data-a-trancher-ouvrir={carte.cle} onClick={ouvrir}>{carte.binaire.non}<Chevron/></button>
@@ -91,7 +115,9 @@ export default function ATrancher({ etat, onAller, onTrancher = null, Photo = nu
             {g.sources.map((s) => (
               <div key={s.cle} className="vrm-at-source" data-a-trancher-ligne={s.cle} data-n={s.n}>
                 {s.cartes.map((k) => <Carte key={k.cle + ':' + (k.id || 'n')} carte={k} ton={s.ton} Photo={Photo} onAller={onAller} onTrancher={onTrancher} ligne={lignes.get(s.cle)}/>)}
-                {s.autres > 0 ? (
+                {s.autres > 0 && s.ensuite ? (
+                  <p className="vrm-at-ensuite" data-a-trancher-ensuite={s.autres}>+ {s.autres} ensuite</p>
+                ) : s.autres > 0 ? (
                   <button type="button" className="vrm-at-autres" data-a-trancher-autres={s.autres} onClick={() => onAller && onAller(lignes.get(s.cle))}>+ {s.autres}<Chevron/></button>
                 ) : null}
               </div>

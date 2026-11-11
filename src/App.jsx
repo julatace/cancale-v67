@@ -114,8 +114,8 @@ import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actio
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
-import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher } from "./aTrancher.js";
-import ATrancher from "./ATrancher.jsx";
+import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
+import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
 // (10 nov., lot BC) « Ma semaine » : l'écran du bilan de la semaine (src/maSemaine.js, aucune règle à lui).
 import MaSemaine from "./MaSemaine.jsx";
 import { maSemaine } from "./maSemaine.js";
@@ -123,7 +123,7 @@ import LitigesEnCours, { EntreeLitiges } from "./LitigesEnCours.jsx";
 import { litigesDesVentes, retoursParModele, preuvesVente, nombreLitigesPublie } from "./litigesEcran.js";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
-import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX, ORDRE_CHOIX as ORDRE_CHOIX_CYCLE } from "./cycleArticle.js";
+import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX, ORDRE_CHOIX as ORDRE_CHOIX_CYCLE, opsChezToi, PLUS_TARD as CYCLE_PLUS_TARD } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
 import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
@@ -3847,6 +3847,23 @@ const gesteVrm = (texte, ops, setters = {}, apres = null) => _gestes.lancer({
   vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
   ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
 });
+// (11 nov., lot DJ4) La réponse à « Tu l'as encore ? » (À trancher dans Ma journée, la fiche
+// d'une paire) : les opérations de `opsChezToi`, lues sur les valeurs COURANTES, en un geste
+// annulable 5 s. Rend false quand la réponse est incomplète (rien n'est écrit).
+function gesteChezToi(carte, reponse, raison, apres = null) {
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const titre = carte && carte.title ? carte.title : String(((fiches[String(carte && carte.id)] || {}).title) || '');
+  const r = opsChezToi({ carte: { ...carte, title: titre }, reponse, raison, decisions: lireObjet(CYCLE_DECISIONS), perdues: lireObjet('vinted_pairs_lost'),
+    slots: lireObjet('vrm_slots'), plusTard: lireObjet(CYCLE_PLUS_TARD), cleDeclaration: (n, id) => cleDeclarationPartie(n, id, fiches), cle: cleNum });
+  if (!r) return false;
+  gesteVrm(r.texte, r.ops, {}, (sens) => {
+    // Le Stock relit ses cases (une case libérée, puis rendue par « Annuler »).
+    if (r.ops.some((o) => o.k === 'vrm_slots')) { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} }
+    try { window.dispatchEvent(new CustomEvent('vrm:chez-toi', { detail: { id: String(carte.id), sens } })); } catch (_) {}
+    if (typeof apres === 'function') apres(sens);
+  });
+  return true;
+}
 function PiluleAnnulerCoque() {
   const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
   return <PiluleAnnuler gestes={_gestes} enHaut={enHaut}/>;
@@ -14493,7 +14510,7 @@ const GROUPES_PLUS=[
   { titre:'Gérer', items:[
     // (9 nov., lot AC — Julien : « tu ne peux pas avoir d'hésitation ») UN endroit pour
     // tout ce que VRM n'a pas pu décider, une ligne = un geste (src/aTrancher.js).
-    {id:'trancher',   icon:'help', label:'À trancher'},
+    // (11 nov., lot DJ4) « À trancher » n'est plus un onglet : sa carte s'ouvre en tête de Ma journée.
     {id:'garage',     icon:'home', label:'Stock'},
     {id:'achats',     icon:'cart', label:'Achats'},
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
@@ -28452,7 +28469,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, filTous = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false }) {
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
@@ -28473,6 +28490,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
   const [cycleRepondus, setCycleRepondus] = useState({});
   const [cycleEnVol, setCycleEnVol] = useState(null);
+  // (11 nov., lot DJ4) La carte « N choses à trancher » de Ma journée s'ouvre EN PLACE (plus d'écran exprès).
+  const [trancherOuvert, setTrancherOuvert] = useState(() => { try { if (sessionStorage.getItem('vrm_trancher_ouvrir') === '1') { sessionStorage.removeItem('vrm_trancher_ouvrir'); return true; } } catch (_) {} return false; });
+  useEffect(() => { const f = () => setTrancherOuvert(true); window.addEventListener('vrm:trancher-ouvrir', f); return () => window.removeEventListener('vrm:trancher-ouvrir', f); }, []);
   // (6 nov.) Un inventaire du Stock EN COURS (src/inventaire.js) : une carte de Ma journée.
   const inventaireJournee = useInventaireEnCours(only === 'journee');
   const atelierJournee = useAtelierJournee(only === 'journee');
@@ -40521,7 +40541,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (10 nov., cartes) Le même style que l'écran : les photos des premières choses (par
           // identité, publiées par leurs écrans) en pile, et les types — plus de phrase.
           const ph = photosATrancher(aTrancher);
-          jobs.push({ id: 'a-trancher', n: aTrancher.total, icon: 'help', color: C.text, court: t, detail: typesATrancher(aTrancher), title: t, tab: 'trancher', prio: 1.9, photos: ph.length ? ph : null, action: 'Trancher' });
+          jobs.push({ id: 'a-trancher', n: aTrancher.total, icon: 'help', color: C.text, court: t, detail: typesATrancher(aTrancher), title: t, prio: 1.9, photos: ph.length ? ph : null, action: 'Trancher' });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -41198,8 +41218,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // boutons chacun) Les articles supprimés de Vinted forment UNE carte : une rangée compacte par
               // article (photo, N°, titre sur une ligne) et SA réponse dans un menu ; « Tous chez moi » d'un coup,
               // confirmé. Les mêmes réponses, la même écriture (`repondreCycle`) : rien n'est écrit sans son clic.
-              const cyclesJ = autres0.filter((j) => j.cycle);
-              const autres = autres0.filter((j) => !j.cycle);
+              // (11 nov., lot DJ4 — Julien : « Je ne sais pas si À trancher sert à quelque chose, surtout un
+              // onglet exprès ») Plus d'écran « À trancher » : SA carte se pose en tête de la liste et s'ouvre
+              // EN PLACE (les mêmes cartes, `ATrancher`). Les articles supprimés de Vinted y sont (source
+              // « supprimes-vinted », publiée par la coque) : plus de seconde carte ici (un doute, une fois).
+              const jobTrancher = autres0.find((j) => j.id === 'a-trancher') || null;
+              const cyclesJ = [];
+              const autres = autres0.filter((j) => !j.cycle && j.id !== 'a-trancher');
               // (3 nov.) Le nombre revient dans le titre : la vignette montre DE QUOI il s'agit (les photos),
               // plus un chiffre en pastille colorée (Julien : « les couleurs… j'aime pas trop »).
               const libCase = (id, n) => ({ envoyer: `${n} colis ${Lbas.aEnvoyer}`, retirer: `${n} colis ${Lbas.aRetirer}`, messages: `${n} message${n > 1 ? 's' : ''}`, prix: `${n} prix à baisser` })[id];
@@ -41239,7 +41264,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
               const carteARelier = () => {
@@ -41293,6 +41318,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{court}</span><span className="vrm-day-task-note">{detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
                   </button>
+                );
+              };
+              const carteTrancher = (j) => {
+                const plein = `${j.court}${j.detail ? '\n' + j.detail : ''}`;
+                return (
+                  <section key="a-trancher" className="vrm-at-journee" data-at-journee={trancherOuvert ? 'ouvert' : 'ferme'} aria-label="À trancher">
+                    <button type="button" className="vrm-day-task vrm-fu-tache" data-job="a-trancher" data-n={String(j.n)} aria-expanded={trancherOuvert ? 'true' : 'false'}
+                      title={plein} aria-label={plein.replace(/\n/g, ' — ')} onClick={() => setTrancherOuvert((o) => !o)}>
+                      <PileVignettes srcs={j.photos || []} n={j.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="help" size={20}/>}/>
+                      <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{j.court}</span>{j.detail ? <span className="vrm-day-task-note">{j.detail}</span> : null}</span>
+                      <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{trancherOuvert ? 'Fermer' : 'Trancher'}</span></span>
+                    </button>
+                    {trancherOuvert && aTrancher ? <div className="vrm-at-journee-corps" data-at-journee-corps=""><ATrancher etat={aTrancher} onAller={onAllerTrancher} onTrancher={onTrancherAT} Photo={PhotoVinted}/></div> : null}
+                  </section>
                 );
               };
               const carteCycles = (liste) => {
@@ -41377,7 +41416,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const prochainAF = premierAF ? React.cloneElement(premierAF.el, { className: ((premierAF.el.props && premierAF.el.props.className) || '') + ' is-prochain', 'data-prochain': '' }) : null;
               const resteAF = listeAF.filter((x) => x !== premierAF);
               const alertesReste = resteAF.filter((x) => x.alerte), autresReste = resteAF.filter((x) => !x.alerte);
-              return { prochain: prochainAF, section: (
+              return { prochain: prochainAF, trancher: jobTrancher ? carteTrancher(jobTrancher) : null, section: (
                 <section className="vrm-fu-afaire" aria-label="À faire">
                   {/* (9 nov., Ma journée v2) « Ensuite » : le reste, après la prochaine chose (posée en tête).
                       Le nombre de gestes compte TOUT (la prochaine comprise) : le même compte qu'avant. */}
@@ -41465,6 +41504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
+            {AF.trancher || null}
             {AF.section}
 
             {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières
@@ -43830,10 +43870,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {!noAcc && <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>}
                   </div>
                   {[
-                    {k:'lot', icon:'grid', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    /* ⚠️ (11 nov., lot DJ4 — Julien, mot pour mot : « L'inventaire physique n'est pas fiable.
+                       Pareil pour audit d'inventaire. Pareil répartir un lot je trouve que ça sert à rien. »)
+                       « Répartir un lot », « Inventaire physique » et « Audit du stock » QUITTENT ce menu (leur
+                       seule entrée). Rien n'est supprimé : leurs modales (`lotOpen`, `inventOpen`, `auditOpen`)
+                       et les données (prix d'achat posés, numéros) restent ; plus rien ne les ouvre. Ne pas les
+                       remettre sans sa demande. Les prix d'un achat groupé : Achats → Fournisseurs. */
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
-                    {k:'inv', icon:'box', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
-                    {k:'aud', icon:'search', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     /* (5 nov., chantier C — revue 2.7) « Compléter les prix d'achat » n'est plus
                        dans ce menu : le bandeau « Prix d'achat · N/M → Compléter », au-dessus de
                        la grille, est la seule porte (le même nombre ne s'écrit pas deux fois). */
@@ -51629,6 +51672,9 @@ function AppCoeur() {
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
+  // (11 nov., lot DJ4) « À trancher » n'est plus un écran : un ancien lien (`?tab=trancher`, raccourci,
+  // notification) ouvre Ma journée, sa carte ouverte en place.
+  React.useEffect(()=>{ if(tab==='trancher'){ try{ sessionStorage.setItem('vrm_trancher_ouvrir','1'); window.dispatchEvent(new Event('vrm:trancher-ouvrir')); }catch(_){} setTab('journee'); } },[tab]);
   React.useEffect(()=>{ if(tab==='leboncoin'){ subVoulue.current='annonces'; setTab('plat_leboncoin'); } },[tab]);
   // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
   // où vivent « Retirer d'eBay » et le lien vers l'annonce Vinted.
@@ -53851,7 +53897,9 @@ function AppCoeur() {
           decisions:lireObjet(CYCLE_DECISIONS), declaree:(id)=>annonceDeclareePartie(id, nums, perduesC),
           vendusMain:new Set((load('vinted_annonces_vendues',[])||[]).map(String)), exclus:exclusC, cle:cleNum,
           // (3 nov.) Retour remis en stock sur SON tap (« Retour reçu ? ») : l'article est chez lui.
-          remis:new Set(Object.values(load('vinted_retours_remis',{})||{}).map(r=>r&&r.num).filter(Boolean).map(cleNum)) };
+          remis:new Set(Object.values(load('vinted_retours_remis',{})||{}).map(r=>r&&r.num).filter(Boolean).map(cleNum)),
+          // (11 nov., lot DJ4) « Plus tard » : la question se tait 20 h (sur cet appareil).
+          plusTard:lireObjet(CYCLE_PLUS_TARD), maintenant:Date.now() };
         let res=cartesSupprimees(nums, { ...base, recrees:{}, viaVrm:new Set(), ventes:{} });
         if(res.total>0){
           const [pv, viaVrm, recrees, ordsC, vcC]=await Promise.all([
@@ -54108,7 +54156,7 @@ function AppCoeur() {
   // redit plus (la colonne de l'ordinateur montrait « 1 » sur Ventes ET « 1 » sur
   // Colis pour le même colis).
   // (9 nov., lot AC) « À trancher » : la somme des sources SUES (src/aTrancher.js), rien à 0.
-  const badgesNav={ cat_bord: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0, trancher: badgeATrancher(aTrancherEtat) };
+  const badgesNav={ cat_bord: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0 };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
   // (9 nov., lot AC) Le geste d'une ligne d'« À trancher » : il OUVRE l'écran propriétaire
   // (la vue d'Annonces, l'onglet de Colis) et va au bloc où il tranche — il n'écrit rien.
@@ -54118,14 +54166,26 @@ function AppCoeur() {
   // « Toujours chez moi » de Ma journée (`vrm_cycle_decisions[id]`), en geste annulable :
   // la carte sort tout de suite, « Annuler » 5 s remet la valeur d'avant exacte. Rien
   // d'autre n'est écrit ; « Non » n'écrit rien (il ouvre Ma journée et ses réponses).
-  const trancherAT=(carte,choix)=>{
-    if(!carte||choix!=='oui'||carte.cle!=='supprimes-vinted'||!carte.id) return;
+  // (11 nov., lot DJ4) « Tu l'as encore ? » : « Oui, je la garde » (CHOIX_CYCLE.CHEZ_MOI) · « Non,
+  // enlève-la du stock » + sa raison (séparée, déclarée partie par identité, case libérée ; le N°
+  // jamais redonné) · « Plus tard » — les opérations de `opsChezToi` (src/cycleArticle.js), en geste
+  // annulable (`gesteChezToi`) : aucune confirmation, ni Vinted, ni vente inventée.
+  // (11 nov., lot DJ4) La même question sur la fiche de la paire (« Tout sur le N° ») : la chose
+  // publiée par la coque pour ce N° (identité : son annonce), les mêmes trois réponses.
+  const questionChezToiFiche=(num)=>{
+    const l=aTrancherEtat&&Array.isArray(aTrancherEtat.lignes)?aTrancherEtat.lignes.find((x)=>x.cle==='supprimes-vinted'):null;
+    const k=cleNum(num); const x=l&&Array.isArray(l.ex)&&k?l.ex.find((e)=>e&&e.id&&cleNum(e.num)===k):null;
+    if(!x) return null;
+    return <div className="vrm-at vrm-at-fiche" data-fiche-chez-toi={x.id}><p className="vrm-at-question">Supprimée de Vinted. Tu l’as encore ?</p>
+      <QuestionChezToi carte={{ cle:'supprimes-vinted', id:x.id, num:x.num, binaire:BINAIRES_TRANCHER['supprimes-vinted'] }} onTrancher={trancherAT}/></div>;
+  };
+  const trancherAT=(carte,choix,raison)=>{
+    if(!carte||carte.cle!=='supprimes-vinted'||!carte.id) return;
+    const rep=choix==='oui'?'garde':choix==='non'?'enleve':choix==='plus-tard'?'plus-tard':null;
+    if(!rep) return;
     const id=String(carte.id), cle='supprimes-vinted:'+id;
-    const avant=lireObjet(CYCLE_DECISIONS)[id];
     const recompter=()=>setTimeout(()=>setPreuveTick(t=>t+1),1200);
-    gesteVrm(`N°${carte.num||'?'} : toujours chez toi`,
-      [{ k: CYCLE_DECISIONS, type: 'cle', id, apres: { choix: CHOIX_CYCLE.CHEZ_MOI, numero: String(carte.num||''), at: new Date().toISOString() }, avant }],
-      {}, (sens)=>{ setTranchesAT((s)=>{ const n=new Set(s); if(sens==='avant') n.delete(cle); else n.add(cle); return n; }); recompter(); });
+    gesteChezToi({ id, numero:String(carte.num||''), title:'' }, rep, raison, (sens)=>{ setTranchesAT((s)=>{ const n=new Set(s); if(sens==='avant') n.delete(cle); else n.add(cle); return n; }); recompter(); });
   };
   // Vestiaire : ses morceaux, chacun dans SA tâche. Annonces · Vestiaire porte
   // aussi ce qui servait à publier (ta clé Photoroom — sur l'écran Vestiaire,
@@ -54788,7 +54848,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = () => setFicheNum(null);
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <NotePaireCoque numero={p.num} variante="bloc" ajout/> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}<NotePaireCoque numero={p.num} variante="bloc" ajout/></> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
@@ -55063,7 +55123,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onAllerTrancher={allerTrancher} onTrancherAT={trancherAT} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
@@ -55096,7 +55156,7 @@ function AppCoeur() {
         {tab==='sales'    &&<GardeEcran nom="sales"><Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/></GardeEcran>}
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
-        {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} onTrancher={trancherAT} Photo={PhotoVinted} entete={<ScreenHead icon="help" title="À trancher"/>}/></GardeEcran>}
+        {/* (11 nov., lot DJ4) Plus d'écran « À trancher » : `?tab=trancher` ouvre Ma journée, la carte ouverte (VUES_DEPLACEES). */}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab}/>}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}
         {tab==='communaute'&&<GardeEcran nom="communaute"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense></GardeEcran>}
