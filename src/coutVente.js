@@ -82,10 +82,11 @@ export const eurosStock = (cents) => {
 };
 
 // Ce que l'écran écrit. `partiel` : une lecture des annonces manque.
-export function texteValeurStock(v, { partiel = false } = {}) {
-  if (!v || v.centimes == null) return { montant: '—', auMoins: false, sur: v && v.n ? `sur ${v.n} paire${v.n > 1 ? 's' : ''}` : '', sans: v && v.nSans ? `${v.nSans} sans prix` : '' };
+// (11 nov., lot DJ2) `mot` / `mots` : « paire » pour un vendeur de sneakers, « article » sinon.
+export function texteValeurStock(v, { partiel = false, mot = 'paire', mots = 'paires' } = {}) {
+  if (!v || v.centimes == null) return { montant: '—', auMoins: false, sur: v && v.n ? `sur ${v.n} ${v.n > 1 ? mots : mot}` : '', sans: v && v.nSans ? `${v.nSans} sans prix` : '' };
   const auMoins = v.nSans > 0 || !!partiel;
-  return { montant: eurosStock(v.centimes), auMoins, sur: `sur ${v.n} paire${v.n > 1 ? 's' : ''}`, sans: v.nSans ? `${v.nSans} sans prix` : '' };
+  return { montant: eurosStock(v.centimes), auMoins, sur: `sur ${v.n} ${v.n > 1 ? mots : mot}`, sans: v.nSans ? `${v.nSans} sans prix` : '' };
 }
 
 // ── Publication (un propriétaire : l'écran Annonces ; des lecteurs) ─────────

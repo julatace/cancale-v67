@@ -142,7 +142,7 @@ async function chercher(pg, q) {
   // ou celui que la loupe ouvre dans l'en-tête (téléphone).
   const champ = await pg.$('[data-recherche-champ]');
   if (!champ || !(await champ.isVisible())) {
-    await pg.locator('button[aria-label="Rechercher une paire"]').first().click();
+    await pg.locator('button[data-recherche-loupe]').first().click();
     await pg.waitForSelector('[data-recherche-champ]', { timeout: 8000 });
   }
   await pg.fill('[data-recherche-champ]', q);
