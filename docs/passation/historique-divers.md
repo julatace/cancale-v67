@@ -1393,3 +1393,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot audits-rouges)
 - **11 nov. · Partager une fiche (lot partage-fiche)** : Annonces « … » / Stock → « Partager » ⇒ `vrm.center/p/<jeton>` (3 gestes, partage du téléphone sinon copie) : photos, titre, taille, état, prix, liens des annonces en ligne (par le N°) ; jamais prix d'achat, N°, compte, adresse ; pseudo seulement voulu ; 1/7/30 j, « Arrêter » ; « Vendu » par la preuve de l'app, jamais par absence ; page datée, « À confirmer » après 72 h ; mode `partage` de /api/compte (aucune fonction neuve), jeton indexé par empreinte, même 404 partout. `docs/passation/2026-11-11-partage-fiche.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **11 nov. · Centre d'aide intégré (lot centre-aide)** : le « ? » de chaque écran ouvre une animation SVG (une scène par geste, 3–5 s, pause, immobile si « réduire les animations ») puis 3 à 5 fiches « Comment faire » ; 69 fiches (`src/aideFiches.js`) avec « M'y emmener » (`?tab=`, `reglage=`) ; recherche tolérante dans la feuille et la loupe, sans IA ; mots selon « Tu vends quoi ? », fiches avancées tues en Simple (la recherche les trouve). `docs/passation/2026-11-11-centre-aide.md`. Geste : aucun.

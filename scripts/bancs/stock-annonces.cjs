@@ -89,11 +89,21 @@ const LIGNES = {
   ], pagination: { total_entries: 5 } } } },
   'harvest_222_listings': { id: 'harvest_222_listings', data: { capturedAt: new Date(AUJ - 3 * 86400000).toISOString(), payload: { items: [ann(2001, 'Paire inventée vingt et un 42')], pagination: { total_entries: 1 } } } },
   'lbc_listings': { id: 'lbc_listings', data: { items: {
+<<<<<<< HEAD
     L1: { id: 'L1', account: 'lbc1', customRef: 'VRM-2', subject: 'Paire inventée deux 40 (Leboncoin)', status: 'active' },
     L2: { id: 'L2', account: 'lbc1', customRef: 'VRM-31', subject: 'Paire inventée trente et un', status: 'active' },
   // (11 nov., DJ4) Une lecture COMPLÈTE fraîche de « Mes annonces » (la règle du 6 nov.,
   // src/enLigneLbc.js) : sans elle, les deux annonces seraient « à confirmer ».
   }, lectures: { lbc1: { at: new Date(AUJ - 3600000).toISOString(), total: 2, n: 2 } } } },
+=======
+    L1: { id: 'L1', customRef: 'VRM-2', subject: 'Paire inventée deux 40 (Leboncoin)', status: 'active', account: 'lbc9' },
+    L2: { id: 'L2', customRef: 'VRM-31', subject: 'Paire inventée trente et un', status: 'active', account: 'lbc9' },
+  // (11 nov., rouges A) Depuis le 6 nov. (src/enLigneLbc.js), une annonce Leboncoin n'est
+  // « en ligne » que si la lecture COMPLÈTE de « Mes annonces » de son compte a moins de
+  // 24 h ; sans elle, « à confirmer ». Le banc dit qu'elle est lue (il y a 1 h, complète) :
+  // « à confirmer » reste le seul fait de compte_beta (et de Vestiaire en V3).
+  }, lectures: { lbc9: { at: new Date(AUJ - 3600000).toISOString(), total: 2, n: 2, ids: ['L1', 'L2'] } } } },
+>>>>>>> origin/claude/rouges-a
   'lbc_ventes': { id: 'lbc_ventes', data: { ventes: {} } },
 };
 
@@ -140,6 +150,10 @@ async function rendre(b, { tel, sombre, scenario }) {
       { id: 2, vinted_user_id: '222', login: 'compte_beta', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
     ]);
     // « rien » : les annonces de chaque plateforme ne répondent pas (la base, elle, oui).
+    // (11 nov., rouges A) VRM numérote tout seul une annonce Vestiaire sans N° (§5 (a),
+    // `useNumerotationVestiaire` monté dans la coque) — mais jamais sur « pas su » : les N°
+    // réservés pas lus ⇒ rien. C'est l'état où une annonce Vestiaire reste SANS N° (V2).
+    if (scenario === 'vc-sans-num' && /id=eq\.panel_num_reserves/.test(u)) return j({ message: 'panne inventée' }, 500);
     if (scenario === 'rien' && /id=eq\.(harvest_\d+_listings|lbc_listings|lbc_ventes|ebay_comptes|ebay_listings|vc_listings|vc_ventes)/.test(u)) return j({ message: 'panne inventée' }, 500);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data$|^data$/.test(sel) ? projette(r, sel) : { ...r, updated_at: new Date(AUJ).toISOString() });
@@ -207,10 +221,19 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
         const theme = await pg.evaluate(() => document.documentElement.getAttribute('data-theme') || '');
         dit(theme === (sombre ? 'dark' : 'light'), `${t} : le thème demandé est rendu`, theme);
         // A — les chiffres en tête.
+<<<<<<< HEAD
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (!el) return null; return { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), ac: el.getAttribute('data-stock-a-confirmer'), ma: el.getAttribute('data-stock-masquees'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') }; });
         dit(!!tete && tete.n === '5' && tete.am === '0', `${t} : A/V1 — (DJ4) 5 paires EN LIGNE (N°2 sur deux sites, N°9 Vinted+Vestiaire : une fois chacune ; N°41 Vestiaire seul ; ni N°21 à confirmer ni N°5 masquée), pas « au moins »`, JSON.stringify(tete));
         dit(!!tete && tete.ac === '1' && /compte_beta/.test(tete.txt) && /à confirmer/.test(tete.txt), `${t} : A — à part : 1 « à confirmer », le compte NOMMÉ`, tete && tete.txt);
         dit(!!tete && tete.ma === '1' && /masquée/.test(tete.txt), `${t} : A — à part : 1 masquée par Vinted (toujours chez toi)`, tete && tete.txt);
+=======
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (!el) return null; return { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), ac: el.getAttribute('data-stock-a-confirmer'), ma: el.getAttribute('data-stock-masquees'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' '), noms: ((pop || el).querySelector('[data-stock-a-confirmer-noms]') || {}).textContent || '' }; });
+        dit(!!tete && tete.n === '7' && tete.am === '0', `${t} : A/V1 — 7 annonces actuelles (N°2 sur deux sites, N°9 Vinted+Vestiaire : une fois chacune ; N°41 Vestiaire seul), pas « au moins »`, JSON.stringify(tete));
+        // (11 nov., rouges A) Le nom se lit dans la phrase « dont N à confirmer (…) » : le texte entier porte aussi
+        // les pastilles du filtre de compte (« compte_beta »), qui le rendaient vrai même sans nom (mutation).
+        dit(!!tete && tete.ac === '1' && /compte_beta/.test(tete.noms) && /à confirmer/.test(tete.txt), `${t} : A — dont 1 « à confirmer », le compte NOMMÉ`, tete && tete.txt);
+        dit(!!tete && tete.ma === '1' && /masquée/.test(tete.txt), `${t} : A — dont 1 masquée par Vinted, comptée parmi les présentes`, tete && tete.txt);
+>>>>>>> origin/claude/rouges-a
         // B — la liste.
         const liste = await pg.evaluate(() => [...document.querySelectorAll('[data-stock-annonce]')].map((el) => ({ k: el.getAttribute('data-stock-annonce'), e: el.getAttribute('data-stock-annonce-etat'), p: el.getAttribute('data-stock-annonce-plats'), o: el.getAttribute('data-stock-annonce-place') })));
         const cles = liste.map((x) => x.k).sort();
@@ -307,8 +330,15 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
       });
       await essaie(t + ' rien', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'rien' });
+<<<<<<< HEAD
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
         dit(!!tete && tete.n === 'passu' && /—/.test(tete.txt) && /pas pu lire|pas lues/.test(tete.txt) && !/Aucune annonce/i.test(tete.txt), `${t} : H — rien lu : « — » et la raison, jamais « aucune annonce »`, JSON.stringify(tete));
+=======
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' '), passu: (el.querySelector('[data-stock-passu]') || {}).textContent || '' } : null; });
+        // (11 nov., rouges A) La raison s'écrit « Annonces pas lues (… les lectures qui manquent) »
+        // depuis les textes courts (9 nov.) : on juge le bloc « pas su » (`data-stock-passu`) et qu'il NOMME ce qui manque.
+        dit(!!tete && tete.n === 'passu' && /—/.test(tete.txt) && tete.passu && /pas lues/.test(tete.passu) && /compte_alpha/.test(tete.passu) && !/Aucune annonce/i.test(tete.txt), `${t} : H — rien lu : « — » et la raison, jamais « aucune annonce »`, JSON.stringify(tete));
+>>>>>>> origin/claude/rouges-a
         const pl = await pg.evaluate(() => [...document.querySelectorAll('[data-case-etat="plusenligne"]')].length);
         dit(pl === 0 && !(await pg.$('[data-stock-plus-en-ligne]')) && await attr(pg, '[data-case-num="7"]', 'data-case-etat') === 'vendue', `${t} : H — aucune case dite « plus en ligne » ; la vendue reste allumée`, String(pl));
         dit(!!(await pg.$('[data-case-num="1"]')) && !!(await pg.$('[data-case-num="8"]')), `${t} : H — les paires rangées restent dans leurs cases (rien ne disparaît)`);
