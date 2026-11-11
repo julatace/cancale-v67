@@ -75,8 +75,10 @@ async function controles(T, ok) {
   const app = T.app || '';
   const brut = sansCommentaires(app);
   const lectures = brut.split('\n').filter((l) => /PROFIL_VENDEUR\.mode|\bprofil\.mode\b|mode: p\.mode/.test(l));
-  const permises = lectures.filter((l) => /caseJourneeMontree\(|const ctx = \{ mode: (p|profil)\.mode/.test(l));
-  ok(lectures.length > 0 && lectures.length === permises.length, 'B1 le mode n’est lu que par la navigation, les filtres de site et les cases de Ma journée', lectures.filter((l) => !permises.includes(l)).map((l) => l.trim().slice(0, 120)).join(' | '));
+  // (11 nov., lot journee-perso) `visibiliteCarte` et `nCachees` (src/journeePerso.js) partent de
+  // `caseJourneeMontree` (audit-journee-perso le vérifie) : la même règle de départ, ses choix par-dessus.
+  const permises = lectures.filter((l) => /caseJourneeMontree\(|visibiliteCarte\(|nCartesCachees\(|const ctx = \{ mode: (p|profil)\.mode/.test(l));
+  ok(lectures.length > 0 && lectures.length === permises.length, 'B1 le mode n’est lu que par la navigation, les filtres de site et les cartes de Ma journée', lectures.filter((l) => !permises.includes(l)).map((l) => l.trim().slice(0, 120)).join(' | '));
   ok(/<div hidden>\{T\.filter\(\(x\) => !cases\.includes\(x\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app), 'B2 une case tue garde son compteur publié (bloc caché `data-tuile`)');
   ok(/entreeMontree\(t, ctx\)/.test(app) && /\.filter\(\(o\) => siteMontre\(o\.id, ctx\)\)/.test(app), 'B3 la navigation et les filtres passent par la règle');
   ok(/<VentesToutes sites=\{sitesPresents\}/.test(app), 'B4 « Tous » des ventes reçoit tous les sites présents (aucun filtre Simple)');

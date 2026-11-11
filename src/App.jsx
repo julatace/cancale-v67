@@ -32,6 +32,8 @@ import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfi
 import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
 import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
+import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
+import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends } from './profilVendeur.js';
 import { exemplesVendeur, motTaille } from './vocabulaireVendeur.js';   // (11 nov., lot DJ2) exemples et petits mots selon ce qu'il vend
 // (9 nov.) Le bandeau discret d'un incident ouvert par les sondes de /statut.
@@ -573,6 +575,7 @@ import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos,
 // CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
 import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
+import "./styles-journee-perso.css";   // (11 nov.) « Modifier ma journée » : l'éditeur des cartes, la ligne du bas, « Affichée car urgent »
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
 import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
@@ -2557,6 +2560,9 @@ const SYNC_KEYS = [
   'vrm_remise_refus',
   // (8 nov.) Affichage Simple / Complet et « Je vends : Sneakers / Autre » (src/profilVendeur.js) : { choix, at }.
   'vrm_affichage','vrm_je_vends',CLE_PLATEFORMES,
+  // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes qu'il a cachées
+  // (src/journeePerso.js) : { v, ordre, choix, at } — la même sur tous ses appareils.
+  CLE_JOURNEE_PERSO,
   // (9 nov.) La configuration de départ (src/configurationDepart.js) : { etat: 'fait'|'plusTard', at,
   // statut: 'inconnu'|null } ; la TVA d'une société (src/profilFiscal.js). La méthode d'étiquetage
   // est `vrm_numero_ecrit` (actif + `ou`, src/numeroEcrit.js), déjà synchronisée.
@@ -40237,6 +40243,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, baseKO, sales.items, sales.loading, listings.items, listings.loading, txnPret, vendusAilleurs.v.at, vendusAilleurs.v.charge]);
   const [feuilleAilleurs, setFeuilleAilleurs] = useState(false);
   const [feuilleDeux, setFeuilleDeux] = useState(false);   // (6 nov.) « en ligne deux fois »
+  // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes cachées (src/journeePerso.js),
+  // et la feuille « Modifier ma journée ».
+  const [persoJ] = useJourneePerso();
+  const [feuillePerso, setFeuillePerso] = useState(false);
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
@@ -41406,7 +41416,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const AF = (baseKO || premierJour) ? { prochain: null, section: null } : (() => {
               // (8 nov.) Affichage Simple : le conseil « Prix à baisser » se tait (src/profilVendeur.js) ;
               // son compteur reste publié dans le bloc caché ci-dessous (aucun nombre ne change).
-              const cases = T.filter((x) => !x.pasSu && x.t && x.t.n > 0 && caseJourneeMontree(x.id, PROFIL_VENDEUR.mode));
+              // (11 nov., lot journee-perso) Par-dessus : SES choix (« Modifier ma journée »). Une case qu'il a
+              // cachée revient d'elle-même quand elle porte un geste DÛ urgent (`urgencesJournee` : colis en
+              // retard ou à sa date limite, dernier jour de retrait) ; cachée, son compteur reste publié dans le
+              // MÊME bloc caché (aucun nombre ne change pour les autres écrans ni le widget).
+              const urgJ = urgencesJournee({ tuiles, alertes: alertesArgent });
+              const visJ = (id) => visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode, urgent: !!urgJ[id] });
+              const cases = T.filter((x) => !x.pasSu && x.t && x.t.n > 0 && visJ(x.id).montree);
+              const casesCachees = T.filter((x) => !x.pasSu && x.t && x.t.n > 0 && !visJ(x.id).montree);
               const nPretsJournee = (tuiles.envoyer && tuiles.envoyer.emballer && tuiles.envoyer.emballer.n) || 0;
               // « Emballer » est le geste de la carte « Colis à poster » : pas une seconde carte.
               // (3 nov., Julien : « vente Vestiaire Collective : tout va être ensemble ») La vente Vestiaire à
@@ -41459,7 +41476,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
+              // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, cycles: cyclesJ.length ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
+              const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
+              const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
+              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0)
+                - cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
               const carteARelier = () => {
@@ -41547,20 +41570,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               };
               const carteCase = (x) => {
                 const so = sousCase(x);
+                const forceJ = visJ(x.id).force;   // cachée par lui, revenue parce qu'elle est urgente
                 const presse = !!(x.t && x.t.presses && (x.t.presses.urgent || x.t.presses.nAuj > 0)) || !!(x.t && x.t.alerte);
                 return (
-                  <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id}
+                  <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id} data-jp-force={forceJ ? '' : undefined}
                     data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
                     title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
                     <PileVignettes srcs={photosCase[x.id]} n={x.t.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={icCase[x.id] || x.ic} size={20}/>}/>
-                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note" data-journee-a-imprimer={nPretsJournee} data-exact={tuiles.envoyer.emballer.exact ? '1' : '0'}>{tuiles.envoyer.emballer.exact ? '' : 'au moins '}{nPretsJournee} à imprimer</span> : null}</span>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{forceJ ? <span className="vrm-jp-urgent">Affichée car urgent</span> : null}{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note" data-journee-a-imprimer={nPretsJournee} data-exact={tuiles.envoyer.emballer.exact ? '1' : '0'}>{tuiles.envoyer.emballer.exact ? '' : 'au moins '}{nPretsJournee} à imprimer</span> : null}</span>
                     <span className={'vrm-day-task-action' + (x.id === 'envoyer' && nPretsJournee > 0 ? ' is-principal' : '')} data-fu-principal={x.id === 'envoyer' && nPretsJournee > 0 ? '' : undefined}><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || VERBES.voir}</span></span>
                   </button>
                 );
               };
               // (9 nov., Ma journée v2) Pendant la lecture, la PLACE de la prochaine chose est gardée dans la tête :
               // elle arrive sans pousser la frise (banc `chargement`, CLS).
-              const placeProchain = <div className="vrm-jv2-prochain-attente" aria-hidden="true" data-jv2-prochain-attente=""/>;
+              const placeProchain = !visibiliteCarte('prochain', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? null : <div className="vrm-jv2-prochain-attente" aria-hidden="true" data-jv2-prochain-attente=""/>;
               if (loading) return { prochain: placeProchain, section: null };
               // (6 nov.) Les actions du jour de la coque (la cloche) pas encore rangées : la liste
               // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
@@ -41574,6 +41598,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (5 nov., chantier E1, §5) « Rien à faire » ne se dit que sur ce qui a été LU : une case
               // pas lue (« — ») n'est pas une case à zéro. Sinon la ligne nomme ce qui manque.
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
+              if (nGestes === 0 && nCacheesAF > 0) return { prochain: null, section: (
+                <p className="vrm-fu-vide" data-tout-a-jour="" data-jp-rien-affiche={nCacheesAF}>Rien à faire dans tes cartes affichées · {nCacheesAF} geste{nCacheesAF > 1 ? 's' : ''} dans les cartes cachées</p>
+              ) };
               if (nGestes === 0) return { prochain: null, section: pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
                 : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96} vend={vendActuel()}/><p>Rien à faire</p></div> };
@@ -41581,19 +41608,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // dans la carte sombre, avant l'argent (Julien : l'ordre = ce qu'il faut faire maintenant, puis
               // l'argent, puis le reste). L'ordre de toujours (le plus pressé d'abord) la désigne ; les
               // mêmes éléments, les mêmes attributs, dits une seule fois (elle n'est plus redite dans la liste).
+              // (11 nov., lot journee-perso) SON ordre (« Modifier ma journée ») : les alertes urgentes toujours en
+              // premier (on ne peut ni les cacher ni les déplacer), puis les cartes cachées revenues parce
+              // qu'elles sont urgentes (« Affichée car urgent »), puis les cartes dans l'ordre qu'il a choisi.
+              // Sans réglage, l'ordre d'origine (`CARTES_JOURNEE`) : celui d'avant, carte pour carte.
+              const blocsAF = {
+                ailleurs: carteAilleurs ? [carteVendusAilleurs()] : [],
+                'deux-fois': deuxFois.length ? [carteDeuxFois()] : [],
+                ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, cases.filter((x) => x.id === id).map((x) => carteCase(x))])),
+                'a-relier': comptesARelierJour.length ? [carteARelier()] : [],
+                'stock-sortie': sortiesStock.length ? [carteSortieStock()] : [],
+                cycles: cyclesJ.length ? [carteCycles(cyclesJ)] : [],
+                autres: autres.map((j, i) => tache(j, i)),
+                urssaf: urssafJob ? [tache(urssafJob, 99)] : [],
+              };
+              const forcesAF = [], montresAF = [];
+              for (const id of ordreJournee('afaire', persoJ)) {
+                const v = visJ(id); if (!v.montree) continue;
+                for (const el of (blocsAF[id] || [])) (v.force ? forcesAF : montresAF).push({ el, carte: id });
+              }
               const listeAF = [
                 ...alertesArgent.map((j, i) => ({ el: tache(j, i), alerte: true })),
-                ...(carteAilleurs ? [{ el: carteVendusAilleurs() }] : []),
-                ...(deuxFois.length ? [{ el: carteDeuxFois() }] : []),
-                ...cases.map((x) => ({ el: carteCase(x) })),
-                ...(comptesARelierJour.length ? [{ el: carteARelier() }] : []),
-                ...(sortiesStock.length ? [{ el: carteSortieStock() }] : []),
-                ...(cyclesJ.length ? [{ el: carteCycles(cyclesJ) }] : []),
-                ...autres.map((j, i) => ({ el: tache(j, i) })),
-                ...(urssafJob ? [{ el: tache(urssafJob, 99) }] : []),
+                ...forcesAF, ...montresAF,
               ].filter((x) => x.el && React.isValidElement(x.el));
               // Une carte de gestes groupés (un choix par rangée) reste dans la liste : la tête porte UN geste.
-              const premierAF = listeAF.find((x) => !(x.el.props && x.el.props['data-cycle-groupe'] != null)) || null;
+              // (11 nov., lot journee-perso) « La prochaine chose à faire » cachée par lui ⇒ rien ne monte en tête.
+              const premierAF = !visibiliteCarte('prochain', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? null : (listeAF.find((x) => !(x.el.props && x.el.props['data-cycle-groupe'] != null)) || null);
               const prochainAF = premierAF ? React.cloneElement(premierAF.el, { className: ((premierAF.el.props && premierAF.el.props.className) || '') + ' is-prochain', 'data-prochain': '' }) : null;
               const resteAF = listeAF.filter((x) => x !== premierAF);
               const alertesReste = resteAF.filter((x) => x.alerte), autresReste = resteAF.filter((x) => !x.alerte);
@@ -41621,6 +41661,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ) : null}
                   {/* Les cases à zéro restent lisibles par les autres écrans et les bancs (mêmes compteurs), sans place à l'écran. */}
                   <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
+                  {/* (11 nov., lot journee-perso) Les autres cartes qu'il a cachées : leur nombre reste lisible, sans place. */}
+                  {cacheesHorsCases.length ? <div hidden data-jp-cachees="">{cacheesHorsCases.map((id) => <span key={id} data-jp-cachee={id} data-n={String(nParCarteAF[id])}/>)}</div> : null}
                 </section>
               ) };
         })();
@@ -41640,16 +41682,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
                 <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
                 <h1 className="vrm-fu-titre-tete">Ma journée</h1>
+                {/* (11 nov., lot journee-perso) La tête suit SON ordre et SES choix (« Modifier ma journée ») ;
+                    une carte cachée qui publie un chiffre (frise, chiffres du mois) reste rendue dans un bloc caché :
+                    ses `data-*` et ses publications ne changent pas. Sans réglage : l'ordre d'avant. */}
+                {(() => {
+                  const blocsTete = {
+                    phrase: (<>
                 {/* (8 nov., « beauté ») LA PHRASE DU JOUR : les cases publiées (« À envoyer », « À retirer »,
                     leur limite) mises en mots, le ton selon l'heure (src/phraseJour.js) ; rien de lu ⇒ la
                     phrase fixe de l'écran. Aucun nombre recalculé. */}
                 {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
                   return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
                     : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
+                    </>),
+                    prochain: (<>
                 {/* (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE, en tête : avant l'argent. La carte de
                     « À faire » qui vient en premier dans l'ordre de toujours (le plus pressé d'abord), avec son
                     geste ; elle n'est plus redite dans la liste « Ensuite ». */}
                 {AF.prochain ? <div className="vrm-jv2-prochain" data-jv2-prochain="">{AF.prochain}</div> : null}
+                    </>),
+                    frise: (<>
                 {/* (9 nov., Ma journée v2) L'ARGENT : la frise des sept jours, qui se TOUCHE (un jour ⇒ ce jour-là ;
                     « Semaine du … » ⇒ la semaine passée — l'ancienne carte « Semaine », fondue ici), puis les
                     cases du mois choisies par Julien (« Modifier »). Le grand chiffre par défaut de la carte
@@ -41662,6 +41714,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
                       .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>
                 )}
+                    </>),
+                    chiffres: (<>
                 {/* (3 nov., carte réglable par page) Les chiffres de la tête : un grand chiffre + trois
                     cases, choisis par Julien (« Modifier »). Défaut = vendu aujourd'hui (porté par la frise
                     ci-dessus), bénéfice du mois (`chiffreBenefice`, la lecture de Compta), vendu du mois, reçu du
@@ -41677,14 +41731,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       return null;
                     }}/>
                 )}
+                    </>),
+                  };
+                  return ordreJournee('tete', persoJ).map((id) => {
+                    if (id === 'prochain') return <React.Fragment key={id}>{blocsTete.prochain}</React.Fragment>;
+                    const v = visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode });
+                    if (v.montree) return <React.Fragment key={id}>{blocsTete[id]}</React.Fragment>;
+                    return id === 'phrase' ? null : <div key={id} hidden data-jp-cachee={id}>{blocsTete[id]}</div>;
+                  });
+                })()}
               </section>
               ); })()}
 
             {/* (9 nov., Ma journée v2) La carte « Semaine du … » (4 nov.) n'est plus une carte à part : la semaine
                 passée se touche dans la frise de la tête (« Semaine du … »), avec les MÊMES règles
                 (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
-            {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
-
             {AF.section}
 
             {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières
@@ -41721,7 +41782,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {/* (6 nov.) Un compte relié : le guide reste tant qu'une étape est à faire
                 (boîte e-mail, numéros), et se masque d'un geste. */}
-            {!loading && !baseKO && !premierJour && accountsReady && Array.isArray(accounts) ? <GuideDemarrageApp onNav={onNav} comptes={accounts}/> : null}
+            {/* (11 nov., lot journee-perso) « En bas » : les notifications coupées et le guide de démarrage, dans
+                SON ordre ; cachés par lui, ils ne s'affichent plus (rien n'est publié par eux). La première visite
+                (`premierJour`) garde son guide plein écran : c'est tout l'écran, il ne se cache pas. */}
+            {!baseKO && !premierJour ? ordreJournee('bas', persoJ).map((id) => {
+              if (!visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree) return null;
+              if (id === 'notifs') return <NotifsMuettes key={id} onNav={onNav}/>;
+              if (id === 'guide') return !loading && accountsReady && Array.isArray(accounts) ? <GuideDemarrageApp key={id} onNav={onNav} comptes={accounts}/> : null;
+              return null;
+            }) : null}
+            {/* (11 nov., lot journee-perso) « Modifier ma journée » : en bas, toujours (aussi dans Paramètres → Affichage). */}
+            {!baseKO && !premierJour ? (() => { const nc = nCartesCachees(persoJ, PROFIL_VENDEUR.mode); return (
+              <div className="vrm-jp-bas" data-jp-bas="">
+                <Bouton variante="secondaire" icone="pencil" data-jp-modifier="" onClick={() => setFeuillePerso(true)}>Modifier ma journée</Bouton>
+                {nc ? <span className="vrm-jp-bas-note" data-jp-n-cachees={nc}>{nc} carte{nc > 1 ? 's' : ''} cachée{nc > 1 ? 's' : ''}</span> : null}
+              </div>
+            ); })() : null}
+            {feuillePerso ? (
+              <SheetShell titre="Modifier ma journée" sousTitre="Montre, cache et range tes cartes" onClose={() => setFeuillePerso(false)} maxWidth={560} data-feuille-journee-perso="">
+                <JourneePersoSetting/>
+              </SheetShell>
+            ) : null}
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier
@@ -50238,6 +50319,28 @@ function useProfilVendeur() {
   React.useEffect(() => { _ecoutesProfil.add(maj); return () => { _ecoutesProfil.delete(maj); }; }, []);
   return PROFIL_VENDEUR.uid === (AUTH.user?.id || '') ? PROFIL_VENDEUR : { mode: 'complet', usage: {}, relies: {}, contexte: {}, plateformes: null };
 }
+// (11 nov., lot journee-perso) SA Ma journée (src/journeePerso.js) : lue au montage, relue
+// quand le nuage arrive (seulement s'il n'y a pas touché ici) ou qu'un autre écran l'écrit.
+const _ecoutesPerso = new Set();
+function useJourneePerso() {
+  const [r, setR] = useState(() => lireJourneePerso(load(CLE_JOURNEE_PERSO, null)));
+  useEffect(() => { _ecoutesPerso.add(setR); return () => { _ecoutesPerso.delete(setR); }; }, []);
+  const touche = useRef(false);
+  useEffect(() => onCloudReady(() => { if (!touche.current) setR(lireJourneePerso(load(CLE_JOURNEE_PERSO, null))); }), []);
+  useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_JOURNEE_PERSO) setR(lireJourneePerso(load(CLE_JOURNEE_PERSO, null))); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  // Toutes les instances (Ma journée et sa feuille, Paramètres) suivent le geste tout de suite.
+  const poser = React.useCallback((n) => { touche.current = true; const x = lireJourneePerso(n); [..._ecoutesPerso].forEach((f) => f(x)); save(CLE_JOURNEE_PERSO, x); }, []);
+  return [r, poser];
+}
+// Le contenu de « Modifier ma journée » (feuille de Ma journée, et Paramètres → Affichage).
+function JourneePersoSetting() {
+  const p = useProfilVendeur();
+  const [r, poser] = useJourneePerso();
+  return <JourneePersoEditeur reglage={r} poser={poser} mode={p.mode} accent={C.accent} eteint={`${C.text}26`} toast={toast}/>;
+}
 // (9 nov.) LE PROFIL FISCAL (src/profilFiscal.js) : ce que son statut permet de montrer
 // et de calculer, pour Comptabilité, Ma journée, Statistiques et la configuration.
 // (Rangé hors du bloc de la règle URSSAF, que audit-urssaf exécute seul.) Trois états comme `useRegimeFiscal` ; suit les écritures des clés qu'il lit.
@@ -55468,6 +55571,7 @@ function AppCoeur() {
 }
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
 export { useProfilFiscal, profilFiscalLu };
+export { useJourneePerso, JourneePersoSetting };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
