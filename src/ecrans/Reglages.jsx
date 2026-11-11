@@ -2014,7 +2014,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
       // (11 nov.) « Quoi de neuf » : les nouveautés qui le concernent depuis son inscription (src/nouveautes.js).
-      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'soleilLevant', lib:tr('reglages.quoi-de-neuf.lib'), desc:tr('reglages.quoi-de-neuf.desc'), data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
+      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'vitrine', lib:tr('reglages.quoi-de-neuf.lib'), desc:tr('reglages.quoi-de-neuf.desc'), data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
       // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
       { id:'centre-aide', type:'action', ic:'search', lib:tr('reglages.centre-aide.lib'), desc:tr('reglages.centre-aide.desc'), onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
