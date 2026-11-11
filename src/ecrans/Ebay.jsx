@@ -37,7 +37,7 @@ import FeuilleParametresEbay from '../ebay/FeuilleParametresEbay.jsx';
 import { FenetreGuideeEbay, QuestionsEbay, BoutonGuideEbay } from '../ebay/FenetresEbay.jsx';
 import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay/ConnexionEbayGuidee.jsx';
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
-import { DEPS_FACTURE, MicDictee } from '../App.jsx';
+import { DEPS_FACTURE, MicDictee, DEMANDE_RETOUR_EBAY, lireComptesEbay } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 const FactureEbayParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureEbayVente = (props) => <React.Suspense fallback={null}><FactureEbayParesseuse {...props}/></React.Suspense>;
@@ -1522,7 +1522,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ebay.param.titre')}</div>
                   <div data-ebay-reglages-resume={resumeReglagesEbay(reglagesPub, { type: typeComptePub }).length} style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>{resumeReglagesEbay(reglagesPub, { type: typeComptePub }).map((x) => tr(x.cle, x.vars)).join(' · ') || tr('ebay.param.commeAvant')}</div>
                 </div>
-                <Bouton variante="secondaire" data-ebay-reglages-ouvrir="" onClick={ouvrirReglages}>{tr('ebay.param.regler')}</Bouton>
+                <Bouton variante="secondaire" data-ebay-tous-reglages="" onClick={ouvrirReglages}>{tr('ebay.param.regler')}</Bouton>
               </div>
             </BlocEbay>
 
@@ -1636,6 +1636,8 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const [deconnexion, setDeconnexion] = React.useState({});   // ref → '…' | message
   React.useEffect(() => {
     try {
+      // (11 nov.) Le retour gardé par la coque (adresse sans onglet), servi une fois.
+      if (DEMANDE_RETOUR_EBAY.v) { const v = DEMANDE_RETOUR_EBAY.v; DEMANDE_RETOUR_EBAY.v = null; setRetourCx(v); if (v.statut === 'connecte') signalerComptesEbay(); return; }
       const p = new URLSearchParams(window.location.search);
       const e = p.get('ebay');
       if (e) {
@@ -5283,8 +5285,10 @@ function EbayRemises({ compte = 'principal' }) {
   }, [compte]);
   React.useEffect(() => { relire(); }, [relire]);
   React.useEffect(() => { let stop = false; (async () => {
-    const r = await lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', [{ ref: compte, principal: compte === 'principal' }]);
-    if (!stop) setAnnonces(r ? r.items.filter((x) => x && x.itemId) : null);
+    const cs = await lireComptesEbay().catch(() => null);
+    const c = Array.isArray(cs) ? cs.find((x) => x.ref === compte) : null;
+    const r = c ? await lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', [c]) : null;
+    if (!stop) setAnnonces(r && !r.illisibles.length ? r.items.filter((x) => x && x.itemId) : null);
   })(); return () => { stop = true; }; }, [compte]);
   const ids = Object.keys(choisies).filter((k) => choisies[k]);
   const fin = Date.now() + Math.max(1, Math.min(30, Number(jours) || 0)) * 86400000;
