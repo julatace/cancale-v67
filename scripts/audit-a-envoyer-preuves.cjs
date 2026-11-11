@@ -186,6 +186,9 @@ function poser({ sansEmails = false } = {}) {
     dit(typeof D.ventesPartiesParPreuve === 'function' && typeof D.raisonDepartVente === 'function', 'api/_lib/depart-vente.js existe (la règle unique)');
     const bp = {}, lignes = [];
     for (const [tx, s] of [['1', 'XW500000001TS'], ['2', 'XW500000002TS'], ['3', 'XW500000002TS'], ['4', 'XW500000004TS'], ['5', 'XW500000005TS']]) bp[tx] = { transaction: tx, suivi: s, receivedAt: iso(NOW - 48 * H) };
+    // (11 nov.) Le dépôt du n°1 est daté du 7 nov. (la phrase le dit) : son bordereau est reçu AVANT (le 6),
+    // sinon, trois jours plus tard, « bordereau reçu il y a 48 h » le rendait plus récent que le dépôt (refusé à raison).
+    bp['1'].receivedAt = new Date(Date.UTC(2026, 10, 6, 9)).toISOString();
     // Forme de l'APP (les lignes `tracking` relues) : status, suivi, subject, sens, emailAt.
     lignes.push({ suivi: 'XW500000001TS', status: 'transit', subject: 'Votre colis est entre de bonnes mains', carrier: 'mondialrelay', emailAt: Date.UTC(2026, 10, 7, 9) });
     lignes.push({ suivi: 'XW500000002TS', status: 'transit', subject: 'Votre colis est entre de bonnes mains', carrier: 'mondialrelay', emailAt: iso(NOW - 10 * H) });

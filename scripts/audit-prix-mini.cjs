@@ -104,7 +104,13 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   dit(A.ecritureMini(r10['4']) === null && A.ecritureMini(null) === null, 'E3 rien posé ⇒ rien écrit');
   // La lecture de l'extension (autoAccepterOffres) : `Number(nums[k].min)` > 0.
   const BG = fs.readFileSync(path.join(R, 'vinted-sync-extension', 'background.js'), 'utf8');
-  dit(/const n = Number\(nums\[k\] && nums\[k\]\.min\); if \(isFinite\(n\) && n > 0\) mins\[String\(k\)\] = n;/.test(BG) && Number(w.min) > 0, 'E4 l’extension lit `Number(min)` : « 41 » vaut 41 (jamais « 41,00 »)');
+  // (11 nov.) L'extension lit désormais par `seuilOffreLu` (virgule, espace, « € » tolérés) : on EXÉCUTE sa vraie règle.
+  const lecteurAvant = /const n = Number\(nums\[k\] && nums\[k\]\.min\); if \(isFinite\(n\) && n > 0\) mins\[String\(k\)\] = n;/.test(BG);
+  const fSeuil = (/\nfunction seuilOffreLu\(v\) \{[\s\S]*?\n\}/.exec(BG) || [''])[0];
+  let seuil = null; try { seuil = fSeuil ? new Function(fSeuil + '\nreturn seuilOffreLu;')() : null; } catch (_) { seuil = null; }
+  const lecteurSeuil = !!seuil && /const n = seuilOffreLu\(nums\[k\] && nums\[k\]\.min\); if \(n != null\) mins\[String\(k\)\] = n;/.test(BG)
+    && seuil(w.min) === Number(w.min) && seuil('41') === 41 && seuil('0') === null && seuil('') === null && seuil(null) === null;
+  dit((lecteurAvant || lecteurSeuil) && Number(w.min) > 0, 'E4 l’extension lit le mini écrit par l’app : « 41 » vaut 41 (jamais « 41,00 »)');
 
   }
   console.log('\n── X. L’action');
@@ -116,7 +122,10 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   console.log('\n── S. Le branchement dans l’app');
   const APP = sansCommentaires(fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8'));
   const i = APP.indexOf('<PrixMiniFeuille choisies={miniSel}');
-  const bloc = i >= 0 ? APP.slice(i, i + 2000) : '';
+  // (11 nov.) Le bloc s'arrête à la fin de l'élément (`}}/>`) : la feuille voisine « Baisser le prix »
+  // (lot baisseprix, ext. 5.336, son clic) commande Vinted, elle — elle n'est pas « Prix mini ».
+  const fin = i >= 0 ? APP.indexOf('}}/>', i) : -1;
+  const bloc = i >= 0 ? APP.slice(i, fin > i ? fin + 4 : i + 2000) : '';
   dit(/askConfirm\(\{ title: `Poser \$\{lignes\.length\} prix mini \?`, desc: lignes\.map\(\(l\)=>`\$\{l\.numero \? 'N°'\+l\.numero : 'Sans N°'\} · \$\{montant\(l\.prix\)\} → mini \$\{montant\(l\.mini\)\}/.test(bloc) && /if \(!ok\) return;/.test(bloc), 'S1 la confirmation liste N° · prix · mini, et rien ne s’écrit sans elle');
   dit(/const w = ecritureMini\(l, \{ avecRefus \}\); if \(it && w\) \{ updatePair\(it, w\); n\+\+; \}/.test(bloc), 'S2 l’écriture par le chemin de la carte : `updatePair` … `ecritureMini`');
   dit(!/vmrCmd|executerCommande|recreerVinted/.test(bloc), 'S3 aucune commande n’est envoyée à Vinted');

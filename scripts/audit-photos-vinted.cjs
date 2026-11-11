@@ -154,6 +154,9 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Photo :: url': 'AnnoncesLeboncoin (catalogue, 22 oct., main) : `ad.images[0]` d’une annonce LEBONCOIN lue par l’extension (CDN de Leboncoin) — jamais une adresse Vinted ; https seulement, repli « — » si elle ne charge pas',
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
+      'BoutonPhotoCarton :: apercu': 'photo du carton prise par le vendeur, compressée en data:image par compresserPhotoCarton (src/photoCarton.js) ; aucune URL distante',
+      'AideInstallation :: "/vrm-icon-v5-192.png"': 'icône officielle de l’app (fichier du site) dans l’aide « Installer VRM », aucune URL distante',
+      'SideBar :: "/logo-vrm-96.png"': 'logo de l’app dans la barre latérale (fichier du site public/logo-vrm-96.png), aucune URL distante',
       'DemarrageVRM :: "/vrm-icon-v5-192.png"': 'icône officielle locale au démarrage, aucune URL distante',
       // (5 nov.) deux <img> arrivés après la liste (24d409ad, 0d961728) :
       'PhotosEbayEditeur :: e.apercu': 'photo prise ou choisie sur l’appareil pour eBay (5 nov.) : `apercu` = URL.createObjectURL(fichier) posée au choix du fichier (blob: local), jamais une adresse Vinted',

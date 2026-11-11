@@ -20,6 +20,7 @@ import {
 } from './modeVacances.js';
 import { SUPABASE_URL, sbAuth, lireTout, load, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, askConfirm, Bouton } from './App.jsx';
 import './styles-mode-vacances.css';
+import { motsNavigateur } from './navigateurExtension.js';   // (11 nov.) « dans Orion » sur Orion, jamais « Chrome » en dur
 
 const lireLigne = async (id, select) => {
   try {
@@ -34,7 +35,7 @@ const MOT = { true: 'En vacances', false: 'Ouvert' };
 const PHRASE_ACTION = {
   ouvrir: 'Ouvre vinted.fr sur ce compte',
   apprendre: 'Fais-le une fois à la main sur vinted.fr',
-  passu: 'Compte ouvert dans Chrome : pas su',
+  passu: `Compte ouvert ${motsNavigateur().dansNu} : pas su`,
 };
 const ISSUE = { fait: 'Fait, relu', deja: 'Déjà fait, relu', ecart: 'Pas changé', incertain: 'Pas relu', echec: 'Refusé', refus: 'Pas envoyé', apprendre: 'Pas encore appris', envoi: 'Envoi…' };
 
@@ -135,7 +136,7 @@ export default function ModeVacances({ comptes = [] }) {
           const etatAttr = l.vacances === true ? 'oui' : l.vacances === false ? 'non' : 'passu';
           const sous = iss && iss.etat !== 'envoi' && iss.raison ? iss.raison
             : (action && PHRASE_ACTION[action]) ? PHRASE_ACTION[action]
-            : [l.onglet ? 'Ouvert dans Chrome' : '', ageLu(l.at)].filter(Boolean).join(' · ');
+            : [l.onglet ? `Ouvert ${motsNavigateur().dansNu}` : '', ageLu(l.at)].filter(Boolean).join(' · ');
           return (
             <div key={l.uid} className="vrm-ios-rangee vrm-vac-rangee" data-vac-ligne={l.uid} data-vac-etat={etatAttr} data-vac-source={l.source || ''}
               data-vac-action={action} data-vac-onglet={l.onglet ? '1' : '0'} data-vac-issue={iss ? iss.etat : ''}>

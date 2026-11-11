@@ -1,0 +1,25 @@
+/* (11 nov., lot stats-categories) Statistiques → « Par catégorie » et la feuille
+   « Poser la catégorie ». Neutre : aucune couleur d'accent (§7). */
+.vrm-stats-vitrine .vrm-sv-ligne-cat { display: grid; grid-template-columns: minmax(96px, 9rem) minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--vrm-line, rgba(0,0,0,.06)); }
+.vrm-stats-vitrine .vrm-sv-ligne-cat:last-of-type { border-bottom: 0; }
+.vrm-stats-vitrine .vrm-sv-ligne-cat .vrm-sv-nom { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-stats-vitrine .vrm-sv-cat-chiffre { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-stats-vitrine .vrm-sv-cat-detail { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+.vrm-stats-vitrine .vrm-sv-cat-detail:empty { display: none; }
+.vrm-stats-vitrine .vrm-sv-cat-sans { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding-top: 10px; color: var(--vrm-muted); }
+@media (max-width: 520px) {
+  .vrm-stats-vitrine .vrm-sv-ligne-cat { grid-template-columns: minmax(0, 1fr) auto; }
+  .vrm-stats-vitrine .vrm-sv-ligne-cat .vrm-sv-piste { grid-column: 1 / -1; grid-row: 2; }
+}
+.vrm-cat-feuille { display: flex; flex-direction: column; gap: 8px; }
+.vrm-cat-liste { display: flex; flex-direction: column; max-height: 46vh; overflow-y: auto; }
+.vrm-cat-ligne { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--vrm-line, rgba(0,0,0,.06)); cursor: pointer; }
+.vrm-cat-ligne input { width: 20px; height: 20px; margin: 0; }
+.vrm-cat-tout { font-weight: 600; grid-template-columns: 24px minmax(0, 1fr); }
+.vrm-cat-titre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cat-info { font-size: 13px; color: var(--vrm-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vrm-cat-choix { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+.vrm-cat-choix-lib { font-size: 13px; color: var(--vrm-muted); }
+.vrm-cat-puces { display: flex; flex-wrap: wrap; gap: 6px; }
+.vrm-cat-puces > * { min-height: 44px; }
+.vrm-cat-fini { margin: 8px 0; }

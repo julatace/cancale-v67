@@ -62,6 +62,19 @@ if (typeof window !== 'undefined') {
 }
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
+// (11 nov., lot app-installable) « Mettre à jour » discret et l'aide d'installation.
+import { PiluleMiseAJour, AideInstallation } from './AppInstallable.jsx';
+import { decisionMaj, estSaisie, CLE_MAJ_REFUSEE } from './miseAJour.js';
+// Android (Chrome, Edge, Samsung) offre l'installation : gardée pour l'aide,
+// qui la propose UNE fois (src/aideInstallation.js). Plus de mini-bandeau surprise.
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    try { e.preventDefault(); } catch (_) {}
+    window.__vrmInviteInstallation = e;
+    try { window.dispatchEvent(new Event('vrm:invite-installation')); } catch (_) {}
+  });
+  window.addEventListener('appinstalled', () => { window.__vrmInviteInstallation = null; });
+}
 const App = React.lazy(() => import('./App.jsx'));
 // Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
 // visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
@@ -154,7 +167,11 @@ function Racine() {
       setVue('app');
     }} />;
   }
-  return <React.Suspense fallback={<FondApp />}><App /></React.Suspense>;
+  return <>
+    <React.Suspense fallback={<FondApp />}><App /></React.Suspense>
+    <PiluleMiseAJour />
+    <AideInstallation actif={aUneSession()} />
+  </>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -169,9 +186,12 @@ suivreDemarrage();
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
+  // (11 nov., lot app-installable) Un nouveau service worker ne recharge PLUS la
+  // page au milieu d'un geste : la page relit seulement sa version (`autoUpdate`),
+  // qui décide (src/miseAJour.js). Rien à faire au tout premier enregistrement.
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading || !hadController) return; // pas de reload au tout premier install
-    reloading = true; window.location.reload();
+    if (reloading || !hadController) return;
+    try { window.dispatchEvent(new Event('vrm:verifier-version')); } catch (_) {}
   });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((reg) => {
@@ -253,16 +273,35 @@ if ('serviceWorker' in navigator) {
       return m ? m[0] : null;
     } catch (_) { return null; }
   };
+  // (11 nov., lot app-installable) Une nouvelle version ne recharge plus d'office :
+  // src/miseAJour.js décide (recharger si rien n'est en cours, sinon « Mettre à
+  // jour » discret, une fois par version).
+  let cacheeA = null;
   const check = async () => {
     if (reloading) return;
     const fp = await fingerprint();
     if (!fp) return;
     if (current == null) { current = fp; return; } // page sans empreinte connue : on s'aligne
-    if (fp !== current) { reloading = true; window.location.reload(); }
+    let refusee = null;
+    try { refusee = localStorage.getItem(CLE_MAJ_REFUSEE); } catch (_) {}
+    const demarrage = document.getElementById('vrm-demarrage');
+    const d = decisionMaj({
+      actuelle: current, serveur: fp, refusee,
+      demarrageVisible: !!(demarrage && !demarrage.hasAttribute('data-sortie')),
+      saisieEnCours: estSaisie(document.activeElement),
+      cacheeDepuisMs: cacheeA == null ? null : Date.now() - cacheeA,
+    });
+    cacheeA = null;
+    if (d === 'recharger') { reloading = true; window.location.reload(); return; }
+    if (d === 'proposer' && window.__vrmMajDispo !== fp) {
+      window.__vrmMajDispo = fp;
+      try { window.dispatchEvent(new Event('vrm:maj-dispo')); } catch (_) {}
+    }
   };
+  window.addEventListener('vrm:verifier-version', () => check());
   window.addEventListener('load', () => {
     check();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { cacheeA = Date.now(); return; } check(); });
     // pageshow (persisted) = page « gelée » restaurée (iOS installé) → on revérifie.
     window.addEventListener('pageshow', (e) => { if (e.persisted) check(); });
     window.addEventListener('focus', () => check());
