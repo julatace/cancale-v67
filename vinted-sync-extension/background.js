@@ -4361,6 +4361,8 @@ async function storeSeenUrls(domain, paths, reponses, conversation) {
 //    (`…/replies`), le profil (`PUT /users/{id}` : nom réel, naissance), le
 //    téléphone et les vérifications — leur contenu n'est jamais rangé, seule la
 //    FORME (noms de clés et types) l'est (`formeCorps`).
+const WREQ_FORME_PERSO = /\/replies\b|phone|verification|\/users\/\d+\/?$/i;
+const WREQ_SANS_FORME = /bank_account|credit_card|payments|payment(?!_?out)|user_2fa|save_email|email_change|personal_data|purchases\/|checkout|identity|password|refund/i;
 const WREQ_SENSIBLE = /bank_account|credit_card|payments|payment|payout|user_2fa|save_email|email_change|personal_data|purchases\/|checkout|identity|password|dsa\/|help_center|complaint|refund|user_addresses|\/replies\b|phone|verification|\/users\/\d+\/?$/i;
 // (17 oct.) LA FORME D'UNE DEMANDE DE RETRAIT D'ARGENT. Julien veut « un endroit
 // où on peut retirer l'argent du porte-monnaie ». Sa page a déjà appelé
@@ -4423,7 +4425,10 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabI
       }
     }
   }
-  const forme = (WREQ_FORME.test(path) || WREQ_SENSIBLE.test(path)) ? formeCorps(body) : null;   // AVANT de retirer le contenu
+  // Relecture 5.356 : la FORME seule pour les ajouts de la revue (réponse, profil,
+  // téléphone, vérification) — JAMAIS pour une écriture bancaire ou de paiement
+  // (carte, compte, paiement, 2FA, mot de passe : `audit-extension-5186` §2).
+  const forme = (WREQ_FORME.test(path) || (WREQ_FORME_PERSO.test(path) && !WREQ_SANS_FORME.test(path))) ? formeCorps(body) : null;   // AVANT de retirer le contenu
   if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
   // (ex: /api/v2/items/123 et /api/v2/items/456 -> meme cle).

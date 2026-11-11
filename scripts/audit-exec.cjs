@@ -126,12 +126,21 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
     dit(a && a.ok && b && b.ok && c && c.ok && envois.length === 3, 'accepter, refuser, faire une offre : sur SON clic, ça part', envois.join(','));
   });
   await essaie('lire une conversation', async () => {
+    // 5.356 (revue de robustesse, haute 15) : LIRE un fil depuis l'app passe par le
+    // budget de LECTURE (20/h, CLAUDE.md §3), séparé du plafond des 50 actions.
     const { envois, envoyer } = faireCtx();
     let r = null;
-    for (let i = 0; i < 25; i++) r = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/987' });
-    dit(r && r.ok && r.data && r.data.conversation && envois.length === 25, 'LIRE un fil part, et ne consomme pas le plafond des actions (25 lectures)', `${envois.length} lecture(s)`);
+    for (let i = 0; i < 20; i++) r = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/987' });
+    dit(r && r.ok && r.data && r.data.conversation && envois.length === 20, 'LIRE un fil part (20 lectures dans l’heure)', `${envois.length} lecture(s)`);
+    const r21 = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/987' });
+    dit(envois.length === 20 && r21 && r21.ok === false && r21.code === 'trop-de-lectures', 'la 21e lecture de l’heure ne part pas (budget de lecture 20/h)', JSON.stringify(r21).slice(0, 160));
+    const a = await envoyer(REPONSE);
+    dit(a && a.ok && envois.length === 21, 'et le budget de lecture épuisé ne mange pas le plafond des actions : une réponse part encore', `${envois.length} envoi(s)`);
+  });
+  await essaie('lecture hors liste', async () => {
+    const { envois, envoyer } = faireCtx();
     const g = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/users/1/items' });
-    dit(g && g.ok === false && envois.length === 25, 'mais une autre lecture (hors liste) ne part pas', envois.slice(25).join(','));
+    dit(g && g.ok === false && envois.length === 0, 'une lecture hors liste blanche ne part pas', envois.join(','));
   });
   await essaie('lecture sur un autre compte', async () => {
     const { envois, envoyer } = faireCtx({ connecte: '999' });

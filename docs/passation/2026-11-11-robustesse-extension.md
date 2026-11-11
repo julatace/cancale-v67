@@ -60,3 +60,14 @@ Vérifié : `audit-extension-zip`, `coherence`, `variables`, `tdz`, `identite`, 
 Aucun tant que l'agent principal n'a pas intégré. Après mise en ligne : installer 5.356.0
 (remplacer le dossier, ⟳ dans chaque Chrome). Nouveau : pour écrire à un favori depuis la
 cloche, VRM **entoure** le favori (ou la cloche) dans l'onglet vinted.fr — c'est lui qui clique.
+
+## Relecture indépendante (11 nov., branche `claude/relecture-agent2-extension`)
+
+- **Corrigé** : la FORME d'une écriture était rangée pour TOUT `WREQ_SENSIBLE`, carte bancaire
+  comprise (`audit-extension-5186` §2 rouge sur la branche). La forme seule ne vaut plus que pour les
+  ajouts de la revue (`WREQ_FORME_PERSO` : réponse, profil, téléphone, vérification) et jamais pour
+  une écriture bancaire ou de paiement (`WREQ_SANS_FORME`).
+- **Remis à la règle** : `audit-exec` attendait 25 lectures de fil d'affilée ; la lecture depuis l'app
+  est au budget 20/h — l'audit vérifie maintenant 20 parties, la 21e refusée (`trop-de-lectures`),
+  une réponse qui part encore (plafond des actions séparé) ; mutation (garde de lecture retirée) ⇒ rouge.
+- Version inchangée (5.356.0, jamais publiée) ; zips régénérés.
