@@ -134,12 +134,12 @@ export function ParcoursArrivee({ etat, montree, succes = '', gestes = {}, detai
 }
 
 // La petite carte de Ma journée. `mode` : 'etape' · 'reprendre' · 'pret' (src/parcoursArrivee.js).
-export function CarteParcours({ etat, mode, onContinuer, onPlusTard, onOk, onMasquer = null, onExemple = null, attrsContinuer = {}, libelleContinuer = 'Continuer' }) {
+export function CarteParcours({ etat, mode, onContinuer, onPlusTard, onOk, onMasquer = null, onExemple = null, attrsContinuer = {}, attrsCarte = {}, libelleContinuer = 'Continuer' }) {
   if (!etat || !mode || mode === 'cachee') return null;
   const c = etat.etapes.find((x) => x.cle === etat.courante) || null;
   const i = c ? etat.etapes.indexOf(c) : -1;
   return (
-    <section className="vrm-guide vrm-pa-carte" data-guide-demarrage="" data-parcours-carte={mode} data-guide-faites={etat.faites} data-guide-courante={etat.courante || ''} aria-labelledby="vrm-pa-carte-titre">
+    <section className="vrm-guide vrm-pa-carte" data-guide-demarrage="" data-parcours-carte={mode} data-guide-faites={etat.faites} data-guide-courante={etat.courante || ''} aria-labelledby="vrm-pa-carte-titre" {...attrsCarte}>
       <div className="vrm-guide-tete">
         <h2 id="vrm-pa-carte-titre" className="vrm-guide-titre">{mode === 'pret' ? 'C’est prêt' : 'Démarrer avec VRM'}</h2>
         <span className="vrm-guide-compte" data-guide-progres={`${etat.faites}/${etat.total}`}>{etat.faites} sur {etat.total}</span>

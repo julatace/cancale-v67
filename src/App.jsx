@@ -19184,7 +19184,8 @@ function CarteParcoursApp({ comptes, plein = false }) {
   return (
     <CarteParcours etat={etat} mode={mode} onContinuer={continuer} onPlusTard={reporterEtapeIci}
       libelleContinuer={c === 'configuration' ? (conf ? 'Reprendre' : 'Commencer') : 'Continuer'}
-      attrsContinuer={c === 'configuration' && mode === 'etape' ? { 'data-configuration-ouvrir': '', 'data-reprendre-configuration': conf ? 'plustard' : 'jamais' } : {}}
+      attrsContinuer={c === 'configuration' && mode === 'etape' ? { 'data-configuration-ouvrir': '' } : {}}
+      attrsCarte={c === 'configuration' && mode === 'etape' ? { 'data-reprendre-configuration': conf ? 'plustard' : 'jamais' } : {}}
       onOk={() => ecrireParcoursIci({ fini: new Date().toISOString(), ouvert: false })}
       onExemple={sansCompte && plein ? () => entrerModeExemple() : null}
       onMasquer={!plein && mode !== 'pret' ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
