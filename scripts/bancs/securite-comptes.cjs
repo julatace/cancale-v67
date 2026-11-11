@@ -122,6 +122,8 @@ const lire = (pg) => pg.evaluate(() => { const s = document.querySelector('[data
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     petites: [...s.querySelectorAll('button, input')].filter((x) => !x.disabled && x.getBoundingClientRect().width > 0 && x.getAttribute('role') !== 'switch').map((x) => x.getBoundingClientRect().height).filter((h) => h < 43.5).length }; });
 const cle = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_securite_comptes') || 'null'); } catch (_) { return null; } });
+// La sauvegarde est différée (`save`) : on attend que SA clé dise ce qu'on attend (8 s au plus).
+const attendreCle = async (pg, test) => { for (let i = 0; i < 40; i++) { const k = await cle(pg); if (k && test(k)) return k; await pg.waitForTimeout(200); } return cle(pg); };
 const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { recursive: true }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, nom + '.png'), fullPage: false }).catch(() => {}); };
 
 (async () => {
@@ -137,8 +139,9 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           await ouvrir(pg);
           let s = await lire(pg);
           const L = s ? s.L : {};
-          dit(L['vinted:111'] && L['vinted:111'].niveau === 'robot' && /vérifie ton compte/.test(L['vinted:111'].phrase) && /vinted\.fr/.test(L['vinted:111'].phrase), 'A1 atelier_test : « Vinted vérifie ton compte · … sur vinted.fr »', s && JSON.stringify(L['vinted:111']));
-          dit(L['vinted:222'] && L['vinted:222'].niveau === 'prudence' && /Prudence jusqu/.test(L['vinted:222'].phrase), 'A2 second_test : prudence, l’heure de reprise dite', s && JSON.stringify(L['vinted:222']));
+          // Jugé sur la règle (niveau, hôte, heure), pas sur la langue du navigateur du banc.
+          dit(L['vinted:111'] && L['vinted:111'].niveau === 'robot' && /vinted\.fr/.test(L['vinted:111'].phrase), 'A1 atelier_test : « Vinted vérifie ton compte · … sur vinted.fr »', s && JSON.stringify(L['vinted:111']));
+          dit(L['vinted:222'] && L['vinted:222'].niveau === 'prudence' && /\d{1,2} h \d{2}/.test(L['vinted:222'].phrase), 'A2 second_test : prudence, l’heure de reprise dite', s && JSON.stringify(L['vinted:222']));
           dit(L['vinted:333'] && ['ok', 'repos'].includes(L['vinted:333'].niveau), 'A3 troisieme : calme (ou repos si le banc tourne la nuit)', s && JSON.stringify(L['vinted:333']));
           dit(L['vestiaire:4242'] && s.groupes.includes('vestiaire') && s.groupes.includes('vinted'), 'A4 Vestiaire a son groupe, le compte vu par l’extension y est', s && JSON.stringify(s.groupes));
           const amb = L['vinted:111'] && L['vinted:111'].couleur, gris = L['vinted:222'] && L['vinted:222'].couleur;
@@ -152,22 +155,23 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           await pg.locator('[data-secu-tout-arreter]').click();
           await pg.waitForFunction(() => document.querySelector('[data-securite-comptes]').getAttribute('data-secu-arret') === '1', null, { timeout: 8000 }).catch(() => {});
           s = await lire(pg);
-          const k1 = await cle(pg);
+          const k1 = await attendreCle(pg, (k) => Array.isArray(k.evts) && k.evts.length > 0);
           const cmds = await pg.evaluate(() => window.__cmds.slice());
           const ev = k1 && Array.isArray(k1.evts) ? k1.evts[k1.evts.length - 1] : null;
           dit(s && s.arret === '1' && ev && ev.s === 'arret' && cmds.some((c) => c.cmd === 'secuArret' && c.arret === true), 'B1 « Tout arrêter » : sa clé porte l’arrêt, l’extension reçoit l’ordre tout de suite', JSON.stringify({ ev, cmds }));
-          dit(s && s.L['vinted:333'].niveau === 'arret' && s.L['vinted:222'].niveau === 'arret' && s.L['vinted:111'].niveau === 'robot', 'B2 chaque compte dit « Tout est arrêté » (la vérification reste dite d’abord)', s && JSON.stringify(Object.values(s.L).map((x) => x.niveau)));
+          const nArret = await pg.locator('[data-secu-arrete]').count();
+          dit(s && nArret === 1 && !Object.values(s.L).some((x) => x.niveau === 'arret') && s.L['vinted:111'].niveau === 'robot', 'B2 « Tout est arrêté » dit UNE fois, en tête (§7) ; chaque compte garde son état (la vérification reste dite)', s && JSON.stringify({ nArret, n: Object.values(s.L).map((x) => x.niveau) }));
           await capture(pg, `securite-comptes-arret-${suf}`);
           await pg.locator('[data-secu-relancer]').click();
           await pg.waitForTimeout(400);
           s = await lire(pg);
-          const k2 = await cle(pg);
-          dit(s && s.arret === '0' && k2.evts[k2.evts.length - 1].s === 'relance', 'B3 « Relancer » : le dernier geste fait foi');
+          const k2 = await attendreCle(pg, (k) => Array.isArray(k.evts) && k.evts.length > 1);
+          dit(s && s.arret === '0' && k2 && k2.evts[k2.evts.length - 1].s === 'relance', 'B3 « Relancer » : le dernier geste fait foi', JSON.stringify(k2));
           // ── C ──
           await pg.locator('[data-secu-compte="vinted:333"] > .vrm-ios-rangee-zone').click();
           const champ = pg.locator('[data-secu-reglages="vinted:333"] [data-secu-champ="parJour"]');
           await champ.fill('5'); await champ.press('Enter'); await pg.waitForTimeout(300);
-          const k3 = await cle(pg);
+          const k3 = await attendreCle(pg, (k) => k.comptes && k.comptes['vinted:333']);
           dit(k3 && k3.comptes && k3.comptes['vinted:333'] && k3.comptes['vinted:333'].parJour === 5 && !(k3.comptes['vinted:111']), 'C1 plafond par jour 5 : écrit pour CE compte seulement', JSON.stringify(k3 && k3.comptes));
           await capture(pg, `securite-comptes-reglages-${suf}`);
           await pg.locator('[data-secu-compte="vinted:333"] > .vrm-ios-rangee-zone').click();
@@ -176,7 +180,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           const conseil = await pg.locator('[data-secu-reglages="vinted:222"] [data-secu-conseil-calme]').count();
           if (conseil) await pg.locator('[data-secu-reglages="vinted:222"] [data-secu-calme-poser]').click();
           await pg.waitForTimeout(300);
-          const k4 = await cle(pg);
+          const k4 = await attendreCle(pg, (k) => k.comptes && k.comptes['vinted:222']);
           const dates = k4 && k4.comptes && k4.comptes['vinted:222'] && k4.comptes['vinted:222'].calmeDates;
           dit(conseil === 1 && Array.isArray(dates) && dates.length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(dates[0]), 'D1 un refus vu ⇒ « Journée calme conseillée », « Calme aujourd’hui » pose la date', JSON.stringify({ conseil, dates }));
           s = await lire(pg);

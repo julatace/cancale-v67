@@ -156,7 +156,8 @@ export default function SecuriteComptes({ comptes = [] }) {
     const etat = rowsEtat === undefined ? undefined : etatDuCompte(rowsEtat, c.cle, maintenant);
     const reg = secuReglages(tout, c.plateforme, c.compte);
     const auj = tableau && tableau[c.cle] ? tableau[c.cle].jours[jours[jours.length - 1]] : (tableau ? 0 : null);
-    const ph = etat === undefined ? null : secuPhrase({ plateforme: c.plateforme, compte: c.compte, etat: etat || {}, reg, arret, maintenant, aujourdhui: auj });
+    // « Tout arrêter » est dit UNE fois, en tête (§7) : chaque rangée dit son propre état.
+    const ph = etat === undefined ? null : secuPhrase({ plateforme: c.plateforme, compte: c.compte, etat: etat || {}, reg, arret: null, maintenant, aujourdhui: auj });
     const texte = etat === undefined ? '…' : (etat === null ? tr('securite.etatPasSu') : phraseDe(ph));
     const freins = etat && etat.prudence && etat.prudence.depuis ? [{ vu: etat.prudence.depuis }] : [];
     const conseil = !!journeeCalme(freins, maintenant);
