@@ -242,6 +242,9 @@ const MeilleuresSources = aLaDemande(() => import('./MeilleuresSources.jsx'));
 // ⟦→ ecrans/Vestiaire.jsx #3⟧
 // ⟦→ ecrans/Compta.jsx #3⟧
 const RechercheEbay = aLaDemande(() => import('./ebayRecherche.jsx'));
+// (11 nov., lot alertes-ebay) « Nouvelles annonces pour tes recherches » (eBay → Achats), à la demande.
+const AlertesEbay = aLaDemande(() => import('./AlertesEbay.jsx'));
+import { mediane } from './alertesEbayMarge.js';
 // ⟦→ ecrans/Compta.jsx #4⟧
 const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
 // (6 nov.) La même, sur la LIGNE de la vente (à côté de la vente) : rien pendant le
@@ -22958,7 +22961,7 @@ const SESSION_FIL_EBAY={
   prete:async()=>{ if(!AUTH.session) return true; if(authValid()) return true; return authRefresh(); },
   renouveler:()=>authRefresh(),
 };
-function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
+function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte,contexte={}}){
   const {ventes}=useVentesCoque();
   const repere=React.useMemo(()=>{
     if(!Array.isArray(ventes))return null;
@@ -22968,8 +22971,18 @@ function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
     // ou une taille enfant (« lacets », « boîte vide », « enfant ») : mieux vaut un blanc qu'un faux.
     return (titre)=>{const k=extractModel(titre);if(!repereAdmis(titre,k))return null;const e=k&&V[k];if(!e||e.n<REPERE_MIN)return null;return {modele:k,moyenne:e.s/e.n,n:e.n};};
   },[ventes,panelOff]);
+  // (11 nov., lot alertes-ebay) La revente d'une recherche en alerte, à défaut de SON prix : la MÉDIANE
+  // de ses ventes du modèle de la recherche (même règle que le repère : ≥ 3 ventes, jamais une clé
+  // générique ni un accessoire). Ventes pas lues ⇒ undefined (« pas su »), rien ⇒ null.
+  const revente=React.useMemo(()=>{
+    if(!Array.isArray(ventes))return ()=>undefined;
+    const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
+    const V=moyennesParModele(ventes,(o)=>compteEcarte(o&&o._acc&&o._acc.vinted_user_id,hAcc,panelOff||{}));
+    return (mots)=>{const k=extractModel(mots);if(!repereAdmis(mots,k))return null;const e=k&&V[k];if(!e||e.n<REPERE_MIN)return null;return {modele:k,mediane:mediane(e.prix),n:e.n};};
+  },[ventes,panelOff]);
   const [gagnes,setGagnes]=React.useState(false);
   return <div style={{padding:16}} data-ebay-achats-onglet="">
+    <Suspense fallback={null}><AlertesEbay headers={headers} theme={C} revente={revente} contexte={contexte}/></Suspense>
     <RechercheEbay vend={vendActuel()} exemple={exemplesActuels().achat} headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
     <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
     {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
@@ -27459,8 +27472,8 @@ const moyennesParModele = (commandes, ecarte) => {
     if (!o || (typeof ecarte === 'function' && ecarte(o)) || classifyOrderStatus(o.status) === 'cancelled') continue;
     const k = extractModel(o.title); if (!k) continue;
     const p = montantCommande(o); if (!(p > 0)) continue;
-    const e = par[k] || (par[k] = { k, n: 0, s: 0, marques: {} });
-    e.n += 1; e.s += p;
+    const e = par[k] || (par[k] = { k, n: 0, s: 0, marques: {}, prix: [] });
+    e.n += 1; e.s += p; e.prix.push(Math.round(p * 100));   // (11 nov.) en centimes : la médiane des alertes eBay
     const b = extractBrand(o.title); if (b) e.marques[b] = (e.marques[b] || 0) + 1;
   }
   return par;
@@ -56418,7 +56431,7 @@ function AppCoeur() {
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
+          {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette}/>}
           {sec==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };
