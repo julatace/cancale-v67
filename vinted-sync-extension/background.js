@@ -10098,9 +10098,9 @@ async function visiteVinted() {
     await envoyerNotifsSuivi();
     // 5.319 : les avis reçus (première page), une fois par 24 h — lecture seule, classe « suivi ».
     await capterAvis(uid);
-    // 5.344 : l'historique de départ (ventes puis achats), quelques pages par
-    // visite, sous la réserve de l'argent et des colis (voir `importerHistorique`).
-    await importerHistorique(uid);
+    // 5.344 : l'historique de départ part APRÈS la visite, en fond (`tickImport`,
+    // 1 min plus tard puis toutes les 5 min) — jamais dans la rafale de la visite.
+    planifierImport();
     // ⚠️ 5.167 (11 octobre) — CE QUI EST EN LIGNE SUR SES AUTRES COMPTES : leur
     // dressing PUBLIC, relu avec la session du compte connecté (au plus 3 comptes
     // par visite, aucun relu depuis moins de 30 min, budget de lecture ordinaire).
@@ -13134,7 +13134,9 @@ async function reserveLectures(uid, classe = 'photos') {
   for (const k of Object.keys(max)) {
     const d = dues[k];
     const connu = d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS;
-    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : max[k];   // pas su ⇒ réserve entière
+    // 5.344 : l'import ne réserve que ce qu'il a NOTÉ (chaque passage le note) ;
+    // un compte sans import en cours ne prive pas les photos.
+    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : (k === 'import' ? 0 : max[k]);   // pas su ⇒ réserve entière
   }
   return r;
 }
@@ -15804,6 +15806,12 @@ async function importerHistoriqueUn(uid, opts) {
   st.publie = await publierImport(uid, st);
   await poserImport(uid, st);
   return n;
+}
+// Après une visite : un passage 1 min plus tard (la rafale de la visite est
+// passée). Un seul minuteur ; le service worker endormi ⇒ l'alarme de 5 min.
+let _importMinuteur = null;
+function planifierImport() {
+  try { if (_importMinuteur) return; _importMinuteur = setTimeout(() => { _importMinuteur = null; tickImport(); }, 60000); } catch (_) {}
 }
 // Le passage de fond (alarme `vrm-import`, 5 min) : onglet vinted.fr ouvert, le
 // compte de son cookie, une session VRM, aucune pause, une base qui répond, un
