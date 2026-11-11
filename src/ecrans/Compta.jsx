@@ -3497,13 +3497,18 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
         <button key={q.id} type="button" className="vrm-argent-w" data-argent-q={q.id}
           data-argent-valeur={q.valeur == null ? '' : String(Math.round(q.valeur * 100))} data-argent-partiel={q.partiel ? '1' : undefined}
           data-argent-raison={q.raison || undefined} data-argent-echeance={q.echeance ? String(q.echeance) : undefined}
-          aria-label={`${q.question} ${q.valeur == null ? (q.texte || 'pas su') : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''}`}
+          aria-label={q.valeur == null && !q.texte
+            ? `${q.libelle} : ${q.note ? q.note + ', ' : ''}pas su — ${q.question}`
+            : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`}
           onClick={() => aller(q)}>
-          <span className="vrm-argent-w-l">{q.libelle}</span>
+          {/* (11 nov., lot accessibilité) Le nom commence par ce qui est ÉCRIT (libellé, chiffre, note —
+              WCAG 2.5.3) puis pose la question ; un « — » affiché se dit « pas su », APRÈS le texte écrit ;
+              les espaces séparent les morceaux pour le lecteur. */}
+          <span className="vrm-argent-w-l">{q.libelle}</span>{' '}
           <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
             {q.valeur != null ? <>{q.partiel ? <small>au moins </small> : null}{somme(q.valeur)}</> : (q.texte || '—')}
           </b>
-          {q.note ? <span className="vrm-argent-w-note">{q.note}</span> : null}
+          {q.note ? <>{' '}<span className="vrm-argent-w-note">{q.note}</span></> : null}
           <span className="vrm-argent-w-chev" aria-hidden="true">›</span>
         </button>
       ))}

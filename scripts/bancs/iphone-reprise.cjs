@@ -204,7 +204,7 @@ const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(aw
   // (`data-en-cours` de la barre, 4 s au plus), jamais un délai fixe seul (CLAUDE.md §6.5).
   await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {});
   return true; };
-const PLUS = '.vrm-tabbar button[aria-label="Plus"]';
+const PLUS = '.vrm-tabbar button[aria-label^="Plus"]';
 // Ce que « Plus » porte (App.jsx, GROUPES_PLUS sans les groupes `ordi`) : lu dans la source, pas recopié.
 const PLUS_ATTENDUES = (() => {
   try {
@@ -241,7 +241,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
   const m = document.querySelector('.vrm-sheet'); if (!m) return null;
   const q = m.getBoundingClientRect(); const nav = document.querySelector('.vrm-tabbar').getBoundingClientRect();
   const entrees = [...m.querySelectorAll('[data-nav-entree]')].map((e) => { const r = e.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); const lib = e.querySelector('.vrm-sheet-lib'); return { id: e.getAttribute('data-nav-entree'), h: Math.round(r.height), visible: r.top >= 0 && r.bottom <= Math.min(innerHeight, nav.top) + 1, touche: !!hit && e.contains(hit), coupe: lib ? lib.scrollWidth > lib.clientWidth + 1 : false }; });
-  return { bas: Math.round(q.bottom), navHaut: Math.round(nav.top), defile: m.scrollHeight > m.clientHeight + 1, entrees, plusOuvert: document.querySelector('.vrm-tabbar button[aria-label="Plus"]').getAttribute('aria-expanded') };
+  return { bas: Math.round(q.bottom), navHaut: Math.round(nav.top), defile: m.scrollHeight > m.clientHeight + 1, entrees, plusOuvert: document.querySelector('.vrm-tabbar button[aria-label^="Plus"]').getAttribute('aria-expanded') };
 });
 
 (async () => {
@@ -292,7 +292,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(e5.ecran === 'ventes' && !(await pg.locator('.vrm-sheet').count()), `B5 ${qui} : panneau ouvert, toucher Ventes y va et le ferme`, JSON.stringify(e5));
         // B6 · un écran de « Plus »
         await toucher(pg, PLUS); await toucher(pg, '.vrm-sheet [data-nav-entree="compta"]');
-        const e6 = await pg.evaluate(() => { const x = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), plusEcran: x.getAttribute('data-plus-ecran') || '', courant: x.getAttribute('aria-current') || '' }; });
+        const e6 = await pg.evaluate(() => { const x = document.querySelector('.vrm-tabbar button[aria-label^="Plus"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), plusEcran: x.getAttribute('data-plus-ecran') || '', courant: x.getAttribute('aria-current') || '' }; });
         await capture(pg, `compta-${mode}-${sombre ? 'sombre' : 'clair'}`);
         dit(e6.ecran === 'compta' && e6.plusEcran === 'compta' && e6.courant === 'page', `B6 ${qui} : sur Compta, la 5ᵉ place dit Compta`, JSON.stringify(e6));
         const m6 = await mesureBarre(pg);
@@ -301,7 +301,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         const vus = [];
         for (const id of PLUS_ATTENDUES) {
           await toucher(pg, PLUS); await toucher(pg, `.vrm-sheet [data-nav-entree="${id}"]`);
-          const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
+          const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label^="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
           vus.push({ id, ...x });
         }
         dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : chaque écran de « Plus » (lu dans GROUPES_PLUS) — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));

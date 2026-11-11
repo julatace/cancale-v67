@@ -514,7 +514,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       {f.photo
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : <span className="vrm-s2d-sansphoto" aria-hidden="true">{String(f.title || '').trim().slice(0, 1).toUpperCase() || '·'}</span>}
-      <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}>N°{f.numero}</span>
+      {/* (11 nov., lot accessibilité) Dans une vignette MINI (44–48 px), « N°12 » était coupé (« N°1… ») :
+          la pastille y est resserrée (styles-stock-2d.css) et porte le N° entier en `title` ; la ligne
+          l'écrit aussi en clair, d'où `aria-hidden` (lu une fois). */}
+      <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}
+        {...(mini ? { title: `N°${f.numero}`, 'aria-hidden': 'true', 'data-mini': '' } : {})}>N°{f.numero}</span>
       {sold && !mini && <span className="vrm-s2d-vendue">Vendue</span>}
       {!sold && hors && !mini && <span className="vrm-s2d-horsligne">Plus en ligne</span>}
     </>
