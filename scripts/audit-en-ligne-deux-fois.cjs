@@ -106,6 +106,7 @@ if (arg.includes('--prouve')) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-en-ligne-deux-fois-'));
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'enLigneDeuxFois.js'), regleSrc);
+    fs.copyFileSync(path.join(__dirname, '..', 'src', 'profilVendeur.js'), path.join(dir, 'profilVendeur.js'));   // (lot vocabulaire-article) le mot du vendeur, importé par la règle
     try { R = await import(pathToFileURL(path.join(dir, 'enLigneDeuxFois.js')).href); } catch (e) { dit(false, 'la règle ne se charge pas : ' + e.message); }
   } else dit(false, 'src/enLigneDeuxFois.js absent : aucune règle « en ligne deux fois »');
 

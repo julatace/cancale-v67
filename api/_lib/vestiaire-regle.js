@@ -29,7 +29,6 @@
 //    devinée.
 // Fonctions PURES : `scripts/audit-vestiaire-partout.cjs` les exécute.
 // ─────────────────────────────────────────────────────────────────────────────
-import { motsVendeur } from '../../src/profilVendeur.js';   // (11 nov.) lu par l'app (Ma journée) : le mot du vendeur connecté
 import { cleNum } from './numerotation.js';
 import { joursAvant } from './ebay-a-expedier.js';
 import { departProuve, suivisAmbigus } from './depart-colis.js';
@@ -255,7 +254,8 @@ export function stockVestiaire(liste) {
 // Entrées : `lst` = `vc_listings` ({ items, liens, capturedAt }) ou null ;
 // `ventes` = `vc_ventes.ventes`. Rend { annonces, ventes, manques } dans la
 // forme de `articlesVendusAilleurs` (src/bilanSynchronisation.js).
-export function retraitsVestiaire({ lst, ventes, maintenant = Date.now() } = {}) {
+// (11 nov., lot vocabulaire-article) `mots` : « paire » / « article » du vendeur (l'app passe `motsVendeur()`) ; absent ⇒ le texte d'avant.
+export function retraitsVestiaire({ lst, ventes, maintenant = Date.now(), mots = null } = {}) {
   const annonces = [], vs = [], manques = [];
   const vv = objet(ventes) || {};
   const liens = (objet(lst) && objet(lst.liens)) || {};
@@ -281,6 +281,6 @@ export function retraitsVestiaire({ lst, ventes, maintenant = Date.now() } = {})
     if (!num) { sansIdentite++; continue; }
     vs.push({ id: 'vc:' + String(id), numero: num, plateforme: 'Vestiaire', engagee: true });
   }
-  if (sansIdentite) manques.push(`${sansIdentite} vente${sansIdentite > 1 ? 's' : ''} Vestiaire sans référence VRM-n° (VRM ne devine pas ${motsVendeur().le})`);
+  if (sansIdentite) manques.push(`${sansIdentite} vente${sansIdentite > 1 ? 's' : ''} Vestiaire sans référence VRM-n° (VRM ne devine pas ${(mots && mots.le) || 'la paire'})`);
   return { annonces, ventes: vs, manques };
 }

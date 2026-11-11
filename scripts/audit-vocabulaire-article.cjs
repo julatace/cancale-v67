@@ -71,6 +71,7 @@ const PERMIS = [
   ['src/ecrans/Reglages.jsx', /« paires »|Autre paire · taille 41/, 'la description du choix « Sneakers » / l’exemple Sneakers (gardé par `snEx`)'],
   ['src/annulerCommandes.js', /^(Relier un achat à une paire|N° déjà servi|sort la paire du stock|Achats, Compta, Paramètres, Messages, fiche paire)/, 'CONFIRMATIONS : l’inventaire lu par audit-annuler-commandes, jamais affiché'],
   ['src/operations/description.js', /^À plusieurs : tâches, paires/, '`DESCRIPTION_ORGANISATION` gardée pour les audits d’Organisation ; l’app lit `descriptionOrganisation()`'],
+  ['api/_lib/vestiaire-regle.js', /^la paire$/, 'repli quand aucun mot n’est passé (serveur seul) ; l’app passe `mots: motsVendeur()` (B10)'],
   ['src/aideEcrans.js', null, 'rendu par `phraseVendeur` (AideEcran.jsx) : chaque phrase a sa version « article » (B2, B3)'],
   ['src/aideEtapes.js', null, 'généré par scripts/aide-generer.cjs ; rendu par `phraseVendeur` (B2, B3)'],
   ['src/rechercheUnique.js', /^Paires$/, 'GROUPES_LOUPE : l’étiquette « Paires » est remplacée par `motsVendeur().Noms` dans la recherche (App.jsx, B9)'],
@@ -306,6 +307,7 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   dit(!malPlaces.length, 'B7 manifeste : vrm-mots.js chargé AVANT chaque page qui l’utilise', malPlaces);
   dit(/await rafraichirVendExt\(main\.vrm_je_vends, owner\);/.test(fond) && /'vrm_numero_ecrit', 'vrm_je_vends'\]/.test(fond) && /function fullSync\(\) \{ vendExtAJour\(\);/.test(fond), 'B8 fond : `vrm_je_vends` relu avec les infos de page et à chaque synchronisation (au plus toutes les 6 h)');
   dit(/const GROUPES = GROUPES_LOUPE\.map\(\(\[t, l\]\) => \[t, t === 'paire' \? motsVendeur\(\)\.Noms : l\]\);/.test(app), 'B9 la recherche : le groupe « Paires » s’appelle « Articles » hors Sneakers');
+  dit(/const rv = retraitsVestiaire\(\{.*, mots: motsVendeur\(\) \}\);/.test(app), 'B10 Ma journée (Vestiaire) passe le mot du vendeur à `retraitsVestiaire`');
   if (arbreAvant) try { fs.rmSync(arbreAvant, { recursive: true, force: true }); } catch (_) {}
   return ko;
 }

@@ -40194,7 +40194,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const rowsVc = resultats[3] && resultats[3].status === "fulfilled" ? resultats[3].value : null;
     if (Array.isArray(rowsVc) && rowsVc.every((r) => r.owner === owner && ["vc_listings", "vc_ventes"].includes(r.id))) {
       const lst = rowsVc.find((r) => r.id === "vc_listings") || null;
-      const rv = retraitsVestiaire({ lst: avecNumerosVc(lst), ventes: (rowsVc.find((r) => r.id === "vc_ventes") || {}).ventes || {} });
+      const rv = retraitsVestiaire({ lst: avecNumerosVc(lst), ventes: (rowsVc.find((r) => r.id === "vc_ventes") || {}).ventes || {}, mots: motsVendeur() });
       annonces.push(...rv.annonces); ventes.push(...rv.ventes); manques.push(...rv.manques);
     } else manques.push("Vestiaire non relu");
     for(const l of ea?.lignes||[])if(l.ligne?.complet===true&&Number(l.ligne.capturedAt)>0)completes.push({plateforme:'eBay',compte:String(l.compte.ref),at:Number(l.ligne.capturedAt)});
