@@ -146,7 +146,8 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
             const ouverture = posts.slice(0, avantClic);
             dit(ouverture.every((p) => JSON.stringify(JSON.parse(p || '{}')) === '{"action":"verifier"}'), `C ${tag} : avant le clic, seule la vérification d'ouverture est partie`, JSON.stringify(ouverture));
             await FEUILLE(pg).getByRole('button', { name: 'Déconnecter', exact: true }).click({ timeout: 5000 }).catch(() => {});
-            await attendre(700);
+            for (let i = 0; i < 40 && posts.length === avantClic; i++) await attendre(200);
+            await attendre(500);
             const clic = posts.slice(avantClic);
             dit(clic.length === 1 && JSON.parse(clic[0] || '{}').session === 'b2c3d4e5-0000-4000-8000-000000000002' && Object.keys(JSON.parse(clic[0] || '{}')).length === 1, `C ${tag} : « Déconnecter » n'envoie QUE l'identifiant de cet appareil`, JSON.stringify(clic));
           }
@@ -155,7 +156,11 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
             await FEUILLE(pg).getByRole('button', { name: 'Se déconnecter partout' }).waitFor({ timeout: 5000 }).catch(() => {});
             await capture(pg, `D-${tag}-confirmer`);
             await FEUILLE(pg).getByRole('button', { name: 'Se déconnecter partout' }).click({ timeout: 5000 }).catch(() => {});
-            await attendre(2600);
+            // (11 nov.) Attendre le FAIT (l'appel parti, puis la session effacée sur un oui) plutôt qu'un délai fixe :
+            // sur une machine chargée, 2,6 s ne suffisaient pas (rouges changeants d'un passage à l'autre).
+            for (let i = 0; i < 40 && !logouts.length; i++) await attendre(200);
+            if (issue === 'oui') await pg.waitForFunction(() => { try { return !localStorage.getItem('vrm_session'); } catch (_) { return true; } }, null, { timeout: 8000 }).catch(() => {});
+            await attendre(800);
             const reste = await pg.evaluate(() => { try { return !!localStorage.getItem('vrm_session'); } catch (_) { return null; } });
             dit(logouts.length === 1 && /scope=global/.test(logouts[0]), `D ${tag} (${issue}) : un seul appel, scope=global`, JSON.stringify(logouts));
             if (issue === 'panne') dit(reste === true, `D ${tag} : une panne de Supabase n'efface RIEN ici`, reste);
