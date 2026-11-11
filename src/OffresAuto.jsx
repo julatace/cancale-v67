@@ -17,6 +17,8 @@
 //   4. « Historique » : les offres acceptées / refusées NOTÉES par l'extension
 //      (lot G, `journal_vrm_*`), jamais déduites ;
 //   5. le message de refus (SON texte, vide par défaut).
+// (11 nov., lot prix-mini) Refait : la règle en trois lignes sous l'interrupteur, « Prix
+// mini manquants » (src/PrixMiniManquants.jsx) juste dessous, tous les textes par tr().
 // Rien ici ne change une règle du moteur (CLAUDE.md §3).
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
@@ -27,6 +29,8 @@ import { jaugeDuCompte, heureFr } from './jaugeActions.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { apercuMoteur, journalOffres, lignesSeuils, alertePlafond, journeeCalme, seuilsIllisibles, montantSeuil, LIBELLE_DECISION, RAISON_GARDE, DELAI_OFFRE_MIN, DELAI_OFFRE_MAX, OFFRES_PAR_VISITE } from './offresSures.js';
 import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth } from './App.jsx';
+import PrixMiniManquants from './PrixMiniManquants.jsx';
+import { tr, localeCourante } from './i18n/index.js';
 import './offres-auto.css';
 
 const PAR_PAGE = 30;
@@ -36,8 +40,8 @@ const quand = (t) => {
     const hh = heureFr(t);
     if (d.toDateString() === auj.toDateString()) return hh;
     const hier = new Date(auj); hier.setDate(auj.getDate() - 1);
-    if (d.toDateString() === hier.toDateString()) return `hier ${hh}`;
-    return `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' })} ${hh}`;
+    if (d.toDateString() === hier.toDateString()) return `${tr('commun.hier')} ${hh}`;
+    return `${d.toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' })} ${hh}`;
   } catch (_) { return ''; }
 };
 
@@ -100,7 +104,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
   // 5. « Tout arrêter » : offres auto + mode auto des favoris (et sa file) sur chaque compte.
   const [arret, setArret] = React.useState(null);
   const toutArreter = async () => {
-    const ok = await askConfirm({ title: 'Tout arrêter ?', desc: 'Offres automatiques éteintes. Messages automatiques aux favoris arrêtés sur tous tes comptes Vinted.\n\nRien d’autre ne change. Tu rallumes quand tu veux.', ok: 'Tout arrêter', cancel: 'Annuler' });
+    const ok = await askConfirm({ title: tr('oa.arret.titre'), desc: tr('oa.arret.desc'), ok: tr('oa.toutArreter'), cancel: tr('oa.annuler') });
     if (!ok) return;
     eteindreOffres && eteindreOffres();
     const liste = (comptes || []).filter((c) => /^\d{1,20}$/.test(String(c.uid)));
@@ -117,7 +121,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
     const r = { at: Date.now(), enCours: false, ok: res.filter((x) => x.ok).map((x) => x.ok), ko: res.filter((x) => x.ko).map((x) => x.ko) };
     setArret(r);
     try { window.dispatchEvent(new CustomEvent('vrm:favoris-auto', { detail: {} })); } catch (_) {}
-    toast(r.ko.length ? `Offres auto éteintes · favoris : ${r.ko.length} compte${r.ko.length > 1 ? 's' : ''} pas confirmé${r.ko.length > 1 ? 's' : ''}` : 'Tout est arrêté');
+    toast(r.ko.length ? tr('oa.arret.toastKo', { n: r.ko.length }) : tr('oa.arret.toastOk'));
   };
   const basculerCoche = (id) => setCoches((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const corrigerIllisibles = () => {
@@ -128,104 +132,112 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
 
   return (
     <section className="vrm-oa" data-offres-auto-ecran={actif ? 'on' : 'off'}>
-      {/* ── 1. L'INTERRUPTEUR ET LA SÉCURITÉ DU COMPTE ── */}
+      {/* ── 1. L'INTERRUPTEUR, LA RÈGLE EN TROIS LIGNES, LA SÉCURITÉ DU COMPTE ── */}
       <div className="vrm-oa-tete">
         <div className="vrm-oa-ligne">
-          <span className="vrm-oa-icone" aria-hidden="true"><Icon name="tag" size={18}/></span>
+          <span className={'vrm-oa-icone' + (actif ? ' is-on' : '')} aria-hidden="true"><Icon name="tag" size={20}/></span>
           <div className="vrm-oa-texte">
-            <b>Offres automatiques</b>
-            <span data-oa-statut="">{actif ? `Allumées · ${nAvec} paire${nAvec > 1 ? 's' : ''} réglée${nAvec > 1 ? 's' : ''}` : 'Éteintes'}</span>
+            <b>{tr('oa.titre')}</b>
+            <span data-oa-statut="">{actif ? tr('oa.allumees', { n: nAvec }) : tr('oa.eteintes')}</span>
           </div>
-          <button type="button" role="switch" aria-checked={!!actif} data-offres-auto-toggle={actif ? '1' : '0'} onClick={basculer} className="vrm-offres-auto-switch" aria-label="Acceptation automatique des offres">
+          <button type="button" role="switch" aria-checked={!!actif} data-offres-auto-toggle={actif ? '1' : '0'} onClick={basculer} className="vrm-offres-auto-switch" aria-label={tr('oa.interrupteur')}>
             <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
           </button>
         </div>
+        <ul className="vrm-oa-regles" data-oa-regles="">
+          <li><span className="vrm-oa-regle-icone is-oui" aria-hidden="true"><Icon name="check" size={14}/></span>{tr('oa.regle.accepte', { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX })}</li>
+          <li><span className="vrm-oa-regle-icone" aria-hidden="true"><Icon name="close" size={14}/></span>{tr('oa.regle.refuse')}</li>
+          <li><span className="vrm-oa-regle-icone" aria-hidden="true"><Icon name="chat" size={14}/></span>{tr('oa.regle.toi')}</li>
+        </ul>
         {actif && u ? <JaugeActions uid={u} nom={nomDe(u)}/> : null}
-        {alerte ? <p className="vrm-oa-alerte" data-oa-plafond={alerte.niveau} role="status">{alerte.niveau === 'atteint' ? `${alerte.n}/${alerte.max} : VRM attend la prochaine heure.` : `${alerte.n}/${alerte.max} cette heure : ralentis tes clics.`}</p> : null}
-        {pauseMin > 0 ? <p className="vrm-oa-alerte" data-oa-pause={pauseMin} role="status">Vinted a demandé de ralentir : rien ne part pendant {pauseMin} min.</p> : null}
-        {calme && !pauseMin ? <p className="vrm-oa-alerte" data-oa-calme="" role="status">Vinted a freiné à {quand(calme.depuis)}. Journée calme conseillée.</p> : null}
+        {alerte ? <p className="vrm-oa-alerte" data-oa-plafond={alerte.niveau} role="status">{alerte.niveau === 'atteint' ? tr('oa.plafond.atteint', { n: alerte.n, max: alerte.max }) : tr('oa.plafond.proche', { n: alerte.n, max: alerte.max })}</p> : null}
+        {pauseMin > 0 ? <p className="vrm-oa-alerte" data-oa-pause={pauseMin} role="status">{tr('oa.pause', { n: pauseMin })}</p> : null}
+        {calme && !pauseMin ? <p className="vrm-oa-alerte" data-oa-calme="" role="status">{tr('oa.calme', { heure: quand(calme.depuis) })}</p> : null}
         <div className="vrm-oa-arret">
-          <Bouton variante="secondaire" data-oa-tout-arreter="" occupe={!!(arret && arret.enCours)} disabled={!!(arret && arret.enCours)} onClick={toutArreter}>Tout arrêter</Bouton>
-          {arret && !arret.enCours ? <span className="vrm-oa-muet" data-oa-arret-ok={arret.ok.length} data-oa-arret-ko={arret.ko.length}>{arret.ko.length ? `Pas confirmé : ${arret.ko.map((c) => c.nom).join(', ')}. Réessaie.` : `Arrêté à ${heureFr(arret.at)}.`}</span>
-            : <span className="vrm-oa-muet">Offres et favoris auto, d’un coup.</span>}
+          <Bouton variante="secondaire" data-oa-tout-arreter="" occupe={!!(arret && arret.enCours)} disabled={!!(arret && arret.enCours)} onClick={toutArreter}>{tr('oa.toutArreter')}</Bouton>
+          {arret && !arret.enCours ? <span className="vrm-oa-muet" data-oa-arret-ok={arret.ok.length} data-oa-arret-ko={arret.ko.length}>{arret.ko.length ? tr('oa.arret.ko', { noms: arret.ko.map((c) => c.nom).join(', ') }) : tr('oa.arret.ok', { heure: heureFr(arret.at) })}</span>
+            : <span className="vrm-oa-muet">{tr('oa.arret.quoi')}</span>}
         </div>
       </div>
 
-      {/* ── 2. CE QUE LE MOTEUR FERAIT ── */}
-      <h3 className="vrm-oa-titre">{actif ? 'Offres en attente' : 'Si tu allumes'}</h3>
+      {/* ── 2. PRIX MINI MANQUANTS (lot prix-mini) : la liste et la saisie en série ── */}
+      <PrixMiniManquants annonces={annonces} numeros={numeros} virgule={virguleLue === true} poserSeuils={poserSeuils} PhotoVinted={PhotoVinted} nomDe={nomDe}/>
+
+      {/* ── 3. CE QUE LE MOTEUR FERAIT ── */}
+      <h3 className="vrm-oa-titre">{actif ? tr('oa.attente.titre') : tr('oa.attente.siAllume')}</h3>
       <div className="vrm-oa-groupe" data-oa-apercu={apercu === undefined ? 'lecture' : apercu === null ? 'pas-su' : apercu.lignes.length}>
-        {apercu === undefined ? <p className="vrm-oa-vide">Lecture des offres…</p>
-          : apercu === null ? <p className="vrm-oa-vide">Offres pas lues : « — ». Ouvre Vinted sur ton compte.</p>
-          : !apercu.lignes.length ? <p className="vrm-oa-vide">Aucune offre en attente.</p>
+        {apercu === undefined ? <p className="vrm-oa-vide">{tr('oa.attente.lecture')}</p>
+          : apercu === null ? <p className="vrm-oa-vide">{tr('oa.attente.pasLues')}</p>
+          : !apercu.lignes.length ? <p className="vrm-oa-vide">{tr('oa.attente.aucune')}</p>
           : apercu.lignes.slice(0, 20).map((l) => (
             <div key={l.cle} className="vrm-oa-offre" data-oa-offre={l.cle} data-oa-decision={l.quoi}>
-              <span className="vrm-oa-nom">{l.numero ? <Numero n={l.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{l.titre || 'Sans titre'}</span></span>
-              <span className="vrm-oa-chiffres"><b>{montant(l.prix)}</b>{l.min != null ? <span> · dès {montant(l.min)}</span> : null}{l.refuse != null && l.quoi !== 'accepter' ? <span> · refus sous {montant(l.refuse)}</span> : null}</span>
-              <span className={`vrm-oa-puce vrm-oa-puce-${l.quoi}`} data-oa-puce={l.quoi}>{LIBELLE_DECISION[l.quoi]}{l.quoi === 'garde' ? ` · ${RAISON_GARDE[l.raison] || 'pas vérifiée'}` : l.quoi === 'sans' && l.raison === 'illisible' ? ' · seuil illisible' : ''}</span>
+              <span className="vrm-oa-nom">{l.numero ? <Numero n={l.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{l.titre || tr('oa.sansTitre')}</span></span>
+              <span className="vrm-oa-chiffres"><b>{montant(l.prix)}</b>{l.min != null ? <span> · {tr('oa.des', { prix: montant(l.min) })}</span> : null}{l.refuse != null && l.quoi !== 'accepter' ? <span> · {tr('oa.refusSous', { prix: montant(l.refuse) })}</span> : null}</span>
+              <span className={`vrm-oa-puce vrm-oa-puce-${l.quoi}`} data-oa-puce={l.quoi}>{LIBELLE_DECISION[l.quoi] ? tr(`oa.decision.${l.quoi}`, { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX }) : ''}{l.quoi === 'garde' ? ` · ${RAISON_GARDE[l.raison] ? tr(`oa.garde.${l.raison}`) : tr('oa.pasVerifiee')}` : l.quoi === 'sans' && l.raison === 'illisible' ? ` · ${tr('oa.seuilIllisible')}` : ''}</span>
               {nomDe(l.uid) ? <span className="vrm-oa-compte">{nomDe(l.uid)}</span> : null}
             </div>
           ))}
-        {apercu && apercu.lignes.length > 20 ? <p className="vrm-oa-vide">Et {apercu.lignes.length - 20} autres.</p> : null}
-        <div className="vrm-oa-pied" data-oa-rien-envoye="">Aperçu : rien n’est envoyé d’ici. <Pourquoi>Le moteur tourne dans l’extension, sur le compte ouvert dans l’onglet vinted.fr. Une offre au-dessus de « Accepter dès » est acceptée entre {DELAI_OFFRE_MIN} et {DELAI_OFFRE_MAX} min après qu’il l’a vue, tiré au hasard, {OFFRES_PAR_VISITE} au plus par visite, dans les 50 actions par heure. Sous « Refuser sous », elle est refusée (avec ton message s’il y en a un). Entre les deux, c’est toi qui négocies. Une paire vendue ailleurs n’est jamais acceptée.</Pourquoi></div>
+        {apercu && apercu.lignes.length > 20 ? <p className="vrm-oa-vide">{tr('oa.attente.autres', { n: apercu.lignes.length - 20 })}</p> : null}
+        <div className="vrm-oa-pied" data-oa-rien-envoye="">{tr('oa.apercu')} <Pourquoi>{tr('oa.apercu.pourquoi', { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX, n: OFFRES_PAR_VISITE })}</Pourquoi></div>
       </div>
 
-      {/* ── 3. TES PAIRES : LES SEUILS ── */}
-      <h3 className="vrm-oa-titre">Tes paires</h3>
+      {/* ── 4. TES PAIRES : LES SEUILS ── */}
+      <h3 className="vrm-oa-titre">{tr('oa.paires.titre')}</h3>
       {illisibles.length ? (
         <div className="vrm-oa-illisible" data-oa-illisibles={illisibles.length} role="status">
-          <span>{illisibles.length} seuil{illisibles.length > 1 ? 's' : ''} avec virgule{virguleLue === true ? ' : à écrire avec un point.' : `, ignoré${illisibles.length > 1 ? 's' : ''} par ton extension.`}</span>
-          <Bouton variante="secondaire" data-oa-corriger="" onClick={corrigerIllisibles}>Corriger</Bouton>
+          <span>{virguleLue === true ? tr('oa.virgule.point', { n: illisibles.length }) : tr('oa.virgule.ignore', { n: illisibles.length })}</span>
+          <Bouton variante="secondaire" data-oa-corriger="" onClick={corrigerIllisibles}>{tr('oa.corriger')}</Bouton>
         </div>
       ) : null}
       <div className="vrm-oa-outils">
-        <Segmente label="Paires" value={filtre} onChange={(v) => { setFiltre(v); setMax(PAR_PAGE); }} options={[{ v: 'toutes', l: 'Toutes' }, { v: 'avec', l: 'Réglées' }, { v: 'sans', l: 'Sans seuil' }]}/>
-        <input className="vrm-oa-cherche" type="search" value={recherche} onChange={(e) => { setRecherche(e.target.value); setMax(PAR_PAGE); }} placeholder="N° ou titre" aria-label="Chercher une paire"/>
+        <Segmente label={tr('oa.paires.filtre')} value={filtre} onChange={(v) => { setFiltre(v); setMax(PAR_PAGE); }} options={[{ v: 'toutes', l: tr('oa.paires.toutes') }, { v: 'avec', l: tr('oa.paires.reglees') }, { v: 'sans', l: tr('oa.paires.sans') }]}/>
+        <input className="vrm-oa-cherche" type="search" value={recherche} onChange={(e) => { setRecherche(e.target.value); setMax(PAR_PAGE); }} placeholder={tr('oa.paires.cherche')} aria-label={tr('oa.paires.chercheLabel')}/>
       </div>
       <div className="vrm-oa-groupe" data-oa-paires={lignes.length}>
-        {!Array.isArray(annonces) ? <p className="vrm-oa-vide">Annonces pas lues : « — ».</p>
-          : !lignes.length ? <p className="vrm-oa-vide">{filtre === 'avec' ? 'Aucune paire réglée.' : 'Aucune paire.'}</p>
+        {!Array.isArray(annonces) ? <p className="vrm-oa-vide">{tr('oa.paires.pasLues')}</p>
+          : !lignes.length ? <p className="vrm-oa-vide">{filtre === 'avec' ? tr('oa.paires.aucuneReglee') : tr('oa.paires.aucune')}</p>
           : lignes.slice(0, max).map((l) => (
             <div key={l.id} className="vrm-oa-paire" data-oa-paire={l.id} data-oa-min={l.min == null ? '' : String(l.min)} data-oa-refus={l.refuse == null ? '' : String(l.refuse)} data-oa-incoherent={l.incoherent ? '1' : undefined}>
-              <label className="vrm-oa-case"><input type="checkbox" checked={coches.has(l.id)} onChange={() => basculerCoche(l.id)} aria-label={`Choisir ${l.numero ? 'N°' + l.numero : l.titre || 'cette paire'}`}/></label>
+              <label className="vrm-oa-case"><input type="checkbox" checked={coches.has(l.id)} onChange={() => basculerCoche(l.id)} aria-label={tr('oa.paires.choisir', { quoi: l.numero ? 'N°' + l.numero : l.titre || tr('oa.sansTitre') })}/></label>
               <span className="vrm-oa-paire-nom">
-                <span className="vrm-oa-nom">{l.numero ? <Numero n={l.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{l.titre || 'Sans titre'}</span></span>
-                <span className="vrm-oa-muet">{l.prix != null ? montant(l.prix) : '—'}{nomDe(l.uid) ? ` · ${nomDe(l.uid)}` : ''}{l.incoherent ? ' · refus au-dessus du mini' : ''}</span>
+                <span className="vrm-oa-nom">{l.numero ? <Numero n={l.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{l.titre || tr('oa.sansTitre')}</span></span>
+                <span className="vrm-oa-muet">{l.prix != null ? montant(l.prix) : '—'}{nomDe(l.uid) ? ` · ${nomDe(l.uid)}` : ''}{l.incoherent ? ` · ${tr('oa.paires.incoherent')}` : ''}</span>
               </span>
               <span className="vrm-oa-seuils">
-                <ChampSeuil label="Accepter dès" data="min" valeur={l.minBrut} onPoser={(v) => poserSeuils && poserSeuils([{ id: l.id, min: v }])}/>
-                <ChampSeuil label="Refuser sous" data="refuse" valeur={l.refuseBrut} onPoser={(v) => poserSeuils && poserSeuils([{ id: l.id, refuse: v }])}/>
+                <ChampSeuil label={tr('oa.accepterDes')} data="min" valeur={l.minBrut} onPoser={(v) => poserSeuils && poserSeuils([{ id: l.id, min: v }])}/>
+                <ChampSeuil label={tr('oa.refuserSous')} data="refuse" valeur={l.refuseBrut} onPoser={(v) => poserSeuils && poserSeuils([{ id: l.id, refuse: v }])}/>
               </span>
             </div>
           ))}
-        {Array.isArray(annonces) && lignes.length > max ? <button type="button" className="vrm-oa-plus" data-oa-plus="" onClick={() => setMax((m) => m + PAR_PAGE)}>Voir {Math.min(PAR_PAGE, lignes.length - max)} de plus</button> : null}
+        {Array.isArray(annonces) && lignes.length > max ? <button type="button" className="vrm-oa-plus" data-oa-plus="" onClick={() => setMax((m) => m + PAR_PAGE)}>{tr('oa.voirPlus', { n: Math.min(PAR_PAGE, lignes.length - max) })}</button> : null}
       </div>
       {coches.size > 0 ? (
         <div className="vrm-oa-serie" data-oa-serie={coches.size}>
-          <Bouton variante="discret" onClick={() => setCoches(new Set())}>Décocher</Bouton>
-          <Bouton variante="primaire" data-oa-serie-ouvrir={coches.size} onClick={() => ouvrirSerie && ouvrirSerie([...coches])}>Régler en série · {coches.size}</Bouton>
+          <Bouton variante="discret" onClick={() => setCoches(new Set())}>{tr('oa.decocher')}</Bouton>
+          <Bouton variante="primaire" data-oa-serie-ouvrir={coches.size} onClick={() => ouvrirSerie && ouvrirSerie([...coches])}>{tr('oa.enSerie', { n: coches.size })}</Bouton>
         </div>
       ) : null}
 
-      {/* ── 4. HISTORIQUE (noté par l'extension) ── */}
-      <h3 className="vrm-oa-titre">Historique</h3>
+      {/* ── 5. HISTORIQUE (noté par l'extension) ── */}
+      <h3 className="vrm-oa-titre">{tr('oa.histo.titre')}</h3>
       <div className="vrm-oa-groupe" data-oa-historique={histo === undefined ? 'lecture' : histo === null ? 'pas-su' : histo.length}>
-        {histo === undefined ? <p className="vrm-oa-vide">Lecture…</p>
-          : histo === null ? <p className="vrm-oa-vide">Historique pas lu : « — ». <button type="button" className="vrm-pied-lien" onClick={lireJournal}>Réessayer</button></p>
-          : !histo.length ? <p className="vrm-oa-vide">Aucune offre notée par l’extension.</p>
+        {histo === undefined ? <p className="vrm-oa-vide">{tr('oa.histo.lecture')}</p>
+          : histo === null ? <p className="vrm-oa-vide">{tr('oa.histo.pasLu')} <button type="button" className="vrm-pied-lien" onClick={lireJournal}>{tr('commun.reessayer')}</button></p>
+          : !histo.length ? <p className="vrm-oa-vide">{tr('oa.histo.aucune')}</p>
           : histo.map((h) => { const f = h.item ? (numeros || {})[h.item] : null; return (
             <div key={`${h.uid}:${h.t}:${h.tx || ''}:${h.sorte}`} className="vrm-oa-histo" data-oa-histo={h.sorte} data-oa-histo-auto={h.auto ? '1' : '0'}>
-              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? 'Acceptée' : 'Refusée'}{h.auto ? ' (auto)' : ''}</span>
-              <span className="vrm-oa-nom">{f && f.numero ? <Numero n={f.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{(h.item && titreDe.get(h.item)) || (f && f.title) || (h.tx ? `commande ${h.tx}` : '')}</span></span>
+              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? tr('oa.histo.acceptee') : tr('oa.histo.refusee')}{h.auto ? ` ${tr('oa.histo.auto')}` : ''}</span>
+              <span className="vrm-oa-nom">{f && f.numero ? <Numero n={f.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{(h.item && titreDe.get(h.item)) || (f && f.title) || (h.tx ? tr('oa.histo.commande', { tx: h.tx }) : '')}</span></span>
               <span className="vrm-oa-chiffres">{h.prix != null ? <b>{montant(h.prix)}</b> : '—'} · {quand(h.t)}{nomDe(h.uid) ? ` · ${nomDe(h.uid)}` : ''}</span>
             </div>
           ); })}
-        <p className="vrm-oa-pied">Noté par l’extension au moment du geste.</p>
+        <p className="vrm-oa-pied">{tr('oa.histo.pied')}</p>
       </div>
 
-      {/* ── 5. LE MESSAGE DE REFUS (son texte, vide par défaut) ── */}
-      <h3 className="vrm-oa-titre">Message de refus</h3>
+      {/* ── 6. LE MESSAGE DE REFUS (son texte, vide par défaut) ── */}
+      <h3 className="vrm-oa-titre">{tr('oa.refus.titre')}</h3>
       <div className="vrm-oa-groupe">
-        <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder="Vide : refus sans message." aria-label="Message envoyé quand VRM refuse une offre"/>
+        <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder={tr('oa.refus.vide')} aria-label={tr('oa.refus.label')}/>
       </div>
     </section>
   );
