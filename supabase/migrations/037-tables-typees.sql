@@ -388,6 +388,7 @@ declare
   v_n integer;
   v_lu timestamptz;
   v_mal text := '';
+  v_propre boolean;
   r record;
 begin
   if fam is null then return 'hors'; end if;
@@ -410,6 +411,14 @@ begin
     return 'efface';
   end if;
 
+  -- « Liste inchangée ⇒ rien à recopier » n'est permis que si la copie d'avant est
+  -- PROPRE (déjà recopiée, ni erreur ni forme inconnue en cours) : sinon une recopie
+  -- ratée ne se rattraperait jamais par une réécriture à l'identique.
+  v_propre := p_avant is not null
+    and exists (select 1 from public.vrm_projection_sources s where s.owner = p_owner and s.source = p_id)
+    and not exists (select 1 from public.vrm_projection_ecarts e where e.owner = p_owner and e.source = p_id
+                     and e.raison in ('forme', 'meta_absente', 'erreur'));
+
   -- Familles lues par `meta` (004) : sans meta, rien n'est deviné.
   if not public.vrm_t_lit_data(fam) and (p_meta is null or jsonb_typeof(p_meta) <> 'object') then
     perform public.vrm_t_ecart(p_owner, p_id, fam, 'meta_absente', 1);
@@ -428,7 +437,7 @@ begin
       return 'inconnu';
     end if;
     v_lu := public.vrm_t_date(p_data -> 'capturedAt');
-    if p_avant is not null and (p_avant -> 'payload' -> 'items') = liste then
+    if v_propre and (p_avant -> 'payload' -> 'items') = liste then
       perform public.vrm_t_lue(p_owner, p_id, fam, v_lu, null, null);
       return 'ok';
     end if;
@@ -475,7 +484,7 @@ begin
       return 'inconnu';
     end if;
     v_lu := public.vrm_t_date(p_data -> 'capturedAt');
-    if p_avant is not null and (p_avant -> 'payload' -> 'my_orders') = liste then
+    if v_propre and (p_avant -> 'payload' -> 'my_orders') = liste then
       perform public.vrm_t_lue(p_owner, p_id, fam, v_lu, null, null);
       return 'ok';
     end if;
@@ -588,7 +597,7 @@ begin
   if fam = 'main' then
     if p_data ? 'vinted_used_numeros' and jsonb_typeof(p_data -> 'vinted_used_numeros') is distinct from 'array' then
       v_mal := 'vinted_used_numeros n''est pas une liste';
-    elsif p_avant is null or (p_avant -> 'vinted_used_numeros') is distinct from (p_data -> 'vinted_used_numeros') then
+    elsif not v_propre or (p_avant -> 'vinted_used_numeros') is distinct from (p_data -> 'vinted_used_numeros') then
       insert into public.numeros (owner, cle_num, valeur)
       select distinct on (c) p_owner, c, v
         from (select public.vrm_cle_num(e) c, btrim(e #>> '{}') v, i
@@ -600,7 +609,7 @@ begin
     end if;
     if p_data ? 'vinted_annonce_numeros' and jsonb_typeof(p_data -> 'vinted_annonce_numeros') is distinct from 'object' then
       v_mal := ltrim(v_mal || ' · vinted_annonce_numeros n''est pas un objet', ' ·');
-    elsif p_avant is null or (p_avant -> 'vinted_annonce_numeros') is distinct from (p_data -> 'vinted_annonce_numeros') then
+    elsif not v_propre or (p_avant -> 'vinted_annonce_numeros') is distinct from (p_data -> 'vinted_annonce_numeros') then
       delete from public.numeros_fiches f
        where f.owner = p_owner
          and not exists (select 1 from jsonb_each(case when jsonb_typeof(p_data -> 'vinted_annonce_numeros') = 'object'
