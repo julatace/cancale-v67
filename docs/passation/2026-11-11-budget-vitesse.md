@@ -64,26 +64,33 @@ Le budget observe donc **au moins 25 s**, et ne compte rien de ce qui part **apr
 (les relectures à la minute). Après : écarts de 0 à 4 lectures entre passages.
 `BUDGET_AU_MOINS=ms` change le plancher (à ne pas baisser sous ~20 s).
 
-## Budgets figés (main `fc3883d`, base inventée au poids réel, processeur non ralenti)
+## Budgets figés (main `2084be1` après fusion, base inventée au poids réel)
 mesure (le plus haut des 4 passages) → **budget**
 | écran | ouverture | lectures | octets | doublons | entières | JS+CSS |
 |---|---|---|---|---|---|---|
-| Ma journée | appareil neuf | 116 → **134** | 2643 → **3040** Ko | 20 → **21** (16 adr.) | 0 | 1496 → **1646** Ko |
-| Ma journée | 2ᵉ ouverture | 104 → **120** | 756 → **869** Ko | 12 → **13** (10 adr.) | 0 | 1496 → **1646** Ko |
-| Ventes | appareil neuf | 95 → **110** | 2605 → **2995** Ko | 14 → **15** (12 adr.) | 0 | 1496 → **1646** Ko |
-| Ventes | 2ᵉ ouverture | 92 → **106** | 826 → **950** Ko | 14 → **15** (12 adr.) | 0 | 1496 → **1646** Ko |
-| Annonces | appareil neuf | 112 → **129** | 2824 → **3247** Ko | 28 → **29** (23 adr.) | 0 | 1496 → **1646** Ko |
-| Annonces | 2ᵉ ouverture | 100 → **115** | 936 → **1077** Ko | 20 → **21** (17 adr.) | 0 | 1496 → **1646** Ko |
-| Achats | appareil neuf | 118 → **136** | 2605 → **2996** Ko | 29 → **30** (24 adr.) | 0 | 1515 → **1667** Ko |
-| Achats | 2ᵉ ouverture | 107 → **124** | 826 → **950** Ko | 21 → **22** (18 adr.) | 0 | 1515 → **1667** Ko |
-| Stock | appareil neuf | 94 → **109** | 2531 → **2911** Ko | 13 → **14** (11 adr.) | 0 | 1535 → **1689** Ko |
-| Stock | 2ᵉ ouverture | 91 → **105** | 752 → **865** Ko | 13 → **14** (11 adr.) | 0 | 1535 → **1689** Ko |
-| Messages | appareil neuf | 118 → **136** | 3226 → **3710** Ko | 25 → **26** (20 adr.) | 0 | 1530 → **1684** Ko |
-| Messages | 2ᵉ ouverture | 113 → **130** | 1339 → **1540** Ko | 24 → **25** (20 adr.) | 0 | 1530 → **1684** Ko |
-| Argent | appareil neuf | 100 → **115** | 3182 → **3659** Ko | 13 → **14** (11 adr.) | 0 | 1595 → **1755** Ko |
-| Argent | 2ᵉ ouverture | 97 → **112** | 1403 → **1613** Ko | 13 → **14** (11 adr.) | 0 | 1595 → **1755** Ko |
-| E-mails | appareil neuf | 91 → **105** | 2531 → **2911** Ko | 12 → **13** (10 adr.) | 0 | 1537 → **1691** Ko |
-| E-mails | 2ᵉ ouverture | 88 → **102** | 752 → **865** Ko | 12 → **13** (10 adr.) | 0 | 1537 → **1691** Ko |
+| Ma journée | appareil neuf | 120 → **138** | 2721 → **3129** Ko | 22 → **23** (19 adr.) | 0 | 1538 → **1692** Ko |
+| Ma journée | 2ᵉ ouverture | 114 → **132** | 287 → **330** Ko | 21 → **22** (18 adr.) | 0 | 1538 → **1692** Ko |
+| Ventes | appareil neuf | 105 → **121** | 2681 → **3083** Ko | 21 → **22** (18 adr.) | 0 | 1534 → **1688** Ko |
+| Ventes | 2ᵉ ouverture | 94 → **109** | 355 → **408** Ko | 14 → **15** (12 adr.) | 0 | 1534 → **1688** Ko |
+| Annonces | appareil neuf | 113 → **130** | 2899 → **3334** Ko | 26 → **27** (23 adr.) | 0 | 1534 → **1688** Ko |
+| Annonces | 2ᵉ ouverture | 106 → **122** | 466 → **536** Ko | 24 → **25** (23 adr.) | 0 | 1534 → **1688** Ko |
+| Achats | appareil neuf | 119 → **137** | 2681 → **3083** Ko | 27 → **28** (24 adr.) | 0 | 1557 → **1713** Ko |
+| Achats | 2ᵉ ouverture | 115 → **133** | 355 → **408** Ko | 27 → **28** (24 adr.) | 0 | 1557 → **1713** Ko |
+| Stock | appareil neuf | 95 → **110** | 2607 → **2998** Ko | 11 → **12** (10 adr.) | 0 | 1573 → **1731** Ko |
+| Stock | 2ᵉ ouverture | 91 → **105** | 281 → **324** Ko | 11 → **12** (10 adr.) | 0 | 1573 → **1731** Ko |
+| Messages | appareil neuf | 120 → **138** | 3302 → **3797** Ko | 24 → **25** (20 adr.) | 0 | 1568 → **1725** Ko |
+| Messages | 2ᵉ ouverture | 118 → **136** | 868 → **999** Ko | 27 → **28** (20 adr.) | 0 | 1568 → **1725** Ko |
+| Argent | appareil neuf | 109 → **126** | 3258 → **3746** Ko | 19 → **20** (16 adr.) | 0 | 1646 → **1811** Ko |
+| Argent | 2ᵉ ouverture | 97 → **112** | 932 → **1072** Ko | 11 → **12** (10 adr.) | 0 | 1646 → **1811** Ko |
+| E-mails | appareil neuf | 92 → **106** | 2607 → **2998** Ko | 10 → **11** (9 adr.) | 0 | 1577 → **1735** Ko |
+| E-mails | 2ᵉ ouverture | 88 → **102** | 281 → **324** Ko | 10 → **11** (9 adr.) | 0 | 1577 → **1735** Ko |
+
+Deux relevés dans `releves` : les budgets initiaux (`fc3883d`), puis, après la fusion de
+`main` (`2084be1`), un relevé de TOUS les écrans — le banc était rouge sur Ma journée :
+**`app_data?id=like.email_reception_*&select=id&limit=1` lue deux fois** (arrivée avec
+`main` entre les deux, à chaque essai : un vrai doublon, à corriger dans l'app, puis
+baisser le budget) ; et l'app installable fait lire à la 2ᵉ ouverture 60–70 % d'octets en
+moins (Ma journée 756 → 287 Ko) : budget BAISSÉ, pour que ce gain ne se reperde pas.
 
 ⚠️ **Ce que ces chiffres disent (constat, rien corrigé ici)** : 12 à 30 lectures
 IDENTIQUES par écran sur 25 s, dont la vague des ~15 s (lbc_accounts, lbc_listings,
