@@ -204,7 +204,7 @@ const confirmer = async (pg) => { await pg.waitForSelector('.vrm-confirmation', 
         const { ctx, pg } = await page(b, T, { version: '5.337.0' });
         await ouvrir(pg);
         const s = await lire(pg);
-        dit(s && s.on.off && s.off.off && /5\.338/.test(s.ext), 'E1 extension 5.337 : la raison est dite (5.338), les deux boutons grisés', s && JSON.stringify({ on: s.on, ext: s.ext }));
+        dit(s && s.on.off && s.off.off && /5\.(33[89]|3[4-9]\d)\.\d/.test(s.ext), 'E1 extension 5.337 : la raison est dite (version servie ≥ 5.338), les deux boutons grisés', s && JSON.stringify({ on: s.on, ext: s.ext }));
         await pg.locator('[data-vac-tout="on"]').click({ force: true }).catch(() => {});
         await pg.waitForTimeout(500);
         dit((await cmds(pg)).length === 0, 'E2 … rien ne part');

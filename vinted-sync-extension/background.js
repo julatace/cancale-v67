@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.338.0';
+const CODE_VERSION = '5.339.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3569,6 +3569,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // (11 nov., 5.339) vinted-infos.js : la ligne sous SES annonces, l'encart d'achat.
+    if (msg && msg.from === 'cancale-vinfos') {
+      (async () => {
+        try {
+          if (msg.action === 'infos') { sendResponse(await infosVintedPage(sender, msg)); return; }
+          if (msg.action === 'stockModele') { sendResponse(await stockPourModele()); return; }
+          sendResponse({ ok: false, error: 'action inconnue' });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     // PONT LEBONCOIN : le script lbc.js (sur leboncoin.fr) demande la liste des
     // annonces Vinted prêtes à publier, ou marque une annonce comme publiée.
     if (msg && msg.from === 'cancale-ebay') {
@@ -4662,6 +4673,115 @@ function numerosDuCompte(m, uid, msg) {
   const u = String(uid || '');
   const pick = (src, comptes, ids) => { const o = {}; if (!u) return o; for (const id of (Array.isArray(ids) ? ids.slice(0, 400) : [])) { const k = String(id); if (src[k] && comptes && comptes[k] === u) o[k] = src[k]; } return o; };
   return { items: pick(m.parItem, m.cItem, msg.items), convs: pick(m.parConv, m.cConv, msg.convs), txs: pick(m.parTx, m.cTx, msg.txs) };
+}
+// ── SUR VINTED : « N°124 · acheté 60 € · en ligne depuis 23 j » ET L'ENCART D'ACHAT
+// (11 nov., lot AA, propositions 40 et 41 validées par Julien — 5.339).
+// LECTURE SEULE : rien n'est envoyé à Vinted, aucune requête Vinted (la base VRM
+// et le cookie de l'onglet seulement). Une annonce est À LUI par IDENTITÉ :
+// l'identifiant d'annonce dans SA fiche (`accountId` du compte connecté) ou dans
+// le dressing capté de CE compte (`harvest_{uid}_listings`) — jamais un titre.
+// Un autre compte (le sien ou pas) ⇒ rien. Pas su ⇒ le champ manque (jamais 0).
+// Le prix d'achat part BRUT (la fiche et `vinted_buyprice_by_num` du N°) : la page
+// le lit par `prixAchatDe`, la règle de l'app recopiée (vrm-regles-achat.js).
+let _infosPage = null;
+async function donneesInfosPage(uid) {
+  const owner = String((await loadSession())?.user_id || '');
+  if (!owner || !uid) return null;
+  if (_infosPage && _infosPage.owner === owner && _infosPage.uid === uid && Date.now() - _infosPage.at < 120000) return _infosPage;
+  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit']);
+  if (main === null) return null;
+  const dates = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
+  if (dates === null) return null;
+  const dr = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
+  if (dr === null) return null;
+  const parId = {};
+  for (const it of ((dr && dr[0] && Array.isArray(dr[0].items)) ? dr[0].items : [])) if (it && it.id != null) parId[String(it.id)] = it;
+  if (String((await loadSession())?.user_id || '') !== owner) return null;
+  _infosPage = { owner, uid, at: Date.now(), fiches: main.vinted_annonce_numeros || {}, buyByNum: main.vinted_buyprice_by_num || {},
+    ecrit: numeroEcritAllume(main), dates: (dates && dates[0] && dates[0].data) || {}, parId };
+  return _infosPage;
+}
+function infosDuCompte(d, uid, ids) {
+  const u = String(uid || ''), out = {};
+  if (!d || !u) return out;
+  const ms = (v) => { const n = Number(v); return v != null && v !== '' && isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : null; };
+  for (const x of (Array.isArray(ids) ? ids.slice(0, 400) : [])) {
+    const id = String(x == null ? '' : x); if (!/^\d{4,15}$/.test(id)) continue;
+    const f = d.fiches[id] && typeof d.fiches[id] === 'object' ? d.fiches[id] : null, it = d.parId[id] || null;
+    const compte = f && f.accountId != null && String(f.accountId) ? String(f.accountId) : (it ? u : '');
+    if (compte !== u) continue;   // l'annonce d'un autre compte, ou d'on ne sait qui : rien
+    const o = {};
+    const num = f && f.numero != null ? String(f.numero).trim() : '';
+    if (num) o.numero = num;
+    else if (d.ecrit && it && it.numEcrit && it.numEcrit.etat === 'lu' && it.numEcrit.cle) { o.numero = String(it.numEcrit.cle); o.ecrit = true; }
+    if (f && f.buyPrice != null && String(f.buyPrice).trim() !== '') o.buyPrice = String(f.buyPrice);
+    if (num && d.buyByNum[num] != null && String(d.buyByNum[num]).trim() !== '') o.buyNum = String(d.buyByNum[num]);
+    // La date de mise en ligne, dans l'ordre de l'écran Annonces (`listedAgeDays`) :
+    // « Ajouté il y a… » lu sur la page, puis la date Vinted du dressing.
+    const lu = d.dates[id] && ms(d.dates[id].ts);
+    const cree = it ? (ms(it.created_at_ts) || ms(it.createdTs) || ms(it.photo && it.photo.high_resolution && it.photo.high_resolution.timestamp)) : null;
+    if (lu || cree) o.depuis = lu || cree;
+    out[id] = o;
+  }
+  return out;
+}
+// Ses identifiants de PROFIL, tous comptes (`harvest_{uid}_profile`). `null` = pas su.
+async function sesProfils() {
+  const rows = await sbGet('app_data?id=like.harvest_*_profile&select=id,pid:data->payload->user->>id');
+  if (rows === null || !Array.isArray(rows)) return null;
+  const s = new Set(); for (const r of rows) if (r && r.pid != null && String(r.pid)) s.add(String(r.pid));
+  return s;
+}
+// La page d'une annonce d'un AUTRE vendeur ? Seulement si c'est SÛR : son profil
+// connecté est connu, la page montre un profil qui n'est aucun des siens, et
+// l'annonce n'est dans aucune de ses fiches. Sinon `false` (pas su ⇒ rien).
+function annonceDUnAutre(membres, profils, pid, fiches, id) {
+  if (!profils || !pid || !profils.has(String(pid))) return false;
+  if (fiches && Object.prototype.hasOwnProperty.call(fiches, String(id))) return false;
+  const autres = (Array.isArray(membres) ? membres : []).map(String).filter((m) => /^\d{1,15}$/.test(m) && !profils.has(m));
+  return autres.length > 0;
+}
+async function infosVintedPage(sender, msg) {
+  let u; try { u = new URL(sender?.tab?.url || sender?.url || ''); } catch { return { ok: true, portee: 'hors_compte' }; }
+  if (u.protocol !== 'https:' || !/^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname)) return { ok: true, portee: 'hors_compte' };
+  const uid = await activeAccountId(u.host);
+  if (!uid) return { ok: true, portee: 'hors_compte' };
+  const pid = await profilIdRange(uid);
+  if (pid === null) return { ok: false };
+  const membre = /^\/member\/(\d+)(?:[-/]|$)/.exec(u.pathname);
+  const article = /^\/items\/(\d{4,15})(?:[-/]|$)/.exec(u.pathname);
+  if (/^\/member(?:\/|$)/.test(u.pathname) && (!membre || !pid || String(pid) !== membre[1])) return { ok: true, portee: 'hors_compte' };
+  if (!membre && !article) return { ok: true, portee: 'hors_page' };
+  const d = await donneesInfosPage(String(uid));
+  if (!d) return { ok: false };
+  const infos = infosDuCompte(d, uid, msg && msg.items);
+  let achat = false;
+  if (article && !infos[article[1]]) {
+    const profils = await sesProfils();
+    achat = annonceDUnAutre(msg && msg.membres, profils, pid, d.fiches, article[1]);
+  }
+  return { ok: true, portee: 'compte', infos, achat };
+}
+// « Peut-être N paires proches » : SES paires EN LIGNE (la règle « en ligne »,
+// `lireDressingsEnLigne`, la même que l'app), tous comptes — titre, marque, taille
+// seulement. Une PROPOSITION (§5) : la page compare par `pairesDuModele` (lot F),
+// jamais une liaison, rien n'est écrit. Lu seulement quand il ouvre l'encart.
+let _stockModele = null;
+async function stockPourModele() {
+  const owner = String((await loadSession())?.user_id || '');
+  if (!owner) return { ok: false };
+  if (_stockModele && _stockModele.owner === owner && Date.now() - _stockModele.at < 300000) return _stockModele.r;
+  const L = await lireDressingsEnLigne();
+  if (!L || L.echec) return { ok: false };
+  const stock = [];
+  for (const [, res] of L.parCompte) for (const it of (res.enLigne || [])) {
+    if (!it || it.id == null || stock.length >= 2000) continue;
+    stock.push({ id: String(it.id), titre: String(it.title || ''), marque: String(it.brand_title || (typeof it.brand === 'string' ? it.brand : '') || ''), taille: String(it.size_title || (typeof it.size === 'string' ? it.size : '') || '') });
+  }
+  const r = { ok: true, stock, aConfirmer: L.aConfirmer.size > 0 };
+  if (String((await loadSession())?.user_id || '') !== owner) return { ok: false };
+  _stockModele = { owner, at: Date.now(), r };
+  return r;
 }
 // <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
 // `audit-supprimees.cjs`. Une annonce `id` lue dans un dressing capturé à `capTs`
