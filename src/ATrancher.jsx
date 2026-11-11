@@ -15,6 +15,7 @@
 import React from 'react';
 import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import { cartesATrancher } from './aTrancher.js';
+import { enArticles } from './design/tacheCourte.js';   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
 import './styles-a-trancher.css';
 
 const Chevron = () => (
@@ -67,10 +68,12 @@ function Carte({ carte, ton, Photo, onAller, onTrancher, ligne }) {
   );
 }
 
-export default function ATrancher({ etat, onAller, onTrancher = null, Photo = null, entete = null }) {
+export default function ATrancher({ etat, onAller, onTrancher = null, Photo = null, entete = null, vend = 'sneakers' }) {
   if (!etat) return null;
   const { total, partiel, manque } = etat;
   const c = cartesATrancher(etat);
+  // (11 nov., lot DJ2) Hors Sneakers, les questions disent « article » (mêmes cartes, mêmes nombres).
+  if (vend !== 'sneakers') c.groupes = c.groupes.map((g) => ({ ...g, sources: (g.sources || []).map((s) => ({ ...s, cartes: (s.cartes || []).map((k) => ({ ...k, question: enArticles(k.question) })) })) }));
   // Un seul groupe : le total du haut est déjà son compte (un nombre ne s'écrit qu'une fois).
   if (c.groupes.length === 1) c.groupes[0] = { ...c.groupes[0], compteVisible: false };
   const lignes = new Map((etat.lignes || []).map((l) => [l.cle, l]));

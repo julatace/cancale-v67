@@ -28,7 +28,7 @@ import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarat
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
-import { useProfilFiscal } from '../App.jsx';
+import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
@@ -1162,7 +1162,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
             }} placeholder="ex: 1280"/>
           </Field>
           <Field label="Désignation *">
-            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder="ex: Adidas Spezial bleu marine taille 365"/>
+            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder={vendActuel()==='sneakers' ? 'ex: Adidas Spezial bleu marine taille 365' : exemplesActuels().achat}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
             <Field label="Prix de vente&nbsp;€ *">
