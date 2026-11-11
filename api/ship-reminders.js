@@ -23,9 +23,8 @@
 import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif } from './_lib/push.js';
-import { heureSoir, HEURES_SOIR } from './_lib/notif-groupe.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
-import { reglageCalme, minutesParis } from './_lib/notif-textes.js';
+import { reglageCalme, reglageSoir, soirALHeure } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
@@ -1148,21 +1147,20 @@ function bordsDuVendeur(d) {
 // Le texte : `texteSoir`, fabriqué dans api/_lib/notif-apercus.js (l'aperçu de
 // Paramètres → Notifications l'appelle aussi) — réexporté ici.
 export { texteSoir };
-// (11 nov., lot `notifs-groupees`) L'heure choisie dans Paramètres → Notifications
-// (`push_prefs.resumeSoir`, api/_lib/notif-groupe.js). Le cron habituel (18:00 UTC)
-// laisse passer un vendeur dont l'heure n'est pas encore là : le passage de
-// 15 min (`?moment=groupe`) l'envoie à son heure (`aSonHeure`). Heure passée ⇒
-// le cron l'envoie (un retard vaut mieux qu'un oubli). Un seul par soir (mémo).
-async function rappelDuSoir(maintenant = Date.now(), { aSonHeure = false } = {}) {
+// (11 nov., décision C8) `horaire` : le passage HORAIRE (GitHub, `passage=heure`) ne sert que
+// les vendeurs qui ont CHOISI une heure ; le cron de Vercel sert les autres, comme avant. Les
+// deux attendent que l'heure de Paris ait atteint la sienne (`soirALHeure`) ; le mémo du jour
+// fait qu'un seul part. Préférences pas lues : le passage horaire ne fait rien, le cron d'avant
+// garde son défaut (on ne devine pas une heure choisie).
+async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
   const today = parisDate(0);
   const deja = await getRow('soir_reminder_dedup');
   if (deja === undefined) return { soir: 'mémo illisible — rien envoyé' };
   if (deja && deja.date === today) return { soir: 'déjà envoyé' };
-  if (!aSonHeure) {
-    const h = heureSoir(await prefsDuVendeur());
-    const m = minutesParis(maintenant);
-    if (h && m != null && m < Number(h.slice(0, 2)) * 60 + Number(h.slice(3))) return { soir: `à son heure (${h})` };
-  }
+  const prefsSoir = await prefsDuVendeur();
+  if (horaire && !prefsSoir) return { soir: 'préférences pas lues — rien envoyé' };
+  if (horaire && reglageSoir(prefsSoir).heure == null) return { soir: 'heure par défaut — le cron du soir' };
+  if (!soirALHeure(prefsSoir || {}, maintenant)) return { soir: `pas encore son heure (${reglageSoir(prefsSoir).heure} h)` };
   if (!(await pushCategorieActive('soir'))) return { soir: 'désactivé par le vendeur' };
   const d = await lireDonneesColis();
   const t = txsAExpedier(d);
@@ -1230,40 +1228,32 @@ async function traiterVendeurReveil(maintenant = Date.now()) {
 }
 // (11 nov., lot `notifs-groupees`) LE PASSAGE DE 15 MIN. Seuls les vendeurs qui
 // ont une fenêtre échue (`push_journal.data->>attenteJusqua` ≤ maintenant, une
-// projection : aucun `select=data`), et ceux dont l'heure du soir est là. Une
+// projection : aucun `select=data`). (L'heure du résumé du soir a son passage
+// horaire, décision C8 : `traiterVendeurSoirHeure`.) Une
 // lecture ratée ⇒ rien (503, on repassera). Un vendeur qui plante n'arrête pas
 // les autres. Budget : 240 s.
-export const FENETRE_SOIR_MIN = 45;
 async function passageGroupe(maintenant = Date.now()) {
   const debut = Date.now();
   const iso = new Date(maintenant).toISOString();
   const dus = await fetchPaginated(`app_data?id=eq.push_journal&data->>attenteJusqua=lte.${encodeURIComponent(iso)}&select=owner`);
   if (!dus) return { fait: false, raison: 'pas su' };
-  const m = minutesParis(maintenant);
-  const heures = m == null ? [] : HEURES_SOIR.filter((h) => { const d = m - (Number(h.slice(0, 2)) * 60 + Number(h.slice(3))); return d >= 0 && d < FENETRE_SOIR_MIN; });
-  const soirs = [];
-  for (const h of heures) {
-    const rows = await fetchPaginated(`app_data?id=eq.push_prefs&data->>resumeSoir=eq.${encodeURIComponent(h)}&select=owner`);
-    if (!rows) return { fait: false, raison: 'pas su (heures du soir)' };
-    soirs.push(...rows);
-  }
   const uniq = (l) => [...new Set(l.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
-  const aVider = uniq(dus), aSoir = uniq(soirs);
-  let echecs = 0, envoyes = 0, soirsEnvoyes = 0, budgetAtteint = false;
+  const aVider = uniq(dus);
+  let echecs = 0, envoyes = 0, budgetAtteint = false;
   const bilans = [];
   const tache = async (o, f) => { try { return await contexteVendeur.run({ owner: o }, f); } catch (e) { echecs += 1; return { erreur: String((e && e.message) || e).slice(0, 120) }; } };
-  const files = [...aVider.map((o) => ['groupe', o]), ...aSoir.map((o) => ['soir', o])];
+  const files = aVider;
   for (let i = 0; i < files.length; i += VENDEURS_EN_PARALLELE) {
     if (Date.now() - debut > 240000) { budgetAtteint = true; break; }
     const lot = files.slice(i, i + VENDEURS_EN_PARALLELE);
-    const out = await Promise.all(lot.map(([q, o]) => (q === 'groupe' ? tache(o, () => vidangerResume()) : tache(o, () => rappelDuSoir(maintenant, { aSonHeure: true })))));
-    out.forEach((r, k) => {
-      if (lot[k][0] === 'groupe' && r && r.vidange === 'envoye') envoyes += 1;
-      if (lot[k][0] === 'soir' && r && r.soir === 'envoyé') soirsEnvoyes += 1;
-      bilans.push({ q: lot[k][0], ...(r && typeof r === 'object' ? r : {}) });
-    });
+    const out = await Promise.all(lot.map((o) => tache(o, () => vidangerResume())));
+    out.forEach((r) => { if (r && r.vidange === 'envoye') envoyes += 1; bilans.push(r && typeof r === 'object' ? r : {}); });
   }
-  return { fait: true, fenetres: aVider.length, resumes: envoyes, soirs: aSoir.length, soirsEnvoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
+  return { fait: true, fenetres: aVider.length, resumes: envoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
+}
+// (11 nov., décision C8) Le passage horaire : le résumé seul (ni eBay relu, ni bilan de la semaine).
+async function traiterVendeurSoirHeure() {
+  return rappelDuSoir(Date.now(), { horaire: true });
 }
 async function traiterVendeurSoir() {
   // Le soir : lire et notifier les changements, puis le rappel du soir.
@@ -1449,8 +1439,10 @@ export default async function handler(req, res) {
   }
   const soir = moment === 'soir';
   const reveil = moment === 'reveil';
+  // (11 nov., décision C8) `?moment=soir&passage=heure` : le passage horaire du résumé du soir.
+  const horaire = soir && String((req.query && req.query.passage) || '') === 'heure';
   const debutCron = Date.now();
-  const traiter = reveil ? traiterVendeurReveil : soir ? traiterVendeurSoir : traiterVendeur;
+  const traiter = reveil ? traiterVendeurReveil : horaire ? traiterVendeurSoirHeure : soir ? traiterVendeurSoir : traiterVendeur;
   try {
     const cl = await cloisonnee();
     // Pas su : on ne devine pas (ni passe globale, ni passe par vendeur). 503 =
@@ -1474,7 +1466,7 @@ export default async function handler(req, res) {
     // envoi configuré elle ne fait rien (et le dit dans la réponse).
     // (9 nov.) Les sondes de /statut, aussi au matin et au soir (si GitHub ne passe pas).
     let sondes = null;
-    if (!reveil) { try { sondes = await sondesStatut(debutCron); } catch (e) { sondes = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    if (!reveil && !horaire) { try { sondes = await sondesStatut(debutCron); } catch (e) { sondes = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
@@ -1522,7 +1514,9 @@ export default async function handler(req, res) {
     //    `cron_curseur_{moment}_{jour}` (propriétaire neutre) dit qui est fait —
     //    relancé, le cron ne refait personne ; le lendemain, les oubliés d'abord.
     //    L'ordre tourne chaque jour : jamais les mêmes en dernier.
-    const momentCurseur = reveil ? 'reveil' : soir ? 'soir' : 'matin';
+    // (11 nov., C8) Le passage horaire a SON curseur par heure : un vendeur passé à 17 h (pas encore
+    // son heure) doit être revu à 18 h — jamais marqué « fait » pour la journée.
+    const momentCurseur = reveil ? 'reveil' : horaire ? `soir-h${new Date(debutCron).getUTCHours()}` : soir ? 'soir' : 'matin';
     const budget = Number(process.env.VRM_CRON_BUDGET_MS) > 0 ? Number(process.env.VRM_CRON_BUDGET_MS) : BUDGET_VENDEURS_MS;
     const lot = await passerVendeurs({
       owners, moment: momentCurseur, jour: parisDate(0), debut: debutCron, budgetMs: budget, parallele: VENDEURS_EN_PARALLELE,
@@ -1530,7 +1524,7 @@ export default async function handler(req, res) {
       lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre, retirerCurseur: retirerNeutre,
     });
     const { bilans, echecs } = lot;
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
       bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {

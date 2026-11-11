@@ -87,10 +87,6 @@ const PHRASE = {
   message: (k) => `${k} message${k > 1 ? 's' : ''}`,
 };
 const GESTE = { bordereau: 'Colis à poster', arrivee: 'Colis à retirer', vente: 'Ventes', argent: 'Ventes', offre: 'Offres', message: 'Messages' };
-// (11 nov.) L'heure du résumé du soir (`push_prefs.resumeSoir`, « HH:MM »).
-// Absente ⇒ le passage habituel (cron Vercel, 18:00 UTC : 19 h l'hiver, 20 h l'été).
-export const HEURES_SOIR = ['18:00', '19:00', '20:00', '21:00'];
-export const heureSoir = (prefs) => (prefs && HEURES_SOIR.includes(prefs.resumeSoir) ? prefs.resumeSoir : null);
 export const ORDRE_GENRES = ['bordereau', 'arrivee', 'vente', 'argent', 'offre', 'message'];
 
 // `entrees` : les notifications du résumé (rangées dans la cloche, avec leur

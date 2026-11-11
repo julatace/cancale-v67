@@ -213,6 +213,22 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await pg.locator('[data-famille-notif]').first().waitFor({ state: 'attached', timeout: 6000 }).catch(() => {});
           const types = await pg.locator('[data-famille-notif]').evaluateAll((l) => l.map((e) => e.getAttribute('data-famille-notif')));
           dit(types.length === 8 && ['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes'].every((t) => types.includes(t)), `${T} · F1 huit types (dont « Nouveau compte relié ») réglables`, types.join(','));
+          // (11 nov., décision C8) L'heure du résumé du soir : défaut inchangé, réglable de 18 h à 22 h.
+          const sel = pg.locator('[data-np-soir-choix]');
+          const opts = await sel.evaluate((e) => [...e.options].map((o) => o.value)).catch(() => []);
+          dit(await pg.locator('[data-np-soir="defaut"]').count() === 1 && opts.join(',') === ',18,19,20,21,22', `${T} · C8 « Résumé du soir » : défaut (19 h hiver · 20 h été), puis 18 à 22 h`, opts.join(','));
+          const hSel = await sel.evaluate((e) => Math.round(e.getBoundingClientRect().height)).catch(() => 0);
+          if (mobile) dit(hSel >= 44, `${T} · C8 le choix fait 44 px`, String(hSel));
+          ecrits.length = 0;
+          await sel.selectOption('22'); await pg.waitForTimeout(600);
+          const ps = ecrits.find((l) => l.id === 'push_prefs');
+          dit(!!ps && ps.data.soirHeure === 22 && ps.data.familles && ps.data.familles.messages === false && !('soir' in ps.data && typeof ps.data.soir === 'object'), `${T} · C8 22 h ⇒ push_prefs.soirHeure:22 écrit, le reste de la ligne GARDÉ`, JSON.stringify(ps && ps.data));
+          dit(await pg.locator('[data-np-soir-calme]').count() === 1, `${T} · C8 22 h tombe dans les heures calmes (22 h → 8 h) : dit en une phrase`);
+          if (SHOTS) await pg.locator('[data-np-reglages]').screenshot({ path: path.join(SHOTS, `centre-${vp.width}-${sombre ? 'sombre' : 'clair'}-soir.png`) }).catch(() => {});
+          ecrits.length = 0;
+          await sel.selectOption(''); await pg.waitForTimeout(600);
+          const pd = ecrits.find((l) => l.id === 'push_prefs');
+          dit(!!pd && !('soirHeure' in pd.data) && await pg.locator('[data-np-soir-calme]').count() === 0, `${T} · C8 revenir au défaut retire l’heure choisie`, JSON.stringify(pd && pd.data));
           ecrits.length = 0;
           const calme = pg.locator('[data-np-calme] [role="switch"]');
           dit(await calme.count() === 1, `${T} · F2 l’interrupteur « Heures calmes » est là`);
@@ -225,8 +241,8 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await pg.waitForTimeout(500);
           const p = ecrits.find((l) => l.id === 'push_prefs');
           dit(!!p && p.data.calme && p.data.calme.actif === false && p.data.familles && p.data.familles.messages === false, `${T} · F3 heures calmes coupées ⇒ push_prefs.calme.actif:false écrit, le reste de la ligne GARDÉ`, JSON.stringify(p && p.data));
-          // (11 nov., lot `notifs-groupees`) Regrouper : Non · 15 · 30 · 60 min (15 par défaut),
-          // et l'heure du résumé du soir (Auto par défaut). Chaque choix écrit la ligne entière.
+          // (11 nov., lot `notifs-groupees`) Regrouper : Non · 15 · 30 · 60 min (15 par défaut).
+          // Chaque choix écrit la ligne entière.
           const fen0 = await pg.locator('[data-np-fenetre]').getAttribute('data-np-fenetre').catch(() => null);
           const choix = await pg.locator('[data-np-fenetre-choix]').evaluateAll((l) => l.map((e) => e.getAttribute('data-np-fenetre-choix')));
           dit(fen0 === '15' && choix.join(',') === 'non,15,30,60', `${T} · F5 « Regrouper » : 15 min par défaut ; Non · 15 · 30 · 60`, `${fen0} · ${choix}`);
@@ -240,15 +256,6 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await pg.waitForTimeout(500);
           const gnon = ecrits.filter((l) => l.id === 'push_prefs').pop();
           dit(!!gnon && gnon.data.regrouper === false && await pg.locator('[data-np-regrouper="off"]').count() === 1, `${T} · F5c « Non » ⇒ regrouper:false (chaque notification seule)`, JSON.stringify(gnon && gnon.data));
-          const soir0 = await pg.locator('[data-np-soir]').getAttribute('data-np-soir').catch(() => null);
-          await pg.locator('[data-np-soir-choix="21:00"]').click().catch(() => {});
-          await pg.waitForTimeout(500);
-          const s21 = ecrits.filter((l) => l.id === 'push_prefs').pop();
-          dit(soir0 === 'auto' && !!s21 && s21.data.resumeSoir === '21:00' && s21.data.regrouper === false, `${T} · F5d résumé du soir « Auto » par défaut ; « 21 h » ⇒ resumeSoir:'21:00'`, `${soir0} · ${JSON.stringify(s21 && s21.data)}`);
-          await pg.locator('[data-np-soir-choix="auto"]').click().catch(() => {});
-          await pg.waitForTimeout(500);
-          const sa = ecrits.filter((l) => l.id === 'push_prefs').pop();
-          dit(!!sa && !('resumeSoir' in sa.data), `${T} · F5e « Auto » retire l’heure (le passage habituel)`, JSON.stringify(sa && sa.data));
           await pg.locator('[data-np-fenetre-choix="15"]').click().catch(() => {});
           await pg.waitForTimeout(400);
           const rel = await pg.evaluate(() => { const e = document.querySelector('[data-relances-essai]'); return e ? { etat: e.getAttribute('data-relances-essai'), codes: e.querySelectorAll('code').length } : null; });

@@ -276,6 +276,43 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(/au moins 2 colis/.test(p.title || '') && /eBay pas relu/.test(p.body || ''), 'eBay illisible ⇒ « au moins 2 colis », eBay nommé', `${p.title} / ${p.body}`);
   });
 
+  // (11 nov., décision C8) L'heure CHOISIE (Paramètres → Notifications, `push_prefs.soirHeure`, 18–22 h,
+  // heure de Paris). Défaut inchangé : le cron de Vercel (SOIR = 20 h 05 l'été d'octobre).
+  console.log('\n── (C8) L’heure du résumé, réglable');
+  const horaire = { moment: 'soir', passage: 'heure' };
+  await essaie('heure choisie', async () => {
+    reset(); V.A.prefs = { soirHeure: 22 };
+    let r = await lancer(SOIR);
+    const bil = r.corps && r.corps.bilans ? r.corps.bilans.find((x) => x.owner === 'A') : null;
+    dit(soirDe('A').length === 0 && /pas encore son heure/.test(String(bil && bil.soir)) && !((memos.A || {}).soir_reminder_dedup), 'C8. A a choisi 22 h : le cron de 20 h 05 n’envoie rien, ne mémorise rien', JSON.stringify(bil && bil.soir));
+    r = await lancer(SOIR + 3600000, horaire);
+    dit(soirDe('A').length === 0, 'C8. passage horaire à 21 h 05 : pas encore 22 h ⇒ rien');
+    r = await lancer(SOIR + 2 * 3600000, horaire);
+    dit(soirDe('A').length === 1 && (soirDe('A')[0].title || '') === 'Demain : 2 colis à déposer', 'C8. passage horaire à 22 h 05 : le résumé part, le même texte', JSON.stringify(soirDe('A').map((x) => x.title)));
+    await lancer(SOIR + 3 * 3600000, horaire);
+    dit(soirDe('A').length === 1, 'C8. une fois par soir : 23 h 05 ⇒ rien de plus');
+    dit(r.corps && r.corps.passage === 'heure' && !('sondes' in r.corps), 'C8. le passage horaire ne fait que le résumé (ni sondes, ni eBay relu, ni bilan)', JSON.stringify(Object.keys(r.corps || {})));
+  });
+  await essaie('heure par défaut', async () => {
+    reset();
+    await lancer(SOIR - 3600000, horaire);
+    dit(soirDe('A').length === 0, 'C8. sans heure choisie, le passage horaire ne fait rien (le cron d’avant décide)');
+    await lancer(SOIR);
+    dit(soirDe('A').length === 1, 'C8. sans heure choisie : 20 h 05, comme avant');
+  });
+  await essaie('heure plus tôt', async () => {
+    reset(); V.A.prefs = { soirHeure: 18 };
+    await lancer(SOIR - 2 * 3600000, horaire);
+    dit(soirDe('A').length === 1, 'C8. A a choisi 18 h : passage horaire de 18 h 05 ⇒ le résumé part');
+    await lancer(SOIR);
+    dit(soirDe('A').length === 1, 'C8. le cron de 20 h 05 ne le renvoie pas (mémo du jour)');
+  });
+  await essaie('heure et catégorie', async () => {
+    reset(); V.A.prefs = { soirHeure: 19, soir: false };
+    await lancer(SOIR - 3600000 + 600000, horaire);
+    dit(soirDe('A').length === 0, 'C8. une heure choisie ne rallume pas une préférence coupée');
+  });
+
   console.log('\n── Le matin ne part pas le soir, et inversement');
   await essaie('matin', async () => {
     reset();
@@ -289,6 +326,8 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     // réécriture le mène à la MÊME route avec `?moment=soir`.
     const soir = crons.find((c) => c.path === '/api/rappel-soir');
     const rw = (vj.rewrites || []).find((r) => r.source === '/api/rappel-soir');
+    const gh = fs.readFileSync(path.join(RACINE, '.github', 'workflows', 'resume-soir-heure.yml'), 'utf8');
+    dit(/cron: '13 16-21 \* \* \*'/.test(gh) && /moment=soir&passage=heure/.test(gh), 'C8. GitHub appelle le passage horaire de 16 h à 21 h UTC (18 h → 22 h à Paris)');
     dit(crons.length === 2 && !!soir && /^0 1[89] \* \* \*$/.test(soir.schedule) && !!rw && rw.destination === '/api/ship-reminders?moment=soir', 'vercel.json : un second cron, une fois par jour, réécrit vers la MÊME route (?moment=soir)', JSON.stringify(crons));
   });
 

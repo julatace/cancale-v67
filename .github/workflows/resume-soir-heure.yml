@@ -1,0 +1,37 @@
+name: Résumé du soir à son heure (18–22 h)
+# (11 nov., décision C8) Le résumé du soir part par défaut au cron de Vercel (18:00 UTC :
+# 19 h l'hiver, 20 h l'été) — inchangé. Un vendeur peut CHOISIR son heure (Paramètres →
+# Notifications, 18 h à 22 h, heure de Paris). Le plan gratuit de Vercel ne lance un cron
+# qu'une fois par jour : GitHub appelle donc le passage horaire chaque heure, de 16 h à
+# 21 h UTC (18 h → 22 h à Paris, été comme hiver). La route ne sert que les vendeurs qui
+# ont choisi une heure, une fois cette heure atteinte, une fois par soir (mémo du jour).
+# Sans le secret `CRON_SECRET` dans GitHub (Settings → Secrets and variables → Actions,
+# le même que colis-frais.yml), rien n'est appelé et le journal le dit.
+on:
+  schedule:
+    - cron: '13 16-21 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: resume-soir-heure
+  cancel-in-progress: false
+jobs:
+  soir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Appeler le passage horaire du résumé du soir
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET absent des secrets GitHub : aucun résumé à une heure choisie n'est demandé."
+            exit 0
+          fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 280 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vrm.center/api/ship-reminders?moment=soir&passage=heure")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,vendeurs:r.vendeurs,echecs:r.echecs,soirs:(r.bilans||[]).map(b=>b.soir)}))" || true
+          test "$code" = "200"

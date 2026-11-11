@@ -29,21 +29,20 @@ Aucune fonction `api/` de plus (12/12), aucune migration, rien dans l'extension.
 | Texte | `resumeDeGroupe` | une seule : elle-même ; un genre : le titre du genre ; plusieurs : « 2 colis à poster · 1 colis à retirer » + « Dernier : … ». Un geste par genre (Android ; iOS ouvre le premier). |
 | **Chiffres** | `resumeDeGroupe` | jamais recalculés : ce sont les objets annoncés (un par clé), chacun décidé par la règle de son émetteur (§5). Le résumé ne dit pas un total d'écran qu'il ne connaît pas. |
 | **Écran exact** | `api/_lib/lien-notif.js` | `DESTINATIONS.colis` → **Ventes** (« À expédier »), `retrait` → **Achats** (« À retirer »), `achat` → Achats. Plus aucune notification ne fabrique `tab=cat_bord`. ⚠️ Sur l'app d'aujourd'hui, la carte du colis vit encore dans Colis : la cible est trouvée **une fois le lot DJ3 (`claude/colis-a-leur-place`) intégré**. À intégrer ensemble. |
-| **Heure du résumé du soir** | `push_prefs.resumeSoir`, `rappelDuSoir` | Auto (cron habituel, 18:00 UTC) · 18 h · 19 h · 20 h · 21 h. Le cron habituel laisse passer un vendeur dont l'heure n'est pas là ; le passage de 15 min l'envoie à son heure (fenêtre de 45 min ; un seul par soir, mémo `soir_reminder_dedup`). Heure déjà passée ⇒ le cron l'envoie. 22 h non proposé (heures calmes par défaut). |
-| Réglages | `src/ecrans/Reglages.jsx` | Paramètres → Notifications : « Regrouper » Non · 15 min · 30 min · 1 h ; « Résumé du soir » Auto · 18 h…21 h. Par type : inchangé (déjà là). |
+| Heure du résumé du soir | — | livrée en parallèle par la décision C8 (`soirHeure`, passage horaire `resume-soir-heure.yml`) : **gardée telle quelle**, ma version (faite avant de la voir) retirée à la fusion pour ne rien doubler. |
+| Réglages | `src/ecrans/Reglages.jsx` | Paramètres → Notifications : « Regrouper » Non · 15 min · 30 min · 1 h (l'interrupteur devient ce choix). Par type et heure du soir : déjà là (C8). |
 | Cloche | `src/journalNotifs.js` | états « Dans le prochain résumé » / « Dans un résumé ». |
 
 ⚠️ Sans le secret `CRON_SECRET` dans GitHub, le passage de 15 min ne tourne pas : le résumé
-part alors au prochain envoi du vendeur, et une heure du soir choisie après 19 h/20 h ne part
-pas (le réveil a la même dépendance depuis le 5 nov.).
+part alors au prochain envoi du vendeur (le réveil a la même dépendance depuis le 5 nov.).
 
 ## 3. Preuves
 
 | preuve | résultat |
 |---|---|
-| `scripts/audit-notifs-groupees.cjs` — EXÉCUTE `sendPushToAll` et la VRAIE route `api/ship-reminders.js` (`?moment=groupe`, `?moment=soir`) sur une fausse base (filtres `data->>`, `Range`, comparer-et-échanger), push simulé, horloge de Paris simulée | **32/32** ; sur `origin/main` (`--sur`) **27 rouges** |
-| Mutations (8/8 rouges) | fenêtre jamais occupée (18), idempotence retirée (6), urgent ignoré (5), résumé à la fenêtre libre ignoré (2), clé sans jour (2), Colis rétabli (3), heures calmes ignorées au passage (3), heure du soir ignorée (2) |
-| banc `centre-notifs` (390 tactile / 1512, clair / sombre) : F5 à F5e neufs (Regrouper, résumé du soir, ligne écrite entière) | 114/114 ; captures regardées (un vide de 160 px sous le libellé vu à la capture et corrigé) |
+| `scripts/audit-notifs-groupees.cjs` — EXÉCUTE `sendPushToAll` et la VRAIE route `api/ship-reminders.js` (`?moment=groupe`) sur une fausse base (filtres `data->>`, `Range`, comparer-et-échanger), push simulé, horloge de Paris simulée | **29/29** ; sur `origin/main` (`--sur`) **27 rouges** (avant retrait des 3 contrôles du soir) |
+| Mutations (7/7 rouges, refaites après la fusion) | fenêtre jamais occupée, idempotence retirée, urgent ignoré, résumé à la fenêtre libre ignoré, clé sans jour, Colis rétabli, heures calmes ignorées au passage |
+| banc `centre-notifs` (390 tactile / 1512, clair / sombre) : F5 à F5c neufs (Regrouper Non · 15 · 30 · 60, ligne écrite entière) | 114/114 ; captures regardées (un vide de 160 px sous le libellé vu à la capture et corrigé) |
 | audits voisins remis à la règle (adresses Ventes/Achats) | `audit-notifications`, `audit-notifs-belles`, `audit-colis-heure`, `audit-suivi-vinted`, `audit-suivi-colis` ; bancs `colis-relais-push`, `retrait-conv-push`, `rappel-soir` |
 
 **Rouges restants (dits, pas cachés)** : bancs de rendu `notifs-destination` (15 rouges ; 9 déjà sur

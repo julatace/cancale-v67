@@ -7,7 +7,7 @@
 // chose (objet + jour) ; heures calmes respectées ; chaque notification ouvre
 // l'écran exact (Ventes « À expédier », Achats « À retirer », jamais Colis).
 // EXÉCUTE la vraie porte d'envoi (`api/_lib/push.js`) et la VRAIE route
-// (`api/ship-reminders.js`, `?moment=groupe` et `?moment=soir`) contre une fausse
+// (`api/ship-reminders.js`, `?moment=groupe`) contre une fausse
 // base (app_data owner/id/data, comparer-et-échanger sur `rev`, filtres `data->>`,
 // pagination `Range`), téléphones interceptés, horloge de Paris simulée.
 //   G  la fenêtre : la 1re sonne, les suivantes attendent, UN résumé à la fin
@@ -15,7 +15,8 @@
 //   I  idempotence : même objet le même jour ⇒ rien ; le lendemain ⇒ oui
 //   L  la fenêtre libre : ce qui attendait part AVEC la suivante (un seul son)
 //   Q  heures calmes : rien ne sonne, les entrées passent « heures calmes »
-//   P  réglages : Non (chaque notification seule), 1 h, heure du résumé du soir
+//   P  réglages : Non (chaque notification seule), 1 h
+//   (L'heure du résumé du soir : décision C8, son propre audit.)
 //   E  l'écran exact : Ventes / Achats, jamais `cat_bord`
 // `--sur <dossier>` : juge un autre arbre (le code d'avant). Données inventées.
 'use strict';
@@ -211,16 +212,6 @@ const plus = (iso, min) => new Date(Date.parse(iso) + min * 60e3).toISOString();
     const n1 = pushes.length;
     await aHeure(plus(t0, 62), () => appeler('groupe'));
     dit(n1 === 1 && pushes.length === 2 && pushes[1].title === 'Offre de 55 €', 'P2 « 1 h » : rien à +20 min, la seule en attente sonne telle quelle à +62 min', `${n1} puis ${pushes.length} · ${pushes[1] && pushes[1].title}`);
-    // L'heure du résumé du soir.
-    prepare({ resumeSoir: '21:00' });
-    const s1 = await aHeure(parisA(19, 0), () => appeler('soir'));
-    const b1 = JSON.stringify(s1.corps.bilans || s1.corps);
-    dit(/à son heure \(21:00\)/.test(b1), 'P3 le cron habituel (19 h) laisse passer un vendeur réglé sur 21 h', b1.slice(0, 220));
-    const g1 = await aHeure(parisA(20, 34), () => appeler('groupe'));
-    dit(g1.code === 200 && g1.corps.soirs === 0, 'P4 à 20 h 34, le passage ne le prend pas', JSON.stringify(g1.corps).slice(0, 160));
-    const g2 = await aHeure(parisA(21, 4), () => appeler('groupe'));
-    const bs = (g2.corps.bilans || []).filter((x) => x.q === 'soir');
-    dit(g2.code === 200 && g2.corps.soirs === 1 && bs.length === 1 && !/à son heure/.test(String(bs[0].soir)), 'P5 à 21 h 04, le passage lance SON résumé du soir (sans attendre)', JSON.stringify(g2.corps).slice(0, 220));
   });
 
   await essaie('E — l’écran exact', async () => {
