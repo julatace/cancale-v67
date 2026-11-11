@@ -145,7 +145,12 @@ const ouvrirPage = async (ctx, query = '') => {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   // L'horloge de chaque ouverture CONTINUE celle d'avant (une app rouverte ne
   // remonte pas le temps : une valeur rangée « dans le futur » serait refusée).
-  await pg.clock.install({ time: maintenant.getTime() + (Date.now() - DEBUT) });
+  // (11 nov., webkit-fiable) L'horloge de Playwright est celle du CONTEXTE : l'installer une
+  // 2ᵉ fois (page suivante du même appareil) lève sous WebKit (« __pwClock.controller »,
+  // mesuré en CI : toute la partie R tombait). Installée une fois, puis seulement avancée.
+  const t0 = maintenant.getTime() + (Date.now() - DEBUT);
+  if (!ctx.__vrmHorloge) { await pg.clock.install({ time: t0 }); ctx.__vrmHorloge = true; }
+  else await pg.clock.setSystemTime(t0);
   await pg.goto(`http://localhost:${PORT}/${query}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-main') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(2800);
@@ -177,8 +182,17 @@ const ecran = (pg) => pg.evaluate((CHAMP_ANNONCES) => {
 const balayer = async (ctx, pg, x0, x1, y) => {
   await pg.evaluate(([x0, x1, y]) => {
     const cible = document.elementFromPoint(x0 < 1 ? 1 : x0, y) || document.querySelector('.vrm-main');
-    const t = (x) => new Touch({ identifier: 1, target: cible, clientX: x, clientY: y, pageX: x, pageY: y, screenX: x, screenY: y });
-    const ev = (type, x, liste) => cible.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: liste ? [t(x)] : [], targetTouches: liste ? [t(x)] : [], changedTouches: [t(x)] }));
+    // (11 nov., webkit-fiable) `new Touch(...)` n'existe pas sous WebKit (« Illegal constructor »,
+    // mesuré en CI : la partie B s'arrêtait là). Un toucher de page porte ce que l'app lit
+    // (`touches[0].clientX/Y`, `changedTouches`) : sans constructeur, un objet de la même forme
+    // posé sur un TouchEvent (ou un Event nommé pareil si TouchEvent manque aussi).
+    const t = (x) => { try { return new Touch({ identifier: 1, target: cible, clientX: x, clientY: y, pageX: x, pageY: y, screenX: x, screenY: y }); } catch (_) { return { identifier: 1, target: cible, clientX: x, clientY: y, pageX: x, pageY: y, screenX: x, screenY: y }; } };
+    const ev = (type, x, liste) => {
+      const champs = { touches: liste ? [t(x)] : [], targetTouches: liste ? [t(x)] : [], changedTouches: [t(x)] };
+      let e; try { e = new TouchEvent(type, Object.assign({ bubbles: true, cancelable: true }, champs)); if (!e.touches || e.touches.length !== champs.touches.length || !e.changedTouches || !e.changedTouches.length) throw 0; }
+      catch (_) { e = new Event(type, { bubbles: true, cancelable: true }); for (const [k, v] of Object.entries(champs)) Object.defineProperty(e, k, { value: v }); }
+      return cible.dispatchEvent(e);
+    };
     ev('touchstart', x0, true);
     for (let k = 1; k <= 6; k++) ev('touchmove', x0 + (x1 - x0) * k / 6, true);
     ev('touchend', x1, false);
@@ -191,6 +205,8 @@ const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(aw
   await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {});
   return true; };
 const PLUS = '.vrm-tabbar button[aria-label="Plus"]';
+// Ce que « Plus » porte aujourd'hui (App.jsx, GROUPES_PLUS, sans les entrées « ordi »).
+const PLUS_ATTENDUES = ['messages', 'trancher', 'garage', 'achats', 'emails', 'compta', 'communaute'];
 
 // La barre, mesurée.
 const mesureBarre = (pg) => pg.evaluate(() => {
@@ -241,7 +257,11 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await capture(pg, `plus-${mode}-${sombre ? 'sombre' : 'clair'}`);
         dit(!!p && p.plusOuvert === 'true', `B3 ${qui} : « Plus » ouvert le dit (aria-expanded)`);
         dit(!!p && p.bas <= p.navHaut + 1, `B3 ${qui} : le panneau ne recouvre pas la barre`, JSON.stringify(p && { bas: p.bas, navHaut: p.navHaut }));
-        dit(!!p && p.entrees.length >= 9 && p.entrees.every((e) => e.visible) && !p.defile, `B3 ${qui} : toutes les entrées visibles sans défiler`, JSON.stringify(p && { horsVue: p.entrees.filter((e) => !e.visible).map((e) => e.id), defile: p.defile }));
+        // (11 nov., webkit-fiable) Les entrées de « Plus » d'AUJOURD'HUI (App.jsx, GROUPES_PLUS) :
+        // Statistiques + Compta = « Argent » (`compta`, 10 nov.), Paramètres sous la photo du
+        // profil (lot DJ6, 11 nov.), « À trancher » et « E-mails » ajoutés. L'ancien « ≥ 9 »
+        // était rouge à chaque passage depuis le 10 nov. (ce n'était pas une instabilité).
+        dit(!!p && PLUS_ATTENDUES.every((id) => p.entrees.some((e) => e.id === id)) && p.entrees.every((e) => e.visible) && !p.defile, `B3 ${qui} : toutes les entrées visibles sans défiler`, JSON.stringify(p && { ids: p.entrees.map((e) => e.id), horsVue: p.entrees.filter((e) => !e.visible).map((e) => e.id), defile: p.defile }));
         dit(!!p && p.entrees.every((e) => e.h >= 44 && e.touche && !e.coupe), `B3 ${qui} : entrées ≥ 44 px, touchables, libellés entiers`, JSON.stringify(p && p.entrees.filter((e) => !(e.h >= 44 && e.touche && !e.coupe))));
         // B4 · retour avec « Plus » ouvert
         await pg.goBack({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(800);
@@ -267,12 +287,12 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(m6.entrees.every((e) => !e.coupe), `B6 ${qui} : son libellé n'est pas coupé`, JSON.stringify(m6.entrees.filter((e) => e.coupe)));
         // Chaque écran de « Plus » : la 5ᵉ place le dit, libellé entier.
         const vus = [];
-        for (const id of ['messages', 'garage', 'achats', 'dashboard', 'communaute', 'settings']) {
+        for (const id of PLUS_ATTENDUES) {
           await toucher(pg, PLUS); await toucher(pg, `.vrm-sheet [data-nav-entree="${id}"]`);
           const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
           vus.push({ id, ...x });
         }
-        dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : Messages, Stock, Achats, Stats, Communauté, Réglages — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
+        dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : chaque écran de « Plus » (Messages, À trancher, Stock, Achats, E-mails, Argent, Communauté) — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
         // B7 · balayages
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
         // Le milieu de l'écran, HORS d'une commande : un geste qui part d'un bouton, d'un lien,
@@ -410,7 +430,9 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
           // (mis en capitales par la feuille de style) ; les titres Vendre · Gérer · Argent
           // doivent être VISIBLES (« Moi », au pied, peut taire son titre) ; « en entier » =
           // le contrôle des libellés coupés ci-dessus.
-          dit(!!r && ['Gérer', 'Argent', 'Moi'].every((g) => r.groupes.includes(g)) && ['Gérer', 'Argent'].every((g) => r.titresVus.includes(g)) && !r.groupes.includes('Plateformes') && !r.groupes.includes('Vendre'), `O ${qui} : les groupes Gérer · Argent · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide (lot AL : Republier et Favoris & offres vivent dans Annonces et Messages)`, JSON.stringify(r && { groupes: r.groupes, titresVus: r.titresVus }));
+          // (11 nov., webkit-fiable) Depuis le 10 nov. (« L'onglet Compta est trop flou… relier avec
+          // Stats »), « Argent » est UNE entrée du groupe Gérer : il n'y a plus de groupe « Argent ».
+          dit(!!r && ['Gérer', 'Moi'].every((g) => r.groupes.includes(g)) && r.titresVus.includes('Gérer') && !r.groupes.includes('Argent') && !r.groupes.includes('Plateformes') && !r.groupes.includes('Vendre'), `O ${qui} : les groupes Gérer (avec Argent) · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide (lot AL : Republier et Favoris & offres vivent dans Annonces et Messages)`, JSON.stringify(r && { groupes: r.groupes, titresVus: r.titresVus }));
           await ctx.close();
         });
       }

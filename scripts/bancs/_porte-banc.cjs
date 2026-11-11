@@ -110,6 +110,42 @@ function poser(pw) {
   // BANC_SESSION_UID : un banc qui déclare SON vendeur (owner explicite sur ses lignes) le donne ici.
   const script = () => SCRIPT.replace('__UID_BANC__', process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
   const surContexte = (ctx) => { try { ctx.addInitScript(script()); tracer(ctx); } catch (_) {} return ctx; };
+  // (11 nov., webkit-fiable) Le faux serveur d'un banc doit répondre comme un VRAI serveur
+  // cross-origin (Supabase) : sous WebKit, les routes de Playwright reçoivent aussi le
+  // pré-vol CORS (OPTIONS) et une réponse servie sans `access-control-allow-*` est REFUSÉE
+  // par la page (Chromium, lui, ne le demande pas). Résultat mesuré en CI : aucune donnée
+  // chargée, « À retirer » vide, 63 rouges. On répond au pré-vol et on pose les en-têtes
+  // sur chaque réponse servie. Posé sous WebKit ; `BANC_CORS=1` le pose aussi sous Chromium
+  // (pour vérifier qu'il ne change rien là où tout passait déjà).
+  const corsVoulu = (moteur) => moteur === 'webkit' || process.env.BANC_CORS === '1';
+  const ENTETES_CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST, PATCH, PUT, DELETE, HEAD, OPTIONS', 'access-control-expose-headers': 'content-range, content-length, content-type, etag, x-vrm-version, *', 'access-control-max-age': '600' };
+  const enveloppes = new WeakMap();
+  const avecCors = (h) => {
+    if (typeof h !== 'function') return h;
+    if (enveloppes.has(h)) return enveloppes.get(h);
+    const w = (route, req) => {
+      let rq; try { rq = route.request(); } catch (_) { return h(route, req); }
+      const voulu = (() => { try { return (rq.headers()['access-control-request-headers'] || 'authorization, apikey, content-type, prefer, range, x-client-info, accept-profile, content-profile, x-vrm-equipe'); } catch (_) { return '*'; } })();
+      if (rq.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: Object.assign({}, ENTETES_CORS, { 'access-control-allow-headers': voulu }) });
+      const ff = route.fulfill.bind(route);
+      const p = new Proxy(route, { get(t, k) { if (k === 'fulfill') return (o = {}) => { let base = o.headers; if (!base && o.response) { try { base = o.response.headers(); } catch (_) {} } return ff(Object.assign({}, o, { headers: Object.assign({}, ENTETES_CORS, { 'access-control-allow-headers': voulu }, base || {}) })); }; const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } });
+      return h(p, req);
+    };
+    enveloppes.set(h, w); return w;
+  };
+  const poserCors = (o) => {
+    if (!o || o.__vrmCors) return o; o.__vrmCors = true;
+    const r0 = o.route.bind(o), u0 = o.unroute.bind(o);
+    o.route = (url, h, ...x) => r0(url, avecCors(h), ...x);
+    o.unroute = (url, h, ...x) => u0(url, h ? (enveloppes.get(h) || h) : h, ...x);
+    return o;
+  };
+  const corsContexte = (ctx) => {
+    poserCors(ctx);
+    const np0 = ctx.newPage.bind(ctx);
+    ctx.newPage = async (...x) => poserCors(await np0(...x));
+    return ctx;
+  };
   // Un banc écrit sur une autre machine vise parfois /usr/bin/chromium : absent,
   // on prend le Chromium installé ici (même moteur, rien d'autre ne change).
   const fs = require('fs');
@@ -125,8 +161,8 @@ function poser(pw) {
   c.launch = async (...a) => {
     const b = await launch(...a);
     const nc = b.newContext.bind(b), np = b.newPage.bind(b);
-    b.newContext = async (...x) => surContexte(await nc(...x));
-    b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return p; };
+    b.newContext = async (...x) => { const c = surContexte(await nc(...x)); return corsVoulu('chromium') ? corsContexte(c) : c; };
+    b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return corsVoulu('chromium') ? poserCors(p) : p; };
     return b;
   };
   const lpc = c.launchPersistentContext.bind(c);
@@ -140,8 +176,8 @@ function poser(pw) {
     w.launch = async (...a) => {
       const b = await wl(...a);
       const nc = b.newContext.bind(b), np = b.newPage.bind(b);
-      b.newContext = async (...x) => surContexte(await nc(...x));
-      b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return p; };
+      b.newContext = async (...x) => { const c = surContexte(await nc(...x)); return corsVoulu('webkit') ? corsContexte(c) : c; };
+      b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return corsVoulu('webkit') ? poserCors(p) : p; };
       return b;
     };
   }

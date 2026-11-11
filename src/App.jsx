@@ -1,6 +1,7 @@
 // (8 nov., démarrage léger) Les feuilles de style de l'app EN PREMIER (déplacées de src/main.jsx,
 // même ordre) : elles viennent avec ce morceau au lieu de bloquer index.html.
 import './stylesApp.js';
+import { signalDelai } from './compatSafari.js';
 import ChampSaisie from './composants/ChampSaisie.jsx';
 import ChoixPlateformes from './ChoixPlateformes.jsx';
 import ConfigurationDepart from './ConfigurationDepart.jsx';
@@ -15737,7 +15738,7 @@ const ouvrirMenuProfil = () => { try { window.dispatchEvent(new Event('vrm:profi
 // La fiche GoTrue (identités Discord/Google reliées) : projetée, jamais rangée ailleurs qu'en mémoire.
 poserLecteurFiche(async () => {
   const tok = AUTH.session && AUTH.session.access_token; if (!tok) return null;
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, signal: AbortSignal.timeout(15000) });
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, signal: signalDelai(15000) });
   if (!r.ok) return null;
   const j = await r.json();
   if (!j || j.id !== (AUTH.user && AUTH.user.id)) return null;
