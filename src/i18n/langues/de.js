@@ -612,4 +612,13 @@ export default {
   "ebay.remise.retirer.supprime": "Er hat nicht begonnen: eBay löscht ihn.",
   "ebay.remise.retirer.ok": "Entfernen",
   "ebay.remise.retiree": "Rabatt bei eBay entfernt.",
+  "ebay.fil.passu": "Diese eBay-Nachricht ist nicht mehr geladen. Öffne Nachrichten neu.",
+  "ebay.fil.conf.titre": "Diese Antwort bei eBay senden?",
+  "ebay.fil.conf.ok": "Ja, senden",
+  "ebay.fil.envoye": "Antwort bei eBay gesendet.",
+  "ebay.fil.fermer": "Verlauf schließen",
+  "ebay.fil.repondre": "Deine Antwort",
+  "ebay.fil.envoyer": "Senden",
+  "ebay.fil.surEbay": "Diese Nachricht wird bei eBay beantwortet.",
+  "ebay.fil.lecture": "eBay: Nachrichten werden geladen…",
 };

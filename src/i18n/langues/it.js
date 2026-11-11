@@ -612,4 +612,13 @@ export default {
   "ebay.remise.retirer.supprime": "Non è iniziata: eBay la elimina.",
   "ebay.remise.retirer.ok": "Rimuovi",
   "ebay.remise.retiree": "Sconto rimosso su eBay.",
+  "ebay.fil.passu": "Questo messaggio eBay non è più caricato. Riapri Messaggi.",
+  "ebay.fil.conf.titre": "Inviare questa risposta su eBay?",
+  "ebay.fil.conf.ok": "Sì, invia",
+  "ebay.fil.envoye": "Risposta inviata su eBay.",
+  "ebay.fil.fermer": "Chiudi la conversazione",
+  "ebay.fil.repondre": "La tua risposta",
+  "ebay.fil.envoyer": "Invia",
+  "ebay.fil.surEbay": "A questo messaggio si risponde su eBay.",
+  "ebay.fil.lecture": "eBay: lettura dei messaggi…",
 };

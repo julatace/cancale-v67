@@ -617,4 +617,13 @@ export default {
   "ebay.remise.retirer.supprime": "Elle n'a pas commencé : eBay la supprime.",
   "ebay.remise.retirer.ok": "Retirer",
   "ebay.remise.retiree": "Remise retirée chez eBay.",
+  "ebay.fil.passu": "Ce message eBay n'est plus lu. Rouvre Messages.",
+  "ebay.fil.conf.titre": "Envoyer cette réponse sur eBay ?",
+  "ebay.fil.conf.ok": "Oui, envoyer",
+  "ebay.fil.envoye": "Réponse envoyée sur eBay.",
+  "ebay.fil.fermer": "Fermer le fil",
+  "ebay.fil.repondre": "Ta réponse",
+  "ebay.fil.envoyer": "Envoyer",
+  "ebay.fil.surEbay": "Ce message se répond sur eBay.",
+  "ebay.fil.lecture": "eBay : lecture des messages…",
 };

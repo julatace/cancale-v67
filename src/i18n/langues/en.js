@@ -612,4 +612,13 @@ export default {
   "ebay.remise.retirer.supprime": "It has not started: eBay deletes it.",
   "ebay.remise.retirer.ok": "Remove",
   "ebay.remise.retiree": "Discount removed on eBay.",
+  "ebay.fil.passu": "This eBay message is no longer loaded. Reopen Messages.",
+  "ebay.fil.conf.titre": "Send this reply on eBay?",
+  "ebay.fil.conf.ok": "Yes, send",
+  "ebay.fil.envoye": "Reply sent on eBay.",
+  "ebay.fil.fermer": "Close the thread",
+  "ebay.fil.repondre": "Your reply",
+  "ebay.fil.envoyer": "Send",
+  "ebay.fil.surEbay": "Reply to this message on eBay.",
+  "ebay.fil.lecture": "eBay: loading messages…",
 };
