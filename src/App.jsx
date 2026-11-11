@@ -546,6 +546,8 @@ import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, 
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
+import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
+import { LIGNE_AVIS_BAS, LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
@@ -573,6 +575,7 @@ import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos,
 // CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
 import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
+import "./styles-avis-bas.css";   // (11 nov., lot avis-negatif) la feuille « Avis négatif »
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
 import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
@@ -40239,6 +40242,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, baseKO, sales.items, sales.loading, listings.items, listings.loading, txnPret, vendusAilleurs.v.at, vendusAilleurs.v.charge]);
   const [feuilleAilleurs, setFeuilleAilleurs] = useState(false);
   const [feuilleDeux, setFeuilleDeux] = useState(false);   // (6 nov.) « en ligne deux fois »
+  // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) arrivé sur un compte : une carte AMBRE
+  // dans « À faire » tant qu'il n'est pas « vu » (14 jours au plus) ; la détection est au serveur.
+  const avisBas = useAvisBas(only === 'journee' && !baseKO, { lire: lireAvisBas, ecrireVus: ecrireAvisBasVus, comptes: accounts });
+  const avisBasListe = Array.isArray(avisBas.liste) ? avisBas.liste : [];
+  const [feuilleAvis, setFeuilleAvis] = useState(false);
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
@@ -41461,7 +41469,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (avisBasListe.length ? 1 : 0);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
               const carteARelier = () => {
@@ -41475,6 +41483,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <PileVignettes srcs={[]} n={comptesARelierJour.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="mail" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{court}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="a-relier">{detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Relier</span></span>
+                  </button>
+                );
+              };
+              const carteAvisBas = () => {
+                const titre = titreAvisBas(avisBasListe), detail = detailAvisBas(avisBasListe);
+                return (
+                  <button key="avis-bas" type="button" className="vrm-day-task vrm-fu-tache" data-journee-avis-bas={avisBasListe.map((a) => a.cle).join(' ')} data-n={String(avisBasListe.length)}
+                    title={`${titre}\n${detail}`} aria-label={`${titre} — ${detail}`} onClick={() => setFeuilleAvis(true)}>
+                    <PileVignettes srcs={[]} n={avisBasListe.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="star" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="avis-bas">{detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Lire</span></span>
                   </button>
                 );
               };
@@ -41587,6 +41606,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ...alertesArgent.map((j, i) => ({ el: tache(j, i), alerte: true })),
                 ...(carteAilleurs ? [{ el: carteVendusAilleurs() }] : []),
                 ...(deuxFois.length ? [{ el: carteDeuxFois() }] : []),
+                ...(avisBasListe.length ? [{ el: carteAvisBas() }] : []),
                 ...cases.map((x) => ({ el: carteCase(x) })),
                 ...(comptesARelierJour.length ? [{ el: carteARelier() }] : []),
                 ...(sortiesStock.length ? [{ el: carteSortieStock() }] : []),
@@ -41614,6 +41634,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div className="vrm-bilan-sync vrm-va-feuille">
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
+                    </SheetShell>
+                  ) : null}
+                  {feuilleAvis && avisBasListe.length ? (
+                    <SheetShell titre={avisBasListe.length > 1 ? 'Avis négatifs' : 'Avis négatif'} sousTitre="Sur Vinted" onClose={() => setFeuilleAvis(false)} maxWidth={560} data-feuille-avis-bas="">
+                      <AvisBasDetail liste={avisBasListe} Bouton={Bouton} onVu={async (cles) => { const ok = await avisBas.vu(cles); if (ok && avisBasListe.length <= cles.length) setFeuilleAvis(false); return ok; }}
+                        onAller={(q) => { setFeuilleAvis(false); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?' + q.replace(/^\?/, '') })); } catch (_) {} }}/>
                     </SheetShell>
                   ) : null}
                   {feuilleDeux && deuxFois.length ? (
@@ -51530,6 +51556,45 @@ async function ecrireNoteSatisfaction(data) {
     if (!r.ok) return false;
     const j = await r.json().catch(() => null);
     return Array.isArray(j) && j.length === 1;
+  } catch (_) { return false; }
+}
+// (11 nov., lot avis-negatif) « Avis 2★ reçu sur shop_x » : les alertes du SERVEUR (`vrm_avis_bas`,
+// projection `data->alertes`), les vus de l'APP, et — seulement pour les comptes concernés — le texte
+// rangé et l'id de profil, en projection (jamais `select=data` sur une ligne de moisson). Une lecture
+// ratée de l'alerte ou des vus ⇒ `undefined` (rien montré) ; texte ou profil pas lus ⇒ « Lis l'avis
+// sur Vinted » / lien par l'identifiant du compte.
+async function lireAvisBas() {
+  const uid = AUTH.user?.id; if (!uid) return undefined;
+  const qui = `&owner=eq.${encodeURIComponent(uid)}`;
+  const get = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}${qui}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+  const [m, v] = await Promise.all([get(`app_data?id=eq.${LIGNE_AVIS_BAS}&select=a:data->alertes`), get(`app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`)]);
+  if (m === null || v === null) return undefined;
+  const alertes = m[0] && Array.isArray(m[0].a) ? m[0].a : [];
+  const vus = v[0] && v[0].data && typeof v[0].data === 'object' ? v[0].data : {};
+  const uids = [...new Set(alertes.map((a) => String(a && a.uid)).filter((x) => /^\d{1,20}$/.test(x)))].slice(0, 30);
+  if (!uids.length) return { memo: { alertes }, vus, textes: {}, pids: {} };
+  const [f, p] = await Promise.all([
+    get(`app_data?id=in.(${uids.map((u) => `harvest_${u}_feedbacks`).join(',')})&select=id,avis:data->payload->user_feedbacks`),
+    get(`app_data?id=in.(${uids.map((u) => `harvest_${u}_profile`).join(',')})&select=id,pid:data->payload->user->>id`),
+  ]);
+  const textes = {}, pids = {};
+  for (const r of f || []) { const u = /^harvest_(\d+)_feedbacks$/.exec(String(r && r.id || '')); if (u && Array.isArray(r.avis)) textes[u[1]] = r.avis; }
+  for (const r of p || []) { const u = /^harvest_(\d+)_profile$/.exec(String(r && r.id || '')); if (u && r.pid != null) pids[u[1]] = String(r.pid); }
+  return { memo: { alertes }, vus, textes, pids };
+}
+// « C'est vu » : lire-fusionner-réécrire SA ligne (`fn(vusLus)`) ; une lecture ratée n'écrit rien.
+async function ecrireAvisBasVus(fn) {
+  const uid = AUTH.user?.id; if (!uid) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&owner=eq.${encodeURIComponent(uid)}&select=data`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!Array.isArray(j)) return false;
+    const data = fn(j[0] && j[0].data && typeof j[0].data === 'object' ? j[0].data : {});
+    const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify([withOwner({ id: LIGNE_AVIS_BAS_VUS, data })]) });
+    if (!w.ok) return false;
+    const o = await w.json().catch(() => null);
+    return Array.isArray(o) && o.length === 1;
   } catch (_) { return false; }
 }
 function NoteSatisfactionJournee() {
