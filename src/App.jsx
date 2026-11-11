@@ -3746,6 +3746,7 @@ if (typeof window !== 'undefined') {
 
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
+const _saveRun = {};   // (11 nov.) la sauvegarde en attente de chaque clé (`viderSave`)
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
@@ -3812,7 +3813,8 @@ const save = (k,v,quand) => {
   if (typeof quand === 'function') (_saveQuand[k] || (_saveQuand[k] = [])).push(quand);
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   else if (SYNC_KEYS.includes(k)) { try { const t = localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
-  _saveTimers[k] = setTimeout(() => {
+  const executer = () => {
+    delete _saveRun[k];
     if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
     // (2 nov.) Ce que le navigateur portait AVANT ce geste : la base de la file
     // d'envoi tant que cet onglet n'a pas encore lu le nuage.
@@ -3845,8 +3847,14 @@ const save = (k,v,quand) => {
     if (r.fusionne && !egalStable(r.v, v)) emettreClesRelues([k]);
     if (r.conflit) { conflitNumerosNuage(r.conflit); return; }
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
-  }, 500);
+  };
+  _saveRun[k] = executer;
+  _saveTimers[k] = setTimeout(executer, 500);
 };
+// (11 nov., reprise-ecrans) La sauvegarde EN ATTENTE d'une clé, faite tout de suite (même
+// chemin : fusion, file d'envoi, nuage). Au passage en arrière-plan seulement : iOS peut
+// tuer l'app avant les 500 ms (l'écran et la recherche de la reprise se perdaient).
+const viderSave = (k) => { const f = _saveRun[k]; if (_saveTimers[k] && f) { clearTimeout(_saveTimers[k]); f(); } };
 
 // ── (11 nov., reprise-ecrans) LA REPRISE SYNCHRONISÉE : un écrivain différé ──
 // Filtres, tri, recherche, compte par site, dernier écran : UNE clé légère
@@ -3902,7 +3910,7 @@ const reprendreRecherches = (tab, now = Date.now()) => {
 const filtreRetenuCompte = (tab) => { try { const s = siteReprise(carteReprise(), tab); if (s) return siteDeTache(tab, s); } catch (_) {} return filtreRetenu(tab); };
 const siteDuTab = (tab, sub) => (estTacheSite(tab) ? siteDeTache(tab, sub) : ({ plat_vinted: 'vinted', plat_leboncoin: 'leboncoin', plat_ebay: 'ebay', plat_vestiaire: 'vestiaire' }[tab] || tab));
 if (typeof document !== 'undefined') {
-  const auRepos = () => { try { quitterRecherches(_histoOnglet.tab || ''); } catch (_) {} ecrireRepriseMaintenant(); };
+  const auRepos = () => { try { quitterRecherches(_histoOnglet.tab || ''); } catch (_) {} ecrireRepriseMaintenant(); viderSave(CLE_REPRISE_ECRANS); };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') auRepos(); });
   window.addEventListener('pagehide', auRepos);
 }
