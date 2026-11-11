@@ -228,7 +228,7 @@ if (sel) {
   dit(parts.includes('texte:data->>texte') && parts.includes('transaction:meta->>transaction'), 'le texte et le n° rangé sont projetés (la règle lit l’un puis l’autre)', sel);
 }
 dit(/data-achat-facture=\{rc\._pdf \|\| rc\.pdfB64 \? 'pdf' : 'email'\}[\s\S]{0,400}onClick=\{\(\)=>setReceiptView\(rc\)\}[\s\S]{0,700}\{NOM_RECU_ACHAT\}/.test(app), 'la pastille de la ligne (« Reçu d’achat ») ouvre CE reçu (setReceiptView(rc))');
-dit(/const rc = receiptFor\(o\);/.test(app) && /\{rc && \(\s*<div className="vrm-buy-facture">/.test(app), 'la pastille n’existe que quand receiptFor a relié un reçu');
+dit(/const rc = receiptFor\(o\);/.test(app) && /\{rc && \(\s*<(?:div|span) className="vrm-buy-facture">/.test(app)   /* (11 nov., lot AN) la pastille est un <span> dans la rangée DA6 */, 'la pastille n’existe que quand receiptFor a relié un reçu');
 dit(/lirePdfLigne\(recu\._emailId\)/.test(app), 'le PDF joint ne se lit qu’au clic, par le lecteur unique (lirePdfLigne)');
 dit(!/receiptFor[\s\S]{0,300}normTitle\(r\.article/.test(app), 'aucun repli par titre ne subsiste autour de receiptFor');
 // (revue du 29 oct.) L'archive : le bilan de la règle, les comptes pas lus PASSÉS.
