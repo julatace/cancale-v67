@@ -1322,3 +1322,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Jauge du plafond + journal de l'extension (lot G, ext. 5.337)** : jauge « 12/50 cette heure · repart à 21 h 40 » (somme de tous les Chrome, « — » si rien publié, ambre à 45) dans Baisser le prix, Republier, Favoris, Offres auto et en tête de Paramètres → « Ce que VRM a fait » (`src/jaugeActions.js`) ; l'extension note offres, réponses, baisses, modifications dans `journal_vrm_*`, lues par `lireJournal` (preuve, sans doublon avec le téléphone). `docs/passation/2026-11-10-jauge-journal.md`. Geste : installer la 5.337.0.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. · Textes courts, 4e série** : Favoris (« Aucune garantie contre un blocage Vinted » et le rythme restent À L'ÉCRAN, le reste sous « Pourquoi ? »), Organisation, Communauté, Accompagnement, fil eBay, inventaire, studio, configuration, connexion et installation de l'extension : une phrase + `src/composants/PourquoiReplie.jsx` ; audit `textes-courts` (relevé statique), banc `popups-propre` + favoris/organisation/communauté. `docs/passation/2026-11-10-textes-courts-4.md`. Geste : aucun.
