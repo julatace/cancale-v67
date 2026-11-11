@@ -134,7 +134,7 @@ async function verifier(F, { silence = false } = {}) {
   const app = require('./_source-app.cjs').sourceAppDe(path.join(__dirname, '..', 'src', 'App.jsx'));
   const ban = lire('src/AlerteArnaque.jsx').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   dit(!/vmrCmd|fetch\(|save\(|signalerVc|withOwner|lireBaseRelue/.test(ban), 'B · la bannière n’agit jamais (aucune commande, aucune écriture, aucune lecture)');
-  dit(/<AlerteArnaque\b/.test(app) && /compteurArnaque|data-arnaque-compteur/.test(app), 'B · Messages Vinted : bannière sur la conversation + compteur');
+  dit(/<AlerteArnaque\b/.test(app) && /<CompteurArnaque\b/.test(app) && /<PastilleArnaque\b/.test(app), 'B · Messages Vinted : bannière sur la conversation + compteur');
   dit(/<AlerteArnaque\b/.test(lire('src/ecrans/MessagesLeboncoin.jsx')), 'B · Leboncoin : bannière');
   dit(/<AlerteArnaque\b/.test(lire('src/ecrans/Vestiaire.jsx')), 'B · Vestiaire : bannière');
   dit(/<AlerteArnaque\b/.test(lire('src/ebayGestion.jsx')), 'B · eBay : bannière');
@@ -147,7 +147,7 @@ async function verifier(F, { silence = false } = {}) {
     for (const m of F.MOTIFS_ARNAQUE) {
       const re = new RegExp("(id: '" + m.id + "',[^\\n]*\\n\\s*test: )");
       if (!re.test(code)) { dit(false, `--prouve · ${m.id} : point de mutation introuvable`); continue; }
-      const mute = code.replace(re, '$1(() => false) || ');
+      const mute = code.replace(re, (t) => t.replace(/test: $/, 'test: () => false, _avant: '));
       const f = path.join(dir, m.id + '.mjs'); fs.writeFileSync(f, mute);
       const G = await import(f);
       const r = await verifier(G, { silence: true });
