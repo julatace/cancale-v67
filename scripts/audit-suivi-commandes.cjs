@@ -131,6 +131,10 @@ function mrFragment({ n, cp, k, jours }) {
     dit(plusFrais && plusFrais.source === 'email', 'l’e-mail plus récent que la lecture du transporteur ⇒ c’est lui qui parle', JSON.stringify(plusFrais && plusFrais.source));
     const vint = statut({ transporteur: l, vinted: { texte: 'Colis livré', at: NOW - 30 * H, cap: NOW - 20 * H } });
     dit(vint && vint.source === 'transporteur', 'Vinted plus ancien que le transporteur ⇒ le transporteur parle', JSON.stringify(vint && vint.source));
+    const vLu = statut({ transporteur: l, vinted: { texte: 'Colis en route', cap: NOW - 10 * 60000 } });
+    dit(vLu && vLu.source === 'transporteur', 'Vinted lu il y a 10 min, sans date d’évènement ⇒ ne passe pas devant le transporteur', JSON.stringify(vLu && vLu.source));
+    const vSeul = statut({ vinted: { texte: 'Colis en route', cap: NOW - H } });
+    dit(vSeul && vSeul.texte === '« Colis en route »' && vSeul.sourceTexte === 'lu sur Vinted il y a 1 h', 'Vinted seul, sans date d’évènement : le texte, jamais une heure inventée — « lu sur Vinted il y a 1 h »', JSON.stringify(vSeul));
   });
 
   essaie('§2 les incohérences : prouvées et datées, « pas su » jamais', () => {
@@ -142,7 +146,7 @@ function mrFragment({ n, cp, k, jours }) {
     dit(vente({ depart: pasPris, envoye: { at: NOW - 2 * J, source: 'colis-fait' } }).length === 0, 'envoyé il y a 2 j seulement ⇒ rien (le seuil est 3 j)');
     dit(vente({ depart: null, envoye: env }).length === 0, 'aucune lecture du transporteur ⇒ rien (pas su)');
     const vieux = depApres(null, T.lireReponseChronopost(200, 'text/xml', cpXml(N, [cpEv('DC', NOW - 5 * J, 'Prépa')]), { suivi: N }), 'chronopost', N, NOW - 30 * H);
-    dit(vente({ depart: vieux, envoye: env }).length === 0, 'lecture de plus de 24 h ⇒ rien (elle ne prouve plus « pas encore »)');
+    dit(vente({ depart: vieux, envoye: { at: NOW - 6 * J, source: 'colis-fait' } }).length === 0, 'lecture de plus de 24 h (pourtant faite après le délai) ⇒ rien : elle ne prouve plus « pas encore »');
     const avantFait = depApres(null, T.lireReponseChronopost(200, 'text/xml', cpXml(N, [cpEv('DC', NOW - 5 * J, 'Prépa')]), { suivi: N }), 'chronopost', N, NOW - 2 * H);
     dit(vente({ depart: avantFait, envoye: { at: NOW - 3 * J - H, source: 'colis-fait' } }).length === 0, 'lecture faite moins de 3 j après « envoyé » ⇒ rien (elle ne couvre pas le délai)');
     // Livré, Vinted pas finalisé.

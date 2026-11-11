@@ -30,7 +30,7 @@ export default function SuiviCommande({ C, suivi, lien = null, statut = null, in
       style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" onClick={copier} data-suivi-copier={suivi} aria-label={`Copier le n° de suivi ${suivi}`} title="Copier le n° de suivi"
-          style={{ ...bouton, flex: '1 1 160px', minWidth: 0, justifyContent: 'space-between', fontVariantNumeric: 'tabular-nums' }}>
+          style={{ ...bouton, flex: '1 1 160px', maxWidth: 380, minWidth: 0, justifyContent: 'space-between', fontVariantNumeric: 'tabular-nums' }}>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: 0.2 }}>N° {suivi}</span>
           <span data-suivi-copie={copie ? '1' : '0'} style={{ color: copie ? C.text : C.muted, fontWeight: 500, fontSize: 12 }}>{copie ? 'Copié ✓' : 'Copier'}</span>
         </button>

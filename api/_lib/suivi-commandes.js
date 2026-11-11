@@ -118,10 +118,13 @@ export function dernierStatut({ transporteur = null, email = null, vinted = null
     const at = msDe(e.receivedAt);
     cands.push({ rang: 1, etat: ETAT_EMAIL[e.status], mot: MOT_EMAIL[e.status], lieu: e.status === 'available' ? villeCourte(e.lieu || '') : '', at, source: 'email', sourceTexte: `e-mail du ${quandCourt(at, maintenant)}`, luAt: at });
   }
+  // Vinted : la date de l'ÉVÈNEMENT seulement si elle est connue (`at`) ; sinon l'heure de la
+  // lecture (`cap`) dit « lu il y a … » mais n'est jamais affichée comme l'heure du colis, et ne
+  // passe devant aucune autre source.
   const v = vinted && typeof vinted === 'object' ? vinted : null;
-  if (v && propre(v.texte)) {
-    const at = msDe(v.at) ?? msDe(v.cap);
-    if (at != null) cands.push({ rang: 0, etat: null, mot: `« ${propre(v.texte, 60)} »`, lieu: '', at, source: 'vinted', sourceTexte: `Vinted ${ageCourt(maintenant - (msDe(v.cap) ?? at))}`, luAt: msDe(v.cap) ?? at });
+  if (v && propre(v.texte) && (msDe(v.at) != null || msDe(v.cap) != null)) {
+    const at = msDe(v.at), cap = msDe(v.cap) ?? at;
+    cands.push({ rang: 0, etat: null, mot: `« ${propre(v.texte, 60)} »`, lieu: '', at, source: 'vinted', sourceTexte: `lu sur Vinted ${ageCourt(maintenant - cap)}`, luAt: cap });
   }
   if (!cands.length) return null;
   cands.sort((a, b) => ((b.at ?? -Infinity) - (a.at ?? -Infinity)) || (b.rang - a.rang));

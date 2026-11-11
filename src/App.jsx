@@ -22229,7 +22229,11 @@ function colisVestiaire(d) {
   })) : null;
   const nl = nonLusVestiaire(d.compteur, d.compteurs);
   const messages = nl ? nl.n : null;
-  return { aEnvoyer, faits, partis, enRoute, messages };
+  // (11 nov., lot suivi-commandes) ENVOYÉES d'après Vestiaire (« envoyée », « en contrôle »), avec un n° :
+  // dans « Envoyés », suivies jusqu'à la livraison (le n° est celui de CETTE vente, `v.suivi`).
+  const envoyees = d.ventes ? Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object' && v.aExpedier !== true && v.suivi && ['en-route', 'controle'].includes(etapeMotVc(v)))
+    .map(([id, v]) => ({ ...v, id, num: numVcVente(v, dv.liens, dv.auto) || '' })) : [];
+  return { aEnvoyer, faits, partis, enRoute, messages, envoyees };
 }
 // (1er nov.) Les jours avant une date limite Vestiaire, à l'heure de PARIS — la
 // règle du widget et des rappels (`joursAvant`, api/_lib/ebay-a-expedier.js).
@@ -39568,6 +39572,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         for (const v of ((cv && cv.faits) || [])) out.push({ cle: 'vc:' + v.id, site: 'vestiaire', type: 'vc', v, rang: 0.5,
           photo: v.photo || null, titre: v.titre || 'Article Vestiaire', num: v.num || '', tr: transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }),
           lues: { imprime: !!(imprimes && imprimes[v.id]), depose: true } });
+        // (11 nov.) Envoyées d'après Vestiaire, suivies jusqu'à la livraison (45 derniers jours).
+        for (const v of ((cv && cv.envoyees) || [])) {
+          const j = v.date ? Math.floor((Date.now() - new Date(v.date).getTime()) / 86400000) : null;
+          if (j != null && j > LIMITE_ENVOYES_J) continue;
+          out.push({ cle: 'vc:' + v.id, site: 'vestiaire', type: 'vcenvoyee', v, j, rang: 2,
+            photo: v.photo || null, titre: v.titre || 'Article Vestiaire', num: v.num || '', tr: transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }),
+            lues: { imprime: true, depose: true, enroute: true } });
+        }
         // (8 nov.) Partis d'après le transporteur (pris en charge, lu chez lui).
         for (const v of ((cv && cv.partis) || [])) out.push({ cle: 'vc:' + v.id, site: 'vestiaire', type: 'vc', v, rang: 0.5, depart: v.depart,
           photo: v.photo || null, titre: v.titre || 'Article Vestiaire', num: v.num || '', tr: transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }),
@@ -39612,7 +39624,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const cap = msOu(e.cap);
     // 450 finalisée ; 220 / ≥ 430 : fin ou blocage (ni « finalisée » ni « pas finalisée ») ; sinon en cours.
     const finalisee = e.s === 450 ? true : (e.s === 220 || e.s >= 430) ? null : false;
-    return { texte: e.ss || '', at: msOu(e.su), cap, luAt: cap, finalisee, retour: e.s === 440 };
+    // `su` date la TRANSACTION (paiement, finalisation), pas le colis : jamais l'heure du statut d'expédition.
+    return { texte: e.ss || '', at: null, cap, luAt: cap, finalisee, retour: e.s === 440 };
   };
   const raisonPasLuVente = (carrier, tr) => {
     const nom = (tr && tr.nom) || (carrier ? nomTransporteur(carrier) : '');
@@ -46855,6 +46868,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // pour un colis ; l'étiquette brute de Vinted reste dans `data-parti` (les règles la lisent).
             if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
             if (x.type === 'vc') return { t: x.depart ? `Vestiaire · ${x.depart.phrase}` : 'Vestiaire · coché « Colis fait »', ambre: false };
+            if (x.type === 'vcenvoyee') return { t: `Vestiaire · envoyée${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
             // (8 nov.) Parti d'après le transporteur (le site ne l'a pas encore dit) : la raison, de la même ligne que la preuve.
             if (x.type === 'transp') return { t: `${x.depart.phrase}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
             return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
