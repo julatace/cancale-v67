@@ -9,7 +9,9 @@ import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
 import ecran_achats from './fr/achats.js';
 import ecran_annonces from './fr/annonces.js';
+import ecran_stock from './fr/stock.js';
 export default {
+  ...ecran_stock,
   ...ecran_annonces,
   ...ecran_achats,
   ...ecran_commun,

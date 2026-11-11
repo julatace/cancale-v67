@@ -25,6 +25,8 @@ import { InventaireStock } from "../InventaireStock.jsx";
 import { InventaireAnnuel } from "../InventaireAnnuel.jsx";   // (10 nov., lot W) l'inventaire de fin d'année
 import { DEMANDE_INVENTAIRE_ANNUEL } from "../inventaireAnnuel.js";   // (11 nov.) ouverte depuis « Clôturer l'année »
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
+import { tr } from '../i18n/index.js';
+import { trj } from '../i18n/react.js';
 
 // ⟦← App.jsx #3⟧
 
@@ -234,8 +236,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     if (k) {
       setPlace(k); setQ('');
       const libre = premiereCaseMeubles({ meubles, slots });
-      if (libre) { viserCase(libre.meubleId, libre.i); toast(`Touche la case où tu ranges N°${placeNum} — proposée : ${caseEnMots(libre)}.`); }
-      else toast(`Touche la case où tu ranges N°${placeNum}.`);
+      if (libre) { viserCase(libre.meubleId, libre.i); toast(tr('stock.toucheCaseRanges', { placeNum: String(placeNum), caseEnMots: String(caseEnMots(libre)) })); }
+      else toast(tr('stock.toucheCaseRanges2', { placeNum: String(placeNum) }));
     }
     if (onPlaced) onPlaced();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -471,11 +473,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         options.push(['choisir', `Je choisis maintenant la nouvelle case de N°${fo.numero}`]);
         options.push(['aranger', `N°${fo.numero} repart dans « À ranger » (il sort de cette case)`]);
         const choix = await askChoix({
-          title: `${ici(m, i)} contient déjà N°${fo.numero}`,
-          desc: `${fo.title ? '« ' + fo.title + ' »\n' : ''}Tu ranges N°${f ? f.numero : cle} dans cette case : où va N°${fo.numero} ?`,
+          title: tr('stock.contientDeja', { ici: String(ici(m, i)), numero: String(fo.numero) }),
+          desc: tr('stock.rangesDansCase', { x: String(fo.title ? '« ' + fo.title + ' »\n' : ''), x2: String(f ? f.numero : cle), numero: String(fo.numero) }),
           options, cancel: 'Annuler — ne rien changer',
         });
-        if (choix == null) { toast(`Rien n'a changé : N°${fo.numero} reste dans ${ici(m, i)}.`); return false; }
+        if (choix == null) { toast(tr('stock.rienChangeReste', { numero: String(fo.numero), ici: String(ici(m, i)) })); return false; }
         if (choix === 'echanger' && ancien && mAncien) { u[occ] = ancien; suite = `N°${fo.numero} est maintenant dans ${ici(mAncien, ancien.i)}.`; }
         else { delete u[occ]; suite = choix === 'choisir' ? `Touche la case où tu poses N°${fo.numero}.` : `N°${fo.numero} est dans « À ranger ».`; if (choix === 'choisir') setPlace(occ); }
       } else { if (ancien) u[occ] = ancien; else delete u[occ]; }   // case notée pour un article qui n'est plus là
@@ -485,7 +487,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     // (1er nov.) Un geste réussi se DIT : où la paire vient d'être posée, avec
     // les mots du meuble (rangée, colonne) — la case qui clignote peut être
     // hors de l'écran sur téléphone.
-    if (m) toast(`N°${f ? f.numero : cle} rangée : ${ici(m, i)}.${suite ? ' ' + suite : ''}`, 'ok');
+    if (m) toast(tr('stock.rangee', { x: String(f ? f.numero : cle), ici: String(ici(m, i)), x2: String(suite ? ' ' + suite : '') }), 'ok');
     return true;
   };
   const retirerCase = (cle) => { const u = { ...slots }; delete u[cle]; ecrireSlots(u); };
@@ -493,7 +495,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const cle = cleDeclarationPartie(f.numero, f.id, numeros);
     setPairsLost((prev) => { const u = { ...prev, [cle]: { id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' } }; save('vinted_pairs_lost', u); return u; });
     retirerCase(cleDeFiche(f));
-    toast(`N°${f.numero} sortie du stock — son numéro reste pris, jamais redonné.`, 'ok');
+    toast(tr('stock.sortieStockNumero', { numero: String(f.numero) }), 'ok');
   };
   const cliquerCase = (mid, i) => {
     setChoisie(null);
@@ -513,8 +515,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : <span className="vrm-s2d-sansphoto" aria-hidden="true">{String(f.title || '').trim().slice(0, 1).toUpperCase() || '·'}</span>}
       <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}>N°{f.numero}</span>
-      {sold && !mini && <span className="vrm-s2d-vendue">Vendue</span>}
-      {!sold && hors && !mini && <span className="vrm-s2d-horsligne">Plus en ligne</span>}
+      {sold && !mini && <span className="vrm-s2d-vendue">{tr('ventes.vendue2')}</span>}
+      {!sold && hors && !mini && <span className="vrm-s2d-horsligne">{tr('stock.plusLigne2')}</span>}
     </>
   );
 
@@ -545,11 +547,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       <section key={m.id} data-meuble={m.id} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble" data-replie={replie ? '1' : undefined}>
         <div className="vrm-s2d-tete">
           <span className="vrm-s2d-nom">{m.name}</span>
-          <span className="vrm-s2d-compte" data-meuble-plein={filled}>{filled}/{total(m)} · {m.cols}×{m.rows}{m.gravite ? ' · empilé' : ''}</span>
-          {nVenduesIci > 0 && !cherche && <span className="vrm-s2d-pastille" data-meuble-vendues={nVenduesIci}>{nVenduesIci} à sortir</span>}
-          {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
+          <span className="vrm-s2d-compte" data-meuble-plein={filled}>{filled}/{total(m)} · {m.cols}×{m.rows}{m.gravite ? tr('stock.empile') : ''}</span>
+          {nVenduesIci > 0 && !cherche && <span className="vrm-s2d-pastille" data-meuble-vendues={nVenduesIci}>{trj('stock.sortir', { nVenduesIci: nVenduesIci })}</span>}
+          {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? tr('stock.ici', { nIci: String(nIci) }) : tr('stock.rienIci')}</span>}
           <span style={{ flex: 1 }} />
-          <button className="vrm-b vrm-b-secondaire vrm-b-petit vrm-b-icone" type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ width: 44, height: 44, display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit vrm-b-icone" type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label={tr('stock.modifierMeuble')} style={{ width: 44, height: 44, display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
         {!replie && (
         <div className="vrm-s2d-defile">
@@ -570,7 +572,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
             return (
               <React.Fragment key={i}>
               {pl.colonne === 1 && <span data-regle-rang={pl.rangee} className="vrm-s2d-regle">{pl.rangee}</span>}
-              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${sold ? ' (vendue, à sortir)' : (hors ? ' (plus en ligne)' : '')} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
+              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${sold ? ' (vendue, à sortir)' : (hors ? ' (plus en ligne)' : '')} — rangée ${pl.rangee}, colonne ${pl.colonne}` : tr('stock.caseVideRangee', { rangee: String(pl.rangee), colonne: String(pl.colonne) })} title={tr('stock.rangeeColonne2', { rangee: String(pl.rangee), colonne: String(pl.colonne) })}
                 data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-case-choisie={estChoisie ? '' : undefined} aria-current={estChoisie ? 'location' : undefined} data-cible={attrCible(['case', m.id, i])} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
                 {...(occ ? dragProps(kOcc) : {})} {...dropProps(m.id, i)}
                 style={kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + ${gap}px))` } : undefined}>
@@ -610,15 +612,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         } else { ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows, planches, gravite }]); }
         fermerModal();
       }} onDelete={modal.id ? async () => {
-        if (!(await askConfirm({ titre: 'Supprimer ce meuble ?', desc: 'Les articles qu\'il contient repartent dans « À ranger ». Aucun numéro n\'est perdu.', danger: true, ok: 'Supprimer' }))) return;
+        if (!(await askConfirm({ titre: tr('stock.supprimerMeuble'), desc: tr('stock.articlesContientRepartent'), danger: true, ok: 'Supprimer' }))) return;
         const us = { ...slots }; Object.keys(us).forEach((c) => { if (us[c] && us[c].m === modal.id) delete us[c]; });
         ecrireMeubles(meubles.filter((x) => x.id !== modal.id)); ecrireSlots(us); fermerModal();
       } : null} />;
     } else if (modal.type === 'placer') {
       const m = meubles.find((x) => x.id === modal.m);
       corps = (<>
-        <h3 style={{ margin: '0 0 2px', fontSize: 17, color: C.text }}>Ranger dans {m ? m.name : ''}</h3>
-        <div data-placer-case={m ? `${placeDansMeubles(modal.i, m).rangee}:${placeDansMeubles(modal.i, m).colonne}` : ''} style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>{m ? <>Rangée {placeDansMeubles(modal.i, m).rangee}, colonne {placeDansMeubles(modal.i, m).colonne}</> : 'Cette case'} · choisis l'article à y poser</div>
+        <h3 style={{ margin: '0 0 2px', fontSize: 17, color: C.text }}>{trj('stock.rangerDans', { x: m ? m.name : '' })}</h3>
+        <div data-placer-case={m ? `${placeDansMeubles(modal.i, m).rangee}:${placeDansMeubles(modal.i, m).colonne}` : ''} style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>{m ? <>{tr('stock.rangee2')} {placeDansMeubles(modal.i, m).rangee}{tr('stock.colonne')} {placeDansMeubles(modal.i, m).colonne}</> : tr('stock.case')} {tr('stock.choisisArticlePoser')}</div>
         {aRanger.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '52vh', overflowY: 'auto' }}>
           {aRanger.map((f) => (
             <button type="button" key={f.id} onClick={() => { poser(cleDeFiche(f), modal.m, modal.i); fermerModal(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 8px', borderRadius: 12, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
@@ -627,7 +629,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               <span style={{ fontWeight: 800, color: estVendu(f) ? C.accent : C.muted }}>N°{f.numero}</span>
             </button>
           ))}
-        </div> : <div style={{ color: C.muted, padding: '22px 0', textAlign: 'center' }}>Tous tes articles sont déjà rangés 👌</div>}
+        </div> : <div style={{ color: C.muted, padding: '22px 0', textAlign: 'center' }}>{tr('stock.tousArticlesSont')}</div>}
       </>);
     } else if (modal.type === 'fiche') {
       const f = ficheParCle[modal.cle]; if (!f) { fermerModal(); return null; }
@@ -636,32 +638,32 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       corps = (<>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
           <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} hors={hors} /></span>
-          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : 'autre'))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? 'Vendu — à sortir du stock' : (hors ? 'Plus en ligne — plus une annonce actuelle' : (f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : 'En stock'))} · N°{f.numero}</div></div>
+          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : 'autre'))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : tr('stock.stock')))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? 'Va le chercher' : 'Rangé dans'}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : 'Pas rangé'}</div>
-          {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>Rangée {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>(en partant du haut)</span> · colonne {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>(depuis la gauche)</span></div>; })()}
-          {!m && (() => { const a = ancienneplace(f.numero); return a ? <div data-fiche-ancienne-place="" style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>Ancienne place, dans la pièce 3D (plus affichée) : <b style={{ color: C.text }}>{[a.roomName, a.itemName, a.nom].filter(Boolean).join(' · ')}</b></div> : null; })()}
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : tr('stock.range')}</div>
+          {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>{tr('stock.rangee2')} {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>{tr('stock.partantHaut')}</span> {tr('stock.colonne2')} {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>{tr('stock.depuisGauche')}</span></div>; })()}
+          {!m && (() => { const a = ancienneplace(f.numero); return a ? <div data-fiche-ancienne-place="" style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>{tr('stock.anciennePlaceDans')} <b style={{ color: C.text }}>{[a.roomName, a.itemName, a.nom].filter(Boolean).join(' · ')}</b></div> : null; })()}
         </div>
         {/* (5 nov.) « Voir l'état » : la fiche complète du N°, avec tout ce qui se
             calcule (prix d'achat, temps achat → vente, réception → mise en ligne,
             mise en ligne → vente, republications) — `etatArticle`. */}
-        <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-voir-etat={cleDeFiche(f)} onClick={() => { const n = String(f.numero); fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>Voir l’état</button>
+        <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-voir-etat={cleDeFiche(f)} onClick={() => { const n = String(f.numero); fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>{tr('stock.voirEtat')}</button>
         <div style={{ display: 'flex', gap: 9 }}>
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
-          <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>{m ? 'Déplacer' : 'Ranger dans une case'}</button>
-          {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); toast(`N°${n} retirée de ${m.name} : elle repasse dans « À ranger ».`); }} style={btnSec}>Retirer de la case</button>}
+          <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>{m ? tr('stock.deplacer') : tr('stock.rangerDansCase')}</button>
+          {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); toast(tr('stock.retireeRepasseDans', { x: String(n), name: String(m.name) })); }} style={btnSec}>{tr('stock.retirerCase')}</button>}
         </div>
-        {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
-        {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>Elle est encore là</button>}
+        {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>{tr('stock.jeAiSorti')}</button>}
+        {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>{tr('stock.encore')}</button>}
       </>);
     }
     return (
       <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
         <div className="vrm-feuille-surface" onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label="Fermer" style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label={tr('commun.fermer')} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
           {corps}
         </div>
       </div>
@@ -676,7 +678,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const encoreLa = (f) => {
     const k = cleDeFiche(f); const g = { ...(load('vrm_stock_garde_hors_ligne', {}) || {}) }; g[k] = Date.now();
     saveTout('vrm_stock_garde_hors_ligne', g); setTic((x) => x + 1);
-    toast(`N°${f.numero} reste dans sa case : elle n'est plus signalée « plus en ligne ».`, 'ok');
+    toast(tr('stock.resteDansCase', { numero: String(f.numero) }), 'ok');
   };
   const sortirDeLaCase = (f) => {
     const k = cleDeFiche(f); const ou = ouEst(f); retirerCase(k);
@@ -716,41 +718,41 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <Card style={{ padding: '13px 14px' }}>
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
         <div className="vrm-s2d-resume-n">
-          {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
-          <small>{nAffiche === 1 && aa && aa.su ? 'paire en ligne' : 'paires en ligne'}{filtreActif ? ' (filtrées)' : ''}</small>
+          {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>{tr('journee.moins')} </span> : null}{nAffiche}</> : '—')}
+          <small>{nAffiche === 1 && aa && aa.su ? tr('stock.paireLigne') : tr('stock.pairesLigne')}{filtreActif ? tr('stock.filtrees') : ''}</small>
         </div>
         {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
-        {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
-        {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Annonces pas lues{manqueTxt ? ` (${manqueTxt})` : ''}, rien n'est perdu : ouvre Vinted {NAV.dans}.</div>}
+        {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>{tr('stock.jeLisAnnonces')}</div>}
+        {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">{tr('stock.annoncesLues')}{manqueTxt ? ` (${manqueTxt})` : ''}{tr('stock.rienPerduOuvre')} {NAV.dans}.</div>}
         {/* (9 nov., lot AI — Julien : « ça fait très moche ») UNE ligne courte (rangées · à ranger, et le
             signal de ce qui manque) ; la phrase d'avant, entière, dans sa pop-up. Ambre : un geste à faire. */}
-        {aa && aa.su && <InfoPop nom="stock-resume" titre="Tes annonces actuelles" className="vrm-s2d-resume-l"
+        {aa && aa.su && <InfoPop nom="stock-resume" titre={tr('stock.annoncesActuelles')} className="vrm-s2d-resume-l"
           ton={nAConf > 0 || aa.manque.length > 0 || aa.vcVieille ? 'ambre' : 'neutre'}
           attrs={{ 'data-stock-resume-court': '' }}
           puces={nAffiche > 0
-            ? [{ texte: `${nRangees} rangée${nRangees > 1 ? 's' : ''}` }, { texte: `${nAffiche - nRangees - nSansNum} à ranger` },
-               nAConf > 0 ? { texte: `${nAConf} à confirmer`, ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null,
-               nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: `${nSansNum + sansNumAutres + vcSansNum.length} sans N°` } : null].filter(Boolean)
-            : [{ texte: 'Aucune annonce lue' }, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null].filter(Boolean)}
+            ? [{ texte: tr('stock.rangees', { n: String(nRangees) }) }, { texte: tr('stock.ranger', { x: String(nAffiche - nRangees - nSansNum) }) },
+               nAConf > 0 ? { texte: tr('stock.confirmer', { nAConf: String(nAConf) }), ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: tr('stock.toutLu'), ton: 'ambre' } : null,
+               nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: tr('stock.sans', { x: String(nSansNum + sansNumAutres + vcSansNum.length) }) } : null].filter(Boolean)
+            : [{ texte: tr('stock.aucuneAnnonceLue') }, aa.manque.length > 0 ? { texte: tr('stock.toutLu'), ton: 'ambre' } : null].filter(Boolean)}
           phrase={aa.manque.length > 0 ? 'Une lecture manque : ouvre ce site avec l’extension.' : nAConf > 0 ? 'À confirmer : repasse sur ce compte pour le relire.' : nAffiche - nRangees - nSansNum > 0 ? 'Range chaque paire : touche « Ranger » dans la liste.' : 'Tout ce qui est en ligne est rangé.'}>
         <div data-stock-resume-detail="">
-          {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
-          {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · à part : <b>{nAConf}</b> à confirmer ({aConfTxt} — {aConfGeste})</span>}
-          {aa.vcVieille && !aConfVoir.some((c) => c.plateforme === 'vestiaire') && <span data-stock-vc-vieille=""> · Vestiaire {depuisQuand(aa.vcVieille.lu)} : ouvre « Mes articles » sur Vestiaire</span>}
-          {nMasq > 0 && <> · à part : <b>{nMasq}</b> masquée{nMasq > 1 ? 's' : ''} par Vinted (toujours chez toi)</>}
-          {nSansNum > 0 && <> · <b>{nSansNum}</b> sans N° (donne-leur un N° dans Annonces pour les ranger)</>}
-          {aa.manque.length > 0 && <span data-stock-manque=""> · pas lu : {manqueTxt}</span>}
-          {sansNumAutres > 0 && <> · {sansNumAutres} annonce{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? 'Leboncoin et eBay' : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} sans N° pas comptée{sansNumAutres > 1 ? 's' : ''} (rien ne dit quelle paire c'est)</>}
-          {vcSansNum.length > 0 && <span data-stock-vc-sans-numero={vcSansNum.length}> · {vcSansNum.length} annonce{vcSansNum.length > 1 ? 's' : ''} Vestiaire sans N° pas comptée{vcSansNum.length > 1 ? 's' : ''} : {vcSansNum.slice(0, 4).map((x) => `« ${x.titre || 'sans titre lu'} »`).join(', ')}{vcSansNum.length > 4 ? '…' : ''} (le N° arrive quand VRM a relu tes numéros — jamais deviné par le titre)</span>}
-          {vcNonDites.length > 0 && <span data-stock-vc-non-dites={vcNonDites.length}> · {vcNonDites.length} annonce{vcNonDites.length > 1 ? 's' : ''} Vestiaire à l'état non dit (ni en ligne ni partie) pas comptée{vcNonDites.length > 1 ? 's' : ''}</span>}
+          {nAffiche > 0 ? <><b>{nRangees}</b> {tr('stock.rangee3')}{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> {tr('stock.encoreRangee')}{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : tr('stock.aucuneAnnonceLigne')}
+          {nAConf > 0 && <span data-stock-a-confirmer-noms=""> {tr('stock.part')} <b>{nAConf}</b> {tr('stock.confirmer2')}{aConfTxt} — {aConfGeste})</span>}
+          {aa.vcVieille && !aConfVoir.some((c) => c.plateforme === 'vestiaire') && <span data-stock-vc-vieille="">{trj('stock.vestiaireOuvreMes', { depuisQuand: depuisQuand(aa.vcVieille.lu) })}</span>}
+          {nMasq > 0 && <> {tr('stock.part')} <b>{nMasq}</b> {tr('stock.masquee')}{nMasq > 1 ? 's' : ''} {tr('stock.vintedToujoursChez')}</>}
+          {nSansNum > 0 && <> · <b>{nSansNum}</b> {tr('stock.sansDonneLeur')}</>}
+          {aa.manque.length > 0 && <span data-stock-manque="">{trj('stock.lu', { manqueTxt: manqueTxt })}</span>}
+          {sansNumAutres > 0 && <> · {sansNumAutres} {tr('annonces.annonce')}{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? tr('ventes.leboncoinEbay') : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} {tr('stock.sansComptee')}{sansNumAutres > 1 ? 's' : ''} {tr('stock.rienDitQuelle')}</>}
+          {vcSansNum.length > 0 && <span data-stock-vc-sans-numero={vcSansNum.length}> · {vcSansNum.length} {tr('annonces.annonce')}{vcSansNum.length > 1 ? 's' : ''} {tr('stock.vestiaireSansComptee')}{vcSansNum.length > 1 ? 's' : ''} : {vcSansNum.slice(0, 4).map((x) => `« ${x.titre || 'sans titre lu'} »`).join(', ')}{vcSansNum.length > 4 ? '…' : ''} {tr('stock.arriveQuandVrm')}</span>}
+          {vcNonDites.length > 0 && <span data-stock-vc-non-dites={vcNonDites.length}>{trj('stock.annoncesVestiaireEtat', { n: vcNonDites.length })}</span>}
         </div></InfoPop>}
         {aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) && (
           <div className="vrm-s2d-filtres" data-stock-filtres="">
-            {platsPresents.length > 1 && <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par plateforme" data-stock-filtre-plat={filtrePlat || 'toutes'}>
-              {['', ...platsPresents].map((x) => <button key={x || 'toutes'} type="button" aria-pressed={filtrePlat === x} data-plat={x || 'toutes'} onClick={() => setFiltrePlat(x)}>{x ? (NOM_PLAT_FILTRE[x] || x) : 'Toutes'}</button>)}
+            {platsPresents.length > 1 && <div className="vrm-rangee vrm-filtres" role="group" aria-label={tr('stock.filtrerPlateforme')} data-stock-filtre-plat={filtrePlat || 'toutes'}>
+              {['', ...platsPresents].map((x) => <button key={x || 'toutes'} type="button" aria-pressed={filtrePlat === x} data-plat={x || 'toutes'} onClick={() => setFiltrePlat(x)}>{x ? (NOM_PLAT_FILTRE[x] || x) : tr('journee.toutes')}</button>)}
             </div>}
-            {comptesPresents.length > 1 && <select aria-label="Filtrer par compte" data-stock-filtre-compte={filtreCompte || 'tous'} value={filtreCompte} onChange={(e) => setFiltreCompte(e.target.value)}>
-              <option value="">Tous les comptes</option>
+            {comptesPresents.length > 1 && <select aria-label={tr('stock.filtrerCompte')} data-stock-filtre-compte={filtreCompte || 'tous'} value={filtreCompte} onChange={(e) => setFiltreCompte(e.target.value)}>
+              <option value="">{tr('achats.tousComptes')}</option>
               {comptesPresents.map((u) => <option key={u} value={u}>{comptesNoms.get(u) || u}</option>)}
             </select>}
           </div>
@@ -768,18 +770,18 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const parCle = new Map([...vendSortir, ...plusEnLigne].map((f) => [cleDeFiche(f), f]));
     const lignes = (cles) => cles.map((k) => parCle.get(k)).filter(Boolean);
     return [
-      { k: 'enlever', libelle: 'Enlever du stock', icone: 'check', variante: 'primaire', faire: async (cles) => {
+      { k: 'enlever', libelle: tr('stock.enleverStock'), icone: 'check', variante: 'primaire', faire: async (cles) => {
         const { ok, pasFaits } = trierSerie(lignes(cles), (f) => (ouEst(f) || slots[cleDeFiche(f)]) ? true : 'case introuvable');
         if (!ok.length) return resumeSerie({ faits: [], pasFaits }, { un: 'enlevée', plusieurs: 'enlevées' });
         const nv = ok.filter((f) => rangeeEtat(f) === 'vendue').length;
-        if (!(await askConfirm({ title: `Enlever ${ok.length} paire${ok.length > 1 ? 's' : ''} du stock ?`, desc: `${ok.map((f) => 'N°' + f.numero).join(', ')}\n${nv ? `${nv} vendue${nv > 1 ? 's' : ''} : sortie${nv > 1 ? 's' : ''} du stock. ` : ''}${ok.length - nv ? `${ok.length - nv} plus en ligne : la case se libère. ` : ''}Les numéros restent pris, jamais redonnés.`, ok: 'Enlever', cancel: 'Annuler' }))) return { annule: true };
+        if (!(await askConfirm({ title: tr('stock.enleverPairesStock', { n: String(ok.length) }), desc: `${ok.map((f) => 'N°' + f.numero).join(', ')}\n${nv ? `${nv} vendue${nv > 1 ? 's' : ''} : sortie${nv > 1 ? 's' : ''} du stock. ` : ''}${ok.length - nv ? `${ok.length - nv} plus en ligne : la case se libère. ` : ''}Les numéros restent pris, jamais redonnés.`, ok: 'Enlever', cancel: 'Annuler' }))) return { annule: true };
         const u = { ...slots }; for (const f of ok) delete u[cleDeFiche(f)];
         const vendues = ok.filter((f) => rangeeEtat(f) === 'vendue');
         if (vendues.length) setPairsLost((prev) => { const n = { ...prev }; const at = new Date().toISOString(); for (const f of vendues) n[cleDeclarationPartie(f.numero, f.id, numeros)] = { id: String(f.id), at, title: f.title || '', from: 'stock' }; save('vinted_pairs_lost', n); return n; });
         ecrireSlots(u);
         return resumeSerie({ faits: ok, pasFaits }, { un: 'enlevée du stock', plusieurs: 'enlevées du stock' });
       } },
-      { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
+      { k: 'exporter', libelle: tr('reglages.donnees.exporter'), icone: 'doc', faire: (cles) => {
         const L = lignes(cles);
         const csv = csvDe(['N°', 'Article', 'État', 'Meuble', 'Rangée', 'Colonne'], L.map((f) => { const ou = ouEst(f); return [f.numero, f.title || '', rangeeEtat(f) === 'vendue' ? 'vendue à sortir' : 'plus en ligne', ou ? ou.meuble.name : '', ou ? ou.rangee : '', ou ? ou.colonne : '']; }));
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a');
@@ -793,50 +795,50 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <div key={f.id} {...serieStock.ligne(cleDeFiche(f))} className="vrm-s2d-liste-ligne" data-stock-rangee={cleDeFiche(f)} style={{ flexWrap: 'wrap' }}>
       <span className="vrm-s2d-vig"><CaseSerie serie={serieStock} cle={cleDeFiche(f)} etiquette={'N°' + f.numero} surPhoto/><Vignette f={f} sold={sold} hors={!sold && rangeeEtat(f) === 'plusenligne'} mini /></span>
       <span className="vrm-s2d-txt"><span className="vrm-s2d-txt-t"><b>N°{f.numero}</b> · {f.title || '—'}</span>
-        <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> · rangée {ou.rangee}, colonne {ou.colonne}</> : 'case introuvable'}</span></span>
-      <div className="vrm-s2d-gestes">{ou && <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => montrer(f)}>Voir la case</button>}{gestes}</div>
+        <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> {tr('stock.rangee4')} {ou.rangee}{tr('stock.colonne')} {ou.colonne}</> : tr('stock.caseIntrouvable')}</span></span>
+      <div className="vrm-s2d-gestes">{ou && <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => montrer(f)}>{tr('stock.voirCase')}</button>}{gestes}</div>
     </div>); };
   const blocVendues = vendSortir.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-vendues-sortir={vendSortir.length}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Vendues à sortir · {vendSortir.length}</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{trj('stock.venduesSortir', { vendSortirN: vendSortir.length })}</span>
           <span style={{ flex: 1 }} />
           <OuvrirSerie serie={serieStock}/>
-          {vendSortir.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={vendSortir.length} onClick={() => { setQ(''); setCibles(vendSortir.map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }}>Le chemin pour les sortir</button>}
+          {vendSortir.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={vendSortir.length} onClick={() => { setQ(''); setCibles(vendSortir.map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }}>{tr('stock.cheminSortir')}</button>}
         </div>
-        {vendSortir.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-primaire" type="button" data-stock-sortir={cleDeFiche(f)} onClick={() => sortir(f)}>✓ Je l'ai sortie</button>))}
+        {vendSortir.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-primaire" type="button" data-stock-sortir={cleDeFiche(f)} onClick={() => sortir(f)}>{tr('stock.jeAiSortie')}</button>))}
       </div>
     </Card>) : null;
   const barreSerieStock = <BarreSerie serie={serieStock} actions={actionsSerieStock()} rendreIcone={(n, t) => <Icon name={n} size={t}/>}/>;
   const blocPlusEnLigne = plusEnLigne.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-plus-en-ligne={plusEnLigne.length}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Plus en ligne · {plusEnLigne.length}</div>
-        <InfoPop nom="stock-plus-en-ligne" titre="Plus en ligne" style={{ margin: '2px 0 4px' }} resume="Retire-les de leur case, ou garde-les">
-          <p>Rangées, mais plus en annonce : retire-les de leur case, ou garde-les.</p>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{trj('stock.plusLigne', { plusEnLigneN: plusEnLigne.length })}</div>
+        <InfoPop nom="stock-plus-en-ligne" titre={tr('stock.plusLigne2')} style={{ margin: '2px 0 4px' }} resume="Retire-les de leur case, ou garde-les">
+          <p>{tr('stock.rangeesMaisPlus')}</p>
         </InfoPop>
         {plusEnLigne.map((f) => ligneRangee(f, <>
-          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>Je l'ai retirée</button>
-          <button className="vrm-b vrm-b-discret" type="button" data-stock-encore-la={cleDeFiche(f)} onClick={() => encoreLa(f)}>Elle est encore là</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>{tr('stock.jeAiRetiree')}</button>
+          <button className="vrm-b vrm-b-discret" type="button" data-stock-encore-la={cleDeFiche(f)} onClick={() => encoreLa(f)}>{tr('stock.encore')}</button>
         </>))}
       </div>
     </Card>) : null;
   const blocPasSu = rangeesPasSu.length && aa ? (
     // (9 nov., lot AI) Une ligne courte (« 3 rangées pas vérifiées · N°5, N°27… ») ; la phrase entière en pop-up.
-    <InfoPop nom="stock-pas-verifiees" titre="Paires rangées pas vérifiées" ton="neutre" style={{ margin: 0 }}
+    <InfoPop nom="stock-pas-verifiees" titre={tr('stock.pairesRangeesVerifiees')} ton="neutre" style={{ margin: 0 }}
       attrs={{ 'data-stock-rangees-passu': rangeesPasSu.length }}
-      puces={[{ texte: `${rangeesPasSu.length} pas vérifiée${rangeesPasSu.length > 1 ? 's' : ''}` }]}
+      puces={[{ texte: tr('stock.verifiees', { n: String(rangeesPasSu.length) }) }]}
       phrase="Une lecture manque : ni « en ligne », ni « partie » n'est dit.">
       {/* (6 nov., onglets B) La lecture qui manque est déjà NOMMÉE en tête (« pas lu : … ») : elle ne se redit
           pas ici (§7, une phrase une fois — mesuré sur sa base : « Vestiaire (jamais lu : ouvre… ») deux fois). */}
-      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. En ligne ou partie : pas su.</p>
+      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} {tr('journee.paire')}{rangeesPasSu.length > 1 ? 's' : ''} {tr('stock.rangee3')}{rangeesPasSu.length > 1 ? 's' : ''} {tr('stock.verifiee')}{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? tr('stock.lectureManqueTout') : (manqueTxt || tr('stock.lectureCompteManque'))}{tr('stock.lignePartieSu')}</p>
     </InfoPop>) : null;
   // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
   const blocListe = aa && aa.su && articlesVus.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-liste={articlesVus.length}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>En ligne</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>{tr('stock.ligne')}</div>
         {articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a) => {
           const f = a.cle ? ficheParCle[a.cle] : null;
           const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
@@ -847,14 +849,14 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               <span className="vrm-s2d-txt">
                 <span className="vrm-s2d-txt-t">{a.cle ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
                 <span className="vrm-s2d-sites" data-stock-sites={a.plateformes.join(',')}>{a.plateformes.map((x) => <span key={x} className="vrm-s2d-site" data-site={x}>{NOM_PLAT_FILTRE[x] || x}</span>)}</span>
-                <span className="vrm-s2d-txt-s">{a.comptes.length ? a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}{a.etat === 'aconfirmer' ? ' · à confirmer' : (a.etat === 'masquee' ? ' · masquée par Vinted' : '')}{(a.aussi || []).length ? ' · aussi N°' + a.aussi.join(', N°') : ''}
-                  <br />{ou ? <b>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</b> : (a.cle ? 'pas encore rangée' : 'sans N° : pas rangeable')}</span>
+                <span className="vrm-s2d-txt-s">{a.comptes.length ? a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}{a.etat === 'aconfirmer' ? tr('stock.confirmer3') : (a.etat === 'masquee' ? tr('stock.masqueeVinted') : '')}{(a.aussi || []).length ? ' · aussi N°' + a.aussi.join(', N°') : ''}
+                  <br />{ou ? <b>{trj('stock.rangeeColonne', { name: ou.meuble.name, rangee: ou.rangee, colonne: ou.colonne })}</b> : (a.cle ? tr('stock.encoreRangee') : tr('stock.sansRangeable'))}</span>
                 {/* (10 nov., lot BD) La note privée de la paire, par son N° (jamais le titre). */}
                 {a.cle ? <NotePaireCoque numero={a.numero} ajout rangee/> : null}
               </span>
-              {a.cle && f && <button className="vrm-b vrm-b-discret" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); toast(`Touche la case où tu ranges N°${a.numero}.`); } }} style={{ flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</button>}
+              {a.cle && f && <button className="vrm-b vrm-b-discret" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }} style={{ flexShrink: 0 }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
             </div>); })}
-        {articlesVus.length > maxListe && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMaxListe((x) => x + 60)} style={{ width: '100%' }}>Voir plus — {maxListe} sur {articlesVus.length}</button>}
+        {articlesVus.length > maxListe && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMaxListe((x) => x + 60)} style={{ width: '100%' }}>{trj('stock.voirPlus', { maxListe: maxListe, articlesVusN: articlesVus.length })}</button>}
       </div>
     </Card>) : null;
 
@@ -881,16 +883,16 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const repliAPart = (cle, titre, liste, rendu, pied = null) => (liste.length ? (
     <details className="vrm-repli vrm-s2d-a-part" data-stock-repli={cle} data-n={liste.length}>
       <summary><span>{titre} · {liste.length}</span></summary>
-      <div>{liste.slice(0, 60).map(rendu)}{liste.length > 60 ? <p className="vrm-aide" style={{ fontSize: 12, color: C.muted }}>{liste.length - 60} de plus</p> : null}{pied}</div>
+      <div>{liste.slice(0, 60).map(rendu)}{liste.length > 60 ? <p className="vrm-aide" style={{ fontSize: 12, color: C.muted }}>{trj('stock.plus', { x: liste.length - 60 })}</p> : null}{pied}</div>
     </details>) : null);
   const blocAPart = aa && aa.su && (nAConf || nMasq || gardees.length) ? (
     <Card style={{ padding: '6px 13px' }}>
       <div data-stock-a-part-blocs="">
-        {repliAPart('aconfirmer', 'À confirmer', parEtat.aConfirmer, (a) => ligneAPart(a, `${a.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' · ')}${a.comptes.length ? ' · ' + a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}`),
+        {repliAPart('aconfirmer', tr('annonces.confirmer3'), parEtat.aConfirmer, (a) => ligneAPart(a, `${a.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' · ')}${a.comptes.length ? ' · ' + a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}`),
           aConfTxt ? <p className="vrm-aide" data-stock-a-confirmer-quand="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{aConfTxt} — {aConfGeste}</p> : null)}
-        {repliAPart('masquees', 'Masquées par Vinted', parEtat.masquees, (a) => ligneAPart(a, a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') || 'Vinted'))}
-        {repliAPart('gardees', 'Gardées chez toi', gardees, (g) => ligneAPart(g, 'Hors ligne · à republier'),
-          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-republier="" style={{ width: '100%', marginTop: 6 }} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=republier' })); } catch (_) {} }}>Republier ›</button>)}
+        {repliAPart('masquees', tr('stock.masqueesVinted'), parEtat.masquees, (a) => ligneAPart(a, a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') || 'Vinted'))}
+        {repliAPart('gardees', tr('stock.gardeesChezToi'), gardees, (g) => ligneAPart(g, tr('stock.horsLigneRepublier')),
+          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-republier="" style={{ width: '100%', marginTop: 6 }} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=republier' })); } catch (_) {} }}>{tr('stock.republier')}</button>)}
       </div>
     </Card>) : null;
 
@@ -961,7 +963,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {elAnnuel}
     {blocResume}
     <StockExplication sneakers={motsStock.nom === 'paire'} />
-    {aa && aa.su && !aa.n && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? 'Aucune annonce lue pour l’instant — une lecture manque (voir plus haut).' : 'Aucune annonce en ligne en ce moment : dès qu’une annonce est en ligne, elle arrive ici, prête à ranger.'}</Card>}
+    {aa && aa.su && !aa.n && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? tr('stock.aucuneAnnonceLue2') : tr('stock.aucuneAnnonceLigne2')}</Card>}
   </>);
 
   // (5 nov.) Ce qui est sorti TOUT SEUL des meubles (colis parti) : dit, avec
@@ -975,20 +977,20 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const g = { ...(load('vrm_stock_garder', {}) || {}) }; g[k] = Date.now(); saveTout('vrm_stock_garder', g);
     const nj = { ...(journal || {}) }; delete nj[x.cle]; saveTout('vrm_stock_sortis', nj); setJournal(nj);
     const r = remettreCase({ slots, meubles, sorti: x, cle: cleNum });
-    if (r.remise) { if (r.slots !== slots) ecrireSlots(r.slots); toast(`N°${x.num} remise dans ${x.itemName} · ${x.nom}. Elle ne sera plus sortie toute seule.`, 'ok'); }
-    else { setPlace(k); toast(`N°${x.num} : ${r.raison}. Touche la case où tu la poses.`); }
+    if (r.remise) { if (r.slots !== slots) ecrireSlots(r.slots); toast(tr('stock.remiseDansSera', { num: String(x.num), itemName: String(x.itemName), nom: String(x.nom) }), 'ok'); }
+    else { setPlace(k); toast(tr('stock.toucheCasePoses', { num: String(x.num), raison: String(r.raison) })); }
   };
   const blocSortis = sortisMeubles.length ? (
     <div className="vrm-s2d-sortis" data-stock-sortis-meubles={sortisMeubles.length}>
-      <div className="vrm-s2d-sortis-titre">Cases libérées toutes seules · {sortisMeubles.length}</div>
-      <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Le colis est parti : la case est libre, le numéro reste. Encore chez toi ? Remets-le.</div>
+      <div className="vrm-s2d-sortis-titre">{trj('stock.casesLibereesToutes', { sortisMeublesN: sortisMeubles.length })}</div>
+      <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{tr('stock.colisPartiCase')}</div>
       {sortisMeubles.map((x) => (
         <div key={x.cle} className="vrm-s2d-sorti" data-stock-sorti-meuble={x.cle}>
           <span style={{ flex: '1 1 220px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.4 }}>
             <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
-            <span style={{ display: 'block', color: C.muted, fontSize: 12 }}>{x.itemName}{x.nom ? ` · ${x.nom}` : ''} · le {jourCourt(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || 'colis parti'}</span>
+            <span style={{ display: 'block', color: C.muted, fontSize: 12 }}>{x.itemName}{x.nom ? ` · ${x.nom}` : ''} {tr('stock.texte')} {jourCourt(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || tr('stock.colisParti')}</span>
           </span>
-          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre-meuble={x.cle} onClick={() => remettre(x)}>Remettre</button>
+          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre-meuble={x.cle} onClick={() => remettre(x)}>{tr('stock.remettre')}</button>
         </div>
       ))}
     </div>
@@ -1004,17 +1006,17 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); setCibles([]); } if (e.key === 'Enter' && resultats.length === 1) { e.preventDefault(); const f = resultats[0]; if (ouEst(f)) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); }
             else if (e.key === 'Enter' && resultats.length > 1) { e.preventDefault(); setCibles(resultats.map(cleDeFiche)); setQ(''); try { e.currentTarget.blur(); } catch (_) {} } }}
           type="search" enterKeyHint="search" autoComplete="off"
-          placeholder="N°, marque, taille…" aria-label="Retrouver un article dans le stock"
+          placeholder={tr('stock.marqueTaille')} aria-label={tr('stock.retrouverArticleDans')}
           style={{ width: '100%', boxSizing: 'border-box', padding: `13px ${DICTEE_OK ? 92 : 40}px 13px 40px`, borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 17, outline: 'none', minHeight: 48 }} />
-        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre={motsStock.nom === 'paire' ? 'Chercher à la voix (« numéro 12 », « nike noire »)' : 'Chercher à la voix (« numéro 12 »)'} onText={(t) => { setQ(requeteDeLaVoix(t).requete); setCibles([]); }} /></span>
-        {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
+        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre={motsStock.nom === 'paire' ? tr('stock.chercherVoixNumero') : tr('stock.chercherVoixNumero2')} onText={(t) => { setQ(requeteDeLaVoix(t).requete); setCibles([]); }} /></span>
+        {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label={tr('reglages.recherche.effacer')} style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
       </div>
       {filtre && (
         <div data-stock-resultats={resultats.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, maxHeight: '46vh', overflowY: 'auto' }}>
           {resultats.length === 0
             ? <div data-stock-rien="" style={{ padding: '14px 14px', fontSize: 15, color: C.muted, lineHeight: 1.45 }}>{qEstNum
-                ? <>Aucun article N°{motsQ[0].toUpperCase()} en stock — il est peut-être vendu et parti, ou retiré du stock. La loupe en haut de l'écran dit tout sur ce numéro.</>
-                : <>Aucun article en stock ne correspond à « {q.trim()} ».</>}</div>
+                ? <>{tr('stock.aucunArticle')}{motsQ[0].toUpperCase()} {tr('stock.stockPeutEtre')}</>
+                : <>{tr('stock.aucunArticleStock')} {q.trim()} ».</>}</div>
             : resultats.slice(0, MAX_RES).map((f) => { const ou = ouEst(f); const sold = estVendu(f);
               return (
                 <button type="button" key={f.id} data-stock-res={cleDeFiche(f)} onClick={() => { if (ou) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); }}
@@ -1023,14 +1025,14 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><b>N°{f.numero}</b> · {f.title || '—'}</span>
                     <span data-stock-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'} style={{ display: 'block', fontSize: 13, marginTop: 2, color: ou ? C.text : C.muted, fontWeight: ou ? 700 : 500 }}>
-                      {ou ? <>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</> : 'Pas encore rangé dans un meuble'}{sold ? <span style={{ color: C.accentTexte, fontWeight: 700 }}> · vendue</span> : null}
+                      {ou ? <>{ou.meuble.name} {tr('stock.rangee4')} {ou.rangee}{tr('stock.colonne')} {ou.colonne}</> : tr('stock.encoreRangeDans')}{sold ? <span style={{ color: C.accentTexte, fontWeight: 700 }}> {tr('stock.vendue')}</span> : null}
                     </span>
                   </span>
-                  <span style={{ color: C.accentTexte, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</span>
+                  <span style={{ color: C.accentTexte, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</span>
                 </button>
               ); })}
-          {resultats.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%' }}>Les montrer toutes dans les meubles ({resultats.length})</button>}
-          {resultats.length > MAX_RES && <div style={{ padding: '9px 12px', fontSize: 12, color: C.muted }}>{resultats.length} trouvées — {MAX_RES} affichées, précise ta recherche.</div>}
+          {resultats.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%' }}>{trj('stock.montrerToutesDans', { resultatsN: resultats.length })}</button>}
+          {resultats.length > MAX_RES && <div style={{ padding: '9px 12px', fontSize: 12, color: C.muted }}>{trj('stock.trouveesAfficheesPrecise', { resultatsN: resultats.length, MAX_RES: MAX_RES })}</div>}
         </div>
       )}
       {cibles.length > 0 && !filtre && (() => {
@@ -1040,16 +1042,16 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         return (
         <div data-stock-cibles={cibles.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '8px 6px 8px 12px', fontSize: 15, color: C.text, maxHeight: '40vh', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <b>À aller chercher{cibles.length > 1 ? ` · ${cibles.length}` : ''}</b>
+            <b>{tr('stock.allerChercher')}{cibles.length > 1 ? ` · ${cibles.length}` : ''}</b>
             <span style={{ flex: 1 }} />
-            <button className="vrm-b vrm-b-discret" type="button" onClick={() => setCibles([])}>Fermer</button>
+            <button className="vrm-b vrm-b-discret" type="button" onClick={() => setCibles([])}>{tr('commun.fermer')}</button>
           </div>
           {tri.map((k) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
             return (
               <button type="button" key={k} data-aller-chercher={k} onClick={() => { if (f && ou) montrer(f); else if (f) setModal({ type: 'fiche', cle: k }); }}
                 style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 4px', minHeight: 44, background: 'transparent', border: 'none', borderTop: `1px solid ${C.line}`, color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 15 }}>
                 <b style={{ minWidth: 48 }}>N°{f ? f.numero : k}</b>
-                <span style={{ flex: 1, minWidth: 0, color: ou ? C.text : C.muted, fontWeight: ou ? 600 : 400 }}>{ou ? `${ou.meuble.name} · rangée ${ou.rangee}, colonne ${ou.colonne}` : (f ? 'pas encore rangé' : 'plus en stock')}</span>
+                <span style={{ flex: 1, minWidth: 0, color: ou ? C.text : C.muted, fontWeight: ou ? 600 : 400 }}>{ou ? tr('stock.rangeeColonne', { name: String(ou.meuble.name), rangee: String(ou.rangee), colonne: String(ou.colonne) }) : (f ? tr('stock.encoreRange') : tr('stock.plusStock'))}</span>
               </button>
             ); })}
         </div>); })()}
@@ -1065,7 +1067,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
     <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
       lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
-    <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>Inventaire de fin d’année</span><span aria-hidden="true">›</span></button>
+    <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>{tr('stock.inventaireFinAnnee')}</span><span aria-hidden="true">›</span></button>
     {elAnnuel}
     {blocCherche}
     {meubles.length === 0 && <StockExplication sneakers={motsStock.nom === 'paire'} />}
@@ -1078,9 +1080,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {aRanger.length > 0 && (
       <Card style={{ padding: '12px 13px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>À ranger</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{tr('stock.ranger3')}</span>
           <span style={{ fontSize: 12, fontWeight: 800, color: C.onAccent, background: C.accent, borderRadius: 999, padding: '1px 8px' }}>{aRanger.length}</span>
-          <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>{souris ? 'glisse un article dans une case (ou clique-le, puis une case)' : 'touche un article puis une case'}</span>
+          <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>{souris ? tr('stock.glisseArticleDans') : tr('stock.toucheArticlePuis')}</span>
         </div>
         <div data-bande-a-ranger="" style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
@@ -1100,23 +1102,23 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
     {place && (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', borderRadius: 12, background: C.accent, color: C.onAccent, fontSize: 15, fontWeight: 700, position: 'sticky', top: 8, zIndex: 20, boxShadow: '0 3px 12px rgba(0,0,0,0.18)' }}>
-        <span>Où ranger <b>N°{(ficheParCle[place] || {}).numero || place}</b> ? Touche une case</span>
-        <button type="button" onClick={() => setPlace(null)} style={{ background: 'rgba(0,0,0,0.18)', border: 'none', color: C.onAccent, borderRadius: 999, padding: '5px 11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Annuler</button>
+        <span>{tr('stock.ranger4')} <b>N°{(ficheParCle[place] || {}).numero || place}</b> {tr('stock.toucheCase')}</span>
+        <button type="button" onClick={() => setPlace(null)} style={{ background: 'rgba(0,0,0,0.18)', border: 'none', color: C.onAccent, borderRadius: 999, padding: '5px 11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{tr('achats.annuler')}</button>
       </div>
     )}
 
-    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
+    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{trj('stock.pairesCompteRetire', { n: nEcartes })}</div>}
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
       {/* (6 nov., onglets B) CE QUE VEULENT DIRE LES CASES, en une ligne (Julien : « être accompagné ») :
           les MÊMES classes que les cases (libre, rangée, vendue = l'accent, plus en ligne = l'ambre, §7). */}
       {meubles.length > 0 ? <div className="vrm-s2d-legende-l" data-stock-legende="" style={{ flex: '1 1 200px', minWidth: 0 }}>
-        <span data-legende="libre"><i className="vrm-s2d-pastille is-libre" aria-hidden="true">+</i>libre</span>
-        <span data-legende="rangee"><i className="vrm-s2d-pastille is-rangee" aria-hidden="true">N°</i>rangée</span>
-        <span data-legende="vendue"><i className="vrm-s2d-pastille is-vendue" aria-hidden="true">N°</i>vendue : à sortir</span>
-        <span data-legende="plusenligne"><i className="vrm-s2d-pastille is-plusenligne" aria-hidden="true">N°</i>plus en ligne</span>
+        <span data-legende="libre"><i className="vrm-s2d-pastille is-libre" aria-hidden="true">+</i>{tr('stock.libre')}</span>
+        <span data-legende="rangee"><i className="vrm-s2d-pastille is-rangee" aria-hidden="true">N°</i>{tr('stock.rangee3')}</span>
+        <span data-legende="vendue"><i className="vrm-s2d-pastille is-vendue" aria-hidden="true">N°</i>{tr('stock.vendueSortir')}</span>
+        <span data-legende="plusenligne"><i className="vrm-s2d-pastille is-plusenligne" aria-hidden="true">N°</i>{tr('stock.plusLigne3')}</span>
       </div> : <div style={{ flex: '1 1 200px', minWidth: 0 }} />}
       {/* (30 oct.) Sans meuble, « De loin / De près » ne montrait rien : le choix attend le premier meuble. */}
-      {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
+      {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label={tr('stock.tailleCases')} value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
     </div>
 
     {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. */}
@@ -1127,10 +1129,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {blocAPart}
 
     {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
-    <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Ajouter un meuble</button>
+    <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>{tr('stock.ajouterMeuble')}</button>
     {meubles.length > 0 && (explication
       ? <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />
-      : <button className="vrm-b vrm-b-discret" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)} style={{ alignSelf: 'center' }}>Comment ça marche ?</button>)}
+      : <button className="vrm-b vrm-b-discret" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)} style={{ alignSelf: 'center' }}>{tr('stock.commentCaMarche')}</button>)}
 
     {Modale()}
   </>);
@@ -1150,32 +1152,32 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
     <div style={{ flex: 1 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', background: C.card2, border: `1px solid ${C.line}`, borderRadius: 12, width: 'fit-content' }}>
-        <button type="button" onClick={step(set, v, -1, min, max)} aria-label="Moins" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 22, cursor: 'pointer' }}>−</button>
+        <button type="button" onClick={step(set, v, -1, min, max)} aria-label={tr('stock.moins')} style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 22, cursor: 'pointer' }}>−</button>
         <span style={{ minWidth: 48, textAlign: 'center', fontSize: 20, fontWeight: 800, color: C.text }}>{v}</span>
-        <button type="button" onClick={step(set, v, 1, min, max)} aria-label="Plus" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 22, cursor: 'pointer' }}>+</button>
+        <button type="button" onClick={step(set, v, 1, min, max)} aria-label={tr('nav.plus')} style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 22, cursor: 'pointer' }}>+</button>
       </div>
     </div>
   );
   return (<>
-    <h3 style={{ margin: '0 0 2px', fontSize: 17, color: C.text }}>{modal.id ? 'Modifier le meuble' : 'Nouveau meuble'}</h3>
-    <div style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Un nom, et le nombre de cases.</div>
+    <h3 style={{ margin: '0 0 2px', fontSize: 17, color: C.text }}>{modal.id ? tr('stock.modifierMeuble') : tr('stock.nouveauMeuble')}</h3>
+    <div style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>{tr('stock.nomNombreCases')}</div>
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>Nom</div>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Étagère salon" maxLength={30} style={{ width: '100%', background: C.card2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 12, padding: '13px 14px', fontSize: 17, outline: 'none' }} />
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>{tr('stock.nom')}</div>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('stock.exEtagereSalon')} maxLength={30} style={{ width: '100%', background: C.card2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 12, padding: '13px 14px', fontSize: 17, outline: 'none' }} />
     </div>
     <div style={{ display: 'flex', gap: 22, marginBottom: 6 }}>
-      <Stepper v={cols} set={setCols} min={1} max={8} label="Colonnes" />
-      <Stepper v={rows} set={setRows} min={1} max={10} label="Lignes" />
+      <Stepper v={cols} set={setCols} min={1} max={8} label={tr('stock.colonnes')} />
+      <Stepper v={rows} set={setRows} min={1} max={10} label={tr('stock.lignes')} />
     </div>
     <label data-gravite-choix="" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '12px 0 4px', cursor: 'pointer', minHeight: 44 }}>
       <input type="checkbox" checked={gravite} onChange={(e) => setGravite(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
-      <span style={{ fontSize: 15, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Un article retiré : ceux du dessus descendent.</span></span>
+      <span style={{ fontSize: 15, color: C.text, lineHeight: 1.4 }}><b>{tr('stock.articlesEmpiles')}</b><br /><span style={{ color: C.muted, fontSize: 13 }}>{tr('stock.articleRetireCeux')}</span></span>
     </label>
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
       <ChoixPlanches cols={cols} rows={rows} planches={planches} setPlanches={setPlanches} />
     </div>
-    <button className="vrm-b vrm-b-primaire" type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
-    {onDelete && <button className="vrm-b vrm-b-secondaire" type="button" onClick={onDelete} style={{ width: '100%', marginTop: 9 }}>Supprimer ce meuble</button>}
+    <button className="vrm-b vrm-b-primaire" type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', marginTop: 9 }}>{modal.id ? tr('commun.enregistrer') : tr('stock.creerMeuble')}</button>
+    {onDelete && <button className="vrm-b vrm-b-secondaire" type="button" onClick={onDelete} style={{ width: '100%', marginTop: 9 }}>{tr('stock.supprimerMeuble2')}</button>}
   </>);
 }
 
@@ -1399,8 +1401,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Stock" phrase="garage" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."
-        right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Bouton variante="secondaire" icone="camera" data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} style={{ minHeight: 44 }} title={`Photographie ${motsStock.le} : VRM montre les annonces qui lui ressemblent`}>Trouver par photo</Bouton><button type="button" className="vrm-b vrm-b-secondaire" data-stock-inventaire-ouvrir="" title={`Compter ${motsStock.tes.replace(/^tes /, 'les ')} présent${motsStock.es}, case par case`} onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}>Faire l’inventaire</button></div>}/>
+      <ScreenHead icon="home" title={tr('nav.garage')} phrase="garage" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."
+        right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Bouton variante="secondaire" icone="camera" data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} style={{ minHeight: 44 }} title={tr('stock.photographieVrmMontre', { le: String(motsStock.le) })}>{tr('stock.trouverPhoto')}</Bouton><button type="button" className="vrm-b vrm-b-secondaire" data-stock-inventaire-ouvrir="" title={`Compter ${motsStock.tes.replace(/^tes /, 'les ')} présent${motsStock.es}, case par case`} onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}>{tr('stock.faireInventaire')}</button></div>}/>
 
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 
@@ -1440,7 +1442,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   // Ajoute plusieurs numéros d'un coup (séparés par virgule, espace, point-virgule ou saut de ligne)
   const addBulk=()=>{
     const parts=bulk.split(/[\s,;]+/).map(norm).filter(Boolean);
-    if(parts.length===0){ toast('Aucun numéro détecté.'); return; }
+    if(parts.length===0){ toast(tr('stock.aucunNumeroDetecte')); return; }
     const set=new Set(stockVinted);
     let added=0;
     parts.forEach(p=>{ if(!set.has(p)){ set.add(p); added++; } });
@@ -1501,16 +1503,16 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 
   return (
     <div>
-      <ScreenHead icon="tag" title={`Stock Vinted (${stockVinted.length})`}
+      <ScreenHead icon="tag" title={tr('stock.stockVinted', { stockVintedN: String(stockVinted.length) })}
         desc="L'ancienne liste des numéros en ligne."
         right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:12,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
-          {showBulk?'Fermer':'Coller en masse'}
+          {showBulk?tr('commun.fermer'):tr('stock.collerMasse')}
         </button>}/>
 
       <p style={{fontSize:13,color:C.muted,margin:'0 0 14px',lineHeight:1.5}}>
-        L'<b>ancienne</b> liste tenue à la main (<b>Annonces</b> a pris le relais). Ajoute tes N° ici.
+        L'<b>{tr('stock.ancienne')}</b> {tr('stock.listeTenueMain')}<b>{tr('reglages.groupe.annonces-reglages')}</b> {tr('stock.prisRelaisAjoute')}
       </p>
-      <div style={{fontSize:13,color:C.muted,margin:'-8px 0 14px'}}><Pourquoi label="Comment elle bouge">Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.</Pourquoi></div>
+      <div style={{fontSize:13,color:C.muted,margin:'-8px 0 14px'}}><Pourquoi label={tr('stock.commentBouge')}>{tr('stock.quandFactureArrive')}</Pourquoi></div>
 
       {/* Saisie à l'unité */}
       <div style={{display:'flex',gap:8,marginBottom:12}}>
@@ -1518,19 +1520,19 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           value={input}
           onChange={e=>setInput(e.target.value)}
           onKeyDown={e=>{ if(e.key==='Enter') addOne(); }}
-          placeholder="N° de l'annonce (ex : 1908)"
+          placeholder={tr('stock.annonceEx1908')}
           inputMode="numeric"
           style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:15}}
         />
         <button type="button" onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
-          Ajouter
+          {tr('stock.ajouter')}
         </button>
       </div>
 
       {/* Collage en masse (optionnel) */}
       {showBulk&&(
         <div style={{marginBottom:14,padding:12,background:C.card2||'rgba(0,0,0,0.04)',borderRadius:12}}>
-          <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Colle plusieurs numéros (séparés par espace, virgule ou retour à la ligne) :</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:6}}>{tr('stock.collePlusieursNumeros')}</div>
           <textarea
             value={bulk}
             onChange={e=>setBulk(e.target.value)}
@@ -1539,7 +1541,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
             style={{width:'100%',padding:10,border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:13,boxSizing:'border-box',resize:'vertical'}}
           />
           <button type="button" onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'9px 16px',fontWeight:500,fontSize:13,cursor:'pointer'}}>
-            Ajouter tout
+            {tr('stock.ajouterTout')}
           </button>
         </div>
       )}
@@ -1548,17 +1550,17 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
       {/* ⚠️ Rien a comparer tant que le garage est vide : on le DIT, une fois. */}
       {garageVide && stockVinted.length>0 && (
         <div style={{marginBottom:16,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,fontSize:13,color:C.muted,lineHeight:1.5}}>
-          Range tes articles dans le <b style={{color:C.text}}>Stock</b> : les écarts apparaîtront ici. <Pourquoi>Aucun numéro n'est encore posé dans le Stock : la comparaison avec cette liste signalerait les {stockVinted.length} numéros d'un coup.</Pourquoi>
+          {tr('stock.rangeArticlesDans')} <b style={{color:C.text}}>{tr('nav.garage')}</b> {tr('stock.ecartsApparaitrontIci')} <Pourquoi>{trj('stock.aucunNumeroEncore', { stockVintedN: stockVinted.length })}</Pourquoi>
         </div>
       )}
       {!garageVide && (enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
         <div style={{marginBottom:16}}>
-          <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn,display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={15}/>Incohérences avec le stock</h3>
+          <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn,display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={15}/>{tr('stock.incoherencesAvecStock')}</h3>
 
           {enLignePasGarage.length>0&&(
             <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:12}}>
-              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>En ligne mais absent du stock ({enLignePasGarage.length})</div>
-              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le stock.</div>
+              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>{trj('stock.ligneMaisAbsent', { enLignePasGarageN: enLignePasGarage.length })}</div>
+              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>{tr('stock.cesAnnoncesSont')}</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {enLignePasGarage.slice(0,ecartsMax).map(n=>(
                   <span key={n} style={{background:C.warn,color:C.onWarn||'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
@@ -1566,17 +1568,15 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
               </div>
               {enLignePasGarage.length>ecartsMax && (
                 <button type="button" onClick={()=>setEcartsMax(m=>m+200)}
-                  style={{marginTop:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                  Voir plus — {ecartsMax} affichés sur {enLignePasGarage.length}
-                </button>
+                  style={{marginTop:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{trj('stock.voirPlusAffiches', { ecartsMax: ecartsMax, enLignePasGarageN: enLignePasGarage.length })}</button>
               )}
             </div>
           )}
 
           {garagePasEnLigne.length>0&&(
             <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:12}}>
-              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>Au stock mais pas en ligne ({garagePasEnLigne.length})</div>
-              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>Dans le stock, pas sur Vinted : à mettre en ligne ?</div>
+              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>{trj('stock.stockMaisLigne', { garagePasEnLigneN: garagePasEnLigne.length })}</div>
+              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>{tr('stock.dansStockVinted')}</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {garagePasEnLigne.map(n=>(
                   <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
@@ -1592,7 +1592,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         <input
           value={search}
           onChange={e=>setSearch(e.target.value)}
-          placeholder="Rechercher un numéro…"
+          placeholder={tr('stock.rechercherNumero')}
           style={{width:'100%',padding:'9px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:13,boxSizing:'border-box',marginBottom:12}}
         />
       )}
@@ -1600,7 +1600,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
       {/* Liste des numéros en ligne */}
       {liste.length===0?(
         <div style={{textAlign:'center',color:C.muted,fontSize:13,padding:'30px 0'}}>
-          {stockVinted.length===0?'Aucun numéro pour le moment. Ajoute tes annonces en ligne ci-dessus.':'Aucun résultat.'}
+          {stockVinted.length===0?tr('stock.aucunNumeroMoment'):tr('stock.aucunResultat')}
         </div>
       ):(
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
@@ -1617,7 +1617,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
                 borderRadius:12,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:500
               }}>
                 {n}
-                <button type="button" onClick={()=>removeOne(n)} title="Retirer" style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:700}}>×</button>
+                <button type="button" onClick={()=>removeOne(n)} title={tr('achats.retirer')} style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:700}}>×</button>
               </span>
             );
           })}
@@ -1626,9 +1626,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
       {liste.length>listeMax && (
         <div style={{marginTop:10}}>
           <button type="button" onClick={()=>setListeMax(m=>m+200)}
-            style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            Voir plus — {listeMax} affichés sur {liste.length}
-          </button>
+            style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{trj('stock.voirPlusAffiches2', { listeMax: listeMax, listeN: liste.length })}</button>
         </div>
       )}
     </div>
@@ -1661,7 +1659,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
     const pair = bordereauPairRef.current;
     if (!file || !pair) return;
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      toast('Merci de choisir le bordereau au format PDF téléchargé depuis Vinted.'); return;
+      toast(tr('stock.merciChoisirBordereau')); return;
     }
     try {
       const buf = await file.arrayBuffer();
@@ -1688,8 +1686,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
   const addPair = () => {
     const numero = addForm.numero.trim();
-    if (!numero) { toast('Indique un numéro.'); return; }
-    if (numeroExists(numero)) { toast(`Le numéro ${numero} est déjà utilisé.`); return; }
+    if (!numero) { toast(tr('stock.indiqueNumero')); return; }
+    if (numeroExists(numero)) { toast(tr('stock.numeroDejaUtilise', { numero: String(numero) })); return; }
     const pair = { id: uid(), numero, title: addForm.title.trim(), status: addForm.status,
       vintedItemId:null, vintedAccountId:null, price:null, photo:null, soldAt:null, transactionId:null, createdAt: tod() };
     persist([pair, ...inventory]);
@@ -1698,15 +1696,15 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   };
 
   const deletePair = async (id)=>{
-    if (!await askConfirm('Supprimer cet article de l\'inventaire ?')) return;
+    if (!await askConfirm(tr('stock.supprimerArticleInventaire'))) return;
     persist(inventory.filter(p => p.id !== id));
   };
 
   const startEdit = (p) => { setEditing(p.id); setEditDraft({ ...p }); };
   const commitEdit = () => {
     const numero = String(editDraft.numero).trim();
-    if (!numero) { toast('Le numéro ne peut pas être vide.'); return; }
-    if (numeroExists(numero, editDraft.id)) { toast(`Le numéro ${numero} est déjà utilisé.`); return; }
+    if (!numero) { toast(tr('stock.numeroPeutEtre')); return; }
+    if (numeroExists(numero, editDraft.id)) { toast(tr('stock.numeroDejaUtilise', { numero: String(numero) })); return; }
     persist(inventory.map(p => p.id === editDraft.id ? { ...editDraft, numero } : p));
     setEditing(null); setEditDraft(null);
   };
@@ -1729,7 +1727,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   // Associe une annonce en ligne a un numero (cree ou met a jour la paire).
   const associate = (acc, listing) => {
     const numero = String(importNums[listing.id] || '').trim();
-    if (!numero) { toast('Indique le numéro à associer à cette annonce.'); return; }
+    if (!numero) { toast(tr('stock.indiqueNumeroAssocier')); return; }
     const existing = inventory.find(p => String(p.numero).trim().toLowerCase() === numero.toLowerCase());
     if (existing) {
       // On sauvegarde le titre EXACT de l'annonce : c'est ce même titre qui
@@ -1842,19 +1840,19 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
       <input ref={bordereauInputRef} type="file" accept="application/pdf,.pdf" onChange={onBordereauFile} style={{display:'none'}}/>
       <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:14}}>
         <StatBox label={motsStock.noms.charAt(0).toUpperCase() + motsStock.noms.slice(1)} value={counts.all}/>
-        <StatBox label="En ligne" value={counts.online} color={INV_STATUS.online.color}/>
-        <StatBox label="Vente en cours" value={counts.pending_sale} color={INV_STATUS.pending_sale.color}/>
-        <StatBox label="Vendues" value={counts.sold} color={INV_STATUS.sold.color} sub="argent reçu"/>
-        <StatBox label="En stock" value={counts.stock} color={INV_STATUS.stock.color}/>
+        <StatBox label={tr('stock.ligne')} value={counts.online} color={INV_STATUS.online.color}/>
+        <StatBox label={tr('stock.venteCours')} value={counts.pending_sale} color={INV_STATUS.pending_sale.color}/>
+        <StatBox label={tr('stock.vendues')} value={counts.sold} color={INV_STATUS.sold.color} sub="argent reçu"/>
+        <StatBox label={tr('stock.stock')} value={counts.stock} color={INV_STATUS.stock.color}/>
       </div>
 
       <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:12}}>
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher un numéro ou un titre…"
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder={tr('stock.rechercherNumeroTitre')}
           style={{...inputStyle, flex:1, minWidth:180}}/>
-        <button type="button" onClick={()=>{setShowAdd(v=>!v);setShowImport(false);}} style={btn(C.accent)}>➕ Ajouter</button>
-        <button type="button" onClick={()=>{setShowImport(v=>!v);setShowAdd(false);}} style={btn(C.blue||C.accent)}>🔄 Importer mes annonces</button>
+        <button type="button" onClick={()=>{setShowAdd(v=>!v);setShowImport(false);}} style={btn(C.accent)}>{tr('stock.ajouter2')}</button>
+        <button type="button" onClick={()=>{setShowImport(v=>!v);setShowAdd(false);}} style={btn(C.blue||C.accent)}>{tr('stock.importerMesAnnonces')}</button>
         <button type="button" onClick={syncSalesFromVinted} disabled={syncing} style={{...btn(INV_STATUS.sold.color),opacity:syncing?0.6:1,cursor:syncing?'default':'pointer'}}>
-          {syncing ? 'Synchronisation…' : '💸 Mettre à jour les ventes'}
+          {syncing ? tr('stock.synchronisation') : tr('stock.mettreJourVentes')}
         </button>
       </div>
 
@@ -1864,7 +1862,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             ? syncResult.msg
             : ((syncResult.sold + syncResult.pending) > 0
                 ? `✅ ${syncResult.sold} vente(s) finalisée(s) comptée(s)${syncResult.pending?`, ${syncResult.pending} en cours (non comptée(s), en attente de validation)`:''} — sur ${syncResult.scanned} commandes analysées.`
-                : `Aucune vente à reporter (${syncResult.scanned} commandes analysées). Chaque article doit avoir le même titre que son annonce Vinted (via « Importer mes annonces »).`)}
+                : tr('stock.aucuneVenteReporter', { scanned: String(syncResult.scanned) }))}
         </div>
       )}
 
@@ -1881,28 +1879,28 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
       {showAdd && (
         <Card style={{marginBottom:14}}>
-          <div style={{fontWeight:600,marginBottom:10,color:C.text}}>Nouvel article</div>
+          <div style={{fontWeight:600,marginBottom:10,color:C.text}}>{tr('stock.nouvelArticle')}</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}>
-            <input value={addForm.numero} onChange={e=>setAddForm(f=>({...f,numero:e.target.value}))} placeholder="Numéro (ex : 2057)" style={{...inputStyle,width:150}}/>
-            <input value={addForm.title} onChange={e=>setAddForm(f=>({...f,title:e.target.value}))} placeholder={motsStock.nom === 'paire' ? 'Titre (ex : Adidas Spezial 38)' : `Titre (${exemplesInv.achat})`} style={{...inputStyle,flex:1,minWidth:180}}/>
+            <input value={addForm.numero} onChange={e=>setAddForm(f=>({...f,numero:e.target.value}))} placeholder={tr('stock.numeroEx2057')} style={{...inputStyle,width:150}}/>
+            <input value={addForm.title} onChange={e=>setAddForm(f=>({...f,title:e.target.value}))} placeholder={motsStock.nom === 'paire' ? tr('stock.titreExAdidas') : tr('stock.titre', { achat: String(exemplesInv.achat) })} style={{...inputStyle,flex:1,minWidth:180}}/>
             <select value={addForm.status} onChange={e=>setAddForm(f=>({...f,status:e.target.value}))} style={inputStyle}>
-              <option value="stock">📦 Stock</option>
-              <option value="online">🟢 En ligne</option>
-              <option value="sold">💸 Vendu</option>
+              <option value="stock">{tr('stock.stock2')}</option>
+              <option value="online">{tr('stock.ligne2')}</option>
+              <option value="sold">{tr('stock.vendu')}</option>
             </select>
-            <button type="button" onClick={addPair} style={btn(C.accent)}>Enregistrer</button>
+            <button type="button" onClick={addPair} style={btn(C.accent)}>{tr('commun.enregistrer')}</button>
           </div>
         </Card>
       )}
 
       {showImport && (
         <Card style={{marginBottom:14}}>
-          <div style={{fontWeight:600,marginBottom:4,color:C.text}}>Importer mes annonces en ligne</div>
+          <div style={{fontWeight:600,marginBottom:4,color:C.text}}>{tr('stock.importerMesAnnonces2')}</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:12}}>
-            Charge tes annonces en ligne, donne à chacune son numéro, puis « Associer ».
-            {' '}<Pourquoi>Si le titre contient déjà « nXX », le numéro est pré-rempli (tu peux le corriger).</Pourquoi>
+            {tr('stock.chargeAnnoncesLigne')}
+            {' '}<Pourquoi>{tr('stock.titreContientDeja')}</Pourquoi>
           </div>
-          {accounts.length === 0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
+          {accounts.length === 0 && <div style={{fontSize:13,color:C.muted}}>{tr('stock.aucunCompteVinted')}</div>}
           {accounts.map(acc => {
             const st = importState[acc.vinted_user_id] || {};
             return (
@@ -1910,11 +1908,11 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
                   <div style={{fontWeight:500,color:C.text,fontSize:13}}>{accName(acc.vinted_user_id)}</div>
                   <button type="button" onClick={()=>loadListings(acc)} style={{...btn(C.blue||C.accent),padding:'5px 10px',fontSize:12}}>
-                    {st.loading ? 'Chargement…' : (st.items ? 'Recharger' : 'Charger les annonces')}
+                    {st.loading ? tr('reglages.langue.chargement') : (st.items ? tr('erreur.recharger') : tr('stock.chargerAnnonces'))}
                   </button>
                 </div>
-                {st.error && <div style={{fontSize:12,color:C.danger}}>Erreur : {String(st.error)}</div>}
-                {st.items && st.items.length === 0 && <div style={{fontSize:12,color:C.muted}}>Aucune annonce en ligne sur ce compte.</div>}
+                {st.error && <div style={{fontSize:12,color:C.danger}}>{trj('stock.erreur', { String: String(st.error) })}</div>}
+                {st.items && st.items.length === 0 && <div style={{fontSize:12,color:C.muted}}>{tr('stock.aucuneAnnonceLigne3')}</div>}
                 {st.items && st.items.length > 0 && (
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:12}}>
                     {st.items.map(listing => {
@@ -1927,12 +1925,12 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                           <div style={{padding:8}}>
                             <div title={listing.title} style={{fontSize:11,fontWeight:600,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:28}}>{listing.title}</div>
                             {linked ? (
-                              <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:500,marginTop:6}}>✓ Associée</div>
+                              <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:500,marginTop:6}}>{tr('stock.associee')}</div>
                             ) : (
                               <div style={{display:'flex',gap:4,marginTop:6}}>
                                 <input value={importNums[listing.id] ?? ''} onChange={e=>setImportNums(n=>({...n,[listing.id]:e.target.value}))}
                                   placeholder="N°" style={{...inputStyle,width:52,padding:'5px 6px'}}/>
-                                <button type="button" onClick={()=>associate(acc, listing)} style={{...btn(C.accent),padding:'5px 8px',fontSize:11,flex:1}}>Associer</button>
+                                <button type="button" onClick={()=>associate(acc, listing)} style={{...btn(C.accent),padding:'5px 8px',fontSize:11,flex:1}}>{tr('stock.associer')}</button>
                               </div>
                             )}
                           </div>
@@ -1949,7 +1947,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
       {filtered.length === 0 && (
         <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'30px 0'}}>
-          {inventory.length === 0 ? 'Ton inventaire est vide. Ajoute un article ou importe tes annonces en ligne.' : 'Aucun article pour ce filtre.'}
+          {inventory.length === 0 ? tr('stock.inventaireVideAjoute') : tr('stock.aucunArticleFiltre')}
         </div>
       )}
 
@@ -1967,22 +1965,22 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                 <div style={{fontSize:20,fontWeight:700,color:C.text,lineHeight:1}}>{p.numero}</div>
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || <span style={{color:C.muted,fontStyle:'italic'}}>Sans titre</span>}</div>
+                <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || <span style={{color:C.muted,fontStyle:'italic'}}>{tr('annonces.sansTitre')}</span>}</div>
                 <div style={{display:'flex',gap:6,alignItems:'center',marginTop:5,flexWrap:'wrap'}}>
                   <Badge color={stt.color}>{stt.icon} {stt.label}</Badge>
                   <button type="button" onClick={()=>garage && onLocate && onLocate(p.numero)}
-                    title={garage?'Voir dans le stock':'Ce numéro n\'apparaît dans aucune case du stock'}
+                    title={garage?tr('stock.voirDansStock'):tr('stock.numeroApparaitDans')}
                     style={{border:'none',background:'transparent',cursor:garage?'pointer':'default',padding:0,fontSize:11,fontWeight:500,color:garage?C.blue||C.accent:C.muted}}>
-                    {garage ? 'Au stock' : 'Absent du stock'}
+                    {garage ? tr('stock.stock3') : tr('stock.absentStock')}
                   </button>
                   {p.price != null && <span style={{fontSize:11,color:C.muted}}>{p.price}&nbsp;€</span>}
-                  {p.vintedItemId && <span style={{fontSize:11,color:C.muted}}>🔗 annonce liée</span>}
+                  {p.vintedItemId && <span style={{fontSize:11,color:C.muted}}>{tr('stock.annonceLiee')}</span>}
                 </div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
-                <button className="vrm-icon-control" aria-label="Générer le bordereau annoté (numéro + titre)" type="button" title="Générer le bordereau annoté (numéro + titre)" onClick={()=>startBordereau(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}><Icon name="doc" size={16}/></button>
-                <button className="vrm-icon-control" aria-label="Modifier l’article" type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
-                <button className="vrm-icon-control" aria-label="Supprimer l’article" type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
+                <button className="vrm-icon-control" aria-label={tr('stock.genererBordereauAnnote')} type="button" title={tr('stock.genererBordereauAnnote')} onClick={()=>startBordereau(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}><Icon name="doc" size={16}/></button>
+                <button className="vrm-icon-control" aria-label={tr('stock.modifierArticle')} type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
+                <button className="vrm-icon-control" aria-label={tr('stock.supprimerArticle')} type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
               </div>
             </div>
           );
@@ -1993,21 +1991,21 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
         <div onClick={()=>{setEditing(null);setEditDraft(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>{setEditing(null);setEditDraft(null);}}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:12,padding:20,width:'100%',maxWidth:420}}>
-            <div style={{fontWeight:600,fontSize:15,color:C.text,marginBottom:14}}>Modifier l’article</div>
-            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Numéro</label>
+            <div style={{fontWeight:600,fontSize:15,color:C.text,marginBottom:14}}>{tr('stock.modifierArticle')}</div>
+            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>{tr('stock.numero')}</label>
             <input value={editDraft.numero} onChange={e=>setEditDraft(d=>({...d,numero:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:12}}/>
-            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Titre</label>
+            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>{tr('stock.titre2')}</label>
             <input value={editDraft.title||''} onChange={e=>setEditDraft(d=>({...d,title:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:12}}/>
-            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Statut</label>
+            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>{tr('stock.statut')}</label>
             <select value={editDraft.status} onChange={e=>setEditDraft(d=>({...d,status:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:16}}>
-              <option value="stock">📦 Stock</option>
-              <option value="online">🟢 En ligne</option>
-              <option value="pending_sale">⏳ Vente en cours</option>
-              <option value="sold">💸 Vendu</option>
+              <option value="stock">{tr('stock.stock2')}</option>
+              <option value="online">{tr('stock.ligne2')}</option>
+              <option value="pending_sale">{tr('stock.venteCours2')}</option>
+              <option value="sold">{tr('stock.vendu')}</option>
             </select>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>Annuler</button>
-              <button type="button" onClick={commitEdit} style={btn(C.accent)}>Enregistrer</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>{tr('achats.annuler')}</button>
+              <button type="button" onClick={commitEdit} style={btn(C.accent)}>{tr('commun.enregistrer')}</button>
             </div>
           </div>
         </div>
