@@ -615,6 +615,7 @@ import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille
 import "./styles-profil.css";   // (11 nov., lot DJ6) la photo du profil et son menu
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
+import "./styles-ventes-achats-visuel.css";   // (11 nov., lot ventes-achats-visuel) Ventes et Achats sobres : frise fine, impression compacte, grille alignée — EN DERNIER
 import { enregistrerGaleries } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
@@ -20489,7 +20490,7 @@ function CompteVente({ compte, plateforme, ou = '' }) {
   if (!compteFourni(compte)) return null;
   return <span className="vrm-vente-compte vrm-sensible" data-vente-compte={compte ? String(compte) : ''} data-vente-compte-ou={ou || undefined} data-vente-compte-passu={compte ? undefined : ''} title={compte ? `Vendue sur le compte ${compte}` : undefined}>{texteCompteVente(compte, plateforme)}</span>;
 }
-function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, basSeul = false, fusion = null, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, friseEtat = null, bas = null, basSeul = false, fusion = null, ...props }) {
   const compte = compteFourni(compteBrut) ? compteBrut : undefined;
   // (5 nov., chantier E2) Le N° du titre en pastille `Numero` (la même qu'au téléphone) ; le texte
   // complet « N°x · nom » reste le nom lu et l'infobulle.
@@ -20576,6 +20577,10 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       </span> : null}
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{numTitre ? <><Numero n={numTitre} taille="petit" data-titre-num=""/>{' '}{titreNom || '(sans titre)'}</> : (titre || '(sans titre)')}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
+      {/* (11 nov., lot ventes-achats-visuel) La frise FINE, dans la ligne : sous l'état au téléphone,
+          dans la colonne « État » à l'ordinateur (une grille alignée : photo · N° + titre · état · prix ·
+          bénéfice). Rien d'interactif dedans (des <span>) : un toucher ouvre la vente, comme avant. */}
+      {friseEtat ? <span className="vrm-ledger-sale-frise" data-frise-ligne="">{friseEtat}</span> : null}
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
       {benef ? <span className="vrm-ledger-sale-achat" data-achat-ligne={benef.achatCentimes ?? ''} data-achat-etat={benef.achatCentimes == null ? 'manque' : 'lu'}>{benef.achatTxt}</span> : null}
       {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">au plus </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
@@ -42129,7 +42134,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div className="vrm-ann-avis vrm-ventes-avis" data-ventes-avis="">
               <div className="vrm-ann-achats" data-ventes-achats={`${n}/${m}`} role="status">
-                <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">Prix d’achat</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">connus</span></span>
+                {/* (11 nov., lot ventes-achats-visuel) L'invitation dit ce qui reste à faire, UNE fois : « 3 prix d'achat à saisir ». */}
+                <span className="vrm-ann-achats-texte" data-ventes-achats-manquent={m - n}><span className="vrm-ann-achats-n">{m - n}</span><span className="vrm-ann-achats-nom">prix d’achat à saisir</span><span className="vrm-ann-achats-sous">· {n}/{m} connus</span></span>
                 <Bouton variante="discret" data-ventes-achats-completer="" title="Le bénéfice ne compte que les prix d’achat connus" onClick={()=>setFillBuyOpen(true)}>{VERBES.completer}</Bouton>
               </div>
             </div>
@@ -42189,7 +42195,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const propPrix = !hidden && st!=='cancelled' && buy==null ? propositionVente(o.transaction_id) : null;
             const coutManque = !hidden && st!=='cancelled' && buy==null && (!(e && e.buyFromId) || !!propPrix);
             const benefLigne = { etat: lb.etat, achatCentimes: lb.achat!=null ? Math.round(lb.achat*100) : null, benefCentimes: lb.benefice!=null ? Math.round(lb.benefice*100) : null,
-              achatTxt: lb.achat!=null ? `${eurosLigne(lb.achat)}\u00a0€` : (st==='cancelled' ? '' : coutManque ? 'à saisir' : '—'), benefTxt: texteBenefice(lb.etat==='partiel' ? { ...lb, etat:'ok' } : lb),
+              achatTxt: lb.achat!=null ? `${eurosLigne(lb.achat)}\u00a0€` : (st==='cancelled' ? '' : '—'), /* (11 nov.) « à saisir » se dit UNE fois, en tête (`data-ventes-achats`) ; `data-achat-etat="manque"` reste */ benefTxt: texteBenefice(lb.etat==='partiel' ? { ...lb, etat:'ok' } : lb),
               aria: lb.etat==='partiel' ? `Bénéfice : au plus ${texteBenefice({ ...lb, etat:'ok' })}, frais pas confirmés` : lb.etat==='achat' ? "Bénéfice : prix d'achat manquant" : undefined };
             // (1er nov.) « DÉPOSÉ » : seulement une vente À EXPÉDIER, pas encore cochée.
             const txL = String(o.transaction_id);
@@ -42363,7 +42369,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
+                data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
                   {emailEnTete ? null : <NoteVenteEmail o={o}/>}
@@ -42371,7 +42377,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       tout de suite, avec le N° seulement s'il est sûr (src/bordereauVenteEmail.js). */}
                   {toShipEmailTx.has(txL) ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="" data-vente-email-bord={txL}>
                     <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
-                    <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
+                    <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title="Imprimer le bordereau" onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span>Imprimer</span></button>
                   </div> : null}
                   {toShipEmailTx.has(txL) && (!num || bordsSansNum[txL]) ? <div data-vente-sans-num={num ? 'avec' : 'sans'} data-sans-glisse="" style={{fontSize:12,fontWeight:600,color:C.warn,overflowWrap:'anywhere'}}>{phraseImprimeSansNumero(bordsSansNum, txL, num) || MENTION_SANS_NUM}</div> : null}
                 </> : peutDeposer ? <>
@@ -42381,7 +42387,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="">
                     <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
                     {fuPdf
-                      ? <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
+                      ? <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title="Imprimer le bordereau" onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span>Imprimer</span></button>
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}

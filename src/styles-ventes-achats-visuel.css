@@ -1,0 +1,192 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VENTES ET ACHATS, BEAUX ET SOBRES (11 nov., lot `ventes-achats-visuel`)
+   Julien, sur ses captures de production : « ces visuels ne sont pas top du tout » ;
+   « plus beau, simple, surtout PRATIQUE ». CLAUDE.md §7 : UNE couleur d'accent, RARE ;
+   ambre pour un geste à faire ; cibles de 44 px au doigt.
+     1. La frise : une barre FINE (3 px), l'étape actuelle nommée UNE fois (Frise.jsx,
+        `.vrm-fu-legende`), neutre + le bleu sur l'étape actuelle seulement, l'ambre sur
+        l'étape en cours seulement si un geste est dû.
+     2. Le bordereau d'UNE vente s'imprime par une petite action de ligne (icône + « Imprimer »,
+        bouton secondaire compact) : un seul bouton bleu plein par écran, « Tout imprimer (N) ».
+     3. Ventes à l'ordinateur : une grille alignée (photo 56 · N° + titre · état · prix ·
+        bénéfice), l'en-tête des colonnes dit « Bénéfice » UNE fois (plus de « Bénéf. »,
+        « Achat », « à saisir » sur chaque ligne) ; les actions à droite.
+     4. Au téléphone : cartes compactes, la frise sous l'état, les actions à 44 px.
+   Rien ici ne touche une donnée ni une règle : seulement la forme. Chargé EN DERNIER (App.jsx).
+   Mesuré par scripts/bancs/ventes-achats-visuel.cjs.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. LA FRISE ─────────────────────────────────────────────────────────── */
+html body .vrm-fu-frise {
+  display: grid !important; grid-template-columns: repeat(var(--fu-n, 4), minmax(0, 1fr)) !important;
+  column-gap: 3px !important; row-gap: 5px !important; align-items: start !important;
+  list-style: none !important; margin: 0 !important; padding: 0 !important; min-width: 0 !important;
+}
+html body .vrm-fu-frise > .vrm-fu-seg { display: block !important; min-width: 0 !important; gap: 0 !important; }
+html body .vrm-fu-frise > .vrm-fu-seg > i {
+  display: block !important; height: 3px !important; border-radius: 2px !important;
+  background: var(--fu-piste, #e5e5ea) !important;
+}
+/* Les étapes passées : neutres (franchies, mais ce n'est pas là qu'on en est). */
+html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"] > i { background: var(--fu-gris3, #aeaeb2) !important; }
+/* L'étape actuelle (la dernière faite) : le seul bleu. */
+html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"][data-derniere] > i { background: var(--fu-bleu, var(--vrm-accent, #0071e3)) !important; }
+/* L'étape en cours, seulement quand un geste est dû : ambre. */
+html body .vrm-fu-frise > .vrm-fu-seg[data-cours][data-ton="urgent"] > i { background: var(--fu-ambre, #ff9f0a) !important; }
+html body .vrm-fu-frise > .vrm-fu-legende {
+  display: block !important; grid-column: 1 / -1 !important; min-width: 0 !important;
+  font: 500 12px/1.25 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important;
+  color: var(--fu-gris, #6e6e73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+  font-variant-numeric: tabular-nums;
+}
+html body .vrm-fu-frise > .vrm-fu-legende[data-ton="urgent"] { color: var(--fu-ambre-txt, #b25000) !important; font-weight: 600 !important; }
+:root[data-theme="dark"] body .vrm-fu-frise > .vrm-fu-legende { color: #98989d !important; }
+:root[data-theme="dark"] body .vrm-fu-frise > .vrm-fu-legende[data-ton="urgent"] { color: #ffb340 !important; }
+/* Chaque segment garde son nom et son état pour VoiceOver ; à l'écran, la légende seule. */
+html body .vrm-fu-frise > .vrm-fu-seg > .vrm-fu-sr {
+  position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important;
+  clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; margin: -1px !important; padding: 0 !important;
+}
+html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
+
+/* ── 2. LE BORDEREAU D'UNE VENTE : UNE PETITE ACTION DE LIGNE ──────────────── */
+/* Le bouton secondaire compact (téléphone : 44 px ; ordinateur : 36 px). */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-rangee-bord :is(.vrm-fu-imprimer-ligne, [data-bouton-bord] > button, button[data-bouton-bord]),
+:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) {
+  all: unset; box-sizing: border-box !important;
+  display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
+  width: auto !important; max-width: none !important; flex: none !important;
+  height: 44px !important; min-height: 44px !important; padding: 0 14px !important; border-radius: 12px !important;
+  background: var(--d-remplir, rgba(118, 118, 128, .12)) !important; color: var(--fu-encre, #1d1d1f) !important;
+  font: 600 14px/1 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important; white-space: nowrap !important;
+  border: 0 !important; box-shadow: none !important; filter: none !important; cursor: pointer !important;
+  transition: background-color .15s ease, transform .12s cubic-bezier(.23, 1, .32, 1) !important;
+}
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-rangee-bord :is(.vrm-fu-imprimer-ligne, [data-bouton-bord] > button, button[data-bouton-bord]),
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) {
+  background: rgba(118, 118, 128, .24) !important; color: #f5f5f7 !important;
+}
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a):active { transform: scale(.97) !important; }
+@media (hover: hover) and (pointer: fine) {
+  :root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a):not([disabled]):hover { background: var(--d-remplir-fort, rgba(118, 118, 128, .20)) !important; }
+}
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a)[disabled] { opacity: .5 !important; cursor: default !important; }
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a) svg { width: 16px !important; height: 16px !important; flex: none !important; }
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #0071e3) !important; outline-offset: 2px !important; }
+/* Le long libellé (« Imprimer le bordereau ») cède au court (« Imprimer ») partout dans une ligne. */
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord .vrm-lib-long { display: none !important; }
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord .vrm-lib-court { display: inline !important; font-size: 14px !important; }
+
+/* La rangée d'une vente : le logo du transporteur (20 px) puis l'action, à droite, sobres. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord {
+  display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-end !important;
+  gap: 10px !important; flex-wrap: nowrap !important; width: auto !important; margin: 0 !important; padding: 0 !important; background: none !important;
+}
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > .vrm-puce-transp {
+  all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+  flex: 0 1 auto !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; padding: 0 !important;
+  background: none !important; border: 0 !important; color: var(--fu-gris, #6e6e73) !important; font: 500 12px/1.2 var(--vrm-police, sans-serif) !important;
+}
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > .vrm-puce-transp :is(svg, img) { width: 20px !important; height: 20px !important; flex: none !important; border-radius: 5px !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > :not(.vrm-puce-transp) { flex: none !important; width: auto !important; min-width: 0 !important; max-width: none !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > [data-bouton-bord]:not([data-bouton-bord="pdf"]) { display: inline-flex !important; flex-direction: row !important; align-items: center !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > [data-bouton-bord] > :not(button) { display: none !important; }
+
+/* La carte d'un colis (« À expédier ») : l'action garde sa place en haut à droite, grise ; icône seule au doigt. */
+@media (max-width: 1023px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) { width: 44px !important; padding: 0 !important; border-radius: 50% !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) :is(.vrm-lib-long, .vrm-lib-court) { display: none !important; }
+}
+@media (min-width: 1024px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord > :not(.vrm-puce-transp) { width: auto !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; font-size: 13px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child { padding-right: 130px !important; }
+}
+
+/* ── 3 et 4. LA LIGNE D'UNE VENTE (Vinted, forme Fusion) ────────────────────── */
+/* Téléphone : photo 56 · (nom + prix / N° · site · compte / état / frise) ; dessous, à droite, les actions. */
+@media (max-width: 1023px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] { padding: 12px 14px !important; gap: 10px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle {
+    display: grid !important; grid-template-columns: 56px minmax(0, 1fr) !important; column-gap: 12px !important; row-gap: 8px !important; align-items: start !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { grid-column: 1 !important; grid-row: 1 / span 2 !important; width: 56px !important; height: 56px !important; border-radius: 12px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-fu-vente-txt { grid-column: 2 !important; grid-row: 1 !important; }
+  /* Le « … » se pose sous le prix : seules les lignes 2 et 3 lui laissent sa place. */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:has(> .vrm-fu-plus-vente) > button.vrm-ledger-sale-toggle :is(.vrm-fu-vente-l2, .vrm-fu-vente-l3) { padding-right: 40px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise { display: block !important; grid-column: 2 !important; grid-row: 2 !important; max-width: 220px !important; position: static !important; width: auto !important; height: auto !important; clip: auto !important; overflow: visible !important; }
+  /* Le « … » de la ligne : en haut à droite, 44 px. */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] { position: relative !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-fu-plus-vente { position: absolute !important; top: 48px !important; right: 6px !important; width: 44px !important; height: 44px !important; min-height: 44px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord { padding-left: 68px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > :is(.vrm-fp-ligne, .vrm-fu-apres, .vrm-note-rangee, .vrm-remise-ligne) { margin-left: 68px !important; }
+}
+
+/* Ordinateur : UNE grille alignée. La ligne = [ligne cliquable][actions 168 px][… 44 px] ;
+   dans la ligne cliquable : photo 56 · N° + titre · état + frise · prix · bénéfice. */
+@media (min-width: 1024px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) 168px 44px !important; column-gap: 12px !important; row-gap: 6px !important;
+    align-items: center !important; padding: 10px 14px !important; position: relative !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle {
+    grid-column: 1 !important; grid-row: 1 !important;
+    display: grid !important; grid-template-columns: 56px minmax(0, 1fr) 190px 88px 96px !important; grid-template-rows: auto auto !important;
+    column-gap: 16px !important; row-gap: 6px !important; align-items: center !important; min-height: 56px !important; padding: 0 !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { grid-column: 1 !important; grid-row: 1 / 3 !important; width: 56px !important; height: 56px !important; border-radius: 12px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-title { grid-column: 2 !important; grid-row: 1 / 3 !important; gap: 3px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-nom { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; font-size: 15px !important; font-weight: 600 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3 !important; grid-row: 1 !important; align-self: end !important; font-size: 13px !important; font-weight: 600 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise { display: block !important; grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; min-width: 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { grid-column: 4 !important; grid-row: 1 / 3 !important; text-align: right !important; font-size: 15px !important; font-weight: 600 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-benef { grid-column: 5 !important; grid-row: 1 / 3 !important; text-align: right !important; font-size: 15px !important; font-weight: 500 !important; }
+  /* « Bénéf. », « Achat » : dits UNE fois, dans l'en-tête des colonnes (§7). Le prix d'achat est dans la vente. */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-benef::before { content: none !important; display: none !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-achat { display: none !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus { display: none !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord { grid-column: 2 !important; grid-row: 1 !important; justify-self: end !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord :is(button, a) { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; font-size: 13px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-fu-plus-vente { position: static !important; grid-column: 3 !important; grid-row: 1 !important; width: 36px !important; height: 36px !important; min-height: 36px !important; justify-self: end !important; }
+  /* Ce qui suit la ligne (note, gestes ouverts par « … », « Déposé », facture, bon de retour, remise en vente) : dessous, aligné sur le titre. */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > :not(button.vrm-ledger-sale-toggle):not(.vrm-rangee-bord):not(.vrm-fu-plus-vente):not(.vrm-ledger-drawer-host) { grid-column: 1 / -1 !important; margin-left: 72px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fp-ligne :is(button, a, .vrm-b) { min-height: 32px !important; height: auto !important; padding: 6px 12px !important; font-size: 13px !important; width: auto !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fp-ligne { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; align-items: center !important; }
+  /* L'en-tête des colonnes, aligné sur la grille (sur ordinateur seulement). */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ledger-heading { display: none !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete {
+    display: grid !important; grid-template-columns: 56px minmax(0, 1fr) 190px 88px 96px !important; column-gap: 16px !important;
+    padding: 10px calc(14px + 168px + 44px + 24px) 8px 14px !important; margin: 0 !important; background: none !important; border: 0 !important;
+    border-bottom: 1px solid var(--vrm-line, rgba(60, 60, 67, .18)) !important;
+    font: 600 12px/1.2 var(--vrm-police, sans-serif) !important; color: var(--fu-gris, #6e6e73) !important; letter-spacing: 0 !important; text-transform: none !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete > span:nth-child(5),
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete > span:nth-child(7) { display: none !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete > .is-droite { text-align: right !important; }
+}
+
+/* Une rangée de note vide (aucune note sur la paire) ne laisse plus un trou de 8 px + un écart. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-note-rangee:empty { display: none !important; }
+/* Téléphone : les colonnes de l'ordinateur (cachées, lues par VoiceOver) ne créent aucune rangée de grille. */
+@media (max-width: 1023px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > :is(.vrm-ledger-sale-title, .vrm-ledger-sale-state, .vrm-ledger-sale-amount, .vrm-ledger-sale-achat, .vrm-ledger-sale-benef, .vrm-ledger-sale-plus) { grid-column: 2 !important; grid-row: 1 !important; }
+}
+
+/* Le bouton d'impression d'une carte « À expédier » est porté par une règle à dix classes répétées
+   (fusion.css, styles-vitrine.css) : il lui faut la même force pour redevenir une action secondaire. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] {
+  background: var(--d-remplir, rgba(118, 118, 128, .12)) !important; color: var(--fu-encre, #1d1d1f) !important; border: 0 !important; box-shadow: none !important;
+}
+:root[data-theme="dark"]:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] {
+  background: rgba(118, 118, 128, .24) !important; color: #f5f5f7 !important;
+}
+@media (min-width: 1024px) {
+  /* Ordinateur : la même action, avec son mot (« Imprimer »), compacte. */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] {
+    width: auto !important; height: 36px !important; min-height: 36px !important; padding: 0 12px !important; border-radius: 12px !important;
+    font-size: 13px !important; gap: 6px !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] .vrm-lib-court.vrm-lib-court.vrm-lib-court { display: inline !important; font-size: 13px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] svg { width: 16px !important; height: 16px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord > :not(.vrm-puce-transp) { width: auto !important; }
+}

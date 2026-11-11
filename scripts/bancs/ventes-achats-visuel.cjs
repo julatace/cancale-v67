@@ -178,6 +178,7 @@ const MESURE = () => {
             // « Tous les sites » d'abord (l'écran tel qu'il s'ouvre), puis le filtre Vinted (la liste des ventes).
             await pg.waitForFunction(() => { const e = document.querySelector('[data-colis-section="ventes"]'); return e && e.getBoundingClientRect().height > 0 && !document.getElementById('vrm-demarrage'); }, null, { timeout: 40000 }).catch(() => {});
             await pg.waitForTimeout(2500);
+            if (process.env.BANC_EVAL_TOUS) console.log(await pg.evaluate(process.env.BANC_EVAL_TOUS));
             await shot(pg, `ventes-achats-visuel-tous-${k}`);
             await shot(pg, `ventes-achats-visuel-tous-liste-${k}`, '[data-colis-section="ventes"] ~ *');
             const MT = await pg.evaluate(MESURE);
@@ -186,6 +187,7 @@ const MESURE = () => {
             await pg.click('[data-filtre-site] button[data-site="vinted"]').catch(() => {});
             await pg.waitForFunction(() => document.querySelectorAll('[data-fu-imprimer]').length >= 3 && [...document.querySelectorAll('.vrm-sale-row[data-tx]')].filter((e) => e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden').length >= 6, null, { timeout: 40000 }).catch(() => {});
             await pg.waitForTimeout(1500);
+            if (process.env.BANC_EVAL) console.log(await pg.evaluate(process.env.BANC_EVAL));
             const nb = await pg.evaluate(() => ({ imp: document.querySelectorAll('[data-fu-imprimer]').length, lignes: document.querySelectorAll('.vrm-sale-row[data-tx]').length }));
             dit(nb.imp >= 3 && nb.lignes >= 6, `${k} Ventes : les 3 bordereaux et les 6 ventes sont à l'écran`, JSON.stringify(nb));
             await shot(pg, `ventes-achats-visuel-ventes-${k}`);
@@ -200,7 +202,9 @@ const MESURE = () => {
               const imp = [...document.querySelectorAll('[data-fu-imprimer]')].filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), bg: getComputedStyle(e).backgroundColor }; });
               const frises = [...document.querySelectorAll('.vrm-sale-row [data-fu-frise]')].filter(vis).map((f) => {
                 const segs = [...f.querySelectorAll('[data-fu-etape]')];
-                const mots = segs.filter((s) => { const sp = s.querySelector(':scope > span'); if (!sp) return false; const r = sp.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(sp).visibility !== 'hidden' && +getComputedStyle(sp).opacity > 0.05; }).length;
+                // Les mots VISIBLES de la frise : un libellé de segment ou la légende, dont la boîte se voit (un texte
+                // réservé à VoiceOver fait 1 px et ne compte pas).
+                const mots = [...f.querySelectorAll('[data-fu-etape] span, [data-fu-legende]')].filter((sp) => { const r = sp.getBoundingClientRect(); const cs = getComputedStyle(sp); return r.width > 2 && r.height > 2 && cs.visibility !== 'hidden' && +cs.opacity > 0.05 && (sp.innerText || '').trim(); }).length;
                 const traits = segs.map((s) => { const i = s.querySelector('i'); return i ? Math.round(i.getBoundingClientRect().height * 10) / 10 : 0; });
                 const couleurs = segs.map((s) => ({ c: s.getAttribute('data-fu-etape'), fait: s.getAttribute('data-fait'), cours: s.hasAttribute('data-cours'), der: s.hasAttribute('data-derniere'), ton: s.getAttribute('data-ton') || '', bg: getComputedStyle(s.querySelector('i') || s).backgroundColor }));
                 return { mots, traits, couleurs, h: Math.round(f.getBoundingClientRect().height) };
@@ -209,7 +213,8 @@ const MESURE = () => {
               const invite = document.querySelector('[data-ventes-achats]'); const nInvites = document.querySelectorAll('[data-ventes-achats]').length;
               const petites = tel ? rows.flatMap((r) => [...r.querySelectorAll('button, a[href]')].filter(vis).filter((e) => !e.closest('.vrm-ledger-drawer-host')).map((e) => ({ t: (e.getAttribute('aria-label') || e.innerText || '').trim().slice(0, 24), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h < 44)) : [];
               const groupes = [...document.querySelectorAll('[data-groupe-transporteur]')].filter(vis).map((g) => { const im = g.querySelector('svg, img'); return { h: Math.round(g.getBoundingClientRect().height), logo: im ? Math.round(im.getBoundingClientRect().height) : 0 }; });
-              return { nInvites, haut, imp, frises, saisir, invite: invite ? { n: invite.getAttribute('data-ventes-achats'), t: invite.innerText.trim().slice(0, 80) } : null, petites, groupes };
+              const benefs = rows.map((r) => { const b = r.querySelector('.vrm-ledger-sale-benef'); return b ? { etat: b.getAttribute('data-benef-etat'), t: (b.textContent || '').trim() } : null; });
+              return { benefs, nInvites, haut, imp, frises, saisir, invite: invite ? { n: invite.getAttribute('data-ventes-achats'), t: invite.innerText.trim().slice(0, 80) } : null, petites, groupes };
             }, tel);
             const maxH = tel ? 190 : 96;
             dit(R.haut.length >= 6 && Math.max(...R.haut) <= maxH, `${k} Ventes : H chaque carte de vente ≤ ${maxH} px`, R.haut.join(','));
@@ -222,6 +227,7 @@ const MESURE = () => {
             dit(R.frises.length >= 4 && bleusHorsActuelle.length === 0, `${k} Ventes : F le bleu seulement sur l'étape actuelle (passées neutres)`, JSON.stringify(bleusHorsActuelle));
             const ambresSansGeste = R.frises.flatMap((f) => f.couleurs.filter((c) => ambreS(c.bg) && c.ton !== 'urgent').map((c) => c.c));
             dit(ambresSansGeste.length === 0, `${k} Ventes : F l'ambre seulement si un geste est dû`, JSON.stringify(ambresSansGeste));
+            dit(R.benefs.length >= 6 && R.benefs.every((b) => b && (b.etat === 'annulee' || /€|—/.test(b.t))), `${k} Ventes : le bénéfice reste écrit sur chaque ligne (montant ou « — »)`, JSON.stringify(R.benefs));
             dit(R.saisir === 0, `${k} Ventes : S « à saisir » n'est écrit sur aucune ligne`, String(R.saisir));
             dit(R.invite && /^\d+\/\d+$/.test(R.invite.n) && R.nInvites === 1, `${k} Ventes : S une seule invitation groupée en tête (prix d'achat à saisir)`, JSON.stringify(R.invite));
             if (tel) dit(R.petites.length === 0, `${k} Ventes : T toutes les cibles de la ligne ≥ 44 px`, JSON.stringify(R.petites.slice(0, 6)));
@@ -241,10 +247,15 @@ const MESURE = () => {
           await essaie('Achats', async () => {
             await pg.waitForFunction(() => /Golf Adidas Samba/.test(document.body.innerText), null, { timeout: 40000 }).catch(() => {});
             await pg.waitForTimeout(1500);
+            if (process.env.BANC_EVAL_ACHATS) console.log(await pg.evaluate(process.env.BANC_EVAL_ACHATS));
             await shot(pg, `ventes-achats-visuel-achats-${k}`);
-            await shot(pg, `ventes-achats-visuel-achats-liste-${k}`, '[data-colis-section="achats"] ~ *, .vrm-achats-liste, [data-achat-tx]');
+            await shot(pg, `ventes-achats-visuel-achats-liste-${k}`, '.vrm-buy-row[data-achat-tx]');
             const M = await pg.evaluate(MESURE);
             dit(M.pleins.length <= 1, `${k} Achats : A au plus UN bouton bleu plein`, JSON.stringify(M.pleins));
+            // A. Plus de bandeau gris pleine largeur portant un logo centré sur une ligne d'achat.
+            const bandeaux = await pg.evaluate(() => [...document.querySelectorAll('.vrm-buy-row[data-achat-tx]')].flatMap((r) => { const lw = r.getBoundingClientRect().width; return [...r.querySelectorAll('.vrm-puce-transp, [data-transporteur]')].filter((p) => { const b = p.getBoundingClientRect(); return b.width > lw * 0.5 && b.height > 0; }).map((p) => r.getAttribute('data-achat-tx') + ':' + Math.round(p.getBoundingClientRect().width) + '/' + Math.round(lw)); }));
+            const nAchats = await pg.evaluate(() => document.querySelectorAll('.vrm-buy-row[data-achat-tx]').length);
+            dit(nAchats >= 2 && bandeaux.length === 0, `${k} Achats : A aucun bandeau transporteur pleine largeur sur une ligne d'achat`, JSON.stringify({ nAchats, bandeaux }));
             if (!tel) dit(M.larges.length === 0, `${k} Achats : W aucun bouton pleine largeur`, JSON.stringify(M.larges));
             await sain(pg, `${k} Achats`);
           });
