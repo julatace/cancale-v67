@@ -33,7 +33,9 @@ aucun nom de variable ni clé de données touché (`paires`, `vinted_paires_dorm
   mois, registre des achats), Republier, Leboncoin, eBay (gestion, recherche, alertes),
   Vestiaire, Messages (fils, Leboncoin), À trancher, offres auto, favoris auto, studio photo,
   recherche photo, fiche, Loupe, Organisation (atelier), « Tes données ».
-- **Aide** : le « ? » de chaque écran (étapes + questions) passe par `phraseVendeur`.
+- **Aide** : le « ? » de chaque écran (étapes + questions) passe par `phraseVendeur` ; après la
+  fusion du centre d'aide de main (qui remplace des groupes de mots, `pourVendeur`), l'aide fait
+  `pourVendeur(phraseVendeur(t, vend), vend)` : la phrase écrite en entier d'abord, sinon la table de main.
 - **Recherche / raccourcis** : groupe « Articles » de la recherche, ⌘K « La fiche de
   l'article » (mot-clé « article » ajouté).
 - **Serveur** (`api/_lib/mots-vendeur.js`, importe la règle de l'app telle quelle) : ce que
@@ -99,6 +101,14 @@ manquait (B7 exige qu'il soit chargé avant).
   infos-vinted (le manifeste charge `vrm-mots.js` en tête). `vestiaire-regle.js` reçoit le mot
   en paramètre (copié seul par 4 audits). `vrm-regles-achat.js` recopié
   (`regles-achat-extension.cjs --recopie`).
+
+## Fusions
+Deux `git merge origin/main` (le second apporte l'extension 5.344 et le centre d'aide) : 5.347.0
+gardée (CODE_VERSION, manifeste, EXT_ATTENDUE, lbc-inject/relay, Orion), zips et
+`vrm-regles-achat.js` refabriqués, conflits résolus en gardant les deux côtés. Après fusion :
+build vert, audits de la consigne verts, `audit-centre-aide` vert, vocabulaire-article vert,
+mutations 20/20, banc V3/V5/V6 vert (84 OK). Note : un `fetch --depth=1` de ma part avait
+rendu le dépôt local superficiel (audit-coherence « pas su ») ; `git fetch --unshallow` l'a réparé.
 
 ## Limites dites
 - Un écran déjà ouvert ne se redessine pas au moment où il répond « Tu vends quoi ? » :

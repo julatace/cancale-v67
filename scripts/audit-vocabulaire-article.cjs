@@ -72,6 +72,7 @@ const PERMIS = [
   ['src/annulerCommandes.js', /^(Relier un achat à une paire|N° déjà servi|sort la paire du stock|Achats, Compta, Paramètres, Messages, fiche paire)/, 'CONFIRMATIONS : l’inventaire lu par audit-annuler-commandes, jamais affiché'],
   ['src/operations/description.js', /^À plusieurs : tâches, paires/, '`DESCRIPTION_ORGANISATION` gardée pour les audits d’Organisation ; l’app lit `descriptionOrganisation()`'],
   ['api/_lib/vestiaire-regle.js', /^la paire$/, 'repli quand aucun mot n’est passé (serveur seul) ; l’app passe `mots: motsVendeur()` (B10)'],
+  ['src/aideFiches.js', /^(Deux paires présentes|deux paires présentes|une autre paire|la bonne paire|Chaque paire|chaque paire|deux paires|Une paire|une paire|La paire|de la paire|la paire|Tes paires|tes paires|les paires|des paires)$/, 'GROUPES_AUTRE (centre d’aide, lot de main) : la colonne Sneakers de sa table de remplacement (audit-centre-aide)'],
   ['src/aideEcrans.js', null, 'rendu par `phraseVendeur` (AideEcran.jsx) : chaque phrase a sa version « article » (B2, B3)'],
   ['src/aideEtapes.js', null, 'généré par scripts/aide-generer.cjs ; rendu par `phraseVendeur` (B2, B3)'],
   ['src/rechercheUnique.js', /^Paires$/, 'GROUPES_LOUPE : l’étiquette « Paires » est remplacée par `motsVendeur().Noms` dans la recherche (App.jsx, B9)'],
@@ -79,7 +80,7 @@ const PERMIS = [
   ['api/_lib/veille-plantages.js', /^Fiche d’une paire$/, 'alerte TECHNIQUE envoyée au seul propriétaire de l’installation (VRM_OWNER_UID)'],
 ];
 // Une ligne gardée par « sneakers » (même ligne) : le texte de Sneakers, l'autre branche dit article.
-const GARDE = /(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'/;
+const GARDE = /seul: 'sneakers'|(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'/;
 const MOT = /\b[Pp]aires?\b/;
 
 function textesDe(racine, rel, parse, traverse) {
@@ -287,7 +288,7 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   const app = lire(racine, 'src/App.jsx');
   dit(/poserSourceVend\(\(\) => vendActuel\(\)\);/.test(app), 'B1 l’app pose la source du vocabulaire (`poserSourceVend(() => vendActuel())`)');
   const aide = lire(racine, 'src/composants/AideEcran.jsx');
-  dit(/phraseVendeur\(e\)/.test(aide) && /phraseVendeur\(q\)/.test(aide) && /phraseVendeur\(r\)/.test(aide), 'B2 l’aide du « ? » (étapes, questions, réponses) passe par `phraseVendeur`');
+  dit(/phraseVendeur\(e, vend\)/.test(aide) && /phraseVendeur\(qq, vend\)/.test(aide) && /phraseVendeur\(r, vend\)/.test(aide), 'B2 l’aide du « ? » (étapes, questions, réponses) passe par `phraseVendeur`');
   try {
     const AE = await imp(racine, 'src/aideEcrans.js'), ET = await imp(racine, 'src/aideEtapes.js');
     const phrases = [...Object.values(ET.ETAPES_ECRANS).flat(), ...Object.values(AE.AIDE_ECRANS).flatMap((a) => a.questions.flat())].filter((t) => MOT.test(t));
@@ -319,7 +320,7 @@ const MUTATIONS = [
   ['src/App.jsx', 'un texte remis en « paire »', '`${motsVendeur().Aucune} à baisser`', "'Aucune paire à baisser'"],
   ['src/App.jsx', 'un texte remis en « paire » (JSX)', '>Régler par {motsVendeur().nom}, voir l’historique ›</button>', '>Régler par paire, voir l’historique ›</button>'],
   ['src/aTrancher.js', 'une règle pure remise en « paire »', "get 'numeros-double'() { return `N° portés par deux ${motsVendeur().noms}`; },", "'numeros-double': 'N° portés par deux paires',"],
-  ['src/composants/AideEcran.jsx', 'l’aide ne passe plus par phraseVendeur', '<span>{phraseVendeur(e)}</span>', '<span>{e}</span>'],
+  ['src/composants/AideEcran.jsx', 'l’aide ne passe plus par phraseVendeur', 'pourVendeur(phraseVendeur(r, vend), vend)', 'pourVendeur(r, vend)'],
   ['src/profilVendeur.js', 'une phrase d’aide sans version article', "  'Range chaque paire là où VRM l’indique.': 'Range chaque article là où VRM l’indique.',\n", ''],
   ['api/_lib/bilan-semaine.js', 'Ma semaine ignore le mot', '${b.dorment.n > 1 ? mots.noms : mots.nom} en ligne', '${b.dorment.n > 1 ? \'paires\' : \'paire\'} en ligne'],
   ['api/ship-reminders.js', 'Ma semaine ne lit plus vrm_je_vends', 'const MAIN_BILAN = [MAIN_MOTS, ', 'const MAIN_BILAN = ['],
