@@ -26,11 +26,15 @@ require('./_porte-banc.cjs');
 //   P12 Délier Google, seule façon de se connecter ⇒ refusé, rien envoyé
 //   P13 Délier Google quand l'e-mail du compte change ⇒ dit AVANT ; puis délié,
 //       la photo passe de Google à Discord
+//   P14 (bug mesuré en production) liaison Discord puis déconnexion puis « Continuer
+//       avec Discord » : du 1er coup ; retour dans une autre fenêtre qui garde un vieux
+//       vérificateur (avec et sans l'identifiant de tentative) : connecté
 //  Partout : aucun jeton, code ni `error_*` laissé dans l'adresse, aucune erreur d'app.
 //  BANC_DIST, BANC_CAPTURES.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
-const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
+const path = require('path'), fs = require('fs'), http = require('http'), os = require('os'), crypto = require('crypto');
+const defi = (v) => crypto.createHash('sha256').update(String(v)).digest('base64url');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); } catch (_) { ({ chromium } = require('playwright')); }
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
@@ -68,6 +72,7 @@ function adresseRetour(redirect, rep) {
 // sc : { authorize(provider) → {code}|{error…}, token(corps) → {status, body}, fiche, session, url, stock, apiAnnule }
 async function ouvrir(b, largeur, sc) {
   const mobile = largeur < 700;
+  sc.flux = sc.flux || {}; sc.n = sc.n || 0;
   const ctx = await b.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, locale: 'fr-FR', timezoneId: 'Europe/Paris', deviceScaleFactor: 2 });
   const pg = await ctx.newPage();
   const j = { errs: [], authorize: [], lier: [], tokens: [], supprimes: [], annuler: 0, urls: [] };
@@ -82,7 +87,7 @@ async function ouvrir(b, largeur, sc) {
     const u = r.request().url();
     if (/cdn\.discordapp\.com|googleusercontent\.com/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: PNG_1 });
     // Chez Discord / Google (liaison) : il autorise, Supabase renvoie vers VRM.
-    if (/^https:\/\/(discord\.com|accounts\.google\.com)\//.test(u)) { const red = sc.lienRetour; return r.fulfill({ status: 302, headers: { location: adresseRetour(red, sc.retourLiaison || { code: 'code-liaison' }) } }); }
+    if (/^https:\/\/(discord\.com|accounts\.google\.com)\//.test(u)) { const red = sc.lienRetour; const rep = sc.retourLiaison || { code: 'code-liaison-' + (++sc.n) }; if (rep.code) sc.flux[rep.code] = sc.defiLiaison; return r.fulfill({ status: 302, headers: { location: adresseRetour(red, rep) } }); }
     return r.abort();
   });
   await pg.route('**/auth/v1/**', async (r) => {
@@ -90,7 +95,7 @@ async function ouvrir(b, largeur, sc) {
     if (/\/auth\/v1\/settings$/.test(u.pathname)) return json(r, { external: { email: true, google: true, discord: true }, mailer_autoconfirm: false });
     if (/\/auth\/v1\/user\/identities\/authorize$/.test(u.pathname)) {
       j.lier.push({ url: u.href, auth: r.request().headers().authorization || '' });
-      sc.lienRetour = u.searchParams.get('redirect_to');
+      sc.lienRetour = u.searchParams.get('redirect_to'); sc.defiLiaison = u.searchParams.get('code_challenge');
       if (sc.manualOff) return json(r, { code: 422, error_code: 'manual_linking_disabled', msg: 'Manual linking is disabled' }, 422);
       return json(r, { url: `https://discord.com/oauth2/authorize?client_id=banc&state=x` });
     }
@@ -105,10 +110,18 @@ async function ouvrir(b, largeur, sc) {
     if (/\/auth\/v1\/user$/.test(u.pathname)) return sc.fiche ? json(r, sc.fiche) : json(r, { msg: 'invalid JWT' }, 401);
     if (/\/auth\/v1\/authorize$/.test(u.pathname)) {
       j.authorize.push(u.href);
-      return r.fulfill({ status: 302, headers: { location: adresseRetour(u.searchParams.get('redirect_to'), sc.authorize(u.searchParams.get('provider'))) } });
+      const rep = Object.assign({}, sc.authorize(u.searchParams.get('provider')));
+      if (rep.code) { rep.code = rep.code + '-' + (++sc.n); sc.flux[rep.code] = u.searchParams.get('code_challenge'); }
+      const loc = adresseRetour(sc.retourSansEssai ? u.searchParams.get('redirect_to').replace(/\?vrm_essai=[^&]*$/, '') : u.searchParams.get('redirect_to'), rep);
+      if (sc.retenir) { sc.retenu = loc; return r.fulfill({ status: 204, body: '' }); }
+      return r.fulfill({ status: 302, headers: { location: loc } });
     }
     if (/\/auth\/v1\/token$/.test(u.pathname) && u.searchParams.get('grant_type') === 'pkce') {
       const corps = JSON.parse(r.request().postData() || '{}'); j.tokens.push(corps);
+      // Comme Supabase (token.go) : le défi de CE flux doit correspondre, sinon 400 et le code reste valable.
+      const d = sc.flux[corps.auth_code];
+      if (d && defi(corps.code_verifier) !== d) { j.refusVerif = (j.refusVerif || 0) + 1; return json(r, { code: 400, error_code: 'bad_code_verifier', msg: 'code challenge does not match previously saved code verifier' }, 400); }
+      if (d) delete sc.flux[corps.auth_code];
       const t = sc.token(corps, j.tokens.length); return json(r, t.body, t.status);
     }
     if (/\/auth\/v1\/token$/.test(u.pathname)) return json(r, { error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' }, 400);
@@ -151,7 +164,7 @@ async function parcours(b, largeur) {
     const neuf = { id: UID_NEUF, email: 'neuve@gmail.test', created_at: ilYa(0.02), last_sign_in_at: ilYa(0.02), identities: [ident('google', 'neuve@gmail.test', { cree: ilYa(0.02) })] };
     const { pg, ctx, j } = await parBouton(b, largeur, { authorize: () => ({ code: 'code-p1' }), token: () => tokenDe(neuf), fiche: neuf }, /Créer mon compte avec Google/, { inscription: true });
     dit(j.authorize.length === 1 && /provider=google/.test(j.authorize[0]) && /code_challenge_method=s256/.test(j.authorize[0]), `${tag} · P1 inscription Google : un seul départ, PKCE s256`, JSON.stringify(j.authorize));
-    dit(j.tokens.length === 1 && j.tokens[0].auth_code === 'code-p1' && (j.tokens[0].code_verifier || '').length >= 43, `${tag} · P1 le code est échangé une fois, avec le vérificateur`, JSON.stringify(j.tokens));
+    dit(j.tokens.length === 1 && /^code-p1-/.test(j.tokens[0].auth_code) && (j.tokens[0].code_verifier || '').length >= 43, `${tag} · P1 le code est échangé une fois, avec le vérificateur`, JSON.stringify(j.tokens));
     dit(await pg.locator('[data-porte-nouveau-oauth]').count() >= 1 && j.annuler === 0, `${tag} · P1 compte neuf voulu (inscription) : rien annulé, la porte « déjà un compte ? »`);
     dit(adressePropre(pg.url()) && !j.errs.length, `${tag} · P1 adresse propre, aucune erreur`, pg.url() + ' ' + j.errs.join('|'));
     await capture(pg, `${tag}-p1-inscription-google`); await ctx.close();
@@ -275,6 +288,50 @@ async function parcours(b, largeur) {
     dit(s13 && s13.user && s13.user.email === 'pseudo@discord.test' && /pseudo@discord\.test/.test(t2), `${tag} · P13 l’e-mail affiché suit celui que Supabase a posé`, JSON.stringify(s13 && s13.user));
     dit(!o.j.errs.length, `${tag} · P13 aucune erreur d’app`, o.j.errs.join('|'));
     await capture(o.pg, `${tag}-p13-delie`); await o.ctx.close();
+  });
+
+  // ── P14 : le vérificateur de CETTE tentative (bug mesuré en production le 11 nov.) ──
+  await essai('P14 suite', async () => {
+    // Relier Discord, se déconnecter, puis « Continuer avec Discord » : du 1er coup.
+    const fiche = ficheVieille([ident('email', 'vendeuse@exemple.test')]);
+    const sc = { session: SESSION(), fiche, url: COMPTE, attente: 5500, authorize: () => ({ code: 'code-p14' }), token: () => { if (!fiche.identities.some((i) => i.provider === 'discord')) fiche.identities.push(ident('discord', 'pseudo@discord.test', { cree: ilYa(0.01) })); return tokenDe(fiche); } };
+    const o = await ouvrir(b, largeur, sc);
+    await toucher(o.pg, o.pg.locator('[data-connexion-relier="discord"]'), mobile);
+    for (let i = 0; i < 60 && !o.j.tokens.length; i++) await o.pg.waitForTimeout(150);
+    await o.pg.waitForTimeout(3500);
+    dit(o.j.tokens.length === 1 && !o.j.refusVerif && /Ton compte Discord est associé/.test(await texte(o.pg)), `${tag} · P14 liaison Discord réussie`, JSON.stringify({ t: o.j.tokens.length, r: o.j.refusVerif }));
+    // Déconnexion par le menu du profil (le vrai geste), sinon par l'app elle-même.
+    let deco = false;
+    try { await toucher(o.pg, o.pg.locator(mobile ? '[data-profil-tete]' : '[data-nav-compte]'), mobile); await o.pg.waitForTimeout(500); await toucher(o.pg, o.pg.getByRole('button', { name: /Se déconnecter/ }), mobile); await o.pg.waitForTimeout(800); const c = o.pg.getByRole('button', { name: /^Se déconnecter$/ }).filter({ visible: true }); if (await c.count()) { await toucher(o.pg, c.last(), mobile); } await o.pg.waitForTimeout(1500); deco = !(await sessionDe(o.pg)); } catch (_) {}
+    dit(deco, `${tag} · P14 déconnecté par « Se déconnecter »`);
+    await o.pg.goto(`http://localhost:${srv.address().port}/?connexion`, { waitUntil: 'domcontentloaded' }); await o.pg.waitForTimeout(2500);
+    const avant = o.j.tokens.length;
+    await toucher(o.pg, o.pg.getByRole('button', { name: /Continuer avec Discord/ }), mobile);
+    for (let i = 0; i < 60 && o.j.tokens.length === avant; i++) await o.pg.waitForTimeout(150);
+    await o.pg.waitForTimeout(4000);
+    const s = await sessionDe(o.pg);
+    dit(o.j.tokens.length === avant + 1 && !o.j.refusVerif && s && s.user && s.user.id === UID, `${tag} · P14 puis « Continuer avec Discord » : connecté du 1er coup, un seul échange, aucun refus`, JSON.stringify({ t: o.j.tokens.length - avant, refus: o.j.refusVerif, u: s && s.user, txt: (await texte(o.pg)).slice(0, 160) }));
+    dit(/vrm_essai=[a-z0-9]{6,}/.test(decodeURIComponent(o.j.authorize[o.j.authorize.length - 1] || '')) && adressePropre(o.pg.url()) && !/vrm_essai/.test(o.pg.url()), `${tag} · P14 l’adresse de retour porte la tentative, puis la quitte`, o.pg.url());
+    await o.ctx.close();
+  });
+  for (const sansEssai of [false, true]) await essai('P14 autre contexte', async () => {
+    // Départ dans un onglet ; le retour arrive dans une AUTRE fenêtre de VRM (app installée qui
+    // capte le lien, onglet dupliqué) dont l'onglet garde le vérificateur d'une vieille tentative.
+    const fiche = ficheVieille([ident('discord', 'vendeuse@exemple.test')]);
+    const sc = { url: '/?connexion', retenir: true, retourSansEssai: sansEssai, authorize: () => ({ code: 'code-p14b' }), token: () => tokenDe(fiche), fiche };
+    const o = await ouvrir(b, largeur, sc);
+    await toucher(o.pg, o.pg.getByRole('button', { name: /Continuer avec Discord/ }), mobile);
+    for (let i = 0; i < 40 && !sc.retenu; i++) await o.pg.waitForTimeout(150);
+    const p2 = await o.ctx.newPage();
+    const errs2 = []; p2.on('pageerror', (e) => errs2.push(String(e.message || e)));
+    await p2.addInitScript(() => { try { if (!sessionStorage.getItem('banc_vieux')) { sessionStorage.setItem('vrm_pkce', 'v'.repeat(64)); sessionStorage.setItem('banc_vieux', '1'); } } catch (_) {} });
+    await p2.goto(sc.retenu, { waitUntil: 'domcontentloaded' }); await p2.waitForTimeout(4000);
+    const s = await sessionDe(p2), t = await texte(p2);
+    dit(s && s.user && s.user.id === UID && !/expiré ou a déjà servi|n’a pas pu aboutir/.test(t), `${tag} · P14 retour dans une autre fenêtre avec un vieux vérificateur${sansEssai ? ' (Supabase sans l’identifiant : Site URL)' : ''} : connecté`, JSON.stringify({ tokens: o.j.tokens.length, refus: o.j.refusVerif, t: t.slice(0, 200) }));
+    dit(sansEssai ? o.j.tokens.length <= 3 : (o.j.tokens.length === 1 && !o.j.refusVerif), `${tag} · P14 ${sansEssai ? 'au plus 3 échanges, le bon trouvé' : 'le bon vérificateur du 1er coup (identifiant de la tentative)'}`, JSON.stringify({ tokens: o.j.tokens.length, refus: o.j.refusVerif }));
+    const reste = await p2.evaluate(() => [localStorage.getItem('vrm_pkce'), sessionStorage.getItem('vrm_pkce'), localStorage.getItem('vrm_pkce_essais'), sessionStorage.getItem('vrm_pkce_essais')]);
+    dit(reste.every((x) => !x) && adressePropre(p2.url()) && !errs2.length, `${tag} · P14 tout vérificateur effacé après l’échange, adresse propre`, JSON.stringify(reste) + ' ' + p2.url());
+    await o.ctx.close();
   });
 }
 

@@ -104,6 +104,39 @@ function chargerRegle(texte) {
       && /adresse restante est déjà prise/.test(D.refusDelier(422, { error_code: 'email_conflict_identity_not_deletable', msg: 'Unable to unlink identity due to email conflict' }, 'discord')), 'D1 les refus réels du retrait, en français');
   }
 
+  // ── K1 : un vérificateur par tentative (bug mesuré en production le 11 nov.) ──
+  let K = null;
+  try { K = await import(path.join(RACINE, 'src', 'auth', 'essaisPkce.js')); } catch (_) { K = null; }
+  dit(!!K && typeof K.candidatsVerificateur === 'function', 'K0 · la règle des tentatives existe (src/auth/essaisPkce.js)');
+  if (K && K.candidatsVerificateur) {
+    const V = (c) => c.repeat(64), maint = Date.now();
+    const mem = () => { const m = {}; return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; }, m }; };
+    const onglet = mem(), appareil = mem();
+    K.poserEssai([onglet, appareil], 'essaiun', V('a'), maint - 5000);
+    K.poserEssai([appareil], 'essaideux', V('b'), maint - 1000);
+    const essais = K.prendreEssais([mem(), appareil], maint);
+    dit(!!essais.essaiun && !!essais.essaideux && appareil.getItem(K.CLE_ESSAIS) === null, 'K1 les tentatives sont lues puis effacées (une fois)', JSON.stringify(Object.keys(essais)));
+    const c1 = K.candidatsVerificateur({ idRetour: 'essaiun', essais, onglet: V('z'), appareil: V('b') });
+    dit(c1[0].v === V('a'), 'K1 le retour présente d’abord le vérificateur de SA tentative (pas celui de l’onglet)', JSON.stringify(c1.map((x) => x.v[0])));
+    const c2 = K.candidatsVerificateur({ idRetour: '', essais, onglet: V('z'), appareil: V('b') });
+    dit(c2.map((x) => x.v[0]).join('') === 'zba', 'K1 sans identifiant (Site URL) : onglet, appareil, puis les tentatives de la plus récente à la plus vieille, sans doublon', JSON.stringify(c2.map((x) => x.v[0])));
+    const lia = { verifier: V('l'), essai: 'essailia', provider: 'discord', owner: 'u' };
+    const c3 = K.candidatsVerificateur({ idRetour: 'essaiun', essais, liaison: lia, onglet: V('z') });
+    dit(c3[0].v === V('a') && c3[0].liaison === false && c3.some((x) => x.v === V('l') && x.liaison), 'K1 une vieille liaison ne passe PAS devant la connexion en cours (et n’en fait pas une liaison)', JSON.stringify(c3));
+    const c4 = K.candidatsVerificateur({ idRetour: 'essailia', essais, liaison: lia });
+    dit(c4[0].v === V('l') && c4[0].liaison === true, 'K1 le retour de « Relier » prend le vérificateur de la liaison', JSON.stringify(c4[0]));
+    const vieux = mem(); vieux.setItem(K.CLE_ESSAIS, JSON.stringify({ x: { v: V('o'), at: maint - 11 * 60000 } }));
+    dit(!Object.keys(K.prendreEssais([vieux], maint)).length, 'K1 une tentative de plus de 10 min ne sert plus');
+  }
+  {
+    const APP0 = lire('src/App.jsx');
+    const cons = (/const consumeAuthRedirect = async \(\) => \{[\s\S]*?\n\};/.exec(APP0) || [''])[0];
+    const start = (/const oauthStart = async[\s\S]*?\n\};/.exec(APP0) || [''])[0];
+    dit(/vrm_essai=/.test(start) && /poserEssai\(/.test(start), 'K2 chaque départ porte SA tentative dans l’adresse de retour et range SON vérificateur');
+    dit(/candidatsVerificateur\(/.test(cons) && /for \(const c of candidats\.slice\(0, ESSAIS_MAX\)\)/.test(cons) && /r\.code !== 'bad_code_verifier'\) break/.test(cons), 'K2 au retour : les candidats dans l’ordre, un autre essai SEULEMENT sur « mauvais vérificateur », 3 au plus');
+    dit(/'vrm_essai'/.test((/const cleanAuthUrl = [\s\S]*?\n\};/.exec(APP0) || [''])[0]), 'K2 `vrm_essai` quitte l’adresse');
+  }
+
   // ── A1 : l'app ──────────────────────────────────────────────────────────
   const APP = lire('src/App.jsx'), REG = lire('src/ecrans/Reglages.jsx');
   const consume = (/const consumeAuthRedirect = async \(\) => \{[\s\S]*?\n\};/.exec(APP) || [''])[0];

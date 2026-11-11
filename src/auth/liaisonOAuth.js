@@ -1,5 +1,5 @@
 // Relier une identité au compte connecté, jamais ouvrir une nouvelle connexion.
-export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cle,origine,verifier,challenge,fetcher=fetch,storage=sessionStorage,stockageAppareil=localStorage,maintenant=Date.now()}){
+export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cle,origine,verifier,challenge,essai='',fetcher=fetch,storage=sessionStorage,stockageAppareil=localStorage,maintenant=Date.now()}){
  if(!['google','discord'].includes(provider)||!enabled)return{ok:false,error:'Cette connexion n’est pas encore activée dans VRM.'};
  if(!token||!owner)return{ok:false,error:'Reconnecte-toi à VRM avant de relier ce compte.'};
  const key='vrm_oauth_liaison';
@@ -9,7 +9,7 @@ export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cl
   // `fetch` suit la redirection et récupère du HTML → `r.json()` échoue, `j` est
   // nul, `new URL('')` lève → « Impossible de préparer ». Avec ce paramètre,
   // l'endpoint rend `{url}` en JSON (c'est ainsi que le SDK Supabase le lit).
-  url.search=new URLSearchParams({provider,redirect_to:origine+'/?tab=settings&vue=compte',code_challenge:challenge,code_challenge_method:'s256',skip_http_redirect:'true'}).toString();
+  url.search=new URLSearchParams({provider,redirect_to:origine+'/?tab=settings&vue=compte'+(/^[a-z0-9]{6,24}$/.test(essai)?'&vrm_essai='+essai:''),code_challenge:challenge,code_challenge_method:'s256',skip_http_redirect:'true'}).toString();
   const r=await fetcher(url.href,{headers:{apikey:cle,Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
   const j=await r.json().catch(()=>null);
   // (11 nov., lot DJ6) « Manual linking » éteint chez Supabase : le DIRE (geste du propriétaire),
@@ -18,7 +18,7 @@ export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cl
   if(!r.ok)return{ok:false,error:r.status===401?'Ta session a expiré. Reconnecte-toi avant de réessayer.':/manual.?linking|manual.*link.*disabled/i.test(t)?'La liaison n’est pas encore activée sur VRM. Ton compte reste inchangé.':/already.*link|identity.*(exists|already)/i.test(t)?'Ce compte est déjà relié à un autre compte VRM.':'La liaison n’est pas disponible pour le moment. Ton compte VRM reste inchangé.'};
   const retour=new URL(j?.url||'');const hotes=provider==='google'?['accounts.google.com']:['discord.com','discordapp.com'];
   if(retour.protocol!=='https:'||retour.username||retour.password||!hotes.includes(retour.hostname))throw Error('retour');
-  const contexte=JSON.stringify({owner,provider,verifier,at:maintenant});storage.setItem(key,contexte);try{stockageAppareil.setItem(key,contexte);}catch(_){}
+  const contexte=JSON.stringify({owner,provider,verifier,at:maintenant,...(essai?{essai}:{})});storage.setItem(key,contexte);try{stockageAppareil.setItem(key,contexte);}catch(_){}
   return{ok:true,url:retour.href};
  }catch(_){return{ok:false,error:'Impossible de préparer la liaison. Réessaie dans un instant.'};}
 }

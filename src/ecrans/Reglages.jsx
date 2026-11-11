@@ -11,6 +11,7 @@ import { HistoriqueModifications } from '../OutilsParcours.jsx';
 import { dateImportValide } from '../brouillonsReglages.js';
 import { preparerLiaisonOAuth } from '../auth/liaisonOAuth.js';
 import { planDelier, refusDelier } from '../auth/delierOAuth.js';
+import { nouvelIdEssai } from '../auth/essaisPkce.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ChampRecherche } from '../composants/ChampRecherche.jsx';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
@@ -144,7 +145,7 @@ const oauthDelier = async (provider, id) => {
  }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
 };
 const oauthRelier = async provider => {
-  try{const verifier=makeVerifier();const r=await preparerLiaisonOAuth({provider,enabled:providerEnabled(provider),token:AUTH.session?.access_token,owner:AUTH.user?.id,base:SUPABASE_URL,cle:SUPABASE_KEY,origine:window.location.origin,verifier,challenge:await makeChallenge(verifier)});if(r.ok)window.location.assign(r.url);return r;}catch(_){return{ok:false,error:'Impossible de préparer cette connexion. Réessaie.'};}
+  try{const verifier=makeVerifier();const r=await preparerLiaisonOAuth({provider,enabled:providerEnabled(provider),token:AUTH.session?.access_token,owner:AUTH.user?.id,base:SUPABASE_URL,cle:SUPABASE_KEY,origine:window.location.origin,verifier,challenge:await makeChallenge(verifier),essai:nouvelIdEssai()});if(r.ok)window.location.assign(r.url);return r;}catch(_){return{ok:false,error:'Impossible de préparer cette connexion. Réessaie.'};}
 };
 // ⟦← App.jsx #19⟧
 

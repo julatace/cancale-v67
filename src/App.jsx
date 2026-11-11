@@ -60,7 +60,8 @@ import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';
-import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)   // (11 nov., lot DJ6)
+import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)
+import {nouvelIdEssai,poserEssai,prendreEssais,candidatsVerificateur,ESSAIS_MAX} from './auth/essaisPkce.js';   // (11 nov., lot DJ6)
 import PorteSansCompte from './auth/PorteSansCompte.jsx';
 import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
@@ -1981,11 +1982,15 @@ const oauthStart = async (provider, intention) => {
     // onglet (sessionStorage vide) — le vérificateur est aussi gardé 10 min sur
     // l'appareil. Seul, il ne sert à rien : il faut aussi le code du retour.
     try { localStorage.setItem(PKCE_KEY, JSON.stringify({ v: verifier, at: Date.now() })); } catch (_) {}
+    // (11 nov., lot connexions-oauth) SON vérificateur, sous SON identifiant, porté par
+    // l'adresse de retour (src/auth/essaisPkce.js) : le retour prend le bon, jamais un vieux.
+    const essai = nouvelIdEssai();
+    poserEssai([sessionStorage, localStorage], essai, verifier);
     const challenge = await makeChallenge(verifier);
     // Une liaison d'extension en cours survit au retour dans un NOUVEL onglet (10 min).
     try { garderLierPourRetourOAuth(); } catch (_) {}
     const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${encodeURIComponent(provider)}`
-      + `&redirect_to=${encodeURIComponent(window.location.origin + window.location.pathname)}`
+      + `&redirect_to=${encodeURIComponent(window.location.origin + window.location.pathname + '?vrm_essai=' + essai)}`
       + `&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256`;
     window.location.href = url;
     return { ok: true };
@@ -2002,7 +2007,7 @@ const cleanAuthUrl = () => {
   try {
     const q=new URLSearchParams(window.location.search||'');
     // URLSearchParams reconnaît aussi les noms encodés et les doublons.
-    for(const k of ['code','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
+    for(const k of ['code','vrm_essai','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
     const reste=q.toString();
     window.history.replaceState({},'',window.location.pathname+(reste?'?'+reste:''));
   }catch(_){}
@@ -2042,6 +2047,7 @@ const consumeAuthRedirect = async () => {
     // (avant, « Discord » par défaut même pour Google). Tout ce départ est consommé.
     const li=lireLiaisonOAuth(sessionStorage,localStorage),it=lireIntentionOAuth([sessionStorage,localStorage]);
     try{sessionStorage.removeItem(PKCE_KEY);localStorage.removeItem(PKCE_KEY);}catch(_){}
+    prendreEssais([sessionStorage,localStorage]);
     const e={error:q.get('error')||hash.get('error')||'',code:q.get('error_code')||hash.get('error_code')||'',description:q.get('error_description')||hash.get('error_description')||''};
     cleanAuthUrl();
     return { error: erreurRetourOAuth(e, li?.provider||it?.fournisseur||'', !!li), ...(li?{liaisonRatee:li.provider}:{}) };
@@ -2049,20 +2055,33 @@ const consumeAuthRedirect = async () => {
 
   const code = q.get('code');
   if (code) {
-    const liaison=lireLiaisonOAuth(sessionStorage,localStorage);
-    let verifier = liaison?.verifier || sessionStorage.getItem(PKCE_KEY);
+    const ctxLiaison=lireLiaisonOAuth(sessionStorage,localStorage);
+    // (11 nov., lot connexions-oauth) Le vérificateur de CETTE tentative (`vrm_essai`),
+    // puis les autres gardés — jamais un seul pris à l'aveugle (src/auth/essaisPkce.js).
+    const onglet = sessionStorage.getItem(PKCE_KEY) || '';
     sessionStorage.removeItem(PKCE_KEY);
+    let appareil = '';
     try {
       const o = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null');
       localStorage.removeItem(PKCE_KEY);
-      if (!verifier && o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) verifier = o.v;
+      if (o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) appareil = o.v;
     } catch (_) {}
+    const candidats = candidatsVerificateur({ idRetour: q.get('vrm_essai') || '', essais: prendreEssais([sessionStorage, localStorage]), liaison: ctxLiaison, onglet, appareil });
+    const verifier = candidats.length ? candidats[0].v : '';
+    // La liaison n'est en jeu que si le PREMIER vérificateur est le sien (sinon c'est une connexion).
+    let liaison = candidats.length && candidats[0].liaison ? ctxLiaison : null;
     cleanAuthUrl();
     // (11 nov.) Le fournisseur du bouton, lu AVANT l'échange (un refus doit le nommer).
     const intention=lireIntentionOAuth([sessionStorage,localStorage]);
     const fourn=liaison?.provider||intention?.fournisseur||'';
     if (!verifier) return { error: fourn ? `Cette connexion a commencé sur un autre appareil ou a expiré. ${liaison?`Reclique « Relier ${fourn==='google'?'Google':'Discord'} ».`:`Reclique « Continuer avec ${fourn==='google'?'Google':'Discord'} » ici.`}` : 'Cette connexion a commencé sur un autre appareil ou a expiré. Recommence depuis cet appareil.' };
-    const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
+    let r = null;
+    for (const c of candidats.slice(0, ESSAIS_MAX)) {
+      r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: c.v });
+      if (r.ok) { liaison = c.liaison ? ctxLiaison : null; break; }
+      // Seul « ce n'est pas le bon vérificateur » vaut un autre essai (Supabase garde le code).
+      if (r.code !== 'bad_code_verifier') break;
+    }
     // Code déjà servi (double clic, retour arrière), expiré, autre appareil : la phrase, jamais l'anglais.
     if (!r.ok) return { error: r.status === 0 ? r.error : erreurRetourOAuth({ code: r.code || '', description: r.error || '' }, fourn, !!liaison), ...(liaison?{liaisonRatee:liaison.provider}:{}) };
     if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
