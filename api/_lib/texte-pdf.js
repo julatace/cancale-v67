@@ -43,7 +43,11 @@ export const estPdf = (u) => !!(u && u.length >= 5 && u[0] === 0x25 && u[1] === 
 const lookup = (ctx, o) => (o instanceof PDFRef ? ctx.lookup(o) : o);
 const fluxOctets = (ctx, o) => {
   const s = lookup(ctx, o);
-  if (s instanceof PDFRawStream) { try { return decodePDFRawStream(s).decode(); } catch (_) { return null; } }
+  // (11 nov., revue de sécurité) DÉCOMPRESSION BORNÉE : `decode()` lisait tout
+  // le flux, et 3 Mo compressés peuvent en donner des gigaoctets (bombe de
+  // décompression dans une pièce jointe d'e-mail ⇒ fonction tuée). On ne lit
+  // que CONTENU_MAX + 1 octets ; au-delà, ce flux ne donne rien.
+  if (s instanceof PDFRawStream) { try { const o = decodePDFRawStream(s).getBytes(CONTENU_MAX + 1); return o && o.length <= CONTENU_MAX ? o : null; } catch (_) { return null; } }
   if (s && typeof s.getContents === 'function') { try { return s.getContents(); } catch (_) { return null; } }
   return null;
 };

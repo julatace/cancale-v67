@@ -24,6 +24,8 @@ import { ageLecture } from './comptesLies.js';
 import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
 import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS, useEstProprietaire, enTeteSession } from './App.jsx';
 import { AlertesProduction } from './composants/AlertesProduction.jsx';
+import { aVoirCapture } from './santeDonnees.js';
+import { LigneSante } from './SanteDonnees.jsx';
 import './styles-tout-va-bien.css';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
@@ -160,11 +162,12 @@ export function ToutVaBien({ onComptes }) {
   if (etat === undefined || !etat.comptesPrets) return <div className="vrm-tvb" data-tout-va-bien="lecture"><div className="vrm-tvb-tete"><Pastille ton="passu"/><div><b className="vrm-tvb-resume">Je vérifie…</b></div></div></div>;
   const { appareils, pannes, lignes, passu, ancien, maintenant } = etat;
   const panneDe = new Map(pannes.map((p) => [`${p.plateforme}:${p.id}`, p]));
-  const anciens = (appareils || []).filter((a) => etatVersion(a, EXT_ATTENDUE) === 'ancienne');
-  // Une extension d'avant la 5.327 qui a écrit en dernier, sans dire son appareil.
-  const ancienInconnu = ancien && ancien.ver && etatVersion({ ver: ancien.ver, code: ancien.code }, EXT_ATTENDUE) === 'ancienne'
-    && !(appareils || []).some((a) => a.at >= ancien.at - 60000) ? ancien : null;
-  const aFaire = lignes.filter((l) => l.geste || panneDe.has(`${l.plateforme}:${l.id}`)).length + anciens.length + (ancienInconnu ? 1 : 0);
+  // (11 nov., lot sante-donnees) LA règle des « choses à voir » : `aVoirCapture`
+  // (src/santeDonnees.js) — la même que les lignes « Comptes pas relus » et
+  // « Extension en retard » de la Santé de tes données.
+  const av = aVoirCapture(etat, { etatVersion, attendue: EXT_ATTENDUE });
+  const ancienInconnu = av.ancienInconnu;
+  const aFaire = (av.comptes || 0) + (av.extensions || 0);
   const sansAppareil = Array.isArray(appareils) && !appareils.length;
   const resume = aFaire ? (aFaire === 1 ? '1 chose à voir' : `${aFaire} choses à voir`)
     : passu.length ? 'Je n’ai pas pu tout vérifier'
@@ -211,6 +214,8 @@ export function ToutVaBien({ onComptes }) {
           </div>
         ) : null}
       </GroupeIos>
+      {/* (11 nov., lot sante-donnees) La ligne compacte : le nombre de choses à corriger dans tes données, et la porte. */}
+      <LigneSante capture={etat}/>
       {proprio ? <AlertesProduction entetes={enTeteSession}/> : null}
       {onComptes ? <div className="vrm-tvb-pied"><button type="button" className="vrm-lien-action" onClick={onComptes}>Gérer mes comptes liés</button></div> : null}
     </div>
