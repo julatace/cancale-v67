@@ -35,7 +35,7 @@
 .vrm-cc-cible { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3) !important; transition: box-shadow .2s; }
 /* Sous la barre, la rangée du titre n'a plus à laisser la place de l'île :
    l'action de l'écran (« Imprimer les N prêts ») se range au bord droit. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-main:has(> .vrm-barre-haut) :is(.vrm-tete-row, .vrm-sous-ile) { padding-right: 0; }
 }
 
