@@ -29,6 +29,7 @@
 //    devinée.
 // Fonctions PURES : `scripts/audit-vestiaire-partout.cjs` les exécute.
 // ─────────────────────────────────────────────────────────────────────────────
+import { motsVendeur } from '../../src/profilVendeur.js';   // (11 nov.) lu par l'app (Ma journée) : le mot du vendeur connecté
 import { cleNum } from './numerotation.js';
 import { joursAvant } from './ebay-a-expedier.js';
 import { departProuve, suivisAmbigus } from './depart-colis.js';
@@ -280,6 +281,6 @@ export function retraitsVestiaire({ lst, ventes, maintenant = Date.now() } = {})
     if (!num) { sansIdentite++; continue; }
     vs.push({ id: 'vc:' + String(id), numero: num, plateforme: 'Vestiaire', engagee: true });
   }
-  if (sansIdentite) manques.push(`${sansIdentite} vente${sansIdentite > 1 ? 's' : ''} Vestiaire sans référence VRM-n° (VRM ne devine pas la paire)`);
+  if (sansIdentite) manques.push(`${sansIdentite} vente${sansIdentite > 1 ? 's' : ''} Vestiaire sans référence VRM-n° (VRM ne devine pas ${motsVendeur().le})`);
   return { annonces, ventes: vs, manques };
 }
