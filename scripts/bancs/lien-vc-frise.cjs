@@ -242,7 +242,7 @@ const frise = (pg, sel) => pg.evaluate((sel) => { const f = document.querySelect
         await capture(pg, `ventes-vc-${nomVp}`);
         await pg.click('[data-vc-vente="V2"] .vrm-ledger-sale-toggle');
         await pg.waitForSelector('[data-recap-vente]:visible [data-fu-frise]', { timeout: 8000 });
-        const r = await pg.evaluate(() => { const d = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.offsetParent !== null); return [...d.querySelectorAll('[data-fu-etape]')].map((s) => s.getAttribute('data-fait')).join(''); });
+        const r = await pg.evaluate(() => { const d = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.offsetParent !== null); return [...d.querySelectorAll('[data-fu-etape]')].filter((s) => !s.closest('[data-vc-parcours]')).map((s) => s.getAttribute('data-fait')).join(''); });   /* (11 nov., vestiaire-plus) le parcours « Chez Vestiaire » (5 étapes) est une AUTRE frise, à part */
         dit(r === '1110', 'E · le récapitulatif porte la MÊME frise', r);
         await capture(pg, `ventes-vc-recap-${nomVp}`);
         await pg.keyboard.press('Escape').catch(() => {});
