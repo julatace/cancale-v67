@@ -29,9 +29,8 @@ function LigneAlerte({ x, veille, revente, contexte, C, onRetirer, occupe }) {
             : x.port === 0 ? <>{eurosCalc(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>{tr('alertesEbay.portCompris')}</span></>
             : <>{eurosCalc(x.total)} <span style={{ fontWeight: 400, color: C.muted }}>{tr('alertesEbay.dontPort', { prix: eurosCalc(x.prix), port: eurosCalc(x.port) })}</span></>}
         </span>
-        <span>{x.recherche}</span>
-        {x.etat && <span>{x.etat}</span>}
       </div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.recherche}{x.etat ? ' · ' + x.etat : ''}</div>
       <div data-alerte-marge={m.etat === 'ok' ? m.benefice : m.etat} data-alerte-borne={m.etat === 'ok' ? m.borne : ''} style={{ fontSize: 13, color: C.muted, marginTop: 3, lineHeight: 1.4 }}>
         {m.etat === 'ok' ? <>{tr('alertesEbay.marge')} <strong style={{ color: C.text, fontWeight: 600 }}>{m.borne === 'au-plus' ? tr('alertesEbay.auPlus') + ' ' : m.borne === 'environ' ? tr('alertesEbay.environ') + ' ' : ''}{eurosCalc(m.benefice)}</strong> · {m.base.source === 'toi' ? tr('alertesEbay.baseToi', { prix: eurosCalc(m.base.montant), site: tr('alertesEbay.site.' + m.base.site) }) : tr('alertesEbay.baseMediane', { prix: eurosCalc(m.base.montant), n: m.base.n })}</>
           : <>{tr('alertesEbay.marge')} — {tr(m.etat === 'pas-su' ? 'alertesEbay.margePasSu' : 'alertesEbay.margeSansBase')}</>}
