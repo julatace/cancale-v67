@@ -13,6 +13,9 @@
 //   POST { action:'moderation' }             → l'extension a rangé « Vinted a masqué / fait disparaître /
 //                                              limite » (5.350) : la route RELIT les lignes, une fois par
 //                                              événement, regroupé (_lib/moderation-notif.js)
+//   POST { action:'avis', uid }              → (11 nov.) l'extension vient de lire les avis de CE
+//                                              compte : la route RELIT la ligne et sonne une fois
+//                                              par avis ≤ seuil (_lib/avis-negatif.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -25,6 +28,7 @@ import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierAvisBas } from './_lib/avis-negatif.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -115,6 +119,13 @@ async function traiter(req, res) {
     // tout est relu ici, au nom de CE vendeur, une fois par événement.
     if (body.action === 'moderation') {
       const r = await notifierModeration();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., lot avis-negatif) L'EXTENSION a lu les avis de CE compte : « Avis 2★ reçu sur shop_x ».
+    // Le corps ne donne que le compte ; tout est relu ici, au nom de CE vendeur (un compte d'un autre est refusé).
+    if (body.action === 'avis') {
+      const r = await notifierAvisBas({ uid: body.uid != null ? String(body.uid) : null });
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }

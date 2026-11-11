@@ -69,6 +69,7 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierAvisBas } from './_lib/avis-negatif.js';   // (11 nov.) le filet des avis négatifs
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
 import { passeTransporteursAnciens, passeTransporteursPdf, reqPdf, avecRelus, REQ_RELUS, MAX_PDF_MATIN, BUDGET_PDF_MATIN_MS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
@@ -888,6 +889,9 @@ async function traiterVendeurApresRelecture() {
     // le filet (une fois par événement, la mémoire du serveur décide).
     let moderation = null;
     try { const r = await notifierModeration(); moderation = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { moderation = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (11 nov., lot avis-negatif) UN AVIS ≤ SEUIL, extension sans réseau au moment de sa lecture : le filet.
+    let avisBas = null;
+    try { const r = await notifierAvisBas(); avisBas = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { avisBas = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
     let relecture = null;
     try { relecture = await rappelComptesARelire(Date.now(), enPanne); } catch (e) { relecture = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
@@ -927,7 +931,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -945,14 +949,14 @@ async function traiterVendeurApresRelecture() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }

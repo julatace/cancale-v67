@@ -578,6 +578,8 @@ import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, 
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
+import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
+import { LIGNE_AVIS_BAS, LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
@@ -605,6 +607,7 @@ import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos,
 // CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
 import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
+import "./styles-avis-bas.css";   // (11 nov., lot avis-negatif) la feuille « Avis négatif »
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
 import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
@@ -1115,7 +1118,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -15000,6 +15003,8 @@ const ICON_PATHS = {
   stream:  <><circle cx="12" cy="12" r="2"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8"/><path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 5.8a8.8 8.8 0 0 0 0 12.4"/><path d="M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
+  // (11 nov., lot avis-negatif) Un avis reçu : l'étoile au trait.
+  star:    <><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/></>,
   // (3 nov.) Scanner un code-barres : le viseur et ses barres.
   scan: <><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8"/><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8"/><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16"/><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 9v6"/><path d="M11 9v6"/><path d="M13.5 9v6"/><path d="M16 9v6"/></>,
   printer: <><path d="M7 9V4h10v5"/><path d="M7 17.5H5a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 5 10.5h14a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-2"/><path d="M7 14.5h10V20H7z"/></>,
@@ -41679,6 +41684,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return <RetirerAilleursBloc plan={affiche} resultats={retraitsAilleurs ? avecRelecture(retraitsAilleurs.res, vendusAilleurs.v) : null} enVol={retraitAilleursEnVol}
       onRetirer={retirerDesAutresSites} onFini={() => setRetraitsAilleurs(null)} PhotoVinted={PhotoVinted} compact={compact}/>;
   };
+  // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) arrivé sur un compte : une carte AMBRE
+  // dans « À faire » tant qu'il n'est pas « vu » (14 jours au plus) ; la détection est au serveur.
+  const avisBas = useAvisBas(only === 'journee' && !baseKO, { lire: lireAvisBas, ecrireVus: ecrireAvisBasVus, comptes: accounts });
+  const avisBasListe = Array.isArray(avisBas.liste) ? avisBas.liste : [];
+  const [feuilleAvis, setFeuilleAvis] = useState(false);
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
@@ -42912,7 +42922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (avisBasListe.length ? 1 : 0);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
               const carteARelier = () => {
@@ -42926,6 +42936,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <PileVignettes srcs={[]} n={comptesARelierJour.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="mail" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{court}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="a-relier">{detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Relier</span></span>
+                  </button>
+                );
+              };
+              const carteAvisBas = () => {
+                const titre = titreAvisBas(avisBasListe), detail = detailAvisBas(avisBasListe);
+                return (
+                  <button key="avis-bas" type="button" className="vrm-day-task vrm-fu-tache" data-journee-avis-bas={avisBasListe.map((a) => a.cle).join(' ')} data-n={String(avisBasListe.length)}
+                    title={`${titre}\n${detail}`} aria-label={`${titre} — ${detail}`} onClick={() => setFeuilleAvis(true)}>
+                    <PileVignettes srcs={[]} n={avisBasListe.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="star" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="avis-bas">{detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Lire</span></span>
                   </button>
                 );
               };
@@ -43071,6 +43092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ...alertesArgent.map((j, i) => ({ el: tache(j, i), alerte: true })),
                 ...(carteAilleurs ? [{ el: carteVendusAilleurs() }] : []),
                 ...(deuxFois.length ? [{ el: carteDeuxFois() }] : []),
+                ...(avisBasListe.length ? [{ el: carteAvisBas() }] : []),
                 ...cases.map((x) => ({ el: carteCase(x) })),
                 ...(comptesARelierJour.length ? [{ el: carteARelier() }] : []),
                 ...(sortiesStock.length ? [{ el: carteSortieStock() }] : []),
@@ -43101,6 +43123,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {blocRetirerAilleurs(true)}
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
+                    </SheetShell>
+                  ) : null}
+                  {feuilleAvis && avisBasListe.length ? (
+                    <SheetShell titre={avisBasListe.length > 1 ? 'Avis négatifs' : 'Avis négatif'} sousTitre="Sur Vinted" onClose={() => setFeuilleAvis(false)} maxWidth={560} data-feuille-avis-bas="">
+                      <AvisBasDetail liste={avisBasListe} Bouton={Bouton} onVu={async (cles) => { const ok = await avisBas.vu(cles); if (ok && avisBasListe.length <= cles.length) setFeuilleAvis(false); return ok; }}
+                        onAller={(q) => { setFeuilleAvis(false); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?' + q.replace(/^\?/, '') })); } catch (_) {} }}/>
                     </SheetShell>
                   ) : null}
                   {feuilleDeux && deuxFois.length ? (
@@ -53124,6 +53152,43 @@ export function QuoiDeNeufParametres({ onNav }) {
   return <QuoiDeNeufReglage liste={q.tout} vues={q.vues} onVoir={(n) => { q.marquer([n.id]); onNav && onNav(n.tab); }}/>;
 }
 export { useQuoiDeNeuf };
+// (11 nov., lot avis-negatif) « Avis 2★ reçu sur shop_x » : les alertes du SERVEUR (`vrm_avis_bas`,
+// projection `data->alertes`), les vus de l'APP, et — seulement pour les comptes concernés — le texte
+// rangé et l'id de profil, en projection (jamais `select=data` sur une ligne de moisson). Une lecture
+// ratée de l'alerte ou des vus ⇒ `undefined` (rien montré) ; texte ou profil pas lus ⇒ « Lis l'avis
+// sur Vinted » / lien par l'identifiant du compte.
+async function lireAvisBas() {
+  // Comme les autres lectures de l'app : la base (RLS) ne rend que les lignes du vendeur de la session.
+  const get = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+  const [m, v] = await Promise.all([get(`app_data?id=eq.${LIGNE_AVIS_BAS}&select=a:data->alertes`), get(`app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`)]);
+  if (m === null || v === null) return undefined;
+  const alertes = m[0] && Array.isArray(m[0].a) ? m[0].a : [];
+  const vus = v[0] && v[0].data && typeof v[0].data === 'object' ? v[0].data : {};
+  const uids = [...new Set(alertes.map((a) => String(a && a.uid)).filter((x) => /^\d{1,20}$/.test(x)))].slice(0, 30);
+  if (!uids.length) return { memo: { alertes }, vus, textes: {}, pids: {} };
+  const [f, p] = await Promise.all([
+    get(`app_data?id=in.(${uids.map((u) => `harvest_${u}_feedbacks`).join(',')})&select=id,avis:data->payload->user_feedbacks`),
+    get(`app_data?id=in.(${uids.map((u) => `harvest_${u}_profile`).join(',')})&select=id,pid:data->payload->user->>id`),
+  ]);
+  const textes = {}, pids = {};
+  for (const r of f || []) { const u = /^harvest_(\d+)_feedbacks$/.exec(String(r && r.id || '')); if (u && Array.isArray(r.avis)) textes[u[1]] = r.avis; }
+  for (const r of p || []) { const u = /^harvest_(\d+)_profile$/.exec(String(r && r.id || '')); if (u && r.pid != null) pids[u[1]] = String(r.pid); }
+  return { memo: { alertes }, vus, textes, pids };
+}
+// « C'est vu » : lire-fusionner-réécrire SA ligne (`fn(vusLus)`) ; une lecture ratée n'écrit rien.
+async function ecrireAvisBasVus(fn) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!Array.isArray(j)) return false;
+    const data = fn(j[0] && j[0].data && typeof j[0].data === 'object' ? j[0].data : {});
+    const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify([withOwner({ id: LIGNE_AVIS_BAS_VUS, data })]) });
+    if (!w.ok) return false;
+    const o = await w.json().catch(() => null);
+    return Array.isArray(o) && o.length === 1;
+  } catch (_) { return false; }
+}
 function NoteSatisfactionJournee() {
   const uid = AUTH.user?.id || '';
   if (!uid || !CLOISONNE) return null;
