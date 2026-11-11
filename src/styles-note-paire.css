@@ -44,3 +44,7 @@
 .vrm-scan .vrm-note .vrm-note-icone { color: rgba(255,255,255,.7); }
 .vrm-prep-note { margin: 8px 0 4px; }
 .vrm-fp-note-privee { margin: -4px 0 14px; }
+
+/* (11 nov., lot accessibilité) « Ajouter une note » sur le remplissage gris : #6E6E73 = 3,96:1 ⇒ en
+   CLAIR un gris un cran plus sombre (#5E5E63 : 5,0:1). Le sombre passe déjà. */
+:root:not([data-theme="dark"]) body .vrm-note-ajout.is-bloc { color: #5E5E63; }

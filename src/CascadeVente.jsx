@@ -22,8 +22,9 @@ export function BarreCoutVente({ c }) {
   if (!s) return null;
   const venteX = c.vente != null && s.total > 0 ? (c.vente / s.total) * 100 : 100;
   return (
-    <div className="vrm-cv-barre" role="img" data-cv-barre={s.segments.map((x) => `${x.cle}:${x.c}`).join(',')} data-cv-perte={s.perte ? '1' : '0'}
-      aria-label={s.segments.map((x) => NOMS[x.cle]).join(', ')}>
+    // (11 nov., lot accessibilité) Sans segment, la barre ne dit rien : décorative (un role="img" au nom vide était faux).
+    <div className="vrm-cv-barre" {...(s.segments.length ? { role: 'img', 'aria-label': s.segments.map((x) => NOMS[x.cle]).join(', ') } : { 'aria-hidden': 'true' })}
+      data-cv-barre={s.segments.map((x) => `${x.cle}:${x.c}`).join(',')} data-cv-perte={s.perte ? '1' : '0'}>
       {s.segments.map((x) => <span key={x.cle} className={`vrm-cv-seg is-${x.cle}`} data-cv-seg={x.cle} style={{ width: `${x.pct}%` }}/>)}
       {s.perte ? <span className="vrm-cv-trait" data-cv-trait="" style={{ left: `${venteX}%` }}/> : null}
     </div>

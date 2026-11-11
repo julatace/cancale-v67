@@ -2288,7 +2288,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           modification et l'offre aux observateurs vivent dans la fiche. ── */}
       <div className="vrm-eb-tete">
         <button type="button" className="vrm-eb-ouvrir" data-ebay-carte-ouvrir={it.itemId} aria-expanded={open} onClick={() => setOpen((o) => !o)}
-          aria-label={`${it.title || 'Annonce eBay'}${numero ? ` — N°${numero}` : ''} — ${open ? 'fermer la fiche' : 'ouvrir la fiche'}`}>
+          /* (11 nov., lot accessibilité) Nommé par ce qu'il montre (titre, N°, état) ; ouvert/fermé : aria-expanded. */>
           <PhotoVente src={it.photo} size={56} />
           <span className="vrm-eb-texte">
             <span className="vrm-eb-titre">{it.title || '(sans titre)'}</span>
