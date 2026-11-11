@@ -619,6 +619,9 @@ import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGarde
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
+// (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
+// `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
+import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n } from "./i18n/index.js";
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
@@ -2544,6 +2547,8 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
   // (8 nov.) L'apparence choisie (Clair · Sombre · Automatique · Le soir, src/apparence.js).
   'vrm_apparence',
+  // (11 nov., lot traduction) La langue choisie (Paramètres → Langue, src/i18n/) : la même partout.
+  'vrm_langue',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -14155,6 +14160,8 @@ const ICON_PATHS = {
   // le cas de `pin` et `nav` juste en dessous depuis leur ajout — les deux
   // repères des points relais ne se dessinaient pas.
   menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
+  // (11 nov., lot traduction) La langue (Paramètres → Langue) : un globe au trait.
+  langue: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></>,
   // Masquer une ligne : l'œil barré. C'était un « 🚫 » nu — un emoji dessiné par
   // le système, au milieu de boutons au trait (§5.55).
   eyeOff: <><path d="M3 3l18 18"/><path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c5 0 9 4.5 9 7a12 12 0 0 1-2.4 3.3"/><path d="M6.5 6.8C4.2 8.2 3 10.3 3 12c0 2.5 4 7 9 7 1.6 0 3-.4 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></>,
@@ -14582,15 +14589,24 @@ function EbayMessagesVolets({ compte, comptesEbay, ...p }) {
 // bon onglet ET au bon filtre (`redirigerOnglet`). Décisions qui tiennent : pas
 // de groupe « Autres outils » ni « Dans Vinted » (17 oct.), Organisation hors du
 // menu (29 oct.), pas de saisie « N° + Entrée » (29 oct.).
+// (11 nov., lot traduction) Le NOM d'une entrée se lit dans la langue au moment du rendu :
+// `label` (et `court`) sont des accesseurs vers `tr('nav.<id>')` — tous les lecteurs de
+// `.label` restent tels quels. ⚠️ Ne pas copier une entrée par `{...e}` au chargement du
+// module (la copie figerait le nom) : `entreeNav({...})` pose les accesseurs.
+const entreeNav=(o)=>{ const court=!!o.court; delete o.label; delete o.court;
+  Object.defineProperty(o,'label',{get(){ return tr('nav.'+(o.cle||o.id)); },enumerable:true,configurable:true});
+  if(court) Object.defineProperty(o,'court',{get(){ return tr('nav.'+(o.cle||o.id)+'.court'); },enumerable:true,configurable:true});
+  return o; };
+const groupeNav=(o)=>{ Object.defineProperty(o,'titre',{get(){ return tr('nav.groupe.'+o.cle); },enumerable:true,configurable:true}); return o; };
 const BOTTOM_TABS=[
-  {id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Journée'},
-  {id:'annonces', icon:'vitrine', label:'Annonces'},
-  {id:'ventes',   icon:'bag',  label:'Ventes'},
-  {id:'cat_bord', icon:'box',  label:'Colis'},
+  entreeNav({id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Journée'}),
+  entreeNav({id:'annonces', icon:'vitrine', label:'Annonces'}),
+  entreeNav({id:'ventes',   icon:'bag',  label:'Ventes'}),
+  entreeNav({id:'cat_bord', icon:'box',  label:'Colis'}),
 ];
 // Messages : dans la colonne de l'ordinateur ; sur téléphone, dans « Plus »
 // (cinq places dans la barre, la cinquième est « Plus »).
-const ONGLET_MESSAGES={id:'messages', icon:'chat', label:'Messages'};
+const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
 const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[1],BOTTOM_TABS[2],ONGLET_MESSAGES,BOTTOM_TABS[3]];
 // (31 oct., soir — Julien, mot pour mot : « je veux qu'il y ait Achats à côté
 // de À retirer », « que dans les deux onglets il n'y ait pas la même chose »,
@@ -14610,34 +14626,34 @@ const GROUPES_PLUS=[
   // chemins (`?tab=republier`, `?tab=favoris`, `vue=republier|favoris`, `demanderVue`)
   // mènent au nouvel endroit (`VUES_DEPLACEES`). Sur l'ordinateur, le groupe « Vendre »
   // devient vide et disparaît (Messages est dans les tâches) ; au téléphone, il garde Messages.
-  { titre:'Vendre', items:[
-    {...ONGLET_MESSAGES, tel:true},
-  ]},
+  groupeNav({ cle:'vendre', nom:'Vendre', items:[
+    entreeNav({...ONGLET_MESSAGES, label:'Messages', tel:true}),
+  ]}),
   // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis
   // on a les codes de retrait ») Plus d'entrée « Colis à retirer » ni de groupe
   // « Expédier » : les colis à retirer vivent dans Colis (colonne « À retirer »,
   // et leur détail — codes, QR, dates limites, relais — juste dessous).
-  { titre:'Gérer', items:[
+  groupeNav({ cle:'gerer', nom:'Gérer', items:[
     // (9 nov., lot AC — Julien : « tu ne peux pas avoir d'hésitation ») UN endroit pour
     // tout ce que VRM n'a pas pu décider, une ligne = un geste (src/aTrancher.js).
-    {id:'trancher',   icon:'help', label:'À trancher'},
-    {id:'garage',     icon:'home', label:'Stock'},
-    {id:'achats',     icon:'cart', label:'Achats'},
+    entreeNav({id:'trancher',   icon:'help', label:'À trancher'}),
+    entreeNav({id:'garage',     icon:'home', label:'Stock'}),
+    entreeNav({id:'achats',     icon:'cart', label:'Achats'}),
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
-    {id:'emails',     icon:'mail', label:'E-mails'},
+    entreeNav({id:'emails',     icon:'mail', label:'E-mails'}),
     // (10 nov., Julien : « L'onglet Compta est trop flou, tu peux peut-être le relier avec
     // Stats ») UNE entrée « Argent » remplace « Statistiques » et « Compta » : un écran à quatre
     // segments (Résumé · Statistiques · Déclarer · Factures, src/argent.js). Les deux écrans
     // restent (`dashboard`, `compta`) : leurs liens mènent à leur segment.
-    {id:'compta',    icon:'euro',  label:'Argent'},
-  ]},
+    entreeNav({id:'compta',    icon:'euro',  label:'Argent'}),
+  ]}),
   // (11 nov., lot DJ6 — Julien : « qu'on ne voie pas les Paramètres mais que quand on
   // clique sur le profil ils apparaissent ») Paramètres n'est plus une entrée : la photo
   // du profil (pied de la colonne, en-tête du téléphone) ouvre le menu du profil
   // (src/profil/MenuProfil.jsx). « g p », ⌘K et `?tab=settings` y mènent toujours.
-  { titre:'Moi', items:[
-    {id:'communaute', icon:'pin',  label:'Communauté'},
-  ]},
+  groupeNav({ cle:'moi', nom:'Moi', items:[
+    entreeNav({id:'communaute', icon:'pin',  label:'Communauté'}),
+  ]}),
 ];
 // ⚠️ (2 nov., Julien : « il ne doit pas y avoir des écritures partout à côté des
 // onglets, c'est vraiment dégueulasse ») UNE ENTRÉE DE NAVIGATION = UNE ICÔNE ET UN
@@ -14669,11 +14685,12 @@ const BAR_GROUPE={
 // Le nom COURT d'un écran, pour l'en-tête de la coque (titre qui apparaît au
 // défilement). Une source : les listes de navigation elles-mêmes (§11).
 function titreEcran(tab) {
-  if (tab === 'journee') return 'Ma journée';
-  if (tab === 'semaine') return 'Ma semaine';
+  if (tab === 'journee') return tr('nav.journee');
+  if (tab === 'semaine') return tr('ecran.semaine');
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { settings: 'Paramètres', dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  const cle = { settings: 'ecran.settings', dashboard: 'nav.compta', litiges: 'ecran.litiges', cat_expedition: 'nav.cat_bord', masques: 'ecran.masques', organisation: 'ecran.organisation', catalog: 'ecran.catalog', stockvinted: 'ecran.stockvinted', vintedaccounts: 'ecran.vintedaccounts', sales: 'nav.ventes', inventory: 'ecran.inventory' }[tab];
+  return cle ? tr(cle) : 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
@@ -15799,7 +15816,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
   // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
   // de l'écran ouvert est ramenée dans la vue à chaque changement.
-  const groupe = g => <section key={g.titre} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.titre}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>;
+  const groupe = g => <section key={g.nom} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.nom}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>;
   const zoneRef = React.useRef(null);
   React.useEffect(() => {
     const el = zoneRef.current; if (!el) return undefined;
@@ -15888,7 +15905,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   const uidCompte = (AUTH.user && AUTH.user.id) || '';
   const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
   const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={tab === 'settings' ? 'page' : undefined}
-    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ouvrir mon profil`} title="Mon profil" onClick={() => ouvrirMenuProfil()}>
+    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ${tr('coque.ouvrirProfil')}`} title={tr('coque.monProfil')} onClick={() => ouvrirMenuProfil()}>
     <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
     <span className="vrm-nav-compte-txt">
       {nomCoque.masque !== false ? <span className="vrm-nav-compte-nom" data-nav-compte-masque="">{nomCoque.texte}</span>
@@ -15896,18 +15913,18 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
       {(offre || (nomCoque.masque === false && nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCoque.masque === false && nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
     </span>
   </button> : null;
-  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label={tr('coque.navigationPrincipale')} style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
     <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
-      {groupes.filter(g => g.titre !== 'Moi').map(groupe)}
+      {groupes.filter(g => g.nom !== 'Moi').map(groupe)}
     </div>
     {/* (1er nov., finition) « Moi » (Communauté, Paramètres) reste posé au pied
         de la colonne : une fenêtre basse fait défiler le reste, jamais
         Paramètres coupé par le bas. Même ordre, mêmes entrées. (9 nov., DA 5)
         Le pied est une carte : le compte, puis Communauté et Paramètres. */}
-    <div className="vrm-rail-pied">{carteCompte}{groupes.filter(g => g.titre === 'Moi').map(groupe)}</div>
+    <div className="vrm-rail-pied">{carteCompte}{groupes.filter(g => g.nom === 'Moi').map(groupe)}</div>
   </nav>;
 }
 
@@ -15979,9 +15996,9 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   };
   if (bottom) return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label="Plus" aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label={tr('nav.plus')} aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
         <span aria-hidden="true" className="vrm-tab-ic" style={{display:'flex',position:'relative'}}>{courant ? <NavigationIcon item={courant} size={22} style={{strokeWidth:2}}/> : <Icon name="more" size={24} style={{strokeWidth:1.6}}/>}{pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>
-        {(() => { const lib = courant ? (courant.court || courant.label) : 'Plus'; return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
+        {(() => { const lib = courant ? (courant.court || courant.label) : tr('nav.plus'); return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
       </button>
       {/* Le PANNEAU « Plus » (5 nov.) : une grille de tuiles posée AU-DESSUS de
           la barre — la barre reste visible et touchable, rien n'est caché sous
@@ -15991,10 +16008,10 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
       {open && (
         <div data-noswipe className="vrm-sheet-voile vrm-plus-voile" onClick={()=>setOpen(false)}>
           <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom vrm-plus-panneau" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
+          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom vrm-plus-panneau" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
             <div className="vrm-plus-grille">
               {groupes.map(g => (
-                <div className="vrm-plus-groupe" key={g.titre} role="group" aria-label={g.titre} data-nav-groupe={g.titre}>{g.items.map(tuile)}</div>
+                <div className="vrm-plus-groupe" key={g.nom} role="group" aria-label={g.titre} data-nav-groupe={g.nom}>{g.items.map(tuile)}</div>
               ))}
             </div>
           </div>
@@ -16004,7 +16021,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   );
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn" aria-label="Tous les écrans" aria-expanded={open}>
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn" aria-label={tr('coque.tousLesEcrans')} aria-expanded={open}>
         <span aria-hidden="true" style={{display:'flex',position:'relative'}}><Icon name={open?'close':'menu'} size={22} style={{strokeWidth:1.6}}/></span>
       </button>
       {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
@@ -16013,16 +16030,16 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
       {open && createPortal(
         <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
           <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-haut" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
+          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-haut" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
             <div className="vrm-sheet-tete">
-              <span className="vrm-sheet-titre">Ton espace</span>
-              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
+              <span className="vrm-sheet-titre">{tr('coque.tonEspace')}</span>
+              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label={tr('coque.fermerMenu')} onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
             </div>
             <div className="vrm-menu-group vrm-sheet-groupe" data-nav-groupe="Tâches">
               <div className="vrm-sheet-carte">{NAV_TACHES.map(rangee)}</div>
             </div>
             {groupes.map(g => (
-              <div className="vrm-menu-group vrm-sheet-groupe" key={g.titre} data-nav-groupe={g.titre}>
+              <div className="vrm-menu-group vrm-sheet-groupe" key={g.nom} data-nav-groupe={g.nom}>
                 <div className="vrm-sheet-label">{g.titre}</div>
                 <div className="vrm-sheet-carte">{g.items.map(rangee)}</div>
               </div>
@@ -16189,7 +16206,7 @@ function BottomBar({tab,setTab,sites,badges}) {
        actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
        seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
        `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
-    <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-en-cours={enCours?'1':undefined} data-plus-ouvert={plusOuvert?'1':'0'} aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
+    <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-en-cours={enCours?'1':undefined} data-plus-ouvert={plusOuvert?'1':'0'} aria-label={tr('coque.navigationPrincipale')} style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
       <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
