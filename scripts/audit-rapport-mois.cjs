@@ -187,7 +187,7 @@ const eur = (c) => { const n = Math.abs(c); return (c < 0 ? '-' : '') + String(M
   const Bp = { ...B, nCout: 9, netFinal: null, raison: 'achats', brut: 310.25 };
   const dP = RM.donneesRapportMois({ ...base, B: Bp, benefice: BN.chiffreBenefice(Bp, 'lu'), brut: BN.chiffreBrut(Bp), bilan: BM.bilanDuMois({ ym, vendu, recu, depense: 42.5, benefice: BN.chiffreBenefice(Bp, 'lu'), B: Bp, meilleur, maintenant: MAINT }) });
   const PP = await lire(await RM.pdfRapportMois(dP, { PDFLib }));
-  dit(/Bénéfice -/.test(PP.pages[0]) && PP.pages[0].includes(`brut au prix connu ${eur(31025)} · 9 sur 12`), 'bénéfice incomplet : « — », brut et « 9 sur 12 » à côté');
+  dit(/Bénéfice —/.test(PP.pages[0]) && PP.pages[0].includes(`brut au prix connu ${eur(31025)} · 9 sur 12`), 'bénéfice incomplet : « — », brut et « 9 sur 12 » à côté');
   dit(!/Bénéfice au moins|Marge au moins/.test(PP.tout + P.tout) && !PP.tout.includes(`au moins ${eur(31025)}`), 'jamais « au moins » devant un bénéfice');
   dit(PP.pages.slice(2).join(' ').includes('prix d’achat manquant pour 3 ventes'.replace('’', "'")), 'le manque du bénéfice NOMMÉ (3 ventes)');
 

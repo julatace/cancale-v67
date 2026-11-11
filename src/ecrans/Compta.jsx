@@ -3987,7 +3987,9 @@ function RapportMoisCarte({ liveStats, compta, panelOff, accounts }) {
       const urssaf = regime == null ? null : { regime, regimeTexte: libelleRegime(regime), taux, raison: raisonUrssaf(regime),
         ...(regime === 'micro' ? montantPeriodeUrssaf(bornesPeriodeExport(ym), ligneUrssaf, taux) : {}) };
       // L'en-tête : SA fiche de facturation, sinon ses comptes vendeurs (jamais un acheteur).
-      const comptes = [...new Set((accounts || []).map((x) => x && (x.login || '')).filter(Boolean))];
+      // Un compte écarté par SON choix n'est nommé nulle part (§5 : « ne plus lui parler des comptes retirés »).
+      const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+      const comptes = [...new Set((accounts || []).filter((x) => x && !compteEcarteChoix(x.vinted_user_id, hAcc, panelOff || {})).map((x) => x.login || '').filter(Boolean))];
       const boutique = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), sous: String(ent.siret || '').trim() ? `SIRET ${String(ent.siret).trim()}` : '' }
         : comptes.length ? { nom: comptes.slice(0, 3).join(' · ') + (comptes.length > 3 ? ` +${comptes.length - 3}` : ''), sous: 'Comptes vendeurs' } : null;
       const d = donneesRapportMois({ ym, maintenant, boutique, bilan, vendu: V ? { lignes: V, manque, nonComptees } : null, B: Bm, benefice: CB, brut: Bm ? chiffreBrut(Bm) : null,

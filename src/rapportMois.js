@@ -214,10 +214,17 @@ export async function pdfRapportMois(d, { PDFLib = null } = {}) {
   const dessinable = (ch) => { try { f.encodeText(ch); return true; } catch (_) { return false; } };
   const propre = (s) => {
     let o = '';
-    for (const ch of String(s == null ? '' : s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[    ]/g, ' ').replace(/−/g, '-').replace(/[—–]/g, '-').replace(/[\r\n\t]+/g, ' ')) {
+    for (const ch of String(s == null ? '' : s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[    ]/g, ' ').replace(/−/g, '-').replace(/[\r\n\t]+/g, ' ')) {
       o += dessinable(ch) ? ch : (dessinable(ch.normalize('NFD')[0]) ? ch.normalize('NFD')[0] : '');
     }
     return o;
+  };
+  // Coupe aux mots en `n` lignes au plus ; la dernière garde le reste (`borne` la termine par « ... »).
+  const lignesDe = (s, font, t, max, n = 2) => {
+    const mots = propre(s).split(' '); const out = []; let cur = '', pris = 0;
+    for (const m of mots) { const essai = cur ? cur + ' ' + m : m; if (font.widthOfTextAtSize(essai, t) <= max || !cur) { cur = essai; } else { out.push(cur); cur = m; if (out.length === n - 1) { cur = mots.slice(pris).join(' '); break; } } pris += 1; }
+    if (cur) out.push(cur);
+    return out;
   };
   const borne = (s, font, t, max) => { let x = propre(s); if (font.widthOfTextAtSize(x, t) <= max) return x; while (x.length > 1 && font.widthOfTextAtSize(x + '...', t) > max) x = x.slice(0, -1); return x + '...'; };
   let page, y, nPage = 0;
@@ -244,7 +251,7 @@ export async function pdfRapportMois(d, { PDFLib = null } = {}) {
   txt(`${maj}${d.enCours ? ' · mois en cours, arrêté au ' + d.etabliLe : ' · du 1er au dernier jour du mois'}`, M, y, { t: 11, c: GRIS }); y -= 30;
 
   // Chiffres clés : 3 × 2 cases.
-  const cw = (LARG - 2 * 10) / 3, ch = 68;
+  const cw = (LARG - 2 * 10) / 3, ch = 74;
   d.cles.forEach((k, i) => {
     const col = i % 3, lig = Math.floor(i / 3);
     const x = M + col * (cw + 10), yy = y - lig * (ch + 10);
@@ -252,7 +259,7 @@ export async function pdfRapportMois(d, { PDFLib = null } = {}) {
     txt(k.nom, x + 12, yy - 18, { t: 8.5, c: GRIS, max: cw - 24 });
     const grand = k.texte.length > 16 ? 14 : 18;
     txt(k.texte, x + 12, yy - 42, { font: fb, t: grand, max: cw - 24 });
-    txt(k.note, x + 12, yy - 58, { t: 7, c: GRIS, max: cw - 24 });
+    lignesDe(k.note, f, 7, cw - 24).forEach((l, i) => txt(l, x + 12, yy - 54 - i * 8.5, { t: 7, c: GRIS, max: cw - 24 }));
   });
   y -= 2 * ch + 10 + 26;
   txt(`Dépensé ce mois : ${d.depenseTexte} (dépenses, abonnements et packs notés)${d.meilleur ? ` · meilleur compte : ${d.meilleur.nom}` : ''}`, M, y, { t: 8.5, c: GRIS }); y -= 30;
