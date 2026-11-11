@@ -25,7 +25,7 @@
 //    scripts/audit-lancement.cjs : ne pas les retirer.
 import React from 'react';
 // (11 nov., lot traduction) Les textes passent par `tr()` (src/i18n/index.js), la langue par `useLangue`.
-import { tr, listeDansLaLangue } from './i18n/index.js';
+import { tr, listeDansLaLangue, monnaie } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import ChoixLangue from './i18n/ChoixLangue.jsx';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
@@ -332,6 +332,9 @@ export default function Accueil({ onEntrer }) {
   const ligneEssai = tr('accueil.essai', { n: ESSAI_JOURS });
   // La liste des navigateurs : la phrase française de la règle (« … ou Vivaldi ») ; ailleurs, la
   // même liste jointe dans la langue (Intl.ListFormat), les noms jamais traduits.
+  // Le prix : la valeur des CGV (« 16,99 », src/accueil-reglages.js) écrite telle quelle en
+  // français, et dans le format de la langue ailleurs (« €16.99 ») — jamais une autre valeur.
+  const prixLu = (p) => (langue === 'fr' ? <>{p}&nbsp;€</> : monnaie(Number(String(p).replace(',', '.'))));
   const navsOrdi = langue === 'fr' ? NAVS_ORDI : listeDansLaLangue(SERVIS.ordinateur, langue);
 
   return (
@@ -368,7 +371,7 @@ export default function Accueil({ onEntrer }) {
             </div>
             <p className="av-prix-ligne" data-prix-ligne="">
               {ACCES_OFFERT && <><span className="nw" data-acces-offert="">{tr('accueil.gratuit')}</span>{tr('accueil.prix.puis')}</>}
-              <span className="nw"><b>{PRIX_MOIS}&nbsp;€</b> {tr('accueil.prix.parMois')}</span> {tr('accueil.prix.apres')} <span className="nw" data-essai={ESSAI_JOURS}>{ligneEssai}</span> · <span className="nw">{tr('accueil.prix.sansEngagement')}</span>
+              <span className="nw"><b>{prixLu(PRIX_MOIS)}</b> {tr('accueil.prix.parMois')}</span> {tr('accueil.prix.apres')} <span className="nw" data-essai={ESSAI_JOURS}>{ligneEssai}</span> · <span className="nw">{tr('accueil.prix.sansEngagement')}</span>
             </p>
             {/* Ce qui est VRAI (1er et 5 nov.) : VRM lit Vinted par l'extension, dans le
                 navigateur de l'ordinateur ; le téléphone consulte et commande. Pas
@@ -449,8 +452,8 @@ export default function Accueil({ onEntrer }) {
               <div>
                 <h2 className="av-h2">{tr('accueil.offres.titre')}</h2>
                 {ACCES_OFFERT && <span className="av-offert" data-acces-offert="">{tr('accueil.gratuit')}</span>}
-                <div className="av-montant" data-prix="" data-offre="solo"><b>{PRIX_MOIS}&nbsp;€</b><span>{tr('accueil.prix.parMois')} · {OFFRES.solo.nom}</span></div>
-                <div className="av-montant" data-prix-pro="" data-offre="pro"><b>{PRIX_PRO_MOIS}&nbsp;€</b><span>{tr('accueil.prix.parMois')} · {OFFRES.pro.nom}{PRO_OUVERT ? '' : tr('accueil.offres.bientot')}</span></div>
+                <div className="av-montant" data-prix="" data-offre="solo"><b>{prixLu(PRIX_MOIS)}</b><span>{tr('accueil.prix.parMois')} · {OFFRES.solo.nom}</span></div>
+                <div className="av-montant" data-prix-pro="" data-offre="pro"><b>{prixLu(PRIX_PRO_MOIS)}</b><span>{tr('accueil.prix.parMois')} · {OFFRES.pro.nom}{PRO_OUVERT ? '' : tr('accueil.offres.bientot')}</span></div>
               </div>
               <div>
                 {/* La phrase de chaque offre : en français, CELLE du serveur (OFFRES, api/_lib/plan-regle.js) ;

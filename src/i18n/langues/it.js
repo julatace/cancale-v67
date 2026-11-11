@@ -230,7 +230,7 @@ export default {
   "accueil.fin": "Domattina saprai cosa spedire, cosa ritirare e cosa dichiarare.",
   "accueil.gratuit": "Gratis per ora",
   "accueil.hautDePage": "VRM — inizio pagina",
-  "accueil.hero.sous": "Vinted, Leboncoin, eBay: ogni mattina VRM ti dice cosa fare, senza confondere i paia.",
+  "accueil.hero.sous": "Vinted, Leboncoin, eBay: ogni mattina VRM ti dice cosa fare, senza confondere le paia.",
   "accueil.hero.titre": "Le tue vendite, i tuoi pacchi e la tua contabilità, nello stesso posto.",
   "accueil.journee.chapo": "Al mattino, al punto di ritiro, in magazzino, a fine mese: quello che c’è da fare, niente di più.",
   "accueil.journee.titre": "La tua giornata da rivenditore, in quattro momenti.",
