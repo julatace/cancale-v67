@@ -218,7 +218,7 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
   // (10 nov., lot T) « Facture en anglais » : la traduction est FIGÉE dans
   // l'instantané (./anglais.js) ; le français reste, mot pour mot.
   const anglais = langue === 'en' ? { anglais: traductionContenu({ mentions, venteJour: jourParis(venteLe), plateforme: txt(vente.plateforme) }) } : {};
-  return {
+  const contenu = {
     v: 1,
     type,
     numero: String(numero),
@@ -253,6 +253,38 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
     logo: typeof c.logo === 'string' && /^data:image\/(png|jpeg);base64,/.test(c.logo) && c.logo.length <= LOGO_MAX ? c.logo : '',
     ...anglais,
   };
+  // (11 nov., lot tva-marge) Régime de la marge : AUCUNE TVA apparente (CGI art. 297 E).
+  // Une facture qui en porterait une n'est jamais produite — l'appelant le sait AVANT de
+  // prendre un numéro (`refusMarge`).
+  const ta = tvaApparente(contenu);
+  if (ta) { const e = new Error(ta); e.code = 'tva_apparente'; e.manquants = [{ champ: 'tva_regime', l: ta }]; throw e; }
+  return contenu;
+}
+
+// ── TVA SUR MARGE : PAS DE TVA APPARENTE (11 nov., lot tva-marge) ───────────
+// CGI art. 297 E (source citée, page Légifrance pas joignable depuis la session : à
+// vérifier sur la page officielle) : l'assujetti-revendeur au régime de la marge ne peut
+// pas faire apparaître la TVA sur ses factures ; la facture porte la mention
+// « Régime particulier – Biens d'occasion » (ann. II art. 242 nonies A, I-13°).
+// Rend la RAISON du refus (texte), ou '' si la facture est conforme (ou pas en marge).
+const TVA_CHIFFREE_RE = /\bTVA\b[^\n]{0,24}?\d+(?:[.,]\d+)?\s*%|\b(?:HT|TTC)\b|hors\s+taxes?|toutes\s+taxes/i;
+export function tvaApparente(c) {
+  if (!c || c.regime !== 'marge') return '';
+  const T = c.totaux || {};
+  if (T.tva != null || c.taux != null) return 'TVA sur marge : la facture ne doit montrer aucun montant de TVA (CGI art. 297 E).';
+  if (Number.isInteger(T.ht) && Number.isInteger(T.ttc) && T.ht !== T.ttc) return 'TVA sur marge : pas de « HT » distinct du total (CGI art. 297 E).';
+  if ((c.lignes || []).some((l) => l && (l.tva != null || l.taux != null))) return 'TVA sur marge : une ligne porte de la TVA (CGI art. 297 E).';
+  const mentions = Array.isArray(c.mentions) ? c.mentions : [];
+  if (!mentions.includes(MENTION_MARGE)) return "TVA sur marge : la mention « Régime particulier – Biens d'occasion » manque.";
+  if (mentions.includes(MENTION_FRANCHISE)) return 'TVA sur marge : la mention de franchise (art. 293 B) ne peut pas y figurer.';
+  const textes = [...(c.lignes || []).map((l) => l && l.designation), c.note, c.paiement].filter((x) => typeof x === 'string');
+  if (textes.some((t) => TVA_CHIFFREE_RE.test(t))) return 'TVA sur marge : un texte de la facture parle de TVA chiffrée ou de « HT/TTC » — retire-le (CGI art. 297 E).';
+  return '';
+}
+// Le contrôle AVANT le numéro (serveur) : l'instantané d'essai, sans rien écrire.
+export function refusMarge(cfg, vente) {
+  if (!cfg || cfg.tva_regime !== 'marge') return '';
+  try { contenuFacture(cfg, vente, { numero: 'FA-2000-0001', emiseLe: Date.now() }); return ''; } catch (e) { return e && e.code === 'tva_apparente' ? e.message : ''; }
 }
 // Le logo : une image PNG ou JPEG, réduite par l'app avant d'être rangée.
 export const LOGO_MAX = 200 * 1024;
@@ -373,6 +405,7 @@ export const MENTIONS_OBLIGATOIRES = [
   { cle: 'designation', l: 'Désignation, quantité et prix unitaire', ok: (c) => c.lignes.length > 0 && c.lignes.every((x) => txt(x.designation) && x.quantite > 0 && Number.isInteger(x.unite)) },
   { cle: 'totaux', l: 'Total à payer', ok: (c) => Number.isInteger(c.totaux.ttc) },
   { cle: 'tva', l: 'TVA (taux et montant) ou la mention qui la remplace', ok: (c) => (c.regime === 'normal' ? Number.isInteger(c.totaux.tva) && c.taux != null && !trouDe(c.mentions, 'tva_taux') : c.mentions.some((m) => m === MENTION_FRANCHISE || m === MENTION_MARGE)) },
+  { cle: 'marge', l: "TVA sur marge : aucune TVA apparente et la mention « Biens d'occasion » (art. 297 E)", ok: (c) => !tvaApparente(c) },
   { cle: 'paiement', l: 'Date du paiement (facture acquittée)', ok: (c) => c.type === 'avoir' || /payée le \d{2}\/\d{2}\/\d{4}/.test(c.paiement) },
 ];
 export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) => { try { return !m.ok(contenu); } catch (_) { return true; } }).map((m) => m.cle);
