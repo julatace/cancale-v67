@@ -19,9 +19,11 @@ const pauseEntre = () => {
   return 3000 + Math.floor(Math.random() * 5000);   // 3 à 8 s entre deux annonces : jamais une rafale
 };
 
-export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onFermer, onFini, Photo, Retour }) {
-  const [mode, setMode] = React.useState('eur');
-  const [texte, setTexte] = React.useState('5');
+// (11 nov. soir) `baisseInitiale` : { mode, texte } — la baisse PROPOSÉE par « Changer le prix »
+// (src/PrixPartout.jsx : un prix modifié dans VRM ⇒ sur Vinted, VRM propose, son clic ici envoie).
+export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onFermer, onFini, Photo, Retour, baisseInitiale = null }) {
+  const [mode, setMode] = React.useState(baisseInitiale && baisseInitiale.mode === 'pct' ? 'pct' : 'eur');
+  const [texte, setTexte] = React.useState(baisseInitiale && baisseInitiale.texte ? String(baisseInitiale.texte) : '5');
   const [coches, setCoches] = React.useState(null);        // null : les coches par défaut de l'aperçu
   const [phase, setPhase] = React.useState('choix');        // choix · confirmer · envoi · fini
   const [etats, setEtats] = React.useState({});

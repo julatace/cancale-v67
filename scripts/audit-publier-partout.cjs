@@ -29,6 +29,7 @@ const F = {
   ebay: path.join(RACINE, 'src', 'ecrans', 'Ebay.jsx'),
   actions: path.join(RACINE, 'src', 'annoncesActions.js'),
   suivi: path.join(RACINE, 'src', 'publierPartoutSuivi.js'),
+  prix: path.join(RACINE, 'src', 'prixPartout.js'),
 };
 const MUTATIONS = {
   'prix-pas-bloque': ['regle', "m.code === 'prix-absent' ? { ...m, bloque: true", "m.code === 'prix-absent' ? { ...m, bloque: false"],
@@ -54,6 +55,11 @@ const MUTATIONS = {
   'suivi-main-ok': ['suivi', "'a-finir': 'main'", "'a-finir': 'ok'"],
   'vc-publier-app': ['app', "publier: !finir && extSait('vcauto') === 'ok'", "publier: extSait('vcauto') === 'ok'"],
   'params-sync-oublie': ['app', "  'vrm_partout_params',\n", ''],
+  // (11 nov. soir) « un prix modifié dans VRM change partout »
+  'prix-sans-ajustement': ['prix', "return r ? prixPourSite(n, r) : n;", 'return n;'],
+  'vinted-envoye': ['prix', "dire(s.cle, { etat: 'propose', raison: null, prix: cible, avant: s.prix }); continue;", "if (typeof envoyer.vinted === 'function') { await envoyer.vinted(s, cible); } dire(s.cle, { etat: 'fait', prix: cible }); continue;"],
+  'relu-ignore': ['prix', "if (etat === 'fait' && relu != null && Math.round(relu * 100) !== Math.round(cible * 100))", 'if (false)'],
+  'prix-reglage-oublie': ['app', "envoyer: ENVOIS_PRIX, surEtat, reglage: reglageP });", 'envoyer: ENVOIS_PRIX, surEtat });'],
 };
 const arg = process.argv.slice(2);
 const mut = (arg.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
@@ -82,15 +88,17 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   const dit = (c, m, d) => { n++; if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d != null && !c ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 400) : '')); };
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : ' + e.message); } };
 
-  let P = null, S = null;
+  let P = null, S = null, X = null;
   if (src.regle != null) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-publier-partout-'));
     fs.mkdirSync(path.join(dir, 'src'));
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'src', 'publierPartout.js'), src.regle);
     for (const f of ['publierAilleurs.js', 'verifAnnonce.js']) fs.copyFileSync(path.join(RACINE, 'src', f), path.join(dir, 'src', f));
+    if (src.prix != null) fs.writeFileSync(path.join(dir, 'src', 'prixPartout.js'), src.prix);
     if (src.suivi != null) fs.writeFileSync(path.join(dir, 'src', 'publierPartoutSuivi.js'), src.suivi);
     try { P = await import(pathToFileURL(path.join(dir, 'src', 'publierPartout.js')).href); } catch (e) { dit(false, 'la règle ne se charge pas : ' + e.message); }
+    try { if (src.prix != null) X = await import(pathToFileURL(path.join(dir, 'src', 'prixPartout.js')).href); } catch (e) { dit(false, 'src/prixPartout.js ne se charge pas : ' + e.message); }
     try { if (src.suivi != null) S = await import(pathToFileURL(path.join(dir, 'src', 'publierPartoutSuivi.js')).href); } catch (e) { dit(false, 'le branchement du suivi ne se charge pas : ' + e.message); }
   } else dit(false, 'src/publierPartout.js absent : aucun « Publier partout »');
 
@@ -244,6 +252,27 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     });
   }
 
+  if (X) {
+    await essaie('J', async () => {
+      console.log('── J. un prix modifié dans VRM change partout');
+      const sites = [
+        { cle: 'vinted:1', site: 'vinted', id: '1', compte: '111', prix: 60, mode: 'propose' },
+        { cle: 'ebay:2', site: 'ebay', id: '2', prix: 60, mode: 'app' },
+        { cle: 'leboncoin:3', site: 'leboncoin', id: '3', prix: 60, mode: 'site' },
+        { cle: 'vestiaire:4', site: 'vestiaire', id: '4', prix: 60, mode: 'site' },
+      ];
+      const appels = [];
+      const envoyer = { vinted: async (s, p) => { appels.push(['vinted', p]); return { etat: 'fait' }; }, ebay: async (s, p) => { appels.push(['ebay', p]); return { etat: 'fait', prixRelu: p }; } };
+      const r = await X.appliquerPrix({ sites, coches: new Set(sites.map((x) => x.cle)), prix: '50', envoyer, reglage: { ebay: { mode: 'eur', valeur: 5 }, leboncoin: { mode: 'pct', valeur: 10 } } });
+      dit(appels.length === 1 && appels[0][0] === 'ebay' && appels[0][1] === 55, 'J1 eBay reçoit SON ajustement (+5 € ⇒ 55 €) ; rien d\'autre n\'est envoyé d\'ici', appels);
+      dit(r.res['ebay:2'].etat === 'fait' && r.res['ebay:2'].relu === true, 'J2 eBay relu après, au prix demandé', r.res['ebay:2']);
+      dit(r.res['vinted:1'].etat === 'propose' && r.res['vinted:1'].prix === 50, 'J3 Vinted : PROPOSÉ (son clic dans « Baisser le prix »), jamais envoyé', r.res['vinted:1']);
+      dit(r.res['leboncoin:3'].etat === 'a-faire' && r.res['leboncoin:3'].prix === 55 && r.res['vestiaire:4'].prix === 50, 'J4 Leboncoin / Vestiaire : « à faire sur le site » avec LE prix à mettre (+10 % ⇒ 55 € ; Vestiaire = le prix tapé)', [r.res['leboncoin:3'], r.res['vestiaire:4']]);
+      const r2 = await X.appliquerPrix({ sites, coches: new Set(['ebay:2']), prix: '50', envoyer: { ebay: async () => ({ etat: 'fait', prixRelu: 60 }) } });
+      dit(r2.res['ebay:2'].etat === 'incertain', 'J5 eBay relu à un autre prix ⇒ « pas sûr », jamais « fait »', r2.res['ebay:2']);
+    });
+  }
+
   console.log('── G. le câblage de l\'app');
   const app = src.app ? sansCommentaires(src.app) : '';
   const i = app.indexOf('function HotePublierPartout(');
@@ -265,6 +294,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   dit(/aussiSur\(\{ lbc:/.test(app) && /vcNumsAnn\.has\(cleNum\(num\)\)/.test(app), 'G12 pastilles « aussi sur » Leboncoin · eBay · Vestiaire sur l\'annonce');
   dit(/'vrm_partout_params',/.test(src.app || '') && /onParamAnnonce=/.test(hote) && /reglageParams\(/.test(hote), 'G13 les paramètres par défaut synchronisés, et par annonce');
   dit(/publier: !finir && extSait\('vcauto'\) === 'ok'/.test(hote), 'G14 Vestiaire à finir ⇒ le dépôt s\'ouvre sans publier tout seul');
+  dit(/prixDe=\{\(site, p\)=>prixParSite\(site, p, reglageP\)\}/.test(app) && /reglage: reglageP \}\)/.test(app) && /<BaissePrixSerie annonces=\{baisseCoque\.annonces\} baisseInitiale=/.test(app), 'G16 « Changer le prix » : ajustement par site, Vinted proposé dans « Baisser le prix »');
   dit(/suiviPourPartout\(await chargerSuivi\(\)/.test(hote) && /doitSArreter: sv \? sv\.doitSArreter/.test(hote), 'G15 le suivi commun (SuiviTravail) branché, avec Pause / Arrêter');
 
   console.log(`\n${n - ko}/${n} vérifications vertes.`);

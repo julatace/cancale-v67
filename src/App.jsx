@@ -567,7 +567,7 @@ import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJourn
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, refVente } from "./importStock.js";
 import { ImportStockReglage } from "./composants/ImportStock.jsx";
-import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
+import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
@@ -54167,6 +54167,9 @@ function AppCoeur() {
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const n=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null; const st=['leboncoin','vestiaire','ebay'].includes(d.site)?d.site:null; setPubAil({num:n,site:st});};window.addEventListener('vrm:publier-ailleurs',ouvrir);return()=>window.removeEventListener('vrm:publier-ailleurs',ouvrir);},[]);
   // (11 nov.) « PUBLIER PARTOUT » : les N° des annonces Vinted (une, ou la sélection d'Annonces).
   const [pubPartout,setPubPartout]=useState(null);
+  // (11 nov. soir) La baisse PROPOSÉE sur Vinted par « Changer le prix » : la feuille « Baisser le prix »
+  // existante, sur CETTE annonce ; rien ne part avant SON clic là-bas (src/BaissePrixSerie.jsx).
+  const [baisseCoque,setBaisseCoque]=useState(null);
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const l=(Array.isArray(d.nums)?d.nums:[]).map(x=>String(x==null?'':x).trim()).filter(x=>x&&x.length<=64).slice(0,200); if(l.length) setPubPartout({nums:l,at:Date.now()});};window.addEventListener('vrm:publier-partout',ouvrir);return()=>window.removeEventListener('vrm:publier-partout',ouvrir);},[]);
   const besoinNumData=gsOpen||!!ficheNum||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout;
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
@@ -57126,10 +57129,19 @@ function AppCoeur() {
           const lecture = !numData || !ex;
           const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(prixNum, rn, ex || { lbcItems: undefined, vcItems: undefined });
           const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
+          // (11 nov. soir) « Un prix modifié dans VRM change partout » : chaque site avec SON ajustement
+          // (`vrm_partout_prix`, réglé dans « Publier partout ») ; sur Vinted, VRM PROPOSE la baisse
+          // (la feuille « Baisser le prix », son clic) ; eBay relu après (src/prixPartout.js).
+          const reglageP = load(CLE_PRIX_PARTOUT, null);
           return <PrixPartout key={prixNum} num={rn.cle || prixNum} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
-            onFermer={()=>setPrixNum(null)}
+            onFermer={()=>setPrixNum(null)} prixDe={(site, p)=>prixParSite(site, p, reglageP)}
+            onProposer={(s, e)=>{ const fiche = (load('vinted_annonce_numeros', {}) || {})[String(s.id)] || {};
+              const delta = Math.round(((s.prix || 0) - (e.prix || 0)) * 100) / 100;
+              if (!(delta > 0)) return;
+              setBaisseCoque({ annonces: [{ id: String(s.id), uid: String(s.compte || ''), compte: (()=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===String(s.compte)); const lb=load('vinted_account_labels',{})||{}; return a ? (lb[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; })(), numero: String(fiche.numero || rn.cle || ''), titre: s.titre || '', photo: fiche.photo || '', prix: s.prix }],
+                baisse: { mode: 'eur', texte: String(delta).replace('.', ',') }, at: Date.now() }); }}
             onAppliquer={async({ coches, prix, surEtat })=>{
-              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat });
+              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat, reglage: reglageP });
               if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
               return r;
             }}/>;
@@ -57147,6 +57159,14 @@ function AppCoeur() {
           return <HotePublierAilleurs comptes={vintedAccounts} num={num} site={pubAil.site} sitesVus={sitesVus} manquesLecture={manquesL} lecture={lecture}
             onChoisir={(n)=>setPubAil((x)=>({ ...(x||{}), num: n }))} onFermer={()=>setPubAil(null)} onNav={setTab}/>;
         }}/></GardeEcran>}
+        {baisseCoque && <GardeEcran nom="baisse-coque" feuille resetKey={String(baisseCoque.at)} onFermer={()=>setBaisseCoque(null)}>{(()=>{
+          const vc = vintedDeChrome();
+          const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
+          return <BaissePrixSerie annonces={baisseCoque.annonces} baisseInitiale={baisseCoque.baisse} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
+            plancherDe={(a)=>plancherVente((load('vinted_annonce_numeros', {}) || {})[String(a.id)] || null)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
+            onFermer={()=>setBaisseCoque(null)}
+            onBaisser={(l)=>vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000)}/>;
+        })()}</GardeEcran>}
         {pubPartout && <GardeEcran nom="partout" feuille resetKey={String(pubPartout.at)} onFermer={()=>setPubPartout(null)}>
           <HotePublierPartout comptes={vintedAccounts} nums={pubPartout.nums} numData={numData} onFermer={()=>setPubPartout(null)}/>
         </GardeEcran>}
