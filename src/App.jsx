@@ -13,7 +13,7 @@ import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
 import {stockageParcours,lireReprise,garderReprise} from './repriseEcran.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
-import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from './composants/SelectionSerie.jsx';
+import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie, avecSerie } from './composants/SelectionSerie.jsx';
 import { trierSerie, resumeSerie, csvDe } from './selectionSerie.js';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
@@ -32744,6 +32744,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tx = o && (o._fromEmail ? o._txMail : o.transaction_id);
     return tx == null ? null : { tx: String(tx), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(tx)) || [] };
   }).filter(Boolean), [ventesAffichees, ventesMax, commandesParTx]);
+  // (11 nov., lot actions-serie) Ventes : sélectionner plusieurs lignes, agir une fois (src/selectionSerie.js).
+  const ordreVentesSerie = useMemo(() => ventesAffichees.map(o => String(o.transaction_id)), [ventesAffichees]);
+  const serieVentes = useSelectionSerie(ordreVentesSerie, { nom: 'ventes' });
+  const actionsSerieVentes = () => {
+    const parTx = new Map(ventesAffichees.map(o => [String(o.transaction_id), o]));
+    const lignes = (cles) => cles.map(k => parTx.get(k)).filter(Boolean);
+    const annulee = (o) => classifyOrderStatus(o.status) === 'cancelled';
+    return [
+      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', faire: async (cles) => {
+        // Les bordereaux prêts du lot « Tout imprimer » (même clé : le n° de transaction).
+        const prets = new Set(lignesLotTous().filter(l => l.cochable !== false).map(l => String(l.cle)));
+        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets.has(String(o.transaction_id)) ? true : 'pas de bordereau prêt');
+        if (ok.length) await batchBordereaux(new Set(ok.map(o => String(o.transaction_id))));
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'bordereau préparé', plusieurs: 'bordereaux préparés' });
+      } },
+      { k: 'depose', libelle: 'Je dépose', icone: 'check', faire: (cles) => {
+        // L'écriture de « Colis déposé » (`gesteColisFait`), en UN geste ⇒ UN « Annuler ».
+        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true);
+        const ops = [];
+        for (const o of ok) {
+          const k = String(o.transaction_id), b = bordsParTxn[k], kb = b ? bordKey(b) : null;
+          if (!shipDone[k]) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: Date.now(), avant: shipDone[k] });
+          if (kb) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: 1, avant: bordsShipped[kb] });
+        }
+        if (ops.length) gesteVrm(ok.length > 1 ? `${ok.length} colis déposés` : 'Colis déposé', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'déposée', plusieurs: 'déposées' });
+      } },
+      { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
+        const L = lignes(cles);
+        const csv = csvDe(['Date', 'Compte', 'Article', 'N°', 'Prix (€)', 'État', 'N° de transaction'],
+          L.map(o => { const e = effEntry(o); return [o.date && Number.isFinite(new Date(o.date).getTime()) ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._acc ? accNameOf(o._acc) : '', o.title || '', (e && e.numero) || '', o.price && o.price.amount != null ? Number(o.price.amount).toFixed(2).replace('.', ',') : '', o.status_title || o.status || '', String(o.transaction_id)]; }));
+        telechargerFichier(csv, `ventes-${dateLocaleISO()}.csv`, 'text/csv;charset=utf-8');
+        return resumeSerie({ faits: L, pasFaits: [] }, { un: 'vente exportée', plusieurs: 'ventes exportées' });
+      } },
+      { k: 'facture', libelle: 'Facture Pro', icone: 'receipt', faire: async (cles) => {
+        const L = lignes(cles);
+        const txDe = (o) => String(o._fromEmail ? o._txMail : o.transaction_id);
+        const m = await import('./FacturePro.jsx');
+        const r = await m.envoyerFacturesSerie(DEPS_FACTURE, L.map(txDe), sales.items);
+        if (!r) return { annule: true };
+        return resumeSerie(r, { un: 'facture envoyée', plusieurs: 'factures envoyées' });
+      } },
+    ];
+  };
   const groupeFactureCle = useMemo(() => groupeFacture.map((v) => v.tx + ':' + (v.commandes || []).length).join(','), [groupeFacture]);
   // Une recherche ou un changement de filtre repart du haut : sinon on garderait
   // « 240 affichées » sur une liste qui n'en compte plus que trois.
@@ -35547,9 +35591,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return resumeSerie({ faits: ok, pasFaits }, { un: 'retiré', plusieurs: 'retirés' });
       } },
       { k: 'relier', libelle: 'Relier', icone: 'link', faire: (cles) => {
-        const L = lignes(cles);
-        if (typeof relierAchatsSerie === 'function') return relierAchatsSerie(L.map(x => x.o));
-        return { texte: 'Pas fait : relier un achat se fait depuis l’annonce' };
+        // Relier = désigner LA paire de l'achat : c'est toujours SON tap (§5, jamais par
+        // ressemblance). La série l'amène à la file « Sans achat relié » (une suggestion
+        // par annonce, « Relier · 32 € » en un tap) et dit ce qui est déjà relié.
+        const { ok, pasFaits } = trierSerie(lignes(cles), ({ o, st }) => st.step === 0 ? 'annulé' : buyNumByTxn[String(o.transaction_id)] != null ? 'déjà relié' : true);
+        if (!ok.length) return resumeSerie({ faits: [], pasFaits }, { un: 'à relier', plusieurs: 'à relier' });
+        demanderVue('sansachat'); if (onNav) onNav('cat_annonces');
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'à relier dans « Sans achat relié »', plusieurs: 'à relier dans « Sans achat relié »' });
       } },
       { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
         const L = lignes(cles);
@@ -38665,6 +38713,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (10 nov., lot BE) la frise prouvée du récapitulatif (ses preuves arrivent après le premier rendu).
     const frisePv = friseProuveeDe(o, litige);
     deps.push(frisePv.cle);
+    deps.push(serieVentes.actif ? (serieVentes.estCoche(tx) ? 2 : 1) : 0);   // (lot actions-serie) coché ⇒ la ligne se redessine
     return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv };
   };
   // ── (10 nov., lots BB et BI) « LITIGES EN COURS » ET « RETOURS PAR MODÈLE » ─────────────
@@ -42069,6 +42118,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             à l'identique — la note « vue par e-mail » d'un compte, un refus de facture commun. */}
         {[...ventesEmailTete.values()].map((g) => <NoteVentesEmailTete key={g.uid} g={g} nom={g.acc ? accNameOf(g.acc) : ''}/>)}
         <FactureRaisonsTete deps={DEPS_FACTURE} ventes={groupeFacture}/>
+        {ventesAffichees.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieVentes}/></div>}
+        <BarreSerie serie={serieVentes} actions={actionsSerieVentes()} rendreIcone={iconeApp}/>
         <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
@@ -42285,8 +42336,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <GlisserVente actif={peutDeposer && !deposeIci} onDepose={()=>demanderDepose(txL, o, libDepose)}>{gp => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
-                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
+              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={<><CaseSerie serie={serieVentes} cle={txL} etiquette={o.title} surPhoto/>{photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<PhotoVente src={photo} size={46} portrait/>}</>} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
+                {...avecSerie(gp, serieVentes.ligne(txL))} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
@@ -43873,7 +43924,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (<>
         {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>Tous sur <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
         {tranche.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieAchats}/></div>}
-        <BarreSerie serie={serieAchats} actions={actionsSerieAchats()}/>
+        <BarreSerie serie={serieAchats} actions={actionsSerieAchats()} rendreIcone={iconeApp}/>
         <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
           {tranche.map(({o,tk,st},i)=>{
             const cancelled = st.step===0;

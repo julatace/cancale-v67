@@ -82,6 +82,18 @@ export function useSelectionSerie(ordre, { nom = '' } = {}) {
   return { nom, actif, sel, choisies, n: choisies.length, total: ordreS.length, estCoche, cocher, tout, vider, commencer, ligne, ouvrir: () => setActif(true) };
 }
 
+// Deux jeux de props sur la même ligne (le glisser « déposé » ET la sélection) :
+// chaque gestionnaire appelle les deux ; celui de la sélection passe d'abord, et
+// s'il arrête le clic, l'autre ne le voit pas.
+export function avecSerie(a, b) {
+  const out = { ...(a || {}), ...(b || {}) };
+  for (const k of Object.keys(a || {})) {
+    if (!/^on[A-Z]/.test(k) || typeof a[k] !== 'function' || !b || typeof b[k] !== 'function') continue;
+    out[k] = (e) => { b[k](e); if (e && typeof e.isPropagationStopped === 'function' && e.isPropagationStopped()) return; a[k](e); };
+  }
+  return out;
+}
+
 // La case d'une ligne. À la souris elle est toujours là (discrète tant que rien
 // n'est coché) ; au doigt elle n'apparaît qu'une fois la sélection ouverte.
 // `surPhoto` : la case se pose dans le coin de la vignette (les lignes en grille
@@ -105,7 +117,7 @@ export function OuvrirSerie({ serie, libelle = 'Sélectionner' }) {
 
 // La barre flottante. `actions` = [{ k, libelle, icone?, desactive?, raison?, faire }]
 // `faire(choisies)` rend (ou promet) un résumé (texte) ; il est dit dans la barre.
-export function BarreSerie({ serie, actions = [], unite = { un: 'sélectionné', plusieurs: 'sélectionnés' } }) {
+export function BarreSerie({ serie, actions = [], unite = { un: 'sélectionné', plusieurs: 'sélectionnés' }, rendreIcone }) {
   const [resume, setResume] = useState('');
   const [occupe, setOccupe] = useState(false);
   // Le résumé reste lisible quelques secondes après la fermeture de la sélection.
@@ -140,7 +152,7 @@ export function BarreSerie({ serie, actions = [], unite = { un: 'sélectionné',
       {resume ? <p className="vrm-serie-resume" role="status" data-serie-resume="">{resume}</p> : null}
       <div className="vrm-serie-actions">
         {actions.filter(Boolean).map((a) => (
-          <Bouton key={a.k} variante={a.variante || 'secondaire'} taille="petit" icone={a.icone} data-serie-action={a.k}
+          <Bouton key={a.k} variante={a.variante || 'secondaire'} taille="petit" icone={a.icone} {...(rendreIcone ? { rendreIcone } : {})} data-serie-action={a.k}
             disabled={!n || occupe || !!a.desactive} title={a.desactive ? a.raison : undefined} onClick={() => lancer(a)}>{a.libelle}</Bouton>
         ))}
       </div>
