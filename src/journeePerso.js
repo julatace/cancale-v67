@@ -41,6 +41,7 @@ export const CARTES_JOURNEE = [
   { id: 'ailleurs', zone: 'afaire', nom: 'Vendus ailleurs', desc: 'Annonces à retirer des autres sites.' },
   { id: 'deux-fois', zone: 'afaire', nom: 'En ligne deux fois', desc: 'La même annonce publiée deux fois.' },
   { id: 'avis-bas', zone: 'afaire', nom: 'Avis négatif reçu', desc: 'Un avis de 3★ ou moins, à lire.' },   // (11 nov., lot avis-negatif, intégration)
+  { id: 'photos-comptes', zone: 'afaire', nom: 'Photos sur deux comptes', desc: 'La même photo sur deux comptes Vinted.' },
   { id: 'envoyer', zone: 'afaire', nom: 'Colis à envoyer', desc: 'Revient seule si un colis est pressé.', urgent: true },
   { id: 'retirer', zone: 'afaire', nom: 'Colis à retirer', desc: 'Revient seule au dernier jour.', urgent: true },
   { id: 'messages', zone: 'afaire', nom: 'Messages', desc: 'Tes messages pas lus.' },

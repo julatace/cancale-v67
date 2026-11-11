@@ -9,8 +9,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
-import JaugeActions from '../JaugeActions.jsx';
-import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la file   // (10 nov., lot G) la jauge des 50 actions/h du compte
+import JaugeActions from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h du compte
+import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la file
+import { EncartPhotosAutresComptes } from '../PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
@@ -1862,6 +1863,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {!aFaire.length && <div data-republier-vide style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'Aucun article dans cette file.'}</div>}
             {/* (30 oct.) Avant de lancer : UNE phrase par fait, le détail derrière ⓘ. */}
             {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à recréer sur Vinted, une par une. Le N° VRM passe sur la nouvelle. <Pourquoi label="Comment ça marche">Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? "l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu." : 'la nouvelle annonce est créée, et seulement si elle est bien en ligne l’ancienne est supprimée.'}</Pourquoi></div>}
+            {/* (11 nov., lot photos-comptes) AVANT de republier : une de ces photos déjà EN LIGNE sur un AUTRE
+                compte Vinted ⇒ l'encart ambre (miniature, compte). Republier reste possible (son choix). */}
+            {action !== 'enLigne' && !!aFaire.length && mode === 'idle' && <EncartPhotosAutresComptes sources={aFaire.map((a) => ({ id: a.id, compte: String(a.uid || compteUid) }))} compteCible={compteUid ? `vinted:${compteUid}` : null} PhotoVinted={PhotoVinted}/>}
             {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à repasser en brouillon, une par une. <Pourquoi label="Comment ça marche">Pour chacune : elle est enregistrée dans VRM, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est retirée, puis le brouillon est créé sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</Pourquoi></div>}
             {action === 'enLigne' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'brouillon')}</b> à mettre en ligne, un par un, tels que tu les as enregistrés.</div>}

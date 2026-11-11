@@ -1533,3 +1533,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot sante-comptes)
 
 - **11 nov. · Santé des comptes (lot sante-comptes)** : En forme / À surveiller par compte Vinted, 7 points lisibles, seuils écrits (`src/santeComptes.js`), Paramètres · Statistiques · Ma journée si un compte glisse ; aucune notification. `docs/passation/2026-11-11-sante-comptes.md`. Geste : aucun.
+## Lignes de CLAUDE.md §9 déplacées telles quelles (11 nov., photos-comptes)
+
+- **11 nov. · Photos en double entre comptes (ext. 5.358)** : empreinte perceptuelle locale sans IA (dHash + pHash, 3 recadrages, `src/photoEmpreinte.js`, seuil 16 MESURÉ : même photo recompressée/recadrée ≤ 11, autre photo ≥ 19) calculée par l'extension (budget de lecture, une image/45 s) ; Annonces → Outils « Photos en double », carte ambre Ma journée, encart avant de publier ; un RISQUE montré, jamais une identité (§5) ; « Republier avec d'autres photos » = Republier à la main ; rien supprimé ni modifié. `docs/passation/2026-11-11-photos-comptes.md`. Geste : installer 5.358.0, laisser vinted.fr ouvert.
+
+- **11 nov. · Connexions Google/Discord (lot connexions-oauth, ext. 5.346)** : bug de prod « code challenge does not match » corrigé (un vérificateur PKCE PAR tentative, `vrm_essai`, `src/auth/essaisPkce.js`) ; refus traduits PAR CODE (`src/auth/erreursOAuth.js`, recopiée dans l'extension) ; même adresse ⇒ relié et dit ; Délier dit l'e-mail qui change ; l'extension n'adopte plus un compte neuf. Banc `connexions-oauth`. Récit `2026-11-11-connexions-oauth.md`. Geste : Redirect URLs, installer 5.346.0.

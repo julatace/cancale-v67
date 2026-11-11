@@ -534,6 +534,7 @@ sans la fonction.
 | `moderation` | `guetterDressing` | **5.350.0** (11 nov.) | « Vinted a masqué / fait disparaître / limite » : deux lectures COMPLÈTES comparées, aucune requête de plus ; `moderation_vinted_{uid}` |
 | `verifdepot` | `alertesDepotVinted` | **5.353.0** (11 nov.) | sur le formulaire de dépôt vinted.fr : encart discret « N° absent / déjà en ligne / prix sous l'achat », base VRM seulement, jamais une garde |
 | `resumemois` | `moisPourCarte` | **5.354.0** (11 nov.) | « Ce mois : … vendus · … ventes · … à expédier » dans la carte du logo : lu dans `widget_stats`, compte de l'onglet prouvé, « — » si pas su, masquable |
+| `empreintes` | `tickEmpreintes` | **5.358.0** (11 nov.) | « photos en double entre tes comptes » : une image par tour (45 s), budget de LECTURE, empreinte seule rangée (`photo_emprunte_{uid}`) |
 
 ---
 
@@ -543,7 +544,6 @@ sans la fonction.
 - **11 nov. · Notifications groupées (lot `notifs-groupees`)** : la 1re sonne, les suivantes (événements par objet) attendent 15 min (réglable : Non · 15 · 30 · 60) puis UN résumé « 2 colis à poster · 1 colis à retirer » (`api/_lib/notif-groupe.js`, passage `?moment=groupe` toutes les 15 min) ; urgent (< 24 h, double vente) tout de suite ; jamais deux fois (objet + jour) ; heures calmes respectées ; **jours calmes** (week-end, jours cochés, congés : seul l'urgent passe, le reste groupé au premier matin non calme) ; colis ⇒ Ventes / Achats, plus jamais `cat_bord` (à intégrer avec DJ3). `docs/passation/2026-11-11-notifs-groupees.md`. Geste : aucun.
 - **11 nov. · Traduction (fr, en, es, it, de)** : `src/i18n/` (`tr()`, pluriels Intl, formats, chargement à la demande), Paramètres → Langue (`vrm_langue`, SYNC_KEYS) ; migrés : coque, menu du profil, Paramètres (liste), connexion, écrans d'erreur, accueil public ; le reste écran par écran (méthode, ordre) : `docs/passation/2026-11-11-traduction.md`. Geste : aucun.
 - **11 nov. · Intégration extension-2 (5.355.0)** : `claude/integration-extension` (6 chantiers) + `claude/relecture-oauth` (connexions Google/Discord, ext. 5.346, suppression de compte OAuth) réunis par vrais `git merge` sur e4 ; un seul contenu **5.355.0** (aucune publiée, production 5.344.0) ; l'avis négatif est une carte de Ma journée comme les autres (`avis-bas`, cachable, comptée) ; Regrouper en Segmente + seuil d'avis. Branche `claude/integration-extension-2`. Geste : installer 5.355.0.
-- **11 nov. · Connexions Google/Discord (lot connexions-oauth, ext. 5.346)** : bug de prod « code challenge does not match » corrigé (un vérificateur PKCE PAR tentative, `vrm_essai`, `src/auth/essaisPkce.js`) ; refus traduits PAR CODE (`src/auth/erreursOAuth.js`, recopiée dans l'extension) ; même adresse ⇒ relié et dit ; Délier dit l'e-mail qui change ; l'extension n'adopte plus un compte neuf. Banc `connexions-oauth`. Récit `2026-11-11-connexions-oauth.md`. Geste : Redirect URLs, installer 5.346.0.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

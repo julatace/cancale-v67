@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.355.0';
+const CODE_VERSION = '5.358.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5887,6 +5887,13 @@ function photoUtile(it) {
       || (Array.isArray(p.thumbnails) && p.thumbnails.find(t => t && t.url)?.url);
     if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) continue;
     const out = { url };
+    // 5.358 — la MINIATURE (photos en double entre comptes : l'empreinte se calcule sur une
+    // petite image). La plus petite d'au moins 100 px de large, de vinted.net seulement.
+    if (typeof p === 'object' && Array.isArray(p.thumbnails)) {
+      const m = p.thumbnails.filter((t) => t && typeof t.url === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(t.url) && Number(t.width || 0) >= 100)
+        .sort((a, b) => Number(a.width || 0) - Number(b.width || 0))[0];
+      if (m) out.mini = m.url;
+    }
     const ts = p.high_resolution && p.high_resolution.timestamp;
     if (ts) out.high_resolution = { timestamp: ts };
     return out;
@@ -7127,6 +7134,302 @@ async function tickPhotosUn() {
     // Plus rien à faire (ou garde qui refuse) → on met en pause ce compte.
     if (!n) { cd[uid] = Date.now(); await chrome.storage.local.set({ vrmPhotosCooldown: cd }); }
   } catch (_) { /* une capture ratée n'a pas à réveiller d'erreur */ }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.358 (11 nov.) — L'EMPREINTE DES PHOTOS : « une même photo sur deux de tes comptes »
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « Vinted relie les comptes entre eux et peut les bannir ; une même photo
+// publiée sur deux de mes comptes est un risque ». La page VRM ne peut pas lire les
+// pixels d'une image de vinted.net (CORS) : l'extension, qui a les droits d'hôte, la
+// télécharge (sans cookie : `credentials: 'omit'`), la dessine en 64 × 64 et en calcule
+// l'empreinte PERCEPTUELLE (src/photoEmpreinte.js, recopiée ci-dessous) — SANS IA (§2.9).
+// Rangée dans `photo_emprunte_{uid}` : { annonces: { [id]: { [clé de photo]: empreinte } } }.
+// JAMAIS l'image, jamais un pixel : l'empreinte seule.
+// Bornes (§3) : un onglet vinted.fr ouvert, un compte connecté, rien pendant qu'il
+// navigue (`PHOTOS_CALME_MS`) ni pendant une pause Vinted ; UNE image par tour au plus,
+// `EMPREINTES_ECART_MS` entre deux ; chaque image compte sur le budget de LECTURE du compte
+// connecté (20/h), classe « photos » — la plus basse : jamais la place de l'argent, des
+// codes ni des colis (`gardeLecture`) ; dans la file Vinted (une requête à la fois) ;
+// la MINIATURE quand Vinted la donne (`photo.mini`), une image de plus de
+// `EMPREINTES_MAX_OCTETS` n'est pas lue. Un refus (429/403) du site des images ⇒ 24 h
+// sans empreinte. Une écriture ne part qu'après une lecture RÉUSSIE de la ligne
+// (lire-fusionner-réécrire : une lecture ratée n'écrit rien).
+// ⚠️ §5 : un doublon de photo est un RISQUE à montrer, jamais une identité.
+// <empreinte-photo-regle> — COPIE de src/photoEmpreinte.js (scripts/audit-photos-comptes.cjs --recopie). Ne pas modifier ici.
+// La taille à laquelle l'image est dessinée avant le calcul (étirée, sans garder les
+// proportions : la même règle pour toutes les photos, page et extension).
+const COTE_EMPREINTE = 64;
+// L'empreinte d'une photo = 6 empreintes de 64 bits : dHash (gradient horizontal, 9 × 8)
+// et pHash (transformée en cosinus 32 × 32, bloc 8 × 8 comparé à sa médiane), chacune
+// sur l'image entière et recadrée de 4 % et 8 % tout autour (un recadrage léger d'un
+// côté retombe sur l'un des trois). 96 caractères hexadécimaux.
+// Distance de deux photos = (meilleure distance dHash) + (meilleure distance pHash) / 2.
+// MESURÉ (banc photos-comptes-seuil, 11 nov., 48 photos inventées × 11 transformations) :
+// même photo recompressée / réduite / agrandie / éclaircie / recadrée ⇒ ≤ 13 ;
+// photo différente (même paire autrement cadrée, ou autre paire) ⇒ ≥ 19. Seuil entre les deux.
+const SEUIL_PHOTO = 16;
+const RECADRAGES = [0, 0.04, 0.08];
+const N_DCT = 32;
+let _cos = null;
+function tableCos() {
+  if (_cos) return _cos;
+  _cos = new Float64Array(8 * N_DCT);
+  for (let u = 0; u < 8; u++) for (let x = 0; x < N_DCT; x++) _cos[u * N_DCT + x] = Math.cos(((2 * x + 1) * u * Math.PI) / (2 * N_DCT));
+  return _cos;
+}
+// Niveaux de gris de la zone [c, 1 − c] réduits à nx × ny par moyenne de surface.
+function grisReduit(gris, w, h, c, nx, ny) {
+  const ax = w * c, ay = h * c, lw = w * (1 - 2 * c), lh = h * (1 - 2 * c);
+  const out = new Float64Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    const y0 = ay + (j * lh) / ny, y1 = ay + ((j + 1) * lh) / ny;
+    for (let i = 0; i < nx; i++) {
+      const x0 = ax + (i * lw) / nx, x1 = ax + ((i + 1) * lw) / nx;
+      let s = 0, a = 0;
+      for (let y = Math.floor(y0); y < Math.min(h, Math.ceil(y1)); y++) {
+        const fy = Math.min(y + 1, y1) - Math.max(y, y0);
+        if (fy <= 0) continue;
+        for (let x = Math.floor(x0); x < Math.min(w, Math.ceil(x1)); x++) {
+          const fx = Math.min(x + 1, x1) - Math.max(x, x0);
+          if (fx <= 0) continue;
+          s += fx * fy * gris[y * w + x]; a += fx * fy;
+        }
+      }
+      out[j * nx + i] = a > 0 ? s / a : 0;
+    }
+  }
+  return out;
+}
+const versHex = (bits) => { let h = ''; for (let q = 0; q < 16; q++) { let n = 0; for (let b = 0; b < 4; b++) n = (n << 1) | (bits[q * 4 + b] ? 1 : 0); h += n.toString(16); } return h; };
+function dHash(g) {                                    // g : 9 × 8
+  const bits = [];
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits.push(g[y * 9 + x] < g[y * 9 + x + 1]);
+  return versHex(bits);
+}
+function pHash(g) {                                    // g : 32 × 32
+  const c = tableCos();
+  const lignes = new Float64Array(8 * N_DCT);
+  for (let y = 0; y < N_DCT; y++) for (let u = 0; u < 8; u++) { let s = 0; for (let x = 0; x < N_DCT; x++) s += g[y * N_DCT + x] * c[u * N_DCT + x]; lignes[u * N_DCT + y] = s; }
+  const bloc = new Float64Array(64);
+  for (let v = 0; v < 8; v++) for (let u = 0; u < 8; u++) { let s = 0; for (let y = 0; y < N_DCT; y++) s += lignes[u * N_DCT + y] * c[v * N_DCT + y]; bloc[v * 8 + u] = s; }
+  const ac = Array.from(bloc).slice(1).sort((x, y) => x - y);
+  const med = (ac[31] + ac[32]) / 2;
+  return versHex(Array.from(bloc, (v, i) => i > 0 && v > med));
+}
+// `rgba` : les octets R, G, B, A ligne par ligne (ImageData.data), `w` × `h`.
+// Rend 96 caractères hexadécimaux, ou null si l'image n'est pas lisible (vide, ou
+// uniforme : une photo sans aucun détail ne dit rien — « pas su », jamais un faux).
+function empreinteDepuisPixels(rgba, w, h) {
+  w = Math.floor(Number(w)); h = Math.floor(Number(h));
+  if (!rgba || !(w > 0) || !(h > 0) || rgba.length < w * h * 4) return null;
+  const gris = new Float64Array(w * h);
+  let mn = 255, mx = 0;
+  for (let i = 0; i < w * h; i++) { const v = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]; gris[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
+  if (!(mx - mn > 2)) return null;                     // image uniforme : rien à dire
+  let d = '', p = '';
+  for (const c of RECADRAGES) { d += dHash(grisReduit(gris, w, h, c, 9, 8)); p += pHash(grisReduit(gris, w, h, c, N_DCT, N_DCT)); }
+  return d + p;
+}
+function empreinteValide(h) { return typeof h === 'string' && /^[0-9a-f]{96}$/.test(h); }
+const BITS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+function hamming16(a, i, b, j) { let n = 0; for (let k = 0; k < 16; k++) n += BITS[parseInt(a[i + k], 16) ^ parseInt(b[j + k], 16)]; return n; }
+// Distance de deux photos (0…96) ; null si l'une n'est pas lisible.
+function distanceEmpreintes(a, b) {
+  if (!empreinteValide(a) || !empreinteValide(b)) return null;
+  let dd = 64, dp = 64;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    dd = Math.min(dd, hamming16(a, i * 16, b, j * 16));
+    dp = Math.min(dp, hamming16(a, 48 + i * 16, b, 48 + j * 16));
+  }
+  return dd + dp / 2;
+}
+function memePhoto(a, b, seuil = SEUIL_PHOTO) {
+  const d = distanceEmpreintes(a, b);
+  return d != null && d <= seuil;
+}
+// La clé d'une photo (son adresse sans la signature `?s=`) : ce qui dit « cette photo
+// est déjà calculée ». Jamais une identité de paire.
+function clePhotoEmpreinte(url) {
+  const s = String(url || '').trim();
+  if (!/^https:\/\/[\w.-]+\//i.test(s)) return '';
+  return s.split('#')[0].split('?')[0].slice(0, 240);
+}
+// </empreinte-photo-regle>
+const EMPREINTES_ECART_MS = 45 * 1000;
+const EMPREINTES_MAX_OCTETS = 600 * 1024;
+const EMPREINTES_PLAN = 'vrmEmpreintesPlan';          // { at, photos: [{ uid, id, k, url }], ids: { [uid]: [id] } }
+const EMPREINTES_PLAN_MS = 3 * 60 * 60 * 1000;        // la liste se relit toutes les 3 h (égress, §4.4)
+const EMPREINTES_PLAN_VIDE_MS = 30 * 60 * 1000;
+const EMPREINTES_MEMO = 'vrmEmpreintesMemo';          // { [clé]: ms du dernier essai }
+const EMPREINTES_RETRY_MS = 24 * 60 * 60 * 1000;
+const EMPREINTES_FILE = 'vrmEmpreintesFile';          // [{ uid, id, k, h, at }] — calculées, pas encore rangées
+const EMPREINTES_LOT = 10;
+const EMPREINTES_LOT_MS = 10 * 60 * 1000;
+const EMPREINTES_DERNIERE = 'vrmEmpreintesDerniere';
+const EMPREINTES_FREIN = 'vrmEmpreintesFrein';
+const EMPREINTES_TOUR = 'vrmEmpreintesTour';
+const EMPREINTES_PAR_ANNONCE = 8;
+const urlImageVinted = (u) => typeof u === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(u);
+// La liste des photos à calculer : les annonces EN LIGNE de ses comptes liés (dressing
+// lu), la photo de couverture d'abord (sa miniature), puis les autres photos de la fiche
+// (`vinted_item_details`) ; moins ce qui est déjà rangé. `null` = pas su (rien ne part).
+async function planEmpreintes() {
+  let st = {};
+  try { st = await chrome.storage.local.get(EMPREINTES_PLAN); } catch (_) { return null; }
+  const p = st[EMPREINTES_PLAN];
+  const age = Date.now() - Number(p && p.at || 0);
+  if (p && Array.isArray(p.photos) && age >= 0 && age < (p.photos.length ? EMPREINTES_PLAN_MS : EMPREINTES_PLAN_VIDE_MS)) return p;
+  const comptes = (await getStoredAccounts()).map((a) => String(a && a.vinted_user_id || '')).filter((u) => /^\d{1,15}$/.test(u));
+  if (!comptes.length) return null;
+  const dressings = await sbGet('app_data?id=like.harvest_*_listings&select=id,items:data->payload->items');
+  if (dressings === null) return null;
+  const faites = await sbGet('app_data?id=like.photo_emprunte_*&select=id,a:data->payload->annonces');
+  if (faites === null) return null;
+  let details = {};
+  const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  if (dr !== null) details = (dr[0] && dr[0].data) || {};
+  const deja = new Set();
+  for (const r of faites || []) {
+    const m = /^photo_emprunte_(\d+)$/.exec(String(r && r.id || '')); if (!m) continue;
+    for (const [id, ph] of Object.entries((r && r.a) || {})) for (const k of Object.keys(ph || {})) deja.add(`${m[1]}|${id}|${k}`);
+  }
+  const couvertures = [], autres = [], ids = {};
+  for (const r of dressings || []) {
+    const m = /^harvest_(\d+)_listings$/.exec(String(r && r.id || ''));
+    if (!m || !comptes.includes(m[1])) continue;
+    const uid = m[1]; ids[uid] = [];
+    for (const it of Array.isArray(r.items) ? r.items : []) {
+      if (!it || !it.id || it.is_closed || it.is_hidden || it.is_draft) continue;
+      const id = String(it.id); ids[uid].push(id);
+      const vues = new Set();
+      const ajoute = (liste, cle, url) => { const k = clePhotoEmpreinte(cle); if (!k || !urlImageVinted(url) || vues.has(k) || vues.size >= EMPREINTES_PAR_ANNONCE) return; vues.add(k); if (!deja.has(`${uid}|${id}|${k}`)) liste.push({ uid, id, k, url }); };
+      const ph = it.photo && typeof it.photo === 'object' ? it.photo : null;
+      if (ph && ph.url) ajoute(couvertures, ph.url, ph.mini || ph.url);
+      const d = details[id];
+      for (const u of (d && Array.isArray(d.photos) ? d.photos : []).slice(0, EMPREINTES_PAR_ANNONCE)) { const url = typeof u === 'string' ? u : (u && u.url); ajoute(autres, url, url); }
+    }
+  }
+  const plan = { at: Date.now(), photos: couvertures.concat(autres), ids };
+  try { await chrome.storage.local.set({ [EMPREINTES_PLAN]: plan }); } catch (_) {}
+  return plan;
+}
+// Une image ⇒ son empreinte (ou null). `createImageBitmap` + `OffscreenCanvas` : dans le
+// service worker, sans page, sans IA. Dessinée en 64 × 64 comme dans la page VRM.
+async function empreinteDeBlob(blob) {
+  try {
+    if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return null;
+    const bmp = await createImageBitmap(blob);
+    const n = COTE_EMPREINTE;
+    const c = new OffscreenCanvas(n, n);
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(bmp, 0, 0, n, n);
+    try { bmp.close && bmp.close(); } catch (_) {}
+    return empreinteDepuisPixels(x.getImageData(0, 0, n, n).data, n, n);
+  } catch (_) { return null; }
+}
+// La file des empreintes calculées part dans `photo_emprunte_{uid}` (une écriture par
+// compte), fusionnée sur la ligne RELUE ; une lecture ratée n'écrit rien (la file reste).
+async function rangerEmpreintes(force = false) {
+  let file = [];
+  try { file = (await chrome.storage.local.get(EMPREINTES_FILE))[EMPREINTES_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const plusVieille = Math.min(...file.map((e) => Number(e.at) || Date.now()));
+  if (!force && file.length < EMPREINTES_LOT && Date.now() - plusVieille < EMPREINTES_LOT_MS) return true;
+  let plan = null;
+  try { plan = (await chrome.storage.local.get(EMPREINTES_PLAN))[EMPREINTES_PLAN] || null; } catch (_) {}
+  const restent = [];
+  const parUid = {};
+  for (const e of file) (parUid[e.uid] = parUid[e.uid] || []).push(e);
+  for (const [uid, liste] of Object.entries(parUid)) {
+    const r = await sbGet(`app_data?id=eq.photo_emprunte_${uid}&select=a:data->payload->annonces`);
+    if (r === null) { restent.push(...liste); noterDiag('empreintes_lecture_ratee'); continue; }
+    const annonces = Object.assign({}, (r[0] && r[0].a && typeof r[0].a === 'object') ? r[0].a : {});
+    for (const e of liste) { annonces[e.id] = Object.assign({}, annonces[e.id] || {}, { [e.k]: e.h }); }
+    // Une annonce qui n'est plus dans le dressing lu de ce compte sort (la ligne reste bornée).
+    const enLigne = plan && plan.ids && Array.isArray(plan.ids[uid]) ? new Set(plan.ids[uid]) : null;
+    if (enLigne && enLigne.size) for (const id of Object.keys(annonces)) if (!enLigne.has(id)) delete annonces[id];
+    const n = Object.values(annonces).reduce((t, a) => t + Object.keys(a || {}).length, 0);
+    const ok = await supabaseUpsert('app_data', [{ id: `photo_emprunte_${uid}`, data: { type: 'photo_empreintes', uid: String(uid), capturedAt: new Date().toISOString(), nItems: n, payload: { version: 1, seuil: SEUIL_PHOTO, annonces } } }], 'id');
+    if (ok === false) { restent.push(...liste); noterDiag('empreintes_ecriture_ratee'); } else noterDiag('empreintes_ecrites');
+  }
+  try { await chrome.storage.local.set({ [EMPREINTES_FILE]: restent }); } catch (_) {}
+  return !restent.length;
+}
+// UN tour : une image au plus. Rend 1 (une image lue), 0 (rien à faire / refus).
+async function empreintesUnTour() {
+  const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
+  if (!tabs || !tabs.length) return 0;                // pas d'onglet Vinted : on ne touche à rien
+  const uid = await activeUidForDomain('www.vinted.fr');
+  if (!uid) return 0;
+  if (await pauseVinted()) return 0;
+  const st = await chrome.storage.local.get([ACTIVITE_VINTED, EMPREINTES_DERNIERE, EMPREINTES_FREIN, EMPREINTES_MEMO]);
+  const t = Date.now();
+  const frein = Number(st[EMPREINTES_FREIN] || 0);
+  if (frein && t - frein >= 0 && t - frein < EMPREINTES_RETRY_MS) return 0;
+  const depuisNav = t - Number(st[ACTIVITE_VINTED] || 0);
+  if (depuisNav >= 0 && depuisNav < PHOTOS_CALME_MS) { noterDiag('empreintes_attend_navigation'); return 0; }
+  const depuis = t - Number(st[EMPREINTES_DERNIERE] || 0);
+  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;
+  const plan = await planEmpreintes();
+  if (!plan) return 0;
+  const memo = st[EMPREINTES_MEMO] || {};
+  let file = [];
+  try { file = (await chrome.storage.local.get(EMPREINTES_FILE))[EMPREINTES_FILE] || []; } catch (_) { return 0; }
+  const enFile = new Set(file.map((e) => `${e.uid}|${e.id}|${e.k}`));
+  const cible = plan.photos.find((p) => !enFile.has(`${p.uid}|${p.id}|${p.k}`) && !(memo[`${p.uid}|${p.id}|${p.k}`] && t - Number(memo[`${p.uid}|${p.id}|${p.k}`]) < EMPREINTES_RETRY_MS));
+  if (!cible) { await rangerEmpreintes(true); return 0; }
+  const acc = (await getStoredAccounts()).find((a) => String(a.vinted_user_id) === String(uid));
+  if (!acc) return 0;
+  const refus = await gardeLecture(uid, acc, 'photos');   // la classe la plus basse
+  if (refus) { noterDiag('empreintes_' + refus.code); return 0; }
+  const cle = `${cible.uid}|${cible.id}|${cible.k}`;
+  memo[cle] = Date.now();
+  try { await chrome.storage.local.set({ [EMPREINTES_MEMO]: memo, [EMPREINTES_DERNIERE]: Date.now() }); } catch (_) {}
+  const rep = await requeteVinted('image', async () => {
+    try {
+      const res = await fetch(cible.url, { credentials: 'omit', cache: 'no-store' });
+      const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');
+      const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);
+      // `status` reste 0 : un refus du site des IMAGES (une adresse signée périmée répond 403)
+      // ne doit pas poser la pause de TOUT Vinted (`requeteVinted`) — son frein est le sien.
+      if (!res.ok || !/^image\//i.test(type) || taille > EMPREINTES_MAX_OCTETS) return { ok: false, status: 0, http: res.status || 0 };
+      const blob = await res.blob();
+      if (!blob || blob.size > EMPREINTES_MAX_OCTETS) return { ok: false, status: 0, http: 413 };
+      return { ok: true, status: 0, http: res.status, blob };
+    } catch (_) { return { ok: false, status: 0, http: 0 }; }
+  });
+  try { await chrome.storage.local.set({ [EMPREINTES_DERNIERE]: Date.now() }); } catch (_) {}
+  if (!rep || !rep.ok || !rep.blob) {
+    noterDiag(`empreintes_image_refusee_${rep ? (rep.http || 0) : 0}`);
+    // « Trop de demandes » du site des images ⇒ 24 h sans empreinte (rien d'autre n'est freiné).
+    if (rep && Number(rep.http) === 429) { try { await chrome.storage.local.set({ [EMPREINTES_FREIN]: Date.now() }); } catch (_) {} }
+    return 0;
+  }
+  const h = await empreinteDeBlob(rep.blob);
+  if (!h) { noterDiag('empreintes_image_illisible'); return 0; }
+  file.push({ uid: cible.uid, id: cible.id, k: cible.k, h, at: Date.now() });
+  try { await chrome.storage.local.set({ [EMPREINTES_FILE]: file }); } catch (_) { return 0; }
+  noterDiag('empreintes_calculee');
+  await rangerEmpreintes(false);
+  return 1;
+}
+// Un tour à la fois (même verrou que les photos : promesse en vol + verrou daté).
+let _tourEmpreintes = null;
+function tickEmpreintes() {
+  if (_tourEmpreintes) return _tourEmpreintes;
+  _tourEmpreintes = (async () => {
+    try {
+      const v = (await chrome.storage.local.get(EMPREINTES_TOUR))[EMPREINTES_TOUR];
+      const age = Date.now() - Number(v && v.at || 0);
+      if (v && age >= 0 && age < PHOTOS_TOUR_MS) return 0;
+      await chrome.storage.local.set({ [EMPREINTES_TOUR]: { at: Date.now() } });
+    } catch (_) { return 0; }
+    try { return await empreintesUnTour(); } catch (_) { return 0; }
+    finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }
+  })().finally(() => { _tourEmpreintes = null; });
+  return _tourEmpreintes;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -9438,7 +9741,8 @@ function alarmeSiAbsente(nom, opts) {
 // ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
 // 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
 // Rien ne part sans session VRM (voir `relaisTick`).
-const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1, 'vrm-transp': 30, 'vrm-versement': 20, 'vrm-import': 5 };
+// 5.358 : l'empreinte des photos (`vrm-empreintes`, 1 min, une image au plus par tour — `tickEmpreintes`).
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1, 'vrm-transp': 30, 'vrm-versement': 20, 'vrm-import': 5, 'vrm-empreintes': 1 };
 function surAlarme(a) {
   if (a.name === 'cancale-sync') captureAllAccounts();
   else if (a.name === 'cancale-active') runActive();
@@ -9453,6 +9757,8 @@ function surAlarme(a) {
   else if (a.name === 'vrm-versement') tickVersements();
   // 5.344 : l'historique de départ, onglet Vinted ouvert (voir `tickImport`).
   else if (a.name === 'vrm-import') tickImport();
+  // 5.358 : l'empreinte des photos de ses annonces (voir `tickEmpreintes`).
+  else if (a.name === 'vrm-empreintes') tickEmpreintes();
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
   // une longue période calme attendrait la prochaine capture pour être écrit.
