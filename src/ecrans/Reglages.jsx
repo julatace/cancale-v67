@@ -2118,7 +2118,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder="Rechercher un réglage" label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder="Rechercher un réglage" label="Rechercher dans les paramètres" micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
           return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>Aucun réglage pour « {rechercheReglage.trim()} ». Essaie « e-mail », « numéro » ou « impression ».</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>Effacer la recherche</Bouton></div>;
@@ -4965,7 +4965,7 @@ function EmailsSetting({onComptes}) {
       {enAttente.length > 0 && (
         <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{enAttente.length} email{enAttente.length>1?'s':''} conservé{enAttente.length>1?'s':''}</div>
-          <ChampRecherche className="vrm-email-recherche-champ" valeur={rechercheRattachement} onChange={v=>{setRechercheRattachement(v);setLimiteRattachement(10);}} label="Rechercher dans les e-mails à rattacher" placeholder="Sujet ou motif" voix="brut"/>
+          <ChampRecherche className="vrm-email-recherche-champ" valeur={rechercheRattachement} onChange={v=>{setRechercheRattachement(v);setLimiteRattachement(10);}} label="Rechercher dans les e-mails à rattacher" placeholder="Sujet ou motif" micro voix="brut"/>
           {motsRattachement&&<p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} · recherche appliquée</p>}
           {/* (30 oct.) Un parcours : où j'en suis, une barre, combien. */}
           {lot ? <Avancement titre={`Email ${Math.min(lot.fait + 1, lot.total)} sur ${lot.total}`} part={lot.total ? lot.fait / lot.total : 0}
