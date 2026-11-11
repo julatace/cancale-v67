@@ -58,3 +58,24 @@ vérifier sur vrm.center après fusion (Colis → À retirer doit gagner ces col
 - Déjà rouges ailleurs, pas de ce lot : `audit-politique-hotes` (ClotureAnnee.jsx), `audit-rouge-doublon`
   (styles-sante-donnees.css).
 - Capture regardée : la feuille à 390 px (« 6 sur 6 · Tout décocher », cube Chronopost).
+
+## 5. « À retirer » réorganisé (17 h, captures de Julien : « des QR codes, des infos dans tous les sens, on ne comprend rien » ; « enlève la carte, ça sert à rien » ; « le n° de suivi est une clé de la réussite de cette appli »)
+- **Plus de carte** des points relais (Colis → À retirer, `avecCarte={false}` ; Achats → filtre « au point relais »).
+  À la place : « Itinéraire » au bout de l'adresse de chaque point (Plans sur Apple, Google Maps ailleurs, `lienItineraire`).
+- **La ligne d'un colis dit ce qu'il faut au comptoir, sans toucher** : le CODE en gros (ou « Code à venir », « QR »,
+  « 2 codes » en ambre), le **n° de suivi complet**, l'échéance (barre). Un colis sans titre d'article a pour titre
+  son n° de suivi complet (plus « n°…0010 » au-dessus de « n° 81000010 »). Le titre tient sur deux lignes.
+- Retirés de la ligne : la ligne de sources « Vinted · e-mail · message · transporteur · vérifié à… » (passée dans le
+  détail ouvert) et le bouton « Code » (le code est écrit ; glisser à gauche copie toujours).
+- **Une section « À retirer »** au lieu de « Prêts à retirer » + « Code à venir » (un point = une carte, ses colis
+  dedans) ; « À retirer aujourd'hui », « Lieu à confirmer », « À vérifier », « Comptés avec », « En route » inchangés.
+- **Le détail ouvert** : sans titre répété ni « Code X · e-mail » (sauf deux codes en désaccord), sans « QR dans
+  l'app Mondial Relay · le code suffit », « QR pas reçu… », « Code pas lu — ouvre l'e-mail… » ; le n° de suivi n'y
+  est plus répété (le compte reste quand il y en a plusieurs).
+- **Règle (suite du §4)** : un achat prouvé en attente choisit son témoin EN PREMIER (sinon une moitié sans commande,
+  arrivée plus tôt, lui prenait le colis encore au point et il était compté deux fois — vu au banc achats-retraits).
+- Bancs mis à la nouvelle présentation sans affaiblir ce qu'ils gardent (chaque code écrit une fois, chaque colis une
+  fois, « J'ai retiré » partout) : `colis-colonnes`, `colis-retirer-propre`, `colis-fiables`, `lot-bordereaux`,
+  `tout-imprimer` ; `retirer-carte-delai` et `retrait-autre-ville` : les contrôles de la carte sont tus et remplacés par
+  « plus de carte » (rouge sur le code d'avant). `achats-retraits` 84/84.
+- Pas fait : les cartes « Point relais changé » (encadré ambre) sont restées telles quelles.
