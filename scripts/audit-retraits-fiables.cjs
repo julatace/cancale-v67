@@ -221,7 +221,9 @@ const ATTENDU = {"MR suggestions sous un en-tête, vrai point sous un autre": ["
     dit(/const completer = \(lu\) => lu;/.test(app) && !/completerParPointConnu\(/.test(app), 'aucune carte n’emprunte l’adresse d’un autre point au même nom');
     dit(/sansSuivi && t\.status === 'info' && codeLigne\(t\)/.test(app) && /etat: 'sans_suivi'/.test(app), 'un e-mail sans n° avec code va dans « à vérifier »');
     const carte = sansCom(fs.readFileSync(path.join(R, 'src/CarteRelais.jsx'), 'utf8'));
-    dit(/data-rp-code-visible=\{x\.code/.test(carte) && /\(x\.code \|\| \(x\.qr \? 'QR' : 'Code'\)\)/.test(carte), 'le code est LISIBLE sur la ligne (0 toucher), un toucher le copie');
+    // (intégration journee-perso, 11 nov.) Plus de bouton « Code » : le code est ÉCRIT sur la ligne (« QR » pour un QR),
+    // le glisser à gauche le copie (voirCode) — la règle est la même : lisible sans toucher, copiable d'un geste.
+    dit(/data-rp-code-visible=\{x\.code\}>\{x\.code\}/.test(carte) && /data-rp-code-visible="qr">QR</.test(carte) && /faire: \(\) => \(desaccord \? setOuvert\(true\) : voirCode\(\)\)/.test(carte), 'le code est LISIBLE sur la ligne (0 toucher), un geste le copie');
     dit(/data-relais-masques=\{masquesIci\.length\}/.test(carte) && /!pressant\(p\)/.test(carte), 'un point masqué laisse sa trace (« N points masqués · Afficher ») ; un colis du dernier jour n’est jamais masqué');
     dit(/data-rp-pas-confirme/.test(carte) && /verifieAncien\(x\.verifieMs\)/.test(carte), 'la ligne dit « pas confirmé depuis » en ambre');
     dit(/data-relais-adresse-pas-lue/.test(carte), 'la carte d’un point au nom seul dit « Adresse pas lue »');
