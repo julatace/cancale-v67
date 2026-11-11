@@ -183,7 +183,9 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '').catch(() 
         await H.attendre(async () => (await pg.locator('[data-profil-menu="deconnexion"]').count()) > 0, 8000);
         await pg.locator('[data-profil-menu="deconnexion"]').click().catch(() => {});
         await dort(800);
-        await pg.getByRole('button', { name: /Envoyer d’abord/ }).last().click().catch(() => {});
+        // Le réseau revenu a parfois déjà vidé la file : alors la question simple (rien à perdre).
+        if (await pg.getByRole('button', { name: /Envoyer d’abord/ }).count()) await pg.getByRole('button', { name: /Envoyer d’abord/ }).last().click().catch(() => {});
+        else await pg.getByRole('button', { name: /^Se déconnecter$/ }).last().click().catch(() => {});
         await H.attendre(async () => !(await pg.evaluate(() => localStorage.getItem('vrm_session')).catch(() => 'x')), 20000);
         await dort(1500);
         const prenomNuage = (H.dataMain(b) || {}).vrm_prenom;
@@ -217,9 +219,11 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '').catch(() 
       await dort(1500);
       await H.attendre(async () => (await pg.locator('input[type="email"]').count()) > 0, 15000);
       await dort(800);
-      await pg.locator('input[type="email"]').first().fill('b@banc.test');
-      await pg.locator('#vrm-cx-password').fill('motdepasse-B-1');
-      await pg.locator('#vrm-cx-password').press('Enter');
+      try {
+        await pg.locator('input[type="email"]').first().fill('b@banc.test', { timeout: 10000 });
+        await pg.locator('#vrm-cx-password').fill('motdepasse-B-1', { timeout: 10000 });
+        await pg.locator('#vrm-cx-password').press('Enter');
+      } catch (e) { await capture(pg, 'vendeurs-connexion-B-ratee'); dit(false, 'l\'écran de connexion de B se remplit', String(e.message).slice(0, 120)); }
       await H.attendre(async () => (await pg.locator('input[type="email"]').count()) === 0, 15000);
       await dort(2500);
       // B va sur Annonces PAR L'APP (pas d'adresse tapée : elle rechargerait la page elle-même).
