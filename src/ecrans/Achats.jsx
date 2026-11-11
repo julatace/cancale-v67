@@ -10,7 +10,7 @@ import { lireTicketAchat, lireTexteTicket, texteMontantSaisie } from '../depense
 import { ticketVersBrouillon, prixEncoreLu, champEncoreLu, resumeTicket } from '../achatTicket.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
 import { BlocGrosLot, LOT0, repartitionDuLot } from '../GrosLot.jsx';
-import { nombreArticles, centimesTapes } from '../grosLot.js';
+import { nombreArticles, centimesTapes, listeRangs } from '../grosLot.js';
 import { SegmenteBase } from '../composants/Bouton.jsx';
 import { tr } from '../i18n/index.js';
 import { DejaEnStock } from '../DejaEnStock.jsx';
@@ -428,7 +428,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     setEnvoi(false);
     if (!r || !r.ok) {
       if (r && Array.isArray(r.erreurs)) setErreursNum(r.erreurs);
-      setErreur(r && r.raison === 'numeros' ? '' : tr(r && r.raison === 'decale' ? 'groslot.refus.decale' : 'groslot.refus.lecture'));
+      setErreur(r && r.raison === 'numeros' ? tr('groslot.refus.numeros', { rangs: listeRangs((r.erreurs || []).map((e) => e.i)) }) : tr(r && r.raison === 'decale' ? 'groslot.refus.decale' : 'groslot.refus.lecture'));
       return;
     }
     if (form.facture && facture) await facture.joindre(cleFacture('hors', r.id), form.facture);

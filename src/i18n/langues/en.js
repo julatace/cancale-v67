@@ -415,4 +415,5 @@ export default {
   "groslot.refus.lecture": "I could not re-read your numbers: nothing was written.",
   "groslot.refus.decale": "The numbers changed in the meantime: check, then try again.",
   "groslot.listeLot": { one: "Bundle of {n} item", other: "Bundle of {n} items" },
+  "groslot.refus.numeros": "Number refused: item {rangs}.",
 };

@@ -415,4 +415,5 @@ export default {
   "groslot.refus.lecture": "No pude releer tus N.º: no se escribió nada.",
   "groslot.refus.decale": "Los N.º cambiaron entretanto: comprueba y vuelve a intentarlo.",
   "groslot.listeLot": { one: "Lote de {n} artículo", other: "Lote de {n} artículos" },
+  "groslot.refus.numeros": "N.º rechazado: artículo {rangs}.",
 };

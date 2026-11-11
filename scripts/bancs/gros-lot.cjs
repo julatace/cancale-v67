@@ -149,10 +149,11 @@ async function passe(b, nom, ctxOpts, sombre, moiMeme) {
   await pg.locator('[data-achat-hors-enregistrer]').first().evaluate((x) => x.click());
   const achat = await attendre(async () => { const a = await cle(pg, 'vinted_offvinted_buys'); return Array.isArray(a) ? a.find((x) => x && x.lot) : null; }, 10000);
   dit(!!achat && achat.price === '429,80' && achat.lot.n === N && achat.lot.prix === 41250 && achat.lot.frais === 1730, `${nom} · L6 · UN achat : 429,80 €, son lot de 20`, JSON.stringify(achat && { p: achat.price, l: achat.lot && achat.lot.n }));
-  const fiches = (await cle(pg, 'vrm_fiches_neuves')) || {};
+  // Chaque clé part par SA file d'écriture (src/gesteAnnulable.js) : on attend qu'elle soit posée.
+  const fiches = (await attendre(async () => { const f = await cle(pg, 'vrm_fiches_neuves'); return f && achat && Object.values(f).filter((x) => x && x.achat === achat.id).length === N ? f : null; }, 10000)) || (await cle(pg, 'vrm_fiches_neuves')) || {};
   const dulot = Object.values(fiches).filter((f) => f && achat && f.achat === achat.id).sort((a, b) => a.rang - b.rang);
   dit(dulot.length === N && dulot.every((f, i) => f.numero === String(45 + i) && f.rang === i + 1) && dulot[0].titre === dulot[1].titre && dulot[0].numero !== dulot[1].numero, `${nom} · L6 · 20 fiches reliées à SON lot (id, rang), N°45 à 64 ; même titre, deux identités`, JSON.stringify(dulot.slice(0, 2).map((f) => [f.numero, f.rang, f.titre])));
-  const couts = (await cle(pg, 'vinted_buyprice_by_num')) || {};
+  const couts = (await attendre(async () => { const c = await cle(pg, 'vinted_buyprice_by_num'); return c && c['64'] != null ? c : null; }, 10000)) || {};
   const sc_ = Array.from({ length: N }, (_, i) => couts[String(45 + i)]);
   const cent = (t) => { const [a, b = '0'] = String(t || '').split(','); return Number(a) * 100 + Number(b.padEnd(2, '0')); };
   dit(sc_.every((x) => x != null) && sc_.reduce((a, x) => a + cent(x), 0) === CIBLE, `${nom} · L6 · 20 coûts par N°, somme 429,80 € (la compta lit le coût réparti)`, JSON.stringify(sc_.slice(0, 3)));
@@ -170,6 +171,7 @@ async function passe(b, nom, ctxOpts, sombre, moiMeme) {
   if (await annuler.count()) {
     await annuler.evaluate((x) => x.click());
     const parti = await attendre(async () => { const a = await cle(pg, 'vinted_offvinted_buys'); return Array.isArray(a) && !a.some((x) => x && x.lot) ? 1 : 0; }, 8000);
+    await attendre(async () => { const f = (await cle(pg, 'vrm_fiches_neuves')) || {}; const c = (await cle(pg, 'vinted_buyprice_by_num')) || {}; return !Object.values(f).some((x) => x && x.achat === achat.id) && c['45'] == null ? 1 : 0; }, 10000);
     const f2 = (await cle(pg, 'vrm_fiches_neuves')) || {};
     const c2 = (await cle(pg, 'vinted_buyprice_by_num')) || {};
     const p2 = (await cle(pg, 'vinted_used_numeros')) || [];
