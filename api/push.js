@@ -10,6 +10,9 @@
 //   POST { action:'comptes' }                → l'app a vu un compte relié pour la première fois :
 //                                              la route RELIT les comptes elle-même (rien du corps)
 //                                              et notifie une fois par compte (_lib/compte-relie.js)
+//   POST { action:'prixachat', ventes }      → (11 nov.) des ventes PROUVÉES sans prix d'achat :
+//                                              chaque transaction est RELUE ici, une notification
+//                                              une fois par vente, jamais la nuit (_lib/prix-achat-demande.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -21,6 +24,7 @@ import { notifierRetraitConversation } from './email-inbound.js';
 import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
+import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -104,6 +108,12 @@ async function traiter(req, res) {
     // Le corps ne dit rien (ni compte, ni nom) : tout est relu ici, au nom de CE vendeur.
     if (body.action === 'comptes') {
       const r = await notifierComptesRelies();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? »
+    if (body.action === 'prixachat') {
+      const r = await notifierPrixAchat(body);
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
