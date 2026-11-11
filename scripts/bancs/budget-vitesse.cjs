@@ -22,7 +22,7 @@
 //
 //  La mesure elle-même est celle de `vitesse.cjs` (`ouvrir`, `bilan`, la même base
 //  inventée au poids réel `_base-volume.cjs`, le même réseau simulé) : rien n'est
-//  dupliqué. Les budgets sont dans `budget-vitesse.json` (à côté).
+//  dupliqué. Les budgets sont dans `scripts/budget-vitesse.json`.
 //
 //  RELEVER UN BUDGET VOLONTAIREMENT (un écran lit plus parce qu'il montre plus) :
 //    BUDGET_RELEVER=1 BUDGET_RAISON="Messages lit les avis (lot X)" \
@@ -50,7 +50,8 @@ const path = require('path'), fs = require('fs');
 if (!process.env.VITESSE_CPU) process.env.VITESSE_CPU = '1';
 const V = require('./vitesse.cjs');
 
-const FICHIER = path.join(__dirname, 'budget-vitesse.json');
+// (11 nov., vert-11nov) hors de scripts/bancs/ : ce dossier ne porte AUCUN .json (audit-bancs, dépôt public).
+const FICHIER = path.join(__dirname, '..', 'budget-vitesse.json');
 const RELEVER = process.env.BUDGET_RELEVER === '1';
 const DETAIL = !!process.env.BUDGET_DETAIL;
 const MUTATION = process.env.BUDGET_MUTATION || '';

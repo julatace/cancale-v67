@@ -97,7 +97,7 @@ jobs:
           - part: 1
             lot: nouveau-vendeur garde-ecrans
           # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
-          # écran principal, contre scripts/bancs/budget-vitesse.json (~5 min).
+          # écran principal, contre scripts/budget-vitesse.json (~5 min).
           - part: 2
             lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis budget-vitesse
           - part: 3
