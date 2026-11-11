@@ -92,7 +92,7 @@ jobs:
           - part: 1
             lot: nouveau-vendeur garde-ecrans
           - part: 2
-            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis
+            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis accessibilite
           - part: 3
             lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois chiffres-coherents retraits-suivi
     steps:
