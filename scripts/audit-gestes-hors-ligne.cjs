@@ -247,6 +247,13 @@ function texteApp() {
   dit(/rejouerGestes\(/.test(app) && /addEventListener\('online'[^\n]*rejouerGestesBientot/.test(app), '14. le retour du réseau rejoue les gestes');
   dit(/<GestesHorsLigneCoque/.test(app), '14. la coque dit « Hors ligne · N gestes en attente »');
   dit(/refusHorsLigne\('extension'\)/.test(app) && /refusHorsLigne\('numero'\)/.test(app) && /refusHorsLigne\('paiement'\)/.test(app), '14. extension, nouveau N°, paiement refusés hors ligne, raison dite');
+  // 15. Toute l'app hors ligne : les morceaux de CE build sont rangés en ligne (un écran jamais ouvert
+  //     s'ouvre sans réseau), et la purge d'un déploiement ne les jette pas. Comportement : banc gestes-hors-ligne.
+  const sw = fs.readFileSync(path.join(racine, 'public', 'sw.js'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const vite = fs.readFileSync(path.join(racine, 'vite.config.js'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  dit(/fileName: 'hors-ligne-assets\.json'/.test(vite) && /plugins: \[[^\]]*listeHorsLigne\(\)/.test(vite), '15. le build publie la liste de ses morceaux');
+  dit(/relireCoquille\(req, cache\)\.then\(\(\) => rechaufferMorceaux\(cache\)\)/.test(sw) && /purgerAncienneVersion\(fresh\.clone\(\)\)\.then\(\(\) => rechaufferMorceaux\(cache\)\)/.test(sw), '15. le service worker range les morceaux, à la 1re ouverture comme aux suivantes');
+  dit(/new Set\(\[\.\.\.noms, \.\.\.\(await nomsGardesHorsLigne\(cache\)\)\]\)/.test(sw), '15. la purge d\'un déploiement garde les morceaux de la liste');
   return ko;
 }
 
