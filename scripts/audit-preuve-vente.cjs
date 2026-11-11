@@ -263,7 +263,7 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
     const sait = (v) => { const ctx = { vmrExtPresent: () => true, vmrExtVersion: () => v }; vm.createContext(ctx); vm.runInContext(src + '\n;this.r = extSait("preuves");', ctx); return ctx.r; };
     const att = (/const EXT_ATTENDUE = '([^']+)'/.exec(APP) || [])[1];
     const vManif = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/manifest.json'), 'utf8')).version;
-    dit(!!PUBLIEES_SANS_PREUVE, 'les versions PUBLIÉES se lisent dans l\'historique de main', PUB ? '' : 'historique illisible ici — relance avec VRM_GIT=<chemin du dépôt> (§6.1)');
+    dit(!!PUBLIEES_SANS_PREUVE, 'les versions PUBLIÉES se lisent dans l\'historique de main', PUB ? '' : 'historique illisible ici (clone superficiel ? git fetch --unshallow origin main) — ou relance avec VRM_GIT=<chemin du dépôt> (§6.1)');
     const lst = PUBLIEES_SANS_PREUVE || [];
     const recentes = lst.filter((v) => /^5\.1[6-9]\d\./.test(v)).sort().join(', ');
     const r = lst.filter((v) => sait(v) !== 'retard').map((v) => `${v}→${sait(v)}`);

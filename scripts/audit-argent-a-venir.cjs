@@ -194,7 +194,9 @@ const charger = async (texte, nom) => {
     dit(M.dateEcriteLue('3 juil. 2026') != null && M.dateEcriteLue('jui 2026') == null && M.dateEcriteLue('32 novembre 2026') == null && M.dateEcriteLue('bientôt') == null, 'date écrite : « 3 juil. 2026 » lue ; ambiguë ou impossible ⇒ rien');
 
     console.log('── La carte des chiffres lit la même règle');
-    const carteTxt = CARTE.replace("from '../argentAVenir.js'", `from 'file://${tmpM}'`);
+    const carteTxt = CARTE.replace("from '../argentAVenir.js'", `from 'file://${tmpM}'`)
+      // (11 nov.) la carte importe aussi src/formatsDate.js (un format créé une fois) : le vrai fichier
+      .replace("from '../formatsDate.js'", `from 'file://${path.join(R, 'src', 'formatsDate.js')}'`);
     let K = null; try { K = (await charger(carteTxt, 'carte')).mod; } catch (e) { K = null; }
     dit(!!K, 'src/design/carteChiffres.js se charge');
     if (K) {

@@ -132,7 +132,12 @@ const TEXTE = (acheteur, titre) => [
     const APP = sansCommentaires(fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8'));
     dit(/const verification = !horsParcours && auCentreDeVerification\(o\);/.test(APP), 'V4 la frise d’une vente lit l’état de SA transaction (`auCentreDeVerification(o)`)');
     dit(/friseVenteFusion\(preuvesFrise\.etapes, \{ geste: peutDeposer, verification: preuvesFrise\.verification \}\)/.test(APP), 'V4 la ligne de la vente porte l’étape');
-    dit(/<RecapFrise etapes=\{etapes\} cle=\{txL\} verification=\{preuvesFrise\.verification\}\/>/.test(APP) && /friseVenteFusion\(etapes, \{ verification \}\)/.test(APP), 'V4 le récapitulatif porte l’étape');
+    // (11 nov.) Depuis le lot BE (10 nov., f58ee6fa) le récapitulatif porte la FRISE PROUVÉE (src/friseProuvee.js) :
+    // l'étape « Au centre de vérification » y entre par `verification: … auCentreDeVerification(o)`.
+    const recapAvant = /<RecapFrise etapes=\{etapes\} cle=\{txL\} verification=\{preuvesFrise\.verification\}\/>/.test(APP) && /friseVenteFusion\(etapes, \{ verification \}\)/.test(APP);
+    const recapProuve = /friseProuvee\(\{ preuves, bifurcation: bif, geste, verification: !bif && auCentreDeVerification\(o\) \}\)/.test(APP) && /<FriseVente frise=\{pre\.frisePv\.frise\}/.test(APP)
+      && /if \(verification === true\) liste\.splice\([^\n]*ETAPE_CENTRE\.cle/.test(fs.readFileSync(path.join(R, 'src/friseProuvee.js'), 'utf8'));
+    dit(recapAvant || recapProuve, 'V4 le récapitulatif porte l’étape');
     dit(/phraseVente\(\{[^}]*verification: preuvesFrise\.verification \}\)/.test(APP), 'V4 la phrase d’état le dit');
     const FR = fs.readFileSync(path.join(R, 'src/design/Frise.jsx'), 'utf8');
     dit(/e\.court \?/.test(FR) && /vrm-fu-sr">\{e\.label\}/.test(FR), 'V4 la frise écrit le mot court sous le trait et garde le nom entier pour la lecture d’écran');

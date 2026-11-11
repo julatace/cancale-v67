@@ -233,8 +233,10 @@ const iso = (j) => new Date(NOW - j * J).toISOString();
     const colis = (/function ComptesARelierColis\([\s\S]*?\n\}/.exec(APP) || [''])[0];
     dit(/aExpedier\(o\)/.test(colis) && /useComptesARelier\(comptes\)/.test(colis) && /!Array\.isArray\(liste\)/.test(colis), 'R7 Colis : seulement un compte à relier qui a des colis à envoyer (la règle `aExpedier`), rien sur une lecture ratée');
     dit(/\{only === 'bordereaux' && <ComptesARelierColis comptes=\{accounts\}\/>\}/.test(APP), 'R7 Colis porte la ligne');
-    dit(/\{comptesARelierJour\.length \? (?:carteARelier\(\)|P\(carteARelier\(\)\)) : null\}/.test(APP) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
-    dit(/useComptesARelier\(accounts, only === 'journee'\)/.test(APP), 'R7 Ma journée ne lit la règle que sur Ma journée');
+    // (11 nov.) Ma journée v2 range ses cartes dans une liste (`[{ el: carteARelier() }]`) ; même règle : UNE carte.
+    dit((/\{comptesARelierJour\.length \? (?:carteARelier\(\)|P\(carteARelier\(\)\)) : null\}/.test(APP) || /\.\.\.\(comptesARelierJour\.length \? \[\{ el: carteARelier\(\) \}\] : \[\]\)/.test(APP)) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
+    // (11 nov.) Depuis le 10 nov. (6f60bc8b) Colis lit aussi la règle (la marque sur les cartes des comptes muets).
+    dit(/useComptesARelier\(accounts, only === 'journee'(?: \|\| only === 'bordereaux')?\)/.test(APP), 'R7 Ma journée (et Colis) seulement lisent la règle');
   });
 
   console.log(ko ? `\n❌ audit-relier-compte : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-relier-compte : ${ok} verts`);
