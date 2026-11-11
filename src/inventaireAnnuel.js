@@ -63,6 +63,8 @@ export function ordreLignes(a, b) {
 
 // ── 2. LA PUBLICATION (un propriétaire : le composant qui tient `annoncesPresentes`) ──
 export const CLE_INVENTAIRE_ANNUEL = 'vrm_inventaire_annuel';
+// (11 nov.) « Clôturer l'année » → « Inventaire au 31 décembre » : le Stock s'ouvre sur la feuille.
+export const DEMANDE_INVENTAIRE_ANNUEL = { at: 0 };
 export const EVT_INVENTAIRE_ANNUEL = 'vrm:inventaire-annuel';
 export function publierInventaireAnnuel(inv, { owner = '', partiel = false, maintenant = Date.now() } = {}) {
   if (!inv || !inv.v) return;
