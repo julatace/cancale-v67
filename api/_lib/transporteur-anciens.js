@@ -30,7 +30,7 @@
 import { transporteurDeTexteBordereau, transporteursNommes, suiviMondialRelayLu } from './transporteur-bordereau.js';
 import { TEXTE_MAX } from './resume-email.js';
 import { transporteurDeForme } from './suivi-colis.js';
-import { transporteurDuPdf } from './transporteur-pdf.js';
+import { transporteurDuPdf, REGLE_PDF } from './transporteur-pdf.js';
 
 export const ID_BORD_TRANSPORTEURS = 'vrm_bord_transporteurs';
 export const MAX_PAR_PASSAGE = 20;
@@ -188,8 +188,11 @@ export const reqPdf = (id) => `app_data?id=eq.${encodeURIComponent(id)}&select=p
 // (11 nov., lot DJ3 — « InPost appartient à Mondial Relay ») Une étiquette décidée sous l'ancienne règle
 // est relue UNE fois : « inpost » (clé que la règle n'écrit plus : son n° Mondial Relay n'était pas lu) et
 // « plusieurs » (Mondial Relay + InPost ⇒ deux noms) sans la marque `g` de la règle du 11 nov.
-export const REGLE_PDF = 2;
-export const decisionARelire = (pdfTx, vuTx) => !!((pdfTx && pdfTx.t === 'inpost') || (!pdfTx && vuTx && vuTx.r === 'plusieurs' && !(Number(vuTx.g) >= REGLE_PDF)));
+// (intégration E3) REGLE_PDF vient de la règle du PDF (transporteur-pdf.js, code « 56… » d'InPost/Mondial Relay) : UNE
+// marque pour les deux relectures. « aucun » et « plusieurs » décidés sous une règle plus ancienne sont relus une fois.
+export { REGLE_PDF };
+const regleVue = (vu) => Math.max(Number(vu && vu.g) || 0, Number(vu && vu.v) || 0);
+export const decisionARelire = (pdfTx, vuTx) => !!((pdfTx && pdfTx.t === 'inpost') || (!pdfTx && vuTx && (vuTx.r === 'plusieurs' || vuTx.r === 'aucun') && !(regleVue(vuTx) >= REGLE_PDF)));
 export function candidatsPdf(bords, labels, cur) {
   const pdf = (cur && cur.pdf) || {}, vus = (cur && cur.pdfVus) || {};
   const deja = (tx) => (pdf[tx] || vus[tx]) && !decisionARelire(pdf[tx], vus[tx]);
@@ -198,7 +201,8 @@ export function candidatsPdf(bords, labels, cur) {
     const tx = String((b && b.tx) || '') || String((b && b.id) || '').replace(/^email_bord_/, '');
     if (!RE_TX.test(tx)) continue;
     avecEmail.add(tx);
-    if (b.pdfLu != null) continue;                                   // lu à la réception
+    // (11 nov.) « aucun » décidé avant la règle du code « 56… » (REGLE_PDF) : relu UNE fois.
+    if (b.pdfLu != null && b.pdfLu !== 'aucun') continue;            // lu à la réception
     if (b.transporteur && String(b.suivi || '').trim()) continue;    // rien à apprendre
     if (deja(tx)) continue;
     out.push({ tx, id: b.id, at: Date.parse(b.recu || '') || 0 });
@@ -282,7 +286,7 @@ export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf,
     else {
       const d = await transporteurDuPdf(b64);
       if (d.etat === 'ok') { neufsPdf[c.tx] = { t: d.t, ...(d.s ? { s: d.s } : {}) }; ranges++; }
-      else { neufsVus[c.tx] = { r: d.etat, at, g: REGLE_PDF }; nVus++; }
+      else { neufsVus[c.tx] = { r: d.etat, at, g: REGLE_PDF, v: REGLE_PDF }; nVus++; }
     }
     depuisEcriture++;
     if (depuisEcriture >= ECRIRE_TOUS && !(await ecrirePaquet())) { ecritureRatee = true; break; }

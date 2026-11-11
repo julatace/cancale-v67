@@ -51,7 +51,9 @@ import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
 // `svg` : le dessin dans une tuile 32×32 (fond `fond`). Valeurs FIGÉES (jamais une donnée lue).
 // Le cube Chronopost (hexagone encre ; une arête blanche de gauche jusqu'au centre puis vers le bas, une
 // courte à droite qui ne rejoint pas le centre — relevé sur la photo du bordereau), tuile 32×32.
-const CUBE_CHRONOPOST = `<path d="M16 4.2 26.6 10.3V22.5L16 28.6 5.4 22.5V10.3Z" fill="#1C0A1C" stroke="#1C0A1C" stroke-width="1.2" stroke-linejoin="round"/><path d="M4.6 10.4 15.8 16.4V25.2" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"/><path d="M27.2 11.8 19.2 15.6" stroke="#FFFFFF" stroke-width="1.6"/>`;
+// (intégration E3) Le dessin relevé le 11 nov. à 15 h 55 (« le logo Chronopost est toujours pas bon ») remplace celui du
+// matin : UN cube pour Chronopost et Shop2Shop (le même réseau, le même pictogramme imprimé).
+const CUBE_CHRONOPOST = `<g transform="translate(5 4.4) scale(.55)"><path fill="#1D1D1B" d="M20 0L40 11V30.5L20 42L0 30.5V11Z"/><path d="M0 11.2L20 21.8V42M20 21.8L31.6 15.4" fill="none" stroke="#FFFFFF" stroke-width="3.8"/></g>`;
 export const DESSINS_TRANSPORTEURS = Object.freeze({
   // (11 nov., lot DJ3 — photo d'un VRAI bordereau Mondial Relay by InPost, imprimé par VRM) Le logo imprimé : carré
   // framboise, point blanc, « r » blanc qui finit sur un petit carré rose pâle (proportions relevées sur la photo).
@@ -61,8 +63,10 @@ export const DESSINS_TRANSPORTEURS = Object.freeze({
   dhl: { fond: '#FFCC00', svg: `<g transform="translate(1 2) scale(1.25)"><path fill="#D40511" d="M4.22 10.303l-.767 1.043h4.18c.21 0 .208.078.105.218-.105.142-.28.39-.386.534-.054.073-.154.207.171.207h1.71l.505-.69c.314-.426.028-1.312-1.095-1.312H4.22zm7.204 0l-1.475 2.002h5.39l1.473-2.002H14.61l-.843 1.146h-.985l.846-1.146h-2.203zm6.105 0l-1.474 2.002h2.334l1.472-2.002H17.53zm-12.845 1.3l-1.54 2.094h3.754c1.24 0 1.932-.844 2.145-1.136h-2.56c-.326 0-.226-.133-.172-.207.107-.143.283-.388.388-.53.104-.14.107-.22-.105-.22h-1.91zM0 12.562v.242h3.398l.176-.242H0zm9.762 0l-.836 1.136h2.203l.836-1.136H9.762zm3.185 0l-.836 1.136h2.203l.836-1.136h-2.203zm2.918 0s-.159.22-.238.326c-.276.374-.033.81.87.81h3.538l.834-1.136h-5.004zm5.408 0l-.177.242H24v-.242h-2.727zM0 13.01v.24h3.068l.178-.24H0zm20.943 0l-.175.24H24v-.24h-3.057zM0 13.457v.24h2.74l.176-.24H0zm20.615 0l-.177.24H24v-.24h-3.385z"/></g>` },
   fedex: { fond: '#FFFFFF', svg: `<svg x="1.5" y="11.6" width="29" height="9.1" viewBox="0 8.6 21.95 6.9" overflow="hidden"><path fill="#4D148C" d="M22.498 14.298c-.016-.414.345-.751.75-.755a.745.745 0 0 1 .752.755.755.755 0 0 1-.751.745c-.395.002-.759-.346-.751-.745zm.759-.083c.067-.02.164-.042.162-.13.007-.09-.086-.133-.162-.134h-.163v.263c0 .001.165-.002.163.001zm-.163.107v.418h-.14v-.91h.327c.156-.021.294.092.286.253a.218.218 0 0 1-.156.19c.162.083.108.322.173.467h-.156a2.355 2.355 0 0 1-.04-.205c-.018-.093-.047-.229-.17-.213h-.124zm.76-.024a.603.603 0 0 0-.605-.632c-.338-.012-.62.302-.605.632a.619.619 0 0 0 .605.622.61.61 0 0 0 .605-.622zm-5.052-.579l-.878 1.008h-1.306l1.559-1.745-1.56-1.75h1.355l.902.997.878-.998h1.306l-1.543 1.743 1.559 1.753h-1.371l-.901-1.008zm-4.703-.352v-.827h1.904v-1.506l1.724 1.948-1.724 1.941v-1.556h-1.904zm1.56 1.36h-3.2V9.044h3.224v1.024H13.77v1.163h1.888v.958h-1.904v1.522h1.904v1.016zm-5.705-.655c-.54.017-.878-.552-.877-1.04-.01-.507.307-1.123.878-1.105.579-.025.871.6.845 1.103.023.501-.29 1.062-.846 1.042zM4.743 12.41c.076-.358.403-.67.78-.663a.788.788 0 0 1 .803.663H4.743zm15.182.564l1.815-2.047h-2.125l-.74.844-.763-.844h-4.037v-.548h1.912V8.741H10.84v2.58c-.362-.448-.981-.559-1.526-.492-.782.123-1.427.762-1.634 1.514-.254-.958-1.179-1.588-2.157-1.554-.781.009-1.6.365-1.987 1.071v-.818h-1.87v-.9h2.043v-1.4H0v6.287h1.666v-2.644h1.666a7.59 7.59 0 0 0-.082.622c-.013 1.232 1.042 2.27 2.274 2.236a2.204 2.204 0 0 0 2.157-1.432H6.254c-.14.268-.441.38-.73.36-.457.009-.83-.417-.829-.86h2.914c.083 1.027.988 1.966 2.043 1.947a1.53 1.53 0 0 0 1.19-.639v.41h7.215l.754-.86.754.86h2.192l-1.832-2.055z"/></svg>` },
   vinted: { fond: '#007782', svg: `<g transform="translate(5 5) scale(.92)"><path fill="#FFFFFF" d="M19.316 0c-.258 0-.571.217-1.415.953-.3.108-.627.027-1.008.613-2.15 3.09-3.825 14.648-5.255 17.984-.286-1.444-.885-10.837-1.116-13.41-.028-.477.027-1.076.027-1.43 0-2.368-.516-3.567-2.886-3.567-1.198 0-2.382.436-3.008 1.226-.299.408-.409.708-.409 1.443 0 4.915 1.171 12.973 2.478 18.228C7.132 23.688 8.603 24 9.99 24c.654 0 1.307-.081 2.233-.544 3.212-1.567 4.07-5.84 4.9-9.993.15-.749.899-4.37 1.253-6.275.476-2.6 1.02-5.54 1.347-6.617C19.833.245 19.63 0 19.317 0z"/></g>` },
-  // (11 nov., lot DJ3 — photo d'un VRAI bordereau Chronopost Shop2Shop) Le logo imprimé : le cube en perspective,
-  // faces encre (violet presque noir), arêtes blanches. Le mot « chronopost » est trop petit pour la tuile.
+  // (11 nov., Julien : « le logo Chronopost est toujours pas bon ») Le pictogramme IMPRIMÉ sur ses
+  // bordereaux Chronopost (relevé sur une vraie étiquette, retournée à l'endroit) : un cube en hexagone,
+  // couvercle entrouvert — la fente gauche et la verticale jusqu'au bas, la droite arrêtée aux deux tiers.
+  // Encre noire sur blanc, comme sur l'étiquette.
   chronopost: { fond: '#FFFFFF', svg: CUBE_CHRONOPOST },
   colissimo: { fond: '#FFD100', svg: `<path d="M6 21.5c3.5 3.3 10.5 4 16 .2" fill="none" stroke="#1D2C5E" stroke-width="1.6" stroke-linecap="round"/><text x="16" y="18.2" text-anchor="middle" fill="#1D2C5E" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="9.4" letter-spacing="-0.4" textLength="26" lengthAdjust="spacingAndGlyphs">colissimo</text>` },
   // (11 nov., lot DJ3) « InPost » = Mondial Relay en France : le logo du bordereau (une ancienne clé rangée).
@@ -117,6 +121,8 @@ export function cleTransporteur(raw) {
   if (/colis ?prive/.test(s)) return 'colisprive';
   if (/coliss|la ?poste|laposte/.test(s)) return 'colissimo';
   if (/vinted/.test(s)) return 'vinted';
+  // (11 nov., Julien : « InPost est avec Mondial Relay ») le même réseau : un colis InPost se range avec Mondial Relay.
+  if (/inpost/.test(s)) return 'mondialrelay';
   if (/\bdpd\b/.test(s)) return 'dpd';
   if (/\bups\b/.test(s)) return 'ups';
   if (/\bgls\b/.test(s)) return 'gls';

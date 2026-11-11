@@ -153,7 +153,7 @@ async function scenario(b, nom, vue, LIGNES) {
   const grAp = ap.map((x) => x.tr).filter((x, i, a) => a.indexOf(x) === i);
   // (11 nov., arbitrage c) L'emplacement de chaque paire, en petit sous sa ligne : lu par SON N° (jamais deviné).
   const emp = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-lot-ligne]')].map((e) => { const p = e.querySelector('[data-lot-emplacement]'); return [e.getAttribute('data-lot-ligne'), p ? p.getAttribute('data-lot-emplacement') : null]; })));
-  dit(/Garage/.test(emp['9201'] || '') && /Étagère du fond/.test(emp['9201'] || '') && emp['9202'] === '', `${nom} : C l'emplacement est sous la paire (N°21 : Garage · Étagère du fond ; N°22 : « emplacement non noté »)`, JSON.stringify(emp));
+  dit(/Garage/.test(emp['9201'] || '') && /Étagère du fond/.test(emp['9201'] || '') && emp['9202'] === null, `${nom} : C l'emplacement est sous la paire (N°21 : Garage · Étagère du fond) ; dit seulement quand il est connu (N°22 : rien)`, JSON.stringify(emp));
   dit(ap.length === 6 && ap.some((x) => x.site === 'vestiaire'), `${nom} : B l'aperçu porte les 6 bordereaux, Vestiaire compris`, JSON.stringify(ap.map((x) => x.cle + ':' + x.site)));
   // (11 nov., lot suivi-commandes, gardé à l'intégration) L'aperçu : trois groupes par transporteur, CHACUN dans l'ordre
   // de l'écran (les clés de colis lues ci-dessus ; la version « groupes de l'écran » comparait des transporteurs à des clés).
