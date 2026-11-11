@@ -281,7 +281,7 @@ function FavorisLeboncoin() {
   return (
     <div data-favoris-lbc={ads.length ? String(connus.length) : 'aucune'}>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
-        Leboncoin donne le <b>nombre</b> de favoris, jamais <b>qui</b> : VRM n'écrit à personne.{' '}
+        <span data-favoris-lbc-qui="jamais">Leboncoin donne le <b>nombre</b> de favoris, jamais <b>qui</b> : VRM n'écrit à personne.</span>{' '}
         {capStats === 'ok' ? <>Ouvre les <b>statistiques</b> de l'annonce sur Leboncoin : le chiffre suit.</>
           : capStats === 'retard' ? <>Pour relever ce chiffre, il faut l'extension <b>{EXT_CAPACITES.lbcstats}</b> : mets-la à jour depuis Paramètres → État des connexions, puis ouvre les <b>statistiques</b> de l'annonce sur Leboncoin.</>
           : <>C'est l'extension, là où elle est installée, qui relève ce chiffre quand tu ouvres les <b>statistiques</b> d'une annonce sur Leboncoin.</>}
