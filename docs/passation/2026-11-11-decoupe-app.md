@@ -78,23 +78,50 @@ Plan rejoué tel quel (`node scripts/decouper-app-2.cjs --appliquer`, 100 s) : *
   extrait sa fonction avant d'ôter les commentaires (sur le texte entier, un `/*` d'ailleurs l'avalait).
   ⚠️ Au GO, un audit ajouté d'ici là peut faire de même : le vérificateur le DIT (« vert sur l'app recollée »)
   et donne la commande.
-BANCS_ICI
+- **Bancs** (le lot de la CI, 13, sur le `dist/` de chaque arbre) : avant 3 rouges (navigation-tache,
+  journee-coherence, iphone-reprise) ; après **les mêmes 3, avec les mêmes lignes rouges** (4 / 5 / 24 ;
+  iphone-reprise : la mesure B3 « null » tombe sur une autre largeur, même nombre) ; les 10 autres verts.
+  ⚠️ **Trouvé par les bancs, pas par le build** : la première répétition ne DÉMARRAIT PAS (« Cannot access
+  'Ni' before initialization » = `prechargerAuRepos` appelé avant sa déclaration : l'outil d'origine posait
+  l'aide APRÈS la marque, et chaque module suivant posait ses lignes juste après la marque). Corrigé dans
+  l'outil ; le vérificateur cherche maintenant toute lecture avant déclaration au chargement d'un module
+  (rouge sur le résultat fautif) et audit-decoupe-outil le rejoue (rouge sur l'outil d'avant).
+- **Écrans identiques** (banc garde-ecrans, `MESURE`/`COMPARER`) : Ma journée, Ventes, Colis à 390 et 1512 px :
+  **même texte, même nombre de nœuds** avant/après ; seules les listes de lectures diffèrent, exactement comme
+  entre deux mesures de l'AVANT (bruit d'horloge, vérifié : avant contre avant = 5 « écarts » du même genre).
+- **Démarrage réel** (`_mesure-demarrage.cjs`, téléphone 390 px, 4G, processeur ×4, base inventée au poids réel) :
+  JS demandé avant « prêt » 1 404 → 1 006 Ko (Ma journée), 1 401 → 1 015 Ko (Ventes), 1 404 → 1 006 Ko (Colis) ;
+  prêt 6,8 → 6,1 s, 7,2 → 5,9 s, 7,2 → 5,7 s (machine partagée : l'ordre de grandeur, pas la décimale).
+  Le reste (≈ 240 Ko) arrive après « prêt », au repos (préchargement).
+- **Captures** (banc nouveau-vendeur, `SHOTS`, 104 images × 2) : 43 identiques au pixel ; les autres = l'avant
+  photographié encore sur l'écran de chargement quand l'après est déjà rendu, ou heures inventées qui bougent
+  (regardées : Ma journée 390 sombre, Ventes vide 390, Messages 1512 sombre).
+- **Rejouable** : l'outil passé tel quel sur `main` d'il y a 15 fusions (25f0095) : les mêmes 13 modules, un
+  différé « absent » (ImportStockReglage n'y existait pas), rien d'autre.
 
 ## La coupe finale « GO » — commandes exactes
 ```
+SCRATCH=/tmp/claude-0/-home-user/01ffd5bd-b42b-5f82-ac63-09da1576e3a7/scratchpad
 cd /home/user/cancale-v67 && git fetch -q origin
 git worktree add /home/user/wt/decoupe-go -B claude/decoupe-go origin/main
-cd /home/user/wt/decoupe-go && ln -s /home/user/cancale-v67/node_modules node_modules
-git merge --no-edit origin/claude/decoupe-app            # l'outil, le plan, texte-pdf (vrai merge)
-git worktree add --detach /home/user/wt/decoupe-go-avant origin/main && ln -s /home/user/cancale-v67/node_modules /home/user/wt/decoupe-go-avant/node_modules
-node scripts/decouper-app-2.cjs --appliquer --rapport /tmp/decoupe-go.json     # ≈ 1 min 40 (machine chargée)
-#   → lire le rapport : chaque « absent » / « REFUSÉ » est un bloc que le main du jour a changé (le reste part quand même)
-node scripts/verifier-decoupe.cjs --avant /home/user/wt/decoupe-go-avant --apres . texte structure imports   # ≈ 1 min 30
-node scripts/audit-decoupe-outil.cjs && node scripts/audit-variables.cjs && node scripts/audit-tdz.cjs       # ≈ 1 min
-$SCRATCH/lourd.sh node scripts/verifier-decoupe.cjs --avant /home/user/wt/decoupe-go-avant --apres . poids tests audits bancs --garder-avant /tmp/decoupe-avant
-#   ≈ DUREE_LOURDE (deux builds, 92 tests ×2, 495 audits ×2 à 2 à la fois, 13 bancs ×2)
-git add -A src/App.jsx src/coeur scripts && git commit -m "Découpe d'App.jsx (découpe 2)…" && git push -u origin claude/decoupe-go
+git worktree add --detach /home/user/wt/decoupe-go-avant origin/main
+for d in decoupe-go decoupe-go-avant; do ln -s /home/user/cancale-v67/node_modules /home/user/wt/$d/node_modules; done
+cd /home/user/wt/decoupe-go
+git merge --no-edit origin/claude/decoupe-app                      # outil, plan, texte-pdf, audits branchés (vrai merge)
+node scripts/decouper-app-2.cjs --appliquer --rapport /tmp/decoupe-go.json          # ≈ 100 s
+#   lire le rapport : un « absent » / « REFUSÉ » = un bloc que le main du jour a changé (le reste part quand même)
+node scripts/verifier-decoupe.cjs --avant ../decoupe-go-avant --apres . texte structure imports   # ≈ 40 s
+node scripts/audit-decoupe-outil.cjs && node scripts/audit-variables.cjs && node scripts/audit-tdz.cjs     # ≈ 1 min
+git add -A src/App.jsx src/coeur && git commit -m "Découpe d'App.jsx (découpe 2)" && git push -u origin claude/decoupe-go
+# vérification lourde, DEUX travaux (un seul dépasse les 2 h d'un travail de fond) :
+$SCRATCH/lourd.sh node scripts/verifier-decoupe.cjs --avant ../decoupe-go-avant --apres . poids tests audits --garder-avant /tmp/decoupe-avant
+$SCRATCH/lourd.sh node scripts/verifier-decoupe.cjs --avant ../decoupe-go-avant --apres . bancs --garder-avant /tmp/decoupe-avant
+#   un audit rouge NEUF « vert sur l'app recollée » : node scripts/brancher-audits.cjs <audits> (commande donnée par le vérificateur)
 ```
+**Durée** : couper et prouver texte/structure/imports ≈ **3 min** ; vérification lourde sur la machine partagée,
+sans compter l'attente d'un créneau : poids ≈ 10 min (deux builds), tests ≈ 10 min, audits ≈ 25 min par arbre
+(l'avant se reprend avec `--audits-avant` s'il a déjà été mesuré sur le même commit), bancs ≈ 45 min par arbre ⇒
+**≈ 2 h 30** au total (mesuré ce 11 nov. : 56 min pour poids+tests+audits après, 45 min de bancs avant, ≈ 50 min après).
 Rejouer après un `main` qui a bougé : refaire depuis `git worktree add` (l'outil refuse de re-couper un App.jsx
 qui porte déjà ses balises : « déjà découpé »). Un écart du vérificateur = ne pas fusionner ; lire la ligne.
 
