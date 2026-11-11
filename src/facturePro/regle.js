@@ -172,6 +172,25 @@ export function jourParis(t) {
 }
 export const anneeParis = (t) => Number(jourParis(t).slice(-4)) || new Date(t).getFullYear();
 
+// (11 nov., lot ventes-lot) UNE VENTE EN LOT : une facture, UNE LIGNE PAR ARTICLE. `vente.lignes`
+// = [{ designation, centimes }] (src/venteLot.js `lignesFactureLot`, parts réparties au centime).
+// Elles ne valent que si leur somme est EXACTEMENT le prix de la vente ; sinon la ligne unique
+// d'avant (jamais un total qui diffère du prix encaissé). Le HT de chaque ligne suit la règle du
+// régime ; la dernière ligne prend l'écart d'arrondi pour que la somme soit le HT de la facture.
+export function lignesDeVente(vente, mt, c, signe = 1) {
+  const L = Array.isArray(vente && vente.lignes) ? vente.lignes : null;
+  const unique = [{ designation: txt(vente.designation), quantite: 1, unite: signe * mt.ht, total: signe * mt.ht }];
+  if (!L || L.length < 2 || !L.every((l) => l && txt(l.designation) && Number.isInteger(l.centimes) && l.centimes > 0)) return unique;
+  if (L.reduce((s, l) => s + l.centimes, 0) !== vente.centimes) return unique;
+  let reste = mt.ht;
+  return L.map((l, i) => {
+    const m = montants(l.centimes, c.tva_regime, c.tva_taux);
+    const ht = i === L.length - 1 ? reste : (m ? m.ht : l.centimes);
+    reste -= ht;
+    return { designation: txt(l.designation).slice(0, 400), quantite: 1, unite: signe * ht, total: signe * ht };
+  });
+}
+
 // ── L'INSTANTANÉ D'UNE FACTURE ──────────────────────────────────────────────
 // Tout ce que le PDF dessine, et rien d'autre : il se refait à l'identique des
 // années plus tard. Lève une erreur (avec la liste) si quelque chose manque —
@@ -219,7 +238,7 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
       adresse: lignes(vente.acheteur.adresse),
       email: emailValide(vente.acheteur.email) ? txt(vente.acheteur.email) : '',
     },
-    lignes: [{ designation: txt(vente.designation), quantite: 1, unite: signe * mt.ht, total: signe * mt.ht }],
+    lignes: lignesDeVente(vente, mt, c, signe),
     regime: c.tva_regime,
     taux: mt.taux,
     totaux: { ht: signe * mt.ht, tva: mt.tva == null ? null : signe * mt.tva, ttc: signe * mt.ttc },
