@@ -5643,7 +5643,9 @@ function requeteVinted(quoi, fn, qui) {
     if (p) { noterDiag('vinted_pause_refus'); return { status: 0, ok: false, json: null, text: '', pause: true, raison: raisonPauseVinted(p) }; }
     const r = await fn();
     if (r && freinVinted(r.status)) await poserPauseVinted(r.status, quoi);
-    if (r && refusDeVinted(r)) await poserPrudence(qui, Number(r.status) || 0, quoi);
+    // (Un 403 sur le dressing PUBLIC d'un autre membre parle de CE membre — profil fermé —, pas de la
+    //  session qui lit : il a sa propre règle, `vrmEnLigneFreins`. Un 429 ou un captcha, si.)
+    if (r && refusDeVinted(r) && !(quoi === 'public' && Number(r.status) === 403)) await poserPrudence(qui, Number(r.status) || 0, quoi);
     return r;
   };
   const suite = _fileRequetes.then(tour, tour);

@@ -204,7 +204,7 @@ const MUTATIONS = [
   ['un prix de n’importe quelle forme est accepté', 'prix: (v) => !!(', 'prix: (v) => true || !!('],
   ['un champ facultatif absent déclenche l’alerte', "if (!presents.length) { if (oblig) return sortie(c, g, 'absent', items[0]); continue; }", "if (!presents.length) { return sortie(c, g, 'absent', items[0]); }"],
   ['la forme revenue n’efface pas l’alerte', "  if (!d) { await formeRevenue(uid, type); return false; }", '  if (!d) { return false; }'],
-  ['un refus de Vinted ne pose pas la prudence', 'if (r && refusDeVinted(r)) await poserPrudence(', 'if (false && r) await poserPrudence('],
+  ['un refus de Vinted ne pose pas la prudence', 'if (r && refusDeVinted(r) && ', 'if (false && r && '],
   ['le plafond n’est pas abaissé en prudence', 'const maxP = enPrudence ? Math.min(max, PRUDENCE_ACTIONS_HEURE) : max;', 'const maxP = max;'],
   ['le plafond normal descend à 20', 'const ACTIONS_MAX_HEURE = 50;', 'const ACTIONS_MAX_HEURE = 20;'],
   ['la prudence ne se lève jamais', 'return p && Number(p.jusqua) > Date.now() ? p : null;', 'return p || null;'],
