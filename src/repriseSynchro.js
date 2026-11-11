@@ -178,6 +178,11 @@ const NOMS_VALEUR = {
   republier: 'Republier', selection: 'Sélection', brouillons: 'Brouillons', masquees: 'Masquées', sansachat: 'Sans achat', acompleter: 'À compléter',
   unread: 'Non lues', repondre: 'À répondre', offres: 'Offres', favoris: 'Favoris', conversations: 'Conversations',
 };
+// Le tri d'Annonces garde les MOTS de sa liste (« Ordre Vinted »…), pas ceux des filtres.
+const TRI_ANNONCES = {
+  oldest: 'Les plus anciennes', recent: 'Ordre Vinted', price_desc: 'Prix décroissant', price_asc: 'Prix croissant', favs: 'Plus de favoris',
+  views: 'Plus de vues', boost: 'Vues sans favoris', sleeping: 'En ligne depuis longtemps', nonum: 'Sans numéro',
+};
 export const nomVue = (nom) => NOMS_VUE[nom] || 'Filtre';
 export function texteValeur(nom, v) {
   if (estRecherche(nom)) return typeof v === 'string' && v.trim() ? `« ${v.trim().slice(0, 40)} »` : '';
@@ -186,6 +191,7 @@ export function texteValeur(nom, v) {
     const f = (d) => { try { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
     return `${f(v.from)} → ${f(v.to)}`;
   }
+  if (nom === 'annonces-tri' && typeof v === 'string' && TRI_ANNONCES[v]) return TRI_ANNONCES[v];
   return typeof v === 'string' ? (NOMS_VALEUR[v] || NOMS_VALEUR[v.split(':')[0]] || '') : '';
 }
 const memeValeur = (a, b) => { try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return a === b; } };

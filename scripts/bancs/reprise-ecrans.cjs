@@ -77,6 +77,12 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   await pA.pg.goto(srv.url + '/?tab=ventes', { waitUntil: 'domcontentloaded' });
   dit(await attendreEcran(pA.pg, 'ventes'), 'P1 : l’ordinateur est sur Ventes', await ecran(pA.pg));
   await pA.pg.waitForTimeout(2500);
+  // Les filtres de Ventes vivent sur le site Vinted (« Tous » n'en a pas) : choisir Vinted
+  // au doigt — le site choisi est lui aussi retenu pour le compte.
+  const vinted = pA.pg.locator('[data-filtre-site="ventes"] [data-site="vinted"]').first();
+  dit((await vinted.count()) > 0, 'P1 : le choix du site « Vinted » est à l’écran');
+  await vinted.click().catch(() => {});
+  await H.attendre(async () => (await pA.pg.locator('button[aria-pressed]', { hasText: /^Finalisées$/ }).count()) > 0, 8000);
   const fin = pA.pg.locator('button[aria-pressed]', { hasText: /^Finalisées$/ }).first();
   await capture(pA.pg, 'P1-ordinateur-ventes');
   dit((await fin.count()) > 0, 'P1 : le filtre « Finalisées » est à l’écran');
@@ -97,6 +103,7 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   dit(c1.vues && c1.vues['ventes-filtre'] && c1.vues['ventes-filtre'].valeur === 'finalisees', 'P1 : le filtre de Ventes est en base, pour le compte', JSON.stringify(c1.vues && c1.vues['ventes-filtre']));
   dit(c1.vues && c1.vues['annonces-tri'] && c1.vues['annonces-tri'].valeur === 'recent', 'P1 : le tri d’Annonces est en base', JSON.stringify(c1.vues && c1.vues['annonces-tri']));
   dit(c1.vues && c1.vues['annonces-recherche'] && c1.vues['annonces-recherche'].valeur === 'Air Max 3', 'P1 : la recherche est en base');
+  dit(c1.sites && c1.sites.ventes && c1.sites.ventes.valeur === 'vinted', 'P1 : le site choisi sur Ventes (Vinted) est en base', JSON.stringify(c1.sites));
   dit(c1.ecran && c1.ecran.tab === 'annonces', 'P1 : le dernier écran (Annonces) est en base', JSON.stringify(c1.ecran));
   dit(!JSON.stringify(c1).includes('position'), 'P1 : aucune position de défilement dans la clé du compte');
   await capture(pA.pg, 'P1-ordinateur-annonces');
