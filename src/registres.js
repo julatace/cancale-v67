@@ -263,7 +263,7 @@ export function resumeRegistre(R) {
 }
 const COLONNES = {
   recettes: [['date', 'Date'], ['montant', 'Montant', 1], ['plateforme', 'Plateforme'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['compte', 'Compte']],
-  achats: [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['paires', 'Paires', 1], ['montant', 'Montant', 1], ['frais', 'Dont frais', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']],
+  get achats() { return [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['paires', motsVendeur().Noms, 1], ['montant', 'Montant', 1], ['frais', 'Dont frais', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']]; },
 };
 const cellule = (l, k, tableur) => {
   if (k === 'montant') return l.montant == null ? (tableur ? '' : '—') : (tableur ? tableurNb(l.montant) : eurosTexte(l.montant));

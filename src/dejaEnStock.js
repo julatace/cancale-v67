@@ -67,5 +67,5 @@ export function pairesDuModele({ cible, stock, sauf = null, marqueDe, modeleDe =
 }
 
 export const phraseDejaEnStock = (n, { autres = false } = {}) => (n > 0
-  ? `Tu as déjà ${n} ${autres ? 'autre' + (n > 1 ? 's' : '') + ' ' : ''}paire${n > 1 ? 's' : ''} de ce modèle en stock`
+  ? `Tu as déjà ${n} ${autres ? 'autre' + (n > 1 ? 's' : '') + ' ' : ''}${n > 1 ? motsVendeur().noms : motsVendeur().nom} de ce modèle en stock`
   : '');

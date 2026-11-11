@@ -198,7 +198,7 @@ export function phraseAbsente(c) {
     case 'urssaf': return 'La carte URSSAF ne s\u2019affiche pas pour ton statut.';
     // Ne promet pas « réglée » : la ligne peut manquer parce que la liste n'est
     // pas encore relue. Le geste est dit.
-    case 'doublon': return `${motsVendeur().Ce} n\u2019est plus dans la liste « à retirer » : la double vente est sans doute déjà réglée. Vérifie dans tes annonces de la plateforme si tu as un doute.';
+    case 'doublon': return `${motsVendeur().Ce} n\u2019est plus dans la liste « à retirer » : la double vente est sans doute déjà réglée. Vérifie dans tes annonces de la plateforme si tu as un doute.`;
     case 'case': return 'Cette case n\u2019est plus sur tes meubles : le meuble a peut-être été modifié ou supprimé.';
     case 'annonce': return "Cette annonce n'est pas dans la liste affichée : regarde le compte et les filtres choisis, ou repasse sur Vinted.";
     default: return '';

@@ -117,7 +117,7 @@ export function InventaireAnnuel({ owner = '', cle, Feuille, onFermer, onSaisirP
         {liste('hors-liste', 'Trouvées, pas dans la liste', ecarts.horsListe.map((k) => ({ id: k, cle: k, numero: k, titre: '', compte: '' })),
           (l) => <li key={l.id} className="vrm-ia-l" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit"/><span className="vrm-ia-l-t">Vue dans un carton</span></li>,
           inv.partiel ? 'Une lecture d’annonces manque : vérifie avant de conclure.' : 'Vues dans tes rangements, absentes de la liste.', 'geste')}
-        {ecarts.sansNumero.length ? <p className="vrm-ia-aide" data-ia-sans-numero={ecarts.sansNumero.length}>{plur(ecarts.sansNumero.length, 'paire', 'paires')} sans N° : impossible à cocher.</p> : null}
+        {ecarts.sansNumero.length ? <p className="vrm-ia-aide" data-ia-sans-numero={ecarts.sansNumero.length}>{plur(ecarts.sansNumero.length, motsVendeur().nom, motsVendeur().noms)} sans N° : impossible à cocher.</p> : null}
         <p className="vrm-ia-aide">Rien n’est changé dans VRM.</p>
       </>) : null}
     </section>);

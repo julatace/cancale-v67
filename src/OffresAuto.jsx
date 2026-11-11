@@ -21,7 +21,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { montant } from './format.js';
-import { motsVendeur } from './profilVendeur.js';
+import { motsVendeur, motArticle } from './profilVendeur.js';
 import { Numero } from './composants/Numero.jsx';
 import JaugeActions, { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, heureFr } from './jaugeActions.js';
@@ -135,7 +135,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
           <span className="vrm-oa-icone" aria-hidden="true"><Icon name="tag" size={18}/></span>
           <div className="vrm-oa-texte">
             <b>Offres automatiques</b>
-            <span data-oa-statut="">{actif ? `Allumées · ${nAvec} paire${nAvec > 1 ? 's' : ''} réglée${nAvec > 1 ? 's' : ''}` : 'Éteintes'}</span>
+            <span data-oa-statut="">{actif ? `Allumées · ${motArticle(nAvec)} réglé${motsVendeur().e}${nAvec > 1 ? 's' : ''}` : 'Éteintes'}</span>
           </div>
           <button type="button" role="switch" aria-checked={!!actif} data-offres-auto-toggle={actif ? '1' : '0'} onClick={basculer} className="vrm-offres-auto-switch" aria-label="Acceptation automatique des offres">
             <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>

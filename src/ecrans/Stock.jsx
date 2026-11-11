@@ -720,7 +720,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           ton={nAConf > 0 || aa.manque.length > 0 || aa.vcVieille ? 'ambre' : 'neutre'}
           attrs={{ 'data-stock-resume-court': '' }}
           puces={nAffiche > 0
-            ? [{ texte: `${nRangees} rangée${nRangees > 1 ? 's' : ''}` }, { texte: `${nAffiche - nRangees - nSansNum} à ranger` },
+            ? [{ texte: `${nRangees} rangé${motsStock.e}${nRangees > 1 ? 's' : ''}` }, { texte: `${nAffiche - nRangees - nSansNum} à ranger` },
                nAConf > 0 ? { texte: `${nAConf} à confirmer`, ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null,
                nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: `${nSansNum + sansNumAutres + vcSansNum.length} sans N°` } : null].filter(Boolean)
             : [{ texte: 'Aucune annonce lue' }, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null].filter(Boolean)}
@@ -790,7 +790,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       phrase="Une lecture manque : ni « en ligne », ni « partie » n'est dit.">
       {/* (6 nov., onglets B) La lecture qui manque est déjà NOMMÉE en tête (« pas lu : … ») : elle ne se redit
           pas ici (§7, une phrase une fois — mesuré sur sa base : « Vestiaire (jamais lu : ouvre… ») deux fois). */}
-      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. En ligne ou partie : pas su.</p>
+      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} {rangeesPasSu.length > 1 ? motsStock.noms : motsStock.nom} rangé{motsStock.e}{rangeesPasSu.length > 1 ? 's' : ''} pas vérifié{motsStock.e}{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. En ligne ou partie : pas su.</p>
     </InfoPop>) : null;
   // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
   const blocListe = aa && aa.su && articlesVus.length ? (
@@ -1024,7 +1024,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </div>
     )}
 
-    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
+    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
       {/* (6 nov., onglets B) CE QUE VEULENT DIRE LES CASES, en une ligne (Julien : « être accompagné ») :
           les MÊMES classes que les cases (libre, rangée, vendue = l'accent, plus en ligne = l'ambre, §7). */}

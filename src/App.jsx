@@ -25287,7 +25287,7 @@ function StockPhotos() {
   if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté</Card>;
   return (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} {fiches.length > 1 ? motsA.noms : motsA.nom} en stock{nVendus > 0 ? <> · <b style={{ color: C.accentTexte }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
+      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} {fiches.length > 1 ? motsA.noms : motsA.nom} en stock{nVendus > 0 ? <> · <b style={{ color: C.accentTexte }}>{nVendus} vendu{motsA.e}{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher un article" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 12, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
     </div>
     {nVendus > 0 && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Qui clignote = vendu · <b style={{ color: C.text }}>Sortie du stock</b> <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et l’article reste en stock.</Pourquoi></div>}
@@ -54112,7 +54112,7 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
-      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${vcARetirer} paire${vcARetirer>1?'s':''} vendue${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
+      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${motArticle(vcARetirer)} vendu${motsVendeur().e}${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
       if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
       if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, photos:lbcRemovePhotos, lbcSuppr:(lbcARetirer||[]).filter(r=>r&&r.lbcId).map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vinted' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
@@ -54123,8 +54123,8 @@ function AppCoeur() {
       // une paire qui y ressemble est encore en vente sur Vinted.
       if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirer)} vendu${motsVendeur().e}${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true});
       if(ebayARetirerAilleurs>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirerAilleurs)} vendu${motsVendeur().e}${ebayARetirerAilleurs>1?'s':''} ${ebayARetirerAilleursOu}, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirerAilleurs, tab:'ebay_annonces', dv:true});
-      if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${ebayAAnnuler} paire${ebayAAnnuler>1?'s':''} vendue${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmée${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
-      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true, annonces:true});
+      if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayAAnnuler)} vendu${motsVendeur().e}${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmé${motsVendeur().e}${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
+      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirerVinted)} vendu${motsVendeur().e}${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true, annonces:true});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
       // lus » et « N offres reçues » ne sont pas intéressants ici — les offres
       // et les messages auront leur propre onglet (captation + envoi, comme
@@ -54700,7 +54700,7 @@ function AppCoeur() {
         const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
         const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
         // (10 nov., lot AX) Paires · Ventes · Achats · Colis · Retraits · … (src/rechercheUnique.js).
-        const GROUPES = GROUPES_LOUPE;
+        const GROUPES = GROUPES_LOUPE.map(([t, l]) => [t, t === 'paire' ? motsVendeur().Noms : l]);
         // La TÊTE : la correspondance exacte d'identité, et PAR QUOI (« par son n° de suivi »).
         const parExacte = (l) => [...new Set(l.map(r => IDENTITES_EXACTES[r.par]).filter(Boolean))].join(', ');
         const blocExactes = exactes.length ? <div data-recherche-groupe="exacte" data-recherche-exacte="" data-recherche-n={exactes.length}>
@@ -55242,7 +55242,7 @@ function AppCoeur() {
             }
             // Ancien format (compat) : { catalog, sales, garageGrid }
             if(data && (data.catalog||data.sales||data.garageGrid)){
-              let msg='Importer cet ancien fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES, puis l\'app se rechargera.';
+              let msg='Importer cet ancien fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} ${motsVendeur().noms}\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES, puis l\'app se rechargera.';
               if(!await askConfirm(msg)) return;
               const entries=[]; if(data.catalog)entries.push(['vinted_catalog',data.catalog]); if(data.sales)entries.push(['vinted_sales',data.sales]); if(data.garageGrid)entries.push(['vinted_garage_grid',data.garageGrid]);
               await applyAndReload(entries); return;

@@ -15,7 +15,7 @@ import { friseVente } from '../recapVente.js';
 import Frise from '../design/Frise.jsx';
 import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
-import { champsFacultatifs, motsVendeur } from '../profilVendeur.js';
+import { champsFacultatifs, motsVendeur, motArticle } from '../profilVendeur.js';
 import { AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner, vendActuel, exemplesActuels } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
@@ -4457,7 +4457,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerEbay.length > 0 && (
       <div data-ebay-a-retirer={dvVue.aRetirerEbay.length} data-cible="doublon:ebay" style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{dvVue.aRetirerEbay.length} paire{dvVue.aRetirerEbay.length > 1 ? 's' : ''} vendue{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</Pourquoi></div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{motArticle(dvVue.aRetirerEbay.length)} vendu{motsVendeur().e}{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</Pourquoi></div>
         {(() => {
           // Retrait automatique allumé : la raison commune à TOUTES les lignes se
           // dit une fois (§7) ; une raison qui distingue se dit sur sa ligne.
@@ -4490,7 +4490,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerEbayAilleurs.length > 0 && (
       <div data-ebay-a-retirer-ailleurs={dvVue.aRetirerEbayAilleurs.length} data-cible="doublon:ebay" style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{dvVue.aRetirerEbayAilleurs.length} paire{dvVue.aRetirerEbayAilleurs.length > 1 ? 's' : ''} vendue{dvVue.aRetirerEbayAilleurs.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aRetirerEbayAilleurs)} — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbayAilleurs.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait jamais tout seul pour une vente faite ailleurs que sur Vinted : confirme, une annonce eBay terminée ne revient pas.</Pourquoi></div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{motArticle(dvVue.aRetirerEbayAilleurs.length)} vendu{motsVendeur().e}{dvVue.aRetirerEbayAilleurs.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aRetirerEbayAilleurs)} — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbayAilleurs.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait jamais tout seul pour une vente faite ailleurs que sur Vinted : confirme, une annonce eBay terminée ne revient pas.</Pourquoi></div>
         {dvVue.aRetirerEbayAilleurs.map((d) => {
           const id = String(d.annonce.itemId); const etat = retraits[id];
           return (
@@ -4509,7 +4509,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerVinted.length > 0 && (
       <div data-ebay-retirer-vinted={dvVue.aRetirerVinted.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{dvVue.aRetirerVinted.length} paire{dvVue.aRetirerVinted.length > 1 ? 's' : ''} vendue{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted <Pourquoi>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</Pourquoi></div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: E.text }}>{motArticle(dvVue.aRetirerVinted.length)} vendu{motsVendeur().e}{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted <Pourquoi>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</Pourquoi></div>
         {dvVue.aRetirerVinted.map((d, i) => (
           <div key={String((d.commande && d.commande.orderId) || i) + d.numero} data-ebay-vendue={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -4891,12 +4891,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const nEligCons = elig ? itemsVue.filter((a) => elig.has(String(a.itemId))).length : 0;
   const plurCons = (n) => (n > 1 ? 's' : '');
   const conseils = [
-    dvVue.aRetirerEbay.length && { k: 'retirer', urg: true, sel: '[data-ebay-a-retirer]', cta: 'Voir', txt: `${dvVue.aRetirerEbay.length} paire${plurCons(dvVue.aRetirerEbay.length)} vendue${plurCons(dvVue.aRetirerEbay.length)} sur Vinted, encore en vente ici — à retirer d'eBay` },
-    dvVue.aRetirerEbayAilleurs.length && { k: 'retirer-ailleurs', urg: true, sel: '[data-ebay-a-retirer-ailleurs]', cta: 'Voir', txt: `${dvVue.aRetirerEbayAilleurs.length} paire${plurCons(dvVue.aRetirerEbayAilleurs.length)} vendue${plurCons(dvVue.aRetirerEbayAilleurs.length)} ${ouVenduesTexte(dvVue.aRetirerEbayAilleurs)}, encore en vente ici — à retirer d'eBay` },
-    dvVue.aAnnulerEbay.length && { k: 'annuler', urg: true, sel: '[data-ebay-a-annuler]', cta: 'Voir', txt: `${dvVue.aAnnulerEbay.length} programmée${plurCons(dvVue.aAnnulerEbay.length)} sur eBay, déjà vendue${plurCons(dvVue.aAnnulerEbay.length)} ailleurs — à annuler` },
-    dvVue.aRetirerVinted.length && { k: 'retirer-vinted', urg: true, sel: '[data-ebay-retirer-vinted]', cta: 'Voir', txt: `${dvVue.aRetirerVinted.length} vendue${plurCons(dvVue.aRetirerVinted.length)} sur eBay, encore sur Vinted — à retirer là-bas` },
+    dvVue.aRetirerEbay.length && { k: 'retirer', urg: true, sel: '[data-ebay-a-retirer]', cta: 'Voir', txt: `${motArticle(dvVue.aRetirerEbay.length)} vendu${motsVendeur().e}${plurCons(dvVue.aRetirerEbay.length)} sur Vinted, encore en vente ici — à retirer d'eBay` },
+    dvVue.aRetirerEbayAilleurs.length && { k: 'retirer-ailleurs', urg: true, sel: '[data-ebay-a-retirer-ailleurs]', cta: 'Voir', txt: `${motArticle(dvVue.aRetirerEbayAilleurs.length)} vendu${motsVendeur().e}${plurCons(dvVue.aRetirerEbayAilleurs.length)} ${ouVenduesTexte(dvVue.aRetirerEbayAilleurs)}, encore en vente ici — à retirer d'eBay` },
+    dvVue.aAnnulerEbay.length && { k: 'annuler', urg: true, sel: '[data-ebay-a-annuler]', cta: 'Voir', txt: `${dvVue.aAnnulerEbay.length} programmé${motsVendeur().e}${plurCons(dvVue.aAnnulerEbay.length)} sur eBay, déjà vendu${motsVendeur().e}${plurCons(dvVue.aAnnulerEbay.length)} ailleurs — à annuler` },
+    dvVue.aRetirerVinted.length && { k: 'retirer-vinted', urg: true, sel: '[data-ebay-retirer-vinted]', cta: 'Voir', txt: `${dvVue.aRetirerVinted.length} vendu${motsVendeur().e}${plurCons(dvVue.aRetirerVinted.length)} sur eBay, encore sur Vinted — à retirer là-bas` },
     setRelierAnn.size && { k: 'relier', filtre: 'relier', cta: 'Filtrer', txt: `${setRelierAnn.size} annonce${plurCons(setRelierAnn.size)} à relier à un article — sinon VRM ne peut pas la retirer à la vente` },
-    nDortAnn && { k: 'dorment', filtre: 'dorment', cta: 'Filtrer', txt: `${nDortAnn} paire${plurCons(nDortAnn)} qui dor${nDortAnn > 1 ? 'ment' : 't'} depuis plus de 30 j — baisse le prix${nEligCons ? ' ou fais une offre' : ''}` },
+    nDortAnn && { k: 'dorment', filtre: 'dorment', cta: 'Filtrer', txt: `${motArticle(nDortAnn)} qui dor${nDortAnn > 1 ? 'ment' : 't'} depuis plus de 30 j — baisse le prix${nEligCons ? ' ou fais une offre' : ''}` },
   ].filter(Boolean);
   const allerConseil = (c) => () => {
     if (c.filtre) { setFiltreAnn(c.filtre); setAnnMax(60); }

@@ -12,7 +12,7 @@ import { photoArticle } from '../photosArticles.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis, cleStatTransporteur } from '../transporteursVisuels.js';
 import { attrCible } from '../cibleNotif.js';
-import { champsFacultatifs, motsVendeur } from '../profilVendeur.js';
+import { champsFacultatifs, motsVendeur, motArticle } from '../profilVendeur.js';
 import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, vendActuel } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
@@ -1727,11 +1727,11 @@ function LeboncoinScreen() {
   const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').length : 0;
   const nRetirerLbcEbay = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou === 'eBay').length : 0;
   const conseilsLbc = data ? [
-    nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${nRetirerLbc} paire${plurLbc(nRetirerLbc)} vendue${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
-    nRetirerLbcEbay && { k: 'retirer-ebay', urg: true, sel: '[data-lbc-retirer-ebay]', txt: `${nRetirerLbcEbay} paire${plurLbc(nRetirerLbcEbay)} vendue${plurLbc(nRetirerLbcEbay)} sur eBay, encore en ligne ici — à retirer de Leboncoin` },
-    data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendue${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
+    nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${motArticle(nRetirerLbc)} vendu${motsVendeur().e}${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
+    nRetirerLbcEbay && { k: 'retirer-ebay', urg: true, sel: '[data-lbc-retirer-ebay]', txt: `${motArticle(nRetirerLbcEbay)} vendu${motsVendeur().e}${plurLbc(nRetirerLbcEbay)} sur eBay, encore en ligne ici — à retirer de Leboncoin` },
+    data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendu${motsVendeur().e}${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
     data.aRelierVentes && data.aRelierVentes.length && { k: 'relier-ventes', sel: '[data-lbc-ventes-a-relier]', txt: `${data.aRelierVentes.length} vente${plurLbc(data.aRelierVentes.length)} Leboncoin à relier à un article` },
-    data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
+    data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${motArticle(data.queue.length)} prêt${motsVendeur().e}${plurLbc(data.queue.length)} à publier sur Leboncoin` },
   ].filter(Boolean) : [];
   const allerLbc = (c) => () => { try { const el = document.querySelector(c.sel); if (el) el.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth', block: 'center' }); } catch (_) {} };
   // La cible posée par Ma journée : consommée une fois, dans la minute ; la mémoire
