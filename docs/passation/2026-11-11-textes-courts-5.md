@@ -69,7 +69,11 @@ l'alerte « deux paires sous un même N° » (`Loupe`, `FichePaire`, App.jsx), c
 - Déjà rouges sur `origin/main`, inchangés : `audit-relier-compte` (5 rouges R7), test
   `brouillon-import-interface` (champ date jamais visible), `audit-accueil-navigateurs --prouve` (3 motifs
   introuvables : une espace insécable dans le motif « ordinateur nécessaire », deux phrases d'avant le 8 nov.).
-- Banc `popups-propre` : voir le résultat dans le rapport de la session (lancé avec `BANC_PORT` aléatoire).
+- Banc `popups-propre` (`BANC_PORT` aléatoire) : **329 verts, 0 rouge** ; captures regardées (Organisation : le
+  « ⓘ Pourquoi ? » à la taille de la note ; Paramètres, Annonces 390 sombre).
+- Banc `accueil` : 166 verts, 3 rouges qui ne touchent aucune ligne changée ici (prix Pro 19,99 € compté comme
+  « autre prix », un « Vestiaire » hors FAQ, le film) ; capture 1512 regardée (FAQ question / réponse, liste des
+  deux automatismes).
 
 ## Ce qui reste
 
