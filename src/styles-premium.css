@@ -1049,13 +1049,15 @@ html body .vrm-fs button.vrm-fs-croix:disabled { cursor: not-allowed !important;
    une hauteur nulle : « … » et le bordereau y sont posés en absolu). Grammaire : le
    geste prend la place de l'ÉTAT (colonne 2, vide tant que rien n'est fait), centré sur
    la rangée comme le bordereau. Une rangée qui porte déjà sa frise garde la frise : la
-   zone d'action passe alors sur une 2e ligne de la rangée (jamais de chevauchement). */
+   zone d'action passe alors sur une 2e ligne de la rangée (jamais de chevauchement).
+   (11 nov., lot suivi-commandes) + la section « À expédier » de Ventes (DJ3) : ces règles ne visaient
+   plus que l'ancien écran Colis — « Relier » dépassait de 12 px sous la carte (banc colis-relier-carte). */
 @media (min-width: 1024px) {
-  .vrm-main[data-ecran="cat_bord"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not(:has(> .vrm-colis-frise)) > .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not(:has(> .vrm-colis-frise)) > .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
     position: absolute !important; top: 50% !important; transform: translateY(-50%) !important; margin: 0 !important;
     left: calc(100% - var(--p-g-bord) - var(--p-g-action) - 24px - var(--p-g-etat)) !important;
   }
-  .vrm-main[data-ecran="cat_bord"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > .vrm-colis-actions:has(> :is([data-geste="relier"], [data-geste="poser-num"])) {
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > .vrm-colis-actions:has(> :is([data-geste="relier"], [data-geste="poser-num"])) {
     grid-column: 2 / -1 !important; grid-row: 2 !important; height: auto !important; display: flex !important; justify-content: flex-start !important;
   }
 }

@@ -101,3 +101,28 @@ deux ventes au même titre, seule celle dont le n° est lu porte le statut trans
   avant FULFILLED) — rien à lire, rien inventé.
 - Un colis vendu Mondial Relay : jamais lu chez le transporteur (code postal de l'acheteur). Une voie sûre
   future : un code postal LU pour CE colis (ex. la transaction Vinted, s'il y figure un jour — non mesuré).
+
+## Ajouts (fin de journée, demandés par la session principale)
+- **« Relier » dépassait de sa carte à 1512 px** (12 px sous la carte, vu par DJ3) : la règle 13.4 de
+  `src/styles-premium.css` (le geste prend la colonne de l'état) ne visait plus que l'ancien écran Colis
+  (`data-ecran="cat_bord"`) ; elle vise aussi `.vrm-colis-section` (Ventes, DJ3). Banc neuf
+  `scripts/bancs/colis-relier-carte.cjs` (chaque bouton DANS sa carte, 390/1512, clair/sombre) : 2 rouges avant
+  (« Relier (12 px) » à 1512 clair et sombre), 20 verts après ; captures regardées.
+- **Banc `tout-imprimer`** : le contrôle B jugeait les groupes par transporteur de l'ÉCRAN, retirés par décision
+  (9 nov., lot AJ : le plus récent en haut, transporteur en pastille). Porté sur la règle actuelle : l'aperçu a trois
+  groupes par transporteur, chacun dans l'ordre de l'écran. 26 conformes.
+- **`achats-retraits`** (« Peut-être en double · 9 » rend 3, « à vérifier » 0/3) : logique des retraits (lots
+  `retraits-fiables` / DJ3), pas celle du suivi des commandes — non touché, signalé.
+- **Mondial Relay sans extension** (demande relayée) : le SERVEUR lit déjà Mondial Relay pour les ACHATS (route
+  `_mvc`, mesurée le 24 oct., `LECTURE_SERVEUR_TRANSP.mondialrelay = true`) ; l'extension n'est qu'un secours sur
+  refus. Pour un colis VENDU, la route exige le code postal du point de l'acheteur. Piste sûre repérée, PAS
+  branchée : le code postal imprimé sur SON étiquette Mondial Relay (PDF relié par le n° de transaction, déjà lu
+  au cron pour le transporteur), vérifié par l'ÉCHO de la route. Mesure en base demandée (lecture seule, comptes
+  seulement) puis interrompue avant d'être approuvée : rien mesuré, rien branché.
+
+| transporteur | serveur | Vinted | e-mail | extension |
+|---|---|---|---|---|
+| Chronopost / Shop2Shop | oui, achats ET ventes (`cp-ws2`, n° seul) | état de la transaction | oui (même n°) | secours sur refus |
+| Vinted Go | oui, achats ET ventes (`vg-v3`, n° seul) | état de la transaction | oui | secours sur refus |
+| Mondial Relay / InPost | achats : oui (`_mvc`, CP du point lu) ; ventes : non (CP de l'acheteur inconnu) | état de la transaction | oui | secours (même route, même CP exigé) |
+| Colissimo, La Poste, UPS, DPD, GLS, Relais Colis | non (aucune route publique mesurée, aucune clé) | état de la transaction | oui | non |
