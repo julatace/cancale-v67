@@ -117,3 +117,28 @@ Sur `claude/revue-colis`, pas de PR (la session principale intègre).
    réaffaiblir ; la preuve est avant/après : vert sur `main` avec Cancale 4, vert ici avec 3, chacun rouge sur
    l'autre), `iphone-reprise` B9/R2, `retrait-relais-carte`, `retrait-autre-ville`, `vestiaire-colis` (ports de
    sélecteur : ils mesurent la même règle qu'avant, sur la nouvelle place).
+
+## Suite 2 : fusion de `integration-11nov-e3` et demande (g)
+
+* **Merge `origin/claude/integration-11nov-e3`** (lot journee-perso : feuille « Bordereaux à imprimer » allégée, InPost =
+  Mondial Relay, étiquette lue par son code 56…, logo Chronopost, achats « encore au point relais »). Pas de
+  contradiction de fond, deux décisions de Julien qui vont dans le même sens :
+  - « Tout imprimer » : la feuille en 3 temps du lot DJ3 est gardée (elle n'a déjà ni case « Contrôlé » ni confirmation) ;
+    la confirmation « N sur M contrôlés » est retirée aussi du moteur (`batchBordereaux`), `verifierContexte` refuse
+    toujours un lot dont un article a changé (audit-annuler-commandes porté : « Lot changé refusé avant impression »).
+    L'emplacement sous chaque paire (arbitrage c) suit LEUR règle : dit seulement quand il est connu (plus
+    « emplacement non noté » sur chaque ligne) — banc tout-imprimer C ajusté.
+  - Étiquettes : leur relecture des « aucun » (règle du code 56…) et la mienne (« inpost », « plusieurs ») sous UNE marque
+    `REGLE_PDF` (importée de transporteur-pdf.js — la déclarer deux fois aurait cassé le module) ; la décision neuve
+    porte `g` et `v`.
+  - Logo : le dessin relevé à 15 h 55 (« toujours pas bon ») remplace celui du matin, pour Chronopost ET Shop2Shop
+    (un pictogramme) ; audit-logos-bordereaux porté.
+  - Ma journée personnalisable : la carte « Commandes à vérifier » devient une carte réglable (`suivi`,
+    src/journeePerso.js) ; elle compte dans « N gestes » et se cache comme les autres.
+  - Navigation : Achats dans la barre (lot DJ3), avec leur `entreeNav`.
+* **(g) « Tes meilleures sources »** posée APRÈS la liste d'Achats (avant les reçus). Mesuré au banc
+  `annonces-ventes-brouillon`, 1512 px : les étapes des achats passent de **1586 à 1301 px** (390 px : 1936 ⇒ 1523) ;
+  captures avant/après regardées : premier écran identique (« À retirer »), au second la liste suit directement les
+  chiffres d'Achats. Le contrôle « dans le premier écran » reste rouge (la section « À retirer » est en tête, par décision).
+* À signaler (hors périmètre, pas touché) : au banc (navigateur en anglais) la navigation s'affiche en anglais
+  (« My day », « Listings »…) — c'est le lot Traduction, alors que §3 dit « VRM reste sur la France ».
