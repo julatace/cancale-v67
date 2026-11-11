@@ -325,6 +325,8 @@ const LeboncoinScreen = aLaDemande(() => import('./ecrans/Leboncoin.jsx').then((
 const LeboncoinColis = aLaDemande(() => import('./ecrans/Leboncoin.jsx').then((m) => ({ default: m.LeboncoinColis })));
 const EbayAnnonces = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayAnnonces })));
 const EbayConnexion = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayConnexion })));
+const GuidesEbay = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.GuidesEbay })));
+const EbayRemises = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayRemises })));
 const EbayVentes = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayVentes })));
 const Garage = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Garage })));
 const StockVinted = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.StockVinted })));
@@ -645,6 +647,7 @@ import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // 
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires, enLigneSur } from "./publierAilleurs.js";
 import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
 import { suiviPourPartout } from "./publierPartoutSuivi.js";
+import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
 import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
@@ -2750,6 +2753,9 @@ const SYNC_KEYS = [
   // Son rythme de programmation eBay (par jour, plage, jours, écart, ordre,
   // préréglages de départ) : le sien, sur tous ses appareils (5 octobre).
   'vrm_ebay_rythme',
+  // (11 nov., ebay-complet) Les réglages de publication eBay par défaut (Paramètres → Comptes eBay ;
+  // src/ebay/parametres.js `defautsDepuis` relit chaque valeur) et « 1re publication » déjà guidée.
+  'vrm_ebay_publication_defaut','vrm_ebay_guide_vu',
   'vrm_ebay_couts',
   'vrm_ebay_vue',             // l'onglet eBay : « Tous les comptes » ou UN compte (9 octobre)
   'vrm_ebay_compte_pub',      // le dernier compte eBay choisi pour publier / programmer
@@ -23412,7 +23418,11 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
     if (sv) sv.terminer();
     return res;
   };
-  return <PublierPartout lignes={lignes} lecture={lecture} reglage={reglage} params={params} etatsLbc={LBC_ETATS} saisies={saisies} vus={vus}
+  // (11 nov. soir) eBay : SES réglages de publication par défaut (lot ebay-complet, src/ebay/parametres.js) —
+  // le brouillon les reprend à sa mise en ligne ; la feuille les nomme (« Offres · Retours 30 j »).
+  let ebayReglages = [];
+  try { ebayReglages = resumeReglagesEbayPP(defautsEbayDepuis(load(CLE_DEFAUTS_EBAY_PP, null))).map((x) => tr(x.cle, x.vars || {})); } catch (_) { ebayReglages = []; }
+  return <PublierPartout lignes={lignes} lecture={lecture} reglage={reglage} params={params} etatsLbc={LBC_ETATS} saisies={saisies} vus={vus} ebayReglages={ebayReglages}
     exclues={choisies === undefined ? 0 : voulus.length - choisies.length}
     onReglage={(site, r) => setReglage((x) => { const n = reglagePrix({ ...x, [site]: r }); save(CLE_PRIX_PARTOUT, n); return n; })}
     onParam={(site, champ, val) => setParams((x) => { const n = reglageParams({ ...x, [site]: { ...((x && x[site]) || {}), [champ]: val } }, { etatsLbc: LBC_ETATS }); save(CLE_PARAMS_PARTOUT, n); return n; })}
@@ -56614,10 +56624,10 @@ function AppCoeur() {
           )}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {sec==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
-          {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {sec==='agent'&&<div style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
-          {sec==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
+          {sec==='offres'&&<div style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };
   // Compte eBay : un panneau des Paramètres (« Comptes eBay »), dans le skin eBay.

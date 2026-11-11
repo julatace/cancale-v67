@@ -81,7 +81,7 @@ function ChampControle({ site, d, valeur, vide, onChange, etatsLbc, categorie, d
     onBlur={(e) => { if (e.target.value.trim() !== (valeur || '')) onChange(e.target.value.trim()); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} {...data}/>;
 }
 // Le réglage PAR DÉFAUT, pour toutes les annonces (rangé dans vrm_partout_params).
-function ReglageParams({ params, onParam, etatsLbc, bloque }) {
+function ReglageParams({ params, onParam, etatsLbc, bloque, ebayReglages = [] }) {
   const [ouvert, setOuvert] = React.useState(false);
   return (
     <section className="vrm-pp-reglage" data-pp-defauts={ouvert ? 'ouvert' : 'ferme'} aria-label={tr('partout.defaut.titre')}>
@@ -103,7 +103,11 @@ function ReglageParams({ params, onParam, etatsLbc, bloque }) {
               ))}
             </div>
           ))}
-          <p className="vrm-pp-aide" data-pp-ebay-params="">{tr('partout.ebay.params')}</p>
+          <div className="vrm-pp-defaut-site" data-pp-defaut-site="ebay">
+            <span className="vrm-pp-site-nom"><LogoSite site="ebay"/>{NOM_PARTOUT.ebay}</span>
+            <p className="vrm-pp-aide" data-pp-ebay-reglages={ebayReglages.length}>{ebayReglages.length ? tr('partout.ebay.reglages', { liste: ebayReglages.join(' · ') }) : tr('partout.ebay.usine')}</p>
+            <p className="vrm-pp-aide" data-pp-ebay-params="">{tr('partout.ebay.params')}</p>
+          </div>
         </>
       ) : null}
     </section>
@@ -217,7 +221,7 @@ function CaseSite({ l, x, coche, onCoche, resultat, vu, enCours, seul, saisie, o
 
 // lignes : sorties `lignePartout` (undefined = en cours de lecture · null = pas su).
 // coches / setCoches : tenus ici. onLancer({ coches, surEtat }) → Promise.
-export default function PublierPartout({ lignes, lecture = false, exclues = 0, reglage, onReglage, params = {}, onParam, onParamAnnonce, saisies = {}, onSaisie, etatsLbc = [], vus = {}, onLancer, onFermer, onRelire, Photo, Retour }) {
+export default function PublierPartout({ lignes, lecture = false, exclues = 0, reglage, onReglage, params = {}, onParam, onParamAnnonce, ebayReglages = [], saisies = {}, onSaisie, etatsLbc = [], vus = {}, onLancer, onFermer, onRelire, Photo, Retour }) {
   useLangue();
   const [coches, setCoches] = React.useState(() => new Set());
   const [res, setRes] = React.useState({});
@@ -284,7 +288,7 @@ export default function PublierPartout({ lignes, lecture = false, exclues = 0, r
           : (
           <>
             <ReglagePrix reglage={reglage} onReglage={onReglage} bloque={enCours}/>
-            {onParam ? <ReglageParams params={params} onParam={onParam} etatsLbc={etatsLbc} bloque={enCours}/> : null}
+            {onParam ? <ReglageParams params={params} onParam={onParam} etatsLbc={etatsLbc} bloque={enCours} ebayReglages={ebayReglages}/> : null}
             {lecture ? <p className="vrm-ao-vide" data-pp-lecture="">{tr('partout.lectureSites')}</p> : null}
             {liste.map((l) => (
               <section key={l.id} className="vrm-pp-article" data-pp-article={l.id} data-pp-num={l.num}>

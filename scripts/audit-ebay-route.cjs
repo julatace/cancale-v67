@@ -2655,8 +2655,18 @@ const RA = {};
       const d = path.basename(f) === 'ebay.js' ? t.indexOf('async function handleRelance(') : -1;
       const fin = d < 0 ? -1 : (() => { const r = /\n(?:async )?function /g; r.lastIndex = d + 10; const m = r.exec(t); return m ? m.index : t.length; })();
       let m; APPEL.lastIndex = 0;
-      while ((m = APPEL.exec(t))) if (!(d >= 0 && m.index > d && m.index < fin)) fautifs.push(`${path.basename(f)}:${t.slice(0, m.index).split('\n').length} ${m[0]}`);
+      // (11 nov., ebay-complet) Une ENCHÈRE se crée par AddItem (AddFixedPriceItem ne
+      // sait faire que le prix fixe) : le nom n'est permis QUE dans `appelTrading`
+      // d'ebay-parametres.js, et seulement pour `format: 'enchere'` (vérifié juste dessous).
+      const dP = path.basename(f) === 'ebay-parametres.js' ? t.indexOf('export function appelTrading(') : -1;
+      const finP = dP < 0 ? -1 : t.indexOf('\n}', dP);
+      while ((m = APPEL.exec(t))) if (!(d >= 0 && m.index > d && m.index < fin) && !(dP >= 0 && m[0] === "'AddItem'" && m.index > dP && m.index < finP)) fautifs.push(`${path.basename(f)}:${t.slice(0, m.index).split('\n').length} ${m[0]}`);
     }
+    try {
+      const { appelTrading } = await import(require('url').pathToFileURL(path.join(RACINE, 'api', '_lib', 'ebay-parametres.js')).href);
+      const v = [appelTrading(null, false), appelTrading(null, true), appelTrading({ format: 'fixe' }, false), appelTrading({ format: 'enchere' }, false), appelTrading({ format: 'enchere' }, true)];
+      dit(v.join(',') === 'AddFixedPriceItem,VerifyAddFixedPriceItem,AddFixedPriceItem,AddItem,VerifyAddItem', '[INA] AddItem seulement pour une ENCHÈRE demandée (sinon AddFixedPriceItem, comme avant)', v.join(','));
+    } catch (e) { dit(false, '[INA] appelTrading se charge', e.message); }
     dit(fautifs.length === 0, '[INA] aucun appel Relist*/AddItem dans api/ hors de la remise en vente sur son clic (lu sans les commentaires)', fautifs.join(','));
     const ebayTxt = sansCommentaires(fs.readFileSync(path.join(RACINE, 'api', 'ebay.js'), 'utf8'));
     const iR = ebayTxt.indexOf('async function handleRelance(');
