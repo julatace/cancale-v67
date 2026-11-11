@@ -40,6 +40,17 @@ doitRefuser('la branche appelle un setX au rendu', `const [tab, setTab] = useSta
   return (<div>{tab==='t' && (<b>{setTab('u')}</b>)}</div>);`, /appelle setTab au rendu/);
 doitRefuser('la branche appelle une fonction qui écrit le composant', `const [tab] = useState('t'); let compte = 0; const noter = () => { compte++; return compte; }; const lire = () => noter();
   return (<div>{tab==='t' && (<b>{lire()}</b>)}{compte}</div>);`, /qui écrit le composant/);
+{ // compagnons
+  const R1 = essai(`const [tab] = useState('t'); const lib = (n) => 'n' + n + x; function aide(n) { return lib(n); }
+  return (<div>{tab==='t' && (<b>{aide(1)}</b>)}</div>);`);
+  if (R1.refus.length || !R1.vues.length || R1.vues[0].compagnons !== 2) { ko++; console.log('❌ compagnons : les 2 fonctions que seule la branche utilise devaient partir avec elle — ' + JSON.stringify(R1.vues) + R1.refus.join(';')); } else console.log('✅ compagnons : les 2 fonctions que seule la branche utilise partent avec elle');
+  const R2 = essai(`const [tab] = useState('t'); const lib = (n) => 'n' + n;
+  return (<div>{lib(0)}{tab==='t' && (<b>{lib(1)}</b>)}</div>);`);
+  if (R2.refus.length || !R2.vues.length || R2.vues[0].compagnons) { ko++; console.log('❌ compagnon utilisé AUSSI ailleurs : devait rester'); } else console.log('✅ une fonction utilisée aussi hors de la branche reste dans le composant');
+  const R3 = essai(`const [tab] = useState('t'); let n = 0; const compter = () => { n++; return n; };
+  return (<div>{tab==='t' && (<b>{compter()}</b>)}{n}</div>);`);
+  if (!R3.refus.length && R3.vues.length && R3.vues[0].compagnons) { ko++; console.log('❌ compagnon qui écrit le composant, appelé au rendu : devait être refusé'); } else console.log('✅ un compagnon qui écrit le composant au rendu ne part pas (' + (R3.refus[0] || R3.epingles[0] || '').slice(0, 90) + ')');
+}
 doitRefuser('lit this', `const [tab] = useState('t');
   return (<div>{tab==='t' && (<b>{this}</b>)}</div>);`, /this/);
 // ── imports différés (sur des fichiers de synthèse dans un dossier temporaire)

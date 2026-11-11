@@ -154,13 +154,45 @@ function trouverVue(A, vue) {
 }
 
 // Ce que la branche lit du composant (valeurs passées) — ou pourquoi elle ne peut pas partir.
-function lectureVue(A, fnPath, E) {
+// (11 nov., reprise) Les COMPAGNONS d'une vue : les fonctions déclarées dans le corps du composant
+// (`const f = (…) => …`, `function f(…)`) que SEULE cette branche utilise (elle, ou un autre compagnon).
+// Elles partent AVEC la vue, déclarées dans son corps : ce qu'elles lisent du composant est passé
+// comme le reste (mêmes règles : rien écrit, rien réaffecté après, rien déclaré après la branche).
+// Déclarées avant la branche seulement ; une déclaration qui n'est pas une fonction reste.
+function compagnons(fnPath, E) {
+  const corps = fnPath.node.body && fnPath.node.body.type === 'BlockStatement' ? fnPath.get('body.body') : [];
   const s = E.node.start, e = E.node.end;
-  const dedans = (n) => n.start >= s && n.end <= e;
+  const cand = [];
+  for (const st of corps) {
+    if (st.node.end > s) break;
+    let noms = null;
+    if (st.isFunctionDeclaration() && st.node.id) noms = [st.node.id.name];
+    else if (st.isVariableDeclaration() && st.node.kind === 'const' && st.node.declarations.every((d) => d.id.type === 'Identifier' && d.init && /^(ArrowFunctionExpression|FunctionExpression)$/.test(d.init.type))) noms = st.node.declarations.map((d) => d.id.name);
+    if (noms) cand.push({ st, noms, b: noms.map((n) => fnPath.scope.getBinding(n)).filter(Boolean) });
+  }
+  const pris = new Set();
+  const dansZone = (n) => (n.start >= s && n.end <= e) || [...pris].some((c) => n.start >= c.st.node.start && n.end <= c.st.node.end);
+  for (let change = true; change;) {
+    change = false;
+    for (const c of cand) {
+      if (pris.has(c) || c.b.length !== c.noms.length) continue;
+      const dansSoi = (n) => n.start >= c.st.node.start && n.end <= c.st.node.end;
+      const ok = c.b.every((b) => b.referencePaths.length && b.referencePaths.every((r) => dansZone(r.node) || dansSoi(r.node)) && b.constantViolations.every((v) => dansSoi(v.node)));
+      if (ok) { pris.add(c); change = true; }
+    }
+  }
+  return cand.filter((c) => pris.has(c)).map((c) => c.st);
+}
+
+function lectureVue(A, fnPath, E, H = []) {
+  const s = E.node.start, e = E.node.end;
+  const zones = [E, ...H];
+  const dedans = (n) => zones.some((z) => n.start >= z.node.start && n.end <= z.node.end);
+  const compagnonsB = new Set(); for (const h of H) for (const nm of Object.keys(h.getBindingIdentifiers())) { const b = fnPath.scope.getBinding(nm); if (b) compagnonsB.add(b); }
   const captures = new Map(); // nom -> binding
   const refus = [];
   const progRefs = new Set();
-  E.traverse({
+  for (const Z of zones) Z.traverse({
     ReferencedIdentifier(p) {
       const nom = p.node.name; const b = p.scope.getBinding(nom);
       if (!b) return;
@@ -310,6 +342,9 @@ function lectureVue(A, fnPath, E) {
       if (!auRendu(p, E)) return;
       const r = mutation(p);
       if (r && captures.has(r.name) && p.scope.getBinding(r.name) === captures.get(r.name)) { refus.push(`modifie au rendu l'objet ${r.name} du composant (ligne ${p.node.loc.start.line})`); return; }
+      if (p.node.type === 'CallExpression' && p.node.callee.type === 'Identifier' && compagnonsB.has(p.scope.getBinding(p.node.callee.name))) {
+        const w = ecrivain(p.scope.getBinding(p.node.callee.name)); if (w) refus.push(`appelle au rendu son compagnon ${p.node.callee.name}, qui écrit le composant (${w})`);
+      }
       if (p.node.type === 'CallExpression' && p.node.callee.type === 'Identifier' && captures.has(p.node.callee.name)) {
         const b = captures.get(p.node.callee.name);
         if (estSetter(b)) refus.push(`appelle ${p.node.callee.name} au rendu (ligne ${p.node.loc.start.line}) : un enfant ne met pas à jour son parent pendant son rendu`);
@@ -355,17 +390,19 @@ function decouper(src, mod, appFile) {
     const t = trouverVue(A, v);
     if (t.absent) { R.absents.push(`${v.nom} (${t.absent})`); continue; }
     if (t.refus) { R.refus.push(`${v.nom} : ${t.refus}`); continue; }
-    const L = lectureVue(A, t.fnPath, t.E);
+    let H = v.compagnons === false ? [] : compagnons(t.fnPath, t.E);
+    let L = lectureVue(A, t.fnPath, t.E, H);
+    if (L.refus.length && H.length) { const L0 = lectureVue(A, t.fnPath, t.E, []); if (!L0.refus.length) { R.epingles.push(`${v.nom} : ses ${H.length} compagnon(s) restent dans ${v.composant} (${L.refus.slice(0, 2).join(' ; ')})`); H = []; L = L0; } }
     if (L.refus.length) { R.refus.push(`${v.nom} : ${L.refus.join(' ; ')}`); continue; }
     if (declDe[v.nom] != null) { R.refus.push(`${v.nom} : ce nom existe déjà en tête d'App.jsx`); continue; }
-    vues.push({ ...v, E: t.E.node, captures: L.captures });
+    vues.push({ ...v, E: t.E.node, H: H.map((h) => h.node), captures: L.captures });
   }
   if (mod.sorte === 'pur' && vues.length) { R.refus.push('une vue ne va jamais dans un module « pur »'); vues.length = 0; }
   if (!racines.length && !vues.length) return { src, R };
 
   // graphe : une référence située DANS une vue compte pour la vue (pseudo-nœud), pas pour son composant
   const n = body.length;
-  const noeudDe = (pos) => { for (let k = 0; k < vues.length; k++) if (pos >= vues[k].E.start && pos < vues[k].E.end) return n + k; return idxDe(pos); };
+  const noeudDe = (pos) => { for (let k = 0; k < vues.length; k++) { if (pos >= vues[k].E.start && pos < vues[k].E.end) return n + k; for (const h of vues[k].H) if (pos >= h.start && pos < h.end) return n + k; } return idxDe(pos); };
   const aretes = Array.from({ length: n + vues.length }, () => new Set());
   const affecte = body.map(() => new Set());
   const refsRacine = {};
@@ -505,8 +542,9 @@ function decouper(src, mod, appFile) {
   vues.forEach((v, k) => {
     const E = v.E; const orig = reecrireChemins(E, E.start, src.slice(E.start, E.end));
     v.cle = `v${k + 1}`;
-    enveloppes += `\n// La branche {${v.condition} && …} de ${v.composant}, telle quelle. Ce qu'elle lit du composant lui est passé (v).\nexport function ${v.nom}({ v }) {\n  ${v.captures.length ? `const { ${v.captures.join(', ')} } = v;\n  ` : ''}return (/*⟦← App.jsx #${v.cle}⟧*/${orig}/*⟦←/⟧*/);\n}\n`;
-    R.vues.push({ nom: v.nom, composant: v.composant, condition: v.condition, taille: E.end - E.start, valeursPassees: v.captures.length });
+    const comp = v.H.map((h, j) => `/*⟦← App.jsx #h${k + 1}_${j + 1}⟧*/${reecrireChemins(h, h.start, src.slice(h.start, h.end))}/*⟦←/⟧*/\n  `).join('');
+    enveloppes += `\n// La branche {${v.condition} && …} de ${v.composant}, telle quelle${v.H.length ? `, avec ${v.H.length} fonction(s) que seule elle utilisait` : ''}. Ce qu'elle lit du composant lui est passé (v).\nexport function ${v.nom}({ v }) {\n  ${v.captures.length ? `const { ${v.captures.join(', ')} } = v;\n  ` : ''}${comp}return (/*⟦← App.jsx #${v.cle}⟧*/${orig}/*⟦←/⟧*/);\n}\n`;
+    R.vues.push({ nom: v.nom, composant: v.composant, condition: v.condition, taille: E.end - E.start + v.H.reduce((a, h) => a + h.end - h.start, 0), valeursPassees: v.captures.length, compagnons: v.H.length });
   });
   let corps = '';
   for (const i of [...M].sort((a, b) => a - b)) {
@@ -552,7 +590,7 @@ function decouper(src, mod, appFile) {
       else edits[edits.length - 1][2] += lignesCss;
     }
   }
-  for (const v of vues) edits.push([v.E.start, v.E.end, `/*⟦→ ${modRel} #${v.cle}⟧*/<${v.nom} v={{ ${v.captures.join(', ')} }}/>/*⟦→/⟧*/`]);
+  for (const v of vues) { edits.push([v.E.start, v.E.end, `/*⟦→ ${modRel} #${v.cle}⟧*/<${v.nom} v={{ ${v.captures.join(', ')} }}/>/*⟦→/⟧*/`]); v.H.forEach((h, j) => edits.push([h.start, h.end, `/*⟦→ ${modRel} #h${v.cle.slice(1)}_${j + 1}⟧*//*⟦→/⟧*/`])); }
   if (mod.sorte === 'pur') {
     let der = -1; for (let i = 0; i < n; i++) if (body[i].type === 'ImportDeclaration') der = i;
     const pos = der >= 0 ? body[der].end : 0;
@@ -744,7 +782,7 @@ function main() {
     if (R.deja) { console.log(tete + ' : déjà découpé (balises présentes)'); continue; }
     const parts = [];
     if (R.racines && R.racines.length) parts.push(`racines ${R.racines.join(', ')}`);
-    if (R.vues && R.vues.length) parts.push(`vues ${R.vues.map((v) => `${v.nom} (${ko(v.taille)} Ko, ${v.valeursPassees} valeurs passées)`).join(', ')}`);
+    if (R.vues && R.vues.length) parts.push(`vues ${R.vues.map((v) => `${v.nom} (${ko(v.taille)} Ko, ${v.valeursPassees} valeurs passées${v.compagnons ? `, ${v.compagnons} compagnon(s)` : ''})`).join(', ')}`);
     if (R.deplaces && R.deplaces.length) parts.push(`${R.deplaces.length} instruction(s) de tête`);
     if (R.differes && R.differes.length) parts.push(`${R.differes.length} différé(s) : ${R.differes.map((d) => d.nom).join(', ')}`);
     console.log(tete + (R.tailleModule ? ` : ${ko(R.tailleModule)} Ko` : '') + (parts.length ? ' — ' + parts.join(' ; ') : ''));

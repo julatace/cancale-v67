@@ -94,7 +94,7 @@ function sourceApp(racine) {
     const rel = path.basename(path.dirname(f)) + '/' + path.basename(f);
     // (11 nov., découpe 2) Une VUE (branche du rendu d'un composant) : son texte d'origine est entre
     // `/*⟦← App.jsx #vk⟧*/` et `/*⟦←/⟧*/` (dans l'enveloppe, en tête du module : jamais recollée).
-    const vues = [...t.matchAll(/\/\*⟦← App\.jsx #(v\d+)⟧\*\/([\s\S]*?)\/\*⟦←\/⟧\*\//g)];
+    const vues = [...t.matchAll(/\/\*⟦← App\.jsx #([vh][\d_]+)⟧\*\/([\s\S]*?)\/\*⟦←\/⟧\*\//g)];   // (11 nov.) #h… : un compagnon de la vue
     const parts = t.split(/\n\/\/ ⟦← App\.jsx #(\d+)⟧/);
     if (parts.length < 3 && !vues.length) { sansBalises.push(t); continue; }
     const m = (morceaux[rel] = {});
@@ -121,7 +121,7 @@ function sourceApp(racine) {
       const m = morceaux[rel]; if (!m || m[k] == null) return b;
       const t = m[k]; delete m[k]; change = true; return cheminsVusDeSrc(t);
     });
-    out = out.replace(/\/\*⟦→ ((?:ecrans|coeur)\/[^ ]+) #(v\d+)⟧\*\/[\s\S]*?\/\*⟦→\/⟧\*\//g, (b, rel, k) => {
+    out = out.replace(/\/\*⟦→ ((?:ecrans|coeur)\/[^ ]+) #([vh][\d_]+)⟧\*\/[\s\S]*?\/\*⟦→\/⟧\*\//g, (b, rel, k) => {
       const m = morceaux[rel]; if (!m || m[k] == null) return b;
       const t = m[k]; delete m[k]; change = true; return cheminsVusDeSrc(t);
     });
