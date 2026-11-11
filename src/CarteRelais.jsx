@@ -35,7 +35,7 @@ import './styles-colis-colonnes.css';
 import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.jsx';
 import { cleStatTransporteur, cleTransporteur, svgMarque } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
-import { NOMS_SOURCES, texteVerifie } from './sourcesRetrait.js';
+import { NOMS_SOURCES, texteVerifie, verifieAncien, texteNonConfirme } from './sourcesRetrait.js';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -392,6 +392,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const aCode = !!(x.code || x.qr || x.code2 || desaccord);
   const marques = Array.isArray(x.sources) ? x.sources : [];
   const verifie = texteVerifie(x.verifieMs);
+  const ancien = !x.horsCompte && verifieAncien(x.verifieMs);
   const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '',  // (lot AJ) l'arrivée lue qui range la ligne
@@ -418,13 +419,13 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
             {!aCode && !x.horsCompte ? <span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span> : null}
           </span> : (!aCode && !x.horsCompte ? <span className="vrm-rpf-puces"><span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span></span> : null)}
           {/* D'où vient ce que la ligne dit, en petit : les sources qui ont vu CE colis et l'heure de la dernière vérification. */}
-          {marques.length || verifie ? <span className="vrm-rpf-sources" data-rp-sources-ligne="">{marques.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className="vrm-rpf-verifie" data-rp-verifie-texte="">{verifie}</span> : null}</span> : null}
+          {marques.length || verifie ? <span className="vrm-rpf-sources" data-rp-sources-ligne="">{marques.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="" data-rp-pas-confirme={ancien ? '1' : undefined}>{ancien ? texteNonConfirme(x.verifieMs) : verifie}</span> : null}</span> : null}
         </span>
         <span className="vrm-rpf-chevron" aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span>
         </button>
         {desaccord
           ? <button type="button" className="vrm-rpf-code is-ambre" data-rp-code="" data-rp-code-desaccord="" aria-label="Deux codes différents : voir les deux" onClick={(ev) => { ev.stopPropagation(); setOuvert(true); }}>2 codes</button>
-          : aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label={x.codeSur ? `Voir le code de retrait (sûr : ${(x.codeSources || []).map((m) => NOMS_SOURCES[m] || m).join(' et ')})` : 'Voir le code de retrait'} onClick={(ev) => { ev.stopPropagation(); voirCode(); }}>{copie?'Copié':'Code'}{x.code && x.codeSur ? <svg className="vrm-rpf-code-sur" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}</button> : null}
+          : aCode ? <button type="button" className={'vrm-rpf-code' + (x.code ? ' is-valeur' : '')} data-rp-code="" data-rp-code-visible={x.code || undefined} aria-label={x.code ? `Code ${x.code} : toucher pour copier${x.codeSur ? ' (sûr)' : ''}` : 'Voir le code de retrait'} onClick={(ev) => { ev.stopPropagation(); voirCode(); }}>{copie?'Copié':(x.code || (x.qr ? 'QR' : 'Code'))}{x.code && x.codeSur ? <svg className="vrm-rpf-code-sur" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}</button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
       {/* La barre hors du bouton de la ligne (un bouton rend ses enfants muets pour un lecteur d'écran). */}
@@ -521,6 +522,8 @@ function useEnLigne() {
 }
 const mouvementReduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
 const auDoigt = () => { try { return window.matchMedia('(pointer: coarse)').matches; } catch (_) { return false; } };
+const PREF_ORDRE = 'vrm_retirer_ordre';
+const PREF_MASQUES = 'vrm_retirer_points_masques';
 function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
   const enLigne = useEnLigne();
   // (8 nov., Julien : « réaffiche la carte ») La carte est AUSSI au téléphone (en haut de la liste, ~200 px) ;
@@ -539,7 +542,19 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
   // ni code postal lus) n'est JAMAIS caché par ce choix (§5 : un colis caché est un colis perdu).
   const sansVille = new Set(pointsSansVille(vueTout));
   const vue = vChoisie ? { ...vueTout, points: ((vueTout && vueTout.points) || []).filter((p) => vChoisie.points.includes(p.cle) || sansVille.has(p.cle)) } : vueTout;
-  const points = (vue && vue.points) || [];
+  // (11 nov., retraits fiables — « personnalisable ») SES préférences d'affichage, dans CE navigateur :
+  // l'ordre (« Date limite » : le point au colis le plus pressé d'abord ; « Récents » : l'ordre de l'appelant)
+  // et les points qu'il MASQUE. Un point masqué n'est jamais un colis caché sans trace : une ligne dit
+  // « N point(s) masqué(s) » et les rend d'un toucher ; un colis du dernier jour n'est jamais masqué.
+  const [ordre, setOrdreEtat] = React.useState(() => { try { return localStorage.getItem(PREF_ORDRE) === 'limite' ? 'limite' : 'recent'; } catch (_) { return 'recent'; } });   // « Récents » par défaut (sa décision du 9 nov.)
+  const setOrdre = (o) => { setOrdreEtat(o); try { localStorage.setItem(PREF_ORDRE, o); } catch (_) {} };
+  const [masques, setMasquesEtat] = React.useState(() => { try { const v = JSON.parse(localStorage.getItem(PREF_MASQUES) || '[]'); return new Set(Array.isArray(v) ? v.map(String) : []); } catch (_) { return new Set(); } });
+  const setMasques = (m) => { setMasquesEtat(m); try { localStorage.setItem(PREF_MASQUES, JSON.stringify([...m])); } catch (_) {} };
+  const pointsTous = (vue && vue.points) || [];
+  const pressant = (p) => (p.arrives || []).some((c) => !c.horsCompte && Number.isFinite(c.jours) && c.jours <= 0);
+  const masquesIci = pointsTous.filter((p) => !p.inconnu && masques.has(p.cle) && !pressant(p));
+  const triLimite = (a, b) => (a.inconnu ? 1 : 0) - (b.inconnu ? 1 : 0) || (Number.isFinite(a.triPoint) ? a.triPoint : 99) - (Number.isFinite(b.triPoint) ? b.triPoint : 99);
+  const points = (ordre === 'limite' ? [...pointsTous].sort(triLimite) : pointsTous).filter((p) => !masquesIci.includes(p));
   const connus = points.filter((p) => !p.inconnu);
   const [choisi, setChoisi] = React.useState('');
   const [etatFond, setEtatFond] = React.useState('charge');
@@ -596,9 +611,11 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
           <span className="vrm-rpf-ident">
             <b className="vrm-rpf-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
             {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
+            {p.adressePasLue ? <span className="vrm-rpf-adr" data-relais-adresse-pas-lue="">Adresse pas lue</span> : null}
           </span>
           <span className="vrm-rpf-meta">
             {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
+            {!p.inconnu && !pressant(p) ? <button type="button" className="vrm-lien-action vrm-rpf-masquer" data-relais-masquer={p.cle} aria-label={`Masquer ${p.nom || 'ce point'}`} onClick={() => { const m = new Set(masques); m.add(p.cle); setMasques(m); }}>Masquer</button> : null}
             <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n && n < rows.length ? <span data-relais-sans-code={n}> · {n} code à venir</span> : null; })()}</span>
           </span>
         </header>
@@ -629,6 +646,10 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
         <button type="button" className="vrm-seg-btn" aria-pressed={!vChoisie} data-ville="" onClick={() => onVille && onVille('')}>Toutes</button>
         {villes.map((v) => <button key={v.cle} type="button" className="vrm-seg-btn" aria-pressed={!!vChoisie && vChoisie.cle === v.cle} data-ville={v.cle} data-ville-n={v.n} data-ville-urgence={v.urgence} onClick={() => onVille && onVille(v.cle)}>{v.nom} <span className="vrm-seg-n">{v.n}</span></button>)}
       </div> : null}
+      {points.filter((p) => !p.inconnu).length > 1 ? <div className="vrm-rpf-ordre vrm-seg" role="group" aria-label="Ordre des points" data-retirer-ordre={ordre}>
+        <button type="button" className="vrm-seg-btn" aria-pressed={ordre === 'recent'} data-ordre="recent" onClick={() => setOrdre('recent')}>Récents</button>
+        <button type="button" className="vrm-seg-btn" aria-pressed={ordre === 'limite'} data-ordre="limite" onClick={() => setOrdre('limite')}>Date limite</button>
+      </div> : null}
       {section('aujourdhui', 'À retirer aujourd’hui', parSection.aujourdhui, { ambre: true })}
       {/* (5 nov.) Un point y est entier : s'il porte un colis au code à venir, la section dit « À retirer ». */}
       {section('prets', parSection.prets.every(({ x }) => x.code || x.qr || x.code2) ? 'Prêts à retirer' : 'À retirer', parSection.prets)}
@@ -657,6 +678,9 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
           <summary className="vrm-rpf-section-titre is-repli"><span>Comptés avec un autre colis<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
           <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
         </details>) : null}
+      {masquesIci.length ? <button type="button" className="vrm-lien-action vrm-rpf-masques" data-relais-masques={masquesIci.length} data-relais-masques-colis={masquesIci.reduce((t, p) => t + p.nComptes, 0)}
+        onClick={() => { const m = new Set(masques); for (const p of masquesIci) m.delete(p.cle); setMasques(m); }}>
+        {masquesIci.length === 1 ? '1 point masqué' : `${masquesIci.length} points masqués`} · Afficher</button> : null}
       {nRoute ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-route" data-rp-section="route" data-rp-section-n={nRoute} data-retirer-en-route-sans={routeSans.length}>
           <summary className="vrm-rpf-section-titre is-repli"><span>En route<span className="vrm-rpf-section-n">{nRoute}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>

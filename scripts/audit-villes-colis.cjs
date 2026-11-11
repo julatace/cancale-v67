@@ -225,7 +225,9 @@ async function charger() {
   const A = nc(fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8'));
   const C = nc(fs.readFileSync(path.join(R, 'src/CarteRelais.jsx'), 'utf8'));
   dit(/const lieuDeLigne = \(t, a\) => \{[\s\S]{0,400}lieuLePlusComplet\(lu, lieuDe\(ra\.lieu\)\)[\s\S]{0,200}completer\(lu/.test(A), 'H1 le lieu d’un e-mail : suivi du même n°, puis conversation de SON achat, puis point connu', '');
-  dit(/registrePointsConnus\(\[[\s\S]{0,300}tracking[\s\S]{0,300}colisRelais[\s\S]{0,300}lieuTransporteurRepare/.test(A), 'H2 le registre lit tous les e-mails, les conversations et les lectures chez le transporteur', '');
+  // (11 nov., retraits fiables — Julien : « le point d'un colis vient UNIQUEMENT de ce qui est lu pour CE colis »)
+  // INVERSÉ : le registre des points connus ne complète plus une carte (une complétion au nom seul).
+  dit(!/completerParPointConnu\(/.test(A.replace(/\/\/.*$/gm, '')) && /const completer = \(lu\) => lu;/.test(A), 'H2 une carte n’emprunte JAMAIS l’adresse d’un autre point au même nom (aucune complétion par le registre)', '');
   dit(/memePoint\(lpA, lqA\) && completudeLieu\(lqA\) > completudeLieu\(lpA\)/.test(A), 'H3 deux lignes du même n° : l’adresse complète du même point gagne', '');
   dit(/const sansVille = new Set\(pointsSansVille\(vueTout\)\)/.test(C) && /vChoisie\.points\.includes\(p\.cle\) \|\| sansVille\.has\(p\.cle\)/.test(C), 'H4 une ville choisie ne cache NI « Lieu à confirmer » NI un point sans ville', '');
   // (8 nov.) Le sélecteur est `selecteurVilles` (villes avec colis + « Autres ») : la carte sombre lit le même.

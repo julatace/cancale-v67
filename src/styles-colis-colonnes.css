@@ -302,3 +302,10 @@ html body .vrm-rpf-ligne .vrm-rpf-code-origine { margin: 4px 0; font-size: 12px;
 /* (11 nov., lot DJ3) Les règles de l'écran Colis (`.vrm-main:has(.vrm-fu-colis)`, fusion.css, design-2026,
    premium) visent aussi `.vrm-main .vrm-colis-section` : la grande carte (`.vrm-fu-colis`) n'est plus rendue
    en section, l'apparence de Colis reste (outils repliés, cartes, onglets). */
+/* (11 nov., retraits fiables) Le code de retrait LISIBLE sur la ligne, en grand, chiffres alignés : on le lit
+   d'un coup d'œil au comptoir ; un toucher le copie. « Pas confirmé depuis » en ambre (§7 : un geste à faire). */
+:root:root body .vrm-rpf-ligne .vrm-rpf-code.is-valeur, :root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-code.is-valeur { font-size: 20px !important; font-weight: 700 !important; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+html body .vrm-rpf-ligne .vrm-rpf-verifie.is-ambre { color: var(--vrm-warn, #B25000) !important; }
+html body .vrm-rpf-tete .vrm-rpf-masquer { font-size: 12px; min-height: 44px; padding: 0 6px; background: none; border: 0; color: var(--p-gris, #86868b); cursor: pointer; }
+html body .vrm-rpf .vrm-rpf-ordre { margin: 4px 0 8px; }
+html body .vrm-rpf .vrm-rpf-masques { display: block; min-height: 44px; margin: 6px 0; font-size: 13px; background: none; border: 0; color: var(--p-gris, #86868b); cursor: pointer; text-align: left; }

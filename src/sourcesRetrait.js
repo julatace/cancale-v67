@@ -117,3 +117,13 @@ export function texteVerifie(ms, maintenant = Date.now()) {
   if (jour(d) === jour(new Date(maintenant - 86400000))) return `vérifié hier ${hm}`;
   return `vérifié le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' })}`;
 }
+
+// (11 nov., retraits fiables — le colis « fantôme ») Plus de 48 h sans AUCUNE source datée qui revoie ce colis
+// (e-mail, lecture chez le transporteur, conversation, achats relus) : il n'est plus présenté comme sûr. La
+// ligne le dit en ambre, « pas confirmé depuis le 8 nov. ». Sans date du tout : rien (pas su ≠ ancien).
+export const CONFIRMATION_MAX_MS = 48 * 3600e3;
+export const verifieAncien = (ms, maintenant = Date.now()) => Number.isFinite(ms) && maintenant - ms > CONFIRMATION_MAX_MS;
+export function texteNonConfirme(ms) {
+  if (!Number.isFinite(ms)) return '';
+  return `pas confirmé depuis le ${new Date(ms).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' })}`;
+}

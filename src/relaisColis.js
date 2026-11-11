@@ -196,8 +196,15 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     if (p.inconnu || p.adressePasLue || cle.startsWith('adr:')) continue;
     const autres = [...points.values()].filter((q) => q !== p && !q.inconnu && !q.adressePasLue && !q.cle.startsWith('adr:') && nomDe(q.cle) === nomDe(cle));
     let memes = [];
+    const memeVille = (q) => !p.ville || !q.ville || normNomRelais(q.ville) === normNomRelais(p.ville);
     if (p.cp && !p.rue) memes = autres.filter((q) => q.cp === p.cp && q.rue);
-    else if (!p.cp && p.rue && p.ville) memes = autres.filter((q) => q.rue && normRue(q.rue) === normRue(p.rue) && q.ville && normNomRelais(q.ville) === normNomRelais(p.ville) && (q.cp || q !== p));
+    // Sans code postal : la MÊME rue avec son numéro (une adresse), dans une ville qui ne contredit pas.
+    else if (!p.cp && p.rue && RUE.test(p.rue)) memes = autres.filter((q) => q.rue && normRue(q.rue) === normRue(p.rue) && memeVille(q));
+    // « Speed Queen - Vannes » (consigne sans code postal) : le nom ET la ville écrits, la rue si les deux l'ont.
+    if (!memes.length && !p.cp) {
+      const tiret = /^(.*?)\s+[-–]\s+(.{2,40})$/.exec(p.nom);
+      if (tiret) memes = [...points.values()].filter((q) => q !== p && q.cp && !q.adressePasLue && nomDe(q.cle) === normNomRelais(tiret[1]) && normNomRelais(q.ville) === normNomRelais(tiret[2]) && (!p.rue || !q.rue || normRue(q.rue) === normRue(p.rue)));
+    }
     if (memes.length !== 1) continue;
     const q = memes[0];
     q.arrives.push(...p.arrives); q.attendus.push(...p.attendus);
@@ -205,6 +212,11 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     q.rue = q.rue || p.rue; q.ville = q.ville || p.ville;
     points.delete(cle);
   }
+  // La clé rendue garde la forme d'avant (« nom|code postal ») quand UN seul point porte ce nom à ce code
+  // postal ; deux points du même nom au même code postal (deux rues) gardent leur rue dans la clé.
+  { const parBase = new Map();
+    for (const p of points.values()) { if (p.inconnu || p.adressePasLue || p.cle.startsWith('adr:')) continue; const b = p.cle.split('|').slice(0, 2).join('|'); parBase.set(b, (parBase.get(b) || 0) + 1); }
+    for (const p of points.values()) { if (p.inconnu || p.adressePasLue || p.cle.startsWith('adr:')) continue; const b = p.cle.split('|').slice(0, 2).join('|'); if (parBase.get(b) === 1) p.cle = b; } }
   const liste = [...points.values()].map((p) => {
     const est = p.attendus.map((c) => c.estimee).filter(Boolean).sort();
     p.attendus.sort((a, b) => (a.estimee ? 0 : 1) - (b.estimee ? 0 : 1) || String(a.estimee || '').localeCompare(String(b.estimee || '')));

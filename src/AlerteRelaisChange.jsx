@@ -11,8 +11,10 @@ import { transporteurDuColis } from './transporteursVisuels.js';
 import { colisRelaisChange, lienItineraire, appareilApple } from './relaisChange.js';
 
 export default function AlerteRelaisChange({ lignes, C, transp = null }) {
-  const liste = colisRelaisChange(lignes, { transp });
-  if (!liste || !liste.length) return null;
+  const liste0 = colisRelaisChange(lignes, { transp });
+  const [copie, setCopie] = React.useState('');
+  if (!liste0 || !liste0.length) return null;
+  const liste = liste0.map((x) => ({ ...x, ancienNom: x.ancienLieu ? String(x.ancienLieu).split(',')[0].trim() : '' }));
   const apple = appareilApple();
   return (
     <div className="vrm-relais-change" data-relais-change={liste.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '12px 0' }}>
@@ -25,7 +27,7 @@ export default function AlerteRelaisChange({ lignes, C, transp = null }) {
             <PastilleTransporteur t={t} C={C} seul taille={22}/>
             <div style={{ flex: '1 1 auto', minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: C.warn }}>Point relais changé</div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>Colis {x.suivi} · pas encore arrivé : il part vers ce point</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>Colis {x.suivi} · en route</div>
               {x.lieu ? (
                 <div data-relais-change-lieu="" style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.35 }}>
                   <strong style={{ fontWeight: 650 }}>{x.nom}</strong>{x.adresse ? <><br/>{x.adresse}</> : null}
@@ -33,6 +35,16 @@ export default function AlerteRelaisChange({ lignes, C, transp = null }) {
               ) : (
                 <div data-relais-change-lieu="absent" style={{ fontSize: 13, color: C.text, marginTop: 4 }}>Le nouveau point n'est pas écrit dans l'e-mail : regarde l'e-mail du transporteur.</div>
               )}
+              {x.ancienNom ? <div data-relais-change-ancien="" style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Avant : {x.ancienNom}</div> : null}
+              {/* (11 nov., retraits fiables) LE CODE de ce colis, en grand, copiable — celui de l'e-mail du
+                  changement, sinon celui d'un autre e-mail du même n° ; sinon « code pas encore reçu ». */}
+              {x.code ? (
+                <button type="button" data-relais-change-code={x.code} data-relais-change-code-de={x.codeDe} aria-label={`Copier le code ${x.code}`}
+                  onClick={() => { try { navigator.clipboard && navigator.clipboard.writeText(x.code); } catch (_) {} setCopie(x.suivi); }}
+                  style={{ marginTop: 6, minHeight: 44, padding: '0 14px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 22, fontWeight: 700, letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums', cursor: 'pointer' }}>
+                  {copie === x.suivi ? 'Copié' : x.code}
+                </button>
+              ) : <div data-relais-change-code="" style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Code pas encore reçu</div>}
             </div>
             {lien ? (
               <a href={lien} target="_blank" rel="noreferrer" data-relais-change-itineraire="" aria-label={`Itinéraire vers ${x.nom || 'le nouveau point'}`}
