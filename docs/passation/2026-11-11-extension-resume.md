@@ -93,8 +93,10 @@ présenté frais.
   Défauts trouvés par le banc et corrigés : « 0 ventes » (→ « 0 vente ») ; le faux `chrome`
   du banc rendait le même objet à chaque appel (un vrai `sendMessage` copie) ; « 3 à /
   expédier » coupé (segments insécables).
-- Bancs existants de la carte repassés : `badge` 138 verts, `extension-visuel` 63 verts
-  (les autres : voir le rapport de fin de session).
+- Bancs existants de la carte du logo repassés : `badge` 138, `extension-visuel` 63,
+  `import-depart` 40, `lbc-clair-carte` 136, `carte-orion-sans-onglet` (voir le rapport) — verts.
+  `carte-stable` (la carte MapLibre de Colis/Communauté, pas celle du logo) : 3 rouges, les MÊMES
+  sur le code d'avant (`claude/extension-visuel`, rejoué dans un arbre `git archive`) — pas de ce lot.
 
 ## Geste de Julien
 
