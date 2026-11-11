@@ -166,7 +166,7 @@ const dit = (c, m) => { if (c) { verts++; console.log('  ✓ ' + m); } else { ro
   const autre = textes('autre');
   const restes = autre.filter((t) => /\b(paires?|chaussures?)\b/i.test(t) || /\b(la|une|cette|bonne|mauvaise) article/i.test(t) || /\{\w+\}/.test(t));
   dit(!restes.length, `vendeur « autre » : aucun « paire », aucun accord faux (${autre.length} textes)` + (restes.length ? ' — ' + restes.slice(0, 2).join(' | ') : ''));
-  dit(!textes('sneakers').some((t) => /\{\w+\}/.test(t) || /\barticles?\b/.test(t) && /paire/.test(t)), 'vendeur de sneakers : les mots de Julien, aucun gabarit oublié');
+  dit(!textes('sneakers').some((t) => /\{\w+\}/.test(t)) && fichesPour({ vend: 'sneakers' }).some((f) => /une paire/.test(f.q)), 'vendeur de sneakers : « paire » dans les fiches, aucun gabarit oublié');
   dit(fichesPour({ vend: 'autre' }).some((f) => f.id === 'annonces-taille') && !fichesPour({ vend: 'sneakers' }).some((f) => f.id === 'annonces-taille')
     && fichesPour({ vend: 'sneakers' }).some((f) => f.id === 'annonces-identiques') && !fichesPour({ vend: 'autre' }).some((f) => f.id === 'annonces-identiques'), 'une fiche réservée à un genre de vendeur ne sort que pour lui');
   const simple = fichesPour({ mode: 'simple' });

@@ -68,8 +68,8 @@ export function SaisieEmballage({ onSaisir, types: typesDonnes = null }) {
 
 // ── BF : la valeur du stock (lue de `vrm_valeur_stock`, jamais recalculée) ──
 // `v` : { centimes, n, nPrix, nSans, partiel } | null (pas su ⇒ « — »).
-export function ValeurStockCarte({ v, onSaisir = null }) {
-  const t = texteValeurStock(v, { partiel: !!(v && v.partiel) });
+export function ValeurStockCarte({ v, onSaisir = null, mots = null }) {
+  const t = texteValeurStock(v, { partiel: !!(v && v.partiel), ...(mots ? { mot: mots.nom, mots: mots.noms } : {}) });
   const pct = v && v.n ? Math.round((v.nPrix / v.n) * 100) : 0;
   return (
     <section className="vrm-cv-stock" aria-label="Valeur du stock" data-valeur-stock={v ? (v.centimes == null ? 'passu' : String(v.centimes)) : 'jamais'}

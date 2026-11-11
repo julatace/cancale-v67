@@ -168,7 +168,7 @@ const res = (pg) => pg.evaluate(() => ({
   sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
 }));
 const ouvrirLoupe = async (pg, tel) => {
-  if (tel) await pg.locator('button[aria-label="Rechercher une paire"]').first().tap(); else await pg.locator('[data-recherche-champ]').first().click();
+  if (tel) await pg.locator('button[data-recherche-loupe]').first().tap(); else await pg.locator('[data-recherche-champ]').first().click();
   for (let i = 0; i < 60; i++) { if (await pg.evaluate(() => { const p = document.querySelector('[data-recherche-panneau]'); return !!(p && p.getAttribute('data-recherche-pret') === '1'); })) break; await pg.waitForTimeout(250); }
 };
 
