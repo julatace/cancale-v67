@@ -80,8 +80,6 @@ const PERMIS = [
 ];
 // Une ligne gardée par « sneakers » (même ligne) : le texte de Sneakers, l'autre branche dit article.
 const GARDE = /(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'/;
-// Le REPLI d'une page de l'extension si vrm-mots.js manquait (B7 l'exige avant chaque page) : le texte d'avant.
-const REPLI_EXT = /globalThis\.VRM_MOTS \? globalThis\.VRM_MOTS\.mots\(\) : \{\}\)\.[A-Za-z]+ \|\| '[^']*paires?'/;
 const MOT = /\b[Pp]aires?\b/;
 
 function textesDe(racine, rel, parse, traverse) {
@@ -101,6 +99,9 @@ function textesDe(racine, rel, parse, traverse) {
         if (par.type === 'ImportDeclaration' || par.type === 'ExportNamedDeclaration') return;
         if (par.type === 'BinaryExpression' && /[=!]==?/.test(par.operator)) return;
         if (par.type === 'SwitchCase') return;
+        // Le REPLI d'une page de l'extension si vrm-mots.js manquait (B7 l'exige avant chaque page) :
+        // seulement le littéral à DROITE d'un `||` dont la gauche lit VRM_MOTS (le texte d'avant).
+        if (par.type === 'LogicalExpression' && par.operator === '||' && par.right === n && /VRM_MOTS/.test(src.slice(par.left.start, par.left.end))) return;
         if (par.type === 'JSXAttribute' && /^(className|data-|key$|id$)/.test(par.name.name)) return;
         if (/^[a-z_:-]+$/.test(v)) {
           // une CLÉ (« paire », « vrm:fiche-paire », un mot vide d'une liste de lecture) — sauf
@@ -276,7 +277,6 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
       nTextes++;
       if (PERMIS.some(([fi, re]) => fi === rel && (!re || re.test(t.v)))) { nPermis++; continue; }
       if (GARDE.test(t.code)) { nGardes++; continue; }
-      if (rel.startsWith('vinted-sync-extension/') && REPLI_EXT.test(t.code)) { nGardes++; continue; }
       hors.push(`${rel}:${t.ligne} ${t.v.slice(0, 110)}`);
     }
   }
@@ -316,7 +316,7 @@ const MUTATIONS = [
   ['src/profilVendeur.js', 'la forme « article » redit paire', "Ce: 'Cet article',", "Ce: 'Cette paire',"],
   ['src/profilVendeur.js', 'sans source ⇒ article (Sneakers changé)', "const v = sourceVend ? sourceVend() : 'sneakers';", "const v = sourceVend ? sourceVend() : 'autre';"],
   ['src/App.jsx', 'la source n’est plus posée', 'poserSourceVend(() => vendActuel());', ''],
-  ['src/App.jsx', 'un texte remis en « paire »', '`Régler par {motsVendeur().nom}', '`Régler par paire'],
+  ['src/App.jsx', 'un texte remis en « paire »', '`${motsVendeur().Aucune} à baisser`', "'Aucune paire à baisser'"],
   ['src/App.jsx', 'un texte remis en « paire » (JSX)', '>Régler par {motsVendeur().nom}, voir l’historique ›</button>', '>Régler par paire, voir l’historique ›</button>'],
   ['src/aTrancher.js', 'une règle pure remise en « paire »', "get 'numeros-double'() { return `N° portés par deux ${motsVendeur().noms}`; },", "'numeros-double': 'N° portés par deux paires',"],
   ['src/composants/AideEcran.jsx', 'l’aide ne passe plus par phraseVendeur', '<span>{phraseVendeur(e)}</span>', '<span>{e}</span>'],

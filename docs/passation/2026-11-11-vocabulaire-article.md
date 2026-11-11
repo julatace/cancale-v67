@@ -78,9 +78,27 @@ manquait (B7 exige qu'il soit chargé avant).
   Il a trouvé en route 4 modules qui appelaient `motsVendeur` sans l'importer (coutVente,
   dejaEnStock, tesDonnees, atelier : plantage à l'exécution que le build ne voit pas) et
   deux phrases oubliées (registre « En gros · N paires », recherche photo) — corrigés.
-- `--prouve` : voir le rapport de fin de session (mutations attrapées).
+- `--prouve` : **20/20 mutations attrapées** (table, source, textes App/JSX/règle pure, aide,
+  Ma semaine, serveur, eBay, e-mail, manifeste, copie, fond, page, encart, accord oublié). Deux
+  failles de l'audit lui-même trouvées par les mutations et corrigées : un motif mort, et
+  l'exception « repli de l'extension » qui excusait toute la ligne (désormais : seul le
+  littéral à droite d'un `||` dont la gauche lit `VRM_MOTS`).
 - Banc `vendeur-generaliste` étendu : V5 (Lunettes, 11 écrans secondaires + aide « ? » de
-  3 écrans, 390 et 1512) et V6 (Sneakers, contrôle positif « paire » toujours là).
+  3 écrans) et V6 (Sneakers, contrôle positif : « paire » toujours là, 24 à 35 phrases).
+  Complet V1–V6, 390 et 1512 (clair) : 150 OK, 0 KO. **V5 sur le build de main : 5 rouges**
+  (Statistiques, Ma semaine, aide d'Annonces/Colis/Stock). Captures regardées (aide
+  « À retrouver l'article… » / « …la paire… », Ma semaine, Annonces « Tes articles en ligne »).
+  Remarque : sans compte Leboncoin/eBay dans la base du banc, `?tab=leboncoin` retombe sur
+  Annonces — ces écrans-là sont couverts par l'audit S1 et E, pas par le rendu.
+- Non-régression : les 463 audits passés sur la branche et sur main (parallèle) : **aucun
+  audit vert sur main n'est rouge ici** (27 rouges ici, 31 sur main, tous préexistants).
+  Audits PORTÉS honnêtement (ils copient une liste fixe de fichiers dans un dossier
+  temporaire ; la règle importe maintenant `profilVendeur.js`, ajouté à la copie) : atelier,
+  equipe-ecriture-membre, doublons-historique, en-ligne-deux-fois, livre-police, registres,
+  stock-2d, vague3-ecrans, comptes-exclus, impression-carton (reçoit la vraie `motsVendeur`),
+  infos-vinted (le manifeste charge `vrm-mots.js` en tête). `vestiaire-regle.js` reçoit le mot
+  en paramètre (copié seul par 4 audits). `vrm-regles-achat.js` recopié
+  (`regles-achat-extension.cjs --recopie`).
 
 ## Limites dites
 - Un écran déjà ouvert ne se redessine pas au moment où il répond « Tu vends quoi ? » :
