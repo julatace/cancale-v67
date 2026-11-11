@@ -1,0 +1,15 @@
+/* (11 nov., lot avis-negatif) La feuille « Avis négatif » de Ma journée (src/AvisNegatifJournee.jsx).
+   Neutre : l'étoile pleine est l'encre, la vide la ligne ; l'ambre est porté par la carte (« un geste »). */
+.vrm-avb { display: grid; gap: 14px; }
+.vrm-avb-avis { border: 1px solid var(--vrm-line); background: var(--vrm-card); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; }
+.vrm-avb-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.vrm-avb-note { font-size: 18px; letter-spacing: 1px; color: var(--vrm-ink); line-height: 1; }
+.vrm-avb-note-vide { color: var(--vrm-line); }
+.vrm-avb-compte { font-size: 13px; color: var(--vrm-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-avb-texte { margin: 0; font-size: 15px; line-height: 1.45; color: var(--vrm-ink); overflow-wrap: anywhere; }
+.vrm-avb-texte.is-muet { color: var(--vrm-muted); }
+.vrm-avb-pourquoi { margin: 0; font-size: 13px; line-height: 1.4; color: var(--vrm-muted); }
+.vrm-avb-gestes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.vrm-avb-gestes > * { min-height: 44px; }
+.vrm-avb-erreur { margin: 0; font-size: 13px; color: var(--vrm-warn); }
+.vrm-avb-vide { margin: 0; color: var(--vrm-muted); }

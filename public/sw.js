@@ -150,6 +150,10 @@ self.addEventListener('notificationclick', event => {
   event.notification.close();
   const d = event.notification.data || {};
   const url = (event.action && d.actions && d.actions[event.action]) || d.url || '/';
+  // (11 nov., lot avis-negatif) Un lien vers les avis du compte SUR VINTED (et lui seul :
+  // la même forme que src/avisNegatif.js, RE_LIEN_AVIS) s'ouvre tel quel, dans une fenêtre
+  // à lui — l'app ouverte n'y peut rien (elle ne sait aller que vers ses écrans).
+  if (/^https:\/\/www\.vinted\.[a-z]{2,3}(\.[a-z]{2})?\/member\/\d{1,20}\?tab=feedback$/.test(url)) { event.waitUntil(clients.openWindow(url)); return; }
   event.waitUntil((async () => {
     // (11 nov., lot app-installable) Seule une fenêtre de L'APP (la coquille `/`)
     // sait sauter d'écran : une page statique ouverte (aide, CGU, statut) ne

@@ -14,6 +14,7 @@
 // Deux conversations sans identité commune ne sont JAMAIS fusionnées : VRM
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
+import { motsVendeur } from '../profilVendeur.js';
 import { C, Icon, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc } from '../App.jsx';
 import { LogoSite } from '../SelecteurSites.jsx';
 import { FilLeboncoin } from './MessagesLeboncoin.jsx';
@@ -189,7 +190,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: C.text }}>
                   <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: C.warn, flexShrink: 0 }}/>
-                  {p.sorte === 'paire' ? 'Peut-être la même paire ?' : 'Peut-être le même acheteur ?'}
+                  {p.sorte === 'paire' ? `Peut-être ${motsVendeur().meme} ?` : 'Peut-être le même acheteur ?'}
                 </div>
                 <div style={{ ...muted, marginTop: 4 }}>
                   {[A, B].map((f, i) => <div key={f.cle} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><Marques plateformes={f.plateformes}/><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nomDe(f)}{f.num ? ` · N°${f.num}` : ''}</span></div>)}

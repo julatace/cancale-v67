@@ -23,6 +23,17 @@
 const CARTE = /[?&]mode=carte\b/.test(location.search);
 const REPARER = /[?&]mode=reparer\b/.test(location.search);
 if (CARTE) { document.body.classList.add('carte'); document.documentElement.classList.add('carte'); }
+// 5.351 (lot extension-visuel) : la teinte CHOISIE dans VRM (Réglages → Apparence,
+// recopiée par le pont de vrm.center dans `vrmApparence`) passe avant celle du
+// système ; « automatique » ou pas su ⇒ le système, comme avant. Rien d'autre lu.
+function poserTeinte(m) {
+  let t = '';
+  if (m === 'sombre' || m === 'clair') t = m;
+  else if (m === 'soir') { const h = new Date().getHours(); t = h >= 19 || h < 7 ? 'sombre' : 'clair'; }
+  if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+}
+try { chrome.storage.local.get('vrmApparence', (g) => { try { if (chrome.runtime.lastError) return; } catch (_) { return; } poserTeinte(g && g.vrmApparence); }); } catch (_) {}
+try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch && ch.vrmApparence) poserTeinte(ch.vrmApparence.newValue); }); } catch (_) {}
 // 5.328 : dans la carte du logo, le cadre dit à la carte qu'il s'affiche et sa
 // hauteur (pour qu'elle le montre en entier, sans second défilement). Seulement
 // ces deux messages : ni e-mail, ni mot de passe, ni état ne sortent d'ici.

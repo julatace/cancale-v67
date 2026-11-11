@@ -95,7 +95,7 @@ async function verifier(textes) {
   const fs1 = tranche(fac, 'export async function envoyerFacturesSerie', 5000);
   ok(/if \(!\(await deps\.askConfirm\(\{ title: `Envoyer \$\{prets\.length\} facture/.test(fs1) && /if \(it\.etat !== 'a-envoyer'\) \{ pasFaits\.push/.test(fs1) && /r2\.code === 429 \|\| r2\.code === 503/.test(fs1), 'B8 « Facture Pro » : confirmation, acheteur prouvé seulement, un 429/503 arrête la série');
   const st = tranche(stock, 'const actionsSerieStock', 3000);
-  ok(/if \(!\(await askConfirm\(\{ title: `Enlever \$\{ok\.length\} paire/.test(st) && (st.match(/ecrireSlots\(/g) || []).length === 1 && !/retirerCase\(/.test(st), 'B9 « Enlever du stock » : confirmation qui nomme les N°, UNE écriture des cases');
+  ok(/if \(!\(await askConfirm\(\{ title: `Enlever \$\{ok\.length\} (?:paire|\$\{ok\.length > 1 \? motsVendeur\(\)\.noms : motsVendeur\(\)\.nom\})/.test(st) && (st.match(/ecrireSlots\(/g) || []).length === 1 && !/retirerCase\(/.test(st), 'B9 « Enlever du stock » : confirmation qui nomme les N°, UNE écriture des cases');
   ok(/n\[cleDeclarationPartie\(f\.numero, f\.id, numeros\)\] = \{ id: String\(f\.id\), at, title: f\.title \|\| '', from: 'stock' \}/.test(st), 'B10 une vendue sort comme « Je l’ai sortie » (vinted_pairs_lost, from: stock) ; le N° reste pris');
   ok(/poserLu\(ok, valeur, ok\.map\(\(e\) => \(\{ k: valeur \? 'lu' : 'nonlu', id: e\.id, at: e\.at \}\)\)\)/.test(boite), 'B11 e-mails « Lu / Non lu » : les gestes de la ligne, en UNE écriture');
   const monte = (t, nom) => t.includes(`useSelectionSerie(`) && t.includes('<BarreSerie serie={' + nom) && t.includes('<CaseSerie serie={' + nom) && t.includes(nom + '.ligne(');

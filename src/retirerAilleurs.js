@@ -28,6 +28,7 @@
 //                  qu'un faux.
 
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
+import { motsVendeur } from './profilVendeur.js';
 
 export const FRAIS_MS = 24 * 3600e3;
 const NOM = { Vinted: 'Vinted', eBay: 'eBay', Leboncoin: 'Leboncoin', Vestiaire: 'Vestiaire' };
@@ -77,7 +78,7 @@ export function planRetirerAilleurs(v, o = {}) {
     const t = tsDe(a.capture);
     const vieille = !(Number.isFinite(t) && maintenant - t <= FRAIS_MS);
     let voie, moyen = null, raison;
-    if (a.aConfirmer) { voie = 'verifier'; raison = 'la paire semble remise en vente — vérifie avant de retirer'; }
+    if (a.aConfirmer) { voie = 'verifier'; raison = `${motsVendeur().le} semble remis${motsVendeur().e} en vente — vérifie avant de retirer`; }
     else if (parNumSite.get(`${a.numero}|${a.plateforme}`) > 1) { voie = 'verifier'; raison = `deux annonces sous ce N° sur ${NOM[a.plateforme] || a.plateforme} — VRM ne choisit pas`; }
     else if (a._peutEtre || vieille) { voie = 'verifier'; raison = Number.isFinite(t) ? `lu le ${dateCourte(t)} — peut-être déjà retirée` : 'état pas confirmé — peut-être déjà retirée'; }
     else if (a.plateforme === 'Vinted') { voie = 'main'; raison = 'à retirer toi-même sur Vinted — VRM ne supprime jamais une annonce Vinted'; }

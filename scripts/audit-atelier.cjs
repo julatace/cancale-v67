@@ -26,7 +26,7 @@ const { pathToFileURL } = require('url');
 
 const RACINE = path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
-const FICHIERS = ['src/operations/atelier.js', 'src/operations/metier.js', 'src/operations/Atelier.jsx', 'src/operations/Operations.jsx',
+const FICHIERS = ['src/profilVendeur.js', 'src/operations/atelier.js', 'src/operations/metier.js', 'src/operations/Atelier.jsx', 'src/operations/Operations.jsx',
   'api/_lib/operations.js', 'api/_lib/session.js', 'api/_lib/cle.js', 'src/App.jsx'];
 const MUTATIONS = {
   // Le membre n'est plus borné à mission.* : il pourrait déplacer les paires du vendeur.

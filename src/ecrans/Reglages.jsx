@@ -2,6 +2,7 @@ import { PlateformesSetting } from '../App.jsx';
 import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 import { RappelsSetting } from '../App.jsx';
+import { CLE_VERIF_COUPEES, lireCoupees, rallumerAlerte, NOMS_ALERTES } from '../verifAnnonce.js';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
 // (11 nov., lot journee-perso) « Ma journée » : le MÊME éditeur que « Modifier ma journée ».
@@ -36,7 +37,7 @@ import { MesModeles } from '../ModelesDescription.jsx';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
 // (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
 const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
-import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
 
@@ -73,6 +74,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme} from '../../api/_lib/notif-textes.js';
+import {reglageSeuilAvis,SEUILS_AVIS,SEUIL_AVIS_DEFAUT} from '../avisNegatif.js';   // (11 nov.) le seuil « avis négatif » (push_prefs.avisSeuil)
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
 import {fenetreGroupe,FENETRES as FENETRES_GROUPE} from '../../api/_lib/notif-groupe.js';
@@ -1516,6 +1518,15 @@ function PushPrefsSetting({ comptes, onMuets }) {
         </select>
       </div>
       {soirCalme ? <div className="vrm-np-relance" data-np-soir-calme="">Pendant tes heures calmes : il ne sonnera pas.</div> : null}
+      {/* (11 nov., lot avis-negatif) Le seuil d'un « avis négatif » : 1★ à 4★, défaut 3★ (src/avisNegatif.js).
+          Rangé dans `push_prefs.avisSeuil` ; le serveur le lit avant de décider (api/_lib/avis-negatif.js). */}
+      <div className="vrm-np-ligne" data-np-avis-seuil={String(reglageSeuilAvis(prefs || {}))}>
+        <span className="vrm-np-lib">Avis négatif<small>Prévenu quand un avis Vinted arrive à ce nombre d’étoiles ou moins.</small></span>
+        <select className="vrm-np-soir" aria-label="Seuil d’un avis négatif" data-np-avis-choix="" value={String(reglageSeuilAvis(prefs || {}))} disabled={!prefs||busy}
+          onChange={(e)=>{ const v = Number(e.target.value); const suite = { ...(prefs || {}) }; if (v === SEUIL_AVIS_DEFAUT) delete suite.avisSeuil; else suite.avisSeuil = v; ecrirePrefs(suite, 'Le seuil des avis'); }}>
+          {SEUILS_AVIS.map((n)=><option key={n} value={String(n)}>{n}★ ou moins</option>)}
+        </select>
+      </div>
       {/* (11 nov., lot `notifs-groupees`) La fenêtre du résumé (api/_lib/notif-groupe.js) :
           la première sonne, les suivantes partent ensemble. L'urgent passe tout de suite. */}
       <div className="vrm-np-ligne vrm-np-ligne-col" data-np-regrouper={regroupe?'on':'off'} data-np-fenetre={fenetre}>
@@ -1542,7 +1553,7 @@ const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
   { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
-  { id: 'comptes', titre: 'Comptes', ids: ['comptes'] },
+  { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
 ];
 function groupesFamillesNotif(familles) {
   const vus = new Set();
@@ -2641,7 +2652,7 @@ function JournalVrm() {
       ))}
       {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
       <div className="vrm-sec-trous" data-journal-trous="">
-        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone', extension: 'gestes de l’extension' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone', extension: 'gestes de l’extension', moderation: 'ce que Vinted a masqué ou limité' }[x] || x)).join(', ')}.</p> : null}
         {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
       </div>
     </div>
@@ -3476,6 +3487,28 @@ function JeVendsSetting() {
   );
 }
 
+// (11 nov., lot verif-publication) Les alertes « vérifier avant de publier » qu'il
+// a coupées (« Ne plus me le dire ») : chacune se rallume d'un clic. Rien de coupé ⇒
+// rien n'est montré (le réglage n'existe que s'il a servi).
+function VerifCoupeesSetting() {
+  const [brut, setBrut] = React.useState(() => load(CLE_VERIF_COUPEES, null));
+  React.useEffect(() => onCloudReady(() => setBrut(load(CLE_VERIF_COUPEES, null))), []);
+  const codes = [...lireCoupees(brut)];
+  if (!codes.length) return null;
+  const rallumer = (code) => { const r = rallumerAlerte(brut, code); save(CLE_VERIF_COUPEES, r); setBrut(r); toast(code ? 'Alerte rallumée.' : 'Toutes les alertes sont rallumées.'); };
+  return (
+    <div data-verif-coupees={codes.length} style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Alertes coupées avant de publier</div>
+      {codes.map((c) => (
+        <div key={c} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44 }}>
+          <span style={{ fontSize: 13, color: C.muted }}>{NOMS_ALERTES[c]}</span>
+          <button type="button" className="vrm-lien-action" data-verif-rallumer={c} onClick={() => rallumer(c)} style={{ minHeight: 44 }}>Rallumer</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function NumeroEcritSetting({ onAnnonces }) {
   const exemples = useExemplesVendeur();
   const lire = () => lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null));
@@ -3635,7 +3668,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       <GuideReglage titre="Numéroter dans tes annonces" etapes={[
         ['Écris le numéro là où tu ranges l’article', 'Sur le carton, l’étagère ou le bac, comme d’habitude.'],
         ['Écris-le à la fin de la description', '« N° 123 » sur la dernière ligne (ou SKU eBay, référence Leboncoin pro).'],
-        ['Ouvre tes annonces dans VRM', 'Il lit le numéro et le range avec la paire. Si un numéro ne colle pas, il te demande.'],
+        ['Ouvre tes annonces dans VRM', `Il lit le numéro et le range avec ${motsVendeur().le}. Si un numéro ne colle pas, il te demande.`],
       ]}/>
       <div data-numero-ecrit-apercu="" style={{marginTop:12}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Ce que VRM lit dans tes annonces</div>
@@ -3698,6 +3731,7 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
       <NumeroEcritSetting onAnnonces={onAnnonces}/>
+      <VerifCoupeesSetting/>
       <div style={{fontSize:13,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Le format des <b>prochains</b> numéros. Ceux déjà donnés ne changent pas.
       </div>

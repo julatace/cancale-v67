@@ -14,10 +14,11 @@
 // 10 mots au plus : ce qu'on fait ici et le geste principal. Pas un paragraphe,
 // pas de « pourquoi » (il vit derrière « ⓘ »). Pour la retirer à nouveau :
 // vider l'entrée ici, rien d'autre à toucher (récit : docs/passation/2026-11-08-clarte.md).
+import { motsVendeur } from './profilVendeur.js';
 export const ECRANS_SANS_PHRASE = [];
 export const PHRASES_ECRAN = {
   journee: 'Ce qui t’attend aujourd’hui, le plus pressé en haut.',
-  annonces: 'Tes paires en ligne : numéro, prix d’achat, offres.',
+  get annonces() { return `${motsVendeur().Tes} en ligne : numéro, prix d’achat, offres.`; },
   ventes: 'Tes ventes de tous les sites, et l’argent qui arrive.',
   colis: 'Imprime les bordereaux, dépose tes colis, retire tes achats.',
   messages: 'Réponds à tes acheteurs et à leurs offres.',
@@ -25,7 +26,7 @@ export const PHRASES_ECRAN = {
   emails: 'Les e-mails de tes plateformes, rangés : codes, bordereaux, ventes.',
   compta: 'Ce que tu as vendu, reçu, gagné, et à déclarer.',
   dashboard: 'Ce qui se vend le mieux, et à quel prix.',
-  garage: 'Où est rangée chaque paire : cherche un N°.',
+  get garage() { return `Où est rangé${motsVendeur().e} ${motsVendeur().chaque.toLowerCase()} : cherche un N°.`; },
   settings: 'Relie tes comptes et ta boîte e-mail, règle VRM.',
   communaute: 'La carte des revendeurs VRM, et tes groupes.',
 };

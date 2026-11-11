@@ -23,6 +23,7 @@
 // Module PUR : exécuté tel quel par scripts/audit-note-achat-double.cjs.
 // ══════════════════════════════════════════════════════════════════════════════
 
+import { motsVendeur } from './profilVendeur.js';
 export const CLE_NOTES_PAIRES = 'vrm_notes_paires';
 export const NOTE_MAX = 200;
 
@@ -74,7 +75,7 @@ export function noteDe(notes, paire, { cleNum = cleNumNote, ambigu = null } = {}
   if (!cles.length) return null;
   const n = cles[0].startsWith('n:') ? cles[0].slice(2) : '';
   if (n && typeof ambigu === 'function' && ambigu(n)) {
-    return estNote(notes['n:' + n]) ? { cachee: true, raison: `N°${n} porté par deux paires` } : null;
+    return estNote(notes['n:' + n]) ? { cachee: true, raison: `N°${n} porté par deux ${motsVendeur().noms}` } : null;
   }
   for (const k of cles) {
     const v = notes[k];
