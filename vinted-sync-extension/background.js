@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.342.0';
+const CODE_VERSION = '5.352.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5935,7 +5935,30 @@ function avisPropre(f) {
   if (typeof f.created_at === 'string' && /^\d{4}-\d{2}-\d{2}/.test(f.created_at)) o.created_at = f.created_at.slice(0, 40);
   if (Number.isFinite(Number(f.created_at_ts)) && f.created_at_ts !== null && f.created_at_ts !== '') o.created_at_ts = Number(f.created_at_ts);
   if (typeof f.feedback === 'string') o.feedback = f.feedback.slice(0, 600);
+  // 5.352 (11 nov., lot avis-negatif) — LE N° DE TRANSACTION, S'IL EST DANS LA RÉPONSE (jamais vu
+  // à ce jour) : la seule identité qui relie un avis à SA vente (§5). Chiffres seulement ; absent ⇒ rien.
+  const tx = f.transaction_id != null ? String(f.transaction_id) : '';
+  if (/^\d{1,20}$/.test(tx)) o.transaction_id = tx;
   return o;
+}
+// 5.352 (11 nov., lot avis-negatif) — APRÈS une écriture RÉUSSIE des avis : « l'extension vient de
+// lire les avis de CE compte » (`/api/push { action:'avis', uid }`). Le serveur relit la ligne au nom
+// du vendeur, compare à SA mémoire et sonne une fois par avis ≤ seuil (api/_lib/avis-negatif.js).
+// Aucune requête Vinted ; sans session, ou réseau KO, rien n'est retenté : le cron du matin et du
+// soir est le filet (la mémoire est côté serveur, rien ne se perd).
+async function signalerAvisLus(uid) {
+  try {
+    if (!/^\d{1,20}$/.test(String(uid || ''))) return false;
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('avis_signal_sans_session'); return false; }
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+      body: JSON.stringify({ action: 'avis', uid: String(uid) }) });
+    clearTimeout(t);
+    noterDiag(r.ok ? 'avis_signal_envoye' : `avis_signal_ko_${r.status}`);
+    return r.ok;
+  } catch (_) { noterDiag('avis_signal_ko_reseau'); return false; }
 }
 // 5.340 (11 nov.) — UN POINT PAR CAPTURE : { at, total (Vinted, ou null), n (avis lus),
 // c: [nombre de 1★, 2★, 3★, 4★, 5★] }. Jamais un texte, un pseudo ni un identifiant
@@ -6005,6 +6028,7 @@ async function capterAvis(uid) {
     const historique = historiqueAvis(hr && hr[0] && hr[0].h, pointAvis(maintenant, user_feedbacks, pag));
     const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_feedbacks`, data: { type: 'feedbacks', uid: String(uid), domain: acc.domain || 'www.vinted.fr', capturedAt: maintenant, nItems: user_feedbacks.length, payload: { user_feedbacks, ...(pag ? { pagination: pag } : {}), historique } } }], 'id');
     noterDiag(ok === false ? 'avis_ecriture_ratee' : 'avis_ecrits');
+    if (ok !== false) await signalerAvisLus(uid);   // 5.352 : seulement une écriture réussie
     return ok !== false;
   } catch (_) { return false; }
 }
