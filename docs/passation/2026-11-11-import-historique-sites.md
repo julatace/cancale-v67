@@ -98,10 +98,26 @@ neuf, zip régénéré, audits et bancs ci-dessous. Restes : voir « Limites ».
   refus de la base, lire une forme inconnue, relire chez eBay une fois fini, sans borne par appel,
   panne = fin) : toutes rouges.
 - Banc **`scripts/bancs/import-sites.cjs`** (390 tactile et 1512, clair et sombre, `locale fr-FR`) :
-  **76 verts**. Il a trouvé deux défauts de banc (navigateur en anglais ⇒ textes anglais, juste ; écritures
+  **88 verts**. Il a trouvé deux défauts de banc (navigateur en anglais ⇒ textes anglais, juste ; écritures
   d'autres écrans comptées) ; la carte elle-même n'a rien eu à corriger. Captures regardées (390 clair,
   1512 sombre) : Vinted puis Leboncoin « Toto » (120 lues · encore…), Vestiaire « 120 sur 400 » et le geste
   en ambre, eBay « Tout ce qu'eBay garde est récupéré ✓ », achats « eBay ne garde que 60 jours ».
+
+## « Tout récupérer » suivi dans la feuille commune (demande du coordinateur)
+
+Branche `claude/suivi-travail` fusionnée (API `lancerTravail`, `src/suiviTravail.js`). « Tout récupérer »
+lancé À LA MAIN fige VRM avec la feuille de suivi (`sorte: 'import-historique'`) :
+- **eBay** : chaque étape de la route, « N commandes · M pages », jusqu'à « fini » ; pause / arrêt lus
+  entre deux étapes ; un refus d'eBay ou de la base est dit avec le geste (la lecture reprendra à la
+  même page) ;
+- **Leboncoin / Vestiaire** : la commande à l'extension (refus ⇒ sa raison + « ouvre le site sur ce
+  compte »), puis les pages lues RELUES dans SA ligne `import_*` (2 min au plus), et « la suite continue
+  toute seule, onglet du site ouvert (12 pages par heure au plus) » — la feuille ne reste pas figée des
+  heures sur un travail de fond.
+- La lecture automatique (alarme, carte ouverte pour eBay) ne fige rien. Le « Tout récupérer » de
+  Vinted (`ImportDepart.jsx`, lot import-depart) n'est pas branché ici.
+- Banc : B4 (eBay jusqu'à « fini » dans la feuille), C3 (pages relues, « continue toute seule »),
+  E1 (refus de l'extension DIT dans la feuille). Captures regardées (390 clair Leboncoin, 1512 sombre refus).
 
 ## Limites
 

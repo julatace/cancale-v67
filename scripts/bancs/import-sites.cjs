@@ -159,8 +159,12 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           await capture(pg, `historique-sites-${suf}`);
           const n0 = ebay.length;
           await pg.locator(`[data-import-tout="ebay:principal"]`).click();
-          await pg.waitForFunction((n) => true, n0); await pg.waitForTimeout(800);
+          await pg.waitForSelector('[data-suivi-travail="import-historique"][data-suivi-statut="fini"]', { timeout: 15000 }).catch(() => {});
           dit(ebay.length === n0 + 1 && ebay[n0].depuisDebut === true && !ebay[n0].compte, 'B3 « Tout récupérer » eBay : repart du début, compte principal', JSON.stringify(ebay.slice(n0)));
+          const fe = await pg.evaluate(() => { const f = document.querySelector('[data-suivi-travail="import-historique"]'); return f ? { statut: f.getAttribute('data-suivi-statut'), n: f.getAttribute('data-suivi-n'), texte: f.innerText.replace(/\s+/g, ' ') } : null; });
+          dit(fe && fe.statut === 'fini' && fe.n === '1/1' && /historique eBay/.test(fe.texte), 'B4 lancé à la main : la feuille de suivi (VRM figé) montre la lecture jusqu’à « fini »', fe && JSON.stringify({ s: fe.statut, n: fe.n }));
+          if (fe) await capture(pg, `historique-sites-suivi-${suf}`);
+          await pg.locator('[data-suivi-fermer]').first().click().catch(() => {});
           dit(!ecrits.length, 'A9 l’app n’écrit jamais une ligne `import_*` ; aucun select=data sur elles', JSON.stringify(ecrits).slice(0, 300));
           dit(!errs.length, 'A10 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
@@ -176,9 +180,15 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           await pg.waitForFunction(() => window.__cmds.length > 0, null, { timeout: 5000 }).catch(() => {});
           const c = await pg.evaluate(() => window.__cmds.slice());
           dit(c.length === 1 && c[0].cmd === 'importSiteTout' && c[0].site === 'leboncoin' && c[0].compte === LBC, 'C2 UNE commande importSiteTout pour ce compte', JSON.stringify(c));
+          ROWS[0] = ext('leboncoin', LBC, { etat: 'encours', at: Date.now() + 1000, resteMin: 600, types: { transactions: { lus: 140, total: null, pages: 7, fini: false }, details: { lus: 40, total: null, pages: 40, fini: false } } });
           await pg.evaluate(() => window.__relacher({ accepte: true, etape: 'file' }));
-          await pg.waitForSelector('[data-import-issue]', { timeout: 5000 }).catch(() => {});
-          dit(await pg.locator('[data-import-issue="ok"]').count() === 1, 'C3 acceptée ⇒ « Lecture lancée »');
+          await pg.waitForSelector('[data-suivi-travail="import-historique"][data-suivi-statut="fini"]', { timeout: 20000 }).catch(() => {});
+          const fe = await pg.evaluate(() => { const f = document.querySelector('[data-suivi-travail="import-historique"]'); return f ? { statut: f.getAttribute('data-suivi-statut'), texte: f.innerText.replace(/\s+/g, ' ') } : null; });
+          dit(fe && fe.statut === 'fini' && /47 pages|7 pages/.test(fe.texte) && /continue toute seule/.test(fe.texte), 'C3 la feuille de suivi : pages lues relues dans SA ligne, « la suite continue toute seule »', fe && fe.texte.slice(0, 300));
+          if (fe) await capture(pg, `historique-sites-suivi-lbc-${suf}`);
+          await pg.locator('[data-suivi-fermer]').first().click().catch(() => {});
+          await pg.waitForTimeout(300);
+          await pg.locator(`[data-import-tout="vestiaire:${VC}"]`).count();
           await capture(pg, `historique-sites-arrete-${suf}`);
           dit(!errs.length, 'C4 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
@@ -187,6 +197,21 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           const s2 = await lire(g.pg);
           dit(s2 && !s2.S.leboncoin.comptes[LBC].bouton && s2.S.ebay.comptes.principal.bouton, 'C5 extension 5.344 : aucun bouton Leboncoin (eBay, côté serveur, garde le sien)');
           await g.ctx.close();
+        });
+        await essaie('E' + suf, async () => {
+          ROWS = ROWS_DEFAUT(); MUET = false;
+          ROWS[0] = ext('leboncoin', LBC, { etat: 'encours', at: auj - 3600e3, capturedAt: iso(auj - 3600e3), resteMin: 600, types: { transactions: { lus: 120, total: null, pages: 6, fini: false }, details: { lus: 40, total: null, pages: 40, fini: false } } });
+          const { ctx, pg, errs } = await page(b, T, { sombre });
+          await ouvrir(pg);
+          await pg.locator(`[data-import-tout="leboncoin:${LBC}"]`).click();
+          await pg.waitForFunction(() => window.__cmds.length > 0, null, { timeout: 5000 }).catch(() => {});
+          await pg.evaluate(() => window.__relacher({ accepte: false, code: 'onglet-absent', raison: 'Ouvre leboncoin.fr sur ce compte dans ce Chrome.' }));
+          await pg.waitForFunction(() => { const f = document.querySelector('[data-suivi-travail="import-historique"]'); return f && f.getAttribute('data-suivi-statut') !== 'cours'; }, null, { timeout: 10000 }).catch(() => {});
+          const fe = await pg.evaluate(() => { const f = document.querySelector('[data-suivi-travail="import-historique"]'); return f ? f.innerText.replace(/\s+/g, ' ') : ''; });
+          dit(/Ouvre leboncoin\.fr sur ce compte dans ce Chrome/.test(fe), 'E1 refusé par l’extension : la feuille DIT la raison et le geste', fe.slice(0, 300));
+          await capture(pg, `historique-sites-refus-${suf}`);
+          dit(!errs.length, 'E2 aucune erreur de page', errs.join(' | ').slice(0, 200));
+          await ctx.close();
         });
         await essaie('D' + suf, async () => {
           ROWS = ROWS_DEFAUT(); MUET = true;
