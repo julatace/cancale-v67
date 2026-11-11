@@ -111,7 +111,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
                 data-bp-prix-vu={e && e.prixVu != null ? String(e.prixVu) : undefined}>
                 <label className="vrm-bp-case">
                   <input type="checkbox" checked={c} disabled={fige || !!l.bloque || l.nouveau == null} onChange={() => basculer(l)} data-bp-case={l.id} aria-label={`Baisser ${l.numero ? 'le N°' + l.numero : l.titre || 'cette annonce'}`}/>
-                  {l.photo && Photo ? <Photo src={l.photo} alt="" className="vrm-bp-photo" loading="lazy"/> : l.photo ? <img src={l.photo} alt="" className="vrm-bp-photo" loading="lazy"/> : <span className="vrm-bp-photo" aria-hidden="true"/>}
+                  {l.photo && Photo ? <Photo src={l.photo} alt="" className="vrm-bp-photo" loading="lazy"/> : <span className="vrm-bp-photo" aria-hidden="true"/>}
                   <span className="vrm-bp-centre">
                     <span className="vrm-bp-nom">{l.numero ? <b className="vrm-bp-num">N°{l.numero}</b> : null}<span className="vrm-bp-titre">{l.titre || 'Sans titre'}</span></span>
                     <span className="vrm-bp-prix">

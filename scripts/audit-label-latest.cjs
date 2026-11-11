@@ -42,6 +42,9 @@ function contexte() {
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
+    // (11 nov.) `lirePdfLigne` garde un bordereau ouvert pour le hors connexion au nom de la session (AUTH) :
+    // aucune session ici ⇒ rien gardé (et jamais `label_latest`, de toute façon).
+    AUTH: { user: null },
     fetch: async (url) => {
       const u = decodeURIComponent(String(url));
       if (!/label_latest/.test(u)) return { ok: true, json: async () => [] };
