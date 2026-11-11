@@ -124,6 +124,10 @@ async function audit(mut, bavard) {
       const t = u.pathname.replace('/rest/v1/', '');
       if (!tables[t]) return rep([]);
       let corps = null; try { corps = opts.body ? JSON.parse(opts.body) : null; } catch (_) {}
+      // La vraie forme de PostgREST : `resolution=ignore-duplicates` n'écrase JAMAIS une ligne
+      // qui existe (rien n'est rendu) — sans quoi deux appareils créeraient chacun « sa » mémoire.
+      const pref = String((opts.headers || {}).Prefer || '');
+      if ((opts.method || '').toUpperCase() === 'POST' && /ignore-duplicates/.test(pref) && Array.isArray(corps) && corps.every((l) => tables[t].lignes.some((x) => x.id === l.id))) return rep([]);
       const x = servirTable(tables[t], { methode: (opts.method || 'GET').toUpperCase(), url: u.pathname + u.search, entetes: opts.headers || {}, corps, owner: UID });
       return new Response(x.status === 204 || x.body == null ? null : JSON.stringify(x.body), { status: x.status, headers: x.headers });
     };

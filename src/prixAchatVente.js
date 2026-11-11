@@ -27,7 +27,8 @@ const str = (v) => String(v == null ? '' : v).trim();
 // La nuit, à Paris : de 22 h à 8 h (les bornes de `CALME_DEFAUT`, api/_lib/notif-textes.js).
 export function estNuitParis(ms = Date.now()) {
   let h;
-  try { h = Number(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', hourCycle: 'h23' }).format(new Date(ms))); } catch (_) { h = new Date(ms).getUTCHours() + 1; }
+  // `formatToParts` : « 23 h » (fr-FR) n'est pas un nombre, la part `hour` l'est.
+  try { const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).find((x) => x.type === 'hour'); h = Number(p && p.value); } catch (_) { h = (new Date(ms).getUTCHours() + 1) % 24; }
   if (!Number.isFinite(h)) return false;
   return h >= 22 || h < 8;
 }
