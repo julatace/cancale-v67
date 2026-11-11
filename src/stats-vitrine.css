@@ -194,3 +194,6 @@ html .vrm-stats-vitrine .vrm-sv-rangee > .vrm-sv-repliee { align-self: start; }
 }
 /* (7 nov.) « CA depuis le début » : une 5e case, sur toute la largeur sous les quatre. */
 .vrm-stats-vitrine .vrm-sv-tuiles > [data-sv-tuile="total"] { grid-column: 1 / -1; }
+/* (11 nov., lot objectifs-mois) L'objectif du mois, sous la vitrine, sur toute la largeur. */
+@media (min-width: 1200px) { html .vrm-statistiques-premium > .vrm-objectif-argent { grid-column: 1 / -1; } }
+.vrm-objectif-argent > div { margin-bottom: 0 !important; }

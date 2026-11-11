@@ -251,17 +251,24 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
   const iV = L.findIndex((r) => r[0] === 'Date de vente' && r[1] === 'Date de versement');
   dit(iV > 0 && L[iV].includes('Montant reçu (€)') && L[iV].includes('Plateforme') && L[iV].includes('Compte'), 'E6 · tableur : ventes avec date de vente, date de versement, plateforme, compte, montant reçu');
   dit(/VENTES À DATER/.test(csv) && /ACHATS DE LA PÉRIODE/.test(csv) && L.some((r) => r.includes('Coût saisi (€)')), 'E6 · tableur : « à dater » à part, achats avec « Coût saisi »');
-  let pdfT = '', pages = 0;
+  let pdfT = '', pages = 0; const parPage = [];
   try {
     const PDFLib = require(path.join(NM, 'pdf-lib'));
     const oct = await EXM.pdfExportComptable(T4, { PDFLib });
     const pdfjs = await import('file://' + path.join(NM, 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs'));
     const doc = await pdfjs.getDocument({ data: new Uint8Array(oct), isEvalSupported: false, useSystemFonts: false, standardFontDataUrl: path.join(NM, 'pdfjs-dist', 'standard_fonts') + '/' }).promise;
     pages = doc.numPages;
-    for (let i = 1; i <= doc.numPages; i++) { const p = await doc.getPage(i); const tc = await p.getTextContent(); pdfT += tc.items.map((x) => x.str).join(' ') + '\n'; }
+    for (let i = 1; i <= doc.numPages; i++) { const p = await doc.getPage(i); const tc = await p.getTextContent(); const t = tc.items.map((x) => x.str).join(' '); parPage.push(t.replace(/\s+/g, ' ')); pdfT += t + '\n'; }
   } catch (e) { dit(false, 'E6 · le PDF se crée et se relit', e.message); }
   const caTxt = T4.caDeclare.toFixed(2).replace('.', ',');
-  dit(pages === 1 && pdfT.replace(/\s+/g, ' ').includes(caTxt) && /4e trimestre 2026/.test(pdfT), 'E6 · PDF : UNE page, le même CA déclaré, la période', `${pages} page(s)`);
+  // (11 nov.) La 1re page est le récapitulatif ; les suivantes NOMMENT les manques (ventes à dater, achats sans coût), une ligne chacun.
+  const p1 = parPage[0] || '';
+  dit(p1.includes(caTxt) && /4e trimestre 2026/.test(p1) && /CA déclaré par mois/.test(p1), 'E6 · PDF : la 1re page porte le même CA déclaré et la période', `${pages} page(s)`);
+  const pAD = parPage.find((t) => /^Ventes à dater/.test(t.trim())) || '';
+  const pSC = parPage.find((t) => /^Achats sans coût saisi/.test(t.trim())) || '';
+  dit(!T4.nADater || (new RegExp(`Ventes à dater [—-] dans aucun mois \\(${T4.nADater}\\)`).test(pAD) && T4.aDater.every((v) => !v.titre || pAD.includes(v.titre.slice(0, 12)))), 'E6 · PDF : chaque vente à dater NOMMÉE sur sa page', `${T4.nADater} à dater`);
+  dit(!T4.sansCout || new RegExp(`Achats sans coût saisi \\(${T4.sansCout}\\)`).test(pSC), 'E6 · PDF : les achats sans coût NOMMÉS sur leur page', `${T4.sansCout} sans coût`);
+  dit(T4.nADater > 0, 'E6 · la fixture a des ventes à dater (sinon le contrôle ne juge rien)', String(T4.nADater));
   dit(!/encaiss/i.test(csv + pdfT + sansCommentaires(EXP)), 'E6 · jamais « encaissé »');
 
   // ── E7. La carte de Comptabilité ────────────────────────────────────────────
