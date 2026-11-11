@@ -76,7 +76,7 @@ function normaliserSignal(s) {
   if (!TYPES.includes(x.type)) return null;
   const cle = String(x.cle || x.type).replace(/[^\w:.-]/g, '').slice(0, 60);
   if (!cle) return null;
-  return { type: x.type, cle, titre: propre(x.titre, 60) || NOMS_TYPES[x.type], corps: propre(x.corps, 160), nature: x.nature === 'muette' ? 'muette' : 'panne', n: Math.max(1, Math.min(10000, Math.round(Number(x.n) || 1))) };
+  return { type: x.type, cle, titre: propre(x.titre, 60) || NOMS_TYPES[x.type], corps: propre(x.corps, 200), nature: x.nature === 'muette' ? 'muette' : 'panne', tag: /^vrm-[\w-]{1,50}$/.test(String(x.tag || '')) ? x.tag : '', compteur: x.compteur !== false, n: Math.max(1, Math.min(10000, Math.round(Number(x.n) || 1))) };
 }
 
 const heure = (t) => { try { return new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
@@ -84,8 +84,8 @@ const heure = (t) => { try { return new Date(t).toLocaleTimeString('fr-FR', { ho
 export function notifPour(a, maintenant) {
   const nouveaux = Math.max(1, (Number(a.n) || 0) - (Number(a.notifieN) || 0));
   const depuis = a.notifieA ? ms(a.notifieA) : ms(a.premier);
-  const compte = nouveaux > 1 ? ` ×${nouveaux}${depuis ? ` depuis ${heure(depuis)}` : ''}.` : '';
-  return { title: a.titre, body: `${a.corps}${compte}`.trim().slice(0, 200), tag: `vrm-alerte-${a.cle.replace(/[:.]/g, '-')}`, url: '/?tab=settings', cat: 'signalement', at: new Date(maintenant).toISOString() };
+  const compte = nouveaux > 1 && a.compteur !== false ? ` ×${nouveaux}${depuis ? ` depuis ${heure(depuis)}` : ''}.` : '';
+  return { title: a.titre, body: `${a.corps}${compte}`.trim().slice(0, 240), tag: a.tag || `vrm-alerte-${a.cle.replace(/[:.]/g, '-')}`, url: '/?tab=settings', cat: 'signalement', at: new Date(maintenant).toISOString() };
 }
 
 // Marque une alerte « dite » : rend la notification, ou null si pas due.
@@ -111,6 +111,8 @@ export function apresSignal(precedent, signal, maintenant = Date.now()) {
   const a = { ...(objet(d.alertes[s.cle]).type === s.type ? d.alertes[s.cle] : { type: s.type, cle: s.cle, premier: iso, n: 0, notifieN: 0, notifieA: null, dites: 0 }) };
   a.n = (Number(a.n) || 0) + s.n;
   a.dernier = iso; a.titre = s.titre; a.corps = s.corps; a.nature = s.nature;
+  if (s.tag) a.tag = s.tag; else delete a.tag;
+  if (!s.compteur) a.compteur = false; else delete a.compteur;
   d.alertes[s.cle] = a;
   const notif = direSiDue(a, d, maintenant);
   purger(d, maintenant);
@@ -207,6 +209,15 @@ export async function passerAlertes({ proprio, operation, env = process.env, fet
   return { fait: false, raison: 'concurrence' };
 }
 
+// Plusieurs signaux et séries d'un coup (une lecture, une écriture), puis la vidange.
+export function apresGroupe(precedent, { signaux = [], suites = [], vidange = true } = {}, maintenant = Date.now()) {
+  let d = copie(precedent); const dues = [];
+  for (const s of suites) { const r = apresSuite(d, s, maintenant); d = r.data; dues.push(...r.dues); }
+  for (const s of signaux) { const r = apresSignal(d, s, maintenant); d = r.data; dues.push(...r.dues); }
+  if (vidange) { const r = apresVidange(d, maintenant); d = r.data; dues.push(...r.dues); }
+  return { data: d, dues };
+}
+export const groupeProduction = ({ groupe, maintenant = Date.now(), ...o }) => passerAlertes({ ...o, maintenant, operation: (d) => apresGroupe(d, groupe, maintenant) });
 export const signalerProduction = ({ signal, maintenant = Date.now(), ...o }) => passerAlertes({ ...o, maintenant, operation: (d) => apresSignal(d, signal, maintenant) });
 export const suiteProduction = ({ suite, maintenant = Date.now(), ...o }) => passerAlertes({ ...o, maintenant, operation: (d) => apresSuite(d, suite, maintenant) });
 export const vidangerProduction = ({ maintenant = Date.now(), ...o }) => passerAlertes({ ...o, maintenant, operation: (d) => apresVidange(d, maintenant) });
@@ -216,7 +227,7 @@ export function alertesPourPanneau(data, maintenant = Date.now()) {
   const d = copie(data);
   purger(d, maintenant);
   const alertes = Object.values(d.alertes).map((a) => ({
-    cle: a.cle, type: a.type, titre: propre(a.titre, 60), corps: propre(a.corps, 160), nature: a.nature === 'muette' ? 'muette' : 'panne',
+    cle: a.cle, type: a.type, titre: propre(a.titre, 60), corps: propre(a.corps, 200), nature: a.nature === 'muette' ? 'muette' : 'panne',
     n: Number(a.n) || 0, premier: a.premier || null, dernier: a.dernier || null, notifieA: a.notifieA || null,
     attente: Math.max(0, (Number(a.n) || 0) - (Number(a.notifieN) || 0)), coupe: !typeActif(d.reglages, a.type),
   })).sort((a, b) => (ms(b.dernier) || 0) - (ms(a.dernier) || 0)).slice(0, 20);
