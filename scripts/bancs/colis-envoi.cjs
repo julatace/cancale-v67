@@ -299,7 +299,10 @@ async function scenario(b, vp, sombre) {
     const sig = (x) => JSON.stringify((x || []).map((y) => [y.k, y.x, y.w, y.h]));
     // (11 nov., lot DJ3 intégré) « À envoyer » et « Envoyés » sont deux onglets de Ventes : leur barre ne bouge pas d'un
     // pixel. « À retirer » vit dans Achats, avec SA barre (le scanner seul) : même forme de bouton, pas les mêmes boutons.
-    dit(!!bE && bE.length >= 2 && sig(bE) === sig(bS), `${nom} : B la barre du haut est la même sur « À envoyer » et « Envoyés »`, JSON.stringify({ envoyer: bE, envoyes: bS }));
+    // Les mêmes boutons, dans le même ordre, de la même forme ; « Tout imprimer (N) » peut changer de largeur avec SON
+    // nombre (un colis déposé entre-temps, plus haut dans ce banc), le bouton du bord (« … ») ne bouge pas.
+    const sigB = (x) => JSON.stringify((x || []).map((y) => [y.k, y.h, y.r, y.k === 'imprimer' && x.every((z) => z.t === (bE.find((w) => w.k === z.k) || {}).t) ? y.w : 0]).concat([[(x || []).slice(-1).map((y) => y.x + y.w)]]));
+    dit(!!bE && bE.length >= 2 && sigB(bE) === sigB(bS), `${nom} : B la barre du haut est la même sur « À envoyer » et « Envoyés »`, JSON.stringify({ envoyer: bE, envoyes: bS }));
     dit(!!bR && bR.length >= 1 && !!bE && bR.every((y) => y.h === bE[0].h && y.r === bE[0].r), `${nom} : B la barre d'Achats · À retirer a la même forme de bouton`, JSON.stringify({ retirer: bR }));
     dit(!!bE && new Set(bE.map((x) => x.h + '/' + x.r)).size === 1, `${nom} : B une seule forme de bouton (hauteur, rayon)`, JSON.stringify(bE));
     if (tel) dit(!!bE && bE.every((x) => x.h >= 44), `${nom} : B 44 px au doigt`, JSON.stringify(bE));
