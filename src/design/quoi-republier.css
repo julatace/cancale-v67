@@ -1,0 +1,26 @@
+/* « Quelles annonces republier ? » (11 nov., lot quoi-republier) — la carte en tête
+   de l'atelier Republier (Vinted et Leboncoin). Neutre : aucune couleur d'accent
+   sauf la marque d'une ligne cochée (le bleu, rare, §7). */
+.vrm-qr { background: var(--fu-carte); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 16px 16px 10px; display: flex; flex-direction: column; gap: 8px; color: var(--fu-encre); min-width: 0; margin-bottom: 14px; box-sizing: border-box; max-width: 100%; }
+.vrm-qr-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.vrm-qr-titre { font-size: 17px; font-weight: 800; letter-spacing: -.01em; margin: 0; line-height: 1.25; min-width: 0; }
+.vrm-qr-n { color: var(--fu-gris); font-weight: 700; margin-left: 6px; font-variant-numeric: var(--fu-chiffres); }
+.vrm-qr-tout, .vrm-qr-plus { min-height: 44px; }
+.vrm-qr-plus { align-self: flex-start; }
+.vrm-qr-reglages > summary { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); min-height: 44px; align-items: center; }
+.vrm-qr-reglages-corps { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; padding: 4px 0 8px; }
+.vrm-qr-reglages-corps .vrm-seg { max-width: 100%; overflow-x: auto; }
+.vrm-qr-label { font-size: 13px; color: var(--fu-gris); }
+.vrm-qr-liste { list-style: none; margin: 0; padding: 0; }
+.vrm-qr-liste > li + li { border-top: 1px solid var(--fu-filet); }
+.vrm-qr-ligne { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) 32px; gap: 12px; align-items: center; padding: 8px 0; min-height: 60px; cursor: pointer; color: var(--fu-encre); }
+.vrm-qr-ligne:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; border-radius: 10px; }
+.vrm-qr-photo { width: 44px; height: 54px; border-radius: 10px; object-fit: cover; background: var(--fu-case); display: block; }
+.vrm-qr-centre { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-qr-nom { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-qr-num { font-weight: 800; margin-right: 6px; }
+.vrm-qr-raison, .vrm-qr-compte { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); line-height: 1.35; overflow-wrap: anywhere; }
+.vrm-qr-marque { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--fu-case); color: var(--fu-gris); font-size: 17px; font-weight: 700; justify-self: end; }
+.vrm-qr-ligne[aria-pressed="true"] .vrm-qr-marque { background: var(--fu-bleu); color: #fff; }
+.vrm-qr-vide, .vrm-qr-note { font-size: 13px; color: var(--fu-gris); margin: 0; padding: 2px 0 6px; }
+.vrm-qr-verifier > summary { font-size: 13px; min-height: 44px; align-items: center; }

@@ -44,6 +44,8 @@ export const CARTES_JOURNEE = [
   { id: 'retirer', zone: 'afaire', nom: 'Colis à retirer', desc: 'Revient seule au dernier jour.', urgent: true },
   { id: 'messages', zone: 'afaire', nom: 'Messages', desc: 'Tes messages pas lus.' },
   { id: 'prix', zone: 'afaire', nom: 'Prix à baisser', desc: 'Un conseil, rien ne part seul.' },
+  // (11 nov., lot quoi-republier) « Quelles annonces republier ? » : seulement s'il y en a ; « Voir » ouvre Republier.
+  { id: 'republier', zone: 'afaire', nom: 'Quoi republier', desc: 'Anciennes et peu vues : tu choisis, tu lances.' },
   { id: 'a-relier', zone: 'afaire', nom: 'E-mails à relier', desc: 'Les comptes dont rien n’arrive.' },
   { id: 'stock-sortie', zone: 'afaire', nom: 'Vendus encore rangés', desc: 'À sortir de tes meubles.' },
   // (11 nov.) « Supprimés de Vinted » n'est plus une carte : ces articles vivent dans « À trancher » (lot DJ4).
