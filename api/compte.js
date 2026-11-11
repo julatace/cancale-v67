@@ -341,7 +341,7 @@ export function evenementDUnAncienAbonnement(avant, ligne) {
 //    Ligne absente ⇒ une INSERTION simple : créée entre-temps ⇒ 409 (23505) ⇒ relu.
 //    Aucune migration : PATCH filtré de PostgREST.
 export const conditionStatut = (avant) => `evenement_ts=eq.${encodeURIComponent(String(avant.evenement_ts))}&${avant.maj == null ? 'maj=is.null' : `maj=eq.${encodeURIComponent(String(avant.maj))}`}`;
-async function ecrireStatut(owner, ligne, evenementTs, { essais = 5 } = {}) {
+export async function ecrireStatut(owner, ligne, evenementTs, { essais = 5 } = {}) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return { ok: false, code: 'sans-cle' };
   const h = { ...sbCle(SERVICE), 'Content-Type': 'application/json' };
