@@ -22,6 +22,7 @@
 //
 // Les outils de l'app (lecture de la base, confirmation, notifications) sont
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
+import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
 import React from 'react';
 import './facture-pro.css';
 import './facture-tva.css';
@@ -192,13 +193,21 @@ async function ouvrirPdf(contenu, deps, { partager = false } = {}) {
   return true;
 }
 
+// (11 nov., réseau instable) Les champs de « Ma facture » pas encore acceptés par la base.
+const CLE_ATTENTE_FP = 'vrm_fp_attente';
+const lireAttenteFp = () => { try { const o = JSON.parse(localStorage.getItem(CLE_ATTENTE_FP) || 'null'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (_) { return {}; } };
+const poserAttenteFp = (o) => { try { if (Object.keys(o).length) localStorage.setItem(CLE_ATTENTE_FP, JSON.stringify(o)); else localStorage.removeItem(CLE_ATTENTE_FP); return true; } catch (_) { return false; } };
+
 // ── Appeler la route du serveur ─────────────────────────────────────────────
 async function route(deps, corps) {
   try {
-    const r = await fetch('/api/compte?mode=facture-pro', corps ? { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) } : { headers: deps.enTeteSession() });
+    // (11 nov., réseau instable) Bornée : un bouton « Émettre » ne reste jamais
+    // occupé sur une réponse qui ne vient pas (src/reseauBorne.js). Le serveur
+    // rend la MÊME facture au rejeu (`deja`) : réessayer ne fait jamais un double.
+    const r = await fetchBorne(fetch, '/api/compte?mode=facture-pro', corps ? { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) } : { headers: deps.enTeteSession() }, DELAI_ROUTE_MS);
     const j = await r.json().catch(() => null);
     return { code: r.status, j: j || {} };
-  } catch (_) { return { code: 0, j: { message: "Pas de réseau : rien n'a été fait." } }; }
+  } catch (e) { return { code: 0, j: { message: typeof navigator !== 'undefined' && navigator.onLine === false && !(e && e.name === NOM_DELAI) ? "Pas de réseau : rien n'a été fait." : "La réponse n'est pas arrivée (réseau trop faible). Réessaie : si elle était partie, tu retrouveras la même facture, jamais une deuxième." } }; }
 }
 // (6 nov.) L'état de la boîte d'envoi ne vaut que LU : un 200 qui ne porte pas
 // `boite` (page HTML servie à la place de la route, réponse d'une autre version
@@ -224,24 +233,56 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   const minuteur = React.useRef(null);
   React.useEffect(() => { if (lu && !cfg) setCfg(lu); }, [lu, cfg]);
 
-  const champsRef = React.useRef({});
   const apercuRef = React.useRef(null);
 
   // Écrire : on RELIT la ligne juste avant (une autre carte — « Ton entreprise »
   // de Comptabilité — écrit la même), on fusionne nos champs, on écrit ; une
   // lecture ratée n'écrit RIEN.
+  // (11 nov., réseau instable) Les champs pas encore acceptés par la base sont
+  // GARDÉS sur l'appareil (`vrm_fp_attente`, effacé à la déconnexion comme tout
+  // `vrm_*`) et renvoyés tout seuls (5 s, 15 s, 1 min, puis 2 min ; au retour du
+  // réseau ; à la réouverture de la fiche) — jamais un « réessaie » qui perd ce
+  // qu'il a tapé si la fiche se ferme. Un champ retapé pendant l'envoi reste en
+  // attente (il n'est retiré que s'il vaut encore ce qui est parti).
+  const reprise = React.useRef({ n: 0, t: null, enVol: false });
+  const envoyer = React.useCallback(async () => {
+    const rp = reprise.current;
+    if (rp.enVol) return; if (rp.t) { clearTimeout(rp.t); rp.t = null; }
+    const att = lireAttenteFp(); if (!Object.keys(att).length) return;
+    rp.enVol = true;
+    let ok = false;
+    try {
+      const frais = await deps.lireReglage(ID_CFG);
+      if (frais !== null) {
+        const fusion = { ...frais, ...att };
+        ok = await deps.ecrireReglage(ID_CFG, fusion);
+        if (ok) {
+          const reste = lireAttenteFp();
+          for (const k of Object.keys(att)) if (JSON.stringify(reste[k]) === JSON.stringify(att[k])) delete reste[k];
+          poserAttenteFp(reste);
+          poserCfg({ ...VIDE, ...migrerAncienne({ ...fusion, ...reste }) });
+        }
+      }
+    } finally { rp.enVol = false; }
+    if (ok && !Object.keys(lireAttenteFp()).length) { rp.n = 0; setStatut('✓ enregistré'); return; }
+    if (ok) { rp.n = 0; rp.t = setTimeout(envoyer, 300); return; }
+    setStatut('⏳ pas encore enregistré · réessai automatique (gardé sur cet appareil)');
+    const d = [5000, 15000, 60000][rp.n] || 120000; rp.n++;
+    rp.t = setTimeout(envoyer, d);
+  }, [deps]);
+  React.useEffect(() => {
+    const f = () => { reprise.current.n = 0; envoyer(); };
+    window.addEventListener('online', f);
+    return () => { window.removeEventListener('online', f); if (reprise.current.t) clearTimeout(reprise.current.t); };
+  }, [envoyer]);
+  // À l'ouverture : ce qui attendait est remis dans la fiche, puis renvoyé.
+  React.useEffect(() => { if (!lu) return; const att = lireAttenteFp(); if (Object.keys(att).length) { setCfg((c) => ({ ...(c || lu), ...att })); setStatut('⏳ pas encore enregistré · réessai automatique (gardé sur cet appareil)'); envoyer(); } }, [!!lu]);
   const ecrire = (next, champs) => {
     setCfg(next); setStatut('enregistrement…');
+    const att = lireAttenteFp(); for (const k of champs) att[k] = next[k];
+    if (!poserAttenteFp(att)) { setStatut("⚠ pas enregistré — cet appareil refuse de le garder, réessaie"); return; }
     if (minuteur.current) clearTimeout(minuteur.current);
-    const a = { ...(champsRef.current || {}) }; for (const k of champs) a[k] = true; champsRef.current = a;
-    minuteur.current = setTimeout(async () => {
-      const aEcrire = Object.keys(champsRef.current); champsRef.current = {};
-      const frais = await deps.lireReglage(ID_CFG);
-      if (frais === null) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); return; }
-      const fusion = { ...frais }; for (const k of aEcrire) fusion[k] = next[k];
-      const ok = await deps.ecrireReglage(ID_CFG, fusion);
-      if (ok) { poserCfg({ ...VIDE, ...migrerAncienne(fusion) }); setStatut('✓ enregistré'); } else setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie");
-    }, 600);
+    minuteur.current = setTimeout(() => { reprise.current.n = 0; envoyer(); }, 600);
   };
   const upd = (k, v) => ecrire({ ...cfg, [k]: v }, [k]);
   const updPlusieurs = (o) => ecrire({ ...cfg, ...o }, Object.keys(o));

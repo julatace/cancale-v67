@@ -596,6 +596,7 @@ import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, 
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
+import { fetchBorne, raisonStatut, DELAI_ECRITURE_MS, DELAI_LECTURE_MS, NOM_DELAI } from "./reseauBorne.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
@@ -3423,7 +3424,8 @@ const lireLocalSync = () => {
 // `undefined` = pas su (rien ne s'écrit) · `{ existe, data, rev, maj }`.
 const lireNuageComplet = async (owner) => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=owner,data,updated_at`, { headers: sbAuth(), cache: 'no-store' });
+    // (11 nov., réseau instable) Bornée : une lecture qui pend vaut « pas su » (src/reseauBorne.js).
+    const res = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=owner,data,updated_at`, { headers: sbAuth(), cache: 'no-store' }, DELAI_LECTURE_MS);
     if (!res.ok) return undefined;
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length > 1 || rows.some(r => r.owner !== owner) || AUTH.user?.id !== owner) return undefined;
@@ -3577,7 +3579,7 @@ const cloudPush = () => {
         if (c === undefined) { _emitSync('error', 'la base n’a pas répondu'); planifierReprise(); return; }
         noterBaseNuage(c.data, c.existe, c.maj);
       }
-      let fini = false;
+      let fini = false, deja401 = false;
       for (let essai = 0; essai < 6 && !fini; essai++) {
         const { L, brut } = essai === 0 ? premier : lireLocalSync();
         const N = _snapNuage.data || {};
@@ -3603,19 +3605,23 @@ const cloudPush = () => {
         if (!_snapNuage.existe) {
           // Premier jour : la ligne n'existe pas. Une INSERTION sans fusion —
           // 409 ⇒ un autre appareil l'a créée entre-temps : on relit.
-          res = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+          res = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data`, {
             method: 'POST',
             headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
             body: JSON.stringify([withOwner({ id: SUPABASE_ROW, data, updated_at: maj })]),
-          });
+          }, DELAI_ECRITURE_MS);
           if (res.status === 409) res = { ok: true, devance: true };
         } else {
           const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
-          const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
+          // (11 nov., réseau instable) Bornée : une écriture qui pend laissait
+          // `_pushEnVol` vrai pour toujours (plus rien ne partait). Abandonnée,
+          // elle vaut « pas su » ; si la base l'avait écrite, le rejeu est
+          // devancé (`rev`) puis relu et fusionné — rien en double.
+          const r = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
             method: 'PATCH',
             headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
             body: JSON.stringify({ data, updated_at: maj }),
-          });
+          }, DELAI_ECRITURE_MS);
           if (r.ok) { let out = null; try { out = await r.json(); } catch (_) { out = null; } res = Array.isArray(out) ? (out.length >= 1 ? { ok: true } : { ok: true, devance: true }) : { ok: false, status: 0 }; }
           else res = r;
         }
@@ -3662,12 +3668,21 @@ const cloudPush = () => {
         }
         if (code) { _pushBloque = true; _emitSync('refus', 'cet écran est plus ancien que tes données (numérotation) — recharge la page'); signalerNumerosPerimes(code); return; }
         const st = res.status || 0;
-        _emitSync('error', st === 401 || st === 403 ? `la base a refusé l'envoi (${st}) — ta session a peut-être expiré` : st >= 500 ? `la base ne répond pas (${st})` : st ? `la base a répondu ${st}` : 'la base n’a pas répondu');
+        // (11 nov., réseau instable) Un jeton simplement VIEUX (le réseau est
+        // revenu après plus d'une heure) n'est pas un refus : on le renouvelle
+        // et on renvoie, une fois. Renouvellement « pas su » (réseau) ⇒ passager.
+        if (st === 401 && !deja401) {
+          deja401 = true;
+          const rafr = await authRefresh();
+          if (rafr === true && AUTH.user?.id === owner) continue;
+          if (rafr !== false) { _emitSync('error', 'session à renouveler — la base n’a pas répondu, nouvel essai'); planifierReprise(); return; }
+        }
+        _emitSync('error', raisonStatut(st));
         planifierReprise();
         return;
       }
       if (!fini) { _emitSync('error', 'la ligne change sans cesse sur un autre appareil — nouvel essai'); planifierReprise(); }
-    } catch (_) { _emitSync('error', typeof navigator !== 'undefined' && navigator.onLine === false ? 'pas de connexion internet' : 'la base n’a pas répondu'); planifierReprise(); }
+    } catch (e) { _emitSync('error', typeof navigator !== 'undefined' && navigator.onLine === false ? 'pas de connexion internet' : e && e.name === NOM_DELAI ? 'la base n’a pas répondu à temps' : 'la base n’a pas répondu'); planifierReprise(); }
     finally {
       _pushEnVol = false;
       if (_pushRelance) { _pushRelance = false; cloudPush(); }
@@ -3694,7 +3709,7 @@ const relireNuage = (opts = {}) => {
       if (_pushEnVol || _cloudTimer) return false;
       // (6 nov., charge) La VERSION de la numérotation vient dans la MÊME lecture
       // scalaire (même ligne, même minute) : une lecture de moins par minute.
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=rev:data->>rev,maj:updated_at,vnum:data->vrm_numerotation->>version`, { headers: sbAuth(), cache: 'no-store' });
+      const r = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=rev:data->>rev,maj:updated_at,vnum:data->vrm_numerotation->>version`, { headers: sbAuth(), cache: 'no-store' }, DELAI_LECTURE_MS);
       if (!r.ok) return false;
       const rows = await r.json();
       if (!Array.isArray(rows) || rows.length > 1) return false;
@@ -5152,7 +5167,8 @@ try {
 const lireReglage = async (id) => {
   const rendre = (v) => { noterReglage(id, v === null); return v; };
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: sbAuth() });
+    // (11 nov., réseau instable) Bornée : une lecture qui pend vaut « pas su ».
+    const res = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: sbAuth() }, DELAI_LECTURE_MS);
     if (!res.ok) return rendre(null);
     const rows = await res.json();
     if (!Array.isArray(rows)) return rendre(null);   // un 522 Cloudflare rend du HTML
@@ -17488,10 +17504,29 @@ function EnAttenteEnvoi() {
   }, []);
   // (8 nov.) Sans abonnement (aperçu) : la base refuse d'écrire, exprès — ce
   // n'est pas un envoi « en attente » ; la carte de l'aperçu dit pourquoi.
-  if (lectureSeuleActive()) return null;
+  // (11 nov., réseau instable) Ce qui a été DIT « en attente » se dit ensuite
+  // « Enregistré ✓ » quand le nuage l'a ACCEPTÉ (file vide ET dernière
+  // sauvegarde réussie), 4 s — jamais avant, jamais sur une simple supposition.
+  const dit = React.useRef(false);
+  const [fait, setFait] = React.useState(0);
   let n = 0; try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; }
   const horsLigneMesure = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (!n || !(horsLigneMesure || _syncInfo.etat === 'error')) return null;
+  const montre = !lectureSeuleActive() && !!n && (horsLigneMesure || _syncInfo.etat === 'error');
+  React.useEffect(() => {
+    if (montre) { dit.current = true; if (fait) setFait(0); return undefined; }
+    if (dit.current && !n && _syncInfo.etat === 'synced') { dit.current = false; setFait(Date.now()); }
+    return undefined;
+  });
+  React.useEffect(() => { if (!fait) return undefined; const t = setTimeout(() => setFait(0), 4000); return () => clearTimeout(t); }, [fait]);
+  if (lectureSeuleActive()) return null;
+  if (!montre && fait && !n) return (
+    <div role="status" data-envoi-fait=""
+      style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px',marginBottom:12}}>
+      <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="check" size={16}/></span>
+      <span style={{fontSize:13,color:C.text,lineHeight:1.4}}><b style={{fontWeight:600}}>Enregistré</b><span style={{color:C.muted}}> — tes changements sont arrivés sur VRM.</span></span>
+    </div>
+  );
+  if (!montre) return null;
   const reseau = horsLigneMesure || /connexion|répondu|réponse|réessaie|ne répond pas/.test(_syncInfo.raison || '');
   const quand = reseau ? 'dès que le réseau revient' : 'dès que la base les accepte';
   return (
@@ -50164,7 +50199,10 @@ const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Autho
 // ── LA FACTURE PRO (2 nov.) : les outils de l'app que src/FacturePro.jsx emprunte.
 const ecrireReglage = async (id, data) => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([withOwner({ id, data })]) });
+    // (11 nov., réseau instable) Bornée : « enregistrement… » ne reste jamais affiché
+    // sur une réponse qui ne vient pas. L'écriture est une fusion idempotente : la
+    // rejouer pose la même valeur.
+    const r = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([withOwner({ id, data })]) }, DELAI_ECRITURE_MS);
     if (r.ok) { try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: data })); } catch (_) {} }
     return r.ok;
   } catch (_) { return false; }
