@@ -61,7 +61,7 @@ const MOMENTS = [
     alt: 'L’écran Ma journée de VRM : en haut, « 1 colis à envoyer » avec le bouton Imprimer, puis la semaine jour par jour et 60 € vendus aujourd’hui. Données d’exemple.',
     titre: 'Chaque matin, le prochain geste.',
     texte: 'Ma journée met en haut ce qui presse : le colis à envoyer avant sa date limite, les achats arrivés au relais, les messages qui attendent. Un bouton par geste.',
-    points: ['Tous tes comptes Vinted, Leboncoin et eBay dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
+    points: ['Tous tes comptes Vinted, Leboncoin, eBay et Vestiaire dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
   },
   {
     id: 'colis', capture: 'retirer',
@@ -396,7 +396,7 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <p className="av-pour" data-pour-qui="">L’outil des revendeurs Vinted, Leboncoin et eBay. Tous articles.</p>
             <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">Chaque matin, VRM te dit quoi faire, sans te tromper d’article.</p>
+            <p className="av-sous">Vinted, Leboncoin, eBay, Vestiaire : chaque matin, quoi faire, sans erreur d’article.</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
@@ -535,7 +535,7 @@ export default function Accueil({ onEntrer }) {
         <div className="av-in">
           <div>
             <span className="marque">VRM</span>
-            <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
+            <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin, eBay ou Vestiaire Collective.</span>
           </div>
           <nav aria-label="Informations">
             <a href="/aide">Aide</a>

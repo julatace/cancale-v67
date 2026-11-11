@@ -22,11 +22,12 @@
 
 import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
-import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
+import { sendPushToAll, pushCategorieActive, prefsDuVendeur, instantCalme } from './_lib/push.js';
+import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRappel, texteRappels, lienRappel, TAG_RAPPEL } from './_lib/rappels-perso.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
-import { reglageCalme, reglageSoir, soirALHeure } from './_lib/notif-textes.js';
+import { reglageCalme, reglageSoir, soirALHeure, dansHeuresCalmes } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
-import { DESTINATIONS } from './_lib/lien-notif.js';
+import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
 import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
@@ -807,7 +808,8 @@ async function traiterVendeur() {
   try { transporteursPdf = await etiquettesCron({ max: MAX_PDF_MATIN, budgetMs: BUDGET_PDF_MATIN_MS }); }
   catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
-  return { ...out, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf };
+  const rappels = await rappelsPersoSur();
+  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1212,7 +1214,49 @@ async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
 // dit ce qui est arrivé pendant (api/_lib/reveil-calme.js). Rien d'autre.
 // Le mémo du jour est écrit AVANT l'envoi (un envoi raté ne part pas deux fois) ;
 // mémo pas écrit ⇒ rien ne part.
+// (11 nov.) Le passage du réveil sert AUSSI les rappels posés par le vendeur (« Me le rappeler ») :
+// ils sonnent à 9 h (Paris), après les heures calmes. Un échec de l'un n'empêche pas l'autre.
 async function traiterVendeurReveil(maintenant = Date.now()) {
+  let r;
+  try { r = await recapReveil(maintenant); } catch (e) { r = { reveil: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  return { ...r, rappels: await rappelsPersoSur() };
+}
+// ── « ME LE RAPPELER » (11 nov., api/_lib/rappels-perso.js) ──────────────────
+// Les rappels que le VENDEUR a posés lui-même (jamais proposés par VRM, §3) :
+// `main` lu PROJETÉ sur `vrm_rappels` seulement (§4.4), le mémo `rappels_perso_dedup`
+// lu en trois états (illisible ⇒ rien) et écrit AVANT l'envoi, confirmé (sinon
+// rien ne part, et rien ne part deux fois). Famille « Rappels » coupée ⇒ rien.
+// Heures calmes ⇒ on N'ENVOIE PAS et on n'écrit pas le mémo : le passage suivant
+// (réveil toutes les 30 min le matin, puis le soir) le fera sonner à son heure.
+// La réponse ne porte que des nombres : jamais une note, un N° ou un titre.
+async function rappelsPersoSur() {
+  try {
+    const maintenant = Date.now();
+    const main = await getRowProjete('main', [CLE_RAPPELS]);
+    if (main === undefined) return { etat: 'pas-su' };
+    const rappels = lireRappels(main && main[CLE_RAPPELS]);
+    if (!rappels.some((r) => r.etat === 'actif')) return { etat: 'aucun' };
+    const memo = await getRow(MEMO_RAPPELS);
+    if (memo === undefined) return { etat: 'memo-illisible' };
+    const envoyes = memo && memo.envoyes;
+    const dus = rappelsDus(rappels, envoyes, maintenant);
+    if (!dus.length) return { etat: 'rien-de-du' };
+    if (!(await pushCategorieActive('rappel'))) return { etat: 'coupe', n: dus.length };
+    const prefs = await prefsDuVendeur();
+    if (dansHeuresCalmes(prefs || {}, 'rappel', instantCalme())) return { etat: 'heures-calmes', n: dus.length };
+    if (!(await ecrireDedup(MEMO_RAPPELS, { envoyes: memoApres(envoyes, dus, maintenant), at: new Date(maintenant).toISOString() }))) return { etat: 'memo-non-ecrit', n: dus.length };
+    let envoi;
+    if (dus.length === 1) {
+      const r = dus[0], t = texteRappel(r);
+      envoi = await sendPushToAll({ cat: 'rappel', title: t.title, body: t.body, tag: TAG_RAPPEL(r.id), url: lienRappel(r, lienNotif) });
+    } else {
+      const t = texteRappels(dus);
+      envoi = await sendPushToAll({ cat: 'rappel', title: t.title, body: t.body, tag: TAG_RAPPEL('jour-' + dus[0].jour), url: lienNotif('journee', { section: 'rappels' }) });
+    }
+    return { etat: 'envoye', n: dus.length, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  } catch (e) { return { etat: 'echec' }; }
+}
+async function recapReveil(maintenant = Date.now()) {
   const prefs = await prefsDuVendeur();
   // (8 nov.) Heures calmes allumées par défaut : seul un `actif: false` posé les éteint.
   // Préférences pas sues ⇒ rien (« pas su » n'envoie pas un récapitulatif inventé).
@@ -1229,18 +1273,20 @@ async function traiterVendeurReveil(maintenant = Date.now()) {
 }
 // (11 nov., décision C8) Le passage horaire : le résumé seul (ni eBay relu, ni bilan de la semaine).
 async function traiterVendeurSoirHeure() {
-  return rappelDuSoir(Date.now(), { horaire: true });
+  const out = await rappelDuSoir(Date.now(), { horaire: true });
+  return { ...out, rappels: await rappelsPersoSur() };
 }
 async function traiterVendeurSoir() {
   // Le soir : lire et notifier les changements, puis le rappel du soir.
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   const out = await rappelDuSoir();
+  const rappels = await rappelsPersoSur();
   // Le bilan de la semaine part le DIMANCHE SOIR (26 oct.) — même dédoublonnage
   // que le lundi matin (un seul bilan par semaine). Un échec du bilan n'empêche
   // jamais le rappel d'expédition du soir.
   let bilan = null;
   try { bilan = await bilanDeLaSemaine(Date.now(), true); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
-  return { ...out, bilan, ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, rappels, bilan, ebayRelu: resumeRelecture(relu), transporteurs: transp };
 }
 
 // ── LA VEILLE DES PLANTAGES (6 nov., filet 4) ─────────────────────────────────
@@ -1507,7 +1553,12 @@ export default async function handler(req, res) {
     //    L'ordre tourne chaque jour : jamais les mêmes en dernier.
     // (11 nov., C8) Le passage horaire a SON curseur par heure : un vendeur passé à 17 h (pas encore
     // son heure) doit être revu à 18 h — jamais marqué « fait » pour la journée.
-    const momentCurseur = reveil ? 'reveil' : horaire ? `soir-h${new Date(debutCron).getUTCHours()}` : soir ? 'soir' : 'matin';
+    // (11 nov., rappels perso) Le réveil aussi : GitHub le lance toutes les 30 min le matin, et la
+    // route décide seule (fin des heures calmes, 9 h des rappels). Un curseur PAR JOUR marquait chaque
+    // vendeur « fait » dès le premier passage (4 h) : le récapitulatif de 8 h ne partait plus. Un
+    // curseur par demi-heure (le mémo de chaque envoi évite les doublons).
+    const dt = new Date(debutCron);
+    const momentCurseur = reveil ? `reveil-h${dt.getUTCHours()}${dt.getUTCMinutes() < 30 ? 'a' : 'b'}` : horaire ? `soir-h${new Date(debutCron).getUTCHours()}` : soir ? 'soir' : 'matin';
     const budget = Number(process.env.VRM_CRON_BUDGET_MS) > 0 ? Number(process.env.VRM_CRON_BUDGET_MS) : BUDGET_VENDEURS_MS;
     const lot = await passerVendeurs({
       owners, moment: momentCurseur, jour: parisDate(0), debut: debutCron, budgetMs: budget, parallele: VENDEURS_EN_PARALLELE,

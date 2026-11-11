@@ -1,0 +1,46 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PARAMÈTRES → IMPORTER (11 nov. — src/composants/ImportStock.jsx)
+   Le dessin de « Importer un tableur » (import-achats.css) : groupes arrondis,
+   pastilles ; ambre = à corriger (conflit, à vérifier, ignorée). Jetons seulement.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-imps { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.vrm-imps-phrase { margin: 0; font-size: 16px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imps-fichier { margin: 0; font-size: 14px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
+.vrm-imps-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
+.vrm-imps-erreur { margin: 0; font-size: 14px; line-height: 1.45; color: var(--vrm-warn, #B25E00); font-weight: 600; }
+.vrm-imps-puces { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-imps-puces li { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 14px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imps-colonnes { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; max-width: 100%; }
+.vrm-imps-col { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; min-width: 124px; max-width: 168px; }
+.vrm-imps-col-nom { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-imps-col select {
+  height: 44px; border-radius: 12px; border: 0; padding: 0 10px; font: inherit; font-size: 15px;
+  background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); color: var(--vrm-ink, #1D1D1F); -webkit-appearance: none; appearance: none;
+}
+.vrm-imps-col select[data-imps-champ=""] { color: var(--vrm-muted, #6E6E73); }
+.vrm-imps-resume { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-imps-pastille { padding: 7px 12px; border-radius: 999px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18)); font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
+.vrm-imps-pastille b { font-weight: 800; }
+.vrm-imps-pastille.vrm-imps-ambre { background: var(--vrm-warn-soft, rgba(255,159,10,.16)); color: var(--vrm-warn, #B25E00); }
+.vrm-imps-case { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 14px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); cursor: pointer; }
+.vrm-imps-case input { flex: 0 0 auto; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--vrm-accent, #0071E3); }
+.vrm-imps-lignes {
+  list-style: none; margin: 0; padding: 0; border-radius: 14px; overflow: hidden;
+  background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18));
+}
+.vrm-imps-ligne { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 14px; box-sizing: border-box; position: relative; min-width: 0; }
+.vrm-imps-ligne + .vrm-imps-ligne::before { content: ''; position: absolute; top: 0; left: 14px; right: 0; height: .5px; background: var(--vrm-line, #E5E5EA); }
+.vrm-imps-n { flex: 0 0 26px; font-size: 12px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; text-align: right; }
+.vrm-imps-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-imps-titre { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-imps-num { font-weight: 800; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.vrm-imps-meta { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); white-space: normal; overflow-wrap: anywhere; }
+.vrm-imps-note-ligne { color: var(--vrm-warn, #B25E00); font-weight: 600; }
+.vrm-imps-prix { flex: 0 0 auto; font-size: 15px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--vrm-ink, #1D1D1F); }
+.vrm-imps-double .vrm-imps-titre, .vrm-imps-double .vrm-imps-prix { color: var(--vrm-muted, #6E6E73); font-weight: 500; }
+.vrm-imps-conflit .vrm-imps-meta, .vrm-imps-conflit .vrm-imps-prix,
+.vrm-imps-averifier .vrm-imps-prix,
+.vrm-imps-ecartee .vrm-imps-meta, .vrm-imps-ecartee .vrm-imps-prix { color: var(--vrm-warn, #B25E00); font-weight: 600; }
+.vrm-imps-pied { display: flex; flex-direction: column; gap: 8px; }
+.vrm-imps-bloc { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.vrm-imps-h { margin: 0; font-size: 13px; font-weight: 600; text-transform: none; color: var(--vrm-muted, #6E6E73); }
