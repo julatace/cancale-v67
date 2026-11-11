@@ -70,7 +70,7 @@ export function EmballagesCarte({ reglage, ecrire, lireFaits, Feuille }) {
         <span>Emballages</span>
         <button type="button" className="vrm-emb2-ajout" data-emb-ajouter="" onClick={() => setOuvert('nouveau')}>Ajouter</button>
       </div>
-      {!etat.types.length ? <p className="vrm-emb2-vide" data-emb-vide="">Note tes cartons et sacs : chaque colis fait en retire un.</p> : (
+      {!etat.types.length ? <p className="vrm-emb2-vide" data-emb-vide="">Note tes emballages (cartons, sacs) : chaque colis fait en retire un.</p> : (
         <ul className="vrm-emb2-liste">
           {etat.types.map((t) => (
             <li key={t.id}>

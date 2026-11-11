@@ -102,20 +102,20 @@ export function InventaireAnnuel({ owner = '', cle, Feuille, onFermer, onSaisirP
     </li>);
 
   const verif = !inv ? null : (
-    <section className="vrm-ia-carte" data-ia-verif={ecarts ? 'oui' : 'non'} aria-label="Vérification dans les cartons">
-      <div className="vrm-ia-tete">Dans tes cartons</div>
+    <section className="vrm-ia-carte" data-ia-verif={ecarts ? 'oui' : 'non'} aria-label="Vérification du rangement">
+      <div className="vrm-ia-tete">Dans ton rangement</div>
       {ecarts ? (
         <div className="vrm-ia-montant" data-ia-trouvees={ecarts.trouvees.length} data-ia-cochables={nCochables}><b>{ecarts.trouvees.length}</b><span> trouvées sur {nCochables}</span></div>
       ) : <div className="vrm-ia-montant"><b>—</b><span> pas encore vérifié</span></div>}
       {session ? <p className="vrm-ia-sous">Vérification du {jour(Number(session.finAt) || Number(session.debut) || 0)}{relu === 'ko' ? ' · cet appareil seulement' : ''}</p> : null}
-      {onVerifier ? <button type="button" className="vrm-b vrm-b-secondaire vrm-ia-large" data-ia-verifier="" onClick={onVerifier}>Je vérifie mes cartons</button> : null}
+      {onVerifier ? <button type="button" className="vrm-b vrm-b-secondaire vrm-ia-large" data-ia-verifier="" onClick={onVerifier}>Je vérifie mon rangement</button> : null}
       {ecarts ? (<>
         {liste('doublons', 'Deux paires sous un même N°', ecarts.doublons.map((k) => ({ id: k, cle: k, numero: k, titre: 'Porté par deux paires', compte: '' })),
           (l) => <li key={l.id} className="vrm-ia-l vrm-ia-double" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit" etat="doublon"/><span className="vrm-ia-l-t">Porté par deux paires</span></li>, null, 'doublon')}
-        {liste('pas-trouvees', 'Pas trouvées', ecarts.pasTrouvees, ligneEcart, 'Dans VRM, pas vues dans les cartons.', 'geste')}
+        {liste('pas-trouvees', 'Pas trouvées', ecarts.pasTrouvees, ligneEcart, 'Dans VRM, pas vues au rangement.', 'geste')}
         {liste('hors-liste', 'Trouvées, pas dans la liste', ecarts.horsListe.map((k) => ({ id: k, cle: k, numero: k, titre: '', compte: '' })),
-          (l) => <li key={l.id} className="vrm-ia-l" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit"/><span className="vrm-ia-l-t">Vue dans un carton</span></li>,
-          inv.partiel ? 'Une lecture d’annonces manque : vérifie avant de conclure.' : 'Vues dans les cartons, absentes de la liste.', 'geste')}
+          (l) => <li key={l.id} className="vrm-ia-l" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit"/><span className="vrm-ia-l-t">Vue au rangement</span></li>,
+          inv.partiel ? 'Une lecture d’annonces manque : vérifie avant de conclure.' : 'Vues au rangement, absentes de la liste.', 'geste')}
         {ecarts.sansNumero.length ? <p className="vrm-ia-aide" data-ia-sans-numero={ecarts.sansNumero.length}>{plur(ecarts.sansNumero.length, 'paire', 'paires')} sans N° : impossible à cocher.</p> : null}
         <p className="vrm-ia-aide">Rien n’est changé dans VRM.</p>
       </>) : null}
