@@ -62,6 +62,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // ⟦← App.jsx #4⟧
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
+import { useExemplesVendeur } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
@@ -1880,7 +1881,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (9 nov., Julien) L'objectif du mois : un montant de VENDU à viser (vide par défaut). La barre fine de
       // Ma journée (et de chaque carte qui la montre) lit CE réglage (`vrm_objectif_mois`, synchronisé).
       { id:'objectif-mois', type:'panneau', nu:true, ic:'chart', lib:'Objectif du mois', desc:'Un montant de vendu à viser chaque mois : une barre fine dans Ma journée.', val: valObjectif, data:{ 'data-reglage-objectif': objectifR ? objectifR.type : 'aucun' }, el:<ObjectifMoisSetting/> },
-      { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:'Je vends', desc:'Sneakers, ou autre chose : les mots et les vérifications suivent.', val: profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre', data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
+      { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:'Je vends', desc:'Ce que tu vends : les mots et les exemples suivent.', val: (() => { const n = nomsCategories(profilV.categories || [], lireReglageJeVends(load(CLE_JE_VENDS, null)).autre); return n.length ? (n.length > 2 ? `${n.slice(0, 2).join(', ')}…` : n.join(', ')) : (profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre'); })(), data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : 'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
@@ -3353,12 +3354,15 @@ function JeVendsSetting() {
       <Segmente label="Je vends" plein value={r.choix} onChange={choisir}
         options={[['auto', 'Automatique'], ['sneakers', 'Sneakers'], ['autre', 'Autre']].map(([v, l]) => ({ v, l, data: { 'data-je-vends-choix': v } }))}/>
       <div className="vrm-setting-applique" role="status" style={{ color: C.text }}>{vend === 'sneakers' ? 'Sneakers : VRM parle de « paires » et vérifie taille et marque avant de publier.' : 'Autre : VRM parle d’« articles » ; taille et marque sont facultatives.'}</div>
-      {cats.length ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }} data-reglage-je-vends-categories={cats.length}>Tu as dit vendre : {cats.join(', ')}. Pour changer le détail : Ma configuration, en tête de ce groupe.</div> : null}
+      {cats.length ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }} data-reglage-je-vends-categories={cats.length}>Tu as dit vendre : {cats.join(', ')}.</div> : null}
+      {/* (11 nov., lot DJ2) Les tuiles « Tu vends quoi ? », seules (la même question que la configuration). */}
+      <Bouton variante="secondaire" data-reglage-je-vends-tuiles="" style={{ marginTop: 10, minHeight: 44 }} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:configuration', { detail: { seule: 'vends' } })); } catch (_) {} }}>Choisir dans la liste</Bouton>
     </div>
   );
 }
 
 function NumeroEcritSetting({ onAnnonces }) {
+  const exemples = useExemplesVendeur();
   const lire = () => lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null));
   const [r, setR] = React.useState(lire);
   const touche = React.useRef(false);
@@ -3504,7 +3508,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       </div>
       <div data-numero-essai={lectureEssai ? lectureEssai.etat : 'vide'} style={{marginTop:12}}>
         <label htmlFor="vrm-numero-essai" style={{display:'block',fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Essaie : colle une description</label>
-        <textarea id="vrm-numero-essai" value={essai} onChange={(e) => setEssai(e.target.value)} rows={3} placeholder={'Très bon état, pointure 42.\nN° 125'}
+        <textarea id="vrm-numero-essai" value={essai} onChange={(e) => setEssai(e.target.value)} rows={3} placeholder={exemples.essaiNumero}
           style={{width:'100%',boxSizing:'border-box',fontSize:16,lineHeight:1.4,padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.bg,color:C.text,resize:'vertical',fontFamily:'inherit'}}/>
         {lectureEssai && <div role="status" data-numero-essai-cle={lectureEssai.etat === 'lu' ? lectureEssai.cle : ''} style={{fontSize:13,marginTop:6,lineHeight:1.5,color:lectureEssai.etat === 'lu' ? C.text : C.muted}}>
           {lectureEssai.etat === 'lu' ? <>VRM lit <b>N°{lectureEssai.cle}</b> ({lectureEssai.ou}, « {lectureEssai.brut} »).</>
@@ -3644,6 +3648,7 @@ function PuceChoix({ actif, onClick, children, data }) {
     style={{minHeight:44,padding:'0 14px',borderRadius:999,border:`1px solid ${actif?C.accent:C.border}`,background:actif?`${C.accent}14`:C.card,color:C.text,fontSize:14,fontWeight:actif?700:500,cursor:'pointer',fontFamily:'inherit',fontVariantNumeric:'tabular-nums'}}>{children}</button>;
 }
 function NumeroSurVinted() {
+  const ANNONCE_EXEMPLE = useExemplesVendeur().annonce;   // (11 nov., lot DJ2) l'annonce d'exemple suit ce qu'il vend
   const lire = () => lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE, null));
   const [r, setR] = React.useState(lire);
   const touche = React.useRef(false);
