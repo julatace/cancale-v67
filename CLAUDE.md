@@ -560,8 +560,7 @@ vérifier par `curl https://vrm.center/api/sante`.
   poser `STRIPE_SECRET_KEY`, régler l'adresse des CGV ; passer en mode réel.
 - Supabase : Site URL `https://vrm.center` et Redirect URLs, SMTP personnalisé,
   confirmation d'email obligatoire ; (pour Discord) activer le fournisseur Discord et « Allow manual linking » (lot DJ6).
-- Migration **016** (mode équipe) : essai annulé, appliquer VRM peu sollicité, puis
-  `node scripts/equipe-sql/essai-annule.cjs --verifier`.
+- Migration **016** (mode équipe) : pas à pas sans terminal dans `2026-11-11-equipe-pret.md` §4.
 - Captcha Turnstile : prêt et éteint ; l'ordre des gestes est dans l'historique sécurité
   (d'abord l'extension, puis la clé de site, puis Supabase).
 - Repasser sur Vinted connecté sur les comptes dont la lecture est ancienne (la ligne de

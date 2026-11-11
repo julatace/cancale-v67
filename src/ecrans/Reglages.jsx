@@ -3208,6 +3208,15 @@ function DiscordCompte() {
   );
 }
 
+// (11 nov.) VRM n'envoie aucun e-mail d'invitation : le vendeur PARTAGE ce
+// message (feuille de partage du téléphone, sinon copié). Il ne porte aucun
+// secret : l'accès se prouve par l'adresse confirmée, jamais par le lien.
+const texteInvitationEquipe = (email) => `Je t'invite à préparer mes colis sur VRM.\nCrée ton compte sur https://vrm.center avec ${email}.\nConfirme ton e-mail, puis touche « Accepter ».`;
+async function partagerInvitationEquipe(email) {
+  const text = texteInvitationEquipe(email);
+  try { if (navigator.share) { await navigator.share({ text }); return 'partage'; } } catch (e) { if (e && e.name === 'AbortError') return 'annule'; }
+  try { await navigator.clipboard.writeText(text); return 'copie'; } catch (_) { return 'montre'; }
+}
 function EquipeSetting() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const proprio = useEstProprietaire();
@@ -3215,6 +3224,7 @@ function EquipeSetting() {
   const [email, setEmail] = React.useState('');
   const [occupe, setOccupe] = React.useState('');
   const [msg, setMsg] = React.useState('');
+  const [montre, setMontre] = React.useState('');
   const relire = React.useCallback(() => { lireEquipe().then(setLu); }, []);
   React.useEffect(() => { relire(); }, [relire]);
   const agir = async (cle, action, extra, ok) => {
@@ -3241,7 +3251,7 @@ function EquipeSetting() {
       <div>{EQUIPE_NON_INSTALLE_TXT}</div>
       <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
         {proprio
-          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base (Supabase).</>
+          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base.<br/>Supabase → SQL Editor → colle <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</>
           : <>Rien à faire : bientôt, tu inviteras ici ton aide par e-mail.</>}
       </div>
       <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
@@ -3251,7 +3261,7 @@ function EquipeSetting() {
   const inviter = async () => {
     const e = email.trim();
     if (!e) { setMsg("Tape l'adresse e-mail de la personne qui t'aide."); return; }
-    await agir('inviter', 'inviter', { email: e }, (r) => { setEmail(''); setMsg(r.deja ? 'Cette personne est déjà invitée.' : ''); });
+    await agir('inviter', 'inviter', { email: e }, (r) => { setEmail(''); setMsg(r.deja ? 'Cette personne est déjà invitée.' : 'Invitée. Envoie-lui le message.'); });
   };
   return (
     <div data-equipe-reglage="lu" style={{ fontSize: 13, color: C.text }}>
@@ -3261,13 +3271,17 @@ function EquipeSetting() {
           style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }}/>
         <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} className="vrm-b vrm-b-primaire">{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
       </div>
-      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>Aucun e-mail n'est envoyé : préviens-la. Elle crée son compte VRM avec cette adresse.</div>
+      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>VRM n'envoie aucun e-mail. Touche « Envoyer l'invitation ».</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
-            <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée, pas encore acceptée'}</span></span>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée'}</span></span>
+            <span style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
+            {x.statut !== 'actif' && <button type="button" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }} className="vrm-b vrm-b-secondaire">Envoyer l'invitation</button>}
             <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} className="vrm-b vrm-b-discret">Retirer</button>
+            </span>
+            {montre === x.id && <div data-equipe-message={x.id} style={{ flex: '1 1 100%', whiteSpace: 'pre-line', userSelect: 'text', WebkitUserSelect: 'text', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', color: C.text }}>{texteInvitationEquipe(x.email)}</div>}
           </div>
         ))}
       </div>}
