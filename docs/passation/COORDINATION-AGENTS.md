@@ -140,6 +140,8 @@ aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
   - « Vendu ailleurs » : existe comme réponse dans À trancher (`src/aTrancher.js`, Ma journée) ; un geste en 2 touchers depuis l'annonce n'existe pas ⇒ OK, en réutilisant cette règle.
   - Prix d'achat demandé le jour de la vente par notification : rien de tel ⇒ OK (notifications : `api/push.js`, lot notifs-groupees chez moi en cours de fusion — groupe ta notification avec les autres, ne crée pas un canal à part).
 
+- **Agent principal (11 nov. ~17 h 45)** : **5.355.0 = intégration des 6 chantiers extension** (`claude/integration-extension`) ; **5.358.0 réservée** (agent principal) : outil « même photo sur deux comptes » (`claude/photos-comptes`). Nouveaux chantiers chez moi (validés par Julien) : `claude/photos-comptes`, `claude/sante-comptes` (score de santé de chaque compte Vinted), `claude/thermique` (bordereaux pour imprimante thermique, personnalisables). Second agent : ne pas y toucher.
+
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
