@@ -23,7 +23,11 @@ export function planDelier(fiche, provider, id) {
   const cible = ids.find((i) => i.provider === provider && (!id || idDe(i) === id)) || ids.find((i) => i.provider === provider);
   if (!cible || !idDe(cible)) return { ok: false, error: `${nom} n’est déjà plus relié. Recharge la page.` };
   const restent = ids.filter((i) => i !== cible);
-  if (!restent.length) return { ok: false, error: `${nom} est ta seule façon de te connecter. Ajoute d’abord un mot de passe (Changer mon mot de passe).` };
+  // (relecture du 11 nov.) Poser un mot de passe n'ajoute AUCUNE identité chez Supabase
+  // (`single_identity_not_deletable` compte les identités) : ce conseil-là menait à un refus.
+  // Le seul geste qui débloque : relier l'autre fournisseur d'abord.
+  const autre = provider === 'google' ? 'Discord' : 'Google';
+  if (!restent.length) return { ok: false, error: `${nom} est ta seule façon de te connecter. Relie d’abord ${autre}, puis délie ${nom}.` };
   const actuel = String(fiche.email || '').trim().toLowerCase();
   let nouveau = '';
   if (actuel && !restent.some((i) => emailDe(i) === actuel)) {
@@ -42,7 +46,7 @@ export function refusDelier(status, j, provider) {
   const nom = nomDe(provider);
   const code = String((j && j.error_code) || '');
   const t = String((j && (j.msg || j.message)) || '');
-  if (code === 'single_identity_not_deletable' || /at least 1 identity/i.test(t)) return `${nom} est ta seule façon de te connecter.`;
+  if (code === 'single_identity_not_deletable' || /at least 1 identity/i.test(t)) return `${nom} est ta seule façon de te connecter. Relie d’abord ${provider === 'google' ? 'Discord' : 'Google'}, puis délie ${nom}.`;
   if (code === 'identity_not_found' || /identity doesn.t exist/i.test(t)) return `${nom} n’est déjà plus relié. Recharge la page.`;
   if (code === 'email_conflict_identity_not_deletable' || /email conflict/i.test(t)) return `Impossible de délier ${nom} : l’adresse restante est déjà prise par un autre compte VRM.`;
   if (status === 401) return 'Ta session a expiré. Reconnecte-toi avant de réessayer.';

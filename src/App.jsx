@@ -61,7 +61,7 @@ import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';
 import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)
-import {nouvelIdEssai,poserEssai,prendreEssais,candidatsVerificateur,ESSAIS_MAX} from './auth/essaisPkce.js';   // (11 nov., lot DJ6)
+import {nouvelIdEssai,poserEssai,prendreEssais,oterEssai,candidatsVerificateur,ESSAIS_MAX} from './auth/essaisPkce.js';   // (11 nov., lot DJ6)
 import PorteSansCompte from './auth/PorteSansCompte.jsx';
 import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
@@ -2051,7 +2051,8 @@ const consumeAuthRedirect = async () => {
     // (avant, « Discord » par défaut même pour Google). Tout ce départ est consommé.
     const li=lireLiaisonOAuth(sessionStorage,localStorage),it=lireIntentionOAuth([sessionStorage,localStorage]);
     try{sessionStorage.removeItem(PKCE_KEY);localStorage.removeItem(PKCE_KEY);}catch(_){}
-    prendreEssais([sessionStorage,localStorage]);
+    // CETTE tentative est morte ; une autre en cours (autre onglet) reste (relecture du 11 nov.).
+    oterEssai([sessionStorage,localStorage],'',q.get('vrm_essai')||hash.get('vrm_essai')||'');
     const e={error:q.get('error')||hash.get('error')||'',code:q.get('error_code')||hash.get('error_code')||'',description:q.get('error_description')||hash.get('error_description')||''};
     cleanAuthUrl();
     return { error: erreurRetourOAuth(e, li?.provider||it?.fournisseur||'', !!li), ...(li?{liaisonRatee:li.provider}:{}) };
@@ -2082,10 +2083,12 @@ const consumeAuthRedirect = async () => {
     let r = null;
     for (const c of candidats.slice(0, ESSAIS_MAX)) {
       r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: c.v });
-      if (r.ok) { liaison = c.liaison ? ctxLiaison : null; break; }
+      if (r.ok) { liaison = c.liaison ? ctxLiaison : null; oterEssai([sessionStorage, localStorage], c.v); break; }
       // Seul « ce n'est pas le bon vérificateur » vaut un autre essai (Supabase garde le code).
       if (r.code !== 'bad_code_verifier') break;
     }
+    // CETTE tentative est consommée (réussie ou morte) ; celles d'un autre onglet restent.
+    oterEssai([sessionStorage, localStorage], '', q.get('vrm_essai') || '');
     // Code déjà servi (double clic, retour arrière), expiré, autre appareil : la phrase, jamais l'anglais.
     if (!r.ok) return { error: r.status === 0 ? r.error : erreurRetourOAuth({ code: r.code || '', description: r.error || '' }, fourn, !!liaison), ...(liaison?{liaisonRatee:liaison.provider}:{}) };
     if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};

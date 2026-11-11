@@ -17,7 +17,8 @@
 //     (Supabase retombé sur la Site URL), les autres, du plus récent au plus vieux ;
 //   · Supabase garde le code après un refus de vérificateur (`bad_code_verifier`,
 //     token.go : le flux n'est pas effacé) ⇒ on essaie le suivant, 3 au plus ;
-//   · tout est effacé après l'échange, réussi ou raté ; jamais réutilisé.
+//   · après l'échange, CE vérificateur et CETTE tentative sont effacés (réussi ou mort) ;
+//     ceux d'une autre tentative en cours restent (10 min) ; jamais réutilisé.
 export const CLE_ESSAIS = 'vrm_pkce_essais';
 export const DUREE_ESSAI_MS = 10 * 60 * 1000;
 export const ESSAIS_MAX = 3;
@@ -42,15 +43,31 @@ export function poserEssai(stockages, id, v, maintenant = Date.now()) {
   }
 }
 
-// Tous les essais encore valables (onglet et appareil fusionnés), puis effacés.
+// Tous les essais encore valables (onglet et appareil fusionnés). LUS, pas effacés :
+// (relecture du 11 nov.) deux connexions lancées en parallèle (deux onglets) partagent
+// l'appareil ; effacer tout au retour de la première faisait échouer la seconde quand
+// elle revenait dans une autre fenêtre. Ce qui a servi part par `oterEssai`.
 export function prendreEssais(stockages, maintenant = Date.now()) {
   const tous = {};
   for (const s of stockages) {
     const m = lireMap(s);
-    try { s && s.removeItem(CLE_ESSAIS); } catch (_) {}
     for (const [id, e] of Object.entries(m)) if (frais(e, maintenant) && !tous[id]) tous[id] = { v: e.v, at: Number(e.at) };
   }
   return tous;
+}
+
+// Efface les essais de ce vérificateur `v` et/ou de cet identifiant `id` (et les périmés).
+// Appelé après l'échange (réussi ou mort) : un vérificateur échangé ne revient jamais.
+export function oterEssai(stockages, v, id = '', maintenant = Date.now()) {
+  for (const s of stockages) {
+    try {
+      if (!s) continue;
+      const m = lireMap(s);
+      const garde = Object.entries(m).filter(([k, e]) => frais(e, maintenant) && !(v && e.v === v) && !(id && k === id));
+      if (garde.length) s.setItem(CLE_ESSAIS, JSON.stringify(Object.fromEntries(garde)));
+      else s.removeItem(CLE_ESSAIS);
+    } catch (_) {}
+  }
 }
 
 // L'ordre des vérificateurs à présenter. `liaison` : le contexte « Relier » (avec
