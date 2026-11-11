@@ -48,7 +48,9 @@ export function PiluleAnnuler({ gestes, enHaut = false }) {
     let dedans = false, survol = false;
     try { dedans = !!(z && document.activeElement && z.contains(document.activeElement)); } catch (_) {}
     try { survol = !!(z && z.matches(':hover') && window.matchMedia('(hover: hover) and (pointer: fine)').matches); } catch (_) {}
-    r.focus = dedans; r.survol = survol; suspendre();
+    // Relire ne fait que LEVER une raison périmée, jamais en inventer une (le :hover du navigateur
+    // peut être en retard d'une image : seul l'événement du pointeur pose le survol).
+    r.focus = r.focus && dedans; r.survol = r.survol && survol; suspendre();
   }, [suspendre]);
   React.useEffect(() => {
     if (v) { derniere.current = v; setSortante(null); relire(); return undefined; }

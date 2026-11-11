@@ -91,7 +91,7 @@ function Carte({ carte, ton, Photo, onAller, onTrancher, ligne }) {
   );
 }
 
-export default function ATrancher({ etat, onAller, onTrancher = null, Photo = null, entete = null }) {
+export default function ATrancher({ etat, onAller, onTrancher = null, Photo = null, entete = null, resume = true }) {
   if (!etat) return null;
   const { total, partiel, manque } = etat;
   const c = cartesATrancher(etat);
@@ -101,7 +101,7 @@ export default function ATrancher({ etat, onAller, onTrancher = null, Photo = nu
   return (
     <div className="vrm-a-trancher vrm-at" data-a-trancher={total} data-a-trancher-partiel={partiel ? '1' : '0'}>
       {entete}
-      {c.groupes.length ? (
+      {resume && c.groupes.length ? (
         <div className="vrm-at-resume" data-a-trancher-resume={total}>
           {partiel ? <span>Au moins</span> : null}
           <b className="vrm-at-total">{total}</b>
