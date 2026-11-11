@@ -49,6 +49,9 @@ export const LIBELLES_TYPE = {
   // (10 nov., lot G) notés par l'extension 5.337 (`journal_vrm_*`)
   baisse_prix: 'Prix baissé',
   annonce_modifiee: 'Annonce modifiée',
+  // (11 nov., extension 5.340) relu chez Vinted après son clic
+  vacances_pose: 'Mode vacances · posé',
+  vacances_retire: 'Mode vacances · retiré',
 };
 export const LIBELLES_RESULTAT = { ok: 'Fait', refuse: 'Refusé', pause: 'En pause', verifier: 'À vérifier', en_cours: 'En cours' };
 // Les filtres de type (puces) : regroupés comme Julien les nomme.
