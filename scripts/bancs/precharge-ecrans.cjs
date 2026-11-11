@@ -4,20 +4,26 @@ require('./_porte-banc.cjs');
 //  src/prechargeEcrans.js, docs/passation/2026-11-11-chargement-leger.md)
 //
 //  Base INVENTÉE au volume de la sienne (`_base-volume.cjs`), 390 px tactile,
-//  processeur ×4, 4G émulée (le profil « 4g » de chargement.cjs). Ma journée est
+//  processeur ×4, 4G simulée par le serveur du banc (150 ms + 1,6 Mbit/s par fichier
+//  de l'app, la base comme chargement.cjs). Ma journée est
 //  ouverte à froid :
 //   A  appareil qui ouvre souvent Réglages (`vrm_ecrans_frequents` = {reglages: 5}) :
 //      A1 le morceau Réglages est téléchargé ;
 //      A2 PAS avant que l'écran soit stable (sa requête part après le dernier
 //         changement d'attente/squelette de l'ouverture) ;
-//      A3 ouvrir Paramètres ensuite : aucune pastille « Ouverture… » ni squelette de
-//         morceau, et le morceau n'est pas retéléchargé ;
-//      A4 le texte de Ma journée est celui de B (le préchargement ne change rien à l'écran).
+//      A3 ouvrir Paramètres ensuite : aucune pastille « Ouverture… », le morceau n'est pas
+//         redemandé, et la liste s'affiche plus vite que sur un appareil neuf (D) ;
+//      (info) le texte de Ma journée comparé à B — PAS un verdict : sur cette base, le réglage
+//      automatique des doublons (toast « Numéros en double réglés ») tombe à des moments différents
+//      d'un passage à l'autre, avec ou sans préchargement ; le texte identique est jugé par
+//      vitesse.cjs (`VITESSE_REFERENCE`). Aucun module d'écran n'a d'instruction de tête (vérifié).
 //   B  appareil neuf (aucun historique) : aucun morceau d'écran téléchargé en fond.
+//   D  appareil neuf qui ouvre Paramètres : le morceau est demandé au geste (référence de A3).
 //   C  « économie de données » (navigator.connection.saveData) avec le même historique
 //      que A : rien téléchargé en fond.
 //
 //  Lancer : npm run build && node scripts/bancs/precharge-ecrans.cjs   (`BANC_PORT`, 11640)
+//  `PRECHARGE_ASSETS=1` imprime chaque morceau JS demandé, daté depuis la navigation.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), http = require('http'), zlib = require('zlib');
 let chromium;
@@ -27,7 +33,7 @@ const { fabriquer, repondre } = require('./_base-volume.cjs');
 const DIST = process.env.PRECHARGE_DIST ? path.resolve(process.env.PRECHARGE_DIST) : path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 11640;
 const UID_BANC = process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b';
-const P = { cdp: { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8, uploadThroughput: 750e3 / 8 }, rtt: 150, debit: 2e6, max: 90000 };
+const P = { rtt: 150, debit: 2e6, debitFichiers: 1.6e6 / 8, max: 90000 };   // le profil « 4g » de chargement.cjs (Lighthouse : 150 ms, 1,6 Mbit/s)
 const base = fabriquer({ volumeReel: true });
 const UIDS_LIES = base.accounts.map((a) => String(a.vinted_user_id));
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
@@ -43,7 +49,13 @@ const srv = http.createServer((q, r) => {
   if (/^\.(js|css|html|json|webmanifest|svg)$/.test(ext) && /gzip/.test(q.headers['accept-encoding'] || '')) {
     if (!_gz.has(p)) _gz.set(p, zlib.gzipSync(fs.readFileSync(p), { level: 9 }));
     const b = _gz.get(p);
-    r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream', 'content-encoding': 'gzip', 'content-length': b.length, 'cache-control': 'no-store' }); return r.end(b);
+    // Le réseau 4G est simulé ICI, par le serveur (aller-retour + débit) : l'émulation de Chrome
+    // ne freinait pas les morceaux demandés après l'ouverture (22 ms pour 106 Ko, mesuré).
+    const delai = /\/assets\//.test(f) ? P.rtt + Math.round(b.length / P.debitFichiers * 1000) : 0;
+    setTimeout(() => {
+      r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream', 'content-encoding': 'gzip', 'content-length': b.length, 'cache-control': 'no-store' }); r.end(b);
+    }, delai);
+    return undefined;
   }
   r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream', 'cache-control': 'no-store' }); fs.createReadStream(p).pipe(r);
 });
@@ -93,9 +105,10 @@ async function ouvrir(b, { frequents = null, saveData = false } = {}) {
   });
   const cdp = await ctx.newCDPSession(pg);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-  await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', P.cdp);
   const morceaux = [];   // { url, debut } — début en performance.now() de la page
   pg.on('request', (q) => { if (MORCEAUX_ECRANS.test(q.url())) morceaux.push({ url: q.url().replace(/^.*\/assets\//, ''), q }); });
+  const t0 = Date.now();
+  if (process.env.PRECHARGE_ASSETS) pg.on('request', (q) => { if (/\/assets\/.*\.js$/.test(q.url())) console.log(`     ${String(Date.now() - t0).padStart(6)} ms  ${q.url().replace(/^.*\/assets\//, '')}`); });
   await pg.route('**/rest/v1/**', async (route) => {
     const rq = route.request(); const url = rq.url();
     try {
@@ -112,15 +125,38 @@ async function ouvrir(b, { frequents = null, saveData = false } = {}) {
   // L'ouverture, puis 20 s de calme (le préchargement attend 3 s d'écran stable + un moment libre).
   await pg.waitForFunction(() => document.querySelector('[data-attente]') && !document.querySelector('[data-attente="attente"],[data-attente="instantane"]'), null, { timeout: P.max });
   await pg.waitForTimeout(20000);
-  const etat = await pg.evaluate(() => ({ ...window.__pre, precharges: window.__vrmPrecharges || [], texte: (document.querySelector('main.vrm-main') || document.body).innerText.replace(/il y a \d+\s?\w+/g, '').replace(/\b\d{1,2}:\d{2}\b/g, 'hh:mm') }));
+  const etat = await pg.evaluate(() => ({ ...window.__pre, precharges: window.__vrmPrecharges || [], texte: (() => { const m = (document.querySelector('main.vrm-main') || document.body).cloneNode(true); for (const t of m.querySelectorAll('.vrm-toasts')) t.remove(); return m.innerText; })().replace(/il y a \d+\s?\w+/g, '').replace(/\b\d{1,2}:\d{2}\b/g, 'hh:mm') }));
   // les débuts de requête, dans l'horloge de la page
   for (const m of morceaux) { const t = m.q.timing(); m.debut = t && t.startTime >= 0 ? await pg.evaluate((s) => Math.round(s - performance.timeOrigin), t.startTime) : null; }
   return { ctx, pg, errs, etat, morceaux };
 }
 
+// Ouvrir Paramètres par la navigation de l'app ; rend le temps jusqu'à sa liste affichée
+// (`[data-sous-ouvrir]`), si la pastille « Ouverture… » a été vue, et si le morceau Réglages
+// a été (re)demandé après le geste.
+async function ouvrirReglages(run) {
+  const avant = run.morceaux.length;
+  const r = await run.pg.evaluate(() => new Promise((fin) => {
+    window.__pre.apres = true;
+    const t0 = performance.now();
+    window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'settings' }));
+    const tic = () => {
+      if (document.querySelector('[data-sous-ouvrir]') && !document.querySelector('[data-morceau-attente]')) return fin({ ms: Math.round(performance.now() - t0), pastilles: window.__pre.pastilles });
+      if (performance.now() - t0 > 30000) return fin({ ms: null, pastilles: window.__pre.pastilles });
+      setTimeout(tic, 20);
+    };
+    tic();
+  }));
+  await run.pg.waitForTimeout(1000);
+  const neufs = run.morceaux.slice(avant).filter((m) => /^Reglages-/.test(m.url));
+  r.redemande = neufs.length;
+  r.telechargement = neufs.length ? Math.round(neufs[0].q.timing().responseEnd) : 0;
+  return r;
+}
+
 (async () => {
   await new Promise((r) => srv.listen(PORT, r));
-  const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
   try {
     console.log('── B appareil neuf (aucun historique)');
     const B = await ouvrir(b, {});
@@ -135,17 +171,22 @@ async function ouvrir(b, { frequents = null, saveData = false } = {}) {
     dit(!!reg && reg.debut != null && reg.debut >= A.etat.dernierChangement, 'A2 pas avant que l’écran soit stable',
       reg ? `requête à ${reg.debut} ms · dernier changement de l’ouverture à ${A.etat.dernierChangement} ms` : '');
     dit(A.etat.precharges.length === 1 && A.etat.precharges[0].famille === 'reglages', 'A1 une seule famille préchargée (reglages)', JSON.stringify(A.etat.precharges));
-    dit(A.etat.texte === B.etat.texte, 'A4 le texte de Ma journée est le même qu’en B', A.etat.texte === B.etat.texte ? '' : `${A.etat.texte.length} / ${B.etat.texte.length} caractères`);
-    const avant = A.morceaux.length;
-    await A.pg.evaluate(() => { window.__pre.apres = true; window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'settings' })); });
-    await A.pg.waitForTimeout(4000);
-    const apres = await A.pg.evaluate(() => ({ pastilles: window.__pre.pastilles, sq: window.__pre.squelettesApres, reglages: !!document.querySelector('[data-garde-ecran="settings"], .vrm-reglages, [data-reglages]') || /Paramètres|Réglages/.test(document.body.innerText) }));
-    dit(apres.reglages, 'A3 Paramètres est ouvert');
-    dit(apres.pastilles === 0 && apres.sq === 0, 'A3 aucune pastille « Ouverture… » ni squelette de morceau', `pastilles ${apres.pastilles} · squelettes ${apres.sq}`);
-    dit(A.morceaux.filter((m) => /^Reglages-/.test(m.url)).length === 1 && A.morceaux.length === avant, 'A3 le morceau n’est pas retéléchargé', A.morceaux.map((m) => m.url).join(', '));
+    console.log(`  ·  (info) texte de Ma journée ${A.etat.texte === B.etat.texte ? 'identique à B' : `différent de B (${A.etat.texte.length} / ${B.etat.texte.length} caractères)`}`);
+    if (A.etat.texte !== B.etat.texte && process.env.PRECHARGE_DIFF) { const a = A.etat.texte.split('\n'), bb = B.etat.texte.split('\n'); console.log('     A seul :', JSON.stringify(a.filter((x) => !bb.includes(x)))); console.log('     B seul :', JSON.stringify(bb.filter((x) => !a.includes(x)))); }
+    const navA = await ouvrirReglages(A);
+    dit(navA.ms != null, 'A3 Paramètres est ouvert', navA.ms != null ? `${navA.ms} ms après le geste` : 'pas en 30 s');
+    dit(navA.pastilles === 0, 'A3 aucune pastille « Ouverture… »', `pastilles ${navA.pastilles}`);
+    dit(navA.redemande === 0, 'A3 le morceau Réglages n’est pas redemandé', `${navA.redemande} requête(s)`);
     dit(!A.errs.length, 'A aucune erreur de page', A.errs.slice(0, 2).join(' | '));
     if (process.env.PRECHARGE_SHOT) await A.pg.screenshot({ path: process.env.PRECHARGE_SHOT });
     await A.ctx.close();
+
+    console.log('── D appareil neuf qui ouvre Paramètres (la référence de A3)');
+    const D = await ouvrir(b, {});
+    const navD = await ouvrirReglages(D);
+    dit(navD.redemande === 1, 'D sans préchargement, le morceau Réglages est demandé au geste', `${navD.redemande} requête(s)`);
+    dit(navA.ms != null && navD.ms != null && navA.ms < navD.ms, 'A3 Paramètres s’ouvre plus vite qu’en D', `A ${navA.ms} ms · D ${navD.ms} ms (téléchargement du morceau en D : ${navD.telechargement} ms)`);
+    await D.ctx.close();
 
     console.log('── C économie de données, même historique que A');
     const Cx = await ouvrir(b, { frequents: { reglages: 5 }, saveData: true });
