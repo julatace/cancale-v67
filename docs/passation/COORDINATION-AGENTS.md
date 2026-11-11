@@ -36,7 +36,13 @@ suivant libre (**5.355+**) AVANT de coder.
 - (vide — écrire ici « sujet · branche · début »)
 
 ## Fini, à intégrer
-- (vide)
+- **Session `session_012bXttmKqZkj54mz4qbazy2` (second agent, 11 nov. ~14 h 45 UTC) — finis, poussés, RIEN fusionné sur main :**
+  - `claude/colis-a-leur-place` (DJ3) : plus d'onglet Colis, « À expédier » en tête de Ventes, « À retirer » en tête d'Achats, « InPost » ⇒ logo Mondial Relay, codes des e-mails tous affichés. Récit `docs/passation/2026-11-11-colis-a-leur-place.md`. ⚠️ recouvre peut-être `revue-colis` / `ventes-achats-visuel` : à trancher par l'agent principal.
+  - `claude/stock-juste` (DJ4) : Stock en ligne seulement (une fois par identité), À trancher dans Ma journée, « L'enlever du stock ? », pilule Annuler qui ne se fige plus. ⚠️ fait rougir 2 bancs : `compta-abonnements` (suppression → corbeille) et `annuler-commandes` K5 (focus « Préparer ») — à corriger avant fusion.
+  - `claude/rouges-a`, `claude/rouges-b` : bancs remis au vert (Ventes CLS 0 ; statut HTTP rendu par la copie du lot K ; focus ⌘K « Exporter »). Conflit connu : `scripts/bancs/stock-annonces.cjs` ⇒ garder la version de `claude/stock-juste`.
+  - `claude/youthful-wozniak-v71bap` : stock-juste + rouges-a + rouges-b déjà assemblés (même ⚠️ des 2 bancs).
+  - Restes notés : « 7,44 € » écrit 3 fois dans Argent → Déclarer ; extension : lire « Mondial Relay by InPost » comme Mondial Relay ; `annonces-ventes-brouillon` 16 rouges de mise en page.
+  Cette session s'arrête ici et ne fusionne plus rien sans qu'on le lui demande.
 
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
