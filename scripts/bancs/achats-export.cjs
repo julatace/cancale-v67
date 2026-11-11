@@ -231,6 +231,12 @@ const moisDuTrim=(d)=>{ const t=Math.floor(d.getMonth()/3); return [0,1,2].map(i
           if(!(await pg.locator('[data-export-comptable]').count())){ await ctx.close(); continue; }
           await pg.click('[data-export-preparer]');
           await attendExport(pg,null);
+          // (11 nov.) Défaut : le dernier mois BOUCLÉ — aucun geste de plus pour le cas courant.
+          const E0=await lireExport(pg); const mb=new Date(maintenant.getFullYear(),maintenant.getMonth()-1,1);
+          dit(!!E0&&E0.periode===ym(mb),'B · défaut : le dernier mois bouclé, sans rien choisir',E0&&E0.periode);
+          const voie=await pg.getAttribute('[data-export-zip]','data-export-zip-voie').catch(()=>null);
+          const libZip=await pg.locator('[data-export-zip]').innerText().catch(()=>'');
+          dit((voie==='telechargement'&&/Télécharger le zip/.test(libZip))||(voie==='partage'&&/Partager le zip/.test(libZip)),'B · le bouton dit ce qui va se passer (partage ou téléchargement)',`${voie} · ${libZip}`);
           const caLigne=(yms)=>r2(((ligne&&ligne.mois)||[]).filter(m=>yms.includes(m.ym)).reduce((t,m)=>t+(Number(m.ca)||0),0));
           const yNow=String(maintenant.getFullYear()), ymNow=ym(maintenant);
           const cas=[['mois',ymNow,[ymNow]],['trimestre',trimestre(maintenant),moisDuTrim(maintenant)],['annee',yNow,Array.from({length:12},(_,i)=>`${yNow}-${String(i+1).padStart(2,'0')}`)]];
@@ -254,6 +260,21 @@ const moisDuTrim=(d)=>{ const t=Math.floor(d.getMonth()/3); return [0,1,2].map(i
             if(type==='mois'){
               dit(!!E&&E['achats-n']===String(achatsDuMois.length)&&E['sans-cout']===String(achatsDuMois.length),`B · ${periode} : ${achatsDuMois.length} achats, tous « sans coût saisi » (rien deviné)`,`${E&&E['achats-n']} · ${E&&E['sans-cout']}`);
               dit(!!E&&Number(E.adater)>=1&&/à dater/.test(E.texte),`B · ${periode} : la vente sans date de versement est à part (« à dater »)`,E&&E.adater);
+              // (11 nov.) LE ZIP, un clic : récap, xlsx, csv, dans UN dossier ; relu ici.
+              const zip=await telecharge(pg,'[data-export-zip]');
+              const { lireZipStocke }=await import('file://'+path.join(__dirname,'..','..','src','exportDonnees.js'));
+              const fz=lireZipStocke(new Uint8Array(zip.octets)); const noms=fz.map(x=>x.nom);
+              const dos=`VRM-comptable-${periode}/`;
+              dit(zip.nom===`VRM-comptable-${periode}.zip`&&noms.length>=3&&noms.every(n=>n.startsWith(dos))&&fz.every(x=>x.crcOk),'B · zip : nommé de la période, UN dossier, CRC justes',noms.join(' , '));
+              dit(noms.some(n=>/1-Recapitulatif-.*\.pdf$/.test(n))&&noms.some(n=>/2-Tableur-.*\.xlsx$/.test(n))&&noms.some(n=>/2-Tableur-.*\.csv$/.test(n)),'B · zip : récap PDF, tableur .xlsx et .csv');
+              const xl=fz.find(x=>/\.xlsx$/.test(x.nom)); const parts=xl?lireZipStocke(xl.octets):[];
+              const feuilles=parts.filter(x=>/^xl\/worksheets\/sheet\d+\.xml$/.test(x.nom)).map(x=>x.texte).join('\n');
+              const wb=(parts.find(x=>x.nom==='xl/workbook.xml')||{}).texte||'';
+              dit(/name="Recettes"/.test(wb)&&/name="À dater"/.test(wb)&&/name="Achats"/.test(wb)&&/91004/.test(feuilles)&&!/91007|compte_exclu/.test(feuilles),'B · xlsx : Recettes, À dater, Achats ; 91004 présente, compte exclu absent');
+              const fin=await pg.getAttribute('[data-export-zip-fin]','data-export-zip-fin').catch(()=>null);
+              dit(fin==='telecharge'||fin==='partage','B · après le clic, l’écran dit où est parti le zip',fin);
+              if(CAP&&regime==='micro') fs.writeFileSync(path.join(CAP,`export-${nomCap}.zip`),zip.octets);
+              await pg.click('[data-export-a-part] summary');
               const csv=await telecharge(pg,'[data-export-csv]'); const pdf=await telecharge(pg,'[data-export-pdf]');
               const t=csv.octets.toString('utf8');
               dit(csv.octets[0]===0xef&&csv.octets[1]===0xbb&&csv.octets[2]===0xbf&&csv.nom===`Export-comptable-${periode}.csv`,'B · tableur : UTF-8 avec BOM, nommé de la période',csv.nom);
@@ -263,7 +284,7 @@ const moisDuTrim=(d)=>{ const t=Math.floor(d.getMonth()/3); return [0,1,2].map(i
               dit(!/91007|7100200|compte_exclu/.test(t),'B · tableur : le compte exclu n’y est pas');
               dit(/VENTES À DATER/.test(t)&&/91004/.test(t.split('VENTES À DATER')[1]||'')&&!/91004/.test((t.split('VENTES VERSÉES')[1]||'').split('VENTES À DATER')[0]),'B · tableur : la vente 91004 dans « à dater », pas dans les ventes versées');
               const P=await lirePdf(pdf.octets);
-              dit(P.pages===1&&P.texte.includes((Number(E.ca)/100).toFixed(2).replace('.',',')),'B · PDF : une page, le même CA déclaré',`${P.pages} page(s)`);
+              dit(P.texte.split('\n')[0].includes((Number(E.ca)/100).toFixed(2).replace('.',',')),'B · PDF : la 1re page porte le même CA déclaré',`${P.pages} page(s)`);
               dit(!/encaiss/i.test(t+P.texte+E.texte),'B · jamais « encaissé »');
               if(CAP&&regime==='micro'){ fs.writeFileSync(path.join(CAP,`export-${nomCap}.csv`),csv.octets); fs.writeFileSync(path.join(CAP,`export-${nomCap}.pdf`),pdf.octets); }
             }
