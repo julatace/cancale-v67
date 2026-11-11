@@ -154,7 +154,8 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
             const r = await lire(pg);
             dit(r.route === '1' && r.achats.join() === 'A1', 'Colis → « À retirer » : l’achat en route, pas celui livré', JSON.stringify(r.achats));
             dit(/chronopost\.fr/.test(r.suivre) && r.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', r.suivre);
-            await pg.click('[data-colis-onglet-choix="envoyer"]'); await pg.waitForTimeout(500);
+            // (11 nov., intégration colis) Retour aux colis à envoyer : ils sont en tête de Ventes (lot DJ3).
+            await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' }))); await pg.locator('[data-colis-section="ventes"]').first().waitFor({ timeout: 30000 }); await pg.waitForTimeout(1500);
             const vide = await pg.evaluate(() => /Aucun colis à envoyer\./.test(document.body.innerText));
             dit(!vide, 'jamais « Aucun colis à envoyer » sous deux colis Vestiaire à envoyer (« Aucun colis Vinted à envoyer »)', String(vide));
           } else if (mode === 'panne') {

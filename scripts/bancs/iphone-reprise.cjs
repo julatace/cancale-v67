@@ -343,10 +343,11 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         // B9 · le retour entre écrans
         await toucher(pg, '.vrm-tabbar [data-nav-entree="journee"]');
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="cat_bord"]');
+        // (11 nov., intégration colis) Colis n'est plus dans la barre : Achats (« À retirer » en tête) a pris sa place (lot DJ3).
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
         await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r1 = (await ecran(pg)).ecran;
         await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r2 = (await ecran(pg)).ecran;
-        dit(r1 === 'ventes' && r2 === 'journee', `B9 ${qui} : retour Colis → Ventes → Journée`, `${r1} puis ${r2}`);
+        dit(r1 === 'ventes' && r2 === 'journee', `B9 ${qui} : retour Achats → Ventes → Journée`, `${r1} puis ${r2}`);
         dit(errs.length === 0, `B ${qui} : aucune erreur de page`, errs.join(' | '));
         await ctx.close();
       });
@@ -373,14 +374,14 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         const r1b = await ecran(pg);
         dit(r1b.ecran === 'ventes' && r1b.site === 'vinted' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify(r1b));
         // R2 · Colis · À retirer, app rouverte
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="cat_bord"]');
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         const r2avant = await ecran(pg);
         await pg.close();
         ({ pg } = await ouvrirPage(ctx));
         const r2 = await ecran(pg);
         await capture(pg, `reprise-colis-${sombre ? 'sombre' : 'clair'}`);
-        dit(r2avant.colis === 'retirer' && r2.ecran === 'cat_bord' && r2.colis === 'retirer', `R2 ${qui} : rouverte, même écran (Colis) et même onglet (À retirer)`, JSON.stringify({ avant: r2avant.colis, apres: r2 }));
+        dit(r2avant.colis === 'retirer' && r2.ecran === 'achats' && r2.colis === 'retirer', `R2 ${qui} : rouverte, même écran (Achats, « À retirer » en tête — lot DJ3) et même liste (À retirer)`, JSON.stringify({ avant: r2avant.colis, apres: r2 }));
         // R3 · Annonces : recherche + défilement, app rouverte
         await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]');
         await toucher(pg, '[data-filtre-site] button[data-site="vinted"]');
