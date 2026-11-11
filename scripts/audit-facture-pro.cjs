@@ -421,7 +421,10 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   dit(/^Message-ID: <[0-9a-f]{32}@vrm-banc\.test>$/mi.test(tete) && /^Date: /mi.test(tete) && !/^List-Unsubscribe/mi.test(tete), 'V6 en-têtes propres : Message-ID, Date, et JAMAIS List-Unsubscribe (transactionnel)', '');
   dit(/Content-Type: text\/plain/.test(mv.data) && /Content-Type: text\/html/.test(mv.data) && /filename="Facture-FA-\d{4}-0007\.pdf"/.test(mv.data), 'V6 texte + HTML, et le PDF de la facture en pièce jointe', '');
   const corpsTexte = (() => { const m = /Content-Type: text\/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)/.exec(mv.data); return m ? Buffer.from(m[1].replace(/\s/g, ''), 'base64').toString('utf8') : ''; })();
-  dit(/envoyée par VRM pour le compte de Boutique Banc EI/.test(corpsTexte) && /répondez simplement à cet e-mail/.test(corpsTexte), 'V6 le message dit que VRM l’envoie pour le vendeur, et qu’on répond au vendeur', corpsTexte.slice(-160));
+  // (11 nov., lot DJ1 — Julien : « je veux pas de ce message ») AUCUN pied « envoyée par VRM pour le
+  // compte de … » : l'e-mail ne porte que le texte du vendeur ; la réponse va chez lui par Reply-To (V6 plus haut).
+  const htmlPart = (() => { const m = /Content-Type: text\/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)/.exec(mv.data); return m ? Buffer.from(m[1].replace(/\s/g, ''), 'base64').toString('utf8') : ''; })();
+  dit(corpsTexte.length > 20 && /Boutique Banc EI/.test(corpsTexte) && !/pour le compte de|envoyée par VRM|répondez simplement|votre réponse arrive|on behalf of/i.test(corpsTexte + htmlPart) && hdr('Reply-To') === '<boutique@banc.test>', 'V6 aucun pied « envoyée par VRM pour le compte de … » (texte ET HTML) ; la réponse va au vendeur par Reply-To seulement', corpsTexte.slice(-160));
   const lv = base.get(cle(A, 'email_invoice_tx23000000706'));
   dit(lv.status === 'sent' && Array.isArray(lv.envois) && lv.envois.length === 1 && lv.envois[0].a === 'marie.banc@exemple.test' && lv.envois[0].via === 'vrm' && lv.envois[0].etat === 'envoyee', 'V7 journal des envois : date, destinataire, chemin, issue', JSON.stringify(lv.envois));
   const evR = await appel(A, { action: 'envoyer', tx: '23000000706', confirme: true, renvoyer: true });

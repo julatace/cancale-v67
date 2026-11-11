@@ -133,7 +133,9 @@ async function verifier(racine, { muet = false } = {}) {
   dit(/<CarteVerifEntreprise /.test(fp) && /<CarteVerifEntreprise /.test(cd) && /useRechercheEntreprise\(deps\.chercherEntreprise/.test(fp) && /useRechercheEntreprise\(entreprise\.chercherEntreprise/.test(cd), 'B1 la MÊME recherche et la MÊME carte dans « Ma facture » et « Ma configuration »');
   dit(!/chercherEntreprise\([^)]*\)\.then/.test(fp), 'B2 « Ma facture » ne remplit plus rien en silence à la réponse du registre');
   dit(/if \(frais === null \|\| frais === undefined\) return false;/.test(cd), 'B3 la configuration relit la fiche avant d’écrire ; lecture ratée ⇒ rien écrit');
-  dit(/Recherche de l’entreprise…/.test(re) && /rep === 'encours'/.test(re) && !/setTimeout/.test(re), 'B4 l’animation « Recherche de l’entreprise… » ne dure que la requête (aucun délai fabriqué)');
+  // (11 nov., lot DJ1) L'animation ne dure que la requête, ARRÊTÉE à 8 s (le seul minuteur pose « lent ») —
+  // jamais un délai fabriqué avant de montrer la réponse (audit-facture-siret l'exécute).
+  dit(/Recherche de ton entreprise…/.test(re) && /rep === 'encours'/.test(re) && (re.match(/setTimeout\(/g) || []).length === 1 && /setTimeout\(\(\) => \{ if \(!mort\) \{ mort = true; setRep\(\{ etat: 'lent' \}\); \} \}, DELAI_RECHERCHE_MS\)/.test(re), 'B4 l’animation ne dure que la requête, arrêtée à 8 s (aucun délai fabriqué)');
   return ko;
 }
 
