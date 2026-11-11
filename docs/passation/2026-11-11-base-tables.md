@@ -1,6 +1,8 @@
 # 11 nov. 2026 — Une vraie base de données (étape 1 sur 4)
 
-Branche `claude/base-tables` (partie de `origin/main` f04d4a58), **rien fusionné, rien appliqué**.
+Branche `claude/base-tables` (partie de `origin/main` f04d4a58, `origin/main` refusionné le 11 nov. : déjà à jour), **rien fusionné, rien appliqué**.
+
+⚠️ **Numéro : 038** (renumérotée le 11 nov.) — le 037 est pris par `037-parrainage-meme-carte.sql` (branche `claude/agent2-argent-parrainage`, écrite avant). Sur `origin/main`, la dernière est la 036 : 038 libre partout.
 Demande de Julien (validée) : une vraie base pour tenir des milliers de vendeurs, plus
 rapide, chiffres plus sûrs, par étapes, sans jamais casser l'app en ligne.
 
@@ -203,9 +205,10 @@ n'y perdent rien.
 ## Geste de Julien
 Aucun pour l'instant. Quand il le décide : §6 (A puis B), ~5 minutes.
 
-## ÉTAT À LA REPRISE (11 nov., arrêt demandé par Julien via la session principale)
-- **Fait et poussé** (`claude/base-tables`) : 038 (tables, RLS, index, déclencheurs, remplissage, couverture, effacement vendeur), banc `scripts/audit-tables-typees-sql.cjs`, ce récit, ligne §9 de CLAUDE.md (58 971 octets).
-- **Prouvé** : grande base ~50 000 lignes : 73 verts, 0 rouge, 6 mutations rouges (avant la dernière optimisation, puis `--petit` 67 verts sur la version allégée ; la grande mesure +36 ms a été prise sur la version allégée). Formes vérifiées en lecture seule sur la vraie base (§1).
-- **Reste** : relancer une fois `node scripts/audit-tables-typees-sql.cjs` (sans `--petit`, ~4 min) sur la tête poussée pour confirmer ; aucune PR, rien fusionné, 038 pas appliquée ; la ligne « Fini, à intégrer » de `docs/passation/COORDINATION-AGENTS.md` (branche `claude/coordination`) n'est PAS écrite.
-- **Prochaines étapes exactes** : intégrer la branche (fichiers neufs + une ligne §9, aucun conflit attendu) ; Julien : §6 (essai annulé puis Run, puis `vrm_tables_remplir(2000)` jusqu'à `fini`) ; puis étape 2 (§7 : drapeau `vrm_lecture_tables`, ombre sur Ventes et serveur d'abord ; 039 Leboncoin/Vestiaire/eBay après mesure).
+## ÉTAT À LA REPRISE (11 nov., fin de lot)
+- **Fait et poussé** (`claude/base-tables`) : 038 (tables, RLS, index, déclencheurs, remplissage, couverture, effacement vendeur), banc `scripts/audit-tables-typees-sql.cjs`, ce récit (plan des étapes 2-4 §7, pas-à-pas §6), ligne §9 de CLAUDE.md (58 971 octets).
+- **Banc final relancé sur la tête** (sans `--petit`, 2 min 15) : **73 verts, 0 rouge** ; 49 632 lignes inventées dans `app_data`, 39 668 recopiées en 20 lots (25,5 s, 0 erreur) ; rejoué 2 fois = tables identiques ; `app_data`/`vinted_accounts` identiques avant/après (aucun N° changé) ; formes inconnues et sans identité comptées exactement ; RLS 9 tables ; **6 mutations, chacune rouge** (`using (true)` 11, garde des N° 3, enveloppe d'erreur 3, forme inconnue qui efface 1, `do update` 6, jetons 1). Surcoût mesuré : écrire 2 000 ventes 15,7 → 55,4 ms (+40 ms) ; `main` 5,9 → 5,7 ms ; une vente par son n° 6,2 → 0,29 ms ; ventes d'octobre 8,0 → 1,5 ms (machine chargée par d'autres agents : les écarts comptent, pas l'absolu).
+- Audits `secrets, fonctions-api, coherence, identite, variables, tdz, icones, textes-courts, quoi-de-neuf, traduction` : verts. Pas de changement de l'app (rien dans `src/`, `api/`, l'extension) ⇒ ni build ni capture ni « Quoi de neuf ».
+- **Reste** : aucune PR, rien fusionné, 038 pas appliquée ; la ligne « Fini, à intégrer » de `docs/passation/COORDINATION-AGENTS.md` (branche `claude/coordination`) à écrire par la session principale.
+- **Prochaines étapes exactes** : intégrer la branche (fichiers neufs + une ligne §9 ; si une autre branche a pris la 038 entre-temps, renuméroter fichier + `M038`/`lire()` du banc + récit) ; Julien : §6 (essai annulé puis Run, puis `vrm_tables_remplir(2000)` jusqu'à `fini`) ; puis étape 2 (§7 : drapeau `vrm_lecture_tables`, ombre sur Ventes et serveur d'abord ; 039 Leboncoin/Vestiaire/eBay après mesure).
 - **Pièges** : ne jamais remettre `<> all(array)` ni recalculer toutes les commandes (220 ms par écriture) ; le raccourci « liste inchangée » n'est permis que si la copie est propre (`v_propre`) ; les fonctions `vrm_projeter*` doivent rester fermées à anon/authenticated (droits par défaut Supabase) ; familles PDF lues par `meta` seulement.
