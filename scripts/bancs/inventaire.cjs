@@ -142,6 +142,10 @@ async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) 
     // Le compte 222 : sa lecture RATE (pas su).
     if (/harvest_222_/.test(u)) return j({ message: 'panne' }, 500);
     const forme = (r) => (sel && !/^id,data$|^data$/.test(sel) ? projette(r, sel) : { ...r, updated_at: new Date(AUJ).toISOString() });
+    // (11 nov.) Les lectures groupées `id=in.(…)` (dressings revalidés par leur version, lot K) servies
+    // comme PostgREST ; une requête qui porte le compte 222 rate en entier (ci-dessus), comme un serveur.
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(ROWS().filter((r) => ids.includes(r.id)).map(forme)); }
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS().filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);

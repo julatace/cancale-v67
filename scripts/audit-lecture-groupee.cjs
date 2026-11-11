@@ -141,6 +141,11 @@ async function verifier(mod) {
   dit(!!brut && /const rows = await lireMoissonGroupee\(`harvest_\$\{uid\}_\$\{type\}`\);\s*if \(!Array\.isArray\(rows\)\) return null;/.test(brut[0]), 'App.jsx : fetchHarvestBrut lit par la lecture groupée ; pas su ⇒ null');
   dit(/app_data\?id=in\.\(\$\{ids\.join\(','\)\}\)&select=\$\{SEL_MOISSON\}/.test(app) && /app_data\?id=eq\.\$\{id\}&select=\$\{SEL_MOISSON\}/.test(app), 'App.jsx : lot `id=in.(…)` et lecture seule, tous deux projetés `SEL_MOISSON`');
   dit(/idGroupable\(id\) \? _groupeMoisson\.charger\(id, `\$\{auth\}\|\$\{famille\}`\) : _lireLigneMoissonSeule\(id, auth\)/.test(app), 'App.jsx : la session ET la famille sont la clé du lot ; un id pas sûr part seul');
+  // (11 nov.) Le chemin « copie sur l'appareil » (lot K) rend le statut HTTP de la lecture ratée :
+  // un 5xx fait relire chaque ligne seule (règle 5xx ci-dessus) ; un statut figé à 0 rendait « pas su »
+  // TOUS les comptes dès qu'un seul était illisible (banc inventaire, 11 nov.).
+  const copie = /if \(uidCopie\) \{[\s\S]*?\n  \}/.exec(app);
+  dit(!!copie && /if \(!res\.ok\) \{ statutRate = res\.status; return null; \}/.test(copie[0]) && /statut: r\.incoherent \? 400 : statutRate \}/.test(copie[0]), 'App.jsx : dressings gardés sur l\'appareil — une lecture ratée rend SON statut HTTP (5xx ⇒ relue ligne par ligne)');
   return ko;
 }
 
