@@ -2514,6 +2514,9 @@ const ENTREPRISE_VIDE = {
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   'vrm_vc_etiquettes','vrm_lbc_dates',
+  // (11 nov., lot stats-categories) La catégorie qu'IL a choisie pour une vente sans
+  // catégorie lue : { ['vinted:tx'|'lbc:id'|'ebay:id'|'vestiaire:id']: { f, at } } — src/statsCategories.js.
+  'vrm_categories_main',
   // (10 nov., lot AB) Les fils de Messages qu'IL a reliés (« Oui, même fil ») ou refusés
   // (« Non ») : { liens: { [a|b]: { a, b, at } }, refus: { [a|b]: at } } — src/filUnique.js.
   'vrm_fils_relies',
@@ -7886,7 +7889,7 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {})
     // (1er nov., audit A11) Une date posée à la main (`dateSaisie`, rangée à midi
     // par `avecDatesLbc`) ou lue sans heure n'a pas d'HEURE : elle ne compte dans
     // aucune case « Quand tu vends » (`heureLue: false` ⇒ « sans heure »).
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), tx: String(v.txId), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
     if (e && excluAutre && excluAutre('ebay', e)) continue;   // (3 nov.) compte écarté par son choix
@@ -7902,7 +7905,7 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {})
     if (eur == null && !vus.has('ebay:' + e.orderId)) nonComptees.push({ plateforme: 'eBay', raison: montantRecuEbay(e).raison, ts: t || null });
     if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
     if (!t) continue;
-    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || '') });
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || ''), tx: String(e.orderId) });   // (11 nov.) `tx` : l'identité de la vente (Statistiques → Par catégorie)
   }
   // VESTIAIRE, au jour de la VENTE : compté si le montant reçu est sûr et la
   // vente datée ; sinon NOMMÉ (`nonComptees`), jamais deviné.
@@ -7911,7 +7914,7 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {})
     const t = dateVenteVc(v), recu = montantRecuVc(v);
     if (recu.eur == null) { nonComptees.push({ plateforme: 'Vestiaire', raison: recu.raison, ts: t || null }); continue; }
     if (!t) { nonComptees.push({ plateforme: 'Vestiaire', raison: 'vente pas datée', ts: null }); continue; }
-    lignes.push({ plateforme: 'Vestiaire', ts: t, eur: recu.eur, compte: String(v.compte || '') });
+    lignes.push({ plateforme: 'Vestiaire', ts: t, eur: recu.eur, compte: String(v.compte || ''), tx: String(v.id) });
   }
   return { lignes, sansDate, ecartees, nonComptees };
 };
@@ -27045,7 +27048,7 @@ const lireExtrasRepartition = async () => {
     for (const r of items) for (const it of ((r && Array.isArray(r.items)) ? r.items : [])) {
       if (!it || it.id == null) continue;
       const w = mapWardrobeItem(it);
-      idx[w.id] = { brand: w.brand, size: w.size, createdTs: w.createdTs, id: w.id, promoted: w.promoted, views: w.views, favourites: w.favourites, title: w.title };
+      idx[w.id] = { brand: w.brand, size: w.size, createdTs: w.createdTs, id: w.id, promoted: w.promoted, views: w.views, favourites: w.favourites, title: w.title, cat: w.catalogId || null };   // (11 nov.) `cat` : la catégorie Vinted LUE (Par catégorie)
     }
   }
   if (AUTH.user?.id !== owner) return {txn:null,items:null,dates:null};
@@ -34257,13 +34260,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     if (!stockDort || !Array.isArray(listings.items) || listings.loading || listings.incomplet !== false || listingDatesLu !== true) return;
     try {
-      const v = { v: 1, dort: stockDort, at: Date.now() };
+      // (11 nov., lot stats-categories) + `parCatalogue` : les annonces en ligne par
+      // catégorie Vinted LUE (`catalog_id` du dressing ; '' pas lue) — Statistiques
+      // → « Par catégorie » la traduit en familles (src/statsCategories.js).
+      const parCatalogue = {};
+      for (const it of annBase) { const k = it && it.catalogId ? String(it.catalogId) : ''; parCatalogue[k] = (parCatalogue[k] || 0) + 1; }
+      const v = { v: 1, dort: stockDort, parCatalogue, at: Date.now() };
       const avant = load('vrm_stats_stock', null);
-      if (avant && JSON.stringify(avant.dort) === JSON.stringify(stockDort) && Date.now() - (Number(avant.at) || 0) < 6 * 3600000) return;
+      if (avant && JSON.stringify(avant.dort) === JSON.stringify(stockDort) && JSON.stringify(avant.parCatalogue || null) === JSON.stringify(parCatalogue) && Date.now() - (Number(avant.at) || 0) < 6 * 3600000) return;
       save('vrm_stats_stock', v);
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stockDort, listings, listingDatesLu]);
+  }, [stockDort, listings, listingDatesLu, annBase]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et
