@@ -97,7 +97,7 @@ async function principal() {
   v = T.venteMarge(L('v4', null, 4000));
   dit(v.etat === 'prix' && v.tvaC === null, 'M4 prix de vente pas lu ⇒ exclue', JSON.stringify(v));
   let d = T.declarationMarge([L('a', 12000, 6000), L('b', 5000, 7000), L('c', 9000, null)], '2026-10');
-  dit(d.tvaC === 1000 && d.baseC === 5000 && d.nPertes === 1 && d.perteC === 2000, 'M5 la perte de 20 € ne se retire PAS des autres ventes (TVA 10,00 €, pas 6,67 €)', JSON.stringify({ tva: d.tvaC, base: d.baseC, p: d.perteC }));
+  dit(d.tvaC === 1000 && d.baseC === 5000 && d.margeC === 6000 && d.nPertes === 1 && d.perteC === 2000, 'M5 la perte de 20 € ne se retire PAS des autres ventes (TVA 10,00 €, pas 6,67 €)', JSON.stringify({ tva: d.tvaC, base: d.baseC, p: d.perteC }));
   dit(!d.complet && d.aCompleter.length === 1 && d.aCompleter[0].id === 'c' && d.nComptees === 2, 'M6 la vente sans prix d’achat est NOMMÉE à part, le total n’est pas « complet »', JSON.stringify({ c: d.complet, a: d.aCompleter.map((x) => x.id) }));
   d = T.declarationMarge([L('r1', 200, 100), L('r2', 200, 100), L('r3', 200, 100)], '2026-10');
   dit(d.tvaC === 51, 'M7 arrondi au centime VENTE PAR VENTE (3 × 0,17 € = 0,51 €, pas 0,50 €)', String(d.tvaC));
@@ -128,14 +128,14 @@ async function principal() {
   if (c) {
     dit(c.mentions.includes(R.MENTION_MARGE) && /Régime particulier – Biens d'occasion/.test(R.MENTION_MARGE), 'F1 la mention « Régime particulier – Biens d’occasion » est sur la facture');
     dit(c.totaux.tva === null && c.taux === null && c.totaux.ht === c.totaux.ttc && R.tvaApparente(c) === '', 'F2 aucune TVA apparente (montant, taux, HT distinct)', JSON.stringify(c.totaux));
-    dit(!R.mentionsManquantes(c).includes('marge'), 'F3 la liste des mentions obligatoires la dit conforme');
+    dit(!R.mentionsManquantes(c).includes('tva') && R.MENTIONS_OBLIGATOIRES.length === 14, 'F3 la liste des mentions obligatoires la dit conforme');
     const mut = (f) => { const x = JSON.parse(JSON.stringify(c)); f(x); return R.tvaApparente(x); };
     dit(!!mut((x) => { x.totaux.tva = 2000; }) && !!mut((x) => { x.taux = 20; }), 'F4 l’inverse est REFUSÉ : un montant ou un taux de TVA');
     dit(!!mut((x) => { x.totaux.ht = 10000; }), 'F5 refusé : un « HT » distinct du total');
     dit(!!mut((x) => { x.lignes[0].tva = 2000; }), 'F6 refusé : une ligne qui porte de la TVA');
     dit(!!mut((x) => { x.mentions = x.mentions.filter((m) => m !== R.MENTION_MARGE); }), 'F7 refusé : la mention « Biens d’occasion » absente');
     dit(!!mut((x) => { x.mentions.push(R.MENTION_FRANCHISE); }), 'F8 refusé : la mention de franchise ajoutée');
-    dit(R.mentionsManquantes({ ...c, totaux: { ...c.totaux, tva: 2000 } }).includes('marge'), 'F9 une TVA apparente rend la facture non conforme dans la liste des mentions');
+    dit(R.mentionsManquantes({ ...c, totaux: { ...c.totaux, tva: 2000 } }).includes('tva'), 'F9 une TVA apparente rend la facture non conforme dans la liste des mentions');
   }
   let leve = null;
   try { R.contenuFacture({ ...CFG, note: 'Prix TTC, TVA 20 % incluse' }, VENTE, { numero: 'FA-2026-0001', emiseLe: Date.now() }); } catch (e) { leve = e; }

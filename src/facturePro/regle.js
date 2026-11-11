@@ -404,8 +404,9 @@ export const MENTIONS_OBLIGATOIRES = [
   { cle: 'acheteur', l: "Nom et adresse de l'acheteur", ok: (c) => plein(c.acheteur.nom) && c.acheteur.adresse.length > 0 },
   { cle: 'designation', l: 'Désignation, quantité et prix unitaire', ok: (c) => c.lignes.length > 0 && c.lignes.every((x) => txt(x.designation) && x.quantite > 0 && Number.isInteger(x.unite)) },
   { cle: 'totaux', l: 'Total à payer', ok: (c) => Number.isInteger(c.totaux.ttc) },
-  { cle: 'tva', l: 'TVA (taux et montant) ou la mention qui la remplace', ok: (c) => (c.regime === 'normal' ? Number.isInteger(c.totaux.tva) && c.taux != null && !trouDe(c.mentions, 'tva_taux') : c.mentions.some((m) => m === MENTION_FRANCHISE || m === MENTION_MARGE)) },
-  { cle: 'marge', l: "TVA sur marge : aucune TVA apparente et la mention « Biens d'occasion » (art. 297 E)", ok: (c) => !tvaApparente(c) },
+  // (11 nov., lot tva-marge) En marge : la mention « Biens d'occasion » ET aucune TVA apparente (art. 297 E) —
+  // la même ligne (le nombre de mentions ne change pour personne).
+  { cle: 'tva', l: 'TVA (taux et montant) ou la mention qui la remplace', ok: (c) => (c.regime === 'normal' ? Number.isInteger(c.totaux.tva) && c.taux != null && !trouDe(c.mentions, 'tva_taux') : c.regime === 'marge' ? !tvaApparente(c) : c.mentions.some((m) => m === MENTION_FRANCHISE || m === MENTION_MARGE)) },
   { cle: 'paiement', l: 'Date du paiement (facture acquittée)', ok: (c) => c.type === 'avoir' || /payée le \d{2}\/\d{2}\/\d{4}/.test(c.paiement) },
 ];
 export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) => { try { return !m.ok(contenu); } catch (_) { return true; } }).map((m) => m.cle);
