@@ -138,7 +138,8 @@ const projette = (row, sel) => {
   }
   return out;
 };
-const BRUIT = /vrm_journee|push_|_vues|vrm_reprise|vrm_ecran|vrm_lu_|vrm_nouveautes|vrm_quoi_de_neuf|vrm_derniere|vrm_appareil|vrm_session/;
+// `restore_N` : le point de restauration périodique de l'app (aussi sur origin/main), pas un geste de cet écran.
+const BRUIT = /restore_\d|vrm_journee|push_|_vues|vrm_reprise|vrm_ecran|vrm_lu_|vrm_nouveautes|vrm_quoi_de_neuf|vrm_derniere|vrm_appareil|vrm_session/;
 
 async function ouvrir(b, vp, sc, { sombre = false, tab = 'journee', images }) {
   const tel = vp.width < 600;
