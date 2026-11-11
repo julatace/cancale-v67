@@ -84,11 +84,11 @@ const appuiLong = async (pg, sel) => {
   return true;
 };
 
-async function passe(nav, { W, theme }) {
+async function passe(nav, { W, theme, sc }) {
   const sombre = theme === 'sombre', tel = W < 600, T = `[${W}px ${theme}]`, nomS = (x) => `serie-${W}-${theme}-${x}`;
   const ouvrir = async (tab) => { const base = { lignes: jeu(), comptes: COMPTES, ecritures: 0 }; const o = await NV.ouvrir(nav, { W, sombre, base, tab }); await o.pg.waitForTimeout(1500); return o; };
 
-  if (SCENES.includes('A')) {
+  if (sc === 'A') {
     const o = await ouvrir('achats'); const pg = o.pg;
     const lu = await attendre(pg, '[data-achat-tx="7400001"]', 25000);
     dit(lu, 'A', `${T} Achats : les 4 achats inventés sont rendus`);
@@ -108,8 +108,8 @@ async function passe(nav, { W, theme }) {
       const menu = await pg.evaluate(() => !!document.querySelector('.vrm-buy-menu'));
       dit(!menu, 'A', `${T} le tap en sélection n'ouvre pas la ligne`);
     } else {
-      await pg.locator(`${L('7400001')} [data-serie-case] input`).first().click();
-      await pg.locator(`${L('7400003')} [data-serie-case] input`).first().click({ modifiers: ['Shift'] });
+      await pg.locator(`${L('7400001')} [data-serie-case] input`).first().click({ timeout: 4000 }).catch(() => {});
+      await pg.locator(`${L('7400003')} [data-serie-case] input`).first().click({ modifiers: ['Shift'], timeout: 4000 }).catch(() => {});
       await pg.waitForTimeout(300);
       const b = await barre(pg);
       dit(b && b.n === '3', 'A', `${T} case puis Maj-clic : la PLAGE (3 lignes)`, JSON.stringify(b));
@@ -118,14 +118,14 @@ async function passe(nav, { W, theme }) {
     }
     await capture(pg, nomS('achats-selection'));
     // Échap ferme (ordinateur), puis on rouvre et on prend tout le filtre.
-    if (!tel) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(250); dit(!(await barre(pg)), 'A', `${T} Échap ferme la sélection`); await pg.locator(`${L('7400001')} [data-serie-case] input`).first().click(); }
+    if (!tel) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(250); dit(!(await barre(pg)), 'A', `${T} Échap ferme la sélection`); await pg.locator(`${L('7400001')} [data-serie-case] input`).first().click({ timeout: 4000 }).catch(() => {}); }
     await pg.locator('[data-serie-tout]').first().click().catch(() => {});
     await pg.waitForTimeout(250);
     let b = await barre(pg);
     dit(b && b.n === b.total && Number(b.n) >= 4, 'A', `${T} « Tout sélectionner » = le filtre courant (${b && b.total})`, JSON.stringify(b));
     const g = await GENERAL(pg, tel);
     dit(!g.debord && !g.petits.length && !g.sousNav, 'G', `${T} Achats : ni débord, cibles 44 px, la barre au-dessus de la navigation`, JSON.stringify(g));
-    await pg.locator('[data-serie-action="retire"]').first().click();
+    await pg.locator('[data-serie-action="retire"]').first().click({ timeout: 4000 }).catch(() => {});
     await pg.waitForTimeout(700);
     const r = await resume(pg), pd = (await ls(pg, 'vinted_pickup_done')) || {};
     const ecrits = ['7400001', '7400002', '7400003'].filter((k) => pd[k]);
@@ -140,7 +140,7 @@ async function passe(nav, { W, theme }) {
     await o.ctx.close();
   }
 
-  if (SCENES.includes('V')) {
+  if (sc === 'V') {
     const o = await ouvrir('ventes'); const pg = o.pg;
     await pg.locator('[data-selecteur-logos] button[data-site="vinted"]').first().click().catch(() => {});
     const lu = await attendre(pg, '[data-serie-ligne="64001"]', 25000);
@@ -155,7 +155,7 @@ async function passe(nav, { W, theme }) {
     const g = await GENERAL(pg, tel);
     dit(!g.debord && !g.petits.length && !g.sousNav, 'G', `${T} Ventes : ni débord, cibles 44 px, la barre au-dessus de la navigation`, JSON.stringify(g));
     // Exporter : un CSV qui porte les lignes cochées.
-    const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 6000 }).catch(() => null), pg.locator('[data-serie-action="exporter"]').first().click()]);
+    const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 6000 }).catch(() => null), pg.locator('[data-serie-action="exporter"]').first().click({ timeout: 4000 }).catch(() => {})]);
     let csv = ''; if (dl) { const p = await dl.path().catch(() => null); if (p) csv = fs.readFileSync(p, 'utf8'); }
     const nl = csv.trim().split(/\r?\n/).length - 1;
     dit(dl && nl === Number(b && b.n) && /64001/.test(csv), 'V', `${T} « Exporter » : un CSV de ${b && b.n} lignes (les cochées)`, `${nl} lignes`);
@@ -163,7 +163,7 @@ async function passe(nav, { W, theme }) {
     await pg.locator('[data-serie-ouvrir="ventes"]').first().click().catch(() => {});
     await pg.locator('[data-serie-tout]').first().click().catch(() => {});
     await pg.waitForTimeout(250);
-    await pg.locator('[data-serie-action="depose"]').first().click();
+    await pg.locator('[data-serie-action="depose"]').first().click({ timeout: 4000 }).catch(() => {});
     await pg.waitForTimeout(800);
     const sd = (await ls(pg, 'vinted_ship_done')) || {}, r = await resume(pg);
     dit(['64001', '64002', '64003'].every((k) => sd[k]) && !sd['64004'], 'V', `${T} « Je dépose » : les 3 ventes à envoyer, pas la finalisée`, JSON.stringify(Object.keys(sd)));
@@ -177,8 +177,9 @@ async function passe(nav, { W, theme }) {
 (async () => {
   await new Promise((ok) => NV.srv.listen(NV.PORT, ok));
   const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--use-angle=swiftshader', '--no-sandbox'] });
-  try { for (const W of LARGEURS) for (const theme of THEMES) await passe(nav, { W, theme }); }
-  catch (e) { dit(false, 'G', 'le banc a planté', e && e.stack); }
+  for (const W of LARGEURS) for (const theme of THEMES) for (const sc of SCENES) {
+    try { await passe(nav, { W, theme, sc }); } catch (e) { dit(false, 'G', `[${W}px ${theme}] scène ${sc} : le banc a planté`, e && e.message); }
+  }
   await nav.close(); try { NV.srv.close(); } catch (_) {}
   const tot = Object.values(compte).reduce((s, x) => s + x.ok, 0);
   console.log(`actions-serie : ${tot} verts, ${ko} rouges · ` + Object.entries(compte).map(([k, v]) => `${k} ${v.ok}/${v.ok + v.ko}`).join(' · '));
