@@ -610,7 +610,7 @@ import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille
 import "./styles-profil.css";   // (11 nov., lot DJ6) la photo du profil et son menu
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
-import { enregistrerGaleries } from "./visionneuse.js";
+import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
@@ -19787,27 +19787,23 @@ const LigneVenteVinted = React.memo(function LigneVenteVinted({ o, i, pre, rendr
 const GelPendantFrappe = React.memo(function GelPendantFrappe({ rendre }) { return rendre(); },
   (avant, apres) => apres.gel === true);
 
+// (11 nov., lot clics-directs) Julien : « dans les ventes, quand je clique sur les photos, je ne
+// veux pas voir la loupe mais la photo en plus grand ». Toucher la photo ouvre DIRECTEMENT LA
+// visionneuse de l'app (src/Visionneuse.jsx — la seule ; l'ancien panneau à part et sa loupe
+// sont retirés) : les autres photos de l'article (`galerieDe`, par fichier — jamais par titre)
+// se balaient dedans. Le bouton reste (clavier, lecteur d'écran) ; le titre de l'article est
+// passé à la visionneuse (`article`, mode stream : la photo en grand dit son article).
 function PhotoArticleAgrandissable({src,titre,children}) {
   const url=photoArticle({photo:src});
-  const [ouverte,setOuverte]=useState(false);
-  const [affichee,setAffichee]=useState('');
-  const bouton=React.useRef(null),fermer=React.useRef(null);
-  React.useEffect(()=>{
-    if(!ouverte) return;
-    fermer.current?.focus();
-    return ()=>bouton.current?.focus();
-  },[ouverte]);
+  const bouton=React.useRef(null);
   if(!url) return children;
-  return <>
-    <button ref={bouton} type="button" className="vrm-photo-open" aria-label={`Agrandir la photo de ${titre || 'cet article'}`} onClick={()=>{ const image=bouton.current?.querySelector('img'); setAffichee(image?.complete&&image.naturalWidth>0?image.currentSrc:url);setOuverte(true); }}>{children}<span aria-hidden="true"><Icon name="search" size={12}/></span></button>
-    {ouverte && createPortal(<div className="vrm-photo-viewer" onClick={()=>setOuverte(false)} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setOuverte(false);}if(e.key==='Tab'){e.preventDefault();fermer.current?.focus();}}}>
-      <FermeAuRetour fermer={()=>setOuverte(false)}/>
-      <div role="dialog" aria-modal="true" aria-label={`Photo de ${titre || 'l’article'}`} className="vrm-photo-panel" data-stream-article={titre || ''} onClick={e=>e.stopPropagation()}>
-        <div><span>{titre || 'Photo de l’article'}</span><button className="vrm-icon-control" ref={fermer} type="button" aria-label="Fermer la photo" onClick={()=>setOuverte(false)}><Icon name="close" size={22}/></button></div>
-        <PhotoVinted src={affichee || url} alt={titre || 'Article'} style={{width:'100%',height:'100%',objectFit:'contain',minHeight:0}}/>
-      </div>
-    </div>,document.body)}
-  </>;
+  const ouvrir=()=>{
+    const image=bouton.current?.querySelector('img');
+    const vue=image&&image.complete&&image.naturalWidth>0?origineVignette(image):'';
+    const g=galerieDe(vue||url);
+    ouvrirVisionneuse(g.photos.length?g.photos:[url],g.index,{titre:titre||'',article:titre||''});
+  };
+  return <button ref={bouton} type="button" className="vrm-photo-open" data-photo-grand="" aria-label={`Voir la photo de ${titre || 'cet article'} en grand`} onClick={ouvrir}>{children}</button>;
 }
 
 // (21 oct.) LA DATE D'ARRIVÉE D'UN COLIS À RETIRER — une ligne, la même sur
@@ -27117,7 +27113,7 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
             </p>
           </div>
           {photos.length && Photo
-            ? <button type="button" className="vrm-jv2-pile-bouton" data-jv2-pile={String(nPile)} aria-label={`Voir les ventes (${faitVentes})`} title="Voir dans Ventes" onClick={() => onVentes && onVentes()}>
+            ? <button type="button" className="vrm-jv2-pile-bouton" data-jv2-pile={String(nPile)} data-sans-visionneuse="" aria-label={`Voir les ventes (${faitVentes})`} title="Voir dans Ventes" onClick={() => onVentes && onVentes()}>
                 <PileVignettes className="vrm-jv2-pile" srcs={photos} n={nPile} Photo={Photo} mortes={mortes} onMorte={onMorte}/>
               </button>
             : null}

@@ -28,7 +28,7 @@ const Croix = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
 );
 
-function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo, Retour, clavier }) {
+function Scene({ photos, index, lien = '', titre = '', sous = '', article = '', fermer, Photo, Retour, clavier }) {
   const [i, setI] = useState(index);
   const [z, setZ] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -131,7 +131,7 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
   const src = photos[i];
   return (
     <div className="vrm-visionneuse" role="dialog" aria-modal="true" aria-label={titre || (n > 1 ? `Photo ${i + 1} sur ${n}` : 'Photo en grand')}
-      data-visionneuse="ouverte" data-visionneuse-index={i} data-visionneuse-n={n} data-visionneuse-zoom={z.toFixed(2)}
+      data-stream-article={article || undefined} data-visionneuse="ouverte" data-visionneuse-index={i} data-visionneuse-n={n} data-visionneuse-zoom={z.toFixed(2)}
       style={{ position: 'fixed', inset: 0, zIndex: Z_VISIONNEUSE, background: '#000', color: '#fff', display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
       {Retour ? <Retour fermer={fermer}/> : null}
       <div ref={scene} className="vrm-visionneuse-scene" onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={annule}
@@ -176,7 +176,7 @@ export default function Visionneuse({ Photo = null, Retour = null }) {
     return () => window.removeEventListener('keydown', k, true);
   }, []);
   useEffect(() => {
-    const ouvrir = (e) => { const d = e && e.detail; if (d && Array.isArray(d.photos) && d.photos.length) setVue({ photos: d.photos, index: d.index || 0, titre: d.titre || '', sous: d.sous || '', cle: Date.now() }); };
+    const ouvrir = (e) => { const d = e && e.detail; if (d && Array.isArray(d.photos) && d.photos.length) setVue({ photos: d.photos, index: d.index || 0, titre: d.titre || '', sous: d.sous || '', article: d.article || '', cle: Date.now() }); };
     // En CAPTURE sur le document : avant la rangée (React écoute sur sa racine, plus bas).
     const clic = (e) => {
       if (e.defaultPrevented || (e.button != null && e.button !== 0) || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -191,5 +191,5 @@ export default function Visionneuse({ Photo = null, Retour = null }) {
     return () => { window.removeEventListener(EVT_VISIONNEUSE, ouvrir); document.removeEventListener('click', clic, true); };
   }, []);
   if (!vue || typeof document === 'undefined') return null;
-  return createPortal(<Scene key={vue.cle} photos={vue.photos} index={vue.index} lien={vue.lien || ''} titre={vue.titre || ''} sous={vue.sous || ''} fermer={fermer} clavier={clavier} Photo={Photo} Retour={Retour}/>, document.body);
+  return createPortal(<Scene key={vue.cle} photos={vue.photos} index={vue.index} lien={vue.lien || ''} titre={vue.titre || ''} sous={vue.sous || ''} article={vue.article || ''} fermer={fermer} clavier={clavier} Photo={Photo} Retour={Retour}/>, document.body);
 }
