@@ -23,6 +23,7 @@ import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { sendPushToAll, pushCategorieActive } from './push.js';
 import { classifyOrderStatus } from './ventes-regle.js';
+import { prixAchatDe } from './prix-achat-regle.js';
 import { CLE_DEMANDES, estNuitParis, texteDemande, lienDemande, aDemander, reserver, MAX_GROUPE, ventesSansPrix, corpsDemande } from '../../src/prixAchatVente.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -172,7 +173,7 @@ export async function demandesDuCron({ maintenant = instant() } = {}) {
   }
   const ventes = [];
   for (const l of ventesL) for (const o of (Array.isArray(l && l.orders) ? l.orders : [])) ventes.push(o);
-  const prixDe = (f) => { const n = String((f && f.numero) || '').trim(); const b = (f && f.buyPrice != null && String(f.buyPrice).trim() !== '') ? f.buyPrice : (n && buy[n] != null ? buy[n] : null); if (b == null || String(b).trim() === '') return null; const x = parseFloat(String(b).replace(',', '.')); return Number.isFinite(x) ? x : null; };
+  const prixDe = (f) => prixAchatDe(f, buy);   // la règle de l'app, copie FABRIQUÉE (scripts/audit-prix-achat-regle.cjs)
   const montant = (o) => { const p = o && o.price; const v = p && typeof p === 'object' ? (p.amount ?? p.value) : p; const x = Number(String(v == null ? '' : v).replace(',', '.')); return v != null && String(v).trim() !== '' && Number.isFinite(x) ? x : null; };
   const liste = ventesSansPrix({ paires, ventes, fiches, prixDe, annulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled', montant, maintenant });
   if (!liste.length) return { status: 200, envoye: false, n: 0, raison: 'aucune vente à demander' };
