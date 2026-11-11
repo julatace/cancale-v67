@@ -607,6 +607,9 @@ import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, 
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
+import { deconnecterSansPerte, TEXTES_DECONNEXION } from "./deconnexionSure.js";
+import { sessionAAdopter, sousVerrou, VERROU_RENOUVELLEMENT } from "./sessionOnglets.js";
+import { modifierLigneCas } from "./ligneCas.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
@@ -1325,6 +1328,10 @@ const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION
 // de l'ouverture compterait la saisie du mot de passe : il n'est pas mesuré (src/mesuresCollecte.js).
 const SESSION_AU_CHARGEMENT = (() => { try { return !!(readSession() || {}).access_token; } catch (_) { return false; } })();
 const writeSession = (s) => {
+  // (11 nov., robustesse des données, point 2) Un vendeur REMPLACÉ par un autre sans
+  // passer par la déconnexion (lien, retour d'un fournisseur) : la page se recharge,
+  // aucun cache de module du premier ne survit.
+  const remplace = !!(AUTH.user?.id && s?.user?.id && AUTH.user.id !== s.user.id);
   if (AUTH.user?.id !== s?.user?.id) {
     vuesSession.clear(); try{const garder=!AUTH.user?.id&&s?.user?.id?s.user.id:null; viderParcours(sessionStorage,garder); viderParcours(localStorage,garder);}catch(_){} _prechargeComptes=null;
     _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
@@ -1340,6 +1347,7 @@ const writeSession = (s) => {
   // quoi que ce soit ne soit relu ou repoussé (voir ensureLocalOwner).
   if (s && s.user && s.user.id) ensureLocalOwner(s.user.id);
   _emitAuth();
+  if (remplace) { try { location.reload(); } catch (_) {} }
 };
 
 // EN-TÊTES SUPABASE — le point de passage unique de toute l'app.
@@ -1551,10 +1559,15 @@ let _authRefreshEchecAt = 0;
 const authRefresh = (opt) => {
   if (_authRefreshEnVol) return _authRefreshEnVol;
   if (opt && opt.discret && Date.now() - _authRefreshEchecAt < 15000) return Promise.resolve(null);
-  _authRefreshEnVol = Promise.resolve().then(async () => {
+  // (11 nov., robustesse des données, point 9) UN SEUL ONGLET RENOUVELLE
+  // (src/sessionOnglets.js) : sous un verrou partagé ; un autre onglet a déjà
+  // renouvelé ⇒ on adopte SA session au lieu de renvoyer l'ancien jeton.
+  _authRefreshEnVol = sousVerrou(VERROU_RENOUVELLEMENT, async () => {
     try {
       const s = AUTH.session;
       if (!s || !s.refresh_token) return false;
+      const neuve = sessionAAdopter(s, readSession());
+      if (neuve) { writeSession(neuve); _authRefreshEchecAt = 0; return true; }
       const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
       // Trois états : true (renouvelé) · false (REFUSÉ par le service : jeton
       // révoqué, compte supprimé) · null (pas su : réseau coupé, service qui ne
@@ -1573,8 +1586,7 @@ const authRefresh = (opt) => {
       _authRefreshEchecAt=0;
       return true;
     } catch (_) {_authRefreshEchecAt=Date.now();return null;}
-    finally { _authRefreshEnVol = null; }
-  });
+  }).catch(() => null).finally(() => { _authRefreshEnVol = null; });
   return _authRefreshEnVol;
 };
 const sessionFrom = (j) => ({
@@ -2152,6 +2164,35 @@ const authSignOut = () => {
     }
   } catch (_) {}
   writeSession(null); wipeLocalData();
+  // (11 nov., robustesse des données, points 2 et 10) UN RECHARGEMENT COMPLET.
+  // Des dizaines de caches de MODULE (lignes lues 60 s, lectures publiques gardées
+  // sans limite, comptes eBay, ventes de la coque, factures, parcours…) gardaient
+  // les données du vendeur parti : le suivant, connecté dans le MÊME onglet, les
+  // voyait. Un rechargement les remet tous à zéro (le délai laisse partir le
+  // message à l'extension, comme Réglages le faisait déjà).
+  try { setTimeout(() => { try { location.reload(); } catch (_) {} }, 300); } catch (_) {}
+};
+// « Se déconnecter » (le GESTE) : rien ne part sans le dire (src/deconnexionSure.js).
+// Une saisie pas encore envoyée ⇒ « Envoyer d'abord » / « Me déconnecter quand
+// même » / « Annuler ». Rend true si la session est fermée.
+const seDeconnecter = async (opts = {}) => {
+  const owner = AUTH.user && AUTH.user.id;
+  const compter = () => {
+    let n; try { n = compterEnAttente(localStorage, owner); } catch (_) { n = null; }
+    if (n == null) return null;
+    try { n += Object.keys(_saveTimers).filter((k) => SYNC_KEYS.includes(k)).length + [..._failedLocalSaves.values()].filter((d) => d && d.owner === owner).length; } catch (_) {}
+    return n;
+  };
+  const r = await deconnecterSansPerte({
+    compter,
+    confirmerSimple: opts.question === false ? null : () => askConfirm(opts.question || { title: 'Se déconnecter ?', desc: 'Tes données restent dans VRM.', ok: 'Se déconnecter', cancel: 'Annuler' }),
+    demander: (n) => askChoix({ title: TEXTES_DECONNEXION.titre(n), desc: TEXTES_DECONNEXION.desc, options: [['envoyer', TEXTES_DECONNEXION.envoyer], ['quand', TEXTES_DECONNEXION.quandMeme]], cancel: 'Annuler' }),
+    envoyer: () => { try { reprendreSyncMaintenant(); } catch (_) {} },
+    attendre: (ms) => new Promise((ok) => setTimeout(ok, ms)),
+    deconnecter: authSignOut,
+    dire: (t) => { try { toast(t); } catch (_) {} },
+  });
+  return r === 'deconnecte';
 };
 
 // CHANGEMENT DE VENDEUR SUR LE MÊME NAVIGATEUR : le localStorage est commun à
@@ -3826,17 +3867,33 @@ function noterJournalNumeros(avant, apres) {
     save(CLE_JOURNAL_NUMEROS, _journalNumAttente);
   } catch (_) {}
 }
+// ⚠️ (11 nov., robustesse des données, points 49 et 61) LA COPIE LOCALE POSÉE
+//    AVANT `save` (pour qu'un écran se relise tout de suite) : le texte d'AVANT est
+//    gardé ici, sinon la minuterie de `save` voyait « rien n'a changé » et le geste
+//    n'entrait jamais dans la FILE D'ENVOI (hors réseau puis app fermée : le nuage
+//    le recouvrait au chargement suivant — un lien Leboncoin, la lettre des N°,
+//    « je la garde »). Toute écriture locale directe d'une clé synchronisée passe
+//    par `ecrireCopieLocale`.
+const _avantCopieLocale = {};
+const ecrireCopieLocale = (k, v) => {
+  try {
+    if (!(k in _avantCopieLocale) && !_saveTimers[k]) { const t = localStorage.getItem(k); _avantCopieLocale[k] = t; }
+    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+    return true;
+  } catch (_) { return false; }
+};
 const save = (k,v,quand) => {
   if (SYNC_KEYS.includes(k)) { _settingsRevision++; try { window.dispatchEvent(new Event('vrm:reglage-attente')); } catch (_) {} }
   const owner = AUTH.user?.id;
   if (typeof quand === 'function') (_saveQuand[k] || (_saveQuand[k] = [])).push(quand);
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
-  else if (SYNC_KEYS.includes(k)) { try { const t = localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
+  else if (SYNC_KEYS.includes(k)) { try { const t = (k in _avantCopieLocale) ? _avantCopieLocale[k] : localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
   _saveTimers[k] = setTimeout(() => {
-    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
+    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; delete _avantCopieLocale[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
     // (2 nov.) Ce que le navigateur portait AVANT ce geste : la base de la file
     // d'envoi tant que cet onglet n'a pas encore lu le nuage.
-    let avantTxt; try { avantTxt = localStorage.getItem(k); } catch (_) { avantTxt = undefined; }
+    let avantTxt; try { avantTxt = (k in _avantCopieLocale) ? _avantCopieLocale[k] : localStorage.getItem(k); } catch (_) { avantTxt = undefined; }
+    delete _avantCopieLocale[k];
     const r = fusionALaSauvegarde(k, v);
     const txt = JSON.stringify(r.v);
     try { localStorage.setItem(k,txt); _failedLocalSaves.delete(k); try { if(noterChangements(sessionStorage,owner,k,_lireJson(avantTxt),r.v))window.dispatchEvent(new Event('vrm:modification-notee')); } catch (_) {} }
@@ -4078,6 +4135,11 @@ window.addEventListener('storage', e => {
     Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
     AUTH={...AUTH,session:prochaine,user:prochaine?.user||null,ready:true};
     _emitAuth(); location.reload();
+  } else if (sessionAAdopter(AUTH.session, prochaine)) {
+    // (11 nov., robustesse des données, point 9) Même vendeur, session renouvelée par
+    // un autre onglet : on la prend (sinon cet onglet renverrait l'ancien jeton).
+    AUTH={...AUTH,session:prochaine,user:prochaine.user||AUTH.user};
+    _emitAuth();
   }
 });
 
@@ -5001,9 +5063,15 @@ const lireTout = async (query, opts = {}) => {
   for (let p = 0; p < max; p++) {
     const from = p * PAGE_SB;
     // (7 nov.) `opts.memo` : une lecture de MONTAGE peut partager la réponse 60 s (`fetchMemo`).
-    const r = await (opts.memo ? fetchMemo : fetch)(`${SUPABASE_URL}/rest/v1/app_data?${requete}`, Object.assign({
-      headers: sbAuth({ Range: `${from}-${from + PAGE_SB - 1}`, 'Range-Unit': 'items' }),
-    }, opts.voirSupprimes ? { vrmVoirSupprimes: true } : {}));
+    // ⚠️ (11 nov., robustesse des données, point 57) Une coupure réseau (`fetch`
+    //    rejeté) ou un corps illisible (HTML d'une page d'erreur) LEVAIT : un
+    //    appelant sans `catch` restait « en cours » pour toujours. Pas su ⇒ `null`.
+    let r;
+    try {
+      r = await (opts.memo ? fetchMemo : fetch)(`${SUPABASE_URL}/rest/v1/app_data?${requete}`, Object.assign({
+        headers: sbAuth({ Range: `${from}-${from + PAGE_SB - 1}`, 'Range-Unit': 'items' }),
+      }, opts.voirSupprimes ? { vrmVoirSupprimes: true } : {}));
+    } catch (_) { return null; }
     // ⚠️⚠️ (1er nov., audit « conditions difficiles ») UNE PAGE RATÉE = « PAS SU »,
     //    TOUJOURS. Avant, seuls les lecteurs `strict` recevaient `null` : les
     //    autres recevaient la PREMIÈRE page seule, présentée comme la liste
@@ -5020,7 +5088,7 @@ const lireTout = async (query, opts = {}) => {
       return null;
     }
     if (!r.ok) return null;
-    const lot = await r.json();
+    let lot; try { lot = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(lot)) return null;
     out.push(...lot);
     if (lot.length < PAGE_SB) { complet = true; break; }
@@ -5309,7 +5377,12 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     // (`id=in.(…)`, src/lectureGroupee.js) : 14 lectures → 1 au banc. Mêmes
     // lignes, même « pas su » (`null`) qu'une lecture seule.
     const rows = await lireMoissonGroupee(`harvest_${uid}_${type}`);
-    if (!Array.isArray(rows)) return null;
+    // ⚠️ (11 nov., robustesse des données, points 8, 28, 32) TROIS ÉTATS, comme
+    //    `fetchHarvestOrders` : `undefined` = NOTRE base n'a pas répondu (pas su) ·
+    //    `null` = pas de ligne (compte jamais capté) · le payload. Un hoquet de la
+    //    base faisait partir les boîtes et les dressings au RELAIS SERVEUR (Vinted
+    //    interrogé depuis l'IP du serveur pour chaque compte).
+    if (!Array.isArray(rows)) return undefined;
     const row = rows[0] ? ligneCommandes(rows[0]) : undefined;
     // 5.167 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
     // règle « en ligne » — la lecture complète la plus récente (son dressing ou
@@ -5340,7 +5413,7 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
     const payload = row.data?.payload || null;
     return payload;
-  } catch (_) { return null; }
+  } catch (_) { return undefined; }
   finally { busyEnd(); }  // finally : le compteur redescend quel que soit le chemin de sortie
 };
 // Le dressing d'UN compte tel que l'app le montre : la ligne `harvest_{uid}_listings`
@@ -8521,21 +8594,27 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   //    d'achat étaient largement sous-comptés (ex. 71 ventes lues comme 20).
   //    per_page=100 suffit en 1 appel pour la plupart des comptes ; on boucle
   //    par sécurité pour les gros comptes (plafond pour rester raisonnable).
-  const perPage = 100; const maxPages = 12;
-  let all = []; let anyOk = false;
+  // ⚠️⚠️ (11 nov., robustesse des données, point 7) UNE PAGE RATÉE = PAS SU. La
+  //    boucle s'arrêtait sur la page 2…12 en échec et rendait les pages lues comme
+  //    une liste COMPLÈTE (CA, « en attente », coûts d'achat sous-comptés, §5) ; et
+  //    au-delà de 12 × 100 commandes, la fin était coupée sans rien dire. Désormais
+  //    50 pages au plus ; une page manquante, ou le plafond atteint sur une page
+  //    pleine ⇒ `ok:false` (« pas su »), jamais une liste partielle.
+  const perPage = 100; const maxPages = 50;
+  let all = [];
   for (let pg = 1; pg <= maxPages; pg++) {
     const endpoint = statusFilter === 'completed'
       ? `/api/v2/my_orders?type=${type}&status=completed&per_page=${perPage}&page=${pg}`
       : `/api/v2/my_orders?type=${type}&per_page=${perPage}&page=${pg}`;
     const res = await vintedApiCall(account, endpoint);
-    if (!res.ok) { if (pg === 1) return { ok: false, error: res.status || res.error, items: [], pagination: null }; break; }
-    anyOk = true;
-    const batch = res.data?.my_orders || [];
+    if (!res.ok) return { ok: false, error: pg === 1 ? (res.status || res.error) : 'partiel', items: [], pagination: null, partiel: pg > 1 };
+    const batch = Array.isArray(res.data?.my_orders) ? res.data.my_orders : null;
+    if (!batch) return { ok: false, error: pg === 1 ? 'forme' : 'partiel', items: [], pagination: null, partiel: pg > 1 };
     all = all.concat(batch);
     const totalPages = res.data?.pagination?.total_pages;
-    if (batch.length < perPage || (totalPages && pg >= totalPages)) break;
+    if (batch.length < perPage || (totalPages && pg >= totalPages)) return { ok: true, items: applyStatus(all), pagination: null };
   }
-  return { ok: anyOk, items: applyStatus(all), pagination: null };
+  return { ok: false, error: 'trop', items: [], pagination: null, partiel: true };
 };
 
 // Recupere la liste des conversations (boite de reception).
@@ -8549,6 +8628,8 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
   //    opts.force = on saute la moisson (bouton "Synchroniser") pour le dernier état.
   if (page === 1 && !opts.force) {
     const h = await fetchHarvest(account.vinted_user_id, 'inbox');
+    // Lecture de NOTRE base en échec : pas su — jamais le relais serveur.
+    if (h === undefined) return { ok: false, error: 'lecture', items: [], pagination: null, raw: null, source: 'harvest-ko' };
     // Une moisson VIDE n'est pas une réponse (cf. fetchVintedOrders) : la page
     // n'a pas encore été ouverte ou la session a expiré. On va voir plus loin.
     if (h && Array.isArray(h.conversations)) {
@@ -10331,6 +10412,8 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
   //    jamais Vinted par le serveur (`src/freinRelaisVinted.js`).
   if (page === 1) {
     const h = await fetchHarvest(account.vinted_user_id, 'listings', opts.force ? { force: true } : undefined);
+    // Lecture de NOTRE base en échec : pas su — jamais le relais serveur.
+    if (h === undefined) return { ok: false, error: 'lecture', items: [], pagination: null, source: 'harvest-ko' };
     // ⚠️ Une moisson VIDE n'est pas une réponse. Zéro annonce moissonnée voulait
     // dire « rien capté », pas « plus rien en ligne » — et l'app le prenait pour
     // argent comptant : d'où les bandeaux « compte muet » et « annonces
@@ -10387,8 +10470,11 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
   // base, un compte annonçait 604 articles sur 7 pages — l'app n'en voyait
   // qu'une poignée, et prenait le reste pour des « annonces disparues ».
   // Vinted plafonne per_page autour de 96, donc il FAUT boucler.
+  // ⚠️ (11 nov., robustesse des données, point 31) Une page ratée, ou le plafond
+  //    atteint sans la dernière page : PAS une lecture complète — ni `lu` (« relu
+  //    à l'instant »), ni `complet`. Avant, la partie lue recevait une date fraîche.
   const MAX_PAGES = 10;
-  let brut = []; let pagination = null; let okUn = false;
+  let brut = []; let pagination = null; let okUn = false; let complet = false;
   for (let pg = page; pg < page + MAX_PAGES; pg++) {
     const res = await vintedApiCall(account, `/api/v2/wardrobe/${profileId}/items?page=${pg}&per_page=100&order=relevance`);
     if (!res.ok) { if (pg === page) return { ok: false, error: res.status || res.error, items: [], pagination: null }; break; }
@@ -10397,8 +10483,9 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     brut = brut.concat(lot);
     pagination = res.data?.pagination || pagination;
     const tp = res.data?.pagination?.total_pages;
-    if (!lot.length || (tp && pg >= tp)) break;
+    if (!lot.length || (tp && pg >= tp)) { complet = true; break; }
   }
+  if (okUn && !complet) return { ok: false, error: 'partiel', items: [], pagination: null, partiel: true };
   const items = brut.filter(isOnlineListing).map(mapWardrobeItem);
   // Lue à l'instant, page après page : c'est une lecture complète et fraîche.
   // Les annonces masquées par Vinted sont des paires présentes (22 oct.).
@@ -15843,7 +15930,7 @@ function MenuProfilCoque({ setTab, entreprise }) {
   return <MenuProfil owner={AUTH.user.id} headers={enTeteSession} email={String(AUTH.user.email || '')} nom={(entreprise && entreprise.nom) || ''}
     offre={planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : ''} theme={C} Feuille={SheetShell} Icon={Icon}
     onFermer={() => setOuvert(false)} onParametres={() => aller('')} onAppareils={() => aller('appareils')}
-    onDeconnexion={async () => { setOuvert(false); if (await askConfirm({ title: 'Se déconnecter ?', desc: 'Tes données restent dans VRM.', ok: 'Se déconnecter', cancel: 'Annuler' })) authSignOut(); }}/>;
+    onDeconnexion={async () => { setOuvert(false); await seDeconnecter(); }}/>;
 }
 // La photo du profil dans l'en-tête du téléphone (à droite) : ouvre le même menu.
 function BoutonProfilTete() {
@@ -19202,7 +19289,7 @@ async function lireLitigesVinted() {
   } catch (_) { return null; }
 }
 async function changerCompteVrm() {
-  if (await askConfirm({ title: 'Changer de compte VRM ?', desc: 'Tu seras déconnecté de ce compte sur cet appareil, puis tu pourras te connecter avec le compte VRM qui porte ce compte Vinted.', ok: 'Me déconnecter', cancel: 'Annuler' })) authSignOut();
+  await seDeconnecter({ question: { title: 'Changer de compte VRM ?', desc: 'Tu seras déconnecté de ce compte sur cet appareil, puis tu pourras te connecter avec le compte VRM qui porte ce compte Vinted.', ok: 'Me déconnecter', cancel: 'Annuler' } });
 }
 function GuideDemarrageApp(props) {
   const profil = useProfilVendeur();
@@ -23080,13 +23167,25 @@ const loadRoomPlan = async () => {
 //    refuse un garage qui ne la porte pas (un écran d'avant la remise à zéro
 //    remettrait les cartons en chiffres). On l'estampille à chaque envoi, et un
 //    refus ne passe plus en silence : c'est l'écran qui est périmé.
-const saveRoomPlan = async (data) => {
+// ⚠️⚠️ (11 nov., robustesse des données, point 3) PLUS JAMAIS LA PIÈCE ENTIÈRE PAR-
+//    DESSUS : la sortie automatique des paires parties et l'écran de la pièce (800 ms
+//    après un geste) s'écrasaient. `base` = la pièce que l'ÉCRIVAIN avait lue : seul
+//    ce qu'il a changé depuis est posé sur la pièce RELUE (fusion par meuble, par
+//    case — src/fusionNuage.js), par comparer-et-échanger sur `data.rev`
+//    (src/ligneCas.js). Sans `base`, sa pièce entière (l'ancien comportement).
+//    `opts.surFusion(plan)` reçoit la pièce réellement écrite.
+const saveRoomPlan = async (data, base, opts = {}) => {
   try {
     const v = versionNumerotation();
-    const corps = v != null ? { ...data, numerotation: v } : data;
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_room', data: corps })) });
-    if (!r.ok) { let t = ''; try { t = await r.text(); } catch (_) {} const code = codeRefusNumeros(t); if (code) signalerNumerosPerimes(code); }
-    return r.ok;
+    const sansMeta = (o) => { if (!o || typeof o !== 'object') return o; const { rev, numerotation, ...reste } = o; return reste; };
+    const res = await modifierLigneCas({ base: SUPABASE_URL, id: 'vrm_room', entetes: sbAuth, estampille: withOwner,
+      modifier: (actuel) => {
+        const fus = (base && actuel) ? fusion3(sansMeta(base), sansMeta(data), sansMeta(actuel), 12) : sansMeta(data);
+        return v != null ? { ...fus, numerotation: v } : fus;
+      } });
+    if (!res.ok) { const code = codeRefusNumeros(res.texte); if (code) signalerNumerosPerimes(code); return false; }
+    try { if (opts.surFusion) opts.surFusion(sansMeta(res.data)); } catch (_) {}
+    return true;
   } catch (_) { return false; }
 };
 // Catalogue de rangements.
@@ -23439,7 +23538,7 @@ const STOCK_SORTIS_JOURS = 60;
 // `save` écrit dans le navigateur 500 ms plus tard : deux passages rapprochés
 // (Vinted, puis Leboncoin, puis eBay qui arrivent) relisaient l'ancien journal
 // et s'effaçaient l'un l'autre. On écrit tout de suite, puis `save` synchronise.
-const saveTout = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} save(k, v); };
+const saveTout = (k, v) => { ecrireCopieLocale(k, v); save(k, v); };
 let _sortieStock = { enCours: false, derniere: '' };
 const sortirPartisDuStock = async (candidats) => {
   if (_sortieStock.enCours || !isCloudReady()) return;
@@ -23481,7 +23580,9 @@ const sortirPartisDuStock = async (candidats) => {
       sortis.push({ ...c, roomId: ou.roomId, roomName: ou.roomName || '', itemId: ou.itemId, itemName: ou.itemName || '', key: ou.key || null, nom: ou.nom || '', at: Date.now() });
     }
     if (!sortis.length) return;
-    if (!(await saveRoomPlan(plan))) { _sortieStock.derniere = ''; return; }   // refusé : rien n'est dit retiré
+    let planEcrit = plan;
+    if (!(await saveRoomPlan(plan, normalizePlan(brut), { surFusion: (p) => { planEcrit = normalizePlan(p); } }))) { _sortieStock.derniere = ''; return; }   // refusé : rien n'est dit retiré
+    plan = planEcrit;
     saveTout('vrm_room_plan', plan);
     const lim = Date.now() - STOCK_SORTIS_JOURS * 86400000;
     const j = {}; const ancien = load('vrm_stock_sortis', {}) || {};
@@ -23815,16 +23916,26 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const roomRef = React.useRef(null);
   const drag = React.useRef(null);
 
-  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud === undefined) { setPlanLu(false); return; } if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); setPlan(np); save('vrm_room_plan', np); } setPlanLu(true); })(); }, []);
+  // (11 nov., robustesse des données, point 3) La pièce telle que lue/écrite en
+  // dernier : la BASE de la fusion (seuls les gestes faits ici partent).
+  const baseRoom = React.useRef(null); const planVu = React.useRef(null);
+  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud === undefined) { setPlanLu(false); return; } if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); baseRoom.current = np; setPlan(np); save('vrm_room_plan', np); } setPlanLu(true); })(); }, []);
   // Écriture locale immédiate (fluide au drag) ; envoi cloud DÉBOUNCÉ (800 ms
   // après le dernier changement) → un glissement = un seul upload, pas 50.
   // (27 oct.) Un article parti sorti tout seul (`sortirPartisDuStock`) : la pièce affichée suit.
-  useEffect(() => { const f = (e) => { if (e && e.detail && Array.isArray(e.detail.rooms)) setPlan(e.detail); }; window.addEventListener('vrm:stock-plan', f); return () => window.removeEventListener('vrm:stock-plan', f); }, []);
+  useEffect(() => { const f = (e) => { if (e && e.detail && Array.isArray(e.detail.rooms)) { baseRoom.current = e.detail; setPlan(e.detail); } }; window.addEventListener('vrm:stock-plan', f); return () => window.removeEventListener('vrm:stock-plan', f); }, []);
   const saveTimer = React.useRef(null);
   const persist = (next) => {
-    setPlan(next); save('vrm_room_plan', next);
+    setPlan(next); save('vrm_room_plan', next); planVu.current = next;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveRoomPlan(next), 800);
+    saveTimer.current = setTimeout(() => {
+      saveRoomPlan(next, baseRoom.current, { surFusion: (p) => {
+        const np = normalizePlan(p); baseRoom.current = np;
+        // Un geste fait ailleurs entre-temps est entré : l'écran le montre (sauf
+        // si un nouveau geste d'ici est déjà parti — il repartira de cette base).
+        if (planVu.current === next && !egalStable(np, next)) { planVu.current = np; setPlan(np); save('vrm_room_plan', np); }
+      } }).then((ok) => { if (!ok) toast('Pièce pas enregistrée : réessaie dans un instant.'); }).catch(() => {});
+    }, 800);
   };
   const activeRoom = plan.rooms.find(r => r.id === plan.active) || plan.rooms[0];
   const items = activeRoom.items || [];
@@ -34745,12 +34856,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // paire depuis un compte et tu la rachètes avec un autre. Vinted la compte
     // comme un ACHAT, mais c'est TA paire (elle porte ton numéro « nXXXX » et/ou
     // la même transaction apparaît dans tes ventes) — ce n'est pas un vrai achat.
-    // Pour les ACHATS, on écarte donc : (a) une commande dont la transaction est
-    // AUSSI une de tes ventes, (b) une commande dont le titre porte TON numéro.
+    // Pour les ACHATS, on écarte donc une commande dont la transaction est AUSSI
+    // une de tes ventes — une IDENTITÉ (§5).
+    // ⚠️ (11 nov., robustesse des données, point 11) Plus jamais par le TITRE : un
+    //    titre portant « n 1234 » / « N°2002 » (écrit par n'importe quel vendeur)
+    //    faisait disparaître un VRAI achat des achats, des dépenses et du prix
+    //    d'achat, sans trace. Un transfert pas reconnu reste visible (masquable).
     const soldTxns = type === 'purchased'
       ? new Set((sales.items || []).map(o => String(o.transaction_id)))
       : null;
-    const porteMonNumero = (t) => /\bn\s?\d{3,4}\b/i.test(String(t || ''));
     const masquesA = type === 'purchased' ? achatsMasques() : new Set();
     // `failedUids` : l'IDENTITÉ des comptes qui n'ont pas répondu — c'est elle
     // qu'un lecteur juge. `failed` (les noms) ne sert qu'à l'affichage d'avant :
@@ -34761,7 +34875,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (res.ok) { anyOk=true; for (const o of res.items) {
         const id = String(o.transaction_id);
         if (seen.has(id)) continue;
-        if (type === 'purchased' && (soldTxns.has(id) || porteMonNumero(o.title))) continue; // transfert entre tes comptes, pas un achat
+        if (type === 'purchased' && soldTxns.has(id)) continue; // transfert entre tes comptes (même transaction), pas un achat
         if (type === 'purchased' && masquesA.has(id)) continue; // masqué à la main → Réglages « Achats masqués »
         seen.add(id); out.push({ ...o, _acc: acc });
       } }
@@ -50722,7 +50836,7 @@ function AbonnementRequis({ info }) {
         {msg && !paiementFerme && <div style={{ fontSize: 13, color: C.warn, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, fontSize: 13 }}>
           <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a>
-          <button type="button" onClick={() => { authSignOut(); }} className="vrm-b vrm-b-discret">Se déconnecter</button>
+          <button type="button" onClick={() => { seDeconnecter({ question: false }); }} className="vrm-b vrm-b-discret">Se déconnecter</button>
         </div>
       </div>
     </div>
@@ -50854,7 +50968,7 @@ function TeteEquipe({ titre, sous, onPropre }) {
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" data-equipe-propre="" onClick={onPropre} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Ma propre boutique</button>
-        <button type="button" onClick={() => { authSignOut(); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: '8px 4px' }}>Se déconnecter</button>
+        <button type="button" onClick={() => { seDeconnecter({ question: false }); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: '8px 4px' }}>Se déconnecter</button>
       </div>
     </div>
   );
@@ -54198,7 +54312,11 @@ function AppCoeur() {
       // (3 nov.) Les photos des annonces à retirer, par IDENTITÉ : l'annonce Leboncoin elle-même
       // (`lbcId`), sinon la fiche N° de l'annonce Vinted vendue (clé = son identifiant) — jamais un titre.
       let lbcRemovePhotos=[];
-      let postedIds=[];              // tous les ids publiés sur LBC (pour le croisement eBay→LBC)
+      // (11 nov., robustesse des données, point 1) `null` = PAS LU : une lecture ratée de
+      // `vinted_lbc_posted` ne publie plus jamais une liste « à retirer » VIDE pour le
+      // logo de leboncoin.fr (l'alerte anti double vente disparaissait sur un hoquet) ;
+      // le logo garde sa dernière liste, le compteur se tait (pas su ≠ rien).
+      let postedIds=null;            // tous les ids publiés sur LBC (pour le croisement eBay→LBC)
       let lbcRemoveEbayCount=0;      // vendues sur eBay, encore en ligne ici (§11, même base que le compte Vinted)
       let lbcRemoveVcCount=0;        // (1er nov.) vendues sur Vestiaire, encore en ligne ici
       // (3 nov.) Les annonces Leboncoin désignées par IDENTITÉ (lien, référence) : la carte de Ma journée porte « Supprimer de Leboncoin ».
@@ -54209,7 +54327,7 @@ function AppCoeur() {
         // (31 oct.) La cloche est un passage de FOND : elle accepte la réponse
         // partagée d'il y a quelques secondes (`vrmFond`, src/lecturesPartagees.js).
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth(),vrmFond:true});
-        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; }
+        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; if(Array.isArray(rows)&&Array.isArray(posted)) postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; }
       }catch(_){}
       // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
       // La MÊME règle que l'écran Leboncoin (`doublesVenteLbc`, §11). Les ventes
@@ -54282,7 +54400,8 @@ function AppCoeur() {
         // logo VRM à une paire que l'écran Leboncoin ne listait pas. Et rien n'est
         // jugé avant l'arrivée des numéros (`nuageAuDepart`) : sinon des lignes sans
         // N° ni annonce partaient vers le logo.
-        if(aJuger && nuageAuDepart){
+        if(postedIds===null){ /* pas lu : rien n'est jugé ni publié */ }
+        else if(aJuger && nuageAuDepart){
           const preuveN=await lirePreuvesVenteVinted().catch(()=>null);
           const vendusR=preuveN&&preuveN.vendus?preuveN.vendus:null;
           lbcARetirer=aRetirerDeLbcVinted({posted:postedIds, numeros:nums, enLigne:lbcOnlineIds, vendus:vendusR, itemsLbc:items, liens:liensR, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis, lectures:ls?ls.lectures:null});
@@ -55855,4 +55974,4 @@ export { useProfilFiscal, profilFiscalLu };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
-export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
+export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, seDeconnecter, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, ecrireCopieLocale, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };

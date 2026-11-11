@@ -13,7 +13,7 @@ import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis, cleStatTransporteur } from '../transporteursVisuels.js';
 import { attrCible } from '../cibleNotif.js';
 import { champsFacultatifs } from '../profilVendeur.js';
-import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, vendActuel } from '../App.jsx';
+import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, vendActuel, ecrireCopieLocale } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import AnnoncesLeboncoin from '../AnnoncesLeboncoin.jsx';
@@ -622,7 +622,7 @@ function relierAnnonceLbc(id, n) {
   // ⚠️ `save` écrit 500 ms plus tard : l'écran se rechargeait AVANT et ne
   //    voyait pas le lien (vu au banc). On pose la copie locale tout de
   //    suite ; `save` garde la synchro vers le nuage.
-  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
+  ecrireCopieLocale('vrm_lbc_liens', liens);
   save('vrm_lbc_liens', liens);
 }
 // « Je me suis trompé » (16 oct., Julien : « j'ai mal relié une paire, il faut
@@ -640,7 +640,7 @@ function gesteDelierLbc(id, numero, reload) {
   const k = String(id);
   const avant = (load('vrm_lbc_liens', {}) || {})[k];
   if (avant == null || String(avant).trim() === '') return;
-  const poserLocal = (v) => { try { const l = { ...(load('vrm_lbc_liens', {}) || {}), [k]: v }; localStorage.setItem('vrm_lbc_liens', JSON.stringify(l)); } catch (_) {} };
+  const poserLocal = (v) => { try { const l = { ...(load('vrm_lbc_liens', {}) || {}), [k]: v }; ecrireCopieLocale('vrm_lbc_liens', l); } catch (_) {} };
   gesteVrm(numero ? `Lien avec la N°${numero} retiré` : 'Lien retiré', [{ k: 'vrm_lbc_liens', type: 'cle', id: k, apres: '', avant }], {}, (sens) => {
     poserLocal(sens === 'apres' ? '' : avant);
     if (typeof reload === 'function') { try { reload(); } catch (_) {} }
@@ -654,7 +654,7 @@ function gesteDelierLbc(id, numero, reload) {
 function rangerSansJumelleLbc(cle) {
   if (!cle) return;
   const m = { ...(load('vrm_lbc_pas_de_paire', {}) || {}), [String(cle)]: new Date().toISOString() };
-  try { localStorage.setItem('vrm_lbc_pas_de_paire', JSON.stringify(m)); } catch (_) {}
+  ecrireCopieLocale('vrm_lbc_pas_de_paire', m);
   save('vrm_lbc_pas_de_paire', m);
 }
 
@@ -1093,6 +1093,11 @@ function LeboncoinScreen() {
     const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
     const pd = (postedRows && postedRows[0] && postedRows[0].data) || {};
     const posted = new Set((pd.ids || []).map(String));
+    // (11 nov., robustesse des données, point 5) Ce qui est DÉJÀ sur Leboncoin pas lu
+    // (`null`) : la file « à publier » listait alors TOUTES les paires déjà publiées,
+    // et « Publier » en série les republiait en double. Pas lu ⇒ file vide, compteur
+    // « — », et l'écran dit pourquoi.
+    const postedKO = postedRows === null;
     // MÊMES RÈGLES DE COMPTE QUE LE RESTE DE L'APP : un compte MASQUÉ à la main
     // ne doit pas alimenter la file (choix explicite de Julien).
     // ⚠️⚠️ UN COMPTE BANNI PAR VINTED (`vinted_accounts_blocked`), LUI, RESTE
@@ -1361,6 +1366,7 @@ function LeboncoinScreen() {
       queue.push(itemFileLbc(o, e, num));
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
+    if (postedKO) queue.length = 0;
 
     // ── RÉPUBLIER SUR LEBONCOIN (29 oct.) ─────────────────────────────────────
     // Julien : « un outil de republication comme pour Vinted, exactement pareil ».
@@ -1567,7 +1573,7 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
-    setData({ retirerAConfirmer, catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
+    setData({ retirerAConfirmer, catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, postedKO, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -1854,7 +1860,7 @@ function LeboncoinScreen() {
           vu tes annonces, ouvre leboncoin.fr » : le mauvais geste. Un seul bloc
           nomme ce qui n'a pas pu être lu, et ce que ça empêche. */}
       {data && (() => {
-        const rates = [data.echecLecture && 'tes annonces Vinted', data.preuveKO && 'tes ventes Vinted', data.ventesLbcKO && 'tes ventes Leboncoin', data.lbcKO && 'tes annonces Leboncoin'].filter(Boolean);
+        const rates = [data.echecLecture && 'tes annonces Vinted', data.postedKO && 'ce qui est déjà sur Leboncoin', data.preuveKO && 'tes ventes Vinted', data.ventesLbcKO && 'tes ventes Leboncoin', data.lbcKO && 'tes annonces Leboncoin'].filter(Boolean);
         if (!rates.length) return null;
         const liste = rates.length === 1 ? rates[0] : rates.slice(0, -1).join(', ') + ' ni ' + rates[rates.length - 1];
         const effets = [
@@ -1862,6 +1868,7 @@ function LeboncoinScreen() {
           data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucun article vendu ici n'est encore en vente sur Vinted",
           data.lbcKO && 'je ne peux pas te dire lesquelles retirer de Leboncoin',
           data.echecLecture && 'la file à publier est incomplète',
+          data.postedKO && 'je ne propose rien à publier (risque de doublon)',
         ].filter(Boolean);
         return (
           <div data-lbc-lecture-ratee={rates.length} style={{ marginBottom: 12 }}>
@@ -2116,7 +2123,7 @@ function LeboncoinScreen() {
         })()}
         {/* À publier */}
         <Card className="vrm-lbc-a-publier">
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>{data.echecLecture ? '—' : data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>{(data.echecLecture || data.postedKO) ? '—' : data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
           {/* ⚠️ UNE ANNONCE QUE TU AS RETIRÉE NE DISPARAÎT PAS EN SILENCE.
               Sans cette ligne, désélectionner faisait fondre la file sans que
               rien ne dise pourquoi — et « 0 à publier » se serait lu « tout est
@@ -2143,7 +2150,7 @@ function LeboncoinScreen() {
           {/* ⚠️ « Tout est publié 🎉 » se disait aussi quand la file était vide
               parce que la base n'avait pas répondu — une fête sur une lecture
               ratée. Le 🎉 ne sort que si on a pu REGARDER. */}
-          {data.queue.length === 0 ? (data.echecLecture
+          {data.queue.length === 0 ? ((data.echecLecture || data.postedKO)
             ? <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>File pas lue (lecture ratée), pas vide.</div>
             /* ⚠️⚠️ TROISIÈME CAUSE, VUE AU RENDU LE 16 SEPTEMBRE SUR UNE
                INSTALLATION NEUVE : « Tout est publié 🎉 (toutes tes paires
