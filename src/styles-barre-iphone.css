@@ -11,7 +11,7 @@
    · Le voile laisse la barre hors de lui : toucher « Plus » le referme,
      toucher un autre onglet y va directement.
    · Une seule couleur d'accent, rare (§7) : l'icône de l'écran ouvert. */
-@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
   html .vrm-app-shell .vrm-sheet-voile.vrm-plus-voile {
     bottom: var(--vrm-barre-bas, 64px);
     background: rgba(0, 0, 0, .28);

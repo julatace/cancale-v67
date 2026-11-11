@@ -241,7 +241,47 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await pg.waitForTimeout(500);
           const p = ecrits.find((l) => l.id === 'push_prefs');
           dit(!!p && p.data.calme && p.data.calme.actif === false && p.data.familles && p.data.familles.messages === false, `${T} · F3 heures calmes coupées ⇒ push_prefs.calme.actif:false écrit, le reste de la ligne GARDÉ`, JSON.stringify(p && p.data));
-          dit(await pg.locator('[data-np-regrouper] [role="switch"]').count() === 1, `${T} · F5 « Regrouper »`);
+          // (11 nov., lot `notifs-groupees`) Regrouper : Non · 15 · 30 · 60 min (15 par défaut).
+          // Chaque choix écrit la ligne entière.
+          const fen0 = await pg.locator('[data-np-fenetre]').getAttribute('data-np-fenetre').catch(() => null);
+          const choix = await pg.locator('[data-np-fenetre-choix]').evaluateAll((l) => l.map((e) => e.getAttribute('data-np-fenetre-choix')));
+          dit(fen0 === '15' && choix.join(',') === 'non,15,30,60', `${T} · F5 « Regrouper » : 15 min par défaut ; Non · 15 · 30 · 60`, `${fen0} · ${choix}`);
+          ecrits.length = 0;
+          await pg.locator('[data-np-fenetre-choix="30"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const g30 = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!g30 && g30.data.groupe && g30.data.groupe.fenetre === 30 && g30.data.regrouper === true && g30.data.familles && g30.data.familles.messages === false
+            && await pg.locator('[data-np-fenetre="30"]').count() === 1, `${T} · F5b « 30 min » ⇒ push_prefs.groupe.fenetre:30, le reste GARDÉ`, JSON.stringify(g30 && g30.data));
+          await pg.locator('[data-np-fenetre-choix="non"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const gnon = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!gnon && gnon.data.regrouper === false && await pg.locator('[data-np-regrouper="off"]').count() === 1, `${T} · F5c « Non » ⇒ regrouper:false (chaque notification seule)`, JSON.stringify(gnon && gnon.data));
+          // (11 nov.) Jours calmes : week-end, jours cochés, congés — la ligne `calme` gardée entière.
+          ecrits.length = 0;
+          dit(await pg.locator('[data-np-weekend="off"]').count() === 1 && await pg.locator('[data-np-jour]').count() === 7, `${T} · F10 « Week-end calme » éteint par défaut, sept jours à cocher`);
+          await pg.locator('[data-np-weekend] [role="switch"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const we = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!we && we.data.calme && JSON.stringify(we.data.calme.jours) === '["sam","dim"]' && we.data.calme.actif === false && we.data.familles && we.data.familles.messages === false
+            && await pg.locator('[data-np-jour="sam"][aria-pressed="true"]').count() === 1, `${T} · F11 week-end calme ⇒ calme.jours [sam, dim], heures calmes et types GARDÉS`, JSON.stringify(we && we.data));
+          await pg.locator('[data-np-jour="mer"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const me = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!me && JSON.stringify(me.data.calme.jours) === '["sam","dim","mer"]', `${T} · F12 cocher mercredi l’ajoute`, JSON.stringify(me && me.data.calme));
+          await pg.locator('[data-np-conges-du]').fill('2026-12-20').catch(() => {});
+          await pg.waitForTimeout(400);
+          await pg.locator('[data-np-conges-au]').fill('2026-12-27').catch(() => {});
+          await pg.waitForTimeout(500);
+          const cg = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!cg && cg.data.calme.conges && cg.data.calme.conges.du === '2026-12-20' && cg.data.calme.conges.au === '2026-12-27' && await pg.locator('[data-np-conges="2026-12-20_2026-12-27"]').count() === 1,
+            `${T} · F13 congés du 20 au 27 déc. écrits`, JSON.stringify(cg && cg.data.calme));
+          if (SHOTS) await pg.locator('[data-np-reglages]').screenshot({ path: path.join(SHOTS, `centre-${vp.width}-${sombre ? 'sombre' : 'clair'}-jours.png`) }).catch(() => {});
+          await pg.locator('[data-np-conges-effacer]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const ef = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!ef && ef.data.calme.conges === null && JSON.stringify(ef.data.calme.jours) === '["sam","dim","mer"]', `${T} · F14 « Effacer » retire les congés, les jours restent`, JSON.stringify(ef && ef.data.calme));
+          await pg.locator('[data-np-fenetre-choix="15"]').click().catch(() => {});
+          await pg.waitForTimeout(400);
           const rel = await pg.evaluate(() => { const e = document.querySelector('[data-relances-essai]'); return e ? { etat: e.getAttribute('data-relances-essai'), codes: e.querySelectorAll('code').length } : null; });
           dit(!!rel && rel.etat === 'non-configure' && rel.codes === 4, `${T} · F6 e-mails de l’essai : « pas configurés » et ce qui manque (au propriétaire)`, JSON.stringify(rel));
           const m = await mesurer(pg, mobile, '.vrm-set');

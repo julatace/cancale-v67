@@ -64,6 +64,8 @@ export async function envoyerNotifTransp(t, ch, { txs = [], codes = [] } = {}) {
   const txt = texteNotifTransp(t, ch);
   const e = await sendPushToAll({ cat: ch.categorie, title: txt.title, body: txt.body, tag: ch.cle, url: (() => { const un = (txs || []).filter(Boolean); const tx = un.length === 1 ? un[0] : ''; return ch.etat === 'disponible' ? DESTINATIONS.retrait({ suivi: t.suivi, tx }) : DESTINATIONS.achat({ tx }); })() });
   if (e && e.coupe) return { envoye: false, raison: 'abonnement' };
+  // (11 nov.) Gardée pour le résumé groupé, ou déjà dite aujourd'hui : pas un échec.
+  if (e && (e.attente || e.doublon)) return { envoye: false, raison: e.attente ? 'dans-le-resume' : 'deja-dite' };
   if (!e || !(Number(e.sent) > 0)) return { envoye: false, raison: e && e.erreur ? 'envoi-impossible' : 'aucun-appareil' };
   return { envoye: true, raison: ch.etat };
 }

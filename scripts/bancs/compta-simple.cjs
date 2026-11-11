@@ -229,6 +229,12 @@ async function scenarioA(b, vp, sombre) {
     check(n3720 === 1, `A ${nom} — les cotisations de septembre (37,20 €), déjà déclaré, sont écrites une fois : ${n3720} fois`);
     check(nNotee <= 1, `A ${nom} — « notée déclarée » est dit au plus une fois : ${nNotee} fois`);
     check(nApayer === 1, `A ${nom} — l'« à payer » du mois en cours (7,44 €) est écrit une fois hors du bénéfice : ${nApayer} fois`);
+    // (11 nov., restes) §7 en général, pas seulement 7,44 € : dans « Déclarer » (suivi ouvert), AUCUN
+    // montant non nul n'est écrit deux fois. Rouge sur integration-11nov-d : 7,44 € ×3, 2 000,01 € ×3 (DAC7).
+    const montants = {};
+    for (const m of tout.matchAll(/\d[\d\u202f\u00a0 ]*,\d\d\s*€/g)) { const k = m[0].replace(/\s/g, ''); if (k !== '0,00€') montants[k] = (montants[k] || 0) + 1; }
+    const doubles = Object.entries(montants).filter(([, n]) => n > 1);
+    check(doubles.length === 0, `A ${nom} — dans « Déclarer », chaque montant est écrit une fois : ${doubles.length ? doubles.map(([k, n]) => `${k} ×${n}`).join(', ') : Object.keys(montants).length + ' montants, aucun doublon'}`);
     const enCours = await texte(pg, '[data-suivi-etat="en_cours"]');
     check(enCours != null && !/à payer/.test(enCours), `A ${nom} — le suivi ne redonne pas l'« à payer » du mois en cours : « ${(enCours || '').replace(/\s+/g, ' ').trim()} »`);
     const cal = await texte(pg, '[data-micro-calendrier]');

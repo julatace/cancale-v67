@@ -623,3 +623,6 @@ depuis la copie, §6.1), corrigé, rouge sur 87df182, vert après, rouge sous mu
   repeinte ignorée, repeinte sans tuile = dessiné) ; **2 rouges sur 87df182**.
   Les 138 audits non SQL : 0 rouge.
 - **Non mesuré** : un vrai réseau mobile lent ; la vraie instance OpenFreeMap.
+
+#### 11 novembre : prête à activer (lot `equipe-pret`)
+La 016 ne referme plus la lecture sans abonnement si la 027 passe avant ; invitation à partager ; SQL à coller. Récit : `docs/passation/2026-11-11-equipe-pret.md`.

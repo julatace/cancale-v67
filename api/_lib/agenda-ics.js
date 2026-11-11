@@ -32,6 +32,7 @@
 import crypto from 'node:crypto';
 import { nextUrssafDeadline, moisPeriodeUrssaf, moisDeclare } from './urssaf-regle.js';
 import { heureCourte } from './limite-envoi.js';
+import { evenementsRappels } from './rappels-perso.js';
 import { vendeurParIndex, ecrireIndexJeton, retirerIndexJeton, memeJeton } from './jeton-index.js';
 
 export const LIGNE_AGENDA = 'vrm_agenda';
@@ -46,7 +47,7 @@ export const urlAgenda = (jeton, origine = 'https://vrm.center') => (jeton ? `${
 export const webcalDe = (url) => String(url || '').replace(/^https?:\/\//i, 'webcal://');
 
 // Les seules clés de `main` lues (§4.4 : jamais `select=data`).
-export const SELECT_MAIN_AGENDA = 'regime:data->>vinted_regime,freq:data->>vinted_urssaf_freq,declare:data->vrm_urssaf_declare,envoi:data->vrm_agenda_envoi,retirer:data->vrm_colis_retirer->colis,retirerAt:data->vrm_colis_retirer->at';
+export const SELECT_MAIN_AGENDA = 'regime:data->>vinted_regime,freq:data->>vinted_urssaf_freq,declare:data->vrm_urssaf_declare,envoi:data->vrm_agenda_envoi,retirer:data->vrm_colis_retirer->colis,retirerAt:data->vrm_colis_retirer->at,rappels:data->vrm_rappels';
 
 const NOMS_TRANSPORTEUR = { mondialrelay: 'Mondial Relay', vinted: 'Vinted Go', vintedgo: 'Vinted Go', chronopost: 'Chronopost', colissimo: 'Colissimo', relaiscolis: 'Relais Colis', ups: 'UPS', dpd: 'DPD', gls: 'GLS', inpost: 'InPost', laposte: 'La Poste' };
 const nomTransporteur = (t) => NOMS_TRANSPORTEUR[String(t || '').toLowerCase().replace(/[\s_-]/g, '')] || '';
@@ -117,6 +118,9 @@ export function echeancesAgenda(main, maintenant = Date.now()) {
     const tr = nomTransporteur(c[2]);
     out.push({ uid: `retrait-${empreinte(ident || jour + ':' + c[1])}`, type: 'retrait', titre: `Colis à retirer${tr ? ' · ' + tr : ''}`, jour, ...(at ? { at } : {}), note: `Dernier jour lu pour le retirer${vuRetrait ? ` · vu dans VRM le ${vuRetrait}` : ''}.` });
   }
+  // 4. (11 nov.) Les rappels qu'IL a posés (« Me le rappeler », api/_lib/rappels-perso.js) :
+  //    « Rappel · N°124 · sa note », à 9 h, l'alarme à l'heure. Ni titre d'annonce, ni acheteur.
+  try { out.push(...evenementsRappels(m.rappels, maintenant)); } catch (_) { /* un rappel illisible n'empêche pas l'agenda */ }
   return out.sort((a, b) => (a.jour < b.jour ? -1 : a.jour > b.jour ? 1 : 0));
 }
 
@@ -151,7 +155,7 @@ export function fichierIcs(evenements, maintenant = Date.now()) {
     }
     L.push(`SUMMARY:${echap(e.titre)}`, `DESCRIPTION:${echap(e.note || '')}`, 'TRANSP:TRANSPARENT');
     // Le rappel : 2 h avant une heure lue ; la veille à 9 h pour une journée entière.
-    L.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${echap(e.titre)}`, `TRIGGER:${e.at ? '-PT2H' : '-PT15H'}`, 'END:VALARM', 'END:VEVENT');
+    L.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${echap(e.titre)}`, `TRIGGER:${/^-PT\d{1,3}[HM]$/.test(String(e.alarme || '')) ? e.alarme : e.at ? '-PT2H' : '-PT15H'}`, 'END:VALARM', 'END:VEVENT');
   }
   L.push('END:VCALENDAR');
   return L.map(plier).join('\r\n') + '\r\n';

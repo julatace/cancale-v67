@@ -1,9 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';
 import { createRequire as creerRequireSourceApp } from 'node:module';
+import * as lienEmail from '../../src/lienEmail.js'; // (11 nov., securite-revue) le lien est noté comme demandé ici
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
 function banc(reponse,{captcha=false}={}){let session=null,appels=0,delai;
- const c=vm.createContext({langueNavigateur:()=>'fr',SUPABASE_URL:'https://projet.supabase.co',SUPABASE_KEY:'publique',captchaActif:()=>captcha,routeProtegee:()=>true,jetonCaptcha:()=>false,etatCaptcha:()=>({statut:'attente'}),MSG_CAPTCHA_ATTENTE:'Vérification en cours',corpsAvecCaptcha:(_,b)=>b,consommerCaptcha:()=>{},AbortController,setTimeout:(f)=>{delai=f;return 1},clearTimeout:()=>{},fetch:async(...args)=>{appels++;return reponse(...args)},avecRetour:p=>p,MAIL_QUOTA:'Limite temporaire',writeSession:s=>{session=s},sessionFrom:j=>j});
+ const c=vm.createContext({...lienEmail,localStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},langueNavigateur:()=>'fr',SUPABASE_URL:'https://projet.supabase.co',SUPABASE_KEY:'publique',captchaActif:()=>captcha,routeProtegee:()=>true,jetonCaptcha:()=>false,etatCaptcha:()=>({statut:'attente'}),MSG_CAPTCHA_ATTENTE:'Vérification en cours',corpsAvecCaptcha:(_,b)=>b,consommerCaptcha:()=>{},AbortController,setTimeout:(f)=>{delai=f;return 1},clearTimeout:()=>{},fetch:async(...args)=>{appels++;return reponse(...args)},avecRetour:p=>p,MAIL_QUOTA:'Limite temporaire',writeSession:s=>{session=s},sessionFrom:j=>j});
  const extrait=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
  vm.runInContext(extrait('const delaiDemandeEmail =','// Les secondes qui restent')+extrait('const authCall = async','// ── OÙ RAMÈNENT')+extrait('const authSignUp  =','const authReset')+';globalThis.inscrire=authSignUp;',c);
  return{inscrire:()=>c.inscrire(' Client@exemple.test ','Secret123'),get appels(){return appels},get session(){return session},expirer:()=>delai()};}

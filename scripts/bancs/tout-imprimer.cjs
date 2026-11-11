@@ -14,6 +14,9 @@
 // Lancer : construire dist/, puis node scripts/bancs/tout-imprimer.cjs   (BANC_PORT)
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+// (11 nov., webkit-fiable) `NAVIGATEUR=webkit` : le même banc sous le moteur de Safari (_navigateur.cjs).
+const { lancer, estWebkit } = require('./_navigateur.cjs');
+const PW_NAV = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const { pathToFileURL } = require('url');
@@ -148,12 +151,16 @@ async function scenario(b, nom, vue, LIGNES) {
   const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), site: e.getAttribute('data-lot-site'), num: e.getAttribute('data-lot-num'), tr: e.getAttribute('data-lot-transp'), coche: e.getAttribute('data-coche') === '1' })));
   const grAp = ap.map((x) => x.tr).filter((x, i, a) => a.indexOf(x) === i);
   dit(ap.length === 6 && ap.some((x) => x.site === 'vestiaire'), `${nom} : B l'aperçu porte les 6 bordereaux, Vestiaire compris`, JSON.stringify(ap.map((x) => x.cle + ':' + x.site)));
-  dit(JSON.stringify(grAp) === JSON.stringify(ecran.filter((g) => grAp.includes(g))) && grAp.length === 3, `${nom} : B groupes de l'aperçu = ordre des groupes de l'écran`, JSON.stringify({ apercu: grAp, ecran }));
+  // (11 nov., webkit-fiable) Depuis le lot AJ (« Colis À envoyer : une liste, transporteur en
+  // pastilles »), l'écran n'a PLUS de groupes par transporteur : l'aperçu regroupe seul (D le
+  // vérifie : chaque transporteur d'un seul tenant, l'ordre du PDF = celui de l'aperçu). S'il en
+  // revient, leur ordre doit être celui de l'aperçu, comme avant.
+  dit(grAp.length === 3 && (ecran.length === 0 || JSON.stringify(grAp) === JSON.stringify(ecran.filter((g) => grAp.includes(g)))), `${nom} : B l'aperçu regroupe les 3 transporteurs (et suit les groupes de l'écran s'il en a)`, JSON.stringify({ apercu: grAp, ecran }));
   const contigu = ap.every((x, i) => i === 0 || x.tr === ap[i - 1].tr || !ap.slice(0, i - 1).some((y) => y.tr === x.tr));
   dit(contigu, `${nom} : B chaque transporteur d'un seul tenant`, JSON.stringify(ap.map((x) => x.tr)));
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-apercu.png`) });
-  // Tout cocher et contrôler, puis imprimer.
-  for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check(); await pg.locator(`[data-lot-ligne="${x.cle}"] input`).nth(1).check(); }
+  // Tout cocher, puis imprimer. (11 nov.) Plus de case « Contrôlé » : la sélection seule.
+  for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check(); }
   await pg.click('button[data-lot-imprimer]');
   // C : le N° à vérifier DEMANDE.
   // (Si une case « Contrôlé » n'a pas pris, la question « Vérifier les articles » passe d'abord : on la franchit.)
@@ -220,7 +227,7 @@ let srvPret;
       } } },
       { id: 'vc_label_71000001', data: { b64: await pdfInvente('V1'), at: ilYaH(1) } },
     ];
-    b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await lancer(PW_NAV, { executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     await scenario(b, '390', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, LIGNES);
     await scenario(b, '1512', { viewport: { width: 1512, height: 950 } }, LIGNES);
   } catch (e) { dit(false, 'le banc s’exécute', String(e.message || e).slice(0, 200)); }

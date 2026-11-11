@@ -55,9 +55,13 @@ import { avecMarche, marcheCourant, marcheDuCompte, MARCHE_DEFAUT, lienAnnonce }
 // compte, on range, et on renvoie un résumé (comptes + échantillon) — pas de
 // schéma inventé (§6).
 const EBAY_API = 'https://api.ebay.com';
+// (11 nov., robustesse) Délais des appels sortants : une lecture 10 s ; un appel
+// Trading (publication, révision, retrait) 25 s — coupé, il rend `incertain:true`
+// (eBay a peut-être agi : l'app relit avant de refaire, jamais « raté » sûr).
+const DELAI_EBAY_MS = 10000, DELAI_TRADING_MS = 25000;
 async function ebayJson(url, token, extra) {
   try {
-    const r = await fetch(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}) });
+    const r = await fetch(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}), signal: AbortSignal.timeout(DELAI_EBAY_MS) });
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (_) {}
     return { status: r.status, ok: r.ok, data: j, raw: txt.slice(0, 400) };
@@ -162,7 +166,7 @@ async function tradingCall(token, callName, inner) {
     const r = await fetch(`${EBAY_API}/ws/api.dll`, {
       method: 'POST',
       headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': marcheCourant().siteId, 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
-      body,
+      body, signal: AbortSignal.timeout(DELAI_TRADING_MS),
     });
     const xml = await r.text();
     const ack = (/<Ack>([\s\S]*?)<\/Ack>/.exec(xml) || [])[1] || '';
@@ -172,7 +176,7 @@ async function tradingCall(token, callName, inner) {
     const err = premiereErreur ? premiereErreur.message : (!ok && erreurs[0] ? erreurs[0].message : '');
     const avertissements = erreurs.filter((e) => e.severite === 'Warning' && e.message).map((e) => e.message);
     return { status: r.status, ok, ack, err, erreurs, avertissements, xml };
-  } catch (e) { return { status: 0, ok: false, erreurs: [], avertissements: [], error: String((e && e.message) || '').slice(0, 140) }; }
+  } catch (e) { return { status: 0, ok: false, erreurs: [], avertissements: [], error: String((e && e.message) || '').slice(0, 140), ...(e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? { incertain: true } : {}) }; }
 }
 
 // ── UNE ANNONCE LUE DANS GetMyeBaySelling ─────────────────────────────────────
