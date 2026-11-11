@@ -47,7 +47,7 @@ function CarteAlerte({ a, onVue }) {
       <p className="vrm-veille-phrase">{t.phrase}</p>
       <details className="vrm-veille-pourquoi"><summary>Pourquoi ?</summary><p>{t.pourquoi}</p></details>
       <div className="vrm-veille-gestes">
-        <BoutonBase variante="primaire" data-veille-geste={a.type} onClick={() => aller(t.geste.aller)}>{t.geste.libelle}</BoutonBase>
+        <BoutonBase variante="secondaire" data-veille-geste={a.type} onClick={() => aller(t.geste.aller)}>{t.geste.libelle}</BoutonBase>
         <BoutonBase variante="discret" occupe={occupe} data-veille-vu={a.k} onClick={async () => { setOccupe(true); const ok = await marquerAlerteVue(a.k); setOccupe(false); if (ok) onVue(); }}>C’est vérifié</BoutonBase>
       </div>
     </div>
@@ -74,7 +74,7 @@ export function VeilleJournee() {
             <div key={l.cle} className="vrm-veille-ligne" data-controle-ligne={l.cle} data-ton={l.ton}>
               <span className="vrm-veille-n">{l.n}</span>
               <span className="vrm-veille-txt">{l.phrase.replace(/^\d+\s/, '')}{l.cle === 'numeros-double' && l.ids.length ? <small> · N°{l.ids.slice(0, 4).join(', N°')}</small> : null}</span>
-              <BoutonBase variante="secondaire" taille="petit" data-controle-geste={l.cle} onClick={() => aller(l.geste.aller)}>{l.geste.libelle}</BoutonBase>
+              <BoutonBase variante="secondaire" data-controle-geste={l.cle} onClick={() => aller(l.geste.aller)}>{l.geste.libelle}</BoutonBase>
             </div>
           ))}
           {ctl.passu.length ? <p className="vrm-veille-passu" data-controle-passu={ctl.passu.length}>Pas vérifié : {ctl.passu.map((p) => `${p.nom.charAt(0).toLowerCase()}${p.nom.slice(1)} (${p.raison})`).join(' · ')}.</p> : null}

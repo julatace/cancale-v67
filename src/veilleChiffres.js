@@ -59,6 +59,7 @@ export function jourDe(ms) {
   try { return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); } catch (_) { return new Date(ms).toISOString().slice(0, 10); }
 }
 const ecartJours = (j0, j1) => Math.round((Date.parse(j1 + 'T12:00:00Z') - Date.parse(j0 + 'T12:00:00Z')) / 864e5);
+const deMois = (ym) => { const m = moisLisible(ym); return /^[aeiouyàâéèêëîïôûü]/i.test(m) ? `d’${m}` : `de ${m}`; };
 export const moisLisible = (ym) => { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); return m ? `${MOIS[Number(m[2]) - 1]} ${m[1]}` : String(ym || ''); };
 const jourLisible = (j) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(j || '')); return m ? `${Number(m[3])} ${MOIS[Number(m[2]) - 1]}` : String(j || ''); };
 const euros = (x) => `${Math.round(Number(x) || 0).toLocaleString('fr-FR')} €`;
@@ -234,10 +235,9 @@ export function texteAlerte(a) {
     };
   }
   if (a.type === 'mois') {
-    const mois = moisLisible(a.ym);
     const caBaisse = a.caDe - a.caA >= SEUIL_CA;
     return {
-      titre: caBaisse ? `Ton CA de ${mois} est passé de ${euros(a.caDe)} à ${euros(a.caA)}` : `Les ventes de ${mois} sont passées de ${a.nDe} à ${a.nA}`,
+      titre: caBaisse ? `Ton CA ${deMois(a.ym)} est passé de ${euros(a.caDe)} à ${euros(a.caA)}` : `Les ventes ${deMois(a.ym)} sont passées de ${a.nDe} à ${a.nA}`,
       phrase: 'Un mois passé ne devrait plus baisser : vérifie.',
       pourquoi: `${a.nDe} ${pl(a.nDe, 'vente', 'ventes')} avant, ${a.nA} maintenant. Un compte pas lu ou une vente annulée peut l’expliquer.`,
       geste: { libelle: 'Voir le mois', aller: '/?tab=compta&cible=urssaf' },

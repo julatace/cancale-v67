@@ -77,7 +77,7 @@ const H = 3600e3, JOUR = 864e5;
   const U = (oct, nov, o = {}) => ({ at: 1, sources: o.sources || { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'lu' }, mois: [{ ym: '2026-11', ca: nov, n: 5 }, { ym: '2026-10', ca: oct[0], n: oct[1], caAilleurs: oct[2] || 0, nAilleurs: oct[3] || 0 }, { ym: '2026-09', ca: 500, n: 6 }] });
   al = deux(150, 150, { urssaf: U([1240, 12], 300) }, { urssaf: U([980, 9], 300) });
   vrai(al.length === 1 && al[0].type === 'mois' && al[0].ym === '2026-10' && al[0].caDe === 1240 && al[0].caA === 980, 'V5 le CA d’octobre (mois passé) passe de 1 240 € à 980 € ⇒ une alerte');
-  vrai(al[0] && /^Ton CA de octobre 2026 est passé de 1\s240\s€ à 980\s€$/.test(V.texteAlerte(al[0]).titre.replace(/ /g, ' ')) && V.texteAlerte(al[0]).geste.aller === '/?tab=compta&cible=urssaf', `V5 la phrase et le geste (« ${al[0] && V.texteAlerte(al[0]).titre} »)`);
+  vrai(al[0] && /^Ton CA d’octobre 2026 est passé de 1\s240\s€ à 980\s€$/.test(V.texteAlerte(al[0]).titre.replace(/ /g, ' ')) && V.texteAlerte(al[0]).geste.aller === '/?tab=compta&cible=urssaf', `V5 la phrase et le geste (« ${al[0] && V.texteAlerte(al[0]).titre} »)`);
   vrai(deux(150, 150, { urssaf: U([1240, 12], 300) }, { urssaf: U([1240, 12], 100) }).length === 0, 'V5 le mois EN COURS qui baisse ⇒ rien');
   vrai(deux(150, 150, { urssaf: U([1240, 12], 300) }, { urssaf: U([1180, 11, 60, 1], 300) }).length === 0, 'V5 une vente déclarée ailleurs (registre) explique la baisse ⇒ rien');
   vrai(deux(150, 150, { urssaf: U([1240, 12], 300) }, { urssaf: U([980, 9], 300, { sources: { Vinted: 'lu', Leboncoin: 'pasSu', eBay: 'lu', Vestiaire: 'lu' } }) }).length === 0, 'V5 une plateforme passée « pas lue » ⇒ rien');

@@ -19,7 +19,7 @@ const filtre = () => (B.owner() ? `&owner=eq.${encodeURIComponent(B.owner())}` :
 
 // `undefined` = pas su · `null` = absente · l'objet `data`.
 export async function lireLigneVeille(id) {
-  if (!B.url || !B.owner()) return undefined;
+  if (!B.url) return undefined;
   try {
     const r = await f(`${B.url}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}${filtre()}&select=data`, { headers: B.auth(), cache: 'no-store' });
     if (!r.ok) return undefined;
@@ -63,7 +63,7 @@ export async function modifierVeille(transformer, essais = 4) {
 // Les suppressions CONSTATÉES (dates), tous comptes : `harvest_{uid}_supprimees`,
 // projetées sur `ids` (petites, 500 au plus par compte). `null` = pas su.
 export async function lireDatesSuppressions() {
-  if (!B.url || !B.owner()) return null;
+  if (!B.url) return null;
   try {
     const r = await f(`${B.url}/rest/v1/app_data?id=like.harvest_%25_supprimees${filtre()}&select=id,ids:data->ids&order=id.asc`, { headers: B.auth(), cache: 'no-store' });
     if (!r.ok) return null;
@@ -83,7 +83,7 @@ const PAS_MS = 30 * 60e3;
 let dernier = { at: 0, cle: '' };
 let enCours = false;
 export async function noterReleveVeille(entree = {}, { maintenant = Date.now(), forcer = false } = {}) {
-  if (enCours || !B.owner()) return { etat: 'occupe' };
+  if (enCours || !B.url) return { etat: 'occupe' };
   const cle = JSON.stringify([entree.stock, (entree.comptes || []).length, entree.urssaf && entree.urssaf.at, (entree.ventes || []).length]);
   if (!forcer && cle === dernier.cle && maintenant - dernier.at < PAS_MS) return { etat: 'rien' };
   enCours = true;

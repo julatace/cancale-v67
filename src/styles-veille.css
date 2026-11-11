@@ -3,7 +3,7 @@
    Jetons seulement. AMBRE pour un geste (un chiffre à vérifier, un problème du
    contrôle) ; ROUGE seulement pour deux paires sous un N° (§7) ; le reste neutre.
    ═══════════════════════════════════════════════════════════════════════════ */
-.vrm-veille { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; }
+.vrm-veille { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; max-width: 608px; }
 .vrm-veille-alerte { padding: 14px 16px; border-radius: 14px; background: var(--d-carte, #FFFFFF);
   border: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); border-left: 3px solid var(--vrm-warn, #B25000); }
 .vrm-veille-titre { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
