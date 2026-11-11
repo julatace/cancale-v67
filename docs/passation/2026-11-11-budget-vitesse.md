@@ -106,7 +106,24 @@ et la date ajoutées à `releves`. Puis **UN commit qui ne touche que le .json**
 Un budget qui monte sans commit justifié est un défaut, pas un réglage. Après un gain,
 baisser de la même façon (sinon le gain peut se reperdre sans bruit).
 
-## Preuves
-(complétées en fin de session, voir « Résultats »)
+## Preuves (tout lancé dans ce conteneur, build de `main` fc3883d)
+- **Mutation intégrée** `BUDGET_MUTATION=doublon` (l'app relance une fois sa première
+  lecture de `vinted_accounts`) : **rouge sur les 16 ouvertures** (« lue 3 fois (budget 2) :
+  vinted_accounts… »), 16 rouges, sous charge (4 bancs en parallèle).
+- **Mutation du code de l'app** (arbre à part, `src/App.jsx` : `email_journal` relu 3 s
+  après sa lecture, puis `vite build`) : **rouge sur les 16 ouvertures** (« NOUVELLE lecture
+  en double (×2) : app_data?id=eq.email_journal… »). ⚠️ La même mutation relue
+  IMMÉDIATEMENT restait verte — et c'est juste : le partage des lectures de l'app la sert
+  sans requête (aucune lecture ne part). Le banc compte ce qui part sur le réseau.
+- **`main` inchangé** : vert seul (relevés et vérifications) ; sous charge extrême (4 bancs
+  en parallèle, charge 6–15) : un passage vert (112/112), un passage avec 1 rouge
+  (`lbc_ventes&select=data` en double sur Ventes, une adresse jamais doublée au relevé — le
+  partage de 2 s raté sous la charge). La CI lance les bancs un par un (`lancer-bancs.cjs`) :
+  ce cas ne la concerne pas, mais un rouge isolé qui disparaît au relancement vient de là.
+  Si ça arrive en CI : relancer ; s'il revient, c'est un vrai défaut.
+- Avant ces réglages (processeur ×4, calme de 3 s) : `main` était rouge 5 fois sur un
+  passage — d'où les trois pièges ci-dessus.
 
 ## Résultats
+- Lancer : `npm run build && node scripts/bancs/budget-vitesse.cjs` (~6–10 min ; 112 contrôles).
+- CI : voir le récit de la session (lancée par `workflow_dispatch` sur la branche).
