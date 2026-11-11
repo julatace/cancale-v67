@@ -85,7 +85,7 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
     dateCap:(()=>{const d=document.querySelector('.vrm-day-greeting .vrm-day-date');return d&&d.getBoundingClientRect().height>0?getComputedStyle(d).textTransform:null;})(),
     tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');if(!h||!t)return null;const a=h.getBoundingClientRect(),b=t.getBoundingClientRect();const mil=(b.top+b.bottom)/2;return mil>=a.top&&mil<=a.bottom?0:Math.round(Math.min(Math.abs(mil-a.top),Math.abs(mil-a.bottom)));})(),
-    limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];return {deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
+    limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];const coupe=(e)=>{for(let x=s;x&&x!==c;x=x.parentElement){const cs=getComputedStyle(x);if(x.scrollWidth>x.clientWidth+1&&(cs.textOverflow==='ellipsis'||cs.overflow==='hidden'||cs.overflowX==='hidden'))return true;}return false;};return {coupe:coupe(),deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
     fraiche:vis(document.querySelector('[data-fraicheur-ventes]')),
     titreEcran:(()=>{const b=document.querySelector('.vrm-mobile-titre,[data-titre-barre]');const t=[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].filter(h=>vis(h)&&/^(Statistiques|Comptabilité|Argent|Colis|Paramètres|Organisation)$/.test(h.textContent.trim()));return t.map(h=>h.textContent.trim());})(),
     courbeDoublons:(()=>{const c=document.querySelector('[data-stats-courbe]');return c?c.querySelectorAll('[data-chart-caption],[data-chart-compare]').length:null;})(),
@@ -156,6 +156,8 @@ if(sub==='ventes'){
   dit(W<600?m.titreEcran.length<=1:m.titreEcran.includes('Colis'),`[${W}] « Colis » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
   dit(m.limites.length>=3,`[${W}] les cartes de Colis portent leur date limite`,String(m.limites.length));
   dit(m.limites.every(x=>!x.deborde),`[${W}] la date limite ne déborde pas de sa carte`,JSON.stringify(m.limites.filter(x=>x.deborde)));
+  // (11 nov., intégration colis — défaut f, session restes) La date limite se lit EN ENTIER : ni coupée par l'ellipse, ni masquée par son conteneur.
+  dit(m.limites.every(x=>!x.coupe),`[${W}] la date limite se lit en entier (aucune ellipse)`,JSON.stringify(m.limites.filter(x=>x.coupe)));
   dit(m.limites.every(x=>!x.rouge),`[${W}] un retard est ambre, pas rouge (§7)`,JSON.stringify(m.limites.filter(x=>x.rouge)));
   dit(!m.fraiche,`[${W}] pas de « Ventes Vinted à jour » quand tout est à jour`);
 } else {

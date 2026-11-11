@@ -472,7 +472,7 @@ import { lieuLePlusComplet, memePoint, completudeLieu } from "./villeRelais.js";
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais.jsx";
 import AlerteRelaisChange from "./AlerteRelaisChange.jsx";
-import { placeDesColis, ecranDeCible } from "./colisPlace.js";
+import { placeDesColis, ecranDeCible, ID_SECTION_COLIS } from "./colisPlace.js";
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
@@ -47455,7 +47455,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (11 nov., lot DJ3) En section de Ventes / d'Achats : un intertitre (le titre de l'écran est « Ventes »
               // ou « Achats ») et la MÊME barre à sa droite ; jamais un second « Colis » en grand titre.
               if (colisDans) return (
-                <header className="vrm-colis-section-tete" data-colis-section={colisDans} id={colisDans === 'achats' ? 'colis-a-retirer' : 'colis-a-expedier'}>
+                <header className="vrm-colis-section-tete" data-colis-section={colisDans} id={ID_SECTION_COLIS[colisDans === 'achats' ? 'achats' : 'ventes']}>
                   <h2 className="vrm-colis-section-titre">{colisDans === 'achats' ? 'À retirer' : 'À expédier'}</h2>
                   {barreColis}
                 </header>);
@@ -47787,8 +47787,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return j < 0 ? { t: 'en retard', urgent: true } : j === 0 ? { t: lim.heure ? `avant ${lim.heure}` : 'aujourd’hui', urgent: true } : j === 1 ? { t: 'demain', urgent: false } : { t: `dans ${j} j`, urgent: false }; };
                   const raison = (l) => l.depotAVerifier ? 'déposé ? à vérifier' : l.imprime ? 'déjà imprimé' : l.ancienne ? `vendue il y a ${Math.floor(l.age)} j` : l.pdf === false ? 'sans bordereau' : '';
                   const logo = (l) => { const c = cleTransporteur(l.trNom); return c ? <LogoTransporteur cle={c} taille={22}/> : <LogoInconnu taille={22}/>; };
+                  // (11 nov., intégration colis — arbitrage c) L'EMPLACEMENT (pièce · meuble · case) en petit sous chaque paire :
+                  // c'est ce qui fait gagner du temps pour la sortir du rayon. Lu par SON N° dans le plan du Stock (`ouEstNumero`),
+                  // jamais deviné ; un N° sans place notée le dit (« emplacement non noté »).
+                  let planLot = null; try { const p0 = load('vrm_room_plan', null); planLot = p0 ? normalizePlan(p0) : null; } catch (_) { planLot = null; }
+                  const emplacementDe = (num) => { if (!num) return null; try { const place = planLot ? ouEstNumero(planLot, num) : null; return place ? [place.roomName, place.itemName, place.nom].filter(Boolean).join(' · ') : ''; } catch (_) { return ''; } };
                   const ligne = (l) => {
-                    const coche = lot.coches.has(l.cle), num = l.num || '', lim = limite(l), r = raison(l);
+                    const coche = lot.coches.has(l.cle), num = l.num || '', lim = limite(l), r = raison(l), place = emplacementDe(num);
                     return (
                       <label key={l.cle} className="vrm-tip-ligne" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} data-lot-pdf={l.pdf===false?'0':'1'} data-lot-cochable={l.cochable===false?'0':'1'} data-lot-verifier={aVerif(l)?'1':'0'}>
                         <input type="checkbox" className="vrm-tip-case" aria-label={`Imprimer ${l.titre||'ce bordereau'}`} disabled={batchBusy||l.cochable===false} checked={coche&&l.cochable!==false} onChange={()=>{ if(l.cochable!==false) basculer(l.cle); }}/>
@@ -47800,6 +47805,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             {r ? <span className="vrm-tip-raison" data-lot-raison="">{r}</span> : null}
                             {l.imprime && <span hidden data-lot-imprime="1"/>}{l.ancienne && <span hidden data-lot-ancienne="1"/>}{l.depotAVerifier && <span hidden data-lot-depot-verifier="1"/>}{l.pdf===false && l.cochable!==false && <span hidden data-lot-sans-bordereau="1"/>}
                             {lot.echecs.includes(l.cle) && <span className="vrm-tip-raison">PDF pas lu</span>}</span>
+                          {place != null ? <span className={place ? 'vrm-tip-place' : 'vrm-tip-place is-sans'} data-lot-emplacement={place || ''}>{place || 'emplacement non noté'}</span> : null}
                         </span>
                         <span className="vrm-tip-logo" aria-label={libelleTransp(l.trNom)} title={libelleTransp(l.trNom)}>{logo(l)}</span>
                       </label>);
@@ -53615,7 +53621,7 @@ function AppCoeur() {
     if(typeof v==='string'){ const frais=(x)=>x&&Date.now()-x.at<3000;
       const pl=placeDesColis({ tab:v, sub:subVoulue.current, onglet:frais(DEMANDE_COLIS)?DEMANDE_COLIS.o:null, cible:frais(CIBLE_NOTIF)?CIBLE_NOTIF.c:null });
       if(pl){ v=pl.tab; subVoulue.current=pl.sub; if(pl.tab==='ventes') setOngletColis(pl.onglet);
-        const id=pl.tab==='achats'?'colis-a-retirer':'colis-a-expedier'; const t0=Date.now();
+        const id=ID_SECTION_COLIS[pl.tab==='achats'?'achats':'ventes']; const t0=Date.now();
         const aller=()=>{ const el=document.getElementById(id); if(el&&el.getClientRects().length){ try{ el.scrollIntoView({block:'start'}); }catch(_){} return; } if(Date.now()-t0<6000) setTimeout(aller,200); };
         if(!(frais(CIBLE_NOTIF)&&CIBLE_NOTIF.c)) setTimeout(aller,150); } }
     // (9 nov., lot AL) « Republier » / « Favoris & offres » : l'écran qui les porte, sur leur vue.
@@ -56430,7 +56436,7 @@ function AppCoeur() {
     if(baseKO) return null;
     if(t==='ventes'&&site==='leboncoin') return (
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site="leboncoin" aria-label="À expédier">
-        <header className="vrm-colis-section-tete" data-colis-section="ventes" id="colis-a-expedier"><h2 className="vrm-colis-section-titre">À expédier</h2></header>
+        <header className="vrm-colis-section-tete" data-colis-section="ventes" id={ID_SECTION_COLIS.ventes}><h2 className="vrm-colis-section-titre">À expédier</h2></header>
         <div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes}/></div>
       </section>);
     const commun={accounts:vintedAccounts,liveStats:liveStatsVus,accountsReady:accountsLoaded,baseKO,onNav:setTab,garageGrid,onLocate:(n)=>{setGarageLocate(String(n));setTab('garage');},onStore:(n)=>{setGaragePlace(String(n));setTab('garage');},onFreeNum:freeGarageNum};
@@ -56451,7 +56457,10 @@ function AppCoeur() {
           ongletColis="retirer" onOngletColis={choisirOngletColis}/></GardeEcran>
         {/* Les OUTILS de retrait (à confirmer, à vérifier, suivis, e-mails reçus, argent à vérifier), sous la liste,
             une fois — les mêmes qu'hier sous Colis → À retirer (`retraitsOutils`). */}
-        <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran>
+        {/* (11 nov., intégration colis — arbitrage b) Les outils SUIVENT le filtre de site, même règle que la liste : ce qu'ils
+            portent (à confirmer, à vérifier, e-mails de suivi, argent à vérifier) vient des achats Vinted et des e-mails —
+            montrés sur Vinted (l'écran d'arrivée, qui montre tout), jamais sous eBay, Leboncoin ou Vestiaire. */}
+        {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran> : null}
       </section>);
     return null;
   };

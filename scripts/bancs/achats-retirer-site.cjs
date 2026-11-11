@@ -155,6 +155,9 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
             codes: [...new Set([...document.querySelectorAll('.vrm-colis-section [data-code-retrait]')].map((e) => e.getAttribute('data-code-retrait')).filter(Boolean))].sort().join(','),
             texte: (document.querySelector('.vrm-colis-section') || { innerText: '' }).innerText }));
           dit(m.site === site, `S Achats est filtré sur « ${site} »`, String(m.site));
+          // (arbitrage b) Les outils de retrait suivent le même filtre : là sur Vinted, absents sous eBay et Leboncoin.
+          const outils = await pg.evaluate(() => document.querySelectorAll('[data-colis-retraits="outils"]').length);
+          dit(outils === (site === 'vinted' ? 1 : 0), `S Achats · ${site} : les outils de retrait ${site === 'vinted' ? 'sont là' : 'ne montrent rien de Vinted'}`, String(outils));
           dit(m.codes === attendus && (attendus || !/012345|654321/.test(m.texte)), `S Achats · ${site} : la section « À retirer » ne montre que les colis de ce site`, `codes=[${m.codes}]`);
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `achats-retirer-${site}-${nom}.png`) });
         });

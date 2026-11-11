@@ -54,3 +54,7 @@ export function placeDesColis({ tab, sub = null, onglet = null, cible = null } =
 // L'écran qu'attend une cible posée pour `tab` (déjà redirigé) : une cible de
 // retrait vit dans Achats, même quand l'appelant a calculé « Ventes ».
 export const ecranDeCible = (tab, c) => (tab === 'ventes' && cibleDeRetrait(c) ? 'achats' : tab);
+
+// (11 nov., intégration colis — arbitrage e) L'ancre de chaque section, UNE définition : la section « À expédier »
+// (Vinted, ou Leboncoin — jamais montées ensemble) et « À retirer ». `setTab` y défile ; un seul élément la porte.
+export const ID_SECTION_COLIS = Object.freeze({ ventes: 'colis-a-expedier', achats: 'colis-a-retirer' });

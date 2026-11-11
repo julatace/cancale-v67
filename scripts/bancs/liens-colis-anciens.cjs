@@ -146,7 +146,8 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
           await pg.waitForTimeout(2500);
           const m = await pg.evaluate(() => { const t = document.querySelector('[data-tache]'); const s = document.querySelector('[data-colis-section]');
             return { tache: t ? t.getAttribute('data-tache') : null, site: t ? t.getAttribute('data-tache-site') : null, section: s ? s.getAttribute('data-colis-section') : null,
-              texte: ((document.querySelector('.vrm-main') || document.body).innerText || '').trim().length }; });
+              texte: ((document.querySelector('.vrm-main') || document.body).innerText || '').trim().length, ancres: document.querySelectorAll('#colis-a-expedier').length + document.querySelectorAll('#colis-a-retirer').length }; });
+          dit(m.ancres === 1, `E \`${lien}\` : une seule ancre de section (#colis-a-expedier / #colis-a-retirer)`, String(m.ancres));
           dit(m.tache === tache && (!site || m.site === site) && m.section === section && m.texte > 40, `L \`${lien}\` ⇒ ${tache}${site ? ' · ' + site : ''}, section « ${section === 'achats' ? 'À retirer' : 'À expédier'} » (jamais un écran blanc)`, JSON.stringify(m));
         });
         dit(errs.length === 0, 'U aucune erreur', errs.slice(0, 2).join(' | '));

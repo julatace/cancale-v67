@@ -73,10 +73,16 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
     // (11 nov., retraits fiables — Julien : « ceux qui ont changé de point relais… tu ne donnes pas les
     // codes ») LE CODE DE CE COLIS, PAR SON N° : celui de l'e-mail du changement, sinon le plus récent des
     // autres e-mails / SMS du MÊME n° (une identité) ; aucun ⇒ '' (« code pas encore reçu »).
-    const avecCode = lignes.filter((x) => x && normaliserSuivi(x.suivi) === n && codeOk(x.code))
-      .sort((a, b) => (msDe(b.emailAt) || msDe(b.receivedAt) || 0) - (msDe(a.emailAt) || msDe(a.receivedAt) || 0));
-    const code = codeOk(t.code) ? String(t.code).trim() : (avecCode[0] ? String(avecCode[0].code).trim() : '');
-    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at, code, codeDe: codeOk(t.code) ? 'changement' : (code ? 'autre-email' : '') });
+    // (11 nov., intégration colis — arbitrage d) Le code d'un AUTRE e-mail ne vaut que s'il est daté APRÈS le changement de
+    // point (un code d'avant pouvait être celui de l'ancien point) ; un code plus ancien, ou sans date, ⇒ « à confirmer »,
+    // jamais montré comme le bon.
+    const dateDe = (x) => msDe(x.emailAt) || msDe(x.receivedAt);
+    const avecCode = lignes.filter((x) => x && x !== t && normaliserSuivi(x.suivi) === n && codeOk(x.code))
+      .sort((a, b) => (dateDe(b) || 0) - (dateDe(a) || 0));
+    const apres = avecCode.filter((x) => at != null && dateDe(x) != null && dateDe(x) > at);
+    const code = codeOk(t.code) ? String(t.code).trim() : (apres[0] ? String(apres[0].code).trim() : '');
+    const codeDe = codeOk(t.code) ? 'changement' : code ? 'autre-email' : avecCode.length ? 'a-confirmer' : '';
+    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at, code, codeDe });
   }
   return out.sort((a, b) => (b.at || 0) - (a.at || 0));
 }

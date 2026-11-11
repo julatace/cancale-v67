@@ -44,7 +44,7 @@ export default function AlerteRelaisChange({ lignes, C, transp = null }) {
                   style={{ marginTop: 6, minHeight: 44, padding: '0 14px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 22, fontWeight: 700, letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums', cursor: 'pointer' }}>
                   {copie === x.suivi ? 'Copié' : x.code}
                 </button>
-              ) : <div data-relais-change-code="" style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Code pas encore reçu</div>}
+              ) : <div data-relais-change-code="" data-relais-change-code-de={x.codeDe || ''} style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{x.codeDe === 'a-confirmer' ? 'Code à confirmer : le seul reçu date d’avant le changement de point' : 'Code pas encore reçu'}</div>}
             </div>
             {lien ? (
               <a href={lien} target="_blank" rel="noreferrer" data-relais-change-itineraire="" aria-label={`Itinéraire vers ${x.nom || 'le nouveau point'}`}

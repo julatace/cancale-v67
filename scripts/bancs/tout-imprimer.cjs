@@ -87,6 +87,8 @@ async function scenario(b, nom, vue, LIGNES) {
   const mainData = LIGNES.find((r) => r.id === 'main').data;
   await pg.addInitScript((m) => {
     try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', 'true');
+      // (11 nov., arbitrage c) Le N°21 est rangé : Garage · Étagère du fond (le plan du Stock, sur l'appareil).
+      localStorage.setItem('vrm_room_plan', JSON.stringify({ rooms: [{ id: 'r1', name: 'Garage', room: { w: 8, h: 6, wallH: 3 }, items: [{ id: 'm1', type: 'metal', name: 'Étagère du fond', x: 1, y: 0, w: 1.2, h: 0.5, rows: 5, cols: 2, h3d: 1.25, slots: { '4_0': ['21'] } }] }], active: 'r1' }));
       if (!sessionStorage.getItem('banc_init')) { sessionStorage.setItem('banc_init', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(m.vinted_annonce_numeros)); localStorage.setItem('vinted_used_numeros', JSON.stringify(m.vinted_used_numeros)); } } catch (_) {}
     window.__pdfs = [];
     const o = URL.createObjectURL.bind(URL);
@@ -149,6 +151,9 @@ async function scenario(b, nom, vue, LIGNES) {
   await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
   const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), site: e.getAttribute('data-lot-site'), num: e.getAttribute('data-lot-num'), tr: e.getAttribute('data-lot-transp'), coche: e.getAttribute('data-coche') === '1' })));
   const grAp = ap.map((x) => x.tr).filter((x, i, a) => a.indexOf(x) === i);
+  // (11 nov., arbitrage c) L'emplacement de chaque paire, en petit sous sa ligne : lu par SON N° (jamais deviné).
+  const emp = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-lot-ligne]')].map((e) => { const p = e.querySelector('[data-lot-emplacement]'); return [e.getAttribute('data-lot-ligne'), p ? p.getAttribute('data-lot-emplacement') : null]; })));
+  dit(/Garage/.test(emp['9201'] || '') && /Étagère du fond/.test(emp['9201'] || '') && emp['9202'] === '', `${nom} : C l'emplacement est sous la paire (N°21 : Garage · Étagère du fond ; N°22 : « emplacement non noté »)`, JSON.stringify(emp));
   dit(ap.length === 6 && ap.some((x) => x.site === 'vestiaire'), `${nom} : B l'aperçu porte les 6 bordereaux, Vestiaire compris`, JSON.stringify(ap.map((x) => x.cle + ':' + x.site)));
   // (11 nov., lot suivi-commandes, gardé à l'intégration) L'aperçu : trois groupes par transporteur, CHACUN dans l'ordre
   // de l'écran (les clés de colis lues ci-dessus ; la version « groupes de l'écran » comparait des transporteurs à des clés).
