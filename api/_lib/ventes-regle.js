@@ -206,7 +206,9 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     const t = Date.parse(e.creationDate || '');
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
-    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
+    // (11 nov., export comptable) Les frais eBay LUS (`totalMarketplaceFee`, en euros : `montantRecuEbay` l'a vérifié).
+    const frais = Math.round(Number(e.totalMarketplaceFee.value) * 100) / 100;
+    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false };
     if (garde(l)) lignes.push(place(l));
   }
   // (1er nov., audit A2) VESTIAIRE : une vente compte si son montant REÇU est
@@ -261,7 +263,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre 
     // (1er nov., audit A11) Une date posée à la main (`dateSaisie`, rangée à midi
     // par `avecDatesLbc`) ou lue sans heure n'a pas d'HEURE : elle ne compte dans
     // aucune case « Quand tu vends » (`heureLue: false` ⇒ « sans heure »).
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, compte: String(v.account || ''), tx: String(v.txId), heureLue: !(v.dateSaisie === true || /^\d{4}-\d{2}-\d{2}$/.test(String(v.dateVente).trim())) });
   }
   for (const e of (ebay || [])) {
     if (e && excluAutre && excluAutre('ebay', e)) continue;   // (3 nov.) compte écarté par son choix
@@ -277,7 +279,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre 
     if (eur == null && !vus.has('ebay:' + e.orderId)) nonComptees.push({ plateforme: 'eBay', raison: montantRecuEbay(e).raison, ts: t || null });
     if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
     if (!t) continue;
-    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || '') });
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, compte: String(e._pseudo || e._compte || ''), tx: String(e.orderId) });   // (11 nov.) `tx` : l'identité de la vente (Statistiques → Par catégorie)
   }
   // VESTIAIRE, au jour de la VENTE : compté si le montant reçu est sûr et la
   // vente datée ; sinon NOMMÉ (`nonComptees`), jamais deviné.
@@ -286,7 +288,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre 
     const t = dateVenteVc(v), recu = montantRecuVc(v);
     if (recu.eur == null) { nonComptees.push({ plateforme: 'Vestiaire', raison: recu.raison, ts: t || null }); continue; }
     if (!t) { nonComptees.push({ plateforme: 'Vestiaire', raison: 'vente pas datée', ts: null }); continue; }
-    lignes.push({ plateforme: 'Vestiaire', ts: t, eur: recu.eur, compte: String(v.compte || '') });
+    lignes.push({ plateforme: 'Vestiaire', ts: t, eur: recu.eur, compte: String(v.compte || ''), tx: String(v.id) });
   }
   return { lignes, sansDate, ecartees, nonComptees };
 };

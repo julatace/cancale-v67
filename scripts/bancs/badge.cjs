@@ -602,6 +602,39 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     }
   });
 
+  // 5.344 : l'historique de départ de CE compte — barre fine, « Tout récupérer ».
+  await essaie('historique', async () => {
+    const enCours = { v: 1, etat: 'encours', ventes: { lus: 400, total: 1250, pages: 4, fini: false }, achats: { lus: 0, total: null, pages: 0, fini: false }, resteMin: 50 };
+    for (const [scheme, mobile] of [['light', { largeur: 390 }], ['dark', { largeur: 390 }], ['dark', null], ['light', null]]) {
+      const e = ETATS.connecte; e.site.choix = 'oui'; e.site.dates = null; e.site.import = enCours;
+      const { ctx, pg } = await rendre(nav, e, { scheme, mobile });
+      if (mobile) { await pg.tap('#vrm-badge'); await pg.waitForTimeout(400); } else await survoler(pg);
+      const d = await pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const x = r.querySelector('[data-import]'); if (!x) return null;
+        const v = x.querySelector('[data-import-type="ventes"]'), bar = v && v.querySelector('.barre > i'), cadre = v && v.querySelector('.barre');
+        return { etat: x.getAttribute('data-import'), t: x.innerText, pc: bar && cadre ? Math.round(bar.getBoundingClientRect().width / cadre.getBoundingClientRect().width * 100) : null, bouton: !!x.querySelector('[data-import-tout]') }; });
+      dit(!!d && d.etat === 'encours' && /400 sur 1\s?250/.test(d.t) && d.pc >= 30 && d.pc <= 34 && !d.bouton, `${scheme} ${mobile ? 390 : 1512} : « 400 sur 1 250 », barre au tiers, pas de bouton pendant la lecture`, JSON.stringify(d));
+      await pg.screenshot({ path: path.join(SORTIE, `badge-historique-${mobile ? 390 : 1512}-${scheme}.png`) });
+      await ctx.close();
+    }
+    {
+      const e = ETATS.connecte; e.site.choix = 'oui'; e.site.import = { v: 1, etat: 'fini', ventes: { lus: 2160, total: 2160, pages: 22, fini: true }, achats: { lus: 340, total: 340, pages: 4, fini: true }, resteMin: 0 };
+      const { ctx, pg } = await rendre(nav, e);
+      await survoler(pg);
+      const d = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-import]'); return x ? { t: x.innerText, bouton: !!x.querySelector('[data-import-tout]') } : null; });
+      dit(!!d && /Tout est récupéré/.test(d.t) && d.bouton, 'fini : « Tout est récupéré ✓ » et « Tout récupérer »', JSON.stringify(d));
+      await ctx.close();
+    }
+    {
+      const e = ETATS.connecte; e.site.choix = 'oui'; e.site.import = null;
+      const { ctx, pg } = await rendre(nav, e);
+      await survoler(pg);
+      const n = await pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelectorAll('[data-import]').length);
+      dit(n === 0, 'jamais lu : la carte n’en dit rien (pas su)', String(n));
+      await ctx.close();
+    }
+    delete ETATS.connecte.site.import;
+  });
+
   await essaie('fond', async () => {
     const { faireFond } = require(path.join(__dirname, '..', '_fond-vm.cjs'));
     const SRC_FOND = process.env.BANC_FOND_SRC || path.join(EXT, 'background.js');
