@@ -21,6 +21,19 @@ export async function deconnecterPartout({ fetch: f, url, apikey, jeton }) {
   } catch (_) { return 'injoignable'; }
 }
 
+// (11 nov., lot connexions-oauth) « Déconnecter les autres appareils » : Supabase
+// ferme toutes les sessions SAUF celle de ce jeton (`scope=others`). Même trois
+// états : 'ok' · 'refuse' · 'injoignable' (une panne ne fait croire à rien).
+export async function deconnecterAutres({ fetch: f, url, apikey, jeton }) {
+  if (!jeton) return 'refuse';
+  try {
+    const r = await f(`${url}/auth/v1/logout?scope=others`, { method: 'POST', headers: { apikey, Authorization: `Bearer ${jeton}` } });
+    if (r && (r.status === 204 || r.status === 200)) return 'ok';
+    if (r && (r.status === 401 || r.status === 403)) return 'refuse';
+    return 'injoignable';
+  } catch (_) { return 'injoignable'; }
+}
+
 // Ce que dit la confirmation. L'extension a SA propre session VRM (fabriquée
 // par `/api/compte?mode=session-extension`) : « partout » la ferme aussi. Une
 // extension qui sait la liaison (5.171+) se reconnecte toute seule quand VRM est

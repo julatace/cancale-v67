@@ -69,7 +69,10 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
-import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';   // (11 nov., lot DJ6)
+import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth,CLE_INTENTION as CLE_INTENTION_OAUTH} from './auth/compteNeuf.js';
+import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)
+import {nouvelIdEssai,poserEssai,prendreEssais,oterEssai,candidatsVerificateur,ESSAIS_MAX} from './auth/essaisPkce.js';   // (11 nov., lot DJ6)
+import {poserReconnexion,lireReconnexion,reconnexionPermise,RETOUR_RECONNEXION,CLE_RECONNEXION} from './auth/reconnexion.js';   // (11 nov., lot suppression-oauth)
 import PorteSansCompte from './auth/PorteSansCompte.jsx';
 import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
@@ -1554,7 +1557,8 @@ const authCall = async (path, body) => {
       const brut = json.error_description || json.msg || json.message || `Erreur ${res.status}`;
       // GoTrue : « captcha protection: request disallowed (…) » / code captcha_failed.
       if (/captcha/i.test(String(brut) + ' ' + String(json.error_code || json.code || ''))) return { ok: false, status: res.status, captcha: true, error: MSG_CAPTCHA_REFUS };
-      return { ok: false, status: res.status, error: brut };
+      // (11 nov., lot connexions-oauth) le code stable de GoTrue (`error_code`), pour traduire.
+      return { ok: false, status: res.status, error: brut, ...(typeof json.error_code === 'string' ? { code: json.error_code } : {}) };
     }
     return { ok: true, status: res.status, json };
   } catch (e) { return { ok: false, status: 0, error: e.name === 'AbortError' ? 'Le serveur met trop de temps à répondre. Réessaie dans un instant.' : 'La connexion au serveur a été interrompue. Réessaie.' }; }
@@ -2030,20 +2034,30 @@ const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfi
 const oauthStart = async (provider, intention) => {
   try {
     try{sessionStorage.removeItem('vrm_oauth_liaison');localStorage.removeItem('vrm_oauth_liaison');}catch(_){}
+    // (11 nov., lot suppression-oauth) « Me reconnecter avec … » (Supprimer mon compte) :
+    // une RE-AUTHENTIFICATION du compte connecté. Aucune intention (rien n'est annulé
+    // au retour) ; retour sur l'écran de suppression ; un autre compte n'entre pas.
+    const reco=intention==='reconnexion';
+    try{for(const st of [sessionStorage,localStorage]){st.removeItem(CLE_RECONNEXION);if(reco)st.removeItem(CLE_INTENTION_OAUTH);}}catch(_){}
+    if(reco&&!poserReconnexion([sessionStorage,localStorage],{owner:AUTH.user?.id,provider}))return{ok:false,error:'Reconnecte-toi à VRM, puis reviens ici.'};
     // (11 nov., lot DJ6) « connexion » ou « inscription » : au retour, un compte que
     // le bouton de CONNEXION a fait créer est annulé (src/auth/compteNeuf.js).
-    poserIntentionOAuth([sessionStorage,localStorage],intention,provider);
+    if(!reco)poserIntentionOAuth([sessionStorage,localStorage],intention,provider);
     const verifier = makeVerifier();
     sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet
     // Téléphone : l'app Discord/Google renvoie souvent le retour dans un NOUVEL
     // onglet (sessionStorage vide) — le vérificateur est aussi gardé 10 min sur
     // l'appareil. Seul, il ne sert à rien : il faut aussi le code du retour.
     try { localStorage.setItem(PKCE_KEY, JSON.stringify({ v: verifier, at: Date.now() })); } catch (_) {}
+    // (11 nov., lot connexions-oauth) SON vérificateur, sous SON identifiant, porté par
+    // l'adresse de retour (src/auth/essaisPkce.js) : le retour prend le bon, jamais un vieux.
+    const essai = nouvelIdEssai();
+    poserEssai([sessionStorage, localStorage], essai, verifier);
     const challenge = await makeChallenge(verifier);
     // Une liaison d'extension en cours survit au retour dans un NOUVEL onglet (10 min).
     try { garderLierPourRetourOAuth(); } catch (_) {}
     const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${encodeURIComponent(provider)}`
-      + `&redirect_to=${encodeURIComponent(window.location.origin + window.location.pathname)}`
+      + `&redirect_to=${encodeURIComponent(window.location.origin + (reco ? RETOUR_RECONNEXION + '&vrm_essai=' : window.location.pathname + '?vrm_essai=') + essai)}`
       + `&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256`;
     window.location.href = url;
     return { ok: true };
@@ -2060,7 +2074,7 @@ const cleanAuthUrl = () => {
   try {
     const q=new URLSearchParams(window.location.search||'');
     // URLSearchParams reconnaît aussi les noms encodés et les doublons.
-    for(const k of ['code','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
+    for(const k of ['code','vrm_essai','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
     const reste=q.toString();
     window.history.replaceState({},'',window.location.pathname+(reste?'?'+reste:''));
   }catch(_){}
@@ -2076,37 +2090,79 @@ const compteOAuthNeuf=(u)=>{
     return Date.now()-cree<10*60*1000?fourn:'';
   }catch(_){return'';}
 };
-// Les refus de Supabase au retour, en français, avec le geste.
-const erreurRetourOAuth=(err,provider)=>{
-  const t=String(err||'');const nom=provider==='google'?'Google':'Discord';
-  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
-  if(/manual.*link.*disabled|manual_linking/i.test(t))return `La liaison de comptes n'est pas encore activée sur le serveur de VRM. Ton compte reste inchangé.`;
-  return t;
+// Le fournisseur `f` dont l'identité vient d'être créée (< 10 min) sur un compte plus
+// vieux (> 10 min) : la liaison automatique de Supabase par adresse vérifiée. Sinon ''.
+const identiteRelieeAuto=(u,f)=>{
+  try{
+    if(f!=='google'&&f!=='discord')return'';
+    const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree)||Date.now()-cree<10*60*1000)return'';
+    const id=(Array.isArray(u?.identities)?u.identities:[]).find(i=>i&&i.provider===f);
+    const t=Date.parse(id?.created_at||'');return Number.isFinite(t)&&Date.now()-t>=-60000&&Date.now()-t<10*60*1000?f:'';
+  }catch(_){return'';}
 };
+// Les refus de Supabase au retour, en français, avec le geste (src/auth/erreursOAuth.js :
+// le CODE d'abord, jamais le texte anglais, jamais « annulée » pour un autre refus).
+const erreurRetourOAuth=(e,provider,liaison)=>messageErreurOAuth(e,provider,liaison?'liaison':'connexion');
 const consumeAuthRedirect = async () => {
   if (!MULTI_USER) return null;
   const q = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { const li=lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: erreurRetourOAuth(err, li?.provider) }; }
+  if (err) {
+    // Le fournisseur : celui de la liaison en cours, sinon celui du bouton cliqué
+    // (avant, « Discord » par défaut même pour Google). Tout ce départ est consommé.
+    const li=lireLiaisonOAuth(sessionStorage,localStorage),it=lireIntentionOAuth([sessionStorage,localStorage]);
+    // (lot suppression-oauth) « Me reconnecter avec … » raté : rien n'a été effacé, l'écran de suppression le dit.
+    const re=lireReconnexion([sessionStorage,localStorage]);
+    try{sessionStorage.removeItem(PKCE_KEY);localStorage.removeItem(PKCE_KEY);}catch(_){}
+    // CETTE tentative est morte ; une autre en cours (autre onglet) reste (relecture du 11 nov.).
+    oterEssai([sessionStorage,localStorage],'',q.get('vrm_essai')||hash.get('vrm_essai')||'');
+    const e={error:q.get('error')||hash.get('error')||'',code:q.get('error_code')||hash.get('error_code')||'',description:q.get('error_description')||hash.get('error_description')||''};
+    cleanAuthUrl();
+    if (re) return { error: `La reconnexion avec ${re.provider==='google'?'Google':'Discord'} n’a pas abouti. Rien n’a été effacé.`, reconnexion: re.provider };
+    return { error: erreurRetourOAuth(e, li?.provider||it?.fournisseur||'', !!li), ...(li?{liaisonRatee:li.provider}:{}) };
+  }
 
   const code = q.get('code');
   if (code) {
-    const liaison=lireLiaisonOAuth(sessionStorage,localStorage);
-    let verifier = liaison?.verifier || sessionStorage.getItem(PKCE_KEY);
+    const ctxLiaison=lireLiaisonOAuth(sessionStorage,localStorage);
+    const reco=lireReconnexion([sessionStorage,localStorage]);   // (lot suppression-oauth)
+    // (11 nov., lot connexions-oauth) Le vérificateur de CETTE tentative (`vrm_essai`),
+    // puis les autres gardés — jamais un seul pris à l'aveugle (src/auth/essaisPkce.js).
+    const onglet = sessionStorage.getItem(PKCE_KEY) || '';
     sessionStorage.removeItem(PKCE_KEY);
+    let appareil = '';
     try {
       const o = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null');
       localStorage.removeItem(PKCE_KEY);
-      if (!verifier && o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) verifier = o.v;
+      if (o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) appareil = o.v;
     } catch (_) {}
+    const candidats = candidatsVerificateur({ idRetour: q.get('vrm_essai') || '', essais: prendreEssais([sessionStorage, localStorage]), liaison: ctxLiaison, onglet, appareil });
+    const verifier = candidats.length ? candidats[0].v : '';
+    // La liaison n'est en jeu que si le PREMIER vérificateur est le sien (sinon c'est une connexion).
+    let liaison = candidats.length && candidats[0].liaison ? ctxLiaison : null;
     cleanAuthUrl();
-    if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
-    const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
-    if (!r.ok) return { error: r.error };
-    if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
+    // (11 nov.) Le fournisseur du bouton, lu AVANT l'échange (un refus doit le nommer).
+    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
+    const fourn=liaison?.provider||reco?.provider||intention?.fournisseur||'';
+    const enReco=reco?{reconnexion:reco.provider}:{};
+    if (!verifier) return { error: fourn ? `Cette connexion a commencé sur un autre appareil ou a expiré. ${liaison?`Reclique « Relier ${fourn==='google'?'Google':'Discord'} ».`:`Reclique « Continuer avec ${fourn==='google'?'Google':'Discord'} » ici.`}` : 'Cette connexion a commencé sur un autre appareil ou a expiré. Recommence depuis cet appareil.', ...enReco };
+    let r = null;
+    for (const c of candidats.slice(0, ESSAIS_MAX)) {
+      r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: c.v });
+      if (r.ok) { liaison = c.liaison ? ctxLiaison : null; oterEssai([sessionStorage, localStorage], c.v); break; }
+      // Seul « ce n'est pas le bon vérificateur » vaut un autre essai (Supabase garde le code).
+      if (r.code !== 'bad_code_verifier') break;
+    }
+    // CETTE tentative est consommée (réussie ou morte) ; celles d'un autre onglet restent.
+    oterEssai([sessionStorage, localStorage], '', q.get('vrm_essai') || '');
+    // Code déjà servi (double clic, retour arrière), expiré, autre appareil : la phrase, jamais l'anglais.
+    if (!r.ok) return { error: r.status === 0 ? r.error : erreurRetourOAuth({ code: r.code || '', description: r.error || '' }, fourn, !!liaison), ...(liaison?{liaisonRatee:liaison.provider}:{}), ...enReco };
+    if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.',...enReco};
     if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
+    // (11 nov., lot suppression-oauth) Ce fournisseur ouvre un AUTRE compte : sa session reste.
+    if(!reconnexionPermise(reco,r.json))return{error:`Ce ${reco.provider==='google'?'Google':'Discord'} ouvre un autre compte VRM. Ta session est gardée. Rien n’a été effacé.`,reconnexion:reco.provider};
     const recovery=q.get('type')==='recovery';
     if(recovery)RECOVERY_PENDING=true;
     writeSession(sessionFrom(r.json));
@@ -2114,12 +2170,16 @@ const consumeAuthRedirect = async () => {
     // relié à AUCUN compte VRM : Supabase en CRÉE un, sans rien dire. On le
     // repère (créé il y a moins de 10 min, aucune identité email) pour le dire
     // AVANT d'ouvrir l'app — sinon il croit être sur sa boutique, vide.
-    const nouveauOAuth=!liaison&&!recovery?compteOAuthNeuf(r.json.user):'';
+    const nouveauOAuth=!liaison&&!reco&&!recovery?compteOAuthNeuf(r.json.user):'';
     // (11 nov., lot DJ6) Le bouton cliqué était « Continuer avec … » (connexion) :
     // ce compte neuf n'a été voulu par personne ⇒ `sansCompte` (PorteSansCompte l'annule).
-    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
     const sansCompte=nouveauOAuth&&intention?.intention==='connexion'&&intention.fournisseur===nouveauOAuth?nouveauOAuth:'';
-    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth, sansCompte };
+    // (11 nov., lot connexions-oauth) Compte ANCIEN + identité de CE fournisseur toute
+    // neuve : Supabase vient de la rattacher (même adresse e-mail vérifiée). Pas de
+    // second compte — on le DIT une fois, pour qu'il sache comment il est entré.
+    const relieAuto=!liaison&&!reco&&!recovery&&!nouveauOAuth?identiteRelieeAuto(r.json.user,fourn):'';
+    if(relieAuto)setTimeout(()=>{try{toast(`${relieAuto==='google'?'Google':'Discord'} est maintenant relié à ton compte VRM (même adresse e-mail).`,'ok');}catch(_){}},2500);
+    return { ok: true, liaison:liaison?.provider, reconnexion:reco?.provider, recovery, nouveauOAuth, sansCompte, relieAuto };
   }
 
   const at = hash.get('access_token');
@@ -53987,6 +54047,8 @@ function AppCoeur() {
       if(t==='settings'&&section==='importer'){ DEMANDE_REGLAGE_SOUS.id='importer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (11 nov., lot centre-aide) « M'y emmener » d'une fiche d'aide : le panneau de Réglages nommé (liste fermée, src/aideFiches.js).
       { const rg=p.get('reglage'); if(t==='settings'&&rg&&REGLAGES_AIDE.includes(rg)){ DEMANDE_REGLAGE_SOUS.id=rg; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } }
+      // (11 nov., lot suppression-oauth) Retour de « Me reconnecter avec … » : Supprimer mon compte.
+      if(t==='settings'&&section==='supprimer'){ DEMANDE_REGLAGE_SOUS.id='fermer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='sante'){ DEMANDE_REGLAGE_SOUS.id='sante'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
@@ -57625,4 +57687,4 @@ export { useJourneePerso, JourneePersoSetting };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
-export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif };
+export { oauthStart, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif };

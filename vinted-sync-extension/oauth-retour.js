@@ -32,7 +32,7 @@
   };
   if (fixe && !code && !error) { dire('Rien à faire ici : cette page sert seulement au retour de la connexion de l’extension VRM.'); return; }
   try {
-    rt.sendMessage({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe, code: code || '', error: error || '', error_description: q.get('error_description') || '' }, (r) => {
+    rt.sendMessage({ from: 'vrm-oauth-retour', action: 'oauthRetour', fixe, code: code || '', error: error || '', error_code: q.get('error_code') || '', error_description: q.get('error_description') || '' }, (r) => {
       try { void rt.lastError; } catch (_) {}
       // 5.330 : parti du MÊME onglet (Orion, pas de petite fenêtre) ⇒ on y revient,
       // sur la page Vinted d'où l'on est parti ; la carte y dit le résultat.
