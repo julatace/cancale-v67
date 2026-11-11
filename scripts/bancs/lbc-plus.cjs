@@ -46,10 +46,11 @@ const VENTES = { ventes: {
 const construire = (o = {}) => [
   { id: 'main', data: Object.assign({}, MAIN, o.main || {}) },
   { id: 'harvest_111_listings', data: LISTINGS },
+  { id: 'vinted_item_details', data: Object.fromEntries(['5002', '5004', '5005'].map((id) => [id, { photos: [1, 2, 3].map((k) => `https://images1.vinted.net/t/banc/f800/${id}-${k}.jpeg`), description: 'Très bon état, portées deux fois. Boîte d’origine.', nPhotos: 3 }])) },
   { id: 'vinted_lbc_posted', data: { ids: ['5002', '5004', '5005'], updatedAt: ilYa(3) } },
   { id: 'lbc_listings', data: { items: Object.assign({}, ITEMS, o.items || {}), lectures: { [MON]: { at: ilYa(0.05), total: 3, n: 3 } } } },
   { id: 'lbc_accounts', data: { accounts: { [MON]: { id: MON, name: 'Totomondu', sessionAt: auj.toISOString(), source: 'session:messagerie' } } } },
-  { id: 'lbc_ventes', data: o.ventes || VENTES },
+  { id: 'lbc_ventes', data: o.remise ? VENTES : { ventes: {} } },
   ...(o.appris ? [{ id: 'lbc_prix_recette', data: { appris: true, raison: '', at: ilYa(1) } }] : []),
 ];
 const ECRITS = [];
@@ -73,7 +74,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
-    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg.replace(/^"|"$/g, '')];
     out[alias] = v == null ? null : v;
   }
   return out;
@@ -104,7 +105,7 @@ const PONT = ({ mode }) => {
 
 async function ouvrir(b, vp, pont, o = {}) {
   const rows = construire(o);
-  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} window.__VRM_BAISSE_PAUSE = 0; });
@@ -146,7 +147,7 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }].filter((v) => !process.env.BANC_LARGEUR || String(v.width) === process.env.BANC_LARGEUR)) {
       // ── 1. Baisser le prix ────────────────────────────────────────────────
       console.log(`── ${vp.width} px · baisser le prix (recette pas apprise)`);
       let o = await ouvrir(b, vp, { mode: 'ok' });
@@ -165,7 +166,7 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       const d0 = await deborde(o.pg); dit(d0.rognes.length === 0 && d0.sw <= d0.cw + 1, 'aucun débordement', JSON.stringify(d0));
       await o.ctx.close();
       console.log(`── ${vp.width} px · baisser le prix (recette apprise)`);
-      o = await ouvrir(b, vp, { mode: 'ok', appris: true });
+      o = await ouvrir(b, vp, { mode: 'ok' }, { appris: true });
       await o.pg.waitForSelector('[data-lbc-baisse-ouvrir]', { timeout: 15000 }).catch(() => {});
       await o.pg.click('[data-lbc-baisse-ouvrir]').catch(() => {});
       await o.pg.waitForSelector('[data-bp-lancer]', { timeout: 8000 }).catch(() => {});
@@ -173,7 +174,7 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       await o.pg.click('[data-bp-lancer]').catch(() => {});
       await o.pg.waitForSelector('[data-bp-confirmer]', { timeout: 4000 }).catch(() => {});
       const conf = await o.pg.evaluate(() => (document.querySelector('[data-bp-confirmation]') || {}).innerText || '');
-      dit(/sur Leboncoin \?/.test(conf) && /onglet Leboncoin/.test(conf), 'la confirmation parle de Leboncoin (pas de Vinted)', conf);
+      dit(/sur Leboncoin \?/.test(conf) && /onglet Leboncoin/.test(conf), 'la confirmation parle de Leboncoin (pas de Vinted)', conf || await o.pg.evaluate(() => ((document.querySelector('[data-bp-ext]') || {}).innerText || '') + ' | lancer=' + ((document.querySelector('[data-bp-lancer]') || {}).disabled)));
       await o.pg.click('[data-bp-confirmer]').catch(() => {});
       await o.pg.waitForSelector('[data-bp-bilan]', { timeout: 15000 }).catch(() => {});
       await o.pg.waitForTimeout(600);
@@ -187,12 +188,12 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
 
       // ── 2. Remise en main propre ─────────────────────────────────────────
       console.log(`── ${vp.width} px · remise en main propre`);
-      o = await ouvrir(b, vp, { mode: 'ok', tab: 'ventes', query: '&site=leboncoin' });
+      o = await ouvrir(b, vp, { mode: 'ok' }, { tab: 'ventes', query: '&site=leboncoin', remise: true });
       await o.pg.waitForSelector('[data-lbc-vente="70010001"]', { timeout: 15000 }).catch(() => {});
       await o.pg.click('[data-lbc-vente="70010001"]').catch(() => {});
       await o.pg.waitForSelector('[data-remise-organiser]', { timeout: 8000 }).catch(() => {});
       const avantR = await o.pg.$('[data-remise-organiser]');
-      dit(!!avantR, '« Organiser la remise » sur la vente à remettre (ouverte)');
+      dit(!!avantR, '« Organiser la remise » sur la vente à remettre (ouverte)', await o.pg.evaluate(() => [...document.querySelectorAll('[data-lbc-vente]')].map((e) => e.getAttribute('data-lbc-vente')).join(',') + ' | ' + document.body.innerText.slice(0, 300)));
       await o.pg.click('[data-remise-organiser]').catch(() => {});
       await o.pg.waitForSelector('[data-remise-feuille]', { timeout: 5000 }).catch(() => {});
       await capture(o.pg, 'remise-feuille', vp);
@@ -200,7 +201,7 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       const e1 = await o.pg.evaluate(() => (document.querySelector('[data-remise-erreur]') || {}).innerText || '');
       dit(/Choisis l’heure/.test(e1), 'sans heure : rien n’est noté, c’est dit', e1);
       const demain = new Date(Date.now() + 864e5); const j = `${demain.getFullYear()}-${String(demain.getMonth() + 1).padStart(2, '0')}-${String(demain.getDate()).padStart(2, '0')}`;
-      await o.pg.fill('[data-remise-jour]', j); await o.pg.fill('[data-remise-heure]', '15:00'); await o.pg.fill('[data-remise-lieu]', 'Gare, sortie nord');
+      await o.pg.fill('[data-remise-jour]', j, { timeout: 3000 }).catch(() => {}); await o.pg.fill('[data-remise-heure]', '15:00', { timeout: 3000 }).catch(() => {}); await o.pg.fill('[data-remise-lieu]', 'Gare, sortie nord', { timeout: 3000 }).catch(() => {});
       await o.pg.click('[data-remise-enregistrer]').catch(() => {});
       await o.pg.waitForSelector('[data-remise-quand]', { timeout: 5000 }).catch(() => {});
       const q = await o.pg.evaluate(() => { const e = document.querySelector('[data-remise-quand]'); return e ? { at: e.getAttribute('data-remise-quand'), t: e.innerText } : null; });
@@ -235,9 +236,9 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       await o.pg.click('[data-repub-lbc-suivant]').catch(() => {});
       await o.pg.waitForSelector('[data-repub-lbc-ordre]', { timeout: 5000 }).catch(() => {});
       const ord0 = await o.pg.evaluate(() => document.querySelector('[data-repub-lbc-ordre]').getAttribute('data-repub-lbc-ordre'));
-      await o.pg.click('[data-repub-lbc-monter="3290000007"]').catch(() => {});
+      await o.pg.click('[data-repub-lbc-monter="3290000002"]').catch(() => {});
       const ord1 = await o.pg.evaluate(() => document.querySelector('[data-repub-lbc-ordre]').getAttribute('data-repub-lbc-ordre'));
-      dit(ord1 === ord0.split(',').reverse().join(',') && ord1.startsWith('3290000007'), 'l’ordre : « monter » met la N°16 en premier', `${ord0} → ${ord1}`);
+      dit(ord1 === ord0.split(',').reverse().join(',') && ord1.startsWith('3290000002'), 'l’ordre : « monter » met la N°13 en premier', `${ord0} → ${ord1}`);
       const esp = await o.pg.evaluate(() => ({ e: !!document.querySelector('[data-repub-lbc-esp="alea"]'), att: (document.querySelector('[data-repub-lbc-attente]') || {}).innerText || '' }));
       dit(esp.e && /Environ 3 min/.test(esp.att), 'l’espacement : fixe ou au hasard, l’attente totale dite', JSON.stringify(esp));
       await capture(o.pg, 'repub-regler', vp);
@@ -245,7 +246,7 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       await o.pg.click('[data-repub-lbc-suivant]').catch(() => {});
       await o.pg.waitForSelector('[data-repub-lbc-main]', { timeout: 5000 }).catch(() => {});
       const m0 = await o.pg.evaluate(() => [...document.querySelectorAll('[data-repub-lbc-main]')].map((e) => ({ id: e.getAttribute('data-repub-lbc-main'), copier: e.querySelectorAll('[data-repub-lbc-copier]').length, photos: (e.querySelector('[data-repub-lbc-photos]') || { getAttribute: () => '0' }).getAttribute('data-repub-lbc-photos') })));
-      dit(m0.length === 2 && m0[0].id === '3290000007' && m0.every((x) => x.copier === 3), 'à la main : une fiche par annonce, dans SON ordre, titre/description/prix à copier', JSON.stringify(m0));
+      dit(m0.length === 2 && m0[0].id === '3290000002' && m0.every((x) => x.copier === 3), 'à la main : une fiche par annonce, dans SON ordre, titre/description/prix à copier', JSON.stringify(m0));
       await capture(o.pg, 'repub-main', vp);
       await o.pg.click('[data-repub-lbc-fait="3290000007"]').catch(() => {});
       await o.pg.waitForTimeout(400);

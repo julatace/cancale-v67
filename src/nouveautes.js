@@ -26,6 +26,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'lbc-baisse-prix', date: '2026-11-11', titre: 'Baisser tes prix Leboncoin en série', phrase: 'VRM propose les annonces sans favori ; tu choisis et lances.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
+  { id: 'lbc-remise-main-propre', date: '2026-11-11', titre: 'Remise en main propre organisée', phrase: 'Jour, heure, lieu, rappel une heure avant, puis « Remis ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'lbc-republier-atelier', date: '2026-11-11', titre: 'Republier sur Leboncoin comme sur Vinted', phrase: 'Ton ordre, ton rythme, par l’extension ou à la main.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
   { id: 'suivi-travail', date: '2026-11-11', titre: 'Pendant que VRM travaille, tu vois tout', phrase: 'Une barre, chaque étape, pause ou arrêt quand tu veux.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'import-depart', date: '2026-11-11', titre: 'Tout ton historique Vinted, relu', phrase: 'Laisse vinted.fr ouvert : ventes et achats arrivent peu à peu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'stats-categories', date: '2026-11-11', titre: 'Tes statistiques par catégorie', phrase: 'Ventes, vendu et bénéfice, catégorie par catégorie.', tab: 'stats', pour: 'tous', mode: 'tous' },
