@@ -41,9 +41,22 @@ const MIGRES = [
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
   ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes']],
+  ['src/ecrans/Achats.jsx', ['*']],
+  ['src/ecrans/PrixMarche.jsx', ['*']],
+  ['src/ecrans/FilsTous.jsx', ['*']],
+  ['src/CadreEmail.jsx', ['*']],
+  ['src/EspaceEmails.jsx', ['*']],
+  ['src/JournalEmails.jsx', ['*']],
+  ['src/ReceptionEmails.jsx', ['*']],
+  ['src/RecusEmail.jsx', ['*']],
+  ['src/OffresAuto.jsx', ['*']],
+  ['src/ActionsClaires.jsx', ['*']],
+  ['src/composants/ChampRecherche.jsx', ['*']],
+  ['src/LitigesEnCours.jsx', ['*']],
+  ['src/LigneFraicheur.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
-const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;
+const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF|PDF|SIRET|SIREN|DAC7|ACRE|CFE)\b/g;
 const PERMIS = [/^[A-Z]{2}$/, /^[\s·—–…→←›✓✕×©+\-:;,.()0-9€%/]*$/];
 
 let ok = 0, ko = 0;
