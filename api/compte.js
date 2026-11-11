@@ -109,6 +109,7 @@ import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleul
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur } from './_lib/plan-regle.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { empreinte } from './_lib/empreinte.js';   // (11 nov.) clé d'idempotence avec les paramètres
 
 export const config = { api: { bodyParser: false } };
 
@@ -558,7 +559,7 @@ async function webhook(req, res) {
     const client = typeof obj.customer === 'string' ? obj.customer : (obj.customer && obj.customer.id) || '';
     const owner = await proprietaireDe(null, client);
     if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });
-    if (!owner) return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' });
+    if (!owner) { console.warn('[stripe] invoice.paid sans propriétaire VRM', String(obj.id || '').slice(0, 40)); return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' }); }   // (11 nov., B133) journalisé
     const p = await factureFilleulPayee(owner, client, obj, PRIX_CGV.centimes);
     if (!p.ok) return repondre(res, 503, { erreur: 'parrainage non crédité', reessayer: true });
     return repondre(res, 200, { recu: true });
@@ -779,7 +780,10 @@ async function checkout(req, res) {
   if (ligne && ligne.client_stripe) params.customer = ligne.client_stripe;
   else if (u.email) params.customer_email = u.email;
   // Un double clic ne crée pas deux sessions (même clé dans la même minute).
-  const cle = `vrm-co-${u.id}-${Math.floor(Date.now() / 60000)}`;
+  // (11 nov., M55) Les PARAMÈTRES dans la clé (Solo ou Pro, essai) : deux clics
+  // différents dans la même minute ne rejouent plus une clé avec d'autres
+  // paramètres (Stripe répondait 400, affiché « panne » 502).
+  const cle = `vrm-co-${u.id}-${Math.floor(Date.now() / 60000)}-${empreinte(JSON.stringify(params)).slice(0, 12)}`;
   let r = await stripeApi('POST', 'checkout/sessions', params, cle);
   // L'adresse des CGV n'est pas encore réglée chez Stripe : sa case ne peut pas
   // s'afficher. Les CGV ont DÉJÀ été acceptées dans VRM (ci-dessus, datées) :
@@ -1799,7 +1803,7 @@ export default async function handler(req, res) {
     return routeCommandes(req, res);
   }
   if(mode==='favoris'){
-    if(m==='POST')req.body=await lireCorpsJson(req);
+    if(m==='POST'){req.body=await lireCorpsJson(req);if(req.body===null)return repondre(res,400,{ok:false,erreur:'json'});}   // (11 nov., B145) un JSON illisible est un 400 net
     return routeFavoris(req,res);
   }
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});

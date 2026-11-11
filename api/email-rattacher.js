@@ -621,7 +621,8 @@ export default async function handler(req, res) {
     // Pas de repli sans filtre : cet écran est réservé à la base cloisonnée.
     if (await sondeCloisonnee() !== true) {indispo(res);return;}
     try {res.status(200).json(await lireReceptionEmail({owner,url:SUPABASE_URL,headers:HEADERS}));}
-    catch (_) {indispo(res);}return;
+    // (11 nov., M93) plus de 500 comptes : une limite NOMMÉE (413), jamais « base injoignable ».
+    catch (e) {if(e&&e.message==='comptes-trop-nombreux'){res.status(413).json({ok:false,error:'comptes-trop-nombreux',message:'Trop de comptes pour cet écran (500 au plus).'});return;}indispo(res);}return;
   }
   // (31 oct.) LE JOURNAL « Tes emails, ce que VRM en a fait » : une page de 20
   // en scalaires projetés, les compteurs seuls (`compte=1`, pour Colis), ou le
@@ -690,8 +691,8 @@ export default async function handler(req, res) {
     //    alors qu'il attend depuis le 17, et la fenêtre d'ancienneté serait fausse.
     __recuLe: ligne.at || null,
   };
-  let resultat = null;
-  const capture = { setHeader() {}, status() { return this; }, json(o) { resultat = o; return this; } };
+  let resultat = null, codeRejeu = 200;
+  const capture = { setHeader() {}, status(c) { codeRejeu = Number(c) || 200; return this; }, json(o) { resultat = o; return this; } };
   // `silencieux` : rejeu en lot → on ne renotifie pas. Isolé par requête.
   await contexteVendeur.run({ owner: owner || '', silence: !!corps.silencieux }, () => traiterEmail(faux, capture));
 
@@ -708,16 +709,22 @@ export default async function handler(req, res) {
     // vide de plus chez celui de l'installation.
     const leSien = trouve.cloisonnee ? `&owner=eq.${enc(trouve.proprio)}` : '';
     const vide = { id, data: { supprime: true, rejoueLe: new Date().toISOString(), type: resultat.type || 'traité' } };
+    // (11 nov., M67) ni l'effacement ni la ligne vidée n'ont abouti : la quarantaine
+    // resterait rejouable (un 2e rejeu doublerait) ⇒ on le DIT (503), jamais « fait ».
+    let efface = false, videe = false;
     try {
-      await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${leSien}`, { method: 'DELETE', headers: HEADERS });
+      const d = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${leSien}`, { method: 'DELETE', headers: { ...HEADERS, Prefer: 'return=representation' } });
+      if (d && d.ok) { const j = await d.json().catch(() => null); efface = Array.isArray(j) && j.length > 0; }
     } catch (_) {}
     try {
-      await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
+      const v = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
         method: 'POST',
         headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify(trouve.cloisonnee ? [{ owner: trouve.proprio, ...vide }] : withOwnerAll([vide])),
       });
+      videe = !!(v && v.ok);
     } catch (_) {}
+    if (!efface && !videe) { res.status(503).json({ ok: false, error: 'quarantaine-pas-videe', message: "L'e-mail est rangé, mais sa copie mise de côté n'a pas pu être retirée. Ne le rattache pas une 2e fois : réessaie dans un instant.", owner: owner || null, resultat }); return; }
     // Les pièces gardées sont vidées aussi (le PDF est maintenant chez lui).
     const soeurs = (Array.isArray(ligne.pieces) ? ligne.pieces : []).map((p) => p && p.ligne).filter((x) => typeof x === 'string' && x.startsWith('email_qpj_'));
     if (soeurs.length) {
@@ -730,6 +737,8 @@ export default async function handler(req, res) {
       } catch (_) {}
     }
   }
+  // (11 nov., B110) le CODE du traitement est recopié : « base en panne » (503) n'est pas « refusé ».
+  if (codeRejeu === 503) { res.status(503).json({ ok: false, error: 'base-injoignable', owner: owner || null, resultat }); return; }
   res.status(200).json({ ok: !!(resultat && resultat.ok), owner: owner || null, resultat });
 }
 

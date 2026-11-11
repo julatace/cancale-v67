@@ -1639,7 +1639,7 @@ export default async function handler(req, res) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
     // cessent en silence. 500 = visible.
-    res.status(500).json({ ok: false, erreur: 'panne', message: String(e) });
+    res.status(500).json({ ok: false, erreur: 'panne', message: String((e && e.name) || 'erreur') + ' : ' + String((e && e.message) || '').slice(0, 160) });   // (11 nov., B127) borné, sans pile
   }
 }
 

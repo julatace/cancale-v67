@@ -244,7 +244,9 @@ async function garderHtmlOrigine(cle, type, resume, html) {
 async function supabaseUpsert(rows) {
   const owner = proprietaireCourant();
   if (!owner) { marquerEcritureRatee(); return false; }
-  rows = rows.map(r => ({ ...r, owner }));
+  // (11 nov., M65) `updated_at` estampillé comme `withOwner` (§4.3) : la ligne ne garde plus sa date de création.
+  const quand = new Date().toISOString();
+  rows = rows.map(r => ({ ...r, owner, updated_at: r.updated_at || quand }));
   const res = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
     method: 'POST',
     headers: {
@@ -2892,7 +2894,12 @@ export async function traiterEmail(req, res) {
         if (data.pro && data.email && data.transaction) {
           facture = await createProInvoice(data, acc, null, now, mail.attachments);
         }
-      } catch (_) {}
+      } catch (e) {
+        // (11 nov., M61) une exception (PDF de retour illisible…) laissait la vente Pro
+        // SANS brouillon de facture, avec un 200 : on le dit (503, le collecteur rejoue).
+        console.warn('email-inbound : brouillon de facture Pro', e && e.name);
+        marquerEcritureRatee();
+      }
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: data.designation }; }
       await logEmail({ type: 'vente', subject, from: mail.from, prix: data.prix, numero: data.numero, facture: facture ? facture.number : null });
       await repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture, ...(data.verification ? { verification: true } : {}) });

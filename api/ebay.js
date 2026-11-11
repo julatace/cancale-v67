@@ -1716,7 +1716,8 @@ async function handleSync(ctx) {
   const lectureCommandesId=crypto.randomUUID();
   const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2,lectureCommandesId):null;
   if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2,lectureCommandesId),status:orders.status}))===true;
-  if (inv.ok && Array.isArray(inv.data?.inventoryItems))stockRange=await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems, status: inv.status, capturedAt: at2 }, ctx.owner)===true;
+  // (11 nov., M77) une seule page lue : `complet`/`total` le disent (jamais un stock partiel présenté entier).
+  if (inv.ok && Array.isArray(inv.data?.inventoryItems))stockRange=await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems, status: inv.status, capturedAt: at2, total: Number.isFinite(Number(inv.data.total)) ? Number(inv.data.total) : null, complet: !inv.data.next && Number.isFinite(Number(inv.data.total)) && Number(inv.data.total) <= inv.data.inventoryItems.length }, ctx.owner)===true;
   // Le principal dont l'identité n'est pas encore apprise : on la demande à
   // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
   // au sélecteur, et ce qui permet d'ajouter un second compte sans mélange.

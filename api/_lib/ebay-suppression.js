@@ -319,7 +319,9 @@ export async function traiterSuppressionEbay(req, dep) {
     const owners = [...new Set(cibles.filter((l) => l.id === 'ebay_comptes').map((l) => String(l.owner)))];
     requeteRegistres = owners.length ? `${requeteRegistres}&owner=in.(${owners.join(',')})` : '';
   } else if (!u || PSEUDO_SUR.test(u)) {
-    const motifs = [u, cleEias].filter(Boolean).map((x) => `data->>comptes.ilike.*${x}*`);
+    // (11 nov., B142) chaque motif ENTRE GUILLEMETS : une virgule ou une parenthèse dans la
+    // clé eBay ne casse plus le filtre `or=()` (400 ⇒ 503 ⇒ eBay rejouait sans fin).
+    const motifs = [u, cleEias].filter(Boolean).map((x) => `data->>comptes.ilike."*${String(x).replace(/["\\]/g, '')}*"`);
     requeteRegistres = motifs.length ? `${requeteRegistres}&or=(${encodeURIComponent(motifs.join(','))})` : '';
   }
   const registres = requeteRegistres ? await lireToutesLignes(supabaseUrl, cleService, sbCle, requeteRegistres, fetcher) : [];
