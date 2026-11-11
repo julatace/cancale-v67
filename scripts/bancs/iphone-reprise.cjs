@@ -344,7 +344,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(r1b.ecran === 'ventes' && r1b.site === 'vinted' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify(r1b));
         // R2 · Colis · À retirer, app rouverte
         await toucher(pg, '.vrm-tabbar [data-nav-entree="cat_bord"]');
-        await toucher(pg, '[data-colis-onglet-choix="retirer"]');
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         const r2avant = await ecran(pg);
         await pg.close();
         ({ pg } = await ouvrirPage(ctx));

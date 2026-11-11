@@ -14440,8 +14440,10 @@ function EbayMessagesVolets({ compte, comptesEbay, ...p }) {
 // en améliorant encore », puis « pour l'espace, il faut totalement réorganiser
 // les onglets… tout peut être amélioré »). La barre ne range plus les écrans par
 // SITE mais par CE QU'IL FAIT :
-//   téléphone, barre du bas : Journée · Annonces · Ventes · Colis · Plus ;
-//   ordinateur, colonne     : Ma journée · Annonces · Ventes · Messages · Colis,
+//   téléphone, barre du bas : Journée · Annonces · Ventes · Achats · Plus ;
+//   ordinateur, colonne     : Ma journée · Annonces · Ventes · Messages · Achats,
+//   (11 nov., lot DJ3 : Colis n'est plus un onglet — « À expédier » en tête de Ventes,
+//   « À retirer » en tête d'Achats, src/colisPlace.js)
 //                             puis les groupes de « Plus », Paramètres en bas.
 // Annonces, Ventes, Messages et Achats portent une rangée de filtres de site
 // (Toutes · Vinted · Leboncoin · eBay · Vestiaire) : le filtre « Vinted » rend

@@ -86,7 +86,7 @@ const ouvrirPlus = (pg, geste) => pg.evaluate((g) => { for (const c of document.
     await pg.waitForTimeout(1200);
 
     await essaie('G1', async () => {
-      await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
       await H.attendre(async () => (await nbRetirer(pg)) > 0, 15000);
       const n0 = await nbRetirer(pg);
       dit(n0 >= 1, 'G1 le colis au relais est à retirer', String(n0));

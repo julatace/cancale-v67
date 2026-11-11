@@ -169,9 +169,9 @@ const ouvrir = async (b, vp, { sombre = false, fondKo = false, tab = 'cat_bord',
   return { ctx, pg, errs, requetes };
 };
 const allerRetirer = async (pg) => {
-  await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+  await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
   await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
-  await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+  await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
   await pg.locator('.vrm-rpf').first().waitFor({ timeout: 15000 });
   await pg.waitForTimeout(1500);
 };

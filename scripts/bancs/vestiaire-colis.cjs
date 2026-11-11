@@ -150,7 +150,7 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
             // produit (900002), du plus haut + 1 (401 et 403, références lues, sont pris) — jamais un titre deviné.
             dit(v2.num === '404' && v2.bord === 'pas-su', 'V2 : sans référence ⇒ le N° neuf de son produit (404), bordereau « pas su »', `${v2.num} · ${v2.bord}`);
             dit(c.route === null && !c.achats.length, '« À envoyer » : aucun achat en route (ce qui arrive n’est pas à envoyer)', JSON.stringify(c.achats));
-            await pg.click('[data-colis-onglet-choix="retirer"]'); await pg.waitForTimeout(800);
+            await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 }); await pg.waitForTimeout(800);
             const r = await lire(pg);
             dit(r.route === '1' && r.achats.join() === 'A1', 'Colis → « À retirer » : l’achat en route, pas celui livré', JSON.stringify(r.achats));
             dit(/chronopost\.fr/.test(r.suivre) && r.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', r.suivre);

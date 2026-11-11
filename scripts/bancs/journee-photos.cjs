@@ -338,7 +338,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
           if (SHOTS) { const suf = `${nom}${JEU === 'base' ? '' : '-' + JEU}`; await pg.screenshot({ path: path.join(SHOTS, `colis-envoyes-${suf}.png`) }); }
           const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
           dit(deb <= 1, 'Colis : aucun débordement horizontal', `${deb}px`);
-          await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+          await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
           await pg.waitForTimeout(700);
           if (SHOTS) { const suf = `${nom}${JEU === 'base' ? '' : '-' + JEU}`; await pg.screenshot({ path: path.join(SHOTS, `colis-retirer-${suf}.png`) }); }
         });

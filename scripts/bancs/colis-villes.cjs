@@ -142,9 +142,9 @@ const mesurer = (pg) => pg.evaluate(() => ({
       console.log(`\n— Colis → À retirer · villes · ${nom}`);
       const { ctx, pg, errs, banDemandes } = await ouvrir(b, vp);
       try {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => document.querySelectorAll('[data-retirer-villes] [data-ville]').length >= 6, null, { timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(600);
         const m = await mesurer(pg);

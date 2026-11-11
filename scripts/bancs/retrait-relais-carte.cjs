@@ -145,8 +145,8 @@ async function main() {
       await essaie(T + ' Colis', async () => {
         const { ctx, pg, errs, ban } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 25000 });
-        await pg.click('[data-colis-onglet-choix="retirer"]');
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 25000 });
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 25000 });
         await pg.waitForSelector('[data-cc-colonne="retirer"] [data-relais-point="kusmitea|56000"][data-relais-repere="oui"]', { timeout: 10000 }).catch(() => {});
         await pg.waitForTimeout(800);

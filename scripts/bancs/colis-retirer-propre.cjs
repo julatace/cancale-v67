@@ -160,9 +160,9 @@ const ouvrir = async (b, vp, sombre) => {
       console.log(`\n— Colis → À retirer · ${nom} · jeu ${JEU}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       await essaie('retirer', async () => {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForTimeout(2500);
         if (process.env.JR_DBG) console.log(await pg.evaluate(() => [document.querySelector('[data-colis-retraits="outils"]'), document.querySelector('[data-colis-retraits="outils"] .vrm-achats'), ...document.querySelectorAll('[data-colis-retraits="outils"] .vrm-achats > *'), document.querySelector('.vrm-rpf-verifier'), document.querySelector('.vrm-rpf')].filter((e) => e && e.getBoundingClientRect().height > 0).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mt${getComputedStyle(e).marginTop} pt${getComputedStyle(e).paddingTop} ${e.tagName}.${String(e.className).slice(0, 30)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')} :: ${e.innerText.slice(0, 90).replace(/\n/g, ' ')}`).join('\n')));
         if (process.env.JR_DBG) console.log('GAP2', await pg.evaluate(() => { const q = (x) => { const e = document.querySelector(x); if (!e) return x + ' —'; const c = getComputedStyle(e), r = e.getBoundingClientRect(); return `${x} top${Math.round(r.top)} h${Math.round(r.height)} mt${c.marginTop} mb${c.marginBottom} pt${c.paddingTop} pb${c.paddingBottom}`; }; return ['.vrm-rpf', '.vrm-colis-retirer', '[data-colis-retraits]', '[data-colis-retraits] > *', '.vrm-achats', '.vrm-achats > *', '.vrm-colis-fraicheur', '.vrm-rpf-verifier'].map(q).join('\n'); }));

@@ -356,7 +356,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         const f = await pg.evaluate(() => ({ choix: [...document.querySelectorAll('[data-colis-onglet-choix]')].map((x) => x.getAttribute('data-colis-onglet-choix')).join('|'), porte: !!document.querySelector('[data-colis-retraits-ouvrir]') }));
         // (3 nov.) Colis a TROIS onglets « À envoyer · Envoyés · À retirer » (historique interface-stock).
         dit(f.choix === 'envoyer|envoyes|retirer' && !f.porte, 'K. Colis : le sélecteur « À envoyer » / « Envoyés » / « À retirer » (plus de porte vers un détail qui redisait les colis)', JSON.stringify(f));
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click(); await pg.waitForTimeout(1500);
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 }); await pg.waitForTimeout(1500);
         await capture(pg, `retraits-${tel ? 'tel' : 'ordi'}`);
         const r = await pg.evaluate(() => { const z = document.querySelector('[data-colis-retraits="outils"]'); return { z: !!z, ecran: z && z.querySelector('[data-ecran-achats]') ? z.querySelector('[data-ecran-achats]').getAttribute('data-ecran-achats') : '',
           onglets: z ? z.querySelectorAll('[data-achats-onglet]').length : -1, kpis: z ? z.querySelectorAll('.vrm-achats-kpis, .vrm-achats-search, .vrm-achats-recus-bas').length : -1,

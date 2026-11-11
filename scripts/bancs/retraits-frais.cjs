@@ -199,10 +199,10 @@ const lireEcran = (pg) => pg.evaluate(() => {
       console.log(`\n— Colis → À retirer, la capture de Julien · ${nom}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'cat_bord');
       await essaie('retirer', async () => {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 40000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 40000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
         await pg.waitForTimeout(1500);
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         // La carte : son fond prêt (ou l'échec dit), puis l'indice.
         await pg.waitForFunction(() => { const c = document.querySelector('.vrm-rpf'); return c && (c.getAttribute('data-retirer-sur-carte') === '0' || ['pret', 'ko'].includes(c.getAttribute('data-retirer-carte-etat'))); }, null, { timeout: 20000 }).catch(() => {});
         await pg.waitForTimeout(400);
