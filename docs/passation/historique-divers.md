@@ -1309,3 +1309,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé de CLAUDE.md §9 (11 nov., lot AA)
 
 - **10 nov. · Communauté pour formateurs (lot AR, demande 7)** : sur les groupes de la 025 — page publique `vrm.center/f/<adresse>` (éteinte par défaut, groupes montrés sur SON geste, jamais un chiffre d'élève), « Demander à rejoindre » = la demande 025 (« rien »), programme d'étapes (coches vues SEULEMENT avec l'accord de l'élève), annonces, suivi « au moins … · X sur Y partagent » (`src/communaute/formateur.js`, `api/_lib/formateur.js`). `docs/passation/2026-11-10-communaute-formateurs.md`. Geste : migration **032** (essai en tête).
+
+## Déplacé de CLAUDE.md §9 (11 nov., lot K)
+
+- **10 nov. · Import tableur, partage de photo, aide par écran (lot J)** : Achats → « Nouvel achat » → « Importer un tableur » (CSV/.xlsx lus dans le navigateur sans dépendance, aperçu ligne à ligne, doublons par RÉFÉRENCE seulement, prix du fichier, N° par `numeroExterne`, coût posé seulement sur une fiche sans prix, rien écrit sans « Importer N achats ») ; VRM cible de partage (`share_target`, `public/sw.js` ⇒ « Nouvel achat » avec la photo ; pas sur iPhone/Safari) ; le « ? » ouvre 3–5 gestes (`scripts/aide-contenu.cjs` ⇒ `src/aideEtapes.js`). `docs/passation/2026-11-10-import-partage-aide.md`. Geste : aucun.
