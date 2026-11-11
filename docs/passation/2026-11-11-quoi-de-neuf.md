@@ -17,8 +17,12 @@ Principe de Julien : « plus beau, simple, surtout PRATIQUE ».
   `main` du compte VRM, le même sur tous ses appareils). Écrit par `save` sur SON geste seulement.
 - **Ma journée** : une ligne « Nouveau · N nouveautés · <le 1er titre> › » juste sous la tête, avant
   les notifications muettes et « À faire » — un bouton, jamais une fenêtre ; rien à voir ⇒ rien. Rien
-  non plus tant que la coque n'a pas posé le profil (Simple/Complet, ce qu'il vend) : mesuré au banc,
-  la carte disait 15 puis la feuille 12 (le défaut automatique passait en Simple après coup).
+  non plus tant que la coque n'a pas posé le profil (Simple/Complet, ce qu'il vend) ET que le nuage
+  n'est pas lu (`isCloudReady`) : mesuré au banc, la carte disait 15 puis la feuille 12 (le défaut
+  automatique passait en Simple après coup), et 12 puis 14 avant la lecture du nuage (statut, « vu »
+  d'un autre appareil) — la carte changeait sous ses yeux.
+- Constaté au banc, pas changé (règle générale de l'app) : `save` attend son minuteur avant d'écrire ;
+  un rechargement dans la seconde qui suit un geste le perd. Le banc attend l'écriture dans `main`.
 - **La feuille** (`SheetShell` : portail, `FermeAuRetour`, Échap, glisser) : une ligne par nouveauté
   (titre, phrase, date courte), « Voir » (44 px, vrai lien `?tab=…`) range CETTE ligne et mène à
   l'écran ; « Tout vu » range tout ; fermer n'est pas « vu ».
@@ -45,10 +49,10 @@ du jour de la mise en ligne, titre ≤ 8 mots, phrase ≤ 12 mots, écran de `ON
 ## Preuves
 - `npm run build` vert ; `audit-{variables,tdz,coherence,identite,icones,textes-courts,fonctions-api,secrets,csp}` verts.
 - `audit-quoi-de-neuf` : format (F), règles exécutées (R), branchement (B) — vert ; `--prouve` :
-  **19/19 mutations** attrapées (historique pour un compte neuf, date pas sue ⇒ tout, Simple montre
+  **20/20 mutations** attrapées (historique pour un compte neuf, date pas sue ⇒ tout, Simple montre
   Complet, pro sur un « pas su », « autre » pour tous, « Vu » redate, une vue revient, titre de 9 mots,
   phrase de 13 mots, écran inexistant, id en double, ordre cassé, clé hors SYNC_KEYS, carte retirée,
-  statut pas su ⇒ pas pro, carte avant le profil, feuille hors SheetShell, carte en fenêtre, Paramètres sans l'entrée).
+  statut pas su ⇒ pas pro, carte avant le profil, carte avant le nuage, feuille hors SheetShell, carte en fenêtre, Paramètres sans l'entrée).
 - Sur `origin/main` (git archive) l'audit est rouge — mais seulement parce que le module n'existe pas :
   ce n'est pas une preuve à lui seul ; ce sont les mutations qui la font.
 - Banc `scripts/bancs/quoi-de-neuf.cjs` (390 et 1512, clair et sombre) : Q1 carte → feuille → « Voir »
