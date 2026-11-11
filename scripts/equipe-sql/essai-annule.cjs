@@ -72,6 +72,13 @@ const REGLES_021 = [...REGLES,
   'app_data:vrm_lecture_privee:RESTRICTIVE:SELECT:authenticated:((owner=(selectauth.uid()))or((owner=(selectvrm_equipe_vendeur()))andvrm_equipe_id_permis(id))):',
 ].sort();
 const AVEC_021 = `exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'app_data' and policyname = 'vrm_lecture_privee')`;
+// (11 nov.) Sur une base qui porte la 027 (sans abonnement : lire oui, écrire
+// non), `abonnement_requis` vaut `true` en lecture : la 016 n'y touche plus.
+// La 027 se reconnaît à SA restrictive d'effacement, pas au `true` lui-même
+// (sinon une restrictive ouverte à la main passerait pour la 027).
+const AVEC_027 = `exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'app_data' and policyname = 'abonnement_requis_effacer')`;
+const vers027 = (l) => l.map((x) => x.startsWith('app_data:abonnement_requis:') ? 'app_data:abonnement_requis:RESTRICTIVE:ALL:authenticated:true:(selectvrm_acces_ok())' : x);
+const REGLES_027 = vers027(REGLES), REGLES_021_027 = vers027(REGLES_021);
 const norm = (x) => `regexp_replace(regexp_replace(regexp_replace(lower(coalesce(${x}, '')), '\\s+', '', 'g'), 'public\\.', '', 'g'), 'as[a-z_]+\\)', ')', 'g')`;
 const etat = `json_build_object(
   'table', to_regclass('public.vrm_equipe') is not null,
@@ -89,7 +96,7 @@ const etat = `json_build_object(
                or coalesce(qual, '') like '%vrm_equipe%' or coalesce(with_check, '') like '%vrm_equipe%')) z),
   'restrictives_bloquantes', (select json_agg(policyname order by policyname) from pg_policies where schemaname = 'public' and tablename = 'app_data'
              and permissive = 'RESTRICTIVE' and cmd in ('SELECT', 'ALL') and (roles @> array['authenticated']::name[] or roles @> array['public']::name[])
-             and coalesce(qual, '') not like '%vrm_equipe_vendeur%'),
+             and coalesce(qual, '') not like '%vrm_equipe_vendeur%' and coalesce(qual, '') <> 'true'),
   'fonctions', (select json_object_agg(q, (select json_build_object('n', count(*), 'def', bool_and(p.prosecdef), 'cfg', (array_agg(to_jsonb(p.proconfig)))[1], 'vol', (array_agg(p.provolatile::text))[1], 'md5', (array_agg(md5(p.prosrc)))[1],
                                             'auth', bool_and(has_function_privilege('authenticated', p.oid, 'execute')),
                                             'sr', bool_and(has_function_privilege('service_role', p.oid, 'execute')),
@@ -107,7 +114,7 @@ if (process.argv.includes('--verifier')) {
     droits: `json_array_length(e.j -> 'droits') = 0`,
     droits_colonnes: `(e.j ->> 'droits_colonnes') is null`,
     regles_table: `(e.j ->> 'regles_table') is null`,
-    regles: `(e.j -> 'regles')::jsonb = case when ${AVEC_021} then ${lit(JSON.stringify(REGLES_021))}::jsonb else ${lit(JSON.stringify(REGLES))}::jsonb end`,
+    regles: `(e.j -> 'regles')::jsonb = case when ${AVEC_021} and ${AVEC_027} then ${lit(JSON.stringify(REGLES_021_027))}::jsonb when ${AVEC_021} then ${lit(JSON.stringify(REGLES_021))}::jsonb when ${AVEC_027} then ${lit(JSON.stringify(REGLES_027))}::jsonb else ${lit(JSON.stringify(REGLES))}::jsonb end`,
     restrictives_bloquantes: `(e.j ->> 'restrictives_bloquantes') is null`,
     fonctions: `(e.j -> 'fonctions')::jsonb = ${lit(JSON.stringify(FONCTIONS_ATTENDUES))}::jsonb`,
   };

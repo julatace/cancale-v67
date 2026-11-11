@@ -50,7 +50,9 @@ const types={'.js':'text/javascript','.css':'text/css','.html':'text/html','.png
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0];if(f==='/'||!path.extname(f))f='/index.html';const p=path.join(DIST,f);if(!fs.existsSync(p)){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':types[path.extname(p)]||'application/octet-stream'});fs.createReadStream(p).pipe(r);}).listen(PORT);
 const projette=(row,sel)=>{const out={};for(const part of sel.split(',')){const m=/^(?:([^:]+):)?(.+)$/.exec(part.trim());if(!m)continue;const src=m[2],al=m[1]||src.split(/->>|->/).pop();if(src==='id'){out[al]=row.id;continue;}if(src==='data'){out[al]=row.data;continue;}let v=row.data;for(const s of src.replace(/^data(->>|->)/,'').split(/->>|->/))v=v==null?null:v[s];out[al]=v==null?null:(src.includes('->>')&&typeof v==='object'?JSON.stringify(v):v);}return out;};
 (async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
-const plan=(process.env.VUES||'plat_vinted:ventes,plat_vinted:annonces,plat_vinted:achats,plat_vinted:messages,cat_bord,journee').split(',');
+// (11 nov., restes) Ventes, Annonces, Achats, Messages sont des onglets de la barre (plus de boutons
+// dans un « espace Vinted ») : le vrai chemin est `?tab=ventes` etc. ; `plat_x:sous` clique encore.
+const plan=(process.env.VUES||'ventes:ventes,annonces:annonces,achats:achats,messages:messages,cat_bord,journee').split(',');
 for(const vp of [{width:390,height:844},{width:1512,height:950}]){for(const sombre of (process.env.SOMBRE?[false,true]:[false])){
 const ctx=await b.newContext({viewport:vp,colorScheme:sombre?'dark':'light',...(vp.width<600?{isMobile:true,hasTouch:true}:{})});const pg=await ctx.newPage();const errs=[];pg.on('pageerror',e=>errs.push(e.message));
 await pg.addInitScript((s)=>{try{localStorage.setItem('vrm_acces_direct','1');if(s)localStorage.setItem('vinted_dark','true');}catch(_){}},sombre);
@@ -61,7 +63,7 @@ const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;const forme=r=>(sel&&!/^id
 const eq=/[?&]id=eq\.([^&]*)/.exec(u);if(eq)return j(rows.filter(r=>r.id===eq[1]).map(forme));const lk=/[?&]id=like\.([^&]*)/.exec(u);if(lk){const re=new RegExp('^'+lk[1].replace(/[.]/g,'\\.').replace(/[*%]/g,'.*')+'$');return j(rows.filter(r=>re.test(r.id)).map(forme));}return j([]);});
 await pg.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"pret":true}'}));
 for(const vue of plan){const [v,sub]=vue.split(':');await pg.goto(`http://localhost:${PORT}/?tab=${v}`,{waitUntil:'domcontentloaded'});await pg.waitForTimeout(4500);
-if(sub){await pg.locator('.vrm-market-space button').filter({hasText:new RegExp('^'+sub+'$','i')}).first().click().catch(e=>console.log('clic',sub,e.message.slice(0,60)));await pg.waitForTimeout(3000);}
+if(sub&&/^plat_/.test(v)){await pg.locator('.vrm-market-space button').filter({hasText:new RegExp('^'+sub+'$','i')}).first().click().catch(e=>console.log('clic',sub,e.message.slice(0,60)));await pg.waitForTimeout(3000);}
 const nom=`${v}${sub?'-'+sub:''}-${vp.width}${sombre?'-sombre':''}`;
 const W=vp.width;
 const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRect().top):null;const vis=(e)=>!!e&&e.getBoundingClientRect().height>0;
@@ -85,39 +87,60 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');if(!h||!t)return null;const a=h.getBoundingClientRect(),b=t.getBoundingClientRect();const mil=(b.top+b.bottom)/2;return mil>=a.top&&mil<=a.bottom?0:Math.round(Math.min(Math.abs(mil-a.top),Math.abs(mil-a.bottom)));})(),
     limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];return {deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
     fraiche:vis(document.querySelector('[data-fraicheur-ventes]')),
-    titreEcran:(()=>{const b=document.querySelector('.vrm-mobile-titre,[data-titre-barre]');const t=[...document.querySelectorAll('.vrm-main h2')].filter(h=>vis(h)&&/^(Statistiques|Comptabilité|Colis|Paramètres|Organisation)$/.test(h.textContent.trim()));return t.map(h=>h.textContent.trim());})(),
+    titreEcran:(()=>{const b=document.querySelector('.vrm-mobile-titre,[data-titre-barre]');const t=[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].filter(h=>vis(h)&&/^(Statistiques|Comptabilité|Argent|Colis|Paramètres|Organisation)$/.test(h.textContent.trim()));return t.map(h=>h.textContent.trim());})(),
     courbeDoublons:(()=>{const c=document.querySelector('[data-stats-courbe]');return c?c.querySelectorAll('[data-chart-caption],[data-chart-compare]').length:null;})(),
     lignesZero:[...document.querySelectorAll('[data-ca-ligne]')].filter(tr=>[...tr.querySelectorAll('td')].slice(1).every(td=>/^0,00/.test(td.textContent.trim()))).length,
     nLignesCa:document.querySelectorAll('[data-ca-ligne]').length,
     pictoSeuls:[...document.querySelectorAll('[data-compta-section] .vrm-pourquoi > summary')].filter(x=>x.textContent.trim().length<3).length,
     v0:top(ventes[0]),a0:top(cartes[0]),a0Barre:(()=>{const w=document.querySelector('.vrm-ann-workbar');return w&&cartes[0]?Math.round(cartes[0].getBoundingClientRect().top-w.getBoundingClientRect().bottom):null;})(),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,pA:(()=>{const a=cartes[0]&&cartes[0].querySelector('.vrm-ann-overview > a');return a?Math.round(a.getBoundingClientRect().height):null;})(),nA:cartes.length,
-    deborde:document.documentElement.scrollWidth>document.documentElement.clientWidth+1};});
+    deborde:document.documentElement.scrollWidth>document.documentElement.clientWidth+1,
+    // (11 nov., restes) LA FORME D'AUJOURD'HUI : Ventes « Tous les sites » (`[data-toutes-vente]`), un seul
+    // titre d'écran (h1 du ScreenHead), la carte d'annonce en grille « comme Vinted » (décision n° 15).
+    titres:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].filter(vis).map(h=>h.textContent.trim()),
+    tv:(()=>{const rows=[...document.querySelectorAll('[data-toutes-vente]')];const v=(e)=>!!e&&e.getClientRects().length>0&&e.getBoundingClientRect().height>0;
+      return {n:rows.length,top:rows[0]?Math.round(rows[0].getBoundingClientRect().top):null,
+        meta:rows.slice(0,6).map(r=>[...r.querySelectorAll('.vrm-toutes-meta,.vrm-toutes-bureau')].filter(v).map(x=>x.innerText.replace(/\s+/g,' ')).join(' ')),
+        etats:rows.map(r=>{const e=[...r.querySelectorAll('.vrm-toutes-etat,.vrm-toutes-bureau > span:nth-child(3)')].filter(v)[0];return e?[e.textContent.trim(),e.getAttribute('data-ton')]:null;}).filter(Boolean)};})(),
+    photoCarte:(()=>{const c=cartes[0],a=c&&c.querySelector('.vrm-ann-overview > a');if(!a)return null;return {pw:Math.round(a.getBoundingClientRect().width),ph:Math.round(a.getBoundingClientRect().height),cw:Math.round(c.getBoundingClientRect().width)};})(),
+    conv0:(()=>{const w=document.createTreeWalker(document.querySelector('.vrm-main')||document.body,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode()))if(n.textContent.trim()==='acheteuse_1'){const e=n.parentElement;if(e.getClientRects().length)return Math.round(e.getBoundingClientRect().top);}return null;})(),
+    tetes:(()=>{const g=document.querySelector('.vrm-day-greeting');if(!g)return null;const L=[...g.querySelectorAll('*')].filter(e=>e.children.length===0&&e.textContent.trim()&&e.getClientRects().length&&!e.closest('.vrm-sr-seul,[aria-hidden="true"] .vrm-sr-seul')).map(e=>{const r=document.createRange();r.selectNodeContents(e);const b=r.getBoundingClientRect();return b.width>0?b:e.getBoundingClientRect();});let n=0;for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){const a=L[i],b=L[j];if(!(a.bottom<=b.top+1||b.bottom<=a.top+1||a.right<=b.left+1||b.right<=a.left+1))n++;}return n;})(),
+    dateTexte:(()=>{const re=/(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) \d{1,2} \S+/i;const w=document.createTreeWalker(document.querySelector('.vrm-main')||document.body,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode())){const m=re.exec(n.textContent);if(m&&n.parentElement.getClientRects().length)return m[0];}return null;})()};});
 if(sub==='ventes'){
-  dit(m.nVentes>=10,`[${W}] les ventes sont rendues`,String(m.nVentes));
-  dit(m.sous.length>0&&m.sous.every(t=>/\d{1,2} \S+/.test(t)&&/(julatace35260|tomj606)/.test(t)),`[${W}] chaque vente dit sa date et son compte sous le titre`,JSON.stringify(m.sous));
-  dit(m.tonExp==='action'&&m.tonVendue!=='action',`[${W}] « À expédier » se distingue de « Vendue »`,`${m.tonExp} / ${m.tonVendue}`);
-  dit(m.reglagesBarre===false,`[${W}] « Bordereaux auto » et « Mes vues » ne sont plus dans la barre (⋯ Outils)`,String(m.reglagesBarre));
+  // (11 nov., restes) Porté sur l'écran Ventes d'aujourd'hui (tous les sites, `[data-toutes-vente]`) :
+  // l'ancien « espace Vinted » à boutons n'existe plus. Mêmes exigences du 26 oct.
+  const T=m.tv;
+  dit(T.n>=10,`[${W}] les ventes sont rendues`,String(T.n));
+  dit(T.meta.length>0&&T.meta.every(t=>/(\d{1,2} \S+|aujourd|hier)/.test(t)&&/(julatace35260|tomj606)/.test(t)),`[${W}] chaque vente dit sa date et son compte`,JSON.stringify(T.meta.slice(0,3)));
+  const exp=T.etats.filter(([t])=>/^À (envoyer|expédier)$/.test(t)),vend=T.etats.filter(([t])=>t==='Vendue');
+  dit(exp.length>0&&vend.length>0&&exp.every(([,d])=>d==='action')&&vend.every(([,d])=>d!=='action'),`[${W}] « À envoyer » se distingue de « Vendue »`,JSON.stringify([exp[0],vend[0]]));
+  dit(m.reglagesBarre!==true,`[${W}] « Bordereaux auto » et « Mes vues » ne sont pas dans une barre`,String(m.reglagesBarre));
   dit(!m.retirer,`[${W}] pas de « Retirer mon argent » sans argent disponible`);
-  dit(!m.titreVentes,`[${W}] pas de second titre « Ventes » sous l'onglet Ventes`);
-  dit(m.v0!=null&&m.v0<=(W<600?560:660),`[${W}] la première vente arrive plus haut`,String(m.v0));
+  dit(m.titres.filter(t=>/^(Ventes|Vos ventes)$/.test(t)).length<=1,`[${W}] un seul titre « Ventes »`,JSON.stringify(m.titres));
+  // Sous la carte du mois (maquette du 2 nov., voulue) : sur ordinateur, la 1re vente tient dans le
+  // premier écran ; au téléphone, la hauteur est rapportée (pas jugée : c'est la maquette).
+  dit(m.dateTexte!=null&&!/ [A-ZÉ]\S+$/.test(m.dateTexte),`[${W}] la date s'écrit « … 11 novembre », pas « … 11 Novembre »`,String(m.dateTexte));
+  if(W>=600) dit(T.top!=null&&T.top+56<=950,`[${W}] la première vente est dans le premier écran`,String(T.top));
+  else console.log(`    [${W}] mesuré : 1re vente à ${T.top} px (écran ${vp.height})`);
 } else if(sub==='achats'){
-  dit(!m.titreAch,`[${W}] pas de second titre « Achats » sous l'onglet Achats`);
+  dit(m.titres.filter(t=>/^Achats$/.test(t)).length<=1,`[${W}] un seul titre « Achats »`,JSON.stringify(m.titres));
   dit(m.recusTop!=null&&m.ongletsTop!=null&&m.recusTop>m.ongletsTop,`[${W}] les reçus par email passent sous la liste, plus en tête`,`${m.recusTop} / ${m.ongletsTop}`);
-  dit(m.colis0!=null&&m.colis0<=(W<600?360:420),`[${W}] les étapes des achats arrivent plus haut`,String(m.colis0));
+  // (11 nov., restes) Sous la carte « Dépensé » (maquette du 2 nov.) : sur ordinateur dans le premier écran ; téléphone rapporté.
+  if(W>=600) dit(m.colis0!=null&&m.colis0+44<=950,`[${W}] les étapes des achats sont dans le premier écran`,String(m.colis0));
+  else console.log(`    [${W}] mesuré : étapes des achats à ${m.colis0} px (écran ${vp.height})`);
 } else if(sub==='messages'){
-  dit(!m.titreMsg,`[${W}] pas de second titre « Messages » sous l'onglet Messages`);
+  dit(m.titres.filter(t=>/^Messages$/.test(t)).length<=1,`[${W}] un seul titre « Messages »`,JSON.stringify(m.titres));
   // Mesuré depuis le choix Conversations / Favoris (et plus depuis le haut de
   // page) : au-dessus vivent les blocs de suivi posés par Julien le 29 oct.
   // (bilan des données lues, synchronisation par compte). Rien ne doit se
   // glisser entre ce choix et la recherche (second titre, reçus…). Mesuré : 28 px.
-  dit(m.convEcart!=null&&m.convEcart>=0&&m.convEcart<=48,`[${W}] la recherche des conversations arrive plus haut`,`${m.convEcart} px sous Conversations/Favoris (haut ${m.convTop})`);
+  // (11 nov., restes) La recherche des conversations n'est plus en tête (Messages refait) : ce qui compte,
+  // la 1re conversation arrive dans le premier écran, aux deux tailles.
+  dit(m.conv0!=null&&m.conv0+56<=vp.height-64,`[${W}] la première conversation est dans le premier écran`,String(m.conv0));
 } else if(v==='journee'){
-  dit(m.chev===false,`[${W}] « Reçu » et « Chiffre d'affaires » ne se chevauchent pas dans la carte Vendu`,String(m.chev));
-  dit(m.dateCap!=='capitalize',`[${W}] la date s'écrit « lundi 26 octobre », pas « Lundi 26 Octobre »`,String(m.dateCap));
-  // Même ligne = le milieu de « N choses à faire » tombe dans la boîte du bonjour
-  // (alignés sur la ligne de base : le haut des deux diffère de la taille du
-  // titre, 40 px depuis styles-disposition du 27 oct.). Sur deux lignes ⇒ rouge.
-  if(W>=768)dit(m.tete!=null&&m.tete===0,`[${W}] bonjour et « N choses à faire » sur la même ligne`,String(m.tete));
+  // (11 nov., restes) Ma journée v2 (9 nov.) : plus de carte « Vendu » à deux chiffres ni de « N choses à
+  // faire » à côté du bonjour. La règle reste : rien ne se chevauche dans la tête de l'écran, et la
+  // date (jugée sur Ventes, où elle s'écrit) ne capitalise pas le mois.
+  dit(m.tetes===0,`[${W}] rien ne se chevauche dans la tête de Ma journée`,String(m.tetes));
 } else if(v==='dashboard'){
   dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Argent'),`[${W}] « Argent » (Statistiques, lot AO) : une fois sur téléphone (la barre du haut), présent sur ordinateur`,JSON.stringify(m.titreEcran));
   dit(m.courbeDoublons===0,`[${W}] « Vendu · 12 mois » ne réécrit pas ses mois arrondis autrement`,String(m.courbeDoublons));
@@ -129,7 +152,8 @@ if(sub==='ventes'){
   const t=v==='settings'?'Paramètres':'Organisation';
   dit(W<600?m.titreEcran.length===0:m.titreEcran.includes(t),`[${W}] « ${t} » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
 } else if(v==='cat_bord'){
-  dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Colis'),`[${W}] « Colis » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
+  // (11 nov., restes) Chaque écran porte son h1 au téléphone aussi (ScreenHead, 2 nov.) : une fois, jamais deux.
+  dit(W<600?m.titreEcran.length<=1:m.titreEcran.includes('Colis'),`[${W}] « Colis » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
   dit(m.limites.length>=3,`[${W}] les cartes de Colis portent leur date limite`,String(m.limites.length));
   dit(m.limites.every(x=>!x.deborde),`[${W}] la date limite ne déborde pas de sa carte`,JSON.stringify(m.limites.filter(x=>x.deborde)));
   dit(m.limites.every(x=>!x.rouge),`[${W}] un retard est ambre, pas rouge (§7)`,JSON.stringify(m.limites.filter(x=>x.rouge)));
@@ -141,12 +165,17 @@ if(sub==='ventes'){
   // (27 oct.) Julien a renversé la décision « compacte » du 26 : « les annonces sont
   // beaucoup trop petites, on ne voit même pas la première photo ». La fiche montre
   // la première photo EN GRAND ; elle arrive quand même plus haut qu'avant (685/707 px).
-  dit(m.pA!=null&&m.pA>=180,`[${W}] la première photo d'une annonce est en grand`,`${m.pA} px (fiche ${m.hA} px)`);
+  // (11 nov., restes) Grille « comme Vinted » (décision n° 15) : en grand = la photo prend TOUTE la largeur
+  // de la carte et au moins sa hauteur carrée (au téléphone, deux cartes par ligne : ~176 px).
+  const P=m.photoCarte;
+  dit(P!=null&&P.pw>=P.cw-2&&P.ph>=Math.round(P.pw*0.9)&&P.ph>=150,`[${W}] la première photo d'une annonce est en grand`,JSON.stringify(P));
   // Mesuré depuis la barre d'outils (recherche, tri, Actions) : au-dessus vivent
   // les blocs posés par Julien (bilan, vendus ailleurs, à compléter, offres auto,
   // 27-29 oct.). Entre la barre et la première fiche, rien que « Stock et
   // ajustements · Publier aussi ailleurs ». Mesuré : 65 px (390), 76 px (1512).
-  dit(m.a0Barre!=null&&m.a0Barre>=0&&m.a0Barre<=110,`[${W}] la première annonce arrive plus haut`,`${m.a0Barre} px sous la barre d'outils (haut ${m.a0})`);
+  // (11 nov., restes) Plus, entre les deux, ce que Julien a voulu : « Prix d'achat N/M connus · Compléter »
+  // et l'en-tête de compte de la grille (décision n° 15) — mesuré 132 px (390), 140 px (1512).
+  dit(m.a0Barre!=null&&m.a0Barre>=0&&m.a0Barre<=160,`[${W}] la première annonce arrive plus haut`,`${m.a0Barre} px sous la barre d'outils (haut ${m.a0})`);
 }
 dit(!m.deborde,`[${W}] aucun débordement horizontal (${nom})`);
 dit(!errs.length,`[${W}] aucune erreur (${nom})`,errs[0]);

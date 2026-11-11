@@ -22,6 +22,7 @@ export function formulaire(obj, prefixe = '', out = []) {
   return out;
 }
 
+export const DELAI_STRIPE_MS = 10000;
 // Un appel Stripe. Rend `{ ok, status, data }` — jamais d'exception.
 export async function stripeApi(methode, chemin, params, idempotence) {
   const cle = stripeCle();
@@ -33,7 +34,8 @@ export async function stripeApi(methode, chemin, params, idempotence) {
   if (!get) headers['Content-Type'] = 'application/x-www-form-urlencoded';
   if (idempotence && !get) headers['Idempotency-Key'] = idempotence;
   try {
-    const r = await fetch(url, { method: methode, headers, body: get ? undefined : corps });
+    // (11 nov., robustesse) Un Stripe lent ne bloque plus la route jusqu'à la coupure.
+    const r = await fetch(url, { method: methode, headers, body: get ? undefined : corps, signal: AbortSignal.timeout(DELAI_STRIPE_MS) });
     let data = null; try { data = await r.json(); } catch (_) {}
     return { ok: r.ok, status: r.status, data: data || {} };
   } catch (e) { return { ok: false, status: 0, data: { error: { message: String(e && e.message || e) } } }; }
