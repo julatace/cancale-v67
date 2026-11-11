@@ -281,7 +281,11 @@ function SuiviTravailCoque() {
   // Au montage (session ouverte) : un travail laissé par un rechargement revient « interrompu »,
   // l'annonce en cours dite par l'extension si elle le sait (ses `cmds`), jamais devinée.
   React.useEffect(() => { suiviTravail.relire(__vmrJobs); }, []);
-  if (!s) return null;
+  // Une action qui finit sous son seuil (≈ 1 s) ne fige pas VRM : la feuille attend `visibleDes`.
+  const [, reveil] = React.useReducer((n) => n + 1, 0);
+  const attente = s && s.visibleDes ? s.visibleDes - Date.now() : 0;
+  React.useEffect(() => { if (!(attente > 0)) return undefined; const t = setTimeout(reveil, attente + 20); return () => clearTimeout(t); }, [attente > 0, s && s.id]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!s || attente > 0) return null;
   return <SuiviTravailHoteParesseux lireJobs={() => __vmrJobs} abonnerExt={onVmrExt}/>;
 }
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
@@ -40751,6 +40755,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const echecs = [], faits = [];let documentPrepare=false;
     if(choisis)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,erreur:''}:x);
     setBatchBusy(true);setProgressionLot({etape:'lecture',fait:0,total:aImprimer.length});
+    // (11 nov., lot suivi-travail) « VRM travaille » : chaque bordereau lu, puis la fusion. Sous 1 s et
+    // sans souci, rien ne s'affiche ; une question (placement du tampon) passe AU-DESSUS de la feuille.
+    const stB = suiviTravail.demarrer({ sorte: 'bordereaux', titre: placer ? 'Placer le tampon' : 'Imprimer les bordereaux', seuilMs: 1000,
+      etapes: [['lecture', 'Lecture du PDF'], ['fusion', 'Ajout au PDF groupé'], ['imprime', 'Dans le PDF à imprimer ✓']],
+      articles: aImprimer.map(l => ({ id: l.cle, num: l.num || '', titre: l.titre || '' })) });
+    const finSuiviB = (raisonErreur) => {
+      if (!stB) return;
+      const s0 = stB.etat();
+      if (s0 && raisonErreur) for (const a of s0.articles) stB.fin(a.id, { etat: 'refus', raison: raisonErreur });
+      stB.terminer('');
+      const s1 = stB.etat();
+      const toutBon = s1 && s1.articles.every(a => a.etat === 'ok');
+      if (s1 && toutBon && s1.visibleDes && Date.now() < s1.visibleDes) suiviTravail.oublier(); else suiviTravail.montrer();
+    };
     try {
       verifierContexte();
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
@@ -40789,14 +40807,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!r0 || !r0.dataUrl) pasLus++; else { try { buf = b64ToBytes(r0.dataUrl.split(',')[1] || ''); } catch (_) { buf = null; } }
         }
         setProgressionLot({etape:'lecture',fait:index+1,total:aImprimer.length});
+        if (stB) { if (buf) stB.etape(l.cle, 'fusion'); else stB.fin(l.cle, { etat: 'refus', raison: l.site === 'leboncoin' || l.site === 'vestiaire' ? 'pas de bordereau lisible' : 'PDF pas lu', geste: 'Retélécharge-le depuis la vente' }); }
         if (!buf) { echecs.push(l.cle); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
         faits.push(l.cle);
         // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
         items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
       }
       verifierContexte();
-      if (!items.length) { if(choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>x?{...x,coches:new Set(echecs),echecs}:x); libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
+      if (!items.length) { finSuiviB(''); if(choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>x?{...x,coches:new Set(echecs),echecs}:x); libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
       setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
+      if (stB) stB.noter('Fusion en un seul PDF…');
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte, apercu: placer ? 'force' : true });
       documentPrepare=true;verifierContexte();
       setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
@@ -40808,6 +40828,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const illisibles = Math.max(0, items.length - imprimes);
       // La fusion rend l'identité exacte des PDF réussis et refusés.
       const clesReussies = (r.reussis || []).map(i => items[i].cle);
+      if (stB) { (r.reussis || []).forEach(i => { stB.etape(items[i].cle, 'imprime'); stB.fin(items[i].cle, { etat: 'ok' }); }); (r.rates || []).forEach(i => stB.fin(items[i].cle, { etat: 'refus', raison: 'PDF illisible', geste: 'Retélécharge-le depuis la vente' })); }
+      finSuiviB('');
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       if (reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
@@ -40815,7 +40837,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
       if (choisis && (AUTH.user?.id||null)===proprietaire) setLot(x => (AUTH.user?.id||null)!==proprietaire?x:x?(echecs.length ? { ...x, coches: new Set(echecs), echecs } : null):x);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?texteSansBordereau(sansLignes):'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
-    } catch(err){ libererOngletPdf();if(!documentPrepare&&!estTamponAnnule(err)&&choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,coches:new Set(aImprimer.map(l=>l.cle)),echecs:aImprimer.map(l=>l.cle),erreur:'La préparation s’est interrompue. Ta sélection est conservée ; tu peux réessayer.'}:x); if (!estTamponAnnule(err)) toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
+    } catch(err){ if (estTamponAnnule(err)) { if (stB) { stB.terminer(''); suiviTravail.oublier(); } } else finSuiviB(String((err && err.message) || err).slice(0, 160)); libererOngletPdf();if(!documentPrepare&&!estTamponAnnule(err)&&choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,coches:new Set(aImprimer.map(l=>l.cle)),echecs:aImprimer.map(l=>l.cle),erreur:'La préparation s’est interrompue. Ta sélection est conservée ; tu peux réessayer.'}:x); if (!estTamponAnnule(err)) toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les

@@ -44,7 +44,27 @@ function useFiger(actif, noeud) {
     }
     const garde = (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); } };
     window.addEventListener('keydown', garde, true);
-    return () => { window.removeEventListener('keydown', garde, true); poses.forEach((el) => { el.removeAttribute('inert'); el.removeAttribute('data-suivi-fige'); }); };
+    // Une question posée PENDANT le travail (confirmation, placement du tampon, couleur d'un
+    // brouillon…) arrive comme un nouveau nœud de <body> : elle n'est pas figée, et elle passe
+    // AU-DESSUS de la feuille (sinon l'action attendrait une réponse qu'on ne peut pas donner).
+    const releves = [];
+    const relever = (el) => {
+      if (!(el instanceof HTMLElement) || el === noeud || el.contains(noeud) || el.tagName === 'SCRIPT' || el.hasAttribute('data-suivi-fige')) return;
+      let z = 0, pos = 'static';
+      try { const cs = getComputedStyle(el); z = Number(cs.zIndex) || 0; pos = cs.position; } catch (_) {}
+      if (z > Z_SUIVI) return;
+      releves.push([el, el.style.zIndex, el.style.position]);
+      if (pos === 'static') el.style.position = 'relative';
+      el.style.zIndex = String(Z_SUIVI + 1); el.setAttribute('data-suivi-releve', '');
+    };
+    let obs = null;
+    try { obs = new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach(relever))); obs.observe(document.body, { childList: true }); } catch (_) { obs = null; }
+    return () => {
+      window.removeEventListener('keydown', garde, true);
+      if (obs) obs.disconnect();
+      releves.forEach(([el, z, p]) => { el.style.zIndex = z; el.style.position = p; el.removeAttribute('data-suivi-releve'); });
+      poses.forEach((el) => { el.removeAttribute('inert'); el.removeAttribute('data-suivi-fige'); });
+    };
   }, [actif, noeud]);
 }
 // Le retour du navigateur ne ferme rien tant que ça tourne : l'entrée est reposée.
@@ -154,7 +174,7 @@ export function SuiviTravailFeuille({ s, jobs = null }) {
             <div><dt>{tr('suivi.temps.ecoule')}</dt><dd data-suivi-ecoule={Math.round(p.ecoule)}>{duree(p.ecoule)}</dd></div>
             <div><dt>{tr('suivi.temps.restant')}</dt><dd data-suivi-restant={p.restant == null ? '' : Math.round(p.restant)}>{fini ? '—' : p.restant == null ? '—' : p.restant === 0 ? tr('suivi.temps.presque') : tr('suivi.temps.environ', { duree: duree(p.restant) })}</dd></div>
           </dl>
-          {p.pause ? <p className="vrm-st-pause" role="status" data-suivi-pause={Math.round(p.pause.sec)}>{p.pause.raison} · {duree(p.pause.sec)}</p> : null}
+          {p.pause ? <p className="vrm-st-pause" role="status" data-suivi-pause={Math.round(p.pause.sec)}>{p.pause.raison} · <b>{duree(p.pause.sec)}</b></p> : null}
           {s.uid && !fini ? <div className="vrm-st-jauge"><JaugeActions uid={s.uid}/></div> : null}
         </div>
 
@@ -216,7 +236,9 @@ export function SuiviTravailHote({ lireJobs = () => null, abonnerExt = null }) {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => { suivi.relire(lireJobs()); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => (typeof abonnerExt === 'function' ? abonnerExt(force) : undefined), [abonnerExt]);
-  if (!s || typeof document === 'undefined') return null;
+  const attente = s && s.visibleDes ? s.visibleDes - Date.now() : 0;
+  React.useEffect(() => { if (!(attente > 0)) return undefined; const t = setTimeout(force, attente + 20); return () => clearTimeout(t); }, [attente > 0, s && s.id]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!s || typeof document === 'undefined' || attente > 0) return null;
   return <SuiviTravailFeuille s={s} jobs={lireJobs()}/>;
 }
 

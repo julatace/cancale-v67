@@ -5,7 +5,8 @@
 //   1 la feuille couvre tout, le reste est `inert` (un clic derrière n'arrive pas)
 //   2 Échap et le retour du navigateur ne ferment rien ; fermer l'onglet DEMANDE (beforeunload)
 //   3 N sur M, barre (aria), étape de l'annonce en cours, « environ », compte à rebours de la pause
-//   4 une confirmation posée APRÈS le gel (askConfirm, z 20000) reste au-dessus et cliquable
+//   4 une confirmation posée APRÈS le gel (askConfirm, z 20000) reste au-dessus et cliquable ;
+//     4b une feuille de l'app plus basse (placement du tampon, z 1000) est relevée au-dessus
 //   5 « Mettre en pause » : la boucle s'arrête entre deux annonces, « Reprendre » la relance
 //   6 « Arrêter » demande confirmation ; « Continuer » ne change rien
 //   7 la fin : récapitulatif (réussies, refusées avec le geste, pas faites), « Fermer » dégèle et garde
@@ -44,7 +45,7 @@ function batir() {
     if (u === '/h.js' || u === '/h.css') { const f = path.join(dist, u.slice(1)); if (!fs.existsSync(f)) { r.writeHead(200, { 'content-type': 'text/css' }); r.end(''); return; } r.writeHead(200, { 'content-type': u.endsWith('.js') ? 'text/javascript' : 'text/css' }); r.end(fs.readFileSync(f)); return; }
     r.writeHead(200, { 'content-type': 'text/html' }); r.end(page0);
   }).listen(PORT, '127.0.0.1');
-  const nav = await chromium.launch({ args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const tailles = [[390, 844, true], [1512, 900, false]];
   const themes = (process.env.THEMES || 'clair,sombre').split(',');
   for (const [w, h, tactile] of tailles) for (const theme of themes) {
@@ -69,7 +70,7 @@ function batir() {
     const lu = await p.evaluate(() => { const f = document.querySelector('[data-suivi-travail]'); const b = f.querySelector('[role=progressbar]'); return { n: f.getAttribute('data-suivi-n'), now: b.getAttribute('aria-valuenow'), max: b.getAttribute('aria-valuemax'), part: Number(b.getAttribute('data-suivi-part')), enCours: (f.querySelector('[data-suivi-en-cours]') || {}).getAttribute && f.querySelector('[data-suivi-en-cours]').getAttribute('data-suivi-en-cours'), ici: (f.querySelector('[data-etat=ici]') || {}).getAttribute ? f.querySelector('[data-etat=ici]').getAttribute('data-suivi-etape-cle') : '', restant: f.querySelector('[data-suivi-restant]').getAttribute('data-suivi-restant'), pause: Number((f.querySelector('[data-suivi-pause]') || { getAttribute: () => -1 }).getAttribute('data-suivi-pause')), lignes: f.querySelectorAll('[data-suivi-ligne]').length }; });
     dit(lu.n === '2/4' && lu.now === '2' && lu.max === '4' && lu.part > 50 && lu.part < 75, `${tag} 3 « 2 sur 4 », barre entre 2 et 3 annonces`, lu);
     dit(lu.enCours === '103' && lu.ici === 'brouillon', `${tag} 3b l'annonce en cours et son étape (brouillon)`, lu);
-    dit(lu.restant !== '' && Number(lu.restant) >= 0 && lu.pause > 80 && lu.pause <= 95, `${tag} 3c temps restant estimé, pause avec compte à rebours`, lu);
+    dit(Math.abs(Number(lu.restant) - 240) < 10 && lu.pause > 80 && lu.pause <= 95, `${tag} 3c temps restant estimé au rythme réel (4 min pour 2 ⇒ environ 4 min), pause avec compte à rebours`, lu);
     dit(lu.lignes >= 8, `${tag} 3d le journal détaille chaque geste`, lu.lignes);
     if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await p.screenshot({ path: path.join(SHOTS, `cours-${w}-${theme}.png`), fullPage: false }); }
     // 4
@@ -77,6 +78,12 @@ function batir() {
     await p.click('#oui');
     dit(conf && await p.evaluate(() => window.__oui === 1), `${tag} 4 une question posée pendant le travail reste répondable`);
     await p.evaluate(() => document.getElementById('conf').remove());
+    // 4b une feuille de l'app à z 1000 (placement du tampon…) posée pendant le travail : relevée au-dessus
+    await p.evaluate(() => { const d = document.createElement('div'); d.id = 'tampon'; d.innerHTML = '<div style="position:fixed;inset:20% 5%;z-index:1000;background:#eee"><button id="placer" style="width:100%;height:100%">Placer</button></div>'; document.body.appendChild(d); d.querySelector('#placer').addEventListener('click', () => { window.__place = 1; }); });
+    await p.waitForTimeout(100);
+    await p.click('#placer', { timeout: 3000 }).catch(() => {});
+    dit(await p.evaluate(() => window.__place === 1), `${tag} 4b une feuille de l'app ouverte pendant le travail (z 1000) passe au-dessus et répond`);
+    await p.evaluate(() => document.getElementById('tampon').remove());
     // 5
     await p.click('[data-suivi-pause-bouton]');
     const boucle = p.evaluate(() => window.__t.continuer());

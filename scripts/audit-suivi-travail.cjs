@@ -124,6 +124,29 @@ async function principal() {
   const x3 = await S.suivreJob(null, '9', { jobId: 'lbc:9', lireJobs: () => jobs, depuis: T0, delaiMs: 3000, attendre: async (ms) => { horloge += ms; }, maintenant: () => horloge });
   dit(x3.fin === 'fait', 'X3 « fait » dit par l\'extension après le départ ⇒ publiée', x3.fin);
 
+  // ── L (l'API unique lancerTravail)
+  S.suivi._poser(null);
+  let r = await S.lancerTravail({ titre: 'Rapide', articles: [{ id: '1' }, { id: '2' }], executer: async () => true });
+  dit(r.statut === 'fini' && S.suivi.lire() === null, 'L1 une action finie sous le seuil, tout réussi : rien ne fige, rien ne reste', r.statut);
+  r = await S.lancerTravail({ titre: 'Un refus', articles: [{ id: '1' }, { id: '2' }], executer: async (a) => (a.id === '2' ? { etat: 'refus', raison: 'non', geste: 'refais' } : true) });
+  dit(S.suivi.lire() && S.suivi.lire().visibleDes === 0 && S.recap(S.suivi.lire()).refusees.length === 1, 'L2 un refus, même rapide : la feuille s\'ouvre sur le récapitulatif', S.suivi.lire() && S.suivi.lire().visibleDes);
+  S.suivi.fermer();
+  const vus = [];
+  r = await S.lancerTravail({ titre: 'Plafond', articles: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], executer: async (a) => { vus.push(a.id); return a.id === 'a' ? { etat: 'refus', raison: '429', arreterTout: true } : true; } });
+  dit(vus.join() === 'a' && r.statut === 'arrete' && r.resultats.c.etat === 'saute', 'L3 un refus qui vaut pour la suite : rien d\'autre ne part, le reste « pas fait »', { vus, statut: r.statut });
+  S.suivi.fermer();
+  const t2 = S.suivi.demarrer({ titre: 'occupe', articles: [{ id: 'x' }] });
+  r = await S.lancerTravail({ titre: 'Deuxième', executer: async () => { vus.push('jamais'); } });
+  dit(r.statut === 'occupe' && !vus.includes('jamais'), 'L4 un autre travail en cours : rien ne part', r.statut);
+  t2.fin('x', { etat: 'ok' }); t2.terminer(''); S.suivi.fermer();
+  r = await S.lancerTravail({ titre: 'Panne', executer: async () => { throw new Error('réseau coupé'); } });
+  dit(r.resultats.action.etat === 'refus' && /réseau coupé/.test(r.resultats.action.raison) && S.suivi.lire() !== null, 'L5 une exception : refus avec son message, montré', r.resultats.action);
+  S.suivi.fermer();
+  r = await S.lancerTravail({ titre: 'Annulé', executer: async () => ({ annule: true }) });
+  dit(S.suivi.lire() === null && r.valeur && r.valeur.annule, 'L6 annulé par lui : rien à montrer ni à garder');
+  r = await S.lancerTravail({ titre: 'Une action', executer: async (o) => { o.etape('x'); return '3 faits'; } });
+  dit(r.valeur === '3 faits' && S.suivi.lire() === null, 'L7 une action seule rend sa valeur (le résumé de l\'écran)', r.valeur);
+
   // ── B (branchements, commentaires retirés)
   const sansCom = (t0) => t0.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   const BR = [
@@ -135,6 +158,8 @@ async function principal() {
     ['src/BaissePrixSerie.jsx', /suivi\.demarrer\(\{ sorte: 'baisse-prix'/],
     ['src/ModeVacances.jsx', /suivi\.demarrer\(\{ sorte: 'vacances'/],
     ['src/App.jsx', /suiviTravail\.demarrer\(\{ sorte: 'retirer-ailleurs'/],
+    ['src/App.jsx', /suiviTravail\.demarrer\(\{ sorte: 'bordereaux'/],
+    ['src/composants/SelectionSerie.jsx', /await lancerTravail\(\{ sorte: `serie-/],
   ];
   for (const [f, re] of BR) dit(re.test(sansCom(lire(f))), `B1 ${f} démarre la feuille (${re.source.slice(0, 50)})`);
   const app = sansCom(lire('src/App.jsx'));
@@ -157,12 +182,14 @@ function prouver() {
     ['pause sans fin (statut fini ignoré)', 'src/suiviTravail.js', "if (!s.articles.some((a) => a.etat === 'attente' || a.etat === 'encours')) return 'fini';", ''],
     ['issue inconnue = réussie', 'src/suiviTravail.js', "const e = FINIS.has(etat) ? etat : 'refus';", "const e = FINIS.has(etat) ? etat : 'ok';"],
     ['Republier : double compté réussi', 'src/ecrans/Republier.jsx', "case 'double': return { etat: 'main'", "case 'double': return { etat: 'ok'"],
+    ['action rapide avec un refus jamais montrée', 'src/suiviTravail.js', "&& toutBon && statut === 'fini') suivi.oublier();", "&& statut === 'fini') suivi.oublier();"],
+    ['la suite part après un refus « pour tout »', 'src/suiviTravail.js', "if (iss.arreterTout) {", "if (false) {"],
     ['feuille au-dessus des confirmations', 'src/composants/SuiviTravail.jsx', 'Z_SUIVI = 15000', 'Z_SUIVI = 25000'],
   ];
   let rouges = 0;
   for (const [nom, f, avant, apres] of MUT) {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'suivi-mut-'));
-    for (const g of ['src/suiviTravail.js', 'src/ecrans/Republier.jsx', 'src/ecrans/Leboncoin.jsx', 'src/ecrans/Ebay.jsx', 'src/ecrans/Vestiaire.jsx', 'src/BaissePrixSerie.jsx', 'src/ModeVacances.jsx', 'src/App.jsx', 'src/composants/SuiviTravail.jsx']) {
+    for (const g of ['src/composants/SelectionSerie.jsx', 'src/suiviTravail.js', 'src/ecrans/Republier.jsx', 'src/ecrans/Leboncoin.jsx', 'src/ecrans/Ebay.jsx', 'src/ecrans/Vestiaire.jsx', 'src/BaissePrixSerie.jsx', 'src/ModeVacances.jsx', 'src/App.jsx', 'src/composants/SuiviTravail.jsx']) {
       fs.mkdirSync(path.dirname(path.join(d, g)), { recursive: true }); fs.copyFileSync(path.join(base, g), path.join(d, g));
     }
     fs.writeFileSync(path.join(d, 'package.json'), '{"type":"module"}');
