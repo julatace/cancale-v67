@@ -310,7 +310,8 @@ function ApercuPdf({ octets, page = 1, largeur, zone, label }) {
 // d'impression, un bordereau INVENTÉ (src/impression/bordereauExemple.js : le dépôt
 // est public, aucun vrai bordereau) — ce qu'on voit est ce qui sortira.
 const nomPapier = (p) => (p.id === 'autre' ? `${fmtMm(p.w)} × ${fmtMm(p.h)} mm` : tr(`impression.format.${p.id}`));
-const TITRE_EXEMPLE = 'Nike Air Max 90';
+// Un titre d'exemple neutre (VRM sert aussi les vendeurs qui ne vendent pas de baskets).
+const TITRE_EXEMPLE = 'Veste en jean bleue';
 const champMm = { width: 76, minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' };
 const ImpressionBordereaux = ({ mode, reg, changer }) => {
   useLangue();
@@ -327,7 +328,7 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
       const [PL, qr] = await Promise.all([import('pdf-lib'), import('qrcode-generator')]);
       const src = await PL.PDFDocument.load(await fabriquerBordereau(PL, qr.default || qr, 'a4-notice'));
       const out = await PL.PDFDocument.create();
-      const r1 = await poserBordereau(PL, out, src, { numero: 'B125', title: TITRE_EXEMPLE, pos: null, thermique: th, impression: { reg, taille: '42', photo: null, emplacement: '' } });
+      const r1 = await poserBordereau(PL, out, src, { numero: 'B125', title: TITRE_EXEMPLE, pos: null, thermique: th, impression: { reg, taille: 'M', photo: null, emplacement: '' } });
       setAp({ etat: 'lu', octets: await out.save(), pages: out.getPageCount(), r1, b: bilanThermique(r1.details) });
     } catch (_) { setAp({ etat: 'ko' }); }
   };

@@ -215,7 +215,7 @@ async function cas(pg, mise, format, reg = {}, o = {}) {
     if (d.mode === 'blanc' || d.mode === 'libre') {
       dit(N.length === 1, `${t} · p${i + 1} : « N° B125 » tamponné sur l'étiquette`, d.mode);
       const zones = [p.qr && p.qr.box, ...p.itf.map((x) => x.box)].filter(Boolean);
-      const adr = p.items.filter((it) => /Jeanne Exemple|rue Imaginaire|PARIS|FRANCE|Bâtiment/.test(it.s)).map(boiteTexte);
+      const adr = p.items.filter((it) => /Jeanne Exemple|Imaginaire|PARIS|FRANCE|Bâtiment/.test(it.s)).map(boiteTexte);
       const tb = p.items.filter((it) => /N°\s*B125|Nike Air|T 42/.test(it.s)).map(boiteTexte);
       const dmin = Math.min(...tb.flatMap((b) => zones.map((z) => dist(b, z))));
       dit(!zones.length || dmin >= 4 * MM, `${t} · p${i + 1} : le tampon est à ≥ 4 mm de chaque code décodé`, `${(dmin / MM).toFixed(1)} mm`);

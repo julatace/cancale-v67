@@ -9,7 +9,7 @@
 // `PL` : pdf-lib ; `qrcode` : qrcode-generator (passés par l'appelant : l'app et
 // le banc n'ont pas le même chargeur).
 
-export const ADRESSE_INVENTEE = Object.freeze(['Jeanne Exemple', '12 rue Imaginaire', 'Bâtiment B', '75000 PARIS', 'FRANCE']);
+export const ADRESSE_INVENTEE = Object.freeze(['Jeanne Exemple', '12 allée Imaginaire', 'Bâtiment B', '75000 PARIS', 'FRANCE']);
 export const EXPEDITEUR_INVENTE = Object.freeze(['Vendeur Exemple', '3 allée des Essais', '35000 RENNES']);
 
 // 2 parmi 5 entrelacé (ITF) : n = barre fine, w = large (2,5 × la fine).
