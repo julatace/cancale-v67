@@ -6133,7 +6133,7 @@ const fetchRetoursAchat = async () => {
     lireTout('id=like.email_rembachat_*&select=id,tx:meta->>transaction,montant:meta->>montant,estime:meta->>estime,at:meta->>receivedAt', { strict: true }).catch(() => null),
   ]);
   const v = {
-    bords: Array.isArray(b) ? b.map((x) => ({ ...x, tx: x.transaction, at: x.receivedAt, pdf: x.pdf === true || x.pdf === 'true' })) : null,
+    bords: Array.isArray(b) ? b.map((x) => ({ ...x, tx: x.transaction, at: x.receivedAt, pdf: x.pdf != null && x.pdf !== '' && x.pdf !== false && x.pdf !== 'false' })) : null,
     remb: Array.isArray(r) ? r : null,
   };
   if (v.bords && v.remb) { c.v = v; c.at = Date.now(); }
