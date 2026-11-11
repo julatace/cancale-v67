@@ -16,6 +16,10 @@
 //   W1  le widget d'un vendeur à EXACTEMENT 1 000 e-mails de vente répond 200
 //       (un 416 à la frontière est la fin de la liste, pas une panne) ;
 //   W2  … et compte les mêmes ventes qu'avec 1 001 (rien n'est perdu).
+//   D1-D3 un vendeur qui boucle sur le widget prend un 429 propre (quand,
+//       phrase), un autre vendeur est servi (api/_lib/debit-vendeur.js) ;
+//   U1-U3 l'usage par vendeur du tableau du propriétaire : anonyme, le gros en
+//       tête, migration 040 absente dite, panne = « pas su ».
 //
 //  Données inventées. `--prouve` : chaque mutation rougit (§6.1).
 //  Lancer : node scripts/audit-limites-client.cjs [--prouve]
@@ -33,6 +37,10 @@ const MUTATIONS = {
   'reporté noté « fait »': [[LIB, "if (r === REPORTE) { reportes.push(o); bilans.push({ owner: o, reporte: true, raison: 'temps-vendeur', ms: maintenant() - t0 }); continue; }", "if (r === REPORTE) { reportes.push(o); faits.push(o); continue; }"]],
   'cron sans borne par vendeur': [[CRON, 'tempsVendeurMs: Number(process.env.VRM_CRON_VENDEUR_MS)', 'tempsVendeurMs0: Number(process.env.VRM_CRON_VENDEUR_MS)']],
   '416 à la frontière = panne': [[ORDRE, 'return !!m && Number(m[1]) === debut;', 'return false;']],
+  'widget sans débit': [['api/widget.js', "{ const d = prendreDebit('widget', owner); if (!d.ok) return refuserTropVite(res, d); }", '']],
+  'débit sans fenêtre minute': [['api/_lib/debit-vendeur.js', 'if (minute.length >= r.parMinute)', 'if (false)']],
+  'usage avec identifiant': [['api/_lib/pilotage.js', '.map((x) => ({ vendeur: etiquetteVendeur(x.owner),', '.map((x) => ({ vendeur: String(x.owner),']],
+  'usage absente = 0': [['api/_lib/pilotage.js', "if (r.status === 404) return { absente: true };", "if (r.status === 404) return { lignes: [], vendeurs: 0, octetsTotal: 0 };"]],
 };
 
 if (process.argv.includes('--prouve')) prouver(__filename, R, MUTATIONS);
@@ -100,6 +108,38 @@ else {
     const w1001 = await ventesWidget(1001);
     const ship = (x) => JSON.stringify(x && x.corps && x.corps.ship);
     vrai(w1001.code === 200 && ship(w1000) === ship(w1001), 'W2 … et le même compte qu\'à 1 001', `${ship(w1000)} / ${ship(w1001)}`);
+
+    // ── D1-D3 : le débit par vendeur (la vraie route widget) ────────────────
+    const fs = require('fs');
+    const debitPath = path.join(R, 'api', '_lib', 'debit-vendeur.js');
+    const D = fs.existsSync(debitPath) ? await import(debitPath) : null;
+    if (D && D._viderDebits) D._viderDebits();
+    const codes = [];
+    for (let i = 0; i < 14; i++) codes.push((await appeler(B, 'widget', { query: { k: graines.jetonWidget(3) } }, 'widget-boucle')).code);
+    const refus = await appeler(B, 'widget', { query: { k: graines.jetonWidget(3) } }, 'widget-boucle');
+    const n200 = codes.filter((c) => c === 200).length;
+    vrai(n200 === 12 && codes.slice(12).every((c) => c === 429), 'D1 un vendeur qui boucle sur le widget : 12 servis par minute, puis 429', codes.join(','));
+    const msg = refus.corps || {};
+    vrai(refus.code === 429 && msg.erreur === 'trop-vite' && Number(msg.reessayerDans) > 0 && /Réessaie dans/.test(String(msg.message || '')), 'D2 … un 429 propre : quand réessayer, et la phrase', JSON.stringify(msg));
+    const autre = await appeler(B, 'widget', { query: { k: graines.jetonWidget(4) } }, 'widget-autre');
+    vrai(autre.code === 200, 'D3 … pendant ce temps, un autre vendeur est servi', String(autre.code));
+
+    // ── U1-U3 : l'usage par vendeur du tableau du propriétaire ──────────────
+    const P = await import(path.join(R, 'api', '_lib', 'pilotage.js'));
+    if (typeof P.lireUsage !== 'function') { vrai(false, 'U1 lireUsage existe'); vrai(false, 'U2'); vrai(false, 'U3'); }
+    else {
+      const env = { SUPABASE_URL: 'http://base.invalid', SUPABASE_SERVICE_KEY: 'k' };
+      const proprio = B.owners[9];
+      const rows = B.owners.map((o, i) => ({ owner: o, lignes: i === 0 ? 5051 : 300, octets: i === 0 ? 30e6 : 2e6, vendeurs: 10, octets_total: 30e6 + 9 * 2e6 }));
+      const rep = (status, body) => async (url, o) => { if (!/rpc\/vrm_usage_vendeurs/.test(url) || (o && o.method) !== 'POST') return { ok: false, status: 400, json: async () => null }; return { ok: status < 300, status, json: async () => body }; };
+      const u = await P.lireUsage(env, rep(200, rows), (id) => id === proprio);
+      const txt = JSON.stringify(u);
+      vrai(u && u.lignes.length === 9 && u.lignes[0].octets === 30e6 && u.vendeurs === 10 && !B.owners.some((o) => txt.includes(o)), 'U1 usage : une ligne par vendeur (lignes, octets), le gros en tête, jamais un identifiant, le propriétaire à part', txt.slice(0, 120));
+      const a = await P.lireUsage(env, rep(404, { code: 'PGRST202' }), () => false);
+      vrai(a && a.absente === true, 'U2 migration 040 absente ⇒ dit comme tel (pas « 0 »)', JSON.stringify(a));
+      const p = await P.lireUsage(env, rep(500, null), () => false);
+      vrai(p === null, 'U3 base en panne ⇒ « pas su » (null)', JSON.stringify(p));
+    }
 
     console.log(`\n${ko ? '❌' : '✅'} ${ok} vert(s), ${ko} rouge(s)`);
     process.exit(ko ? 1 : 0);
