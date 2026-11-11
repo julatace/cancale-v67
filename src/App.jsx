@@ -166,7 +166,7 @@ import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAch
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
-import { requeteDeLaVoix, ficheDeLaVoix } from "./rechercheVocale.js";
+import { requeteDeLaVoix, ficheDeLaVoix, ventesDuMois } from "./rechercheVocale.js";
 import { ventesMainPropre, opsVenduAilleurs } from "./venteAilleurs.js";   // (11 nov., saisie rapide) « Vendu ailleurs »
 import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
 import { VenduAilleurs, FeuillePrixAchat, poserDemandesPrix, abonnerDemandesPrix, lireDemandesPrix } from "./SaisieRapide.jsx";
@@ -7268,6 +7268,8 @@ const SS_PARTI = /exp[ée]di|achemin|livr|d[ée]pos|r[ée]clam|retour|remis|rela
 // la paire n'est jamais partie. Un bordereau reçu n'est donc PAS une preuve
 // d'envoi pour ces ventes-là.
 const txnAnnuleeAvantEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && e.s >= 500 && !SS_PARTI.test(e.ss)); };
+// (11 nov., saisie rapide) La période demandée à l'écran Ventes par la loupe (« vendues en octobre »).
+const DEMANDE_PERIODE_VENTES = { p: null, at: 0 };
 // (11 nov., saisie rapide) La dernière table transaction → annonce LUE (`fetchTxnItemIds`).
 let _txnItemConnu = {};
 const fetchTxnItemIds = async () => {
@@ -30794,6 +30796,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // à un souffle près.
   const ordSearchDiff = React.useDeferredValue(ordSearch);
   const [periode, setPeriode] = useVueSession('commandes-periode', null); // filtre de période (ventes + achats)
+  // (11 nov., saisie rapide) « Vendues en octobre » (la loupe, à la voix ou tapé) : la période
+  // demandée par la coque (`DEMANDE_PERIODE_VENTES`), prise UNE fois, au montage ou à l'appel.
+  useEffect(() => {
+    const prendre = () => { const d = DEMANDE_PERIODE_VENTES; if (d.p && Date.now() - d.at < 60000) { setPeriode({ ...d.p }); d.p = null; } };
+    prendre(); window.addEventListener('vrm:ventes-periode', prendre);
+    return () => window.removeEventListener('vrm:ventes-periode', prendre);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [pickerFor, setPickerFor] = useState(null);
   // Recherche dans le sélecteur d'achat : avec ~700 achats, si la suggestion
   // n'est pas la bonne il n'y avait que le défilement.
@@ -55876,6 +55886,7 @@ function AppCoeur() {
   // du prix, la fiche, Compta → export, Ma configuration, le Stock) — RIEN n'est écrit ni
   // envoyé : l'impression, le prix envoyé, l'export restent derrière leur clic habituel.
   const lancerActionRecherche = (a, qBrut) => {
+    if (a && a.id === 'ventes-mois' && a.mois) { if (qBrut && String(qBrut).trim()) setGsRecents(noterRecent(String(qBrut).trim())); allerVentesMois(a.mois); return; }
     const d = destinationAction(a); if (!d) return;
     if (qBrut && String(qBrut).trim()) setGsRecents(noterRecent(String(qBrut).trim()));
     setGsOpen(false);
@@ -56053,6 +56064,8 @@ function AppCoeur() {
         // (10 nov., lot AX) Un nombre qui est l'identité EXACTE d'autre chose (code de retrait, suivi,
         // transaction — « Tout sur le N° » s'efface alors) ne propose pas « Baisser le prix de N°482913 ».
         const actionsGs = actionsPour(qBrut, { lireNumero: (t) => lireNumeroCherche(t, { cleNum }, [prefixeNumeros(), archiveNumeros()]) }).filter(a => !(a.num && kNumQ && !estNumQ));
+        // (11 nov., saisie rapide) « vendues en octobre » : une action en tête (Ventes sur ce mois).
+        { const vm = ventesDuMois(qBrut); if (vm) actionsGs.unshift({ id: 'ventes-mois', libelle: `Ventes de ${vm.label.toLowerCase()}`, sous: 'Ventes · Vinted, sur ce mois', icone: 'calendar', num: null, mois: vm }); }
         const ligneAction = (a) => (
           <button key={'action-' + a.id + (a.num || '')} type="button" className="vrm-recherche-ligne" onClick={()=>lancerActionRecherche(a, qBrut)} data-recherche-resultat="action" data-recherche-action={a.id} data-recherche-num={a.num || undefined} title={a.sous} style={styleLigne}>
             {thumb(null, <Icon name={a.icone} size={18} style={{color:C.text}}/>)}
@@ -56129,7 +56142,11 @@ function AppCoeur() {
   // l'identité est UNIQUE (`ficheDeLaVoix`, par `cleNum`, compte affiché) ouvre DIRECTEMENT
   // sa fiche ; deux fiches, aucune, ou un texte ⇒ la recherche normale (la liste).
   const directRecherche = (t) => { setGsQ(t); setGsOpen(true); };
-  const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return;
+  // (11 nov., saisie rapide) « Vendues en octobre » ⇒ Ventes · Vinted sur ce mois (la période de l'écran).
+  const allerVentesMois = (vm) => { if (!vm) return; DEMANDE_PERIODE_VENTES.p = { from: vm.from, to: vm.to, label: vm.label }; DEMANDE_PERIODE_VENTES.at = Date.now();
+    setGsOpen(false); setPlatSub('vinted'); setTab('cat_ventes'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:ventes-periode')); } catch (_) {} }, 0); };
+  const dicterRecherche = (t) => { { const vm = ventesDuMois(t); if (vm) { setGsQ(String(t).trim()); allerVentesMois(vm); return; } }
+    const r = requeteDeLaVoix(t); if (!r.requete) return;
     if (r.numero) {
       const n = ficheDeLaVoix(r.requete, load('vinted_annonce_numeros', {}) || {}, cleNum, comptesRecherche(vintedAccounts));
       if (n) { setGsQ(r.requete); setGsRecents(noterRecent(r.requete)); setGsOpen(false); setFicheNum(n); return; }

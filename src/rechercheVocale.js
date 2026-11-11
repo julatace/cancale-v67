@@ -106,3 +106,24 @@ function lireNombre(t) {
   if (/^\d+(?: \d+)*$/.test(s)) { const n = parseInt(s.replace(/ /g, ''), 10); return Number.isFinite(n) && n < 100000 ? n : null; }
   return nombreEnMots(s.split(' '));
 }
+
+// (11 nov., saisie rapide) « VENDUES EN OCTOBRE », « mes ventes de septembre 2025 »,
+// « ventes du mois de mars » ⇒ le MOIS (le plus récent passé ou en cours, sauf année
+// dite) : l'écran Ventes s'ouvre sur cette période — la recherche universelle, elle,
+// ne change pas. Rien d'autre n'est reconnu ici (un mois sans « vendu/ventes » reste
+// du texte libre : « air max octobre » cherche un titre).
+const MOIS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+const MOIS_AFFICHE = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+export const ventesDuMois = (texte, maintenant = Date.now()) => {
+  const t = sansAccents(String(texte == null ? '' : texte)).toLowerCase().replace(/[’']/g, ' ').replace(/[.!?…,;:]+$/u, '').replace(/\s+/g, ' ').trim();
+  const m = /^(?:(?:mes|les|toutes mes|toutes les)\s+)?(?:ventes|vente|vendues|vendue|vendus|vendu|ce que j ai vendu)\s+(?:(?:en|d|de|du|au|pour|du mois d|du mois de|au mois d|au mois de)\s+)?([a-z]+)(?:\s+(\d{4}))?$/.exec(t);
+  if (!m) return null;
+  const i = MOIS.indexOf(m[1]);
+  if (i < 0) return null;
+  const now = new Date(maintenant);
+  let an = m[2] ? Number(m[2]) : now.getFullYear();
+  if (!m[2] && i > now.getMonth()) an -= 1;            // « octobre » dit en mars : l'octobre passé
+  if (an < 2000 || an > now.getFullYear() + 1) return null;
+  const from = new Date(an, i, 1), to = new Date(an, i + 1, 0);
+  return { ym: `${an}-${String(i + 1).padStart(2, '0')}`, from, to, label: `${MOIS_AFFICHE[i].charAt(0).toUpperCase()}${MOIS_AFFICHE[i].slice(1)} ${an}` };
+};
