@@ -332,63 +332,96 @@ export function evenementDUnAncienAbonnement(avant, ligne) {
 }
 
 // ── Écrire le statut (clé de service — elle seule écrit cette table) ────────
-async function ecrireStatut(owner, ligne, evenementTs) {
+// ⚠️ (11 nov., H18 de la revue serveur) COMPARER-ET-ÉCHANGER. Avant : lire
+//    `evenement_ts`, décider, puis un upsert sans condition — deux webhooks
+//    simultanés lisaient la même ligne et le plus ANCIEN pouvait écrire en
+//    dernier. Désormais l'écriture ne passe que si la ligne porte ENCORE ce qui a
+//    été lu (`evenement_ts` et `maj`, que chaque écriture change) ; devancé ⇒ on
+//    relit et on redécide (l'événement plus récent de l'autre gagne alors).
+//    Ligne absente ⇒ une INSERTION simple : créée entre-temps ⇒ 409 (23505) ⇒ relu.
+//    Aucune migration : PATCH filtré de PostgREST.
+export const conditionStatut = (avant) => `evenement_ts=eq.${encodeURIComponent(String(avant.evenement_ts))}&${avant.maj == null ? 'maj=is.null' : `maj=eq.${encodeURIComponent(String(avant.maj))}`}`;
+async function ecrireStatut(owner, ligne, evenementTs, { essais = 5 } = {}) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return { ok: false, code: 'sans-cle' };
   const h = { ...sbCle(SERVICE), 'Content-Type': 'application/json' };
-  // Les webhooks arrivent dans le désordre : un événement plus ANCIEN que celui
-  // déjà appliqué n'écrase rien (sinon un vieux « incomplete » effacerait un
-  // « active » arrivé avant lui).
-  let avant = null;
-  try {
-    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis,abonnement_stripe,statut`, { headers: h, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return { ok: false, code: 'lecture' };
-    const j = await r.json();
-    if (!Array.isArray(j)) return { ok: false, code: 'lecture' };
-    avant = j[0] || null;
-    if (avant && Number(avant.evenement_ts) > evenementTs) return { ok: true, ignore: 'plus-ancien' };
-    if (evenementDUnAncienAbonnement(avant, ligne)) return { ok: true, ignore: 'ancien-abonnement' };
-  } catch (_) { return { ok: false, code: 'lecture' }; }
-  // Depuis quand le prélèvement échoue : la base laisse 14 jours (Stripe
-  // réessaie pendant ce temps), puis coupe. On garde la PREMIÈRE date d'échec —
-  // chaque nouvel essai raté de Stripe ne doit pas relancer les 14 jours — et on
-  // l'efface dès que le statut n'est plus « impayé ».
-  const impaye_depuis = ligne.statut === 'past_due'
-    ? ((avant && avant.impaye_depuis) || new Date((evenementTs || Math.floor(Date.now() / 1000)) * 1000).toISOString())
-    : null;
-  try {
-    const ecrire = (l) => fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?on_conflict=owner`, {
-      method: 'POST',
-      headers: { ...h, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ owner, ...l, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() }]),
-    });
-    let r = await ecrire(ligne);
-    if (r.ok) return { ok: true };
-    let t = await r.text().catch(() => '');
-    // (9 nov., Solo par plateforme) Migration 030 pas passée : la colonne
-    // `comptes_vendeurs` n'existe pas. Le statut, le plan et le compte Vinted
-    // passent sans elle (les autres plateformes : « pas su » côté serveur).
-    if (/comptes_vendeurs/.test(t) && 'comptes_vendeurs' in ligne) {
-      const { comptes_vendeurs: _cv, ...sans030 } = ligne;
-      ligne = sans030;
-      r = await ecrire(ligne);
-      if (r.ok) return { ok: true, sans030: true };
-      t = await r.text().catch(() => '');
-    }
-    // (9 nov.) Migration 028 pas passée : les colonnes `plan`/`compte_vendeur`
-    // n'existent pas. Le STATUT compte plus que le plan : on le range sans elles
-    // (le plan reste lu en direct chez Stripe par l'app ; « pas su » côté serveur).
-    if (/PGRST204|42703|'plan'|compte_vendeur/.test(t) && ('plan' in ligne || 'compte_vendeur' in ligne)) {
-      const { plan: _p, compte_vendeur: _c, comptes_vendeurs: _cv2, ...sans } = ligne;
-      r = await ecrire(sans);
-      if (r.ok) return { ok: true, sansPlan: true };
-      t = await r.text().catch(() => '');
-    }
-    // 23503 : ce vendeur n'existe pas (compte VRM supprimé) — réessayer n'y
-    // changera rien, on l'acquitte et on le dit dans les journaux.
-    if (/23503/.test(t)) return { ok: true, ignore: 'vendeur-inconnu' };
-    return { ok: false, code: 'ecriture-' + r.status };
-  } catch (_) { return { ok: false, code: 'ecriture' }; }
+  for (let n = 0; n < essais; n++) {
+    // Les webhooks arrivent dans le désordre : un événement plus ANCIEN que celui
+    // déjà appliqué n'écrase rien (sinon un vieux « incomplete » effacerait un
+    // « active » arrivé avant lui).
+    let avant = null;
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis,abonnement_stripe,statut,maj`, { headers: h, signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return { ok: false, code: 'lecture' };
+      const j = await r.json();
+      if (!Array.isArray(j)) return { ok: false, code: 'lecture' };
+      avant = j[0] || null;
+      if (avant && Number(avant.evenement_ts) > evenementTs) return { ok: true, ignore: 'plus-ancien' };
+      if (evenementDUnAncienAbonnement(avant, ligne)) return { ok: true, ignore: 'ancien-abonnement' };
+    } catch (_) { return { ok: false, code: 'lecture' }; }
+    // Depuis quand le prélèvement échoue : la base laisse 14 jours (Stripe
+    // réessaie pendant ce temps), puis coupe. On garde la PREMIÈRE date d'échec —
+    // chaque nouvel essai raté de Stripe ne doit pas relancer les 14 jours — et on
+    // l'efface dès que le statut n'est plus « impayé ».
+    const impaye_depuis = ligne.statut === 'past_due'
+      ? ((avant && avant.impaye_depuis) || new Date((evenementTs || Math.floor(Date.now() / 1000)) * 1000).toISOString())
+      : null;
+    let r;
+    try {
+      // Rend la réponse ; `rangee` : vrai si la base a écrit, faux si devancé.
+      const ecrire = async (l) => {
+        const corps = { ...l, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() };
+        if (avant) {
+          const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&${conditionStatut(avant)}&select=owner`, {
+            method: 'PATCH', headers: { ...h, Prefer: 'return=representation' }, body: JSON.stringify(corps),
+          });
+          if (!w.ok) return { w, rangee: false };
+          const out = await w.json().catch(() => null);
+          return { w, rangee: Array.isArray(out) && out.length >= 1, devance: Array.isArray(out) && out.length === 0, illisible: !Array.isArray(out) };
+        }
+        const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements`, {
+          method: 'POST', headers: { ...h, Prefer: 'return=minimal' }, body: JSON.stringify([{ owner, ...corps }]),
+        });
+        return { w, rangee: w.ok };
+      };
+      let e = await ecrire(ligne);
+      if (e.rangee) return { ok: true };
+      if (e.devance) continue;
+      if (e.illisible) return { ok: false, code: 'ecriture-illisible' };
+      r = e.w;
+      let t = await r.text().catch(() => '');
+      // (9 nov., Solo par plateforme) Migration 030 pas passée : la colonne
+      // `comptes_vendeurs` n'existe pas. Le statut, le plan et le compte Vinted
+      // passent sans elle (les autres plateformes : « pas su » côté serveur).
+      if (/comptes_vendeurs/.test(t) && 'comptes_vendeurs' in ligne) {
+        const { comptes_vendeurs: _cv, ...sans030 } = ligne;
+        ligne = sans030;
+        e = await ecrire(ligne);
+        if (e.rangee) return { ok: true, sans030: true };
+        if (e.devance) continue;
+        if (e.illisible) return { ok: false, code: 'ecriture-illisible' };
+        r = e.w; t = await r.text().catch(() => '');
+      }
+      // (9 nov.) Migration 028 pas passée : les colonnes `plan`/`compte_vendeur`
+      // n'existent pas. Le STATUT compte plus que le plan : on le range sans elles
+      // (le plan reste lu en direct chez Stripe par l'app ; « pas su » côté serveur).
+      if (/PGRST204|42703|'plan'|compte_vendeur/.test(t) && ('plan' in ligne || 'compte_vendeur' in ligne)) {
+        const { plan: _p, compte_vendeur: _c, comptes_vendeurs: _cv2, ...sans } = ligne;
+        e = await ecrire(sans);
+        if (e.rangee) return { ok: true, sansPlan: true };
+        if (e.devance) continue;
+        if (e.illisible) return { ok: false, code: 'ecriture-illisible' };
+        r = e.w; t = await r.text().catch(() => '');
+      }
+      // 23503 : ce vendeur n'existe pas (compte VRM supprimé) — réessayer n'y
+      // changera rien, on l'acquitte et on le dit dans les journaux.
+      if (/23503/.test(t)) return { ok: true, ignore: 'vendeur-inconnu' };
+      // 23505 : la ligne a été créée entre la lecture et l'insertion ⇒ relire.
+      if (r.status === 409 && /23505/.test(t)) continue;
+      return { ok: false, code: 'ecriture-' + r.status };
+    } catch (_) { return { ok: false, code: 'ecriture' }; }
+  }
+  return { ok: false, code: 'concurrence' };
 }
 
 // Le propriétaire VRM d'un abonnement Stripe : posé par NOUS dans `metadata`

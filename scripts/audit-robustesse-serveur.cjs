@@ -72,6 +72,7 @@ process.env.VRM_OWNER_UID = J;
 
 // ── La fausse base, à état ──────────────────────────────────────────────────
 const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } });
+const condAbo = (u, l) => [...u.matchAll(/[?&](evenement_ts|maj)=(eq\.[^&]*|is\.null)/g)].every(([, k, c]) => (c === 'is.null' ? l[k] == null : String(l[k]) === decodeURIComponent(c.slice(3))));   // (11 nov., H18) le PATCH conditionnel de ecrireStatut
 let base = [], pannes = [], lectures = [], abonnements = {}, essaisEcrits = [], panneEssais = false, subsStripe = {}, signaux = [];
 const metaDe = (d) => { const o = {}; for (const k in (d || {})) { const v = d[k]; if (['string', 'number', 'boolean'].includes(typeof v) && Buffer.byteLength(JSON.stringify(v)) <= 600) o[k] = v; } return o; };
 const champ = (row, chemin) => {
@@ -142,6 +143,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.includes('/rest/v1/app_data')) return appData(u, m, opts);
   if (u.includes('/rest/v1/abonnements')) {
     if (m === 'POST') { for (const l of JSON.parse(opts.body)) abonnements[l.owner] = { ...(abonnements[l.owner] || {}), ...l }; return rep('', 201); }
+    if (m === 'PATCH') { const o = decodeURIComponent((/owner=eq\.([^&]+)/.exec(u) || [])[1] || ''), l = abonnements[o]; if (!l || !condAbo(u, l)) return rep([]); abonnements[o] = { ...l, ...JSON.parse(opts.body) }; return rep([{ owner: o }]); }
     const own = /owner=eq\.([^&]+)/.exec(u), cli = /client_stripe=eq\.([^&]+)/.exec(u);
     if (own) return rep(abonnements[own[1]] ? [abonnements[own[1]]] : []);
     if (cli) { const l = Object.values(abonnements).find((x) => x.client_stripe === cli[1]); return rep(l ? [{ owner: l.owner }] : []); }

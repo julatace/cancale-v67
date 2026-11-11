@@ -257,6 +257,15 @@ const MUTATIONS = [
         if (!colonne028 && lignes.some((l) => 'plan' in l || 'compte_vendeur' in l)) return rep({ code: 'PGRST204', message: "Could not find the 'plan' column of 'abonnements' in the schema cache" }, 400);
         for (const l of lignes) abos[l.owner] = { ...(abos[l.owner] || {}), ...l }; return rep('', 201);
       }
+      if (m === 'PATCH') {   // (11 nov., H18) l'écriture conditionnelle de ecrireStatut
+        const c = JSON.parse(opts.body);
+        if (!colonne030 && 'comptes_vendeurs' in c) return rep({ code: 'PGRST204', message: "Could not find the 'comptes_vendeurs' column of 'abonnements' in the schema cache" }, 400);
+        if (!colonne028 && ('plan' in c || 'compte_vendeur' in c)) return rep({ code: 'PGRST204', message: "Could not find the 'plan' column of 'abonnements' in the schema cache" }, 400);
+        const o = decodeURIComponent((/owner=eq\.([^&]+)/.exec(u) || [])[1] || ''), l = abos[o];
+        const cond = [...u.matchAll(/[?&](evenement_ts|maj)=(eq\.[^&]*|is\.null)/g)].every(([, k, v]) => (v === 'is.null' ? !l || l[k] == null : String(l[k]) === decodeURIComponent(v.slice(3))));
+        if (!l || !cond) return rep([]);
+        abos[o] = { ...l, ...c }; return rep([{ owner: o }]);
+      }
       if (qui) return rep(abos[qui.id] ? [abos[qui.id]] : []);
       const o = (/owner=eq\.([^&]+)/.exec(u) || [])[1], c = (/client_stripe=eq\.([^&]+)/.exec(u) || [])[1];
       if (/select=statut,plan,compte_vendeur/.test(u) && !colonne028) return rep({ code: '42703' }, 400);
