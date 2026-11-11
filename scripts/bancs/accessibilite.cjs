@@ -123,7 +123,10 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 // Exceptions JUSTIFIÉES, une par une : { regle, cible (regexp sur le sélecteur), raison }.
 const EXCEPTIONS = [];
 const excuse = (regle, cible) => EXCEPTIONS.find((e) => e.regle === regle && new RegExp(e.cible).test(cible));
+// Les animations d'entrée finies d'abord (un texte en fondu à opacité 0 serait sauté par axe).
+const finirAnimations = (pg) => pg.evaluate(() => { try { for (const a of document.getAnimations()) { try { a.finish(); } catch (_) {} } } catch (_) {} });
 async function axe(pg, contexte) {
+  await finirAnimations(pg);
   await pg.evaluate(AXE);
   return pg.evaluate(async ({ tags, ctx }) => {
     const r = await window.axe.run(ctx ? document.querySelector(ctx) || document : document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] });
@@ -143,6 +146,7 @@ function juger(T, nom, viols) {
 // B : zones tactiles. Un bouton (ou lien-bouton) visible plus petit que 44 × 44 px
 // en boîte, et sans zone étendue (::before/::after en position absolue plus grand).
 async function petitesCibles(pg) {
+  await finirAnimations(pg);
   return pg.evaluate(() => {
     const out = [];
     const sel = 'button, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], input[type="checkbox"], input[type="radio"], a.vrm-lien-action, a[role]';
