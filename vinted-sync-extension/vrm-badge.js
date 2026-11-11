@@ -618,9 +618,9 @@
     // Leboncoin (5.335, sa décision du 9 nov.) : les trois lignes Compte · Annonces ·
     // Ventes SONT le message principal — visibles, jamais repliées, pas doublées.
     const lbcVisible = !!lbcLignes;
-    // 5.344 + 5.351 : l'historique de départ est une carte de PROGRESSION — visible
-    // tant qu'il avance (ou attend « Tout récupérer ») ; fini, il passe dans le détail.
-    const historiqueFini = /data-import="fini"/.test(historique);
+    // 5.344 + 5.351 : l'historique de départ est une carte de PROGRESSION — toujours
+    // visible, « Tout est récupéré ✓ » compris (c'est le signal promis : il laisse
+    // vinted.fr ouvert jusque-là).
     // Le détail s'OUVRE tout seul dès qu'il y a un geste à faire (ou rien de sûr).
     // (Un compte ignoré garde « Capter ce compte » sous les yeux : le moyen de revenir.)
     // (« Connecté à VRM : x — C’est fait » se lit sans rien ouvrir, une fois.)
@@ -634,7 +634,7 @@
     poserHtml(contenu, `${doigt || formulaire ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
       ${lbcVisible ? `<div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}` : resumeHtml(resume)}
       ${progression}
-      ${historiqueFini ? '' : historique}
+      ${historique}
       ${lignePerime}
       ${aRetirerLbc}
       ${diagnosticLbc}
@@ -644,7 +644,6 @@
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       ${lbcVisible ? '' : `<div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>`}
       ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
-      ${historiqueFini ? historique : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${outils ? `<div class="outils">${outils}</div>` : ''}
       </details>`);

@@ -25,7 +25,9 @@ requête nouvelle vers Vinted** (le banc le vérifie sur le vrai `background.js`
 4. **Leboncoin** : les trois lignes Compte · Annonces · Ventes (sa décision du 9 nov., 5.335)
    RESTENT le message principal, visibles ; pas de ligne de résumé en double.
 5. **Cartes de progression** : « Dates de versement en cours de lecture · N restantes · environ
-   X jours » reste visible sous le message principal (jamais replié).
+   X jours » et « Ton historique Vinted » (import de départ, 5.344, fusionné depuis `main`)
+   restent visibles sous le message principal, jamais repliés — « Tout est récupéré ✓ » compris
+   (c'est le signal promis : il laisse vinted.fr ouvert jusque-là).
 6. **Le logo se glisse** (souris ou doigt) et **retient sa place par site** (`vrmBadgePos`,
    stockage local) ; la carte s'ouvre du côté où il y a la place (haut/bas, gauche/droite) et
    reste dans l'écran (390 et 1512 px) ; un glisser n'ouvre jamais VRM (le clic qui suit est
@@ -83,3 +85,7 @@ serait un total partiel présenté comme complet.
 - Bancs existants adaptés : `badge.cjs` et `carte-orion-sans-onglet.cjs` ouvrent « Détails » le
   temps de lire (les règles restent jugées sur le texte de la carte) — 132 et 67 verts.
 - Captures avant/après (clair et sombre, 1512 et 390) regardées.
+- Après `git merge origin/main` : build, audits demandés + audits/bancs extension (dont
+  `audit-import-depart`, `import-depart`), `orion-base-validee`, `orion-garde-regression` verts.
+  ⚠️ `audit-coherence` est rouge dans un clone SUPERFICIEL (règle de `main` du 11 nov. : « pas
+  su ») : `git fetch --unshallow origin main`, puis vert.
