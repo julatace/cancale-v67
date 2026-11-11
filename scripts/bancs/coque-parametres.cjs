@@ -178,7 +178,9 @@ async function parametres(nav, { W, theme }) {
       texte: set ? set.innerText : '',
       avatars: [...document.querySelectorAll('[data-profil-compte] .vrm-set-avatar, [data-photo-profil] span')].filter((e) => vis(e) && /^[A-Z?]$|^$/.test(e.innerText.trim()) && e.getBoundingClientRect().width >= 40).length,
       photoHors: [...document.querySelectorAll('[data-photo-profil]')].filter((e) => vis(e) && !e.closest('[data-profil-compte]')).length,
-      discord: [...document.querySelectorAll('[data-connexion-compte="discord"], [data-connexion-indispo="discord"]')].filter(vis).length + [...document.querySelectorAll('[data-discord-compte]')].filter(vis).length,
+      // (11 nov., lot DJ6) Deux sens, chacun UNE fois : se connecter (identité reliée) et le pseudo de la Communauté.
+      discord: [...document.querySelectorAll('[data-connexion-compte="discord"]')].filter(vis).length,
+      discordPseudo: [...document.querySelectorAll('[data-discord-compte]')].filter(vis).length,
     };
   });
   const m = await mesure();
@@ -199,7 +201,7 @@ async function parametres(nav, { W, theme }) {
   dit(!c.doublons.length, 'H3', `${T} Mon compte : une icône par ligne (${c.n} distinctes)`, c.doublons.join(' ¦ '));
   dit(!c.cdc.length, 'H3', `${T} Mon compte : aucune carte dans une carte`, c.cdc.join(' ¦ '));
   dit(c.avatars === 1 && c.photoHors === 0, 'H3', `${T} Mon compte : UN avatar (la photo se change dans la carte du profil)`, JSON.stringify({ avatars: c.avatars, photoHors: c.photoHors }));
-  dit(c.discord === 1, 'H3', `${T} Mon compte : Discord dit UNE fois`, String(c.discord));
+  dit(c.discord === 1 && c.discordPseudo <= 1, 'H3', `${T} Mon compte : Discord dit UNE fois par sens (connexion, pseudo)`, String([c.discord, c.discordPseudo]));
   await capture(pg, `ch-moncompte-${W}-${theme}`);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ch-moncompte-${W}-${theme}-page.png`), fullPage: true }).catch(() => {});
   dit(!o.journal.erreurs.length, 'H0', `${T} aucune erreur JS (Paramètres)`, o.journal.erreurs.join(' ¦ '));

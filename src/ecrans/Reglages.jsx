@@ -1966,11 +1966,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // Discord par `DiscordCompte` (la liaison, qui ouvre aussi « Se connecter avec Discord »).
     AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
       // (11 nov., lot DJ6) Google ET Discord relient une façon de se CONNECTER au compte ouvert
-      // (jamais un nouveau compte) ; la photo du profil vient de là. L'ancienne ligne « Profil
-      // Discord » (pseudo de la carte, `DiscordCompte`) ne s'affiche plus ici : elle faisait croire
-      // que Discord était relié pour se connecter (c'est ainsi que le compte en trop a été créé) ;
-      // le pseudo de la carte se relie dans Communauté.
+      // (jamais un nouveau compte) ; la photo du profil vient de là. La ligne `DiscordCompte`
+      // (pseudo vérifié pour la Communauté) reste, nommée pour ce qu'elle est : elle faisait croire
+      // que Discord était relié pour se connecter (c'est ainsi que le compte en trop a été créé).
       {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
     // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran
@@ -3165,9 +3165,9 @@ function DiscordCompte() {
   );
   return (
     <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'10px 14px 10px 16px',minHeight:56,boxSizing:'border-box',borderTop:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
-      <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:12,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Profil Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Ton pseudo et ton avatar Discord dans VRM</span></>}</span></div>
+      <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:12,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Pseudo Communauté : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Pseudo Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Affiché sur la Communauté, pas pour te connecter</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
+        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de pseudo' : 'Vérifier mon pseudo'}</button>}
         {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} className="vrm-b vrm-b-discret">Retirer</button>}
       </div>
       {!lu.connexion && !lu.discord && <span data-discord-compte-indispo="" title={DISCORD_ERREURS['non-configure']} style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Bientôt</span>}

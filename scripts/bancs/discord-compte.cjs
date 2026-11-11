@@ -185,7 +185,7 @@ const attr = (pg, sel, a) => pg.evaluate(([s, x]) => { const e = document.queryS
         dit(await attr(o.pg, '[data-discord-compte]', 'data-discord-compte') === 'aucun', 'Mon compte dit « Aucun compte Discord relié » (sans être sur la carte)');
         const bouton = await o.pg.$('[data-discord-compte-connecter]');
         dit(!!bouton, 'Discord réglé : « Se connecter avec Discord » est dans Mon compte');
-        dit(await o.pg.getByRole('button',{name:/^(Connecter Discord|Se connecter avec Discord)$/}).count()===1,'un seul bouton Discord dans Mon compte');
+        dit(await o.pg.getByRole('button',{name:/^(Connecter Discord|Se connecter avec Discord|Vérifier mon pseudo)$/}).count()===1,'un seul bouton Discord dans Mon compte');
         if(process.env.BANC_DEBUG)await o.pg.screenshot({path:process.env.BANC_DEBUG+'/compte-'+largeur+'.png',fullPage:true});
         if (bouton) {
           await bouton.click();
