@@ -51549,7 +51549,9 @@ function useQuoiDeNeuf() {
     vend: p.vend || vendActuel() || null, categories: p.categories !== undefined ? p.categories : lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
   const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
-  return { aVoir: nouveautesAVoir(ctx, vues), tout: nouveautesDuCompte(ctx), vues: lireVuesNouveautes(vues), marquer };
+  // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque ⇒ rien : jamais un compte faux qui change sous ses yeux.
+  const pret = p.uid === (AUTH.user?.id || '') && !!p.uid;
+  return { aVoir: pret ? nouveautesAVoir(ctx, vues) : [], tout: pret ? nouveautesDuCompte(ctx) : [], vues: lireVuesNouveautes(vues), marquer };
 }
 function QuoiDeNeufJournee({ onNav }) {
   const q = useQuoiDeNeuf();
