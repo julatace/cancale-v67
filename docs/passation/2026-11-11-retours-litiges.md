@@ -53,7 +53,15 @@ tout arrive par e-mail). Aucune écriture en base.
   de l’app + tampon sur un vrai PDF + compta) : **38/38** ; sur l'arbre d'avant (1c8e0a07, git archive) :
   **15 rouges** (le bordereau de retour sortait « ignoré », le remboursement « connu-sans-action ») ;
   `--prouve` : **11/11** mutations rouges (branche absente, n° du corps seul, sans PDF rangé, e-mail jeté, carte rangée, relié par titre, remboursement inventé, partiel sorti des coûts, « Paire revenue » sans N°, source tue, tampon sans N°).
-- Banc `scripts/bancs/retours-litiges.cjs` (390 tactile clair/sombre, 1512 clair) : voir ci-dessous.
+- Banc NEUF `scripts/bancs/retours-litiges.cjs` (données inventées à la forme mesurée ; 390 tactile clair et
+  sombre, 1512 clair ; navigateur en `fr-FR`) : **65/65 verts** — Retours = exactement 9501/9502 (pas la jumelle
+  au même titre), N°31 par l'achat, ambre < 48 h, « Pas encore remboursé » / « Remboursé 45,90 € », impression
+  ⇒ visionneuse (PDF lu par SON n°, jamais `select=data`), pas redit dans « à renvoyer », section « Retours » de
+  « Tout imprimer » (la remboursée n'y est plus), « Pas à pas » (étape, preuve, sources, « Paire revenue ·
+  N°21 », lien de contestation), aucun rouge, rien ne déborde, aucune requête Vinted, aucune erreur. Captures
+  regardées (390 clair/sombre, 1512 : Achats, Tout imprimer, Pas à pas). Le premier passage, navigateur en
+  anglais, a montré que les textes sont bien traduits (« Drop off by… ») ; le banc juge désormais en français.
+- `npm run build` vert.
 - Touchés et verts : audit-litiges-ecran, litiges, retours-stock, lbc-suppression, variables, tdz,
   coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction (C2 était
   rouge avant la fusion de `origin/claude/revue-colis`, vert après).
