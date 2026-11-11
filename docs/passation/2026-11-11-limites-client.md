@@ -64,7 +64,7 @@ Trouvé en mesurant :
 5. **Usage par vendeur dans « Ton entreprise »** (tableau du propriétaire) : lignes, Mo stockés,
    part, les plus gros d'abord, 20 au plus, étiquette anonyme « V-3fa9c2 » (empreinte, jamais un
    identifiant) ; le propriétaire et le neutre à part. Source : `rpc/vrm_usage_vendeurs`
-   (**migration 040**, lecture seule, clé de service seule). Sans elle : « — Pas su : migration 040
+   (**migration 041**, lecture seule, clé de service seule). Sans elle : « — Pas su : migration 041
    pas appliquée » ; base en panne : « — la base n'a pas répondu ».
 
 ## 3. Preuves
@@ -95,5 +95,5 @@ Trouvé en mesurant :
 
 ## 5. Gestes de Julien
 
-- Appliquer `supabase/migrations/040-usage-par-vendeur.sql` (éditeur SQL Supabase, lecture seule)
+- Appliquer `supabase/migrations/041-usage-par-vendeur.sql` (éditeur SQL Supabase, lecture seule)
   pour voir l'usage par vendeur. Sans elle, rien ne casse : le bloc dit « — ».

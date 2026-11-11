@@ -218,7 +218,7 @@ export function resumerIncidents(data, maintenant) {
 }
 
 // ── (11 nov., lot « limites-client ») L'USAGE PAR VENDEUR ─────────────────
-// `rpc/vrm_usage_vendeurs` (migration 040, clé de service seule) : lignes et
+// `rpc/vrm_usage_vendeurs` (migration 041, clé de service seule) : lignes et
 // octets stockés par vendeur, les plus gros d'abord. Jamais un identifiant
 // dehors : une étiquette tirée d'une empreinte (« V-3fa9c2 »), stable d'une
 // lecture à l'autre. Rend { lignes, vendeurs, octetsTotal } · { absente } · null.
@@ -228,7 +228,7 @@ export async function lireUsage(env, fetcher, exclus, max = 20) {
   let r;
   try { r = await fetcher(`${url}/rest/v1/rpc/vrm_usage_vendeurs`, { method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_max: max + 2 }) }); } catch (_) { return null; }
   if (!r) return null;
-  if (r.status === 404) return { absente: true };   // migration 040 pas appliquée (PGRST202)
+  if (r.status === 404) return { absente: true };   // migration 041 pas appliquée (PGRST202)
   if (!r.ok) return null;
   const j = await r.json().catch(() => null);
   if (!Array.isArray(j)) return null;
@@ -390,7 +390,7 @@ export async function calculerPilotage({ proprio, env = process.env, fetcher = f
 
   // (11 nov.) L'usage par vendeur — « pas su » et « migration absente » dits, jamais 0.
   let usage = null;
-  if (usageLu && !usageLu.absente) usage = usageLu; else raisons.usage = usageLu && usageLu.absente ? 'migration-040' : 'base';
+  if (usageLu && !usageLu.absente) usage = usageLu; else raisons.usage = usageLu && usageLu.absente ? 'migration-041' : 'base';
 
   // Satisfaction
   let satisfaction = null;

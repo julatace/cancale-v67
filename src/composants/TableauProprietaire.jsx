@@ -26,7 +26,7 @@ const RAISONS = {
   'stripe-muet': 'Stripe n’a pas répondu',
   'sondes-absentes': 'les sondes de /statut n’ont encore rien rangé',
   concurrence: 'écrit en même temps ailleurs',
-  'migration-040': 'migration 040 pas appliquée (Supabase, éditeur SQL)',
+  'migration-041': 'migration 041 pas appliquée (Supabase, éditeur SQL)',
 };
 const NOMS_COMPOSANTS = { base: 'la base', connexion: 'la connexion', emails: 'la réception des e-mails', envoi: 'l’envoi des e-mails', notifications: 'les notifications', extension: 'l’extension' };
 const nombre = (n) => new Intl.NumberFormat('fr-FR').format(n);

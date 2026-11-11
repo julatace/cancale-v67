@@ -10,7 +10,7 @@
 --
 -- LECTURE SEULE. Rien n'est écrit, rien n'est changé. Une lecture de toute la
 -- table : appelée seulement à l'ouverture du tableau du propriétaire.
--- Sans cette migration, le tableau dit « — (migration 040 pas appliquée) ».
+-- Sans cette migration, le tableau dit « — (migration 041 pas appliquée) ».
 --
 -- Appliquer : coller dans l'éditeur SQL de Supabase. Annuler :
 --   drop function if exists public.vrm_usage_vendeurs(int);

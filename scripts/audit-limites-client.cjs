@@ -19,7 +19,7 @@
 //   D1-D3 un vendeur qui boucle sur le widget prend un 429 propre (quand,
 //       phrase), un autre vendeur est servi (api/_lib/debit-vendeur.js) ;
 //   U1-U3 l'usage par vendeur du tableau du propriétaire : anonyme, le gros en
-//       tête, migration 040 absente dite, panne = « pas su ».
+//       tête, migration 041 absente dite, panne = « pas su ».
 //
 //  Données inventées. `--prouve` : chaque mutation rougit (§6.1).
 //  Lancer : node scripts/audit-limites-client.cjs [--prouve]
@@ -136,7 +136,7 @@ else {
       const txt = JSON.stringify(u);
       vrai(u && u.lignes.length === 9 && u.lignes[0].octets === 30e6 && u.vendeurs === 10 && !B.owners.some((o) => txt.includes(o)), 'U1 usage : une ligne par vendeur (lignes, octets), le gros en tête, jamais un identifiant, le propriétaire à part', txt.slice(0, 120));
       const a = await P.lireUsage(env, rep(404, { code: 'PGRST202' }), () => false);
-      vrai(a && a.absente === true, 'U2 migration 040 absente ⇒ dit comme tel (pas « 0 »)', JSON.stringify(a));
+      vrai(a && a.absente === true, 'U2 migration 041 absente ⇒ dit comme tel (pas « 0 »)', JSON.stringify(a));
       const p = await P.lireUsage(env, rep(500, null), () => false);
       vrai(p === null, 'U3 base en panne ⇒ « pas su » (null)', JSON.stringify(p));
     }
