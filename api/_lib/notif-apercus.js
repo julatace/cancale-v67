@@ -101,10 +101,10 @@ export function texteSoir({ colis = null, retraits = null, offres = null, manque
   const am = manques.length ? 'au moins ' : '';
   const sortes = [nColis, nRetraits, nOffres].filter((x) => x > 0).length;
   const title = sortes > 1
-    ? 'Demain : ' + [nColis ? `${am}${nColis} colis` : '', nRetraits ? `${nRetraits} ${pl(nRetraits, 'retrait', 'retraits')}` : '', nOffres ? `${nOffres} ${pl(nOffres, 'offre', 'offres')}` : ''].filter(Boolean).join(', ')
+    ? 'Demain : ' + [nColis ? `${am}${nColis} colis` : '', nRetraits ? `${nRetraits} ${pl(nRetraits, 'retrait', 'retraits')}` : '', nOffres ? `${nOffres} ${pl(nOffres, 'offre Vestiaire', 'offres Vestiaire')}` : ''].filter(Boolean).join(', ')
     : nColis ? `Demain : ${am}${nColis} colis à déposer`
       : nRetraits ? `Demain : ${nRetraits} colis à retirer`
-        : `Demain : ${nOffres} ${pl(nOffres, 'offre expire', 'offres expirent')}`;
+        : `Demain : ${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')}`;
   const H = c.heure ? heureCourte(c.heure) : '';
   const phrases = [];
   if (nDemain) phrases.push(nDemain === 1 ? `1 colis à déposer${H ? ` avant ${H}` : ''} demain.` : `${nDemain} colis à déposer demain${H ? `, le premier avant ${H}` : ''}.`);
