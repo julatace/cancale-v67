@@ -108,6 +108,7 @@ export const PUSH_DEFAUT = {
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
   lbcsuppression: true, // Leboncoin a supprimé une annonce : ouvrir « Mes annonces » (api/_lib/lbc-suppression.js)
+  veille:   true,   // un chiffre (stock, CA d'un mois passé) a chuté d'un coup sans raison (api/_lib/veille-chiffres.js)
   relecture: true,  // un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h (api/_lib/comptes-a-relire.js)
   doublevente: true, // vendue sur Vinted, N° PROUVÉ encore en vente sur eBay/Leboncoin (api/_lib/double-vente.js)
   action:   true,

@@ -10,6 +10,8 @@
 //   POST { action:'comptes' }                → l'app a vu un compte relié pour la première fois :
 //                                              la route RELIT les comptes elle-même (rien du corps)
 //                                              et notifie une fois par compte (_lib/compte-relie.js)
+//   POST { action:'veille' }                 → un chiffre a chuté sans raison : la route RELIT
+//                                              `vrm_veille_chiffres` et sonne une fois (_lib/veille-chiffres.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -21,6 +23,7 @@ import { notifierRetraitConversation } from './email-inbound.js';
 import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
+import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -105,6 +108,14 @@ async function traiter(req, res) {
     if (body.action === 'comptes') {
       const r = await notifierComptesRelies();
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., lot agent2-veille) UN CHIFFRE QUI A CHUTÉ SANS RAISON : l'app a écrit une alerte
+    // dans `vrm_veille_chiffres`. Le corps ne dit rien : la ligne est relue ici, au nom de CE
+    // vendeur, et l'alerte sonne une fois (api/_lib/veille-chiffres.js).
+    if (body.action === 'veille') {
+      const r = await notifierAlertesDuVendeur();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.n ? { n: r.n } : {}), ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
     if (body.action === 'subscribe') {

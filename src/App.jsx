@@ -173,6 +173,9 @@ import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDor
 import { versementsDuReleve, completerVersementsParReleve, versementsParReleve } from "./versementReleve.js";
 import { raisonsADater, venteDatees } from "./versementRaisons.js";   // (11 nov., lot DJ7) pourquoi sans date, et le geste
 import { aDaterParAnnee, anneeSureDeVente, tsVenteADater, periodeADater } from './aDaterAnnee.js';
+// (11 nov., lot agent2-veille) La veille : le relevé des chiffres (src/veilleLigne.js) et le contrôle de nuit.
+import { plus30De } from './controleNuit.js';
+import { brancherVeille, noterReleveVeille } from './veilleLigne.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 import VueACompleter from "./AnnoncesACompleter.jsx";
@@ -252,6 +255,10 @@ const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 // (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
 const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
 const JaugeActions = aLaDemande(() => import('./JaugeActions.jsx'));
+// (11 nov., lot agent2-veille) Chiffres qui chutent, contrôle de nuit : chargé à la demande SANS squelette
+// (le plus souvent la carte ne rend rien — un squelette puis rien ferait sauter Ma journée).
+const VeilleJourneeParesseux = lazy(() => import('./VeilleJournee.jsx'));
+const VeilleJournee = () => <GardeEcran nom="journee:veille"><Suspense fallback={null}><VeilleJourneeParesseux/></Suspense></GardeEcran>;
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // ⟦→ ecrans/Reglages.jsx #10⟧
@@ -1457,6 +1464,8 @@ const withOwner = (row) => {
 // (10 nov., lot AZ) La photo du carton (src/photoCarton.js) : SA ligne par vente, la même session, le même
 // propriétaire, la même clé de conflit que le reste. Un autre écran (Litiges) lit `photoCartonDe(tx)`.
 brancherPhotoCarton({ url: SUPABASE_URL, auth: (x) => sbAuth(x), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT, owner: () => (AUTH.user && AUTH.user.id) || '' });
+// (11 nov., lot agent2-veille) La veille des chiffres et le contrôle de nuit lisent et écrivent SES lignes (src/veilleLigne.js).
+brancherVeille({ url: SUPABASE_URL, auth: () => sbAuth(), withOwner: (r) => withOwner(r), owner: () => (AUTH.user && AUTH.user.id) || '', session: () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) });
 
 // Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
 // la même session, le même propriétaire, la même clé de conflit que le reste (§11).
@@ -32452,6 +32461,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // le CA de l'année y lit la part PROUVÉE (vendue et lue finalisée la même année), Compta
       // dit « vendues de … à … ». Aucun mois n'en change (§5).
       { const R = aDaterParAnnee(aDater); ad.annees = R.annees; if (R.de != null) { ad.de = R.de; ad.a = R.a; } }
+      // (11 nov., lot agent2-veille) Celles vendues il y a plus de 30 jours : le contrôle de nuit (src/controleNuit.js) les compte.
+      ad.plus30 = plus30De(aDater, tsVenteADater);
       // (11 nov., lot DJ7) POURQUOI elles n'ont pas de date (src/versementRaisons.js) : détail de
       // la transaction jamais relu (par compte), pas encore finalisée chez Vinted, Leboncoin…
       // et combien sont DATÉES, dont par le relevé du porte-monnaie (par n° de transaction).
@@ -41968,6 +41979,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!loading && !baseKO && !premierJour && accountsReady && Array.isArray(accounts) ? <GuideDemarrageApp onNav={onNav} comptes={accounts}/> : null}
             {/* (11 nov., lot import-depart) L'historique Vinted qui arrive : une barre fine par compte, seulement pendant l'import (src/ImportDepart.jsx). */}
             {!loading && !baseKO && accountsReady && Array.isArray(accounts) && accounts.length ? <ImportDepart comptes={accounts} variante="journee"/> : null}
+            {/* (11 nov., lot agent2-veille) Un chiffre qui a chuté sans raison, et le contrôle de cette nuit (src/VeilleJournee.jsx). */}
+            {!loading && !baseKO && !premierJour ? <VeilleJournee/> : null}
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier
@@ -53767,6 +53780,12 @@ function AppCoeur() {
         //    Pas su ⇒ `null` + la raison (`onlinePasSu`) ; à l'écriture, la valeur
         //    déjà publiée reste (voir l'effet du widget).
         setWidgetBase({enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online:(annAConfirmer.length||annKO.length)?null:online,onlinePasSu:annKO.length?`annonces pas lues (${annKO.length} compte${annKO.length>1?'s':''})`:null,unread,pairesStock});
+        // (11 nov., lot agent2-veille) LE RELEVÉ DES CHIFFRES (src/veilleChiffres.js) : le MÊME stock que le widget
+        // (complet seulement), ce qui explique une chute (ventes lues, suppressions vues), et le CA publié par Ventes.
+        // Une vente pas lue sur un compte ⇒ l'explication n'est pas sue ⇒ aucune alerte de stock.
+        noterReleveVeille({ stock:(annAConfirmer.length||annKO.length)?null:online, comptes:Object.keys(annEnLigne),
+          ventes:perAcc.some(p=>!p.sold.ok)?null:ventesToutes.filter(o=>classifyOrderStatus(o.status)!=='cancelled').map(o=>o.date),
+          urssaf:load('vinted_urssaf_mois',null), selection:[JSON.stringify(load('vrm_comptes_exclus',null)),JSON.stringify(load('vinted_accounts_hidden',[]))] }).catch(()=>{});
       }
     })();
     return ()=>{stop=true;};

@@ -1,0 +1,28 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA VEILLE DANS MA JOURNÉE (11 nov., lot agent2-veille) — src/VeilleJournee.jsx.
+   Jetons seulement. AMBRE pour un geste (un chiffre à vérifier, un problème du
+   contrôle) ; ROUGE seulement pour deux paires sous un N° (§7) ; le reste neutre.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-veille { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; }
+.vrm-veille-alerte { padding: 14px 16px; border-radius: 14px; background: var(--d-carte, #FFFFFF);
+  border: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); border-left: 3px solid var(--vrm-warn, #B25000); }
+.vrm-veille-titre { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.vrm-veille-phrase { margin: 4px 0 0; font-size: 14px; line-height: 1.4; color: var(--vrm-warn, #B25000); }
+.vrm-veille-pourquoi { margin: 6px 0 0; font-size: 14px; color: var(--d-gris, #6E6E73); }
+.vrm-veille-pourquoi > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; list-style: none; width: max-content; }
+.vrm-veille-pourquoi > summary::-webkit-details-marker { display: none; }
+.vrm-veille-pourquoi > p { margin: 0 0 4px; line-height: 1.4; overflow-wrap: anywhere; }
+.vrm-veille-gestes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.vrm-veille-gestes > .vrm-b { min-height: 44px; }
+.vrm-veille-ok { margin: 0 4px; font-size: 14px; color: var(--d-encre, #1D1D1F); }
+.vrm-veille-ok > span { color: var(--d-gris, #6E6E73); }
+.vrm-veille-controle { padding: 8px 14px; border-radius: 14px; background: var(--d-carte, #FFFFFF); border: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
+.vrm-veille-sous { margin: 4px 0; font-size: 13px; font-weight: 600; color: var(--d-gris, #6E6E73); }
+.vrm-veille-ligne { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 0; }
+.vrm-veille-ligne + .vrm-veille-ligne { border-top: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
+.vrm-veille-n { flex: 0 0 auto; min-width: 28px; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--vrm-warn, #B25000); }
+.vrm-veille-ligne[data-ton="rouge"] .vrm-veille-n { color: var(--vrm-doublon, #D70015); }
+.vrm-veille-txt { flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 1.4; color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; }
+.vrm-veille-txt > small { color: var(--d-gris, #6E6E73); font-size: 13px; }
+.vrm-veille-ligne > .vrm-b { flex: 0 0 auto; min-height: 44px; }
+.vrm-veille-passu { margin: 6px 0 4px; font-size: 13px; line-height: 1.4; color: var(--d-gris, #6E6E73); overflow-wrap: anywhere; }
