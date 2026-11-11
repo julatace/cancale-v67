@@ -12,6 +12,8 @@ import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrièr
 import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
+import { PhraseComptePro, ArgentComptePro } from '../VintedProCompte.jsx';   // (11 nov., lot vinted-pro)
+import { statutProVinted } from '../vintedPro.js';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
@@ -682,6 +684,16 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
   const telNorm = (t) => { const d = String(t || '').replace(/\D/g, ''); return d.startsWith('33') && d.length === 11 ? '0' + d.slice(2) : d; };
   const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
   const [typesProfil, setTypesProfil] = useState({}); // { uid: true (pro) | false (particulier) } — lu dans le profil capté
+  // (11 nov., lot vinted-pro) Les e-mails de vente où VINTED écrit « membre Vinted Pro »
+  // (`pro:true`, api/email-inbound.js), comptés PAR compte (uid) — scalaires seulement.
+  // undefined en cours · null pas su · { uid: n } lu.
+  const [emailsPro, setEmailsPro] = useState(undefined);
+  useEffect(() => { let mort = false; (async () => {
+    try { const r = await lireTout('id=like.email_sale_*&data->>pro=eq.true&select=uid:data->>uid', { strict: true });
+      if (mort) return; if (!Array.isArray(r)) { setEmailsPro(null); return; }
+      const m = {}; for (const x of r) { const u = String((x && x.uid) || ''); if (u) m[u] = (m[u] || 0) + 1; } setEmailsPro(m);
+    } catch (_) { if (!mort) setEmailsPro(null); }
+  })(); return () => { mort = true; }; }, []);
   const [photosProfil, setPhotosProfil] = useState({}); // { uid: adresse de la photo de profil Vinted } — lue dans le profil capté
   const setAcctEmail = (uid, val) => {
     const conflit=conflitAdresseCompte(acctEmails,uid,val);
@@ -1074,7 +1086,10 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
     const uid = String(acc.vinted_user_id);
     const h = acctHealth(acc);
     const ev = etatExt && etatExt[uid];
-    const pro = ev && typeof ev.pro === 'boolean' ? ev.pro : (typeof typesProfil[uid] === 'boolean' ? typesProfil[uid] : null);
+    const proProfil = ev && typeof ev.pro === 'boolean' ? ev.pro : (typeof typesProfil[uid] === 'boolean' ? typesProfil[uid] : null);
+    // (11 nov., lot vinted-pro) Pro seulement si LU : le profil d'abord, sinon la mention de Vinted dans un e-mail.
+    const statutPro = statutProVinted({ profil: proProfil, emailsPro: emailsPro ? (emailsPro[uid] || 0) : null });
+    const pro = statutPro.etat === 'pro' ? true : statutPro.etat === 'particulier' ? false : null;
     let etat = etatCompteLie({ banni: h.etat === 'bad' && h.source === 'extension', ouvert: ouvertChrome === uid, lu: lastCap[uid] || null });
     if (h.etat === 'bad' && h.source !== 'extension' && (etat === 'lu' || etat === 'ouvert')) etat = 'a-relire';
     const r = reput[uid];
@@ -1083,7 +1098,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
       <CarteCompteLie key={uid} plateforme="vinted" id={uid} nom={nomAff} photo={photosProfil[uid] || ''} etat={etat} age={ageLecture(lastCap[uid], Date.now())}
         type={pro == null ? '' : pro ? 'pro' : 'particulier'} inclus={!hiddenAccts.has(uid)} onInclus={() => toggleAcctCompta(acc.vinted_user_id)}
         etatVinted={{ etat: h.etat === 'bad' ? 'banni' : h.etat === 'exclu' ? 'masque' : 'actif', source: h.source || '', hint: h.hint }}
-        emails={<LigneEmailsCompte ligne={emailsDe(uid)} uid={uid} login={acc.login || nomAff}/>}
+        emails={<><PhraseComptePro statut={statutPro}/>{statutPro.etat === 'pro' ? <ArgentComptePro uid={uid} lireTout={lireTout}/> : null}<LigneEmailsCompte ligne={emailsDe(uid)} uid={uid} login={acc.login || nomAff}/></>}
         action={<a className="vrm-b vrm-b-discret vrm-cl-bouton" href={`https://www.vinted.fr/member/${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer" data-compte-action="ouvrir">Ouvrir</a>}
         enfants={(
           <details data-gerer-compte="" className="vrm-cl-gerer">

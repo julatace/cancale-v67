@@ -37,6 +37,7 @@ import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/ratta
 import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriode, trousNumerotation, csvRegistre, totauxRegistre, nomZip, SELECT_FACTURES_PRO } from './facturePro/registre.js';
 import { useRechercheEntreprise, CarteVerifEntreprise, CarteMentionsForme } from './RechercheEntreprise.jsx';
 import { comptesConnus, avecCompte } from './facturePro/comptes.js';
+import { comptesProFacture } from './vintedPro.js';   // (11 nov., lot vinted-pro)
 
 const ID_CFG = 'vrm_pro_facture';
 const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true, envoiAuto: false };
@@ -236,6 +237,9 @@ function Feuille({ titre, fermer, children, deps, large = false, data }) {
 export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   const lu = useFicheFacturation(deps);
   const etat = useEtatEnvoi(deps);
+  // (11 nov., lot vinted-pro) Combien de comptes Vinted sont Pro — LU (profil ou e-mail Vinted Pro), jamais deviné.
+  const dFact = useFactures(deps);
+  const nVintedPro = dFact && dFact.comptesPro ? [...dFact.comptesPro.values()].filter((v) => v === true).length : null;
   const [cfg, setCfg] = React.useState(null);
   const [statut, setStatut] = React.useState('');
   const minuteur = React.useRef(null);
@@ -399,7 +403,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
         {/* (11 nov., lot DJ1) « que sur compte professionnel, ou alors on demande au vendeur sur quel compte » */}
         <section className="vrm-fp-section" data-fp-comptes="">
           <h3>Sur quels comptes ?</h3>
-          <p className="vrm-fp-muet">Vinted : tes comptes Pro, ceux que Vinted dit professionnels.</p>
+          <p className="vrm-fp-muet" data-fp-vinted-pro={nVintedPro == null ? '' : String(nVintedPro)}>{nVintedPro ? `Vinted : ${nVintedPro} compte${nVintedPro > 1 ? 's' : ''} Pro, lu${nVintedPro > 1 ? 's' : ''} sur Vinted.` : nVintedPro === 0 ? 'Vinted : aucun compte Pro lu sur Vinted.' : 'Vinted : tes comptes Pro, ceux que Vinted dit professionnels.'}</p>
           {comptesConnus(cfg).length ? <div className="vrm-fp-comptes">
             {comptesConnus(cfg).map((c) => (
               <label key={c.cle} className="vrm-fp-compte" data-fp-compte={c.cle} data-fp-compte-oui={c.oui ? '1' : '0'}>
@@ -629,10 +633,12 @@ export function relireFactures(deps) {
         factures: new Map(factures.filter((x) => x && x.transaction && /^email_invoice_tx/.test(x.id)).map((x) => [String(x.transaction), x])),
         // Le profil Vinted du compte : professionnel ? (la MÊME règle que l'app,
         // `typeCompteVinted`) — true · false · absent (pas su).
-        comptesPro: new Map((Array.isArray(profils) ? profils : []).map((r) => {
+        // (11 nov., lot vinted-pro) + les comptes dont Vinted a écrit « membre Vinted Pro » dans
+        // un e-mail de vente, là où le profil n'est pas lu (src/vintedPro.js). Jamais un « false » inventé.
+        comptesPro: comptesProFacture(new Map((Array.isArray(profils) ? profils : []).map((r) => {
           const uid = String(r.uid || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
           return [uid, deps.typeCompteVinted({ user: { business: r.business, business_account_id: r.business_account_id, business_account: r.business_account } })];
-        }).filter(([u, t]) => u && typeof t === 'boolean')),
+        }).filter(([u, t]) => u && typeof t === 'boolean')), ventes.map((x) => x && x.uid)),
         avoirs: new Map(factures.filter((x) => x && x.transaction && /^email_invoice_av/.test(x.id)).map((x) => [String(x.transaction), x])),
         // (10 nov., lot Q) Toutes les lignes (registre, trous de la numérotation).
         toutes: factures.filter(Boolean),

@@ -45,11 +45,23 @@ html body .vrm-app-shell .vrm-cl-carte .vrm-cl-bouton { min-height: 44px; border
 html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-items: center; justify-content: center; padding: 0 16px; text-decoration: none; background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); }
 .vrm-cl-vide { font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris); padding: 4px 2px; display: flex; align-items: center; gap: 10px; }
 .vrm-cl-gerer { padding-left: 56px; }
+/* (11 nov., lot vinted-pro) La phrase du compte Pro et l'argent de ses ventes. */
+.vrm-cl-pro { margin: 0; padding-left: 56px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
+.vrm-vpro-corps { display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
+.vrm-vpro-muet { margin: 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
+.vrm-vpro-muet .vrm-lien-action { min-height: 44px; display: inline-flex; align-items: center; }
+.vrm-vpro-liste { margin: 0; display: flex; flex-direction: column; }
+.vrm-vpro-liste > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-top: 1px solid var(--fu-trait, rgba(0,0,0,.08)); }
+.vrm-vpro-liste > div:first-child { border-top: none; }
+.vrm-vpro-liste dt { font: 500 14px/1.35 var(--vrm-police); color: var(--fu-encre, inherit); min-width: 0; }
+.vrm-vpro-liste dd { margin: 0; display: flex; flex-direction: column; align-items: flex-end; text-align: right; min-width: 0; max-width: 55%; }
+.vrm-vpro-liste dd b { font: 600 15px/1.3 var(--vrm-police); font-variant-numeric: tabular-nums; }
+.vrm-vpro-liste dd small { font: 500 12px/1.35 var(--vrm-police); color: var(--fu-gris2); overflow-wrap: anywhere; }
 .vrm-cl-gerer > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font: 600 13px/1 var(--vrm-police); color: var(--fu-gris); list-style: none; }
 .vrm-cl-gerer > summary::-webkit-details-marker { display: none; }
 .vrm-cl-alerte { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); border-radius: 16px; padding: 12px 14px; font: 600 14px/1.4 var(--vrm-police); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
 @media (max-width: 420px) {
-  .vrm-cl-actions, .vrm-cl-gerer, .vrm-cl-emails { padding-left: 0; }
+  .vrm-cl-actions, .vrm-cl-gerer, .vrm-cl-emails, .vrm-cl-pro { padding-left: 0; }
   .vrm-cl-actions > * { flex: 1 1 0; }
 }
 
