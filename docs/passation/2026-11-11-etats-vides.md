@@ -59,6 +59,7 @@ Variables : `LARGEURS`, `THEMES`, `ETATS=V,P,B,H`, `ECRANS=journee,…`, `SHOTS=
 - Rouge sur `origin/main` (`git archive`, banc copié dedans) : V 390 clair **10 KO** (les « lecture… »,
   « au moins 0 », Messages) ; H **KO** (« pas relu » reste au retour) ; B Paramètres **KO** (POST de la sonde) ;
   P Ventes et Argent **KO** (« lecture… » après une lecture ratée).
+- Passe complète APRÈS fusion de `origin/main` (banc renforcé : lecture ratée relue à 8 s, écran de démarrage, navigations) : **1 820 OK, 0 KO**. La fusion avait fait rougir H (28 KO : familles gardées `txn`/`captures` venues de main, pas relues au retour) — corrigé.
 - Passe complète avant fusion : **1 664 OK, 0 KO** (13 écrans × 4 états × 390/1512 × clair/sombre) ;
   captures regardées (V, P, B, H ; 390 et 1512 ; clair et sombre).
 - Vert ici : voir la dernière ligne de la passe complète dans le récit de la session (ci-dessous).
@@ -68,6 +69,8 @@ Variables : `LARGEURS`, `THEMES`, `ETATS=V,P,B,H`, `ECRANS=journee,…`, `SHOTS=
   journee-coherence, lectures-lourdes, benefice-unique, objectif-mois verts.
 
 ## Ce qui reste / notes
+
+- Audits rouges AUSSI sur `origin/main`, hors de ce lot : `coherence` (versions publiées illisibles, clone superficiel) ; `lectures-lourdes` (`src/categoriesLecture.js:52`, constante introuvable).
 
 - `plat_leboncoin`, `plat_ebay` sur un compte neuf ouvrent Ventes (filtre du site), `plat_vestiaire`
   Annonces : c'est le hub actuel, pas un trou ; servis tels quels.
