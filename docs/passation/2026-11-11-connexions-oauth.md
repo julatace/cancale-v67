@@ -175,3 +175,41 @@ celle-ci (elle appelle `messageErreurOAuth`, dont la phrase est déjà la sienne
    = un compte VRM) : Supabase → Authentication → Users, filtrer « Email » vide, provider
    discord ; les supprimer à la main si vides (je n'ai rien supprimé).
 6. Installer l'extension **5.346.0**.
+
+## Ajout de Julien : « Appareils connectés » (même lot)
+Sa capture de production : 8 lignes, dont 5 « Mac · Chrome », chacune avec « Déconnecter ».
+
+**Pourquoi 5 Mac · Chrome** (lu dans le code ; la mesure en base de `auth.sessions` n'a pas
+pu être faite : l'outil SQL attendait une autorisation que personne ne pouvait donner) :
+une session Supabase naît à CHAQUE connexion — app, fenêtre ou carte de l'extension
+(5.328+ : e-mail, code, Google/Discord), retour Google/Discord — et ne meurt que sur
+« Se déconnecter » (`logout`). Une connexion abandonnée (stockage effacé, jeton refusé,
+extension réinstallée, l'échec PKCE ci-dessus suivi d'un 2e essai) reste dans
+`auth.sessions` : aucune expiration n'est réglée sur le projet. Ce n'est pas un intrus,
+ni une session par onglet (les onglets partagent la même session) ni par renouvellement
+(un renouvellement garde la session). Rien n'est supprimé en silence ; les vieilles sont
+désormais à part et fermées sur son clic.
+
+**L'alerte « nouvel appareil »** (lot H, 10 nov.) : vérifiée, elle part UNE fois par
+appareil + navigateur (« Mac · Edge »), jamais au renouvellement ni à une 2e connexion du
+même navigateur (audit `appareils-groupes` A1, banc `agenda-appareil` G). Son toucher
+ouvre l'écran avec le groupe de CETTE connexion déplié et « Déconnecter » en évidence.
+Limite connue, dite : un 2e Mac avec Chrome a la même signature, il ne déclenche pas
+d'alerte (aucun identifiant d'appareil fiable sans empreinte, refusée).
+
+**L'écran** (`src/appareilsGroupes.js`, `AppareilsConnectes`) :
+- un groupe par appareil + navigateur : « Mac · Chrome · Cet appareil · 5 connexions ·
+  dernière il y a 2 min », en tête ;
+- les autres derrière « Voir les appareils (3) » ; le détail par connexion (et son
+  « Déconnecter ») seulement en dépliant un groupe ;
+- « Déconnecter les autres appareils » : UN bouton, confirmé, `logout?scope=others`
+  (Supabase garde la session d'ici) ; « Se déconnecter partout » reste en lien discret ;
+- connexions inactives depuis plus de 30 jours : « N connexions anciennes », hors des
+  groupes, « Fermer » sur son clic (confirmé) ; une date illisible n'est jamais « ancienne ».
+
+**Preuves** : audit `appareils-groupes` 15 verts (rouge sur `origin/main` : 4 ; mutation
+« plus d'anciennes » : 2 rouges) ; banc `connexions-oauth` P15 14 verts (390 + 1512,
+données de sa capture) ; bancs `comptes-securite` et `agenda-appareil` mis à jour pour
+l'écran regroupé : verts. (`comptes-securite` comptait aussi l'appel `verifier` de
+l'alerte comme un « Déconnecter » : corrigé dans le banc.) Captures regardées : bordure
+grise du lien « Se déconnecter partout » et résumé coupé à 390 vus et corrigés.

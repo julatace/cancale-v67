@@ -122,7 +122,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           const posts = []; const logouts = [];
           await pg.route('**/api/compte?mode=appareils', async (r) => {
             const q = r.request();
-            if (q.method() === 'POST') { posts.push(q.postData()); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, ferme: 'b2c3d4e5-0000-4000-8000-000000000002' }) }); }
+            if (q.method() === 'POST') { if (JSON.parse(q.postData() || '{}').action === 'verifier') return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, nouveaux: 0 }) }); posts.push(q.postData()); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, ferme: 'b2c3d4e5-0000-4000-8000-000000000002' }) }); }
             return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, appareils: [
               { id: 'a1b2c3d4-0000-4000-8000-000000000001', appareil: 'iPhone · Safari', actifLe: new Date().toISOString(), ici: true },
               { id: 'b2c3d4e5-0000-4000-8000-000000000002', appareil: 'Mac · Chrome', actifLe: new Date(Date.now() - 3 * 3600e3).toISOString(), ici: false },
