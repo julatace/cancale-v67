@@ -7,6 +7,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { cheminMonotone } from '../courbeMonotone.js';
 import { PileVignettes } from './PileVignettes.jsx';
+import './carte-pages.css';   // (11 nov., lot stats-plus) plus de trois cases : pages de 2×2 au téléphone
 
 // La courbe : des valeurs (une par jour), dessinées sans sommet inventé
 // (interpolation monotone), remplissage dégradé. Moins de trois points ⇒ rien (deux points font un trait plat, pas une tendance — critique du 3 nov., #12).
@@ -118,8 +119,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
           ? <PileVignettes className="vrm-fu-pile" srcs={pile.srcs} n={pile.n || 0} Photo={pile.Photo} mortes={pile.mortes} onMorte={pile.onMorte} data-fu-pile="" /> : null}
       </div>}
       {cases.length ? (
-        <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
-          {cases.map((c) => {
+        <CasesEnPages cases={cases}>{(liste) => liste.map((c) => {
             if (c.raison) raisonsVues.current.add(c.cle);
             // (10 nov., lot P) Au lecteur d'écran : « Vendu · mois : 80 € » — le libellé AVANT le
             // chiffre, et « pas su » à la place d'un « — » muet (§5). Le dessin reste tel quel.
@@ -128,10 +128,51 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;
-          })}
-        </div>
+          })}</CasesEnPages>
       ) : null}
       {children}
     </section>
+  );
+}
+
+// ── PLUS DE TROIS CASES (11 nov., lot stats-plus) ───────────────────────────
+// Julien : « on a la possibilité d'avoir qu'une seule stat dans le carré bleu ».
+// Jusqu'à trois cases : la rangée d'avant, inchangée. Quatre : une grille 2×2.
+// Cinq ou six : au téléphone, des PAGES de quatre (2×2) qu'on fait glisser, avec
+// des points de pagination (boutons : « Page 2 sur 2 ») ; sur ordinateur, une
+// seule rangée (les pages s'effacent, `display: contents`). Le glissé reste dans
+// la carte (`data-noswipe` : il ne change pas d'onglet).
+export const PAR_PAGE = 4;
+export function CasesEnPages({ cases, children }) {
+  const n = cases.length;
+  const rail = useRef(null);
+  const [page, setPage] = React.useState(0);
+  if (n <= 3) return <div className="vrm-fu-cases" style={{ '--n': n }}>{children(cases)}</div>;
+  const pages = [];
+  for (let i = 0; i < n; i += PAR_PAGE) pages.push(cases.slice(i, i + PAR_PAGE));
+  const surDefile = () => {
+    const el = rail.current;
+    if (!el || !el.clientWidth) return;
+    const p = Math.round(el.scrollLeft / el.clientWidth);
+    if (p !== page) setPage(Math.max(0, Math.min(pages.length - 1, p)));
+  };
+  const aller = (p) => { const el = rail.current; if (!el) return; setPage(p); try { el.scrollTo({ left: p * el.clientWidth, behavior: 'smooth' }); } catch (_) { el.scrollLeft = p * el.clientWidth; } };
+  return (
+    <div className="vrm-fu-cases-pages" data-fu-pages={pages.length} data-fu-n={n} style={{ '--n': n }}>
+      <div ref={rail} className="vrm-fu-cases is-pages" data-noswipe="" onScroll={surDefile} style={{ '--n': n }}>
+        {pages.map((liste, i) => (
+          <div key={i} className="vrm-fu-page" data-fu-page={i} aria-label={pages.length > 1 ? `Chiffres, page ${i + 1} sur ${pages.length}` : undefined} role={pages.length > 1 ? 'group' : undefined}>
+            {children(liste)}
+          </div>
+        ))}
+      </div>
+      {pages.length > 1 ? (
+        <div className="vrm-fu-points" data-fu-points="">
+          {pages.map((_, i) => (
+            <button key={i} type="button" className="vrm-fu-point" aria-current={i === page ? 'true' : undefined} aria-label={`Page ${i + 1} sur ${pages.length}`} data-fu-point={i} onClick={() => aller(i)}><span aria-hidden="true"/></button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }

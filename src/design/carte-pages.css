@@ -1,0 +1,42 @@
+/* (11 nov., lot stats-plus) La carte sombre à plus de trois cases (src/design/CarteMois.jsx, CasesEnPages).
+   Téléphone : des pages de 2×2 qui glissent (aimantées), des points dessous. Ordinateur : une rangée. */
+.vrm-fu-cases-pages { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.vrm-fu-cases.is-pages {
+  display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x pan-y;
+}
+.vrm-fu-cases.is-pages::-webkit-scrollbar { display: none; }
+.vrm-fu-page {
+  flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start;
+}
+.vrm-fu-points { display: flex; justify-content: center; gap: 0; margin-top: -4px; }
+/* Le point se voit petit (7 px) ; la cible au doigt fait 44 px (§7). */
+.vrm-fu-point { all: unset; box-sizing: border-box; width: 44px; height: 28px; display: grid; place-items: center; cursor: pointer; }
+.vrm-fu-point > span { width: 7px; height: 7px; border-radius: 50%; background: var(--fu-sur-sombre-2, rgba(255,255,255,.45)); opacity: .55; transition: opacity .2s ease, width .2s ease; }
+.vrm-fu-point[aria-current="true"] > span { opacity: 1; width: 18px; border-radius: 4px; background: #fff; }
+.vrm-fu-point:focus-visible > span { outline: 2px solid var(--fu-bleu, #0a84ff); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .vrm-fu-point > span { transition: none; } }
+@media (min-width: 768px) {
+  .vrm-fu-cases.is-pages { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); overflow: visible; scroll-snap-type: none; }
+  .vrm-fu-page { display: contents; }
+  .vrm-fu-points { display: none; }
+}
+/* La feuille « Modifier » : le geste « + Ajouter » et la rangée « ↑ Avant · Après ↓ · Retirer ». */
+.vrm-carte-ajouter > b { color: var(--accent-texte, #0071e3); }
+.vrm-carte-ranger { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-carte-ranger > button { min-height: 44px; }
+.vrm-carte-ranger > button:disabled { opacity: .4; cursor: default; }
+/* Dans la tête sombre de Ma journée, les cases sont forcées en rangée (`.vrm-fu-tete .vrm-fu-cases`,
+   fusion.css, !important) : les pages gardent leur forme, plus fort qu'elle. */
+:root:root body .vrm-fu-cases.is-pages { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; }
+:root:root body .vrm-fu-cases.is-pages > .vrm-fu-page { flex: 0 0 100% !important; min-width: 0 !important; }
+:root:root body .vrm-fu-cases.is-pages > .vrm-fu-page > * { flex: none !important; min-width: 0 !important; }
+@media (min-width: 768px) {
+  :root:root body .vrm-fu-cases.is-pages { display: grid !important; overflow: visible !important; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)) !important; }
+  :root:root body .vrm-fu-cases.is-pages > .vrm-fu-page { display: contents !important; }
+}
+/* Ordinateur large, tête de Ma journée : les cases sont dans une colonne de 440 px — 3 par rangée. */
+@media (min-width: 1024px) {
+  :root:root body .vrm-fu-tete .vrm-fu-cases.is-pages { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}

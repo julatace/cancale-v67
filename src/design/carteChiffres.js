@@ -70,6 +70,13 @@ export const CHIFFRES = {
   enligne:    { nom: 'Annonces en ligne', court: 'en ligne', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces' },
   masquees:   { nom: 'Annonces masquées', court: 'masquées', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces', titre: 'Masquées par Vinted : toujours chez toi, pas en ligne. Une lecture de plus de 24 h est à confirmer (« au moins »).' },
   dorment:    { nom: 'Annonces qui dorment', court: 'qui dorment', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: false, vinted: true, aller: 'annonces' },
+  // (11 nov., lot stats-plus) Trois chiffres de plus pour la carte : chacun LU de la
+  // publication de son écran propriétaire — `vrm_valeur_stock` (Annonces, src/coutVente.js),
+  // l'objectif du mois (`valeurObjectif` + `progressionObjectif`, la barre de la carte),
+  // l'échéance URSSAF (`montantPeriodeUrssaf` de l'app, le rappel de Ma journée).
+  stock:      { nom: 'Valeur du stock', court: 'stock', type: 'eur', periodes: null, sites: ['toutes'], compte: false, aller: 'annonces' },
+  objectif:   { nom: 'Objectif du mois', court: 'objectif', type: 'pct', periodes: null, sites: ['toutes'], compte: false, aller: 'dashboard' },
+  apayer:     { nom: 'URSSAF à payer', court: 'URSSAF à payer', type: 'eur', periodes: null, sites: ['toutes'], compte: false, aller: 'compta' },
 };
 // (6 nov., onglets A) « D'OÙ VIENT CE CHIFFRE ? » — une phrase par chiffre, rangée AVEC sa
 // définition (§5 : la phrase qui explique un chiffre vient de la même source que lui). La
@@ -91,6 +98,9 @@ export const AIDE_CHIFFRES = {
   enligne: 'Tes annonces en ligne, d’après la dernière lecture complète de ton dressing (de moins de 24 h).',
   masquees: CHIFFRES.masquees.titre,
   dorment: 'Tes annonces en ligne depuis plus de 30 jours (l’écran Annonces).',
+  stock: 'Le prix d’achat de tes paires encore chez toi, calculé par l’écran Annonces. Une paire sans prix d’achat n’y est pas : le montant est alors un minimum.',
+  objectif: 'Où tu en es de ton objectif du mois (la barre de la carte) : la part atteinte, en pourcentage.',
+  apayer: 'Les cotisations de ta prochaine échéance URSSAF, sur l’argent reçu (le rappel de Ma journée). Période pas finie ⇒ « au moins ».',
 };
 export const IDS_CHIFFRES = Object.keys(CHIFFRES);
 
@@ -102,7 +112,9 @@ export const IDS_CHIFFRES = Object.keys(CHIFFRES);
 // déclaré par la page elle-même — jamais proposé ailleurs.
 const P = (id, p) => (p ? { id, p } : { id });
 export const PAGES_CARTE = {
-  journee:   { nom: 'Ma journée', g: P('vendu', 'jour'), c: [P('benefice', 'mois'), P('vendu', 'mois'), P('recu', 'mois')] },
+  // (11 nov., lot stats-plus — Julien : « qu'une seule stat dans le carré bleu ») Ma journée
+  // porte jusqu'à `max` cases (6), choisies, ajoutées, retirées et rangées par lui.
+  journee:   { nom: 'Ma journée', g: P('vendu', 'jour'), c: [P('benefice', 'mois'), P('vendu', 'mois'), P('recu', 'mois')], max: 6 },
   ventes:    { nom: 'Ventes · Vinted', g: P('vendu', 'mois'), c: [P('aposter'), P('enroute'), P('apayer')] },
   'ventes-toutes': { nom: 'Ventes · tous les sites', g: P('vendu', 'mois'), c: [P('ventes', 'mois'), P('benefice', 'mois'), P('aposter')] },
   leboncoin: { nom: 'Ventes · Leboncoin', g: P('ca'), c: [P('encours'), P('finalisees-site'), P('vendu', 'mois')] },
@@ -114,6 +126,8 @@ export const PAGES_CARTE = {
   achats:    { nom: 'Achats', g: P('depense'), c: [P('enroute'), P('retirer'), P('recus')] },
 };
 export const PAGES = Object.keys(PAGES_CARTE);
+// Le nombre de cases qu'une page peut porter (3, sauf une page qui dit `max`).
+export const maxCases = (page) => { const d = PAGES_CARTE[page]; return d && Number.isFinite(d.max) ? d.max : 3; };
 
 // La période par défaut d'un chiffre (sa première, « mois » de préférence).
 export const periodeDefaut = (def) => (!def || !Array.isArray(def.periodes) || !def.periodes.length) ? null : (def.periodes.includes('mois') ? 'mois' : def.periodes[0]);
@@ -149,7 +163,10 @@ export const reglageDePage = (reglage, page, locaux = null) => {
   const g = placeValable(r && r.g, locaux) || placeValable(def.g, locaux) || { id: 'vendu', p: 'mois' };
   const cles = new Set([g.id + '|' + clePeriode(g.p)]);
   const c = [];
-  for (let i = 0; i < 3; i++) {
+  // (11 nov., lot stats-plus) Une page à `max` cases garde le NOMBRE qu'il a rangé (1 à max) ;
+  // les autres pages restent à trois. Une case rangée invalide au-delà du défaut : retirée.
+  const nCases = maxCases(page) > 3 && r && Array.isArray(r.c) && r.c.length ? Math.min(r.c.length, maxCases(page)) : 3;
+  for (let i = 0; i < nCases; i++) {
     const brut = r && Array.isArray(r.c) ? r.c[i] : null;
     let x = placeValable(brut, locaux);
     if (!x || cles.has(x.id + '|' + clePeriode(x.p))) x = placeValable(def.c[i], locaux);
@@ -164,7 +181,7 @@ export const reglageDePage = (reglage, page, locaux = null) => {
 export const reglageAEnregistrer = (reglage, page, choix) => {
   const pages = reglage && typeof reglage === 'object' && reglage.pages && typeof reglage.pages === 'object' ? { ...reglage.pages } : {};
   if (choix == null) delete pages[page];
-  else pages[page] = { g: choix.g, c: choix.c.slice(0, 3) };
+  else pages[page] = { g: choix.g, c: choix.c.filter(Boolean).slice(0, maxCases(page)) };
   return { v: 1, pages };
 };
 
@@ -443,6 +460,31 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     if (partiel && !(frais > 0)) return vide('partiel');
     return { valeur: frais, partiel, manque: partiel ? ['lectures de plus de 24 h'] : [], hors: '', p: null, raison: '' };
   }
+  if (id === 'stock') {
+    const v = S.valeurStock;
+    if (v === undefined) return vide('encours');
+    // Jamais publiée (Annonces pas ouvert) ou aucun prix d'achat connu : « — », le geste dit.
+    if (!v || !Number.isFinite(v.n)) return vide('annonces');
+    if (v.centimes == null) return vide('achats');
+    const partiel = !!v.partiel || Number(v.nSans) > 0;
+    if (partiel && !(v.centimes > 0)) return vide('achats');
+    return { valeur: v.centimes / 100, partiel, manque: partiel ? [`${v.nSans || 0} sans prix d’achat`] : [], hors: '', p: null, raison: '', couverture: partiel ? `${v.nPrix} sur ${v.n}` : '' };
+  }
+  if (id === 'objectif') {
+    if (S.objectif === undefined) return vide('encours');
+    if (!S.objectif) return vide('hors', { hors: 'aucun objectif' });
+    const prog = regles.progressionObjectif ? regles.progressionObjectif(S.objectif, valeurObjectif(S.objectif, S, regles, maintenant)) : null;
+    if (!prog || prog.pct == null) return vide('pasSu', { manque: (prog && prog.manque) || [] });
+    return { valeur: prog.pct, partiel: !!prog.partiel, manque: prog.manque || [], hors: '', p: null, raison: '' };
+  }
+  if (id === 'apayer') {
+    const U = typeof regles.urssafAPayer === 'function' ? regles.urssafAPayer(S.ligneUrssaf, maintenant) : null;
+    if (S.ligneUrssaf === undefined) return vide('encours');
+    if (U && U.hors) return vide('hors', { hors: U.hors });
+    if (!U || U.apayer == null) return vide(S.enPreparation && S.enPreparation.urssaf ? 'encours' : 'absente');
+    if (U.partiel && !(U.apayer > 0)) return vide('partiel');
+    return { valeur: U.apayer, partiel: !!U.partiel, manque: U.partiel ? ['période pas finie ou ventes à dater'] : [], hors: '', p: null, raison: '', echeance: U.label || '' };
+  }
   if (id === 'dorment') {
     const pub = S.dorment;
     if (!pub || !Number.isFinite(pub.n)) return vide(S.enPreparation && S.enPreparation.dorment ? 'encours' : 'pasSu');
@@ -466,6 +508,8 @@ export const RAISON_COURTE = {
   nonNotes: 'envois pas notés',
   // (6 nov., onglets A) « À envoyer » pas encore compté sur cet appareil (ou plus de 12 h) : le geste.
   colis: 'ouvre Colis',
+  // (11 nov., lot stats-plus) La valeur du stock pas encore publiée : le geste.
+  annonces: 'ouvre Annonces',
 };
 // (6 nov., onglets A) Un nombre de ventes s'écrit comme les autres (« 1 772 », jamais « 1772 »).
 const nFr = (n) => Number(n).toLocaleString('fr-FR');
