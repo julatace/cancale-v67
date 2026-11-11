@@ -654,11 +654,18 @@ export default async function handler(req, res) {
   // « email inconnu » vide de plus.
   if (!ligne || ligne.supprime) { res.status(404).json({ error: 'email introuvable (déjà rattaché ?)' }); return; }
 
+  // (11 nov., robustesse) LES PIÈCES JOINTES GARDÉES (lignes sœurs
+  // `email_qpj_*`, api/email-inbound.js) sont rendues au rejeu : sans elles, le
+  // bordereau revenait sans PDF, puis la quarantaine était vidée — PDF perdu.
+  // Une pièce annoncée mais illisible ⇒ 503 : on ne rejoue pas un e-mail amputé.
+  const attachments = await piecesGardees(ligne, trouve);
+  if (attachments === null) { indispo(res); return; }
+
   // Rejeu : exactement le même traitement que si l'email venait d'arriver, mais
   // avec le propriétaire imposé. `__ownerForce` est posé ici, côté serveur.
   const faux = {
     method: 'POST', query: { key: process.env.EMAIL_INBOUND_SECRET || '' }, headers: {},
-    body: { from: ligne.from, to: ligne.to, subject: ligne.subject, text: ligne.text, html: ligne.html },
+    body: { from: ligne.from, to: ligne.to, subject: ligne.subject, text: ligne.text, html: ligne.html, attachments, ...(ligne.messageId ? { messageId: ligne.messageId } : {}) },
     __ownerForce: owner,
     // ⚠️ LA DATE D'ORIGINE, PAS CELLE DU REJEU. Sans ça, un email d'il y a six
     //    jours ressort daté d'aujourd'hui : le colis afficherait « arrivé le 22 »
@@ -693,6 +700,41 @@ export default async function handler(req, res) {
         body: JSON.stringify(trouve.cloisonnee ? [{ owner: trouve.proprio, ...vide }] : withOwnerAll([vide])),
       });
     } catch (_) {}
+    // Les pièces gardées sont vidées aussi (le PDF est maintenant chez lui).
+    const soeurs = (Array.isArray(ligne.pieces) ? ligne.pieces : []).map((p) => p && p.ligne).filter((x) => typeof x === 'string' && x.startsWith('email_qpj_'));
+    if (soeurs.length) {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
+          method: 'POST',
+          headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(soeurs.map((x) => (trouve.cloisonnee ? { owner: NEUTRE, id: x, data: { supprime: true, quarantaine: id } } : { id: x, data: { supprime: true, quarantaine: id } }))),
+        });
+      } catch (_) {}
+    }
   }
   res.status(200).json({ ok: !!(resultat && resultat.ok), owner: owner || null, resultat });
+}
+
+// Les pièces jointes d'un e-mail mis de côté, relues de leurs lignes sœurs.
+// Rend la liste `[{ filename, contentType, contentB64 }]` (vide si aucune pièce
+// n'a été gardée) ou `null` (pas su : une pièce annoncée ne se lit pas).
+async function piecesGardees(ligne, trouve) {
+  const pieces = Array.isArray(ligne && ligne.pieces) ? ligne.pieces : [];
+  const ids = pieces.map((p) => p && p.ligne).filter((x) => typeof x === 'string' && /^email_qpj_[A-Za-z0-9_-]+$/.test(x));
+  if (!ids.length) return [];
+  const filtre = trouve && trouve.cloisonnee ? `&owner=eq.${NEUTRE}` : '';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.map(enc).join(',')})${filtre}&select=id,data`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const parId = new Map(j.map((x) => [x && x.id, x && x.data]));
+    const out = [];
+    for (const idPj of ids) {
+      const d = parId.get(idPj);
+      if (!d || typeof d.contentB64 !== 'string' || !d.contentB64) return null;
+      out.push({ filename: d.filename || '', contentType: d.contentType || '', contentB64: d.contentB64 });
+    }
+    return out;
+  } catch (_) { return null; }
 }

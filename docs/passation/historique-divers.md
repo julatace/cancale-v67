@@ -1472,3 +1472,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot journee-perso)
 
 - **11 nov. · Ma journée composée (lot journee-perso)** : « Modifier ma journée » (bas de Ma journée, Paramètres → Affichage) : interrupteur + poignée (doigt, clavier) par carte, « Revenir au réglage d’origine » ; `vrm_journee_perso` synchronisé, par-dessus Simple/Complet ; cachée mais urgente ⇒ revient (« Affichée car urgent ») ; alertes jamais cachables ; compteurs cachés publiés. `2026-11-11-journee-perso.md`. Geste : aucun.
+
+- **11 nov. · Robustesse serveur (second agent)** : quarantaine qui garde les PDF (lignes `email_qpj_*`, rendus au rejeu) ; un 2e e-mail sans PJ n'efface plus un bordereau ; versements jamais fondus ; l'enveloppe décide avant To/Cc ; webhook Stripe 503 si pas su, ancien abonnement sans effet ; effacement à 12 mois seulement après l'avis PROUVÉ ; cron : échec retenté ; délais Stripe/eBay/IA. `docs/passation/2026-11-11-robustesse-serveur.md`. Geste : aucun.

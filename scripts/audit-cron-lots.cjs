@@ -35,6 +35,7 @@ const MUTATIONS = {
   'ordre fixe': [[LIB, 'createHash(\'sha256\').update(`${jour}|${o}`)', 'createHash(\'sha256\').update(`${o}`)']],
   'écrit sur une lecture ratée': [[LIB, 'const peutEcrire = curseurJour !== undefined;', 'const peutEcrire = true;']],
   'tâches globales après les vendeurs': [[CRON, '    let relances = null;\n    if (!soir && !reveil) { try { relances = await passageRelances(', '    let relances = null;\n    await new Promise((ok) => setTimeout(ok, 0));\n    if (!soir && !reveil) await lotFini; if (!soir && !reveil) { try { relances = await passageRelances('], [CRON, '    const lot = await passerVendeurs({', '    let finir; const lotFini = new Promise((ok) => { finir = ok; });\n    const lot = await passerVendeurs({'], [CRON, '    const { bilans, echecs } = lot;', '    const { bilans, echecs } = lot; finir();']],
+  'échec noté fait': [[LIB, 'if (reussi) faits.push(o); else enEchec.push(o);', 'faits.push(o);']],
   'cron sans curseur': [[CRON, 'lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre,', 'lireCurseur: async () => null, ecrireCurseur: async () => true,']],
 };
 
@@ -88,7 +89,17 @@ const NEUTRE = '00000000-0000-0000-0000-000000000000';
   t = 0;
   const g = await L.passerVendeurs({ owners: OWNERS.slice(0, 10), moment: 'soir', jour: J1, debut: 0, budgetMs: 1e9, parallele: 3, maintenant: () => 0,
     traiter: async (o) => { if (o === OWNERS[3]) throw new Error('panne'); return {}; }, lireCurseur: async () => null, ecrireCurseur: async () => true });
-  vrai(g.echecs === 1 && g.bilans.length === 10 && g.restants === 0, 'L1 un vendeur qui plante est compté, les autres passent');
+  vrai(g.echecs === 1 && g.bilans.length === 10 && g.restants === 1, 'L1 un vendeur qui plante est compté, les autres passent');
+  // (11 nov., robustesse) Le vendeur en échec n'entre PAS dans le curseur : il est retenté.
+  { const cur = new Map(); let plante = true;
+    const tr = async (o) => { if (o === OWNERS[3] && plante) throw new Error('panne'); return {}; };
+    const lire = async (id) => (cur.has(id) ? JSON.parse(JSON.stringify(cur.get(id))) : null), ecrire = async (id, d) => { cur.set(id, d); return true; };
+    const h1 = await L.passerVendeurs({ owners: OWNERS.slice(0, 10), moment: 'soir', jour: J1, debut: 0, budgetMs: 1e9, parallele: 3, maintenant: () => 0, traiter: tr, lireCurseur: lire, ecrireCurseur: ecrire });
+    const c1 = cur.get(L.idCurseur('soir', J1));
+    plante = false; const vus = [];
+    const h2 = await L.passerVendeurs({ owners: OWNERS.slice(0, 10), moment: 'soir', jour: J1, debut: 0, budgetMs: 1e9, parallele: 3, maintenant: () => 0, traiter: async (o) => { vus.push(o); return {}; }, lireCurseur: lire, ecrireCurseur: ecrire });
+    vrai(c1 && !c1.faits.includes(OWNERS[3]) && c1.complet === false && vus.length === 1 && vus[0] === OWNERS[3] && h2.restants === 0 && cur.get(L.idCurseur('soir', J1)).complet === true,
+      'L1 (11 nov.) un vendeur en échec n’est PAS noté fait : la relance du jour le retente, lui seul', JSON.stringify({ faits1: c1 && c1.faits.length, complet1: c1 && c1.complet, vus })); }
   // L2. Rotation.
   const o1 = L.ordreDuJour(OWNERS, J1), o2 = L.ordreDuJour(OWNERS, J2);
   const derniers1 = o1.slice(-10);

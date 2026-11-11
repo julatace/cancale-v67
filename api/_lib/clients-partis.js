@@ -63,15 +63,32 @@ export function finDeStripe(sub, maintenant = Date.now()) {
   return null;                                         // vivant, ou inconnu : jamais fini
 }
 
-// 'supprimer' · 'avis' · null.
+// ⚠️⚠️ (11 nov., robustesse) L'EFFACEMENT N'A LIEU QUE SI L'AVIS EST PROUVÉ
+//    PARTI : `issue: 'envoye'` pour CETTE fin, avec sa date d'envoi rangée
+//    (`at`), et au moins `DELAI_APRES_AVIS_JOURS` après lui. Avant, la
+//    suppression tombait à 12 mois même si l'avis n'était jamais parti (SMTP
+//    pas configuré, adresse absente, refus) : un compte effacé sans prévenir.
+//    Avis pas parti ⇒ 'avis' (il part maintenant, la date se décale) ; avis
+//    « incertain » ou « en cours » ⇒ 'avis-pas-prouve' : RIEN n'est effacé, et
+//    le passage le dit (`ignores`).
+export const DELAI_APRES_AVIS_JOURS = 30;
+const avisPour = (avis, fin) => !!(avis && avis.pour === new Date(fin).toISOString());
+export function avisProuve(avis, fin) {
+  return avisPour(avis, fin) && avis.issue === 'envoye' && Number.isFinite(Date.parse(avis.at || ''));
+}
+// La date d'effacement : fin + 12 mois, jamais moins de 30 j après l'avis parti.
+export function dateEffacement(fin, avis) {
+  const douze = ajouterMois(fin, MOIS_GARDE);
+  const at = avisProuve(avis, fin) ? Date.parse(avis.at) : NaN;
+  return Number.isFinite(at) ? Math.max(douze, at + DELAI_APRES_AVIS_JOURS * 864e5) : douze;
+}
+// 'supprimer' · 'avis' · 'avis-pas-prouve' · null.
 export function etapeDepart({ fin, maintenant = Date.now(), avis = null }) {
   if (!Number.isFinite(fin)) return null;
-  if (maintenant >= ajouterMois(fin, MOIS_GARDE)) return 'supprimer';
-  if (maintenant >= ajouterMois(fin, MOIS_AVIS)) {
-    const deja = avis && avis.pour === new Date(fin).toISOString() && ['envoye', 'incertain', 'en-cours'].includes(avis.issue);
-    return deja ? null : 'avis';
-  }
-  return null;
+  if (maintenant < ajouterMois(fin, MOIS_AVIS)) return null;
+  if (avisProuve(avis, fin)) return maintenant >= dateEffacement(fin, avis) ? 'supprimer' : null;
+  const enAttente = avisPour(avis, fin) && ['incertain', 'en-cours'].includes(avis.issue);
+  return enAttente ? 'avis-pas-prouve' : 'avis';
 }
 
 export function mailAvis({ quand }) {
@@ -153,6 +170,7 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
     if (!lignes) { ign('avis pas su'); continue; }
     const etape = etapeDepart({ fin, maintenant, avis: lignes[0] && lignes[0].data });
     if (!etape) { ign('rien aujourd’hui'); continue; }
+    if (etape === 'avis-pas-prouve') { ign('avis pas prouve : rien efface'); continue; }
     if (!mentionsLues) { mentionsLues = true; try { await lireMentions(); } catch (_) {} }
 
     if (etape === 'avis') {
@@ -162,7 +180,7 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
       if (!adr || adr.etat !== 'ok') { ign(`adresse ${adr ? adr.etat : 'passu'}`); continue; }
       const pour = new Date(fin).toISOString();
       if (!(await ecrireAvis(url, service, owner, { pour, at: new Date(maintenant).toISOString(), issue: 'en-cours' }))) { ign('reservation non confirmee'); continue; }
-      const m = mailAvis({ quand: jourFr(ajouterMois(fin, MOIS_GARDE)) });
+      const m = mailAvis({ quand: jourFr(Math.max(ajouterMois(fin, MOIS_GARDE), maintenant + DELAI_APRES_AVIS_JOURS * 864e5)) });
       let v;
       try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); }
       catch (e) { v = { issue: 'incertain' }; }
