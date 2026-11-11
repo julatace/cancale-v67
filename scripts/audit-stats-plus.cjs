@@ -160,7 +160,7 @@ const fichiers = (t, dossier) => t.replace(/from '(\.\.?\/[^']+)'/g, (m, f) => `
   dit(/const urssafAPayerCarte = [\s\S]{0,400}montantPeriodeUrssaf\(due, ligne, tauxUrssaf\(\)\)/.test(APP), 'la carte : URSSAF à payer = `montantPeriodeUrssaf` (la règle du rappel de Ma journée)');
   dit(/useValeurStockCarte\(AUTH\.user\?\.id \|\| ''\)/.test(APP), 'la carte : valeur du stock = la publication d’Annonces (`useValeurStock`)');
   const CM = sansCommentaires(lire('src/design/CarteMois.jsx'));
-  dit(/export function CasesEnPages/.test(CM) && /data-noswipe=""/.test(CM) && /aria-label=\{`Page \$\{i \+ 1\} sur \$\{pages\.length\}`\}/.test(CM), 'plus de 3 cases : pages qui glissent (sans changer d’onglet), points nommés « Page n sur N »');
+  dit(/export function CasesEnPages/.test(CM) && /data-noswipe=""/.test(CM) && /aria-label=\{`Page \$\{i \+ 1\} sur \$\{nPages\}`\}/.test(CM), 'plus de 3 cases : pages qui glissent (sans changer d’onglet), points nommés « Page n sur N »');
 
   console.log(ko ? `\n❌ stats-plus : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ stats-plus : ${ok} vert(s), 0 rouge(s)`);
   process.exit(ko ? 1 : 0);
