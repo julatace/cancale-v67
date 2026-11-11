@@ -83,7 +83,7 @@ const TAILLES = [{ nom: '390', vp: { width: 390, height: 844 }, isMobile: true, 
 const filtreOr = (u) => { const m = /[?&]or=\(([^)]*)\)/.exec(u); if (!m) return null; const conds = m[1].split(',').map((c) => { const [, op, v] = /^id\.(eq|like)\.(.+)$/.exec(c) || []; return op === 'eq' ? (id) => id === v : op === 'like' ? ((re) => (id) => re.test(id))(new RegExp('^' + v.replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$')) : () => false; }); return (id) => conds.some((f) => f(id)); };
 
 async function page(b, T, { sombre = false, version = '5.365.0' } = {}) {
-  const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: sombre ? 'dark' : 'light' });
+  const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR' });
   const pg = await ctx.newPage();
   const errs = [], ecrits = [], ebay = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ sombre }) => { try { if (sessionStorage.getItem('__banc')) return; sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { sombre });
@@ -93,11 +93,11 @@ async function page(b, T, { sombre = false, version = '5.365.0' } = {}) {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
-    if (req.method() !== 'GET') { ecrits.push(u + ' ' + (req.postData() || '').slice(0, 2000)); return j([]); }
+    if (req.method() !== 'GET') { const corps = req.postData() || ''; if (/"id":"import_/.test(corps)) ecrits.push(u + ' ' + corps.slice(0, 2000)); return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
-    if (/import_|lbc_accounts|ebay_orders/.test(u) && /select=data(&|$)/.test(u)) ecrits.push('SELECT_DATA ' + u);
+    if (/import_|ebay_orders/.test(u) && /select=data(&|$)/.test(u)) ecrits.push('SELECT_DATA ' + u);
     const f = filtreOr(u);
     if (f) { if (MUET && /import_/.test(u)) return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' }); return j(ROWS.filter((r) => f(r.id)).map((r) => projette(r, sel))); }
     const eq = /id=eq\.([^&]*)/.exec(u);
@@ -161,7 +161,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           await pg.locator(`[data-import-tout="ebay:principal"]`).click();
           await pg.waitForFunction((n) => true, n0); await pg.waitForTimeout(800);
           dit(ebay.length === n0 + 1 && ebay[n0].depuisDebut === true && !ebay[n0].compte, 'B3 « Tout récupérer » eBay : repart du début, compte principal', JSON.stringify(ebay.slice(n0)));
-          dit(!ecrits.length, 'A9 l’app n’écrit rien en base ; aucun select=data', JSON.stringify(ecrits).slice(0, 300));
+          dit(!ecrits.length, 'A9 l’app n’écrit jamais une ligne `import_*` ; aucun select=data sur elles', JSON.stringify(ecrits).slice(0, 300));
           dit(!errs.length, 'A10 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
         });

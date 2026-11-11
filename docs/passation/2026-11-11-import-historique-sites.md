@@ -97,8 +97,11 @@ neuf, zip régénéré, audits et bancs ci-dessous. Restes : voir « Limites ».
   `ebay-historique.js` (remplacer une commande rangée, garder l'acheteur, garder l'adresse, avancer sur
   refus de la base, lire une forme inconnue, relire chez eBay une fois fini, sans borne par appel,
   panne = fin) : toutes rouges.
-- Banc **`scripts/bancs/import-sites.cjs`** (390 tactile et 1512, clair et sombre) — résultat et
-  captures : voir la fin de ce récit.
+- Banc **`scripts/bancs/import-sites.cjs`** (390 tactile et 1512, clair et sombre, `locale fr-FR`) :
+  **76 verts**. Il a trouvé deux défauts de banc (navigateur en anglais ⇒ textes anglais, juste ; écritures
+  d'autres écrans comptées) ; la carte elle-même n'a rien eu à corriger. Captures regardées (390 clair,
+  1512 sombre) : Vinted puis Leboncoin « Toto » (120 lues · encore…), Vestiaire « 120 sur 400 » et le geste
+  en ambre, eBay « Tout ce qu'eBay garde est récupéré ✓ », achats « eBay ne garde que 60 jours ».
 
 ## Limites
 
