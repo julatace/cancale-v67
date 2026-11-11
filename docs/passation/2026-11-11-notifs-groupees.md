@@ -46,6 +46,12 @@ pas (le réveil a la même dépendance depuis le 5 nov.).
 | banc `centre-notifs` (390 tactile / 1512, clair / sombre) : F5 à F5e neufs (Regrouper, résumé du soir, ligne écrite entière) | 114/114 ; captures regardées (un vide de 160 px sous le libellé vu à la capture et corrigé) |
 | audits voisins remis à la règle (adresses Ventes/Achats) | `audit-notifications`, `audit-notifs-belles`, `audit-colis-heure`, `audit-suivi-vinted`, `audit-suivi-colis` ; bancs `colis-relais-push`, `retrait-conv-push`, `rappel-soir` |
 
+**Rouges restants (dits, pas cachés)** : bancs de rendu `notifs-destination` (15 rouges ; 9 déjà sur
+`origin/main` — URSSAF, double vente réglée, garde-fou) et `cible-evidence` (18). Les rouges en plus
+sont les cibles colis : `?tab=ventes&cible=colis…` et `?tab=achats&cible=retrait…` ne trouvent pas la
+carte, qui vit encore dans Colis tant que **DJ3 (`claude/colis-a-leur-place`)** n'est pas intégré. À
+relancer après l'intégration des deux lots ; s'ils restent rouges, c'est le banc à porter sur Ventes/Achats.
+
 Les bancs qui jugent AUTRE CHOSE que la fenêtre (« une arrivée sonne », adresses…) tournent à
 horloge figée : tout tomberait dans la même fenêtre. `scripts/_horloge-notif.cjs` pose donc
 `VRM_NOTIF_FENETRE=0` (bancs seulement, jamais en production, comme `VRM_NOTIF_HORLOGE`) ;
