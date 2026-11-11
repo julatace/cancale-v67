@@ -37,6 +37,9 @@ process.env.BANC_PORT = process.env.BANC_PORT || '9160';
 const path = require('path'), fs = require('fs');
 const NV = require('./nouveau-vendeur.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+// (11 nov., webkit-fiable) `NAVIGATEUR=webkit` : le même banc sous le moteur de Safari (_navigateur.cjs).
+const { lancer, estWebkit } = require('./_navigateur.cjs');
+const PW_NAV = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const PORT = NV.PORT;
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
@@ -287,7 +290,7 @@ async function tournee(nav, { W, theme, scenario }) {
 
 (async () => {
   await new Promise((ok) => NV.srv.listen(PORT, ok));
-  const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  const nav = await lancer(PW_NAV, { executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
     for (const scenario of SCENARIOS) for (const theme of THEMES) for (const W of LARGEURS) {
       if (scenario !== 'jeu' && theme === 'sombre' && W === 1512 && scenario !== 'annul') continue;   // les jeux d'annulation : un passage sombre suffit
