@@ -113,7 +113,10 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   // (9 nov., Ma journée v2) La prochaine chose à faire est posée EN TÊTE (`data-prochain`) : elle
   // est un geste de « À faire » (comptée dans « N gestes »), hors de la liste « Ensuite ».
   const pro = [...document.querySelectorAll('[data-prochain]')].filter(vis);
-  out.nCartes = cartes.length + pro.filter((e) => !(lst && lst.contains(e))).length + va.filter((e) => !(lst && lst.contains(e)) && !e.hasAttribute('data-prochain')).length;
+  // (11 nov., ci-vert — lot DJ4) « À trancher » n'est plus un écran : SA carte se pose en tête de
+  // « À faire », hors de la liste « Ensuite », et compte UN geste (`jobTrancher` dans nGestes).
+  const at = sec ? [...sec.querySelectorAll('[data-at-journee] > .vrm-day-task-list > [data-job="a-trancher"]')].filter(vis) : [];
+  out.nCartes = cartes.length + at.filter((e) => !(lst && lst.contains(e))).length + pro.filter((e) => !(lst && lst.contains(e))).length + va.filter((e) => !(lst && lst.contains(e)) && !e.hasAttribute('data-prochain')).length;
   out.ailleurs = va.map((e) => ({ dansListe: !!(lst && lst.contains(e)) || e.hasAttribute('data-prochain'), n: e.getAttribute('data-n') || '', texte: txt(e).slice(0, 80) }));
   // E5 — les verbes et les icônes des cartes.
   out.cartes = cartes.map((c) => {
@@ -194,7 +197,7 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
 
 // E4 — pixels : la couleur moyenne d'une zone de la capture (décodée dans le navigateur).
 async function moyenne(pg, nav, clip) {
-  const png = await pg.screenshot({ clip });
+  const png = await pg.screenshot({ clip, fullPage: true });   // (11 nov., ci-vert) clip en coordonnées de PAGE (R ajoute scrollY)
   const p2 = await nav.newPage();
   const m = await p2.evaluate(async (b64) => {
     const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
