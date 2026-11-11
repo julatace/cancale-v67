@@ -1394,3 +1394,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot audits-rouges)
 - **11 nov. · Partager une fiche (lot partage-fiche)** : Annonces « … » / Stock → « Partager » ⇒ `vrm.center/p/<jeton>` (3 gestes, partage du téléphone sinon copie) : photos, titre, taille, état, prix, liens des annonces en ligne (par le N°) ; jamais prix d'achat, N°, compte, adresse ; pseudo seulement voulu ; 1/7/30 j, « Arrêter » ; « Vendu » par la preuve de l'app, jamais par absence ; page datée, « À confirmer » après 72 h ; mode `partage` de /api/compte (aucune fonction neuve), jeton indexé par empreinte, même 404 partout. `docs/passation/2026-11-11-partage-fiche.md`. Geste : aucun.
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (ouverture-legere-2)
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot clics-directs)
+
+- **11 nov. · Clics directs** : Ma journée, toucher la pile (photo comprise) ⇒ Ventes, plus de zoom (`data-sans-visionneuse`) ; Ventes, la photo (ligne et détail) s'ouvre DIRECTEMENT dans LA visionneuse (`ouvrirVisionneuse`, toutes les photos de l'article par fichier, `article` ⇒ mode stream), plus de loupe ni de second panneau. Banc `clics-directs` (rouge sur `main`). `docs/passation/2026-11-11-clics-directs.md`. Geste : aucun.
