@@ -297,8 +297,8 @@ async function allerTache(pg, tache, site) {
       // (`aria-label`) et son nombre est `data-n`. On juge le NOMBRE et la phrase de
       // la règle, pas le libellé affiché (§6.4) — l'ancien contrôle lisait
       // `innerText` et rougissait sur un texte raccourci exprès.
-      const taches = () => pg.evaluate(() => [...document.querySelectorAll('.vrm-day-task')].map((e) => ({ plein: e.getAttribute('aria-label') || '', n: e.getAttribute('data-n') })));
-      await pg.waitForFunction(() => [...document.querySelectorAll('.vrm-day-task')].some((e) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(e.getAttribute('aria-label') || '')), null, { timeout: 15000 }).catch(() => {});
+      const taches = () => pg.evaluate(() => [...document.querySelectorAll('.vrm-day-task')].map((e) => ({ plein: (e.getAttribute('data-plein') || e.getAttribute('aria-label') || ''), n: e.getAttribute('data-n') })));
+      await pg.waitForFunction(() => [...document.querySelectorAll('.vrm-day-task')].some((e) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test((e.getAttribute('data-plein') || e.getAttribute('aria-label') || ''))), null, { timeout: 15000 }).catch(() => {});
       const txt = await pg.evaluate(() => document.body.innerText);
       const tj = await taches();
       const tLbc = tj.find((t) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(t.plein));

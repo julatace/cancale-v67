@@ -210,7 +210,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           // (9 nov., lot Z) L'icône de VRM porte LE MÊME nombre que le badge de Colis (dernière demande au navigateur).
           const pastille = await pg.evaluate(() => (window.__pastille || []).slice(-1)[0]);
           dit(badge.n !== '' && pastille === Number(badge.n), 'Z. pastille de l\'icône de VRM = le badge de Colis', JSON.stringify({ pastille, badge: badge.n }));
-          await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').tap();
+          await pg.locator('.vrm-mobile-nav button[aria-label^="Plus"]').tap();
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
           await capture(pg, 'plus-telephone');

@@ -281,3 +281,7 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex:
 }
 .vrm-ann-geste-texte { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
 .vrm-ann-geste-texte b { font-size: 14px; font-weight: 700; color: var(--vrm-ink, #1D1D1F); }
+
+/* (11 nov., lot accessibilité) « Vérifier » sur le remplissage gris : #0066CC = 4,36:1 ⇒ en
+   clair un bleu un cran plus sombre (#005BB8 : 5,1:1), même teinte d’accent. */
+:root:not([data-theme="dark"]) body .vrm-ann-avis-voir { color: #005BB8; }

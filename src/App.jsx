@@ -15716,12 +15716,23 @@ function groupesVisibles(sites, filtre, ordi = false, profil = PROFIL_VENDEUR) {
 // `vrm_colis_retirer`, le résumé de l'agent eBay, « à retirer de Leboncoin ») —
 // jamais un 0 deviné : pas su ⇒ aucun badge. Sur téléphone, Messages garde un
 // POINT (la barre est petite). Ambre discret : un geste à faire (§7).
+// (11 nov., lot accessibilité) Ce que le badge ajoute au NOM d'une entrée (« · 3 à faire ») :
+// le nom contient alors le texte visible (« Annonces 3 », WCAG 2.5.3), jamais « Annonces » seul.
+function suffixeBadgeNav(t, badges) {
+  if (!badges || t.vue) return '';
+  const v = badges[cleEntree(t)];
+  if (typeof v === 'number' && v > 0) return ` · ${v > 99 ? '99+' : v} à faire`;
+  return v === true ? ' · nouveau' : '';
+}
 function BadgeNav({ t, badges, place }) {
   if (!badges || t.vue) return null;
   const k = cleEntree(t);
   const v = badges[k];
-  if (typeof v === 'number' && v > 0) return <span className={'vrm-nav-badge vrm-nav-badge-n vrm-nav-badge-' + place} data-badge-nav={k} data-badge-n={String(v)} aria-label={`${v} à faire`}>{v > 99 ? '99+' : v}</span>;
-  if (v === true) return <span className={'vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-' + place} data-badge-nav={k} data-badge-n="point" aria-label="nouveau"/>;
+  // (11 nov., lot accessibilité) Le chiffre est DESSINÉ (aria-hidden) et son sens est lu à
+  // part (« · 3 à faire ») : un `aria-label` sur un <span> sans rôle n'est pas lu, et le
+  // chiffre nu collé au libellé donnait « Annonces3 ».
+  if (typeof v === 'number' && v > 0) return <>{' '}<span className={'vrm-nav-badge vrm-nav-badge-n vrm-nav-badge-' + place} data-badge-nav={k} data-badge-n={String(v)} aria-hidden="true">{v > 99 ? '99+' : v}</span><span className="vrm-sr-seul"> · {v} à faire</span></>;
+  if (v === true) return <><span className={'vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-' + place} data-badge-nav={k} data-badge-n="point" aria-hidden="true"/><span className="vrm-sr-seul"> · nouveau</span></>;
   return null;
 }
 
@@ -15775,7 +15786,7 @@ function NomEntrepriseCoque({ entreprise, className }) {
 function SideBar({ tab, setTab, entreprise, sites, badges }) {
   useProfilVendeur();   // (8 nov.) Simple / Complet : la colonne se redessine au changement
   const groupes = groupesVisibles(sites, t => !t.tel, true);
-  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label} title={t.label} data-nav-entree={cleEntree(t)} onClick={()=>ouvrirEntree(t,setTab)} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
+  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label + suffixeBadgeNav(t, badges)} title={t.label} data-nav-entree={cleEntree(t)} onClick={()=>ouvrirEntree(t,setTab)} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
   // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
   // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
   // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
@@ -15960,7 +15971,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   };
   if (bottom) return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label="Plus" aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label={courant && (courant.court || courant.label) !== 'Plus' ? `Plus · ${courant.court || courant.label}` : 'Plus'} aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
         <span aria-hidden="true" className="vrm-tab-ic" style={{display:'flex',position:'relative'}}>{courant ? <NavigationIcon item={courant} size={22} style={{strokeWidth:2}}/> : <Icon name="more" size={24} style={{strokeWidth:1.6}}/>}{pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>
         {(() => { const lib = courant ? (courant.court || courant.label) : 'Plus'; return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
       </button>
@@ -16175,9 +16186,9 @@ function BottomBar({tab,setTab,sites,badges}) {
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
       <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
       {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tabMontre]||tabMontre)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
-        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-label={lib+(n?` · ${n} à faire`:'')} aria-current={on?'page':undefined}>
+        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-current={on?'page':undefined}>
           <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
-          <span className="vrm-nav-label">{lib}</span>
+          <span className="vrm-nav-label">{lib}</span>{n ? <span className="vrm-sr-seul"> · {n} à faire</span> : null}
         </button>
       );})}
       <MenuEcrans tab={tab} setTab={setTab} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
@@ -18598,9 +18609,16 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   const passuComptes = [caps === null || comptes === null ? 'Vinted' : null, ...['leboncoin', 'vestiaire', 'ebay'].map((p) => (autresSites && autresSites[p] === null ? nomPlateforme(p) : null))].filter(Boolean);
   const encoursComptes = comptes === undefined || caps === undefined || etatsComptes === undefined || ['leboncoin', 'vestiaire', 'ebay'].some((p) => !autresSites || autresSites[p] === undefined);
 
+  // (11 nov., lot accessibilité) Le NOM de la pastille contient ce qu'elle ÉCRIT (WCAG 2.5.3 :
+  // le pseudo, « Extension », « · sauf publier »), puis l'état en entier s'il dit plus.
+  // L'initiale de l'avatar est un dessin (CSS, `data-initiale`).
+  const texteCourt = court && st.niveau === 'lecture' ? (code === 'absente' ? 'Extension' : 'Lecture') : court && st.niveau === 'ok' && !loginVinted ? (st.relais ? 'Via ton ordi' : 'Actions') : visible;
+  const precisionPastille = !court && st.niveau === 'ok' && loginVinted && (st.relais || st.exception) ? `· ${st.relais ? 'via ton ordinateur' : 'sauf publier'}` : '';
+  const tetePastille = `${texteCourt}${precisionPastille ? ' ' + precisionPastille : ''}`;
+  const nomPastille = String(libelle).toLowerCase().includes(String(tetePastille).toLowerCase()) ? libelle : `${tetePastille} — ${libelle}`;
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" className="vrm-etat-pastille" aria-label={st.relais && loginVinted ? `${libelle} · ${loginVinted}` : libelle} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
         title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
@@ -18611,12 +18629,12 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             Sans compte Vinted lu : un « V » (Vinted) à la place de l'initiale ; pendant la vérification, l'icône qui tourne. Même information, même menu. */}
         <span aria-hidden="true" className="vrm-etat-avatar" data-etat-avatar={st.niveau === 'ok' && loginVinted ? 'compte' : st.niveau}>
           {st.niveau === 'ok' && loginVinted
-            ? <span className="vrm-etat-initiale vrm-sensible">{String(loginVinted).trim().charAt(0).toUpperCase()}</span>
-            : st.niveau === 'verif' ? <Icon name="sync" size={13}/> : <span className="vrm-etat-initiale" data-etat-v="">V</span>}
+            ? <span className="vrm-etat-initiale vrm-sensible" data-initiale={String(loginVinted).trim().charAt(0).toUpperCase()}/>
+            : st.niveau === 'verif' ? <Icon name="sync" size={13}/> : <span className="vrm-etat-initiale" data-etat-v="" data-initiale="V"/>}
           <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 6, background: point, flexShrink: 0 }}/>
         </span>
-        <span className={st.niveau === 'ok' && loginVinted ? 'vrm-etat-compte vrm-sensible' : undefined} style={st.niveau === 'ok' && loginVinted ? { maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}>{court && st.niveau === 'lecture' ? (code === 'absente' ? 'Extension' : 'Lecture') : court && st.niveau === 'ok' && !loginVinted ? (st.relais ? 'Via ton ordi' : 'Actions') : visible}</span>
-        {!court && st.niveau === 'ok' && loginVinted && (st.relais || st.exception) ? <span className="vrm-etat-precision" style={{ color: C.muted, fontWeight: 500 }}>· {st.relais ? 'via ton ordinateur' : 'sauf publier'}</span> : null}
+        <span className={st.niveau === 'ok' && loginVinted ? 'vrm-etat-compte vrm-sensible' : undefined} style={st.niveau === 'ok' && loginVinted ? { maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}>{texteCourt}</span>
+        {precisionPastille ? <>{' '}<span className="vrm-etat-precision" style={{ color: C.muted, fontWeight: 500 }}>{precisionPastille}</span></> : null}
         {!court ? <i className="vrm-etat-chevron" aria-hidden="true"><Icon name="chevron" size={13}/></i> : null}
       </button>
       {/* (23 oct.) Sur téléphone le panneau part dans document.body : posé dans
@@ -27152,7 +27170,9 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
           return (
             <li key={j.k} className="vrm-fu-jour" data-auj={j.k === 0 ? '' : undefined} data-vendu={n != null ? String(n) : undefined} data-jv2-jour={j.iso} data-choisi={choisi ? '' : undefined}>
               <button type="button" className="vrm-jv2-jour" aria-pressed={choisi} aria-label={lib} title={lib} data-jv2-toucher={j.iso} onClick={() => setChoix(j.k)}>
-                <span aria-hidden="true">{LETTRES_JOUR[j.d.getDay()]}</span><b>{j.d.getDate()}</b>
+                {/* (11 nov., lot accessibilité) La lettre du jour est un DESSIN (CSS, `data-lettre`) : le nom
+                    du bouton (« Mercredi 11 novembre · … ») contient ainsi tout le texte visible (« 11 »). */}
+                <span aria-hidden="true" data-lettre={LETTRES_JOUR[j.d.getDay()]}/><b>{j.d.getDate()}</b>
                 <i className="vrm-jv2-barre" aria-hidden="true" data-barre={v > 0 ? String(Math.round(v * 100)) : undefined} style={{ '--h': v > 0 && max > 0 ? (0.18 + 0.82 * v / max).toFixed(3) : 0 }}/>
               </button>
             </li>
@@ -40999,12 +41019,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // gardent leur icône ailleurs, dans le centre de notifications).
         const ICONE_JOURNEE = { 'double-vente': 'sync', 'sans-numero': 'pencil', 'supprime-vinted': 'trash', 'retrait-dernier-jour': 'pin', 'retrait-a-verifier': 'pin', 'retrait-en-verification': 'pin', 'a-renvoyer': 'restore' };
         const iconeJob = (j) => ICONE_JOURNEE[j.id] || j.icon || 'info';
-        const corpsTache = (j, x) => (<>
+        // `lu` (11 nov., lot accessibilité) : la ligne coupée à l'écran (UneLigne) est cachée au
+        // lecteur et le texte ENTIER est lu à sa place — un `aria-label` qui ne contenait pas
+        // le texte visible (WCAG 2.5.3, « Voir » compris) n'est plus posé.
+        const corpsTache = (j, x, lu) => (<>
           {/* (3 nov., Julien : « les PHOTOS en tout petit, superposées ») La vignette de la ligne :
               les photos de SES articles (par identité, posées par la règle de la ligne), sinon une
               tuile neutre et l'icône. Plus de pastille chiffrée colorée : le titre dit le nombre. */}
           <PileVignettes srcs={j.photos} n={Number(j.n) > 0 ? Number(j.n) : 0} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={iconeJob(j)} size={20}/>}/>
-          <span className="vrm-day-task-textes">
+          {lu ? <span className="vrm-sr-seul">{lu} — </span> : null}
+          <span className="vrm-day-task-textes" aria-hidden={lu ? 'true' : undefined}>
             <span className="vrm-day-task-title-rang">{j.urgent && !x.detail ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}<UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/></span>
             {/* (1er nov., « très répétitif ») Le détail tient sur UNE ligne, téléphone compris :
                 coupé à la fin d'un mot, le texte entier dans l'infobulle et le nom du bouton. */}
@@ -41012,8 +41036,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </span>
         </>);
         const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court; return (
-          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} aria-label={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
-            {corpsTache(j, x)}
+          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} data-plein={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+            {corpsTache(j, x, plein.replace(/\n/g, ' — '))}
             <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || VERBES.voir}</span><span aria-hidden="true">›</span></span>
           </button>
         ); };

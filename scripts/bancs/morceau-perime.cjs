@@ -33,7 +33,7 @@ const base = () => ({ lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes
 // E-mails : dans la barre latérale à l'ordinateur ; au téléphone, sous « Plus » (les tuiles).
 async function versEmails(pg, tel) {
   if (!tel) { await pg.locator('.vrm-sidebar [data-nav-entree="emails"]').first().click(); return; }
-  const plus = pg.locator('.vrm-tabbar button[aria-label="Plus"]').first();
+  const plus = pg.locator('.vrm-tabbar button[aria-label^="Plus"]').first();
   if (await plus.count()) { await plus.click(); await pg.waitForTimeout(500); }
   const tuile = pg.locator('[data-nav-entree="emails"]:visible').first();
   if (await tuile.count()) await tuile.click();
