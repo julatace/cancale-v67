@@ -1,0 +1,68 @@
+/* ── PUBLIER PARTOUT (11 nov.) — src/PublierPartout.jsx ───────────────────────
+   La feuille des outils d'annonce (styles-annonces-outils.css) : le réglage du
+   prix par site, puis une carte par annonce et une ligne par site. Jetons
+   `--fu-*` (clair et sombre). Encre et gris ; l'AMBRE pour un manque bloquant ou
+   un refus (un geste à faire, §7) ; le bleu seulement sur le bouton principal. */
+.vrm-pp-feuille { max-width: 620px; }
+.vrm-pp-source { display: flex; align-items: center; gap: 6px; margin: 0 4px 12px; font-size: 13px; color: var(--fu-gris, #6e6e73); }
+.vrm-pp-reglage, .vrm-pp-article { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 12px 14px; margin-bottom: 12px; }
+.vrm-pp-reglage h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+.vrm-pp-reglage-ligne { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 48px; }
+.vrm-pp-reglage-ligne + .vrm-pp-reglage-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
+.vrm-pp-reglage-ligne small { flex: 1 1 180px; min-width: 0; font-size: 13px; color: var(--fu-gris, #6e6e73); }
+.vrm-pp-reglage-ligne select, .vrm-pp-reglage-ligne input, .vrm-pp-demande select, .vrm-pp-demande input {
+  min-height: 44px; border-radius: 12px; border: 0; background: var(--fu-case, #f2f2f7); color: inherit; font: inherit; font-size: 17px; padding: 0 10px; box-sizing: border-box;
+}
+.vrm-pp-reglage-ligne input { width: 84px; font-variant-numeric: tabular-nums; }
+.vrm-pp-reglage-texte { margin-left: auto; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-pp-site-nom { display: inline-flex; align-items: center; gap: 2px; font-size: 17px; font-weight: 700; min-width: 0; }
+.vrm-pp-reglage-ligne .vrm-pp-site-nom { min-width: 120px; }
+
+.vrm-pp-article-tete { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.vrm-pp-photo { flex: none; width: 48px; height: 60px; border-radius: 12px; overflow: hidden; background: var(--fu-case, #f2f2f7); }
+.vrm-pp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-pp-article-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-pp-article-txt > b { font-size: 15px; font-weight: 700; }
+.vrm-pp-article-txt > span { font-size: 13px; color: var(--fu-gris, #6e6e73); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.vrm-pp-article-prix { flex: none; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.vrm-pp-cases { list-style: none; margin: 0; padding: 0; }
+.vrm-pp-case { padding: 6px 0 8px; }
+.vrm-pp-case + .vrm-pp-case { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
+.vrm-pp-case-tete { display: flex; align-items: center; gap: 8px; min-height: 48px; flex-wrap: wrap; }
+.vrm-pp-coche { display: flex; align-items: center; gap: 2px; flex: 1 1 160px; min-width: 0; min-height: 44px; cursor: pointer; }
+.vrm-pp-coche input { width: 22px; height: 22px; margin: 11px 11px 11px 0; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-pp-case[data-pp-cochable="0"] .vrm-pp-coche { cursor: default; color: var(--fu-gris, #6e6e73); }
+.vrm-pp-resume { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-pp-etat { flex: 1 1 100%; display: flex; flex-direction: column; font-size: 15px; font-weight: 700; color: var(--fu-encre, #1d1d1f); }
+.vrm-pp-etat small { font-weight: 500; font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; line-height: 1.35; }
+.vrm-pp-etat.is-refuse, .vrm-pp-etat.is-pas-envoye, .vrm-pp-etat.is-a-finir { color: var(--fu-ambre-txt, #b25000); }
+.vrm-pp-etat.is-envoi, .vrm-pp-etat.is-attente { color: var(--fu-gris, #6e6e73); }
+.vrm-pp-raison { margin: 0 0 6px; font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.4; overflow-wrap: anywhere; }
+.vrm-pp-raison.is-geste { color: var(--fu-ambre-txt, #b25000); }
+.vrm-pp-manques { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-pp-manques li { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 12px; background: var(--fu-case, #f2f2f7); }
+.vrm-pp-manques li[data-bloque="1"] { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+.vrm-pp-manques b { font-size: 13px; font-weight: 700; }
+.vrm-pp-manques small { font-size: 12px; color: var(--fu-gris, #6e6e73); }
+.vrm-pp-manques li[data-bloque="1"] small { color: inherit; }
+.vrm-pp-demande { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 4px 0 6px; font-size: 15px; font-weight: 600; }
+.vrm-pp-demande span { flex: 1 1 140px; min-width: 0; }
+.vrm-pp-demande input { width: 110px; font-variant-numeric: tabular-nums; }
+.vrm-pp-apercu-bouton {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; border: 0; background: transparent;
+  color: var(--fu-gris, #6e6e73); font: inherit; font-size: 13px; font-weight: 700; padding: 0; cursor: pointer;
+}
+.vrm-pp-dl { margin: 0 0 4px; display: grid; grid-template-columns: minmax(84px, max-content) 1fr; gap: 6px 12px; font-size: 13px; }
+.vrm-pp-dl > div { display: contents; }
+.vrm-pp-dl dt { color: var(--fu-gris, #6e6e73); }
+.vrm-pp-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.vrm-pp-desc dd { white-space: pre-line; max-height: 9em; overflow: auto; }
+.vrm-pp-vignettes { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.vrm-pp-vignette { width: 36px; height: 44px; border-radius: 8px; overflow: hidden; background: var(--fu-case, #f2f2f7); }
+.vrm-pp-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-pp-plus { font-size: 12px; color: var(--fu-gris, #6e6e73); }
+.vrm-pp-bilan { margin: 0 4px 10px; font-size: 15px; font-weight: 700; }
+.vrm-pp-garde { margin: 0 4px 12px; font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.4; }
+/* Les pastilles « aussi sur » de la carte Annonces (logo + nom lu à voix). */
+.vrm-aussi-sur { display: inline-flex; align-items: center; gap: 4px; }

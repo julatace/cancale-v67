@@ -92,12 +92,16 @@ export const ACTIONS_SELECTION = [
   // « à la main » : comptes mélangés permis (`parPaire`) — dans la feuille, une annonce d'un
   // autre compte que celui de l'onglet est dite « Ouvre ce compte » et ne part JAMAIS.
   { k: 'baisser', titre: 'Baisser le prix…', desc: '−X € ou −X % sur les annonces cochées, une par une, prix relu sur Vinted.', etats: ['en-ligne'], robot: false, parPaire: true, lien: true, cap: 'baisseprix' },
+  // (11 nov.) « Publier partout » : les annonces cochées vers Leboncoin, Vestiaire et eBay, DEPUIS
+  // l'annonce Vinted (src/publierPartout.js). Rien ne part chez Vinted : le compte de l'onglet
+  // Vinted ne décide rien (`multiComptes`) ; la feuille dit, site par site, ce qui partira.
+  { k: 'partout', titre: 'Publier partout…', desc: 'Leboncoin, Vestiaire, eBay depuis l’annonce Vinted : une case par site, un bouton.', etats: ['en-ligne'], robot: false, lien: true, multiComptes: true },
   { k: 'mini', titre: 'Prix mini…', desc: '« Accepter dès » (et « Refuser sous ») sur les annonces cochées, calculés depuis leur prix.', etats: ['en-ligne'], robot: false, lien: true, multiComptes: true },
 ];
 // Ce qui se lance au nom d'UN compte (dit d'un mot quand la sélection en mélange deux),
 // et le mot court d'une action permise sur plusieurs comptes.
 const PAR_COMPTE = 'Republier, modifier, brouillon, mise en ligne';
-const COURT = { mini: 'Prix mini', main: 'Republier à la main', baisser: 'Baisser le prix' };
+const COURT = { mini: 'Prix mini', main: 'Republier à la main', baisser: 'Baisser le prix', partout: 'Publier partout' };
 // Les quatre tuiles de la feuille, dans l'ordre (« à la main » est un lien à part).
 export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien).map((A) => A.k);
 const POUR_ETAT = { 'en-ligne': 'les annonces en ligne', brouillon: 'les brouillons', masquee: 'les annonces masquées', verification: 'les annonces en vérification' };

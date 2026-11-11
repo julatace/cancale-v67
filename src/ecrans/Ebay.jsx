@@ -598,6 +598,53 @@ function catDepuisPubinfoEbay(j, nomForce) {
   const conditions = Array.isArray(j.conditions) && j.conditions.length ? j.conditions : null;
   return { categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [], conditions };
 }
+// ── « PUBLIER PARTOUT » → eBay (11 nov., src/publierPartout.js) ─────────────
+// La voie eBay de « Publier partout » : un BROUILLON (`ebay_brouillons`), jamais
+// une publication. Les MÊMES règles que le formulaire « Vendre une paire » :
+// catégorie suggérée par eBay (`pubinfo` → `catDepuisPubinfoEbay`), critères
+// remplis par des FAITS Vinted seulement (`autoRemplirAttributs`), état traduit
+// vers un état qu'eBay propose (`etatEbayDeVinted`, sinon rien), le N° qui
+// devient le SKU `VRM-{n°}` (identité, §5), livraison gérée par eBay (§2.8 :
+// aucun port ici, `itemDeBrouillon` pose `ebayGere`). La mise en ligne reste
+// celle des brouillons (frais annoncés, une confirmation, P12).
+// Lire-fusionner-écrire (`modifierBrouillonsEbay`) : lecture ratée ⇒ RIEN écrit ;
+// un brouillon de la même paire (même identifiant d'annonce) ⇒ pas de second.
+// p : la paire (`useEbayPaires`) ; { prix, titre } : ce que la feuille a réglé.
+// Rend { accepte, etape: 'brouillon', complet, manque, brouillonId, deja } ou { accepte:false, code, raison }.
+async function preparerBrouillonPartout(p, { prix, titre } = {}) {
+  const pairId = String((p && p.id) || '');
+  const numero = p && p.num ? cleNum(p.num) : '';
+  if (!pairId || !numero || !skuEbayDe(numero)) return { accepte: false, code: 'numero', raison: 'pas de N° lisible : aucune identité, rien n’est enregistré' };
+  const px = Number(prix);
+  if (!(px > 0)) return { accepte: false, code: 'prix', raison: 'prix pas su : rien n’est enregistré' };
+  const cur = await lireBrouillonsEbay();
+  if (cur === null) return { accepte: false, code: 'lecture', raison: 'tes brouillons eBay ne sont pas lus — rien n’est écrit, réessaie dans un moment' };
+  const memePaire = (items) => Object.values(items || {}).find((b) => b && String(b.pairId || '') === pairId) || null;
+  const dejaLa = (b) => ({ accepte: true, etape: 'brouillon', deja: true, brouillonId: b.id || null, complet: !(b.etatBrouillon && b.etatBrouillon !== 'brouillon') && !itemDeBrouillon(b).err, manque: [] });
+  { const d = memePaire(cur); if (d) return dejaLa(d); }
+  const t = String(titre || (p && p.title) || '').trim();
+  let cat = null;
+  try { const { j } = await appelEbay({ action: 'pubinfo', title: t }); cat = catDepuisPubinfoEbay(j); } catch (_) { cat = null; }
+  let genre = '';
+  try { if (p.catalogId != null && p.catalogId !== '') genre = familleArticle({ chemin: await cheminVintedApp(p.catalogId) }).genre || ''; } catch (_) { genre = ''; }
+  const aspects = cat ? autoRemplirAttributs(cat.attributs, { titre: p.title || '', marque: p.marque || extractBrand(p.title || '') || '', taille: p.taille || extractSize(p.title || '') || '',
+    faits: { marque: p.marque || '', taille: p.tailleVinted || '', genre, couleur: p.couleur || '', type: familleArticle({ titre: p.title || '', taille: p.taille || '', marque: p.marque || '' }).sous } }) : {};
+  const etat = etatEbayDeVinted(p.etat, cat ? cat.conditions : null);
+  const id = idBrouillonEbay(), at = Date.now();
+  const b = { id, pairId, numero, titre: t, prix: String(px).replace('.', ','), quantite: '1', ...(etat ? { etat } : {}),
+    description: (p.desc || descriptionDeFaits(p) || ''), photos: (p.photos || []).map((u) => String(u || '').trim()).filter((u) => /^https?:\/\//.test(u)),
+    categorie: cat && cat.categoryId ? { id: cat.categoryId, nom: cat.categoryName, requis: cat.required || [] } : null, aspects, cover: p.cover || null,
+    creeLe: at, majLe: at, etatBrouillon: 'brouillon', verif: null, envoi: null, origine: 'partout' };
+  const manque = [];
+  if (!b.categorie) manque.push('la catégorie');
+  else manque.push(...(cat.required || []).filter((n) => !String(aspects[n] || '').trim()));
+  if (!etat) manque.push('l’état');
+  let doublon = null;
+  const w = await modifierBrouillonsEbay((items) => { const d = memePaire(items); if (d) { doublon = d; return false; } items[id] = b; return items; });
+  if (!w.ok) return { accepte: false, code: w.raison === 'lecture' ? 'lecture' : 'ecriture', raison: w.raison === 'lecture' ? 'tes brouillons eBay ne sont pas lus — rien n’est écrit' : 'l’enregistrement du brouillon a échoué — réessaie' };
+  if (doublon) return dejaLa(doublon);
+  return { accepte: true, etape: 'brouillon', complet: !manque.length && !itemDeBrouillon(b).err, manque, brouillonId: id };
+}
 // ⟦← App.jsx #20⟧
 
 // `brouillon` (5 octobre) : un brouillon à rouvrir pour le modifier ; il
@@ -5122,4 +5169,4 @@ const RAISON_RETRAIT_AUTO = {
   'ebay-apres-vente': 'l\'annonce eBay a été mise en ligne après la vente',
   'deja-terminee': 'eBay la dit déjà terminée',
 };
-export { EbayAnnonces, EbayConnexion, EbayVentes };
+export { EbayAnnonces, EbayConnexion, EbayVentes, preparerBrouillonPartout };
