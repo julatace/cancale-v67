@@ -166,7 +166,7 @@ Aucun. À regarder : Messages → Favoris & offres → « Offres auto ».
   offres-auto (26), offres-garde (25), offres, jauge-journal, confiance (39), republier,
   republier-kit (17), republier-main (36), annonces-actions (69), versement-rapide (20).
 - Banc `offres-auto` : **83 OK, 0 KO** (clair : extension 5.342 ⇒ « 45,5 » lu ; sombre : 5.341 ⇒
-  « seuil illisible »). Bancs `republier-kit` / `republier-main` : voir la fin du récit.
+  « seuil illisible »). Banc `republier-kit` : **89 OK, 0 KO** (4 vues) dont « Vinted ↗ copie aussi la description », rouge par mutation (copie retirée ⇒ KO) ; `republier-main` : **137 OK, 0 KO**. Captures regardées (kit 390 clair, 1512 sombre ; vue Republier 1512 ; Offres auto 390/1512).
 
 ### Geste de Julien
 Installer l'extension **5.342.0** (remplacer le dossier, ⟳ dans chaque Chrome). Garder un onglet
