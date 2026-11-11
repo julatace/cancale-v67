@@ -28491,7 +28491,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [cycleRepondus, setCycleRepondus] = useState({});
   const [cycleEnVol, setCycleEnVol] = useState(null);
   // (11 nov., lot DJ4) La carte « N choses à trancher » de Ma journée s'ouvre EN PLACE (plus d'écran exprès).
-  const [trancherOuvert, setTrancherOuvert] = useState(() => { try { if (sessionStorage.getItem('vrm_trancher_ouvrir') === '1') { sessionStorage.removeItem('vrm_trancher_ouvrir'); return true; } } catch (_) {} return false; });
+  // (11 nov., DJ4 — « PRATIQUE : gagner du temps ») Peu de choses (≤ 3) ⇒ ouverte d'office : la
+  // réponse est à UN toucher. Au-delà, fermée (Ma journée reste courte) ; son toucher l'emporte.
+  const [trancherChoix, setTrancherChoix] = useState(() => { try { if (sessionStorage.getItem('vrm_trancher_ouvrir') === '1') { sessionStorage.removeItem('vrm_trancher_ouvrir'); return true; } } catch (_) {} return null; });
+  const trancherOuvert = trancherChoix != null ? trancherChoix : !!(aTrancher && Number(aTrancher.total) > 0 && Number(aTrancher.total) <= 3);
+  const setTrancherOuvert = (f) => setTrancherChoix(typeof f === 'function' ? f(trancherOuvert) : f);
   useEffect(() => { const f = () => setTrancherOuvert(true); window.addEventListener('vrm:trancher-ouvrir', f); return () => window.removeEventListener('vrm:trancher-ouvrir', f); }, []);
   // (6 nov.) Un inventaire du Stock EN COURS (src/inventaire.js) : une carte de Ma journée.
   const inventaireJournee = useInventaireEnCours(only === 'journee');
@@ -41107,7 +41111,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
           return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
             <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
-            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>annonce{stock?.total===1?'':'s'} en ligne</span></div>
+            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>paire{stock?.total===1?'':'s'} en ligne</span></div>
             {stock ? <>
               <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
               <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
@@ -54167,7 +54171,7 @@ function AppCoeur() {
   // la carte sort tout de suite, « Annuler » 5 s remet la valeur d'avant exacte. Rien
   // d'autre n'est écrit ; « Non » n'écrit rien (il ouvre Ma journée et ses réponses).
   // (11 nov., lot DJ4) « Tu l'as encore ? » : « Oui, je la garde » (CHOIX_CYCLE.CHEZ_MOI) · « Non,
-  // enlève-la du stock » + sa raison (séparée, déclarée partie par identité, case libérée ; le N°
+  // enlève-la du stock » en UN toucher (séparée, déclarée partie par identité, case libérée ; le N°
   // jamais redonné) · « Plus tard » — les opérations de `opsChezToi` (src/cycleArticle.js), en geste
   // annulable (`gesteChezToi`) : aucune confirmation, ni Vinted, ni vente inventée.
   // (11 nov., lot DJ4) La même question sur la fiche de la paire (« Tout sur le N° ») : la chose
@@ -54176,7 +54180,7 @@ function AppCoeur() {
     const l=aTrancherEtat&&Array.isArray(aTrancherEtat.lignes)?aTrancherEtat.lignes.find((x)=>x.cle==='supprimes-vinted'):null;
     const k=cleNum(num); const x=l&&Array.isArray(l.ex)&&k?l.ex.find((e)=>e&&e.id&&cleNum(e.num)===k):null;
     if(!x) return null;
-    return <div className="vrm-at vrm-at-fiche" data-fiche-chez-toi={x.id}><p className="vrm-at-question">Supprimée de Vinted. Tu l’as encore ?</p>
+    return <div className="vrm-at vrm-at-fiche" data-fiche-chez-toi={x.id}><p className="vrm-at-question">Supprimée de Vinted. L’enlever du stock ?</p>
       <QuestionChezToi carte={{ cle:'supprimes-vinted', id:x.id, num:x.num, binaire:BINAIRES_TRANCHER['supprimes-vinted'] }} onTrancher={trancherAT}/></div>;
   };
   const trancherAT=(carte,choix,raison)=>{

@@ -253,7 +253,7 @@ export const PLUS_TARD_MS = 20 * 60 * 60 * 1000;
 export const RAISONS_SORTIE = Object.freeze([
   ['donnee', 'Donnée'], ['vendue-ailleurs', 'Vendue ailleurs'], ['perdue', 'Perdue'], ['rendue', 'Rendue'],
 ]);
-export const REPONSES_CHEZ_TOI = Object.freeze({ garde: 'Oui, je la garde', enleve: 'Non, enlève-la du stock', plusTard: 'Plus tard' });
+export const REPONSES_CHEZ_TOI = Object.freeze({ garde: 'Oui, je l’ai', enleve: 'Enlever du stock', plusTard: 'Plus tard' });
 // Le temps restant (ms) pendant lequel la question est repoussée ; 0 = pas repoussée.
 export function repousseeJusqua(plusTard, id, maintenant) {
   const t = Date.parse((plusTard && typeof plusTard === 'object' && plusTard[String(id)]) || '');
@@ -281,7 +281,10 @@ export function opsChezToi({ carte, reponse, raison = null, decisions = {}, perd
       ops: [{ k: PLUS_TARD, type: 'cle', id, apres: at, avant: T[id] }] };
   }
   if (reponse !== 'enleve') return null;
-  const R = RAISONS_SORTIE.find((x) => x[0] === raison);
+  // (11 nov., DJ4 — « PRATIQUE : gagner du temps ») « Non, enlève-la du stock » est UN toucher :
+  // la raison n'est plus demandée (elle ne servait à aucun calcul ; « Annuler » 5 s rattrape un
+  // doigt qui glisse). Une raison donnée doit être connue, sinon rien n'est écrit.
+  const R = raison == null ? ['sortie', 'Sortie'] : RAISONS_SORTIE.find((x) => x[0] === raison);
   if (!R) return null;
   const ops = [{ k: 'vrm_cycle_decisions', type: 'cle', id, apres: { choix: CHOIX.SEPARE, raison: R[0], numero, at }, avant: D[id] }];
   // La déclaration « partie », par IDENTITÉ : jamais une clé portée par une AUTRE annonce.
@@ -292,5 +295,5 @@ export function opsChezToi({ carte, reponse, raison = null, decisions = {}, perd
   // Sa case du Stock (par son N°) : libérée. Le N° lui-même ne bouge pas.
   const kn = numero ? cle(numero) : '';
   if (kn && S[kn]) ops.push({ k: 'vrm_slots', type: 'cle', id: kn, apres: undefined, avant: S[kn] });
-  return { texte: `N°${numero || '?'} sortie du stock · ${R[1].toLowerCase()}`, ops };
+  return { texte: R[0] === 'sortie' ? `N°${numero || '?'} sortie du stock` : `N°${numero || '?'} sortie du stock · ${R[1].toLowerCase()}`, ops };
 }
