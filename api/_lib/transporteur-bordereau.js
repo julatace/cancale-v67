@@ -46,6 +46,9 @@ export function transporteursNommes(texte) {
   for (const [cle, re] of NOMS) if (re.test(s)) out.add(cle);
   // Shop2Shop est le réseau de Chronopost : les deux noms ensemble = Chronopost.
   if (out.has('shop2shop') && out.has('chronopost')) out.delete('shop2shop');
+  // (11 nov., Julien : « InPost est avec Mondial Relay ») InPost est le réseau de Mondial Relay :
+  // l'un, l'autre ou les deux = Mondial Relay (plus jamais « deux noms ⇒ rien » sur ce couple).
+  if (out.has('inpost')) { out.delete('inpost'); out.add('mondialrelay'); }
   return out;
 }
 

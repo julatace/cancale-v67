@@ -304,7 +304,7 @@
 /* Le champ de recherche de macOS : un remplissage neutre (pas une carte blanche
    posée sur le gris), rayon 12, 38 px ; au focus il s'éclaire et prend un halo
    d'accent doux. La touche « / » devient une petite capsule neutre. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-main > .vrm-barre-haut .vrm-barre-recherche {
     min-height: 38px !important; border-radius: 12px !important; border: 0 !important;
     background: var(--n2-b-second) !important; box-shadow: none !important;

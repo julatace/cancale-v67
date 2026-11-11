@@ -82,6 +82,7 @@ export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseu
   const { aFaire, deja, prioritaires } = planDuPassage({ owners, jour, curseurJour, curseurVeille });
   const peutEcrire = curseurJour !== undefined;      // « pas su » : on n'écrit rien
   const faits = [...deja];
+  const enEchec = [];
   const bilans = [];
   let echecs = 0, suivant = 0, budgetAtteint = false, depuisSauve = 0, derniereOk = null;
   const reportes = [];
@@ -108,22 +109,28 @@ export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseu
     while (suivant < aFaire.length) {
       if (maintenant() - debut >= budgetMs) { budgetAtteint = true; return; }
       const o = aFaire[suivant++];
+      // ⚠️ (11 nov., robustesse) SEUL UN VENDEUR RÉUSSI EST « FAIT ». Un vendeur
+      //    en échec entrait dans le curseur du jour et n'était plus retenté : ses
+      //    rappels « à expédier » perdus pour la journée. Il reste à faire (relance
+      //    du même jour, ou en tête le lendemain : le curseur n'est pas « complet »).
+      // (11 nov., limites-client) Et un vendeur trop long est REPORTÉ (pas fait non plus).
       const t0 = maintenant();
-      let r;
+      let r, reussi = false;
       try { r = await borne(o); }
-      catch (e) { echecs++; bilans.push({ owner: o, erreur: String((e && e.message) || e).slice(0, 200), ms: maintenant() - t0 }); faits.push(o); continue; }
+      catch (e) { echecs++; bilans.push({ owner: o, erreur: String((e && e.message) || e).slice(0, 200), ms: maintenant() - t0 }); enEchec.push(o); continue; }
       if (r === REPORTE) { reportes.push(o); bilans.push({ owner: o, reporte: true, raison: 'temps-vendeur', ms: maintenant() - t0 }); continue; }
-      bilans.push({ owner: o, ...r, ms: maintenant() - t0 });
-      faits.push(o);
-      if (++depuisSauve >= SAUVER_TOUS) { depuisSauve = 0; sauver(false); }
+      bilans.push({ owner: o, ...r, ms: maintenant() - t0 }); reussi = true;
+      if (reussi) faits.push(o);
+      // Rangé et ATTENDU (une coupure nette ne perd plus les vendeurs faits depuis le dernier rangement).
+      if (++depuisSauve >= SAUVER_TOUS) { depuisSauve = 0; await sauver(false); }
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(parallele, aFaire.length)) }, ouvrier));
-  const restants = aFaire.length - (faits.length - deja.size);
+  const restants = aFaire.length - (faits.length - deja.size);   // les vendeurs en échec en font partie
   await sauver(restants === 0);
   if (peutEcrire && retirerCurseur) { try { await retirerCurseur(idCurseur(moment, jourAvant(jour, GARDER_JOURS))); } catch (_) { /* un vieux curseur oublié ne gêne rien */ } }
   return {
-    bilans, echecs, traites: faits.length - deja.size, dejaFaits: deja.size, restants, prioritaires, budgetAtteint, reportes: reportes.length,
+    bilans, echecs, enEchec, traites: faits.length - deja.size, dejaFaits: deja.size, restants, prioritaires, budgetAtteint, reportes: reportes.length,
     curseur: !peutEcrire ? 'pas-su' : derniereOk === true ? 'ecrit' : 'non-ecrit',
   };
 }

@@ -59,12 +59,14 @@ export function nomAppareil(nav) {
 // La clé d'un TYPE de plantage : le message sans ce qui change d'un déploiement
 // ou d'une fois à l'autre (noms minifiés de 1 à 3 lettres, fichiers hachés,
 // chiffres). Deux bugs différents gardent deux clés.
+// (11 nov.) Sans « lookbehind » : ce fichier est aussi dans l'app, et Safari < 16.4
+// refuse alors de lire tout le paquet (« L'application n'a pas pu démarrer »).
 export function normaliserMessage(message) {
   return String(message || '')
     .replace(/\/assets\/([A-Za-z0-9_]+)-[A-Za-z0-9_-]{6,}\.(js|css)/g, '/assets/$1.$2')
     .replace(/(['"`])[A-Za-z_$][\w$]{0,2}\1/g, '$1?$1')
-    .replace(/(?<![.\w$])[A-Za-z_$][\w$]{0,2}(?=( is not (defined|a function|a constructor|iterable)| before initialization))/g, '?')
-    .replace(/(?<![.\w$])[A-Za-z_$][\w$]{0,2}(?=\.[\w$]+ is not a function)/g, '?')
+    .replace(/(^|[^.\w$])[A-Za-z_$][\w$]{0,2}(?=( is not (defined|a function|a constructor|iterable)| before initialization))/g, '$1?')
+    .replace(/(^|[^.\w$])[A-Za-z_$][\w$]{0,2}(?=\.[\w$]+ is not a function)/g, '$1?')
     .replace(/\d+/g, '#')
     .replace(/\s+/g, ' ')
     .trim()

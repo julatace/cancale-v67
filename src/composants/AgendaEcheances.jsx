@@ -13,6 +13,8 @@ const CE_QUI_Y_EST = [
   ['urssaf', 'Déclaration URSSAF', 'le dernier jour pour déclarer'],
   ['envoi', 'Colis à déposer', 'l’heure limite lue sur le bordereau'],
   ['retrait', 'Colis à retirer', 'le dernier jour lu pour le retirer'],
+  // (11 nov.) Les rappels qu'il a posés lui-même (« Me le rappeler »), à 9 h.
+  ['rappel', 'Tes rappels', 'le N° et ta note, à 9 h le jour choisi'],
 ];
 
 export default function AgendaEcheances({ enTete = () => ({}), toast = () => {}, confirmer = async () => true, envoyer, ouvrir }) {
@@ -64,7 +66,7 @@ export default function AgendaEcheances({ enTete = () => ({}), toast = () => {},
           </div>
         ))}
       </div>
-      <p className="vrm-agenda-note">Rien d’autre : ni titre, ni acheteur, ni montant.</p>
+      <p className="vrm-agenda-note">Rien d’autre : ni titre d’annonce, ni acheteur, ni montant.</p>
       {etat === undefined ? <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>
         : etat.erreur ? (
           <div className="vrm-sec-liste"><div className="vrm-sec-ligne" data-agenda-erreur=""><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{etat.erreur}</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); appel().then(setEtat); }}>Réessayer</button></div></div>

@@ -7,7 +7,7 @@
    coque (l'écran montré se pose comme avant, enfant de `.vrm-main`). */
 .vrm-ecrans-gardes, .vrm-ecran-vivant { display: contents; }
 /* La règle de styles-bureau.css (`.vrm-main > :not(.vrm-barre-haut)`) pour l'écran gardé montré. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { .vrm-app-shell .vrm-main .vrm-ecran-vivant > .vrm-attente { min-width: 0; } }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { .vrm-app-shell .vrm-main .vrm-ecran-vivant > .vrm-attente { min-width: 0; } }
 
 /* ── La pastille de l'onglet choisi (BottomBar) ──────────────────────────────
    Une capsule neutre (l'encre à 7 % : l'accent reste à l'icône, §7) qui GLISSE

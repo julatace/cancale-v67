@@ -123,9 +123,12 @@ export default {
       content: btoa(String.fromCharCode(...new Uint8Array(a.content))),
     }));
 
-    const rep = await fetch('https://usevrm.com/api/email-inbound?key=' + env.EMAIL_INBOUND_SECRET, {
+    // (11 nov., sécurité) La clé part dans un EN-TÊTE, jamais dans l'adresse :
+    // une adresse est écrite dans les journaux (Vercel, proxys). La route
+    // accepte encore `?key=` pour un Worker d'avant, le temps de le recoller.
+    const rep = await fetch('https://usevrm.com/api/email-inbound', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-vrm-email-key': env.EMAIL_INBOUND_SECRET },
       body: JSON.stringify({
         // L'identité de l'email : deux messages d'une même conversation Vinted
         // ont souvent le même corps — sans elle, le second ne sonnait pas.

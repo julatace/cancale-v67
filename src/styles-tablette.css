@@ -1,0 +1,71 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LA TABLETTE (iPad) — 11 nov. Récit : docs/passation/2026-11-11-ipad.md.
+   Une tablette au doigt prend la coque ORDINATEUR (src/coque.js : rail à
+   gauche, île, liste et fiche côte à côte) ; ces règles n'existent que sous
+   `.vrm-app-shell[data-tablette]` (posé par App quand la coque ordinateur est
+   au doigt) : à la souris et sur téléphone, rien ne change.
+     · chaque commande fait au moins 44 px (cibles au doigt, §7) ;
+     · rien n'attend un survol pour se montrer ;
+     · ≤ 1199 px (portrait, et les iPad 11" couchés) : le rail d'icônes porte
+       aussi son LIBELLÉ (au doigt, une icône seule ne se devine pas : pas de
+       bulle au survol).
+   Même couche que la colonne (`@layer vrm-premium`, styles-nav-v2.css) : ses
+   `!important` ne perdent pas contre ceux des couches plus anciennes. Le
+   sélecteur répète `[data-tablette]` pour passer devant les densités du rail
+   (`data-rail-densite`) sans dépendre de l'ordre des fichiers.
+   Banc : scripts/bancs/ipad.cjs · audit : scripts/audit-coque-tablette.cjs.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* ── 1. LE RAIL : 44 px partout, même resserré pour une fenêtre basse ──────── */
+.vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-button { min-height: 44px !important; }
+.vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] button.vrm-nav-compte { min-height: 44px !important; }
+
+/* ── 2. LE RAIL ÉTROIT LIBELLÉ (≤ 1199 px) ───────────────────────────────── */
+@media (max-width: 1199px) {
+  .vrm-app-shell[data-tablette] { --n2-rail: 88px; }
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] { width: var(--n2-rail) !important; padding: 12px 5px 6px !important; }
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-button {
+    flex-direction: column !important; justify-content: center !important; gap: 3px !important;
+    min-height: 52px !important; padding: 5px 2px !important;
+  }
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-lib {
+    display: block !important; flex: 0 0 auto !important; max-width: 100%;
+    font: 500 10.5px/12px var(--vrm-police) !important; letter-spacing: -.01em !important; text-align: center !important;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-button[aria-current="page"] .vrm-rail-lib { font-weight: 600 !important; }
+  /* Les compteurs restent sur l'icône (pas sur le libellé). */
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-n { top: 2px; right: 12px; }
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-point { top: 6px; right: 18px; }
+  /* Une fenêtre basse (iPad mini couché, 744 px) : le rail se resserre, jamais sous 44 px. */
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2][data-rail-densite] .vrm-rail-button { min-height: 46px !important; padding-block: 3px !important; gap: 2px !important; }
+  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="3"], [data-rail-densite="4"]) .vrm-rail-button { min-height: 44px !important; padding-block: 2px !important; }
+}
+
+/* ── 3. L'ÎLE ET LA BARRE DU HAUT : 44 px ───────────────────────────────── */
+.vrm-app-shell[data-tablette] > header.vrm-app-header :is(button, a[href], [role="button"]) { min-height: 44px !important; min-width: 44px !important; }
+.vrm-app-shell[data-tablette] .vrm-barre-haut .vrm-filtre-site > button { min-width: 44px !important; flex-shrink: 0 !important; }
+/* Les filtres de site gardent leur largeur ; c'est la recherche qui se resserre (en portrait, la
+   rangée débordait vers la gauche, PAR-DESSUS le champ de recherche). */
+.vrm-app-shell[data-tablette] .vrm-barre-haut > .vrm-barre-haut-droite { flex: 0 0 auto !important; }
+.vrm-app-shell[data-tablette] .vrm-barre-haut > .vrm-recherche,
+.vrm-app-shell[data-tablette] .vrm-barre-haut .vrm-barre-recherche { min-width: 96px !important; }
+
+/* ── 4. 744–767 px (iPad mini en portrait) : les règles TÉLÉPHONE de la coque
+   (`max-width: 767px` : `.vrm-main` à 100 % de l'écran, zoom à 80 %) ne
+   s'appliquent pas à la coque ordinateur — le contenu, lui, garde sa mise en
+   page d'une colonne (≈ 630 px utiles, la place d'un grand téléphone). ───── */
+@media (max-width: 767px) {
+  .vrm-app-shell[data-tablette] > .vrm-main { width: auto !important; max-width: none !important; zoom: 1 !important; }
+}
+
+/* ── 5. DANS LES ÉCRANS : ce qui restait sous 44 px au doigt ───────────────── */
+.vrm-app-shell[data-tablette] .vrm-main .vrm-pop-chip { min-height: 44px !important; }
+@media (max-width: 767px) {
+  /* Ma journée : la tête « bord à bord » du téléphone (largeur de l'écran) devient la
+     carte arrondie de l'ordinateur, sinon elle passe sous le rail et déborde à droite. */
+  .vrm-app-shell[data-tablette] .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { width: auto !important; margin: 0 0 20px !important; border-radius: 24px !important; padding: 26px 28px 24px !important; }
+}
+
+} /* fin @layer vrm-premium */
