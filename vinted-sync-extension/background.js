@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.344.0';
+const CODE_VERSION = '5.365.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3769,6 +3769,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // 5.365 : le MODÈLE d'une page « Mes ventes / Mes achats » (l'historique), pour le compte de l'onglet ET de la page.
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcImportModele') {
+      (async () => {
+        let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+        if (!/(^|\.)vestiairecollective\.com$/i.test(hote) || (sender && sender.frameId > 0)) return { ok: false };
+        const compte = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+        if (!compte) return { ok: false, code: 'compte-pas-su' };
+        let u; try { u = new URL(String(msg.url || '')); } catch (_) { return { ok: false }; }
+        if (!/(^|\.)vestiairecollective\.com$/i.test(u.hostname)) return { ok: false };
+        return { ok: await noterModeleSite('vestiaire', compte, msg.quoi === 'achats' ? 'achats' : 'ventes', u.href) };
+      })().then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     // 5.239 : tes ACHATS Vestiaire (vc-inject.js, réponses que la page charge déjà).
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAchats') {
       (async () => {
@@ -4007,6 +4020,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // encore. C'est une lecture de SES ventes (§3), rangée dans lbc_recon.
           // On garde une place par famille (pas par id) : la 100e vente n'écrase
           // pas la carte, elle la rafraîchit. Jamais dans une fixture (§6).
+          // 5.365 : le MODÈLE d'une liste « Mes transactions » (l'historique), pour le compte privé de CET onglet.
+          if (msg.action === 'lbcImportModele') {
+            const tabUrl = (sender && sender.tab && sender.tab.url) || '';
+            if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl)) { sendResponse({ ok: false }); return; }
+            let carte = null; try { carte = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[sender.tab.id]; } catch (_) { carte = null; }
+            const moi = String(msg.moi || '');
+            if (!carte || carte.source !== 'prive' || carte.ambigue || carte.compte !== 'lbc-account:' + moi) { sendResponse({ ok: false, code: 'compte-pas-su' }); return; }
+            let u; try { u = new URL(String(msg.url || '')); } catch (_) { sendResponse({ ok: false }); return; }
+            if (u.origin !== 'https://api.leboncoin.fr') { sendResponse({ ok: false }); return; }
+            sendResponse({ ok: await noterModeleSite('leboncoin', moi, 'transactions', u.href) }); return;
+          }
           if (msg.action === 'lbcVente' && msg.body) {
             const ownerReception=(await loadSession())?.user_id;
             if(!ownerReception||await lbcSansSessionVrm()){_lbcRejeuAttendu=true;sendResponse({ok:false,etat:'ecriture-refusee',sansSession:true});return;}
@@ -8945,7 +8969,7 @@ function surAlarme(a) {
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
   else if (a.name === 'vrm-versement') tickVersements();
   // 5.344 : l'historique de départ, onglet Vinted ouvert (voir `tickImport`).
-  else if (a.name === 'vrm-import') tickImport();
+  else if (a.name === 'vrm-import') { tickImport(); tickImportSites(); }   // 5.365 : et Leboncoin / Vestiaire
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
   // une longue période calme attendrait la prochaine capture pour être écrit.
@@ -14273,6 +14297,11 @@ async function executerCommande(msg) {
     const r = await demanderImportTout(uid);
     return r.ok ? { accepte: true, etape: 'file', etat: r.etat } : { accepte: false, code: r.code || 'refus', raison: r.raison };
   }
+  // 5.365 : « Tout récupérer » Leboncoin / Vestiaire — le compte ouvert dans un onglet de ce site.
+  if (msg && msg.cmd === 'importSiteTout') {
+    const r = await demanderImportSiteTout(String(msg.site || ''), String(msg.compte || ''));
+    return r.ok ? { accepte: true, etape: 'file', etat: r.etat } : { accepte: false, code: r.code || 'refus', raison: r.raison };
+  }
   if (msg && msg.cmd === 'republierVinted') { const r = await republierVinted(msg); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted(msg); await journalCommande(msg, r); return r; }
@@ -15887,6 +15916,346 @@ async function demanderImportTout(uid) {
   await publierImport(String(uid), st);
   if (!p) importerHistorique(String(uid)).catch(() => {});
   return { ok: true, etat: resumeImport(st) };
+}
+
+// ═══ L'HISTORIQUE LEBONCOIN ET VESTIAIRE (5.365, 11 novembre) ════════════════
+// Julien : « récupérer TOUT l'historique de ventes et d'achats sur Leboncoin,
+// eBay et Vestiaire, comme pour Vinted, pour avoir stats et compta complètes dès
+// le premier jour ». (eBay : côté serveur, `api/_lib/ebay-historique.js`.)
+// · LE MODÈLE : l'adresse EXACTE d'une page « Mes transactions » (Leboncoin) ou
+//   « Mes ventes / Mes achats » (Vestiaire) que le SITE a lui-même demandée, avec
+//   un paramètre de pagination que le site a mis (`page`, ou `offset`+`limit`) —
+//   noté par la page (`lbcimportmodele`, `vcimportmodele`), rangé ici PAR COMPTE.
+//   Jamais une adresse devinée, jamais un paramètre ajouté : sans modèle, rien ne
+//   part et la carte dit le geste (« va à la page 2, une fois »).
+// · COMPTE DE L'ONGLET SEULEMENT : Leboncoin = l'identité privée lue par la page
+//   (`vrmLbcTransport`, source « prive ») ; Vestiaire = le compte que l'onglet ET
+//   la page disent (`compteVcCapture`). La page refuse un ordre pour un autre compte.
+// · BUDGET DE LECTURE (20/h, `compterLecture` sous la clé `{site}:{compte}`) :
+//   l'import en prend au plus `IMPSITE_MAX_HEURE` (12) ⇒ 8 restent TOUJOURS aux
+//   lectures de l'argent et des colis (les détails des ventes en cours que la page
+//   relit, `lireDetails`) — jamais leur place. Une requête à la fois (un passage
+//   à la fois), pause aléatoire de 3 à 8 s, des GET seulement ; un 401/403/429
+//   ⇒ pause de 30 min, la série s'arrête.
+// · REPRISE là où on s'est arrêté (`vrmImportSites`, chrome.storage.local, §4.9).
+// · FUSION par identité : Leboncoin par n° de transaction (`rangerLbcVentes`),
+//   Vestiaire par identifiant de vente / d'achat (`rangerVcVentes`,
+//   `rangerVcAchats`) — jamais par titre. Une page que la base n'a pas prise
+//   n'avance PAS ; une réponse d'une forme inconnue n'écrit rien et arrête.
+// · Leboncoin : la liste ne dit ni vendeur/acheteur ni le prix final : chaque
+//   transaction lue est ensuite relue en DÉTAIL (`v2/pages/transactions/{id}`, la
+//   même adresse que `lireDetails`), dans le même budget, sauf celles que la base
+//   a déjà en détail (`isSeller` posé).
+// · Une liste déjà lue jusqu'au bout (état noté ici) n'est plus relue (« fini »,
+//   aucune lecture) ; « Tout récupérer » repart de la première page.
+// · PROGRESSION dans SA ligne `import_{site}_{compte}` (jamais `main`), ≈ 500 o.
+const IMPSITE_STORE = 'vrmImportSites';
+const IMPSITE_MODELES = 'vrmImportModeles';
+const IMPSITE_LUS = 'vrmImportSitesLus';
+const IMPSITE_MAX_HEURE = 12;
+const IMPSITE_PAR_PASSAGE = 3;
+const IMPSITE_PAUSE_MS = [3000, 8000];
+const IMPSITE_PAUSE_REFUS_MS = 30 * 60000;
+const IMPSITE_PAGES_MAX = 300;
+const IMPSITE_DETAILS_MAX = 3000;
+const IMPSITE_TYPES = { leboncoin: ['transactions', 'details'], vestiaire: ['ventes', 'achats'] };
+const cleImpSite = (site, compte) => `${site}:${compte}`;
+const compteImpOk = (c) => /^[\w-]{1,64}$/.test(String(c || ''));
+// La pagination qu'un modèle porte, ou null (« pas su » : rien n'est deviné).
+function paginationModele(url) {
+  let u; try { u = new URL(String(url || '')); } catch (_) { return null; }
+  const p = u.searchParams, n = (k) => (p.has(k) && /^\d{1,6}$/.test(p.get(k)) ? Number(p.get(k)) : null);
+  if (n('page') !== null) return { mode: 'page', base: n('page') === 0 ? 0 : 1 };
+  const off = n('offset'), lim = ['limit', 'size', 'per_page', 'perPage', 'pageSize'].map((k) => [k, n(k)]).find(([, v]) => v !== null && v > 0);
+  if (off !== null && lim) return { mode: 'offset', cleLimite: lim[0], limite: lim[1] };
+  return null;
+}
+// L'adresse de la page `i` (0 = la première) du modèle : seul le paramètre de
+// pagination que le site a mis change ; tout le reste est recopié tel quel.
+function urlPageModele(url, i) {
+  const pg = paginationModele(url);
+  if (!pg || !Number.isInteger(i) || i < 0) return null;
+  const u = new URL(url);
+  if (pg.mode === 'page') u.searchParams.set('page', String(pg.base + i));
+  else u.searchParams.set('offset', String(i * pg.limite));
+  return u.href;
+}
+// La clé d'une liste : son adresse sans pagination (deux onglets d'une même page = deux listes).
+function cleListeModele(url) {
+  try { const u = new URL(url); for (const k of ['page', 'offset', 'limit', 'size', 'per_page', 'perPage', 'pageSize']) u.searchParams.delete(k); u.searchParams.sort(); return u.origin + u.pathname + '?' + u.searchParams.toString(); } catch (_) { return ''; }
+}
+async function lireStoreImp(cle, nom) {
+  try { return ((await chrome.storage.local.get(nom))[nom] || {})[cle] || null; } catch (_) { return undefined; }
+}
+async function poserStoreImp(cle, nom, val) {
+  try { const cur = (await chrome.storage.local.get(nom))[nom] || {}; cur[cle] = val; await chrome.storage.local.set({ [nom]: cur }); return true; } catch (_) { return false; }
+}
+// Un modèle vu par la page : rangé pour CE compte (au plus 4 listes par type).
+async function noterModeleSite(site, compte, quoi, url) {
+  if (!IMPSITE_TYPES[site] || !compteImpOk(compte) || !paginationModele(url)) return false;
+  const cle = cleImpSite(site, compte);
+  const cur = await lireStoreImp(cle, IMPSITE_MODELES);
+  if (cur === undefined) return false;
+  const m = Object.assign({}, cur || {});
+  const l = Object.assign({}, m[quoi] || {});
+  const k = cleListeModele(url);
+  if (!k) return false;
+  if (l[k] && l[k].url === url) return true;
+  if (!l[k] && Object.keys(l).length >= 4) return false;
+  l[k] = { url, at: Date.now() };
+  m[quoi] = l;
+  const ok = await poserStoreImp(cle, IMPSITE_MODELES, m);
+  if (ok) planifierImportSites();
+  return ok;
+}
+async function impLusHeure(cle) {
+  try { const cur = (await chrome.storage.local.get(IMPSITE_LUS))[IMPSITE_LUS] || {}; return (cur[cle] || []).filter((x) => x > Date.now() - 3600000); } catch (_) { return null; }
+}
+async function noterImpLu(cle) {
+  try { const cur = (await chrome.storage.local.get(IMPSITE_LUS))[IMPSITE_LUS] || {}; const t = Date.now(); const l = (cur[cle] || []).filter((x) => x > t - 3600000); l.push(t); cur[cle] = l; await chrome.storage.local.set({ [IMPSITE_LUS]: cur }); } catch (_) {}
+}
+// Une liste neuve (l'index de la prochaine page, ce qui a été lu).
+const listeImpNeuve = (url) => ({ url, i: 0, lus: 0, total: null, pages: 0, fini: false, dernier: '' });
+// Les listes connues d'un type, l'état existant gardé (une liste déjà finie reste finie).
+function fusionListesImp(st, quoi, modeles) {
+  const t = Object.assign({ listes: {}, fini: false }, st[quoi] || {});
+  const listes = Object.assign({}, t.listes || {});
+  for (const [k, m] of Object.entries(modeles || {})) if (!listes[k]) listes[k] = listeImpNeuve(m.url); else if (m.url && !listes[k].fini) listes[k] = Object.assign({}, listes[k], { url: m.url });
+  t.listes = listes;
+  return t;
+}
+const typeImpFini = (t) => !!(t && t.listes && Object.keys(t.listes).length && Object.values(t.listes).every((l) => l.fini));
+// L'état SIMPLE publié (par type : lus, total, pages, fini ; et ce qu'il attend).
+function resumeImpSite(site, st, maintenant = Date.now()) {
+  if (!st) return null;
+  const types = {};
+  let attend = null;
+  for (const nom of IMPSITE_TYPES[site]) {
+    const t = st[nom] || {};
+    if (site === 'leboncoin' && nom === 'details') {
+      const file = Array.isArray(t.file) ? t.file.length : 0, faits = Math.max(0, Number(t.faits) || 0);
+      const listeFinie = typeImpFini(st.transactions);
+      types.details = { lus: faits, total: listeFinie ? faits + file : null, pages: faits, fini: listeFinie && !file };
+      continue;
+    }
+    const ls = Object.values(t.listes || {});
+    if (!ls.length) { types[nom] = { lus: 0, total: null, pages: 0, fini: !!t.deja, sansModele: !t.deja }; if (!t.deja && !attend) attend = 'modele'; continue; }
+    const tot = ls.every((l) => Number.isFinite(Number(l.total)) && l.total !== null) ? ls.reduce((s, l) => s + Number(l.total), 0) : null;
+    const lus = ls.reduce((s, l) => s + (Number(l.lus) || 0), 0);
+    types[nom] = { lus: tot !== null ? Math.min(lus, tot) : lus, total: tot, pages: ls.reduce((s, l) => s + (Number(l.pages) || 0), 0), fini: ls.every((l) => l.fini) };
+  }
+  const fini = Object.values(types).every((x) => x.fini);
+  const pause = st.pause && Number(st.pause.jusqua) > maintenant ? st.pause : null;
+  const etat = fini ? 'fini' : pause ? 'pause' : (Object.values(types).some((x) => x.lus > 0 || x.pages > 0) ? 'encours' : 'attente');
+  // Le reste à lire, au mieux connu : pages de liste + détails ⇒ minutes à 12 lectures/h.
+  let reste = 0;
+  for (const nom of IMPSITE_TYPES[site]) {
+    const x = types[nom]; if (x.fini) continue;
+    if (site === 'leboncoin' && nom === 'details') reste += Array.isArray((st.details || {}).file) ? st.details.file.length : 0;
+    else for (const l of Object.values(((st[nom] || {}).listes) || {})) { if (l.fini) continue; const pg = paginationModele(l.url); const parPage = pg && pg.mode === 'offset' ? pg.limite : Math.max(1, Math.round((Number(l.lus) || 0) / Math.max(1, Number(l.pages) || 1)) || 20); reste += l.total !== null && Number(l.total) > 0 ? Math.max(1, Math.ceil((Number(l.total) - (Number(l.lus) || 0)) / parPage)) : 1; }
+  }
+  return { v: 1, type: 'import', plateforme: site, etat, types, attend: fini ? null : attend, debut: Number(st.debut) || null, fin: fini ? (Number(st.fin) || Date.now()) : null,
+    repriseA: pause ? Number(pause.jusqua) : null, cause: pause ? String(pause.cause || '') : null, resteMin: fini ? 0 : Math.max(5, Math.ceil(reste / IMPSITE_MAX_HEURE * 60)), at: Number(st.at) || null, demande: !!st.demande };
+}
+async function publierImpSite(site, compte, st) {
+  const r = resumeImpSite(site, st);
+  if (!r) return false;
+  try {
+    const data = Object.assign({}, r, { compte: String(compte), code: CODE_VERSION, capturedAt: new Date().toISOString() });
+    const ok = await supabaseUpsert('app_data', [{ id: `import_${site}_${compte}`, data }], 'id');
+    if (ok !== false) notifierApp({ type: 'maj', quoi: 'import', site, compte: String(compte) });
+    return ok !== false;
+  } catch (_) { return false; }
+}
+// L'état de ce compte, créé à la 1re fois (ou sur `force`) ; les modèles neufs s'y ajoutent.
+async function departImpSite(site, compte, opts = {}) {
+  const cle = cleImpSite(site, compte);
+  const [st0, modeles] = [await lireStoreImp(cle, IMPSITE_STORE), await lireStoreImp(cle, IMPSITE_MODELES)];
+  if (st0 === undefined || modeles === undefined) return null;
+  const t = Date.now();
+  let st = st0 && !opts.force ? Object.assign({}, st0) : { v: 1, debut: t, at: t, demande: !!opts.force };
+  for (const nom of IMPSITE_TYPES[site]) if (!(site === 'leboncoin' && nom === 'details')) st[nom] = fusionListesImp(st, nom, (modeles || {})[nom]);
+  if (site === 'leboncoin') st.details = Object.assign({ file: [], faits: 0 }, st.details || {});
+  // ⚠️ Vestiaire : `vc_ventes.lectures.ventes.complet` ne dit pas DE QUEL compte la
+  //    liste entière a été lue (la ligne est commune à tous les comptes) : « pas su »
+  //    ne vaut pas « complet » ⇒ on lit (la fusion par identifiant ne perd rien).
+  if (!(await poserStoreImp(cle, IMPSITE_STORE, st))) return null;
+  return st;
+}
+function pauseImpSite() {
+  const p = IMPSITE_PAUSE_MS, ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['impsite', ms]); } catch (_) {}
+  return new Promise((ok) => setTimeout(ok, ms));
+}
+// L'onglet de CE compte sur CE site (le cadre principal), ou null.
+async function ongletImpSite(site, compte) {
+  if (site === 'leboncoin') { const o = await ongletLbcDuCompte(compte); return o && o.ok ? o.tabId : null; }
+  let m = {};
+  try { m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {}; } catch (_) { return null; }
+  for (const [tid, e] of Object.entries(m)) {
+    if (!e || String(e.compte || '') !== String(compte)) continue;
+    let tab = null; try { tab = await chrome.tabs.get(Number(tid)); } catch (_) { tab = null; }
+    if (tab && /^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(tab.url || '')) return Number(tid);
+  }
+  return null;
+}
+// Les détails Leboncoin que la base n'a pas encore (`isSeller` absent) parmi `ids`.
+// `null` = base muette (on les garde tous à lire : « pas su »).
+async function detailsLbcManquants(ids) {
+  const l = ids.filter((x) => /^\d{1,15}$/.test(x)).slice(0, 40);
+  if (!l.length) return [];
+  const sel = l.map((id, i) => `s${i}:data->ventes->"${id}"->>isSeller`).join(',');
+  const rows = await sbGetLbc(`app_data?id=eq.lbc_ventes&select=${sel}`);
+  if (rows === null || !Array.isArray(rows)) return null;
+  const r = rows[0] || {};
+  return l.filter((id, i) => !(r['s' + i] === 'true' || r['s' + i] === 'false'));
+}
+// UNE lecture d'import : l'ordre à la page, la réponse rangée. Rend
+// { ok, n, ids, total, fin, refus } — `ok:false` ⇒ rien n'avance.
+async function lireUneImpSite(site, compte, tabId, quoi, url) {
+  let rep = null;
+  const action = site === 'leboncoin' ? 'lbcImportPage' : 'vcImportPage';
+  try { rep = await avecDelai(chrome.tabs.sendMessage(tabId, { from: 'vrm-fond', action, url, quoi, compte }, { frameId: 0 }), 30000, null); } catch (_) { rep = null; }
+  if (!rep || rep.ok !== true) return { ok: false, cause: 'muet' };
+  if ([401, 403, 429].includes(Number(rep.statut))) return { ok: false, refus: true, cause: site };
+  if (rep.erreur) return { ok: false, cause: rep.erreur };
+  if (!(rep.statut >= 200 && rep.statut < 300)) return { ok: false, cause: 'statut' };
+  const owner = (await loadSession())?.user_id;
+  if (!owner) return { ok: false, cause: 'session' };
+  if (site === 'leboncoin') {
+    if (String(rep.moi || '') !== String(compte)) return { ok: false, cause: 'autre-compte' };
+    const c = await sessionDeListe(rep.session);
+    if (!c || c.id !== 'lbc-account:' + compte) return { ok: false, cause: 'compte-pas-su' };
+    let j = null; try { j = JSON.parse(rep.corps); } catch (_) {}
+    const ventes = extraireVentesLbc(url, rep.corps);
+    if (Array.isArray(j) && !j.length) return { ok: true, n: 0, ids: [] };
+    if (!ventes.length) return { ok: false, cause: 'forme' };
+    for (const v of ventes) { v.account = c.id; v.accountName = c.name || ''; }
+    const ok = await rangerLbcVentes(ventes, owner);
+    if (ok !== true) return { ok: false, cause: 'base' };
+    return { ok: true, n: ventes.length, ids: ventes.map((v) => v.txId), etats: ventes.map((v) => v.stepStatus || '') };
+  }
+  const moi = await compteVcCapture(tabId, rep.moi);
+  if (!moi || moi !== String(compte)) return { ok: false, cause: 'autre-compte' };
+  const p = rep.paquet;
+  if (!p || Array.isArray(p.inconnu) || !rep.quoi) return { ok: false, cause: 'forme' };
+  const lot = quoi === 'ventes' ? p.ventes : p.achats;
+  if (!Array.isArray(lot)) return { ok: false, cause: 'forme' };
+  if (!lot.length) return { ok: true, n: 0, ids: [], total: p.total };
+  const ok = quoi === 'ventes' ? await rangerVcVentes(Object.assign({}, p, { source: 'ventes', compte: moi })) : await rangerVcAchats(Object.assign({}, p, { compte: moi }));
+  if (ok !== true) return { ok: false, cause: 'base' };
+  return { ok: true, n: lot.length, ids: lot.map((x) => x.id), total: typeof p.total === 'number' ? p.total : null };
+}
+let _impSiteEnCours = null;
+function importerSite(site, compte, opts = {}) {
+  if (_impSiteEnCours) { try { noterDiag('impsite_deja_en_cours'); } catch (_) {} return _impSiteEnCours.then(() => 0, () => 0); }
+  _impSiteEnCours = importerSiteUn(site, compte, opts).catch(() => 0).finally(() => { _impSiteEnCours = null; });
+  return _impSiteEnCours;
+}
+async function importerSiteUn(site, compte, opts) {
+  if (!IMPSITE_TYPES[site] || !compteImpOk(compte)) return 0;
+  const tabId = await ongletImpSite(site, compte);
+  if (tabId == null) return 0;
+  const st = await departImpSite(site, compte, { force: !!opts.force });
+  if (!st) return 0;
+  const cle = cleImpSite(site, compte);
+  if (st.pause && Number(st.pause.jusqua) > Date.now()) { if (!st.publie) { st.publie = await publierImpSite(site, compte, st); await poserStoreImp(cle, IMPSITE_STORE, st); } return 0; }
+  delete st.pause;
+  let n = 0;
+  while (n < IMPSITE_PAR_PASSAGE) {
+    // Le prochain travail : une page d'une liste pas finie, sinon un détail (Leboncoin).
+    let quoi = null, k = null, l = null, url = null;
+    for (const nom of IMPSITE_TYPES[site]) {
+      if (site === 'leboncoin' && nom === 'details') continue;
+      for (const [kk, ll] of Object.entries(((st[nom] || {}).listes) || {})) if (!ll.fini) { quoi = nom; k = kk; l = ll; break; }
+      if (l) break;
+    }
+    if (l) {
+      if (l.i >= IMPSITE_PAGES_MAX) { l.fini = true; noterDiag(`impsite_garde_fou_${site}`); continue; }
+      url = urlPageModele(l.url, l.i);
+      if (!url) { l.fini = true; continue; }
+    } else if (site === 'leboncoin' && st.details.file.length) {
+      quoi = 'details'; url = `https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/${st.details.file[0]}`;
+    } else break;
+    const lus = await impLusHeure(cle);
+    if (lus === null) { noterDiag('impsite_compteur_muet'); break; }
+    if (lus.length >= IMPSITE_MAX_HEURE) { st.pause = { jusqua: Math.min(...lus) + 3600000, cause: 'rythme' }; break; }
+    if (n > 0) await pauseImpSite();
+    // DANS le budget de lecture de CE compte (20/h) : l'import s'arrête à 12, le reste est gardé.
+    const c = await compterLecture(cle, IMPSITE_MAX_HEURE);
+    if (!c.ok) { st.pause = c.code === 'stockage' ? null : { jusqua: Date.now() + 15 * 60000, cause: 'budget' }; if (!st.pause) delete st.pause; break; }
+    await noterImpLu(cle);
+    n++;
+    const r = await lireUneImpSite(site, compte, tabId, quoi === 'details' ? 'details' : quoi, url);
+    if (!r.ok) {
+      noterDiag(`impsite_${site}_${r.cause || 'refus'}`);
+      if (r.refus) st.pause = { jusqua: Date.now() + IMPSITE_PAUSE_REFUS_MS, cause: site };
+      // Un détail introuvable (forme inconnue) ne bloque pas toute la file : il passe en fin, une fois.
+      if (quoi === 'details' && r.cause === 'forme') { const id = st.details.file.shift(); st.details.rates = (st.details.rates || []).concat(id).slice(-200); }
+      break;
+    }
+    if (quoi === 'details') { st.details.file.shift(); st.details.faits = (Number(st.details.faits) || 0) + 1; continue; }
+    const empreinte = (r.ids || []).join(',');
+    l.pages += 1; l.i += 1;
+    if (Number.isFinite(Number(r.total)) && r.total !== null && Number(r.total) >= 0) l.total = Number(r.total);
+    // La DERNIÈRE page : vide, la même que la précédente (le site ignore la pagination), ou le total atteint.
+    if (!r.n || (empreinte && empreinte === l.dernier)) l.fini = true;
+    else { l.lus += r.n; if (l.total !== null && l.lus >= l.total) { l.lus = l.total; l.fini = true; } }
+    l.dernier = empreinte;
+    if (site === 'leboncoin' && r.n) {
+      const neufs = (r.ids || []).filter((id, i) => !/cancel/i.test((r.etats || [])[i] || ''));
+      const manq = await detailsLbcManquants(neufs);
+      const aLire = manq === null ? neufs : manq;
+      const deja = new Set(st.details.file);
+      for (const id of aLire) if (!deja.has(id) && st.details.file.length < IMPSITE_DETAILS_MAX) { st.details.file.push(id); deja.add(id); }
+    }
+    st[quoi].listes[k] = l;
+  }
+  st.at = Date.now();
+  const r = resumeImpSite(site, st);
+  if (r && r.etat === 'fini' && !st.fin) { st.fin = st.at; logActivity(`📥 Historique ${site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'} récupéré`); }
+  const cur = await lireStoreImp(cle, IMPSITE_STORE);
+  if (cur && Number(cur.debut) !== Number(st.debut)) { noterDiag('impsite_relance_pendant'); return n; }
+  st.publie = await publierImpSite(site, compte, st);
+  await poserStoreImp(cle, IMPSITE_STORE, st);
+  return n;
+}
+let _impSiteMinuteur = null;
+function planifierImportSites() {
+  try { if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000); } catch (_) {}
+}
+// Le passage de fond (alarme `vrm-import`) : chaque compte ouvert dans un onglet
+// Leboncoin / Vestiaire qui a un modèle et quelque chose à lire — un à la fois.
+async function tickImportSites() {
+  try {
+    if (await sansSessionPourEcrire()) return 0;
+    if (await reculBase()) return 0;
+    let modeles = {};
+    try { modeles = (await chrome.storage.local.get(IMPSITE_MODELES))[IMPSITE_MODELES] || {}; } catch (_) { return 0; }
+    for (const cle of Object.keys(modeles)) {
+      const [site, compte] = cle.split(':');
+      if (!IMPSITE_TYPES[site] || !compteImpOk(compte)) continue;
+      const st = await lireStoreImp(cle, IMPSITE_STORE);
+      if (st === undefined) continue;
+      const r = st ? resumeImpSite(site, st) : null;
+      if (r && r.etat === 'fini' && st.publie) continue;
+      if (r && r.etat === 'pause') continue;
+      if ((await ongletImpSite(site, compte)) == null) continue;
+      const n = await importerSite(site, compte);
+      if (n) return n;
+    }
+    return 0;
+  } catch (_) { return 0; }
+}
+// « Tout récupérer » (l'app) : le compte ouvert dans un onglet de CE site seulement.
+async function demanderImportSiteTout(site, compte) {
+  if (!IMPSITE_TYPES[site] || !compteImpOk(compte)) return { ok: false, code: 'invalide', raison: 'Compte inconnu.' };
+  if ((await ongletImpSite(site, compte)) == null) return { ok: false, code: 'onglet-absent', raison: site === 'leboncoin' ? 'Ouvre leboncoin.fr sur ce compte dans ce Chrome.' : 'Ouvre Vestiaire sur ce compte dans ce Chrome.' };
+  const st = await departImpSite(site, String(compte), { force: true });
+  if (!st) return { ok: false, code: 'stockage', raison: 'L’extension ne peut pas noter la reprise. Recharge-la.' };
+  await publierImpSite(site, String(compte), st);
+  importerSite(site, String(compte)).catch(() => {});
+  return { ok: true, etat: resumeImpSite(site, st) };
 }
 
 // ═══ LA PREUVE DE VENTE, RANGÉE (5.169, 11 octobre) ════════════════════════
@@ -20203,6 +20572,7 @@ function extraireVentesLbc(url, body) {
 //    qu'elle venait de poser. Prouvé (audit-lbc-restes.cjs) : la liste et un
 //    détail envoyés ensemble ⇒ plus aucune `dateVente`. Les rangements passent
 //    maintenant à la file : chacun relit ce que le précédent a écrit.
+const LBC_VENTES_MAX = 3000;
 let _lbcVentesChaine = Promise.resolve();
 async function rangerLbcVentes(list,ownerAttendu=null) {
   const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return false;
@@ -20236,7 +20606,8 @@ async function rangerLbcVentesUneFois(list,owner) {
     ventes[k] = m;
   }
   const noms = Object.keys(ventes);
-  if (noms.length > 500) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 500); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
+  // 5.365 : l'historique (« Mon historique ») range TOUTES les transactions — 3 000 au plus (≈ 1,5 Mo) ; au-delà, les moins récemment vues sortent.
+  if (noms.length > LBC_VENTES_MAX) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, LBC_VENTES_MAX); const garde = new Set(g); for (const n of noms) if (!garde.has(n)) delete ventes[n]; }
   const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id',owner);
   await noterFlux('leboncoin', _okFlux === true);
   if(_okFlux===true)notifierApp({type:'maj',quoi:'lbc'});
